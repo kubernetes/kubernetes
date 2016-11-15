@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Run the CockroachDB PetSet example on a minikube instance.
+# Run the CockroachDB StatefulSet example on a minikube instance.
 #
 # For a fresh start, run the following first:
 #   minikube delete
@@ -29,7 +29,7 @@
 set -exuo pipefail
 
 # Clean up anything from a prior run:
-kubectl delete petsets,pods,persistentvolumes,persistentvolumeclaims,services -l app=cockroachdb
+kubectl delete statefulsets,pods,persistentvolumes,persistentvolumeclaims,services -l app=cockroachdb
 
 # Make persistent volumes and (correctly named) claims. We must create the
 # claims here manually even though that sounds counter-intuitive. For details
@@ -69,4 +69,4 @@ spec:
 EOF
 done;
 
-kubectl create -f cockroachdb-petset.yaml
+kubectl create -f cockroachdb-statefulset.yaml

@@ -220,6 +220,8 @@ pkg/util/limitwriter
 pkg/util/logs
 pkg/util/maps
 pkg/util/metrics
+pkg/util/netsh
+pkg/util/ratelimit
 pkg/util/replicaset
 pkg/util/validation/field
 pkg/util/workqueue

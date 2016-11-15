@@ -184,7 +184,7 @@ func newTestVolumeManager(
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
-	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, volumetest.NewFakeVolumeHost(tmpDir, kubeClient, nil, "" /* rootContext */))
+	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, volumetest.NewFakeVolumeHost(tmpDir, kubeClient, nil))
 
 	vm, err := NewVolumeManager(
 		true,
@@ -195,7 +195,8 @@ func newTestVolumeManager(
 		&containertest.FakeRuntime{},
 		&mount.FakeMounter{},
 		"",
-		fakeRecorder)
+		fakeRecorder,
+		false /* experimentalCheckNodeCapabilitiesBeforeMount*/)
 
 	return vm, err
 }

@@ -79,7 +79,8 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 }
 
 // CreateContainer creates a new container in the given PodSandbox
-// Note: docker doesn't use LogPath yet.
+// Docker cannot store the log to an arbitrary location (yet), so we create an
+// symlink at LogPath, linking to the actual path of the log.
 // TODO: check if the default values returned by the runtime API are ok.
 func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
 	if config == nil {
@@ -120,34 +121,15 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 
 	// Fill the HostConfig.
 	hc := &dockercontainer.HostConfig{
-		Binds:          generateMountBindings(config.GetMounts()),
-		ReadonlyRootfs: config.GetReadonlyRootfs(),
-		Privileged:     config.GetPrivileged(),
+		Binds: generateMountBindings(config.GetMounts()),
 	}
 
-	// Apply options derived from the sandbox config.
+	// Apply cgroupsParent derived from the sandbox config.
 	if lc := sandboxConfig.GetLinux(); lc != nil {
 		// Apply Cgroup options.
 		// TODO: Check if this works with per-pod cgroups.
 		// TODO: we need to pass the cgroup in syntax expected by cgroup driver but shim does not use docker info yet...
 		hc.CgroupParent = lc.GetCgroupParent()
-
-		// Apply namespace options.
-		sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
-		hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
-		hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
-		hc.UTSMode = ""
-		hc.PidMode = ""
-
-		nsOpts := lc.GetNamespaceOptions()
-		if nsOpts != nil {
-			if nsOpts.GetHostNetwork() {
-				hc.UTSMode = namespaceModeHost
-			}
-			if nsOpts.GetHostPid() {
-				hc.PidMode = namespaceModeHost
-			}
-		}
 	}
 
 	// Apply Linux-specific options if applicable.
@@ -159,7 +141,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		if rOpts != nil {
 			hc.Resources = dockercontainer.Resources{
 				Memory:     rOpts.GetMemoryLimitInBytes(),
-				MemorySwap: -1, // Always disable memory swap.
+				MemorySwap: -1,
 				CPUShares:  rOpts.GetCpuShares(),
 				CPUQuota:   rOpts.GetCpuQuota(),
 				CPUPeriod:  rOpts.GetCpuPeriod(),
@@ -167,6 +149,9 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 			hc.OomScoreAdj = int(rOpts.GetOomScoreAdj())
 		}
 		// Note: ShmSize is handled in kube_docker_client.go
+
+		// Apply security context.
+		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc)
 	}
 
 	// Set devices for container.
@@ -180,12 +165,12 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	}
 	hc.Resources.Devices = devices
 
-	var err error
-	hc.SecurityOpt, err = getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
+	// Apply appArmor and seccomp options.
+	securityOpts, err := getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.GetName(), err)
 	}
-	// TODO: Add or drop capabilities.
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)
@@ -245,10 +230,10 @@ func (ds *dockerService) StartContainer(containerID string) error {
 	}
 	// Create container log symlink.
 	if err := ds.createContainerLogSymlink(containerID); err != nil {
-		// Do not stop the container if fail to create symlink, because:
-		// 1. This is not a critical failure.
-		// 2. We don't have enough information to properly stop container here.
-		// Kubelet will surface this error to user with event.
+		// Do not stop the container if we failed to create symlink because:
+		//   1. This is not a critical failure.
+		//   2. We don't have enough information to properly stop container here.
+		// Kubelet will surface this error to user via an event.
 		return err
 	}
 	return nil
@@ -264,7 +249,7 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 func (ds *dockerService) RemoveContainer(containerID string) error {
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
-	// we can't prevent that now, so we also cleanup the symlink here.
+	// we can't prevent that now, so we also clean up the symlink here.
 	err := ds.removeContainerLogSymlink(containerID)
 	if err != nil {
 		return err
@@ -295,7 +280,7 @@ func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time,
 	return createdAt, startedAt, finishedAt, nil
 }
 
-// ContainerStatus returns the container status.
+// ContainerStatus inspects the docker container and returns the status.
 func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error) {
 	r, err := ds.client.InspectContainer(containerID)
 	if err != nil {
@@ -308,7 +293,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)
 	}
 
-	// Convert the image id to pullable id.
+	// Convert the image id to a pullable id.
 	ir, err := ds.client.InspectImageByID(r.Image)
 	if err != nil {
 		return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)

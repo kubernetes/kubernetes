@@ -83,7 +83,7 @@ function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
-  kube::release::package_build_image_tarball &
+  kube::release::package_src_tarball &
   kube::release::package_client_tarballs &
   kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
@@ -95,10 +95,20 @@ function kube::release::package_tarballs() {
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 }
 
-# Package the build image we used from the previous stage, for compliance/licensing/audit/yadda.
-function kube::release::package_build_image_tarball() {
+# Package the source code we built, for compliance/licensing/audit/yadda.
+function kube::release::package_src_tarball() {
   kube::log::status "Building tarball: src"
-  "${TAR}" czf "${RELEASE_DIR}/kubernetes-src.tar.gz" -C "${LOCAL_OUTPUT_BUILD_CONTEXT}" .
+  local source_files=(
+    $(cd "${KUBE_ROOT}" && find . -mindepth 1 -maxdepth 1 \
+      -not \( \
+        \( -path ./_\*        -o \
+           -path ./.git\*     -o \
+           -path ./.config\* -o \
+           -path ./.gsutil\*    \
+        \) -prune \
+      \))
+  )
+  "${TAR}" czf "${RELEASE_DIR}/kubernetes-src.tar.gz" -C "${KUBE_ROOT}" "${source_files[@]}"
 }
 
 # Package up all of the cross compiled clients. Over time this should grow into
@@ -307,6 +317,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/cluster-autoscaler/cluster-autoscaler.manifest" "${dst_dir}/"
   cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
   cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
+  cp "${salt_dir}/fluentd-gcp-gci/fluentd-gcp-gci.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
   cp "${salt_dir}/etcd/etcd.manifest" "${dst_dir}"

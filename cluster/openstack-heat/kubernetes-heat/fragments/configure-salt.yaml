@@ -48,9 +48,9 @@ write_files:
       logging_destination: elasticsearch
       elasticsearch_replicas: "1"
       enable_cluster_dns: "true"
-      dns_replicas: "1"
       dns_server: 10.246.0.10
       dns_domain: cluster.local
+      enable_dns_horizontal_autoscaler: "false"
       federations_domain_map: ''
       instance_prefix: kubernetes
       admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,ResourceQuota

@@ -61,8 +61,13 @@
 {% set etcd_servers = "--etcd-servers=http://127.0.0.1:2379" -%}
 {% set etcd_servers_overrides = "--etcd-servers-overrides=/events#http://127.0.0.1:4002" -%}
 
+{% set max_requests_inflight = "" -%}
 {% set target_ram_mb = "" -%}
 {% if pillar['num_nodes'] is defined -%}
+  # If the cluster is large, increase max-requests-inflight limit in apiserver.
+  {% if pillar['num_nodes']|int >= 1000 -%}
+    {% set max_requests_inflight = "--max-requests-inflight=1500" -%}
+  {% endif -%}
   # Set amount of memory available for apiserver based on number of nodes.
   # TODO: Once we start setting proper requests and limits for apiserver
   # we should reuse the same logic here instead of current heuristic.
@@ -158,7 +163,7 @@
   {% set enable_garbage_collector = "--enable-garbage-collector=" + pillar['enable_garbage_collector'] -%}
 {% endif -%}
 
-{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
+{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
 {% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config + image_review_config -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration

@@ -26,8 +26,7 @@ skip=${SKIP:-""}
 # Currently, parallelism only affects when REMOTE=true. For local test,
 # ginkgo default parallelism (cores - 1) is used.
 parallelism=${PARALLELISM:-8}
-report=${REPORT:-"/tmp/"}
-artifacts=${ARTIFACTS:-"/tmp/_artifacts"}
+artifacts=${ARTIFACTS:-"/tmp/_artifacts/`date +%y%m%dT%H%M%S`"}
 remote=${REMOTE:-"false"}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 test_args=${TEST_ARGS:-""}
@@ -39,17 +38,23 @@ if [[ $parallelism > 1 ]]; then
 fi
 
 if [[ $focus != "" ]]; then
-  ginkgoflags="$ginkgoflags -focus=$focus "
+  ginkgoflags="$ginkgoflags -focus='$focus' "
 fi
 
 if [[ $skip != "" ]]; then
-  ginkgoflags="$ginkgoflags -skip=$skip "
+  ginkgoflags="$ginkgoflags -skip='$skip' "
 fi
 
 if [[ $run_until_failure != "" ]]; then
   ginkgoflags="$ginkgoflags -untilItFails=$run_until_failure "
 fi
 
+# Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
+if [ ! -d "${artifacts}" ]; then
+  echo "Creating artifacts directory at ${artifacts}"
+  mkdir -p ${artifacts}
+fi
+echo "Test artifacts will be written to ${artifacts}"
 
 if [ $remote = true ] ; then
   # The following options are only valid in remote run.
@@ -73,18 +78,6 @@ if [ $remote = true ] ; then
   instance_prefix=${INSTANCE_PREFIX:-"test"}
   cleanup=${CLEANUP:-"true"}
   delete_instances=${DELETE_INSTANCES:-"false"}
-
-  # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
-  if [[ $gubernator = true && -d "${artifacts}" ]]; then
-    echo "Removing artifacts directory at ${artifacts}"
-    rm -r ${artifacts}
-  fi
-
-  if [ ! -d "${artifacts}" ]; then
-    echo "Creating artifacts directory at ${artifacts}"
-    mkdir -p ${artifacts}
-  fi
-  echo "Test artifacts will be written to ${artifacts}"
 
   # Get the compute zone
   zone=$(gcloud info --format='value(config.properties.compute.zone)')
@@ -137,7 +130,7 @@ if [ $remote = true ] ; then
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
     --image-project="$image_project" --instance-name-prefix="$instance_prefix" --setup-node="true" \
     --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata" \
-    2>&1 | tee "${artifacts}/build-log.txt"
+    2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 
 else
@@ -155,7 +148,7 @@ else
   # Test using the host the script was run on
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go --ginkgo-flags="$ginkgoflags" \
-    --test-flags="--alsologtostderr --v 4 --report-dir=${report} --node-name $(hostname) \
-    $test_args" --build-dependencies=true
+    --test-flags="--alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
+    $test_args" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 fi

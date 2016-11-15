@@ -42,7 +42,7 @@ type KubeProxyConfiguration struct {
 	// '2h22m').  Must be greater than 0.
 	IPTablesSyncPeriod unversioned.Duration `json:"iptablesSyncPeriodSeconds"`
 	// iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
-	// '2h22m').  Must be greater than 0.
+	// '2h22m').
 	IPTablesMinSyncPeriod unversioned.Duration `json:"iptablesMinSyncPeriodSeconds"`
 	// kubeconfigPath is the path to the kubeconfig file with authorization information (the
 	// master location is set by the master flag).
@@ -74,9 +74,13 @@ type KubeProxyConfiguration struct {
 	// conntrackMin is the minimum value of connect-tracking records to allocate,
 	// regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).
 	ConntrackMin int32 `json:"conntrackMin"`
-	// conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open
-	// (e.g. '250ms', '2s').  Must be greater than 0.
+	// conntrackTCPEstablishedTimeout is how long an idle TCP connection
+	// will be kept open (e.g. '2s').  Must be greater than 0.
 	ConntrackTCPEstablishedTimeout unversioned.Duration `json:"conntrackTCPEstablishedTimeout"`
+	// conntrackTCPCloseWaitTimeout is how long an idle conntrack entry
+	// in CLOSE_WAIT state will remain in the conntrack
+	// table. (e.g. '60s'). Must be greater than 0 to set.
+	ConntrackTCPCloseWaitTimeout unversioned.Duration `json:"conntrackTCPCloseWaitTimeout"`
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
@@ -370,8 +374,6 @@ type KubeletConfiguration struct {
 	// experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
 	// binary that is available via $PATH,
 	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
-	// experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.
-	ExperimentalMounterRootfsPath string `json:"experimentalMounterRootfsPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	RktAPIEndpoint string `json:"rktAPIEndpoint"`
 	// rktStage1Image is the image to use as stage1. Local paths and
@@ -494,10 +496,19 @@ type KubeletConfiguration struct {
 	// Resource isolation might be lacking and pod might influence each other on the same node.
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
-	// How to integrate with runtime. If set to CRI, kubelet will switch to
-	// using the new Container Runtine Interface.
+	// featureGates is a string of comma-separated key=value pairs that describe feature
+	// gates for alpha/experimental features.
+	FeatureGates string `json:"featureGates,omitempty"`
+	// Enable Container Runtime Interface (CRI) integration.
 	// +optional
-	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	EnableCRI bool `json:"enableCRI,omitempty"`
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	// Tells the Kubelet to fail to start if swap is enabled on the node.
+	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
+	// This flag, if set, enables a check prior to mount operations to verify that the required components
+	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
+	// and fails the mount operation fails.
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"ExperimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
 }
 
 type KubeletAuthorizationMode string

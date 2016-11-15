@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
@@ -133,7 +134,7 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *api.Service, no
 		return nil, utilerrors.Flatten(errs)
 	}
 
-	glog.V(2).Infof("ensure(%s): FINISH - %s", service.Name, *pip.Properties.IPAddress)
+	glog.V(2).Infof("ensure(%s): FINISH - %s", serviceName, *pip.Properties.IPAddress)
 	return &api.LoadBalancerStatus{
 		Ingress: []api.LoadBalancerIngress{{IP: *pip.Properties.IPAddress}},
 	}, nil
@@ -339,14 +340,29 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 			return lb, false, err
 		}
 
-		expectedProbes[i] = network.Probe{
-			Name: &lbRuleName,
-			Properties: &network.ProbePropertiesFormat{
-				Protocol:          probeProto,
-				Port:              to.Int32Ptr(port.NodePort),
-				IntervalInSeconds: to.Int32Ptr(5),
-				NumberOfProbes:    to.Int32Ptr(2),
-			},
+		if serviceapi.NeedsHealthCheck(service) {
+			podPresencePath, podPresencePort := serviceapi.GetServiceHealthCheckPathPort(service)
+
+			expectedProbes[i] = network.Probe{
+				Name: &lbRuleName,
+				Properties: &network.ProbePropertiesFormat{
+					RequestPath:       to.StringPtr(podPresencePath),
+					Protocol:          network.ProbeProtocolHTTP,
+					Port:              to.Int32Ptr(podPresencePort),
+					IntervalInSeconds: to.Int32Ptr(5),
+					NumberOfProbes:    to.Int32Ptr(2),
+				},
+			}
+		} else {
+			expectedProbes[i] = network.Probe{
+				Name: &lbRuleName,
+				Properties: &network.ProbePropertiesFormat{
+					Protocol:          probeProto,
+					Port:              to.Int32Ptr(port.NodePort),
+					IntervalInSeconds: to.Int32Ptr(5),
+					NumberOfProbes:    to.Int32Ptr(2),
+				},
+			}
 		}
 
 		expectedRules[i] = network.LoadBalancingRule{
@@ -362,13 +378,14 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 				Probe: &network.SubResource{
 					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
 				},
-				FrontendPort: to.Int32Ptr(port.Port),
-				BackendPort:  to.Int32Ptr(port.NodePort),
+				FrontendPort:     to.Int32Ptr(port.Port),
+				BackendPort:      to.Int32Ptr(port.Port),
+				EnableFloatingIP: to.BoolPtr(true),
 			},
 		}
 	}
 
-	// remove unwated probes
+	// remove unwanted probes
 	dirtyProbes := false
 	var updatedProbes []network.Probe
 	if lb.Properties.Probes != nil {
@@ -457,25 +474,41 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName string, service *api.Service) (network.SecurityGroup, bool, error) {
 	serviceName := getServiceName(service)
 	wantLb := len(service.Spec.Ports) > 0
-	expectedSecurityRules := make([]network.SecurityRule, len(service.Spec.Ports))
+
+	sourceRanges, err := serviceapi.GetLoadBalancerSourceRanges(service)
+	if err != nil {
+		return sg, false, err
+	}
+	var sourceAddressPrefixes []string
+	if sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges) {
+		sourceAddressPrefixes = []string{"Internet"}
+	} else {
+		for _, ip := range sourceRanges {
+			sourceAddressPrefixes = append(sourceAddressPrefixes, ip.String())
+		}
+	}
+	expectedSecurityRules := make([]network.SecurityRule, len(service.Spec.Ports)*len(sourceAddressPrefixes))
+
 	for i, port := range service.Spec.Ports {
 		securityRuleName := getRuleName(service, port)
 		_, securityProto, _, err := getProtocolsFromKubernetesProtocol(port.Protocol)
 		if err != nil {
 			return sg, false, err
 		}
-
-		expectedSecurityRules[i] = network.SecurityRule{
-			Name: to.StringPtr(securityRuleName),
-			Properties: &network.SecurityRulePropertiesFormat{
-				Protocol:                 securityProto,
-				SourcePortRange:          to.StringPtr("*"),
-				DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.NodePort))),
-				SourceAddressPrefix:      to.StringPtr("Internet"),
-				DestinationAddressPrefix: to.StringPtr("*"),
-				Access:    network.Allow,
-				Direction: network.Inbound,
-			},
+		for j := range sourceAddressPrefixes {
+			ix := i*len(sourceAddressPrefixes) + j
+			expectedSecurityRules[ix] = network.SecurityRule{
+				Name: to.StringPtr(securityRuleName),
+				Properties: &network.SecurityRulePropertiesFormat{
+					Protocol:                 securityProto,
+					SourcePortRange:          to.StringPtr("*"),
+					DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.Port))),
+					SourceAddressPrefix:      to.StringPtr(sourceAddressPrefixes[j]),
+					DestinationAddressPrefix: to.StringPtr("*"),
+					Access:    network.Allow,
+					Direction: network.Inbound,
+				},
+			}
 		}
 	}
 

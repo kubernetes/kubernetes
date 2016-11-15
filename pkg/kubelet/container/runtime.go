@@ -70,8 +70,9 @@ type Runtime interface {
 	// This may be different from the runtime engine's version.
 	// TODO(random-liu): We should fold this into Version()
 	APIVersion() (Version, error)
-	// Status returns error if the runtime is unhealthy; nil otherwise.
-	Status() error
+	// Status returns the status of the runtime. An error is returned if the Status
+	// function itself fails, nil otherwise.
+	Status() (*RuntimeStatus, error)
 	// GetPods returns a list of containers grouped by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
@@ -127,7 +128,7 @@ type DirectStreamingRuntime interface {
 	// Runs the command in the container of the specified pod using nsenter.
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
 	// tty.
-	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error
+	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 	// ContainerAttach encapsulates the attaching to containers for testability
@@ -164,7 +165,7 @@ type ContainerAttacher interface {
 type ContainerCommandRunner interface {
 	// RunInContainer synchronously executes the command in the container, and returns the output.
 	// If the command completes with a non-0 exit code, a pkg/util/exec.ExitError will be returned.
-	RunInContainer(id ContainerID, cmd []string) ([]byte, error)
+	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
 }
 
 // Pod is a group of containers.
@@ -433,6 +434,12 @@ type RunContainerOptions struct {
 	ReadOnly bool
 	// hostname for pod containers
 	Hostname string
+	// EnableHostUserNamespace sets userns=host when users request host namespaces (pid, ipc, net),
+	// are using non-namespaced capabilities (mknod, sys_time, sys_module), the pod contains a privileged container,
+	// or using host path volumes.
+	// This should only be enabled when the container runtime is performing user remapping AND if the
+	// experimental behavior is desired.
+	EnableHostUserNamespace bool
 }
 
 // VolumeInfo contains information about the volume.
@@ -445,6 +452,59 @@ type VolumeInfo struct {
 }
 
 type VolumeMap map[string]VolumeInfo
+
+// RuntimeConditionType is the types of required runtime conditions.
+type RuntimeConditionType string
+
+const (
+	// RuntimeReady means the runtime is up and ready to accept basic containers.
+	RuntimeReady RuntimeConditionType = "RuntimeReady"
+	// NetworkReady means the runtime network is up and ready to accept containers which require network.
+	NetworkReady RuntimeConditionType = "NetworkReady"
+)
+
+// RuntimeStatus contains the status of the runtime.
+type RuntimeStatus struct {
+	// Conditions is an array of current observed runtime conditions.
+	Conditions []RuntimeCondition
+}
+
+// GetRuntimeCondition gets a specified runtime condition from the runtime status.
+func (r *RuntimeStatus) GetRuntimeCondition(t RuntimeConditionType) *RuntimeCondition {
+	for i := range r.Conditions {
+		c := &r.Conditions[i]
+		if c.Type == t {
+			return c
+		}
+	}
+	return nil
+}
+
+// String formats the runtime status into human readable string.
+func (s *RuntimeStatus) String() string {
+	var ss []string
+	for _, c := range s.Conditions {
+		ss = append(ss, c.String())
+	}
+	return fmt.Sprintf("Runtime Conditions: %s", strings.Join(ss, ", "))
+}
+
+// RuntimeCondition contains condition information for the runtime.
+type RuntimeCondition struct {
+	// Type of runtime condition.
+	Type RuntimeConditionType
+	// Status of the condition, one of true/false.
+	Status bool
+	// Reason is brief reason for the condition's last transition.
+	Reason string
+	// Message is human readable message indicating details about last transition.
+	Message string
+}
+
+// String formats the runtime condition into human readable string.
+func (c *RuntimeCondition) String() string {
+	return fmt.Sprintf("%s=%t reason:%s message:%s", c.Type, c.Status, c.Reason, c.Message)
+}
 
 type Pods []*Pod
 

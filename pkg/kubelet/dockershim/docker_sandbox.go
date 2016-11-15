@@ -79,7 +79,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (str
 	if err != nil {
 		return createResp.ID, fmt.Errorf("failed to start sandbox container for pod %q: %v", config.Metadata.GetName(), err)
 	}
-	if config.GetLinux().GetNamespaceOptions().GetHostNetwork() {
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
 		return createResp.ID, nil
 	}
 
@@ -286,6 +286,18 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	return result, nil
 }
 
+// applySandboxLinuxOptions applies LinuxPodSandboxConfig to dockercontainer.HostConfig and dockercontainer.ContainerCreateConfig.
+func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig, lc *runtimeApi.LinuxPodSandboxConfig, createConfig *dockertypes.ContainerCreateConfig, image string) error {
+	// Apply Cgroup options.
+	// TODO: Check if this works with per-pod cgroups.
+	hc.CgroupParent = lc.GetCgroupParent()
+	// Apply security context.
+	applySandboxSecurityContext(lc, createConfig.Config, hc)
+
+	return nil
+}
+
+// makeSandboxDockerConfig returns dockertypes.ContainerCreateConfig based on runtimeApi.PodSandboxConfig.
 func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) (*dockertypes.ContainerCreateConfig, error) {
 	// Merge annotations and labels because docker supports only labels.
 	labels := makeLabels(c.GetLabels(), c.GetAnnotations())
@@ -316,29 +328,11 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 
 	// Apply linux-specific options.
 	if lc := c.GetLinux(); lc != nil {
-		// Apply Cgroup options.
-		// TODO: Check if this works with per-pod cgroups.
-		hc.CgroupParent = lc.GetCgroupParent()
-
-		// Apply namespace options.
-		hc.NetworkMode, hc.UTSMode, hc.PidMode = "", "", ""
-		nsOpts := lc.GetNamespaceOptions()
-		if nsOpts != nil {
-			if nsOpts.GetHostNetwork() {
-				hc.NetworkMode = namespaceModeHost
-			} else {
-				// Assume kubelet uses either the cni or the kubenet plugin.
-				// TODO: support docker networking.
-				hc.NetworkMode = "none"
-			}
-			if nsOpts.GetHostIpc() {
-				hc.IpcMode = namespaceModeHost
-			}
-			if nsOpts.GetHostPid() {
-				hc.PidMode = namespaceModeHost
-			}
+		if err := ds.applySandboxLinuxOptions(hc, lc, createConfig, image); err != nil {
+			return nil, err
 		}
 	}
+
 	// Set port mappings.
 	exposedPorts, portBindings := makePortsAndBindings(c.GetPortMappings())
 	createConfig.Config.ExposedPorts = exposedPorts
@@ -355,10 +349,11 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 	setSandboxResources(hc)
 
 	// Set security options.
-	hc.SecurityOpt, err = getSandboxSecurityOpts(c, ds.seccompProfileRoot)
+	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.GetName(), err)
 	}
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 	return createConfig, nil
 }
 
@@ -373,7 +368,7 @@ func sharesHostNetwork(container *dockertypes.ContainerJSON) bool {
 
 func setSandboxResources(hc *dockercontainer.HostConfig) {
 	hc.Resources = dockercontainer.Resources{
-		MemorySwap: -1, // Always disable memory swap.
+		MemorySwap: -1,
 		CPUShares:  defaultSandboxCPUshares,
 		// Use docker's default cpu quota/period.
 	}

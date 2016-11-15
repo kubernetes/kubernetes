@@ -45,7 +45,7 @@ type KubeProxyConfiguration struct {
 	// '2h22m').  Must be greater than 0.
 	IPTablesSyncPeriod unversioned.Duration `json:"iptablesSyncPeriodSeconds"`
 	// iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
-	// '2h22m').  Must be greater than 0.
+	// '2h22m').
 	IPTablesMinSyncPeriod unversioned.Duration `json:"iptablesMinSyncPeriodSeconds"`
 	// kubeconfigPath is the path to the kubeconfig file with authorization information (the
 	// master location is set by the master flag).
@@ -294,7 +294,7 @@ type KubeletConfiguration struct {
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
 	// +optional
-	CgroupsPerQOS bool `json:"cgroupsPerQOS,omitempty"`
+	ExperimentalCgroupsPerQOS bool `json:"experimentalCgroupsPerQOS,omitempty"`
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
@@ -326,8 +326,6 @@ type KubeletConfiguration struct {
 	RktPath string `json:"rktPath,omitempty"`
 	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
 	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
-	// experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.
-	ExperimentalMounterRootfsPath string `json:"experimentalMounterRootfsPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	// +optional
 	RktAPIEndpoint string `json:"rktAPIEndpoint,omitempty"`
@@ -462,10 +460,16 @@ type KubeletConfiguration struct {
 	// featureGates is a string of comma-separated key=value pairs that describe feature
 	// gates for alpha/experimental features.
 	FeatureGates string `json:"featureGates"`
-	// How to integrate with runtime. If set to cri, kubelet will switch to
-	// using the new Container Runtine Interface.
+	// Enable Container Runtime Interface (CRI) integration.
 	// +optional
-	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	EnableCRI bool `json:"enableCRI,omitempty"`
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	// Tells the Kubelet to fail to start if swap is enabled on the node.
+	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
+	// This flag, if set, enables a check prior to mount operations to verify that the required components
+	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
+	// and fails the mount operation fails.
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"ExperimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
 }
 
 type KubeletAuthorizationMode string

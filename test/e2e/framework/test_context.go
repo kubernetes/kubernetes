@@ -100,8 +100,12 @@ type TestContextType struct {
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
 type NodeTestContextType struct {
-	// Name of the node to run tests on (node e2e suite only).
+	// NodeE2E indicates whether it is running node e2e.
+	NodeE2E bool
+	// Name of the node to run tests on.
 	NodeName string
+	// NodeConformance indicates whether the test is running in node conformance mode.
+	NodeConformance bool
 	// DisableKubenet disables kubenet when starting kubelet.
 	DisableKubenet bool
 	// Whether to enable the QoS Cgroup Hierarchy or not
@@ -114,15 +118,13 @@ type NodeTestContextType struct {
 	ManifestPath string
 	// PrepullImages indicates whether node e2e framework should prepull images.
 	PrepullImages bool
-	// RuntimeIntegrationType indicates how runtime is integrated with Kubelet. This is mainly used for CRI validation test.
-	RuntimeIntegrationType string
+	// Enable CRI integration.
+	EnableCRI bool
 	// ContainerRuntimeEndpoint is the endpoint of remote container runtime grpc server. This is mainly used for Remote CRI
 	// validation test.
 	ContainerRuntimeEndpoint string
 	// MounterPath is the path to the program to run to perform a mount
 	MounterPath string
-	// MounterRootfsPath is the path to the root filesystem for the program used to perform a mount in kubelet
-	MounterRootfsPath string
 }
 
 type CloudConfig struct {
@@ -208,19 +210,27 @@ func RegisterClusterFlags() {
 
 // Register flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
-	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on (node e2e suite only).")
+	// Mark the test as node e2e when node flags are registered.
+	TestContext.NodeE2E = true
+	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
+	// TODO(random-liu): Move kubelet start logic out of the test.
+	// TODO(random-liu): Move log fetch logic out of the test.
+	// There are different ways to start kubelet (systemd, initd, docker, rkt, manually started etc.)
+	// and manage logs (journald, upstart etc.).
+	// For different situation we need to mount different things into the container, run different commands.
+	// It is hard and unnecessary to deal with the complexity inside the test suite.
+	flag.BoolVar(&TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
 	// TODO(random-liu): Remove kubelet related flags when we move the kubelet start logic out of the test.
 	// TODO(random-liu): Find someway to get kubelet configuration, and automatic config and filter test based on the configuration.
 	flag.BoolVar(&TestContext.DisableKubenet, "disable-kubenet", false, "If true, start kubelet without kubenet. (default false)")
 	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
-	flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
+	flag.BoolVar(&TestContext.CgroupsPerQOS, "experimental-cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	flag.StringVar(&TestContext.CgroupDriver, "cgroup-driver", "", "Driver that the kubelet uses to manipulate cgroups on the host.  Possible values: 'cgroupfs', 'systemd'")
 	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
-	flag.StringVar(&TestContext.RuntimeIntegrationType, "runtime-integration-type", "", "Choose the integration path for the container runtime, mainly used for CRI validation.")
+	flag.BoolVar(&TestContext.EnableCRI, "enable-cri", false, "Enable Container Runtime Interface (CRI) integration.")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The endpoint of remote container runtime grpc server, mainly used for Remote CRI validation.")
 	flag.StringVar(&TestContext.MounterPath, "experimental-mounter-path", "", "Path of mounter binary. Leave empty to use the default mount.")
-	flag.StringVar(&TestContext.MounterRootfsPath, "experimental-mounter-rootfs-path", "", "Absolute path to root filesystem for the mounter binary.")
 }
 
 // overwriteFlagsWithViperConfig finds and writes values to flags using viper as input.

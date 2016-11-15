@@ -72,7 +72,7 @@ func NewHollowKubelet(
 		TLSOptions:        nil,
 		OOMAdjuster:       oom.NewFakeOOMAdjuster(),
 		Writer:            &kubeio.StdWriter{},
-		Mounter:           mount.New(),
+		Mounter:           mount.New("" /* default mount path */),
 	}
 
 	return &HollowKubelet{
@@ -138,7 +138,7 @@ func GetHollowKubeletConfig(
 	c.EnableCustomMetrics = false
 	c.EnableDebuggingHandlers = true
 	c.EnableServer = true
-	c.CgroupsPerQOS = false
+	c.ExperimentalCgroupsPerQOS = false
 	// hairpin-veth is used to allow hairpin packets. Note that this deviates from
 	// what the "real" kubelet currently does, because there's no way to
 	// set promiscuous mode on docker0.

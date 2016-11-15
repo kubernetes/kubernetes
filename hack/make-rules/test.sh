@@ -53,6 +53,7 @@ kube::test::find_dirs() {
     find -L . \
         -path './_output' -prune \
         -o -path './vendor/k8s.io/client-go/*' \
+        -o -path './test/e2e_node/system/*' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | LC_ALL=C sort -u
   )
 }

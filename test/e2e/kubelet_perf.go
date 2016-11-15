@@ -227,15 +227,21 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		// initialization. This *noise* is obvious when N is small. We
 		// deliberately set higher resource usage limits to account for the
 		// noise.
+		//
+		// We set all resource limits generously because this test is mainly
+		// used to catch resource leaks in the soak cluster. For tracking
+		// kubelet/runtime resource usage, please see the node e2e benchmark
+		// dashboard. http://node-perf-dash.k8s.io/
+		//
+		// TODO(#36621): Deprecate this test once we have a node e2e soak
+		// cluster.
 		rTests := []resourceTest{
 			{
 				podsPerNode: 0,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.06, 0.95: 0.08},
-					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.06},
+					stats.SystemContainerKubelet: {0.50: 0.10, 0.95: 0.20},
+					stats.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.20},
 				},
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
 					// The detail can be found at https://github.com/kubernetes/kubernetes/issues/28384#issuecomment-244158892
@@ -243,28 +249,13 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 				},
 			},
 			{
-				podsPerNode: 35,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.12, 0.95: 0.14},
-					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.07},
-				},
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
-				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
-				},
-			},
-			{
-				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.17, 0.95: 0.22},
-					stats.SystemContainerRuntime: {0.50: 0.06, 0.95: 0.09},
+					stats.SystemContainerKubelet: {0.50: 0.35, 0.95: 0.50},
+					stats.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.50},
 				},
 				podsPerNode: 100,
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 80 * 1024 * 1024},
+					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
 					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
 				},
 			},

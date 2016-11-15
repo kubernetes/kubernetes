@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux,!windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -59,6 +59,6 @@ func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerMana
 	return &unsupportedPodContainerManager{}
 }
 
-func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig) (ContainerManager, error) {
+func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

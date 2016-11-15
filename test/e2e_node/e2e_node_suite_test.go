@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"syscall"
 	"testing"
 	"time"
 
@@ -36,8 +37,10 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	"k8s.io/kubernetes/test/e2e_node/system"
 
 	"github.com/golang/glog"
+	"github.com/kardianos/osext"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	more_reporters "github.com/onsi/ginkgo/reporters"
@@ -47,7 +50,9 @@ import (
 
 var e2es *services.E2EServices
 
+// TODO(random-liu): Change the following modes to sub-command.
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
+var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
 
 func init() {
 	framework.RegisterCommonFlags()
@@ -59,7 +64,7 @@ func init() {
 	// It seems that someone is using flag.Parse() after init() and TestMain().
 	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
 	// into TestContext.
-	pflag.CommandLine.MarkHidden("runtime-integration-type")
+	pflag.CommandLine.MarkHidden("enable-cri")
 }
 
 func TestMain(m *testing.M) {
@@ -67,10 +72,30 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// When running the containerized conformance test, we'll mount the
+// host root filesystem as readonly to /rootfs.
+const rootfs = "/rootfs"
+
 func TestE2eNode(t *testing.T) {
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
 		services.RunE2EServices()
+		return
+	}
+	if *systemValidateMode {
+		// If system-validate-mode is specified, only run system validation in current process.
+		if framework.TestContext.NodeConformance {
+			// Chroot to /rootfs to make system validation can check system
+			// as in the root filesystem.
+			// TODO(random-liu): Consider to chroot the whole test process to make writing
+			// test easier.
+			if err := syscall.Chroot(rootfs); err != nil {
+				glog.Exitf("chroot %q failed: %v", rootfs, err)
+			}
+		}
+		if err := system.Validate(); err != nil {
+			glog.Exitf("system validation failed: %v", err)
+		}
 		return
 	}
 	// If run-services-mode is not specified, run test.
@@ -94,12 +119,9 @@ func TestE2eNode(t *testing.T) {
 
 // Setup the kubelet on the node
 var _ = SynchronizedBeforeSuite(func() []byte {
-	// Initialize node name here, so that the following code can get right node name.
-	if framework.TestContext.NodeName == "" {
-		hostname, err := os.Hostname()
-		Expect(err).NotTo(HaveOccurred(), "should be able to get node name")
-		framework.TestContext.NodeName = hostname
-	}
+	// Run system validation test.
+	Expect(validateSystem()).To(Succeed(), "system validation")
+
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
 	if framework.TestContext.PrepullImages {
@@ -137,6 +159,9 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// The node test context is updated in the first function, update it on every test node.
 	err := json.Unmarshal(data, &framework.TestContext.NodeTestContextType)
 	Expect(err).NotTo(HaveOccurred(), "should be able to deserialize node test context.")
+
+	// update test context with node configuration.
+	Expect(updateTestContext()).To(Succeed(), "update test context with node config.")
 })
 
 // Tear down the kubelet on the node
@@ -151,6 +176,22 @@ var _ = SynchronizedAfterSuite(func() {}, func() {
 	glog.Infof("Tests Finished")
 })
 
+// validateSystem runs system validation in a separate process and returns error if validation fails.
+func validateSystem() error {
+	testBin, err := osext.Executable()
+	if err != nil {
+		return fmt.Errorf("can't get current binary: %v", err)
+	}
+	// Pass all flags into the child process, so that it will see the same flag set.
+	output, err := exec.Command(testBin, append([]string{"--system-validate-mode"}, os.Args[1:]...)...).CombinedOutput()
+	// The output of system validation should have been formatted, directly print here.
+	fmt.Print(string(output))
+	if err != nil {
+		return fmt.Errorf("system validation failed: %v", err)
+	}
+	return nil
+}
+
 func maskLocksmithdOnCoreos() {
 	data, err := ioutil.ReadFile("/etc/os-release")
 	if err != nil {
@@ -159,7 +200,7 @@ func maskLocksmithdOnCoreos() {
 		return
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
-		output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput()
+		output, err := exec.Command("systemctl", "mask", "--now", "locksmithd").CombinedOutput()
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
 		glog.Infof("Locksmithd is masked successfully")
 	}
@@ -172,24 +213,60 @@ func waitForNodeReady() {
 		// nodeReadyPollInterval is the interval to check node ready.
 		nodeReadyPollInterval = 1 * time.Second
 	)
-	config, err := framework.LoadConfig()
-	Expect(err).NotTo(HaveOccurred())
-	client, err := clientset.NewForConfig(config)
-	Expect(err).NotTo(HaveOccurred())
+	client, err := getAPIServerClient()
+	Expect(err).NotTo(HaveOccurred(), "should be able to get apiserver client.")
 	Eventually(func() error {
-		nodes, err := client.Nodes().List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		if nodes == nil {
-			return fmt.Errorf("the node list is nil.")
+		node, err := getNode(client)
+		if err != nil {
+			return fmt.Errorf("failed to get node: %v", err)
 		}
-		Expect(len(nodes.Items) > 1).NotTo(BeTrue())
-		if len(nodes.Items) == 0 {
-			return fmt.Errorf("empty node list: %+v", nodes)
-		}
-		node := nodes.Items[0]
-		if !api.IsNodeReady(&node) {
+		if !api.IsNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil
 	}, nodeReadyTimeout, nodeReadyPollInterval).Should(Succeed())
+}
+
+// updateTestContext updates the test context with the node name.
+// TODO(random-liu): Using dynamic kubelet configuration feature to
+// update test context with node configuration.
+func updateTestContext() error {
+	client, err := getAPIServerClient()
+	if err != nil {
+		return fmt.Errorf("failed to get apiserver client: %v", err)
+	}
+	node, err := getNode(client)
+	if err != nil {
+		return fmt.Errorf("failed to get node: %v", err)
+	}
+	// Initialize the node name
+	framework.TestContext.NodeName = node.Name
+	return nil
+}
+
+// getNode gets node object from the apiserver.
+func getNode(c *clientset.Clientset) (*api.Node, error) {
+	nodes, err := c.Nodes().List(api.ListOptions{})
+	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
+	if nodes == nil {
+		return nil, fmt.Errorf("the node list is nil.")
+	}
+	Expect(len(nodes.Items) > 1).NotTo(BeTrue(), "should not be more than 1 nodes.")
+	if len(nodes.Items) == 0 {
+		return nil, fmt.Errorf("empty node list: %+v", nodes)
+	}
+	return &nodes.Items[0], nil
+}
+
+// getAPIServerClient gets a apiserver client.
+func getAPIServerClient() (*clientset.Clientset, error) {
+	config, err := framework.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %v", err)
+	}
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+	return client, nil
 }

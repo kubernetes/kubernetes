@@ -68,6 +68,11 @@ function usage() {
   echo "  ci/latest:      ${0} ${ci_latest}"
 }
 
+function print-node-version-info() {
+  echo "== $1 Node OS and Kubelet Versions =="
+  "${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o=jsonpath='{range .items[*]}name: "{.metadata.name}", osImage: "{.status.nodeInfo.osImage}", kubeletVersion: "{.status.nodeInfo.kubeletVersion}"{"\n"}{end}'
+}
+
 function upgrade-master() {
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
@@ -363,6 +368,8 @@ if [[ "${master_upgrade}" == "false" ]] && [[ "${node_upgrade}" == "false" ]]; t
   exit 1
 fi
 
+print-node-version-info "Pre-Upgrade"
+
 if [[ "${local_binaries}" == "false" ]]; then
   set_binary_version ${1}
 fi
@@ -389,3 +396,5 @@ fi
 
 echo "== Validating cluster post-upgrade =="
 "${KUBE_ROOT}/cluster/validate-cluster.sh"
+
+print-node-version-info "Post-Upgrade"

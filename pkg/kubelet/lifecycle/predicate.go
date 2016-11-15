@@ -84,7 +84,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
 		case *predicates.InsufficientResourceError:
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
-			message := re.Error()
+			message = re.Error()
 			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
 		case *predicates.FailureReason:
 			reason = re.GetReason()
@@ -92,7 +92,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
 		default:
 			reason = "UnexpectedPredicateFailureType"
-			message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
+			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
 			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 		}
 		return PodAdmitResult{

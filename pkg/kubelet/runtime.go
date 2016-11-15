@@ -68,21 +68,28 @@ func (s *runtimeState) setInitError(err error) {
 	s.initError = err
 }
 
-func (s *runtimeState) errors() []string {
+func (s *runtimeState) runtimeErrors() []string {
 	s.RLock()
 	defer s.RUnlock()
 	var ret []string
 	if s.initError != nil {
 		ret = append(ret, s.initError.Error())
 	}
-	if s.networkError != nil {
-		ret = append(ret, s.networkError.Error())
-	}
 	if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
 		ret = append(ret, "container runtime is down")
 	}
 	if s.internalError != nil {
 		ret = append(ret, s.internalError.Error())
+	}
+	return ret
+}
+
+func (s *runtimeState) networkErrors() []string {
+	s.RLock()
+	defer s.RUnlock()
+	var ret []string
+	if s.networkError != nil {
+		ret = append(ret, s.networkError.Error())
 	}
 	return ret
 }

@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -27,6 +28,16 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
+)
+
+const (
+	// MaxDisruptedPodSize is the max size of PodDisruptionBudgetStatus.DisruptedPods. API server eviction
+	// subresource handler will refuse to evict pods covered by the corresponding PDB
+	// if the size of the map exceeds this value. It means a large number of
+	// evictions have been approved by the API server but not noticed by the PDB controller yet.
+	// This situation should self-correct because the PDB controller removes
+	// entries from the map automatically after the PDB DeletionTimeout regardless.
+	MaxDisruptedPodSize = 2000
 )
 
 func newEvictionStorage(store *registry.Store, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) *EvictionREST {
@@ -72,7 +83,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 
 		// If it was false already, or if it becomes false during the course of our retries,
 		// raise an error marked as a 429.
-		ok, err := r.checkAndDecrement(pod.Namespace, pdb)
+		ok, err := r.checkAndDecrement(pod.Namespace, pod.Name, pdb)
 		if err != nil {
 			return nil, err
 		}
@@ -104,14 +115,28 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
-func (r *EvictionREST) checkAndDecrement(namespace string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
+func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
+	if pdb.Status.ObservedGeneration != pdb.Generation {
+		return false, nil
+	}
 	if pdb.Status.PodDisruptionsAllowed < 0 {
 		return false, fmt.Errorf("pdb disruptions allowed is negative")
+	}
+	if len(pdb.Status.DisruptedPods) > MaxDisruptedPodSize {
+		return false, fmt.Errorf("DisrputedPods map too big - too many evictions not confirmed by PDB controller")
 	}
 	if pdb.Status.PodDisruptionsAllowed == 0 {
 		return false, nil
 	}
 	pdb.Status.PodDisruptionsAllowed--
+	if pdb.Status.DisruptedPods == nil {
+		pdb.Status.DisruptedPods = make(map[string]unversioned.Time)
+	}
+	// Eviction handler needs to inform the PDB controller that it is about to delete a pod
+	// so it should not consider it as available in calculations when updating PodDisruptions allowed.
+	// If the pod is not deleted within a reasonable time limit PDB controller will assume that it won't
+	// be deleted at all and remove it from DisruptedPod map.
+	pdb.Status.DisruptedPods[podName] = unversioned.Time{Time: time.Now()}
 	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).UpdateStatus(&pdb); err != nil {
 		return false, err
 	}

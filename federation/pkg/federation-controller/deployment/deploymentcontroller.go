@@ -29,16 +29,19 @@ import (
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -91,6 +94,8 @@ type DeploymentController struct {
 	fedUpdater        fedutil.FederatedUpdater
 	deploymentBackoff *flowcontrol.Backoff
 	eventRecorder     record.EventRecorder
+
+	deletionHelper *deletionhelper.DeletionHelper
 
 	defaultPlanner *planner.Planner
 }
@@ -202,7 +207,70 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 			return err
 		})
 
+	fdc.deletionHelper = deletionhelper.NewDeletionHelper(
+		fdc.hasFinalizerFunc,
+		fdc.removeFinalizerFunc,
+		fdc.addFinalizerFunc,
+		// objNameFunc
+		func(obj runtime.Object) string {
+			deployment := obj.(*extensionsv1.Deployment)
+			return deployment.Name
+		},
+		updateTimeout,
+		fdc.eventRecorder,
+		fdc.fedDeploymentInformer,
+		fdc.fedUpdater,
+	)
+
 	return fdc
+}
+
+// Returns true if the given object has the given finalizer in its ObjectMeta.
+func (fdc *DeploymentController) hasFinalizerFunc(obj runtime.Object, finalizer string) bool {
+	deployment := obj.(*extensionsv1.Deployment)
+	for i := range deployment.ObjectMeta.Finalizers {
+		if string(deployment.ObjectMeta.Finalizers[i]) == finalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// Removes the finalizer from the given objects ObjectMeta.
+// Assumes that the given object is a deployment.
+func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+	deployment := obj.(*extensionsv1.Deployment)
+	newFinalizers := []string{}
+	hasFinalizer := false
+	for i := range deployment.ObjectMeta.Finalizers {
+		if string(deployment.ObjectMeta.Finalizers[i]) != finalizer {
+			newFinalizers = append(newFinalizers, deployment.ObjectMeta.Finalizers[i])
+		} else {
+			hasFinalizer = true
+		}
+	}
+	if !hasFinalizer {
+		// Nothing to do.
+		return obj, nil
+	}
+	deployment.ObjectMeta.Finalizers = newFinalizers
+	deployment, err := fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove finalizer %s from deployment %s: %v", finalizer, deployment.Name, err)
+	}
+	return deployment, nil
+}
+
+// Adds the given finalizer to the given objects ObjectMeta.
+// Assumes that the given object is a deployment.
+func (fdc *DeploymentController) addFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+	deployment := obj.(*extensionsv1.Deployment)
+	deployment.ObjectMeta.Finalizers = append(deployment.ObjectMeta.Finalizers, finalizer)
+	deployment, err := fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add finalizer %s to deployment %s: %v", finalizer, deployment.Name, err)
+	}
+	return deployment, nil
 }
 
 func (fdc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
@@ -220,7 +288,7 @@ func (fdc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	// Wait until the cluster is synced to prevent the update storm at the very beginning.
 	for !fdc.isSynced() {
 		time.Sleep(5 * time.Millisecond)
-		glog.Infof("Waiting for controller to sync up")
+		glog.V(3).Infof("Waiting for controller to sync up")
 	}
 
 	for i := 0; i < workers; i++ {
@@ -414,7 +482,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 	startTime := time.Now()
 	defer glog.V(4).Infof("Finished reconcile deployment %q (%v)", key, time.Now().Sub(startTime))
 
-	obj, exists, err := fdc.deploymentStore.GetByKey(key)
+	objFromStore, exists, err := fdc.deploymentStore.GetByKey(key)
 	if err != nil {
 		return statusError, err
 	}
@@ -422,7 +490,35 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		// don't delete local deployments for now. Do not reconcile it anymore.
 		return statusAllOk, nil
 	}
-	fd := obj.(*extensionsv1.Deployment)
+	obj, err := conversion.NewCloner().DeepCopy(objFromStore)
+	fd, ok := obj.(*extensionsv1.Deployment)
+	if err != nil || !ok {
+		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
+		return statusError, err
+	}
+
+	if fd.DeletionTimestamp != nil {
+		if err := fdc.delete(fd); err != nil {
+			glog.Errorf("Failed to delete %s: %v", fd.Name, err)
+			fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "DeleteFailed",
+				"Deployment delete failed: %v", err)
+			return statusError, err
+		}
+		return statusAllOk, nil
+	}
+
+	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for deployment: %s",
+		fd.Name)
+	// Add the required finalizers before creating a deployment in underlying clusters.
+	updatedDeploymentObj, err := fdc.deletionHelper.EnsureFinalizers(fd)
+	if err != nil {
+		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in deployment %s: %v",
+			fd.Name, err)
+		return statusError, err
+	}
+	fd = updatedDeploymentObj.(*extensionsv1.Deployment)
+
+	glog.V(3).Infof("Syncing deployment %s in underlying clusters", fd.Name)
 
 	clusters, err := fdc.fedDeploymentInformer.GetReadyClusters()
 	if err != nil {
@@ -540,4 +636,24 @@ func (fdc *DeploymentController) reconcileDeploymentsOnClusterChange() {
 		key, _ := controller.KeyFunc(dep)
 		fdc.deliverDeploymentByKey(key, 0, false)
 	}
+}
+
+// delete deletes the given deployment or returns error if the deletion was not complete.
+func (fdc *DeploymentController) delete(deployment *extensionsv1.Deployment) error {
+	glog.V(3).Infof("Handling deletion of deployment: %v", *deployment)
+	_, err := fdc.deletionHelper.HandleObjectInUnderlyingClusters(deployment)
+	if err != nil {
+		return err
+	}
+
+	err = fdc.fedClient.Extensions().Deployments(deployment.Namespace).Delete(deployment.Name, nil)
+	if err != nil {
+		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
+		// This is expected when we are processing an update as a result of deployment finalizer deletion.
+		// The process that deleted the last finalizer is also going to delete the deployment and we do not have to do anything.
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete deployment: %v", err)
+		}
+	}
+	return nil
 }

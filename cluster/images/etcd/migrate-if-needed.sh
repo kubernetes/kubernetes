@@ -18,7 +18,7 @@
 # This script performs etcd upgrade based on the following environmental
 # variables:
 # TARGET_STORAGE - API of etcd to be used (supported: 'etcd2', 'etcd3')
-# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.13')
+# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.14')
 # DATA_DIRECTORY - directory with etcd data
 #
 # The current etcd version and storage format is detected based on the
@@ -27,8 +27,8 @@
 #
 # The update workflow support the following upgrade steps:
 # - 2.2.1/etcd2 -> 2.3.7/etcd2
-# - 2.3.7/etcd2 -> 3.0.13/etcd2
-# - 3.0.13/etcd2 -> 3.0.13/etcd3
+# - 2.3.7/etcd2 -> 3.0.14/etcd2
+# - 3.0.14/etcd2 -> 3.0.14/etcd3
 #
 # NOTE: The releases supported in this script has to match release binaries
 # present in the etcd image (to make this script work correctly).
@@ -66,7 +66,7 @@ fi
 # NOTE: SUPPORTED_VERSION has to match release binaries present in the
 # etcd image (to make this script work correctly).
 # We cannot use array since sh doesn't support it.
-SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.13"
+SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.14"
 SUPPORTED_VERSIONS=$(echo "${SUPPORTED_VERSIONS_STRING}" | tr " " "\n")
 
 VERSION_FILE="version.txt"
@@ -144,6 +144,18 @@ stop_etcd() {
 
 ATTACHLEASE="${ATTACHLEASE:-/usr/local/bin/attachlease}"
 ROLLBACK="${ROLLBACK:-/usr/local/bin/rollback}"
+
+# If we are upgrading from 2.2.1 and this is the first try for upgrade,
+# do the backup to allow restoring from it in case of failed upgrade.
+BACKUP_DIR="${DATA_DIRECTORY}/migration-backup"
+if [ "${CURRENT_VERSION}" = "2.2.1" -a ! -d "${BACKUP_DIR}" ]; then
+  echo "Backup etcd before starting migration"
+  mkdir ${BACKUP_DIR}
+  ETCDCTL_CMD="/usr/local/bin/etcdctl-2.2.1"
+  ETCDCTL_API=2 ${ETCDCTL_CMD} backup --data-dir=${DATA_DIRECTORY} \
+    --backup-dir=${BACKUP_DIR}
+  echo "Backup done in ${BACKUP_DIR}"
+fi
 
 # Do the roll-forward migration if needed.
 # The migration goes as following:

@@ -26,6 +26,10 @@ type FakePolicy struct {
 	*core.Fake
 }
 
+func (c *FakePolicy) Evictions(namespace string) internalversion.EvictionInterface {
+	return &FakeEvictions{c, namespace}
+}
+
 func (c *FakePolicy) PodDisruptionBudgets(namespace string) internalversion.PodDisruptionBudgetInterface {
 	return &FakePodDisruptionBudgets{c, namespace}
 }

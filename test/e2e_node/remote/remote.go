@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"os/exec"
 	"os/user"
@@ -45,8 +44,6 @@ const (
 	archiveName  = "e2e_node_test.tar.gz"
 	CNIRelease   = "07a8a28637e97b22eb8dfe710eeae1344f69d16e"
 	CNIDirectory = "cni"
-	// Note: This path needs to be in sync with the "target" path for `/` in cluster/gce/gci/mounter/mounter
-	mounterRootfsPath string = "/media/root"
 )
 
 var CNIURL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNIRelease)
@@ -115,7 +112,7 @@ func CreateTestArchive() (string, error) {
 		}
 	}
 
-	// Include the GCI mounter in the deployed tarball
+	// Include the GCI mounter artifacts in the deployed tarball
 	k8sDir, err := builder.GetK8sRootDir()
 	if err != nil {
 		return "", fmt.Errorf("Could not find K8s root dir! Err: %v", err)
@@ -161,7 +158,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		if err != nil {
 			return "", false, fmt.Errorf("could not find username: %v", err)
 		}
-		output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sudo", "usermod", "-a", "-G", "docker", uname.Username)
+		output, err := SSH(host, "usermod", "-a", "-G", "docker", uname.Username)
 		if err != nil {
 			return "", false, fmt.Errorf("instance %s not running docker daemon - Command failed: %s", host, output)
 		}
@@ -169,83 +166,87 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
-	dirName := fmt.Sprintf("gcloud-e2e-%d", rand.Int31())
-	tmp := fmt.Sprintf("/tmp/%s", dirName)
-
-	_, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "mkdir", tmp)
+	workspace := fmt.Sprintf("/tmp/node-e2e-%s", getTimestamp())
+	// Do not sudo here, so that we can use scp to copy test archive to the directdory.
+	_, err := SSHNoSudo(host, "mkdir", workspace)
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
 	}
 	if cleanup {
 		defer func() {
-			output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "rm", "-rf", tmp)
+			output, err := SSH(host, "rm", "-rf", workspace)
 			if err != nil {
-				glog.Errorf("failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
+				glog.Errorf("failed to cleanup workspace %s on host %v.  Output:\n%s", workspace, err, output)
 			}
 		}()
 	}
 
 	// Install the cni plugin.
-	cniPath := filepath.Join(tmp, CNIDirectory)
-	if _, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c",
-		getSshCommand(" ; ", fmt.Sprintf("sudo mkdir -p %s", cniPath),
-			fmt.Sprintf("sudo wget -O - %s | sudo tar -xz -C %s", CNIURL, cniPath))); err != nil {
+	cniPath := filepath.Join(workspace, CNIDirectory)
+	cmd := getSSHCommand(" ; ",
+		fmt.Sprintf("mkdir -p %s", cniPath),
+		fmt.Sprintf("wget -O - %s | tar -xz -C %s", CNIURL, cniPath),
+	)
+	if _, err := SSH(host, "sh", "-c", cmd); err != nil {
 		// Exit failure with the error
 		return "", false, err
 	}
 
 	// Configure iptables firewall rules
 	// TODO: consider calling bootstrap script to configure host based on OS
-	cmd := getSshCommand("&&",
+	cmd = getSSHCommand("&&",
 		`iptables -L INPUT | grep "Chain INPUT (policy DROP)"`,
 		"(iptables -C INPUT -w -p TCP -j ACCEPT || iptables -A INPUT -w -p TCP -j ACCEPT)",
 		"(iptables -C INPUT -w -p UDP -j ACCEPT || iptables -A INPUT -w -p UDP -j ACCEPT)",
 		"(iptables -C INPUT -w -p ICMP -j ACCEPT || iptables -A INPUT -w -p ICMP -j ACCEPT)")
-	output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sudo", "sh", "-c", cmd)
+	output, err := SSH(host, "sh", "-c", cmd)
 	if err != nil {
 		glog.Errorf("Failed to configured firewall: %v output: %v", err, output)
 	}
-	cmd = getSshCommand("&&",
+	cmd = getSSHCommand("&&",
 		`iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null`,
 		"(iptables -C FORWARD -w -p TCP -j ACCEPT || iptables -A FORWARD -w -p TCP -j ACCEPT)",
 		"(iptables -C FORWARD -w -p UDP -j ACCEPT || iptables -A FORWARD -w -p UDP -j ACCEPT)",
 		"(iptables -C FORWARD -w -p ICMP -j ACCEPT || iptables -A FORWARD -w -p ICMP -j ACCEPT)")
-	output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sudo", "sh", "-c", cmd)
+	output, err = SSH(host, "sh", "-c", cmd)
 	if err != nil {
 		glog.Errorf("Failed to configured firewall: %v output: %v", err, output)
 	}
 
 	// Copy the archive to the staging directory
-	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), tmp))
+	_, err = runSSHCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), workspace))
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
 	}
 
 	// Kill any running node processes
-	cmd = getSshCommand(" ; ",
-		"sudo pkill kubelet",
-		"sudo pkill kube-apiserver",
-		"sudo pkill etcd",
+	cmd = getSSHCommand(" ; ",
+		"pkill kubelet",
+		"pkill kube-apiserver",
+		"pkill etcd",
 	)
 	// No need to log an error if pkill fails since pkill will fail if the commands are not running.
 	// If we are unable to stop existing running k8s processes, we should see messages in the kubelet/apiserver/etcd
 	// logs about failing to bind the required ports.
 	glog.Infof("Killing any existing node processes on %s", host)
-	RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
+	SSH(host, "sh", "-c", cmd)
 
 	// Extract the archive
-	cmd = getSshCommand(" && ", fmt.Sprintf("cd %s", tmp), fmt.Sprintf("tar -xzvf ./%s", archiveName))
+	cmd = getSSHCommand(" && ",
+		fmt.Sprintf("cd %s", workspace),
+		fmt.Sprintf("tar -xzvf ./%s", archiveName),
+	)
 	glog.Infof("Extracting tar on %s", host)
-	output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
+	output, err = SSH(host, "sh", "-c", cmd)
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
 	}
 
 	// If we are testing on a GCI node, we chmod 544 the mounter and specify a different mounter path in the test args.
-	// We do this here because the local var `tmp` tells us which /tmp/gcloud-e2e-%d is relevant to the current test run.
+	// We do this here because the local var `workspace` tells us which /tmp/node-e2e-%d is relevant to the current test run.
 
 	// Determine if the GCI mounter script exists locally.
 	k8sDir, err := builder.GetK8sRootDir()
@@ -261,38 +262,35 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	}
 
 	// Determine if tests will run on a GCI node.
-	output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", "'cat /etc/os-release'")
+	output, err = SSH(host, "sh", "-c", "'cat /etc/os-release'")
 	if err != nil {
 		glog.Errorf("Issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 		return "", false, fmt.Errorf("Issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 	}
 	if strings.Contains(output, "ID=gci") {
+		glog.Infof("GCI node and GCI mounter both detected, modifying --experimental-mounter-path accordingly")
 		// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 		// here will tell us to update the remote test runner.
-		mounterPath := filepath.Join(tmp, "cluster/gce/gci/mounter/mounter")
-		output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
+		mounterPath := filepath.Join(workspace, "cluster/gce/gci/mounter/mounter")
+		output, err = SSH(host, "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
 		if err != nil {
 			glog.Errorf("Unable to chmod 544 GCI mounter script. Err: %v, Output:\n%s", err, output)
 			return "", false, err
 		}
 		// Insert args at beginning of testArgs, so any values from command line take precedence
-		testArgs = fmt.Sprintf("--experimental-mounter-rootfs-path=%s ", mounterRootfsPath) + testArgs
 		testArgs = fmt.Sprintf("--experimental-mounter-path=%s ", mounterPath) + testArgs
-
-		// Temporarily disabled (associated Kubelet flags commented out in k8s.io/kubernetes/test/e2e_node/services/services.go):
-		// glog.Infof("GCI node and GCI mounter both detected, setting --experimental-mounter-path=%q and --experimental-mounter-rootfs-path=%q accordingly", mounterPath, mounterRootfsPath)
 	}
 
 	// Run the tests
-	cmd = getSshCommand(" && ",
-		fmt.Sprintf("cd %s", tmp),
+	cmd = getSSHCommand(" && ",
+		fmt.Sprintf("cd %s", workspace),
 		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 4 --node-name=%s --report-dir=%s/results --report-prefix=%s %s",
-			testTimeoutSeconds.Seconds(), ginkgoFlags, host, tmp, junitFilePrefix, testArgs),
+			testTimeoutSeconds.Seconds(), ginkgoFlags, host, workspace, junitFilePrefix, testArgs),
 	)
 	aggErrs := []error{}
 
 	glog.Infof("Starting tests on %s", host)
-	output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
+	output, err = SSH(host, "sh", "-c", cmd)
 
 	if err != nil {
 		aggErrs = append(aggErrs, err)
@@ -305,18 +303,18 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		// TODO: This is a best-effort, temporary hack that only works for
 		// journald nodes. We should have a more robust way to collect logs.
 		var (
-			logName  = fmt.Sprintf("%s-system.log", dirName)
-			logPath  = fmt.Sprintf("/tmp/%s-system.log", dirName)
+			logName  = "system.log"
+			logPath  = filepath.Join(workspace, logName)
 			destPath = fmt.Sprintf("%s/%s-%s", *resultsDir, host, logName)
 		)
 		glog.Infof("Test failed unexpectedly. Attempting to retreiving system logs (only works for nodes with journald)")
 		// Try getting the system logs from journald and store it to a file.
 		// Don't reuse the original test directory on the remote host because
 		// it could've be been removed if the node was rebooted.
-		_, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", fmt.Sprintf("'sudo journalctl --system --all > %s'", logPath))
+		_, err := SSH(host, "sh", "-c", fmt.Sprintf("'journalctl --system --all > %s'", logPath))
 		if err == nil {
 			glog.Infof("Got the system logs from journald; copying it back...")
-			if _, err := RunSshCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIp(host), logPath), destPath); err != nil {
+			if _, err := runSSHCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIp(host), logPath), destPath); err != nil {
 				glog.Infof("Failed to copy the log: err: %v", err)
 			}
 		} else {
@@ -325,7 +323,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	}
 
 	glog.Infof("Copying test artifacts from %s", host)
-	scpErr := getTestArtifacts(host, tmp)
+	scpErr := getTestArtifacts(host, workspace)
 	if scpErr != nil {
 		aggErrs = append(aggErrs, scpErr)
 	}
@@ -333,27 +331,50 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	return output, len(aggErrs) == 0, utilerrors.NewAggregate(aggErrs)
 }
 
+// timestampFormat is the timestamp format used in the node e2e directory name.
+const timestampFormat = "20060102T150405"
+
+func getTimestamp() string {
+	return fmt.Sprintf(time.Now().Format(timestampFormat))
+}
+
 func getTestArtifacts(host, testDir string) error {
-	_, err := RunSshCommand("scp", "-r", fmt.Sprintf("%s:%s/results/", GetHostnameOrIp(host), testDir), fmt.Sprintf("%s/%s", *resultsDir, host))
+	logPath := filepath.Join(*resultsDir, host)
+	if err := os.MkdirAll(logPath, 0755); err != nil {
+		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
+	}
+	// Copy logs to artifacts/hostname
+	_, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIp(host), testDir), logPath)
 	if err != nil {
 		return err
 	}
-
 	// Copy junit to the top of artifacts
-	_, err = RunSshCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), fmt.Sprintf("%s/", *resultsDir))
+	_, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), *resultsDir)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// getSshCommand handles proper quoting so that multiple commands are executed in the same shell over ssh
-func getSshCommand(sep string, args ...string) string {
+// getSSHCommand handles proper quoting so that multiple commands are executed in the same shell over ssh
+func getSSHCommand(sep string, args ...string) string {
 	return fmt.Sprintf("'%s'", strings.Join(args, sep))
 }
 
-// runSshCommand executes the ssh or scp command, adding the flag provided --ssh-options
-func RunSshCommand(cmd string, args ...string) (string, error) {
+// SSH executes ssh command with runSSHCommand as root. The `sudo` makes sure that all commands
+// are executed by root, so that there won't be permission mismatch between different commands.
+func SSH(host string, cmd ...string) (string, error) {
+	return runSSHCommand("ssh", append([]string{GetHostnameOrIp(host), "--", "sudo"}, cmd...)...)
+}
+
+// SSHNoSudo executes ssh command with runSSHCommand as normal user. Sometimes we need this,
+// for example creating a directory that we'll copy files there with scp.
+func SSHNoSudo(host string, cmd ...string) (string, error) {
+	return runSSHCommand("ssh", append([]string{GetHostnameOrIp(host), "--"}, cmd...)...)
+}
+
+// runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
+func runSSHCommand(cmd string, args ...string) (string, error) {
 	if env, found := sshOptionsMap[*sshEnv]; found {
 		args = append(strings.Split(env, " "), args...)
 	}

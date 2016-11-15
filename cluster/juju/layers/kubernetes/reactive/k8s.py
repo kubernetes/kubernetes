@@ -330,8 +330,6 @@ def gather_sdn_data():
     else:
         # There is no SDN cider fall back to the kubernetes config cidr option.
         pillar['dns_server'] = get_dns_ip(hookenv.config().get('cidr'))
-    # The pillar['dns_server'] value is used the kubedns-svc.yaml file.
-    pillar['dns_replicas'] = 1
     # The pillar['dns_domain'] value is used in the kubedns-rc.yaml
     pillar['dns_domain'] = hookenv.config().get('dns_domain')
     # Use a 'pillar' dictionary so we can reuse the upstream kubedns templates.

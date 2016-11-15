@@ -862,6 +862,142 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"batch.CronJob": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJob represents the configuration of a single cron job.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/api.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/batch.CronJobSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/batch.CronJobStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"api.ObjectMeta", "batch.CronJobSpec", "batch.CronJobStatus"},
+	},
+	"batch.CronJobList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobList is a collection of cron jobs.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of CronJob.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/batch.CronJob"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"batch.CronJob", "unversioned.ListMeta"},
+	},
+	"batch.CronJobSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobSpec describes how the job execution will look like and when it will actually run.",
+				Properties: map[string]spec.Schema{
+					"schedule": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"startingDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"concurrencyPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"suspend": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"jobTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+							Ref:         spec.MustCreateRef("#/definitions/batch.JobTemplateSpec"),
+						},
+					},
+				},
+				Required: []string{"schedule", "jobTemplate"},
+			},
+		},
+		Dependencies: []string{
+			"batch.JobTemplateSpec"},
+	},
+	"batch.CronJobStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobStatus represents the current state of a cron job.",
+				Properties: map[string]spec.Schema{
+					"active": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Active holds pointers to currently running jobs.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/api.ObjectReference"),
+									},
+								},
+							},
+						},
+					},
+					"lastScheduleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"api.ObjectReference", "unversioned.Time"},
+	},
 	"batch.Job": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1128,142 +1264,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"api.ObjectMeta", "batch.JobSpec"},
-	},
-	"batch.ScheduledJob": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJob represents the configuration of a single scheduled job.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/api.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/batch.ScheduledJobSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/batch.ScheduledJobStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"api.ObjectMeta", "batch.ScheduledJobSpec", "batch.ScheduledJobStatus"},
-	},
-	"batch.ScheduledJobList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobList is a collection of scheduled jobs.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of ScheduledJob.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/batch.ScheduledJob"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"batch.ScheduledJob", "unversioned.ListMeta"},
-	},
-	"batch.ScheduledJobSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobSpec describes how the job execution will look like and when it will actually run.",
-				Properties: map[string]spec.Schema{
-					"schedule": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"startingDeadlineSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"concurrencyPolicy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"suspend": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"jobTemplate": {
-						SchemaProps: spec.SchemaProps{
-							Description: "JobTemplate is the object that describes the job that will be created when executing a ScheduledJob.",
-							Ref:         spec.MustCreateRef("#/definitions/batch.JobTemplateSpec"),
-						},
-					},
-				},
-				Required: []string{"schedule", "jobTemplate"},
-			},
-		},
-		Dependencies: []string{
-			"batch.JobTemplateSpec"},
-	},
-	"batch.ScheduledJobStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobStatus represents the current state of a Job.",
-				Properties: map[string]spec.Schema{
-					"active": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Active holds pointers to currently running jobs.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/api.ObjectReference"),
-									},
-								},
-							},
-						},
-					},
-					"lastScheduleTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"api.ObjectReference", "unversioned.Time"},
 	},
 	"certificates.CertificateSigningRequest": {
 		Schema: spec.Schema{
@@ -1920,7 +1920,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"iptablesMinSyncPeriodSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.",
+							Description: "iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
@@ -2600,7 +2600,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"cgroupsPerQOS": {
+					"experimentalCgroupsPerQOS": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes And all Burstable and BestEffort pods are brought up under their specific top level QoS cgroup.",
 							Type:        []string{"boolean"},
@@ -2672,13 +2672,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"experimentalMounterPath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"experimentalMounterRootfsPath": {
-						SchemaProps: spec.SchemaProps{
-							Description: "experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -2996,15 +2989,29 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"experimentalRuntimeIntegrationType": {
+					"enableCRI": {
 						SchemaProps: spec.SchemaProps{
-							Description: "How to integrate with runtime. If set to cri, kubelet will switch to using the new Container Runtine Interface.",
-							Type:        []string{"string"},
+							Description: "Enable Container Runtime Interface (CRI) integration.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"experimentalFailSwapOn": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Tells the Kubelet to fail to start if swap is enabled on the node.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"ExperimentalCheckNodeCapabilitiesBeforeMount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "This flag, if set, enables a check prior to mount operations to verify that the required components (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled and fails the mount operation fails.",
+							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginMTU", "networkPluginDir", "cniConfDir", "cniBinDir", "volumePluginDir", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "experimentalMounterPath", "experimentalMounterRootfsPath", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "featureGates"},
+				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginMTU", "networkPluginDir", "cniConfDir", "cniBinDir", "volumePluginDir", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "experimentalMounterPath", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "featureGates", "experimentalFailSwapOn", "ExperimentalCheckNodeCapabilitiesBeforeMount"},
 			},
 		},
 		Dependencies: []string{
@@ -5212,6 +5219,26 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			SchemaProps: spec.SchemaProps{
 				Description: "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
 				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other status informatio is valid only if observedGeneration equals to PDB's object generation.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"disruptedPods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptedPods contains information about pods whose eviction was processed by the API server eviction subresource handler but has not yet been observed by the PodDisruptionBudget controller. A pod will be in this map from the time when the API server processed the eviction request to the time when the pod is seen by PDB controller as having been marked for deletion (or after a timeout). The key in the map is the name of the pod and the value is the time when the API server processed the eviction request. If the deletion didn't occur and a pod is still there it will be removed from the list automatically by PodDisruptionBudget controller after some time. If everything goes smooth this map should be empty for the most of the time. Large number of entries in the map may indicate problems with pod deletions.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/unversioned.Time"),
+									},
+								},
+							},
+						},
+					},
 					"disruptionsAllowed": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Number of pod disruptions that are currently allowed.",
@@ -5241,10 +5268,11 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"disruptionsAllowed", "currentHealthy", "desiredHealthy", "expectedPods"},
+				Required: []string{"disruptedPods", "disruptionsAllowed", "currentHealthy", "desiredHealthy", "expectedPods"},
 			},
 		},
-		Dependencies: []string{},
+		Dependencies: []string{
+			"unversioned.Time"},
 	},
 	"rbac.ClusterRole": {
 		Schema: spec.Schema{
@@ -10023,7 +10051,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"deletionTimestamp": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Description: "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
 						},
 					},
@@ -10542,11 +10570,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/v1.AzureDiskVolumeSource"),
 						},
 					},
+					"photonPersistentDisk": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+							Ref:         spec.MustCreateRef("#/definitions/v1.PhotonPersistentDiskVolumeSource"),
+						},
+					},
 				},
+				Required: []string{"photonPersistentDisk"},
 			},
 		},
 		Dependencies: []string{
-			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.PersistentVolumeSpec": {
 		Schema: spec.Schema{
@@ -10626,6 +10661,31 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v1.PhotonPersistentDiskVolumeSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Represents a Photon Controller persistent disk resource.",
+				Properties: map[string]spec.Schema{
+					"pdID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ID that identifies Photon Controller persistent disk",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"fsType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"pdID", "fsType"},
 			},
 		},
 		Dependencies: []string{},
@@ -13131,11 +13191,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/v1.AzureDiskVolumeSource"),
 						},
 					},
+					"photonPersistentDisk": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+							Ref:         spec.MustCreateRef("#/definitions/v1.PhotonPersistentDiskVolumeSource"),
+						},
+					},
 				},
+				Required: []string{"photonPersistentDisk"},
 			},
 		},
 		Dependencies: []string{
-			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.VsphereVirtualDiskVolumeSource": {
 		Schema: spec.Schema{
@@ -13660,7 +13727,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"iptablesMinSyncPeriodSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.",
+							Description: "iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
@@ -14361,7 +14428,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"cgroupsPerQOS": {
+					"experimentalCgroupsPerQOS": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes And all Burstable and BestEffort pods are brought up under their specific top level QoS cgroup.",
 							Type:        []string{"boolean"},
@@ -14412,13 +14479,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"experimentalMounterPath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount binary that is available via $PATH,",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"experimentalMounterRootfsPath": {
-						SchemaProps: spec.SchemaProps{
-							Description: "experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -14736,15 +14796,29 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"experimentalRuntimeIntegrationType": {
+					"enableCRI": {
 						SchemaProps: spec.SchemaProps{
-							Description: "How to integrate with runtime. If set to CRI, kubelet will switch to using the new Container Runtine Interface.",
-							Type:        []string{"string"},
+							Description: "Enable Container Runtime Interface (CRI) integration.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"experimentalFailSwapOn": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Tells the Kubelet to fail to start if swap is enabled on the node.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"ExperimentalCheckNodeCapabilitiesBeforeMount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "This flag, if set, enables a check prior to mount operations to verify that the required components (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled and fails the mount operation fails.",
+							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "experimentalMounterPath", "experimentalMounterRootfsPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "featureGates"},
+				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "experimentalMounterPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "featureGates", "experimentalFailSwapOn", "ExperimentalCheckNodeCapabilitiesBeforeMount"},
 			},
 		},
 		Dependencies: []string{
@@ -16422,7 +16496,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"v1beta1.Job": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Job represents the configuration of a single job.",
+				Description: "Job represents the configuration of a single job. DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.",
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
@@ -16503,7 +16577,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"v1beta1.JobList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "JobList is a collection of jobs.",
+				Description: "JobList is a collection of jobs. DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.",
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
@@ -16945,6 +17019,26 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			SchemaProps: spec.SchemaProps{
 				Description: "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
 				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other status informatio is valid only if observedGeneration equals to PDB's object generation.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"disruptedPods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptedPods contains information about pods whose eviction was processed by the API server eviction subresource handler but has not yet been observed by the PodDisruptionBudget controller. A pod will be in this map from the time when the API server processed the eviction request to the time when the pod is seen by PDB controller as having been marked for deletion (or after a timeout). The key in the map is the name of the pod and the value is the time when the API server processed the eviction request. If the deletion didn't occur and a pod is still there it will be removed from the list automatically by PodDisruptionBudget controller after some time. If everything goes smooth this map should be empty for the most of the time. Large number of entries in the map may indicate problems with pod deletions.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/unversioned.Time"),
+									},
+								},
+							},
+						},
+					},
 					"disruptionsAllowed": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Number of pod disruptions that are currently allowed.",
@@ -16974,10 +17068,11 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"disruptionsAllowed", "currentHealthy", "desiredHealthy", "expectedPods"},
+				Required: []string{"disruptedPods", "disruptionsAllowed", "currentHealthy", "desiredHealthy", "expectedPods"},
 			},
 		},
-		Dependencies: []string{},
+		Dependencies: []string{
+			"unversioned.Time"},
 	},
 	"v1beta1.PodSecurityPolicy": {
 		Schema: spec.Schema{
@@ -18359,6 +18454,142 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"v2alpha1.CronJob": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJob represents the configuration of a single cron job.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CronJobSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CronJobStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v2alpha1.CronJobSpec", "v2alpha1.CronJobStatus"},
+	},
+	"v2alpha1.CronJobList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobList is a collection of cron jobs.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of CronJob.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v2alpha1.CronJob"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.ListMeta", "v2alpha1.CronJob"},
+	},
+	"v2alpha1.CronJobSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobSpec describes how the job execution will look like and when it will actually run.",
+				Properties: map[string]spec.Schema{
+					"schedule": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"startingDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"concurrencyPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"suspend": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"jobTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.JobTemplateSpec"),
+						},
+					},
+				},
+				Required: []string{"schedule", "jobTemplate"},
+			},
+		},
+		Dependencies: []string{
+			"v2alpha1.JobTemplateSpec"},
+	},
+	"v2alpha1.CronJobStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobStatus represents the current state of a cron job.",
+				Properties: map[string]spec.Schema{
+					"active": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Active holds pointers to currently running jobs.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.ObjectReference"),
+									},
+								},
+							},
+						},
+					},
+					"lastScheduleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Time", "v1.ObjectReference"},
+	},
 	"v2alpha1.Job": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18625,142 +18856,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.ObjectMeta", "v2alpha1.JobSpec"},
-	},
-	"v2alpha1.ScheduledJob": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJob represents the configuration of a single scheduled job.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ScheduledJobSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ScheduledJobStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v2alpha1.ScheduledJobSpec", "v2alpha1.ScheduledJobStatus"},
-	},
-	"v2alpha1.ScheduledJobList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobList is a collection of scheduled jobs.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of ScheduledJob.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v2alpha1.ScheduledJob"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.ListMeta", "v2alpha1.ScheduledJob"},
-	},
-	"v2alpha1.ScheduledJobSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobSpec describes how the job execution will look like and when it will actually run.",
-				Properties: map[string]spec.Schema{
-					"schedule": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"startingDeadlineSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"concurrencyPolicy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"suspend": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"jobTemplate": {
-						SchemaProps: spec.SchemaProps{
-							Description: "JobTemplate is the object that describes the job that will be created when executing a ScheduledJob.",
-							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.JobTemplateSpec"),
-						},
-					},
-				},
-				Required: []string{"schedule", "jobTemplate"},
-			},
-		},
-		Dependencies: []string{
-			"v2alpha1.JobTemplateSpec"},
-	},
-	"v2alpha1.ScheduledJobStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobStatus represents the current state of a Job.",
-				Properties: map[string]spec.Schema{
-					"active": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Active holds pointers to currently running jobs.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ObjectReference"),
-									},
-								},
-							},
-						},
-					},
-					"lastScheduleTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.Time", "v1.ObjectReference"},
 	},
 	"version.Info": {
 		Schema: spec.Schema{

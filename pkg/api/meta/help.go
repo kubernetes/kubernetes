@@ -66,6 +66,57 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 	}
 }
 
+// EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
+// the loop.
+func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
+	// TODO: Change to an interface call?
+	itemsPtr, err := GetItemsPtr(obj)
+	if err != nil {
+		return err
+	}
+	items, err := conversion.EnforcePtr(itemsPtr)
+	if err != nil {
+		return err
+	}
+	len := items.Len()
+	if len == 0 {
+		return nil
+	}
+	takeAddr := false
+	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Ptr && elemType.Kind() != reflect.Interface {
+		if !items.Index(0).CanAddr() {
+			return fmt.Errorf("unable to take address of items in %T for EachListItem", obj)
+		}
+		takeAddr = true
+	}
+
+	for i := 0; i < len; i++ {
+		raw := items.Index(i)
+		if takeAddr {
+			raw = raw.Addr()
+		}
+		switch item := raw.Interface().(type) {
+		case *runtime.RawExtension:
+			if err := fn(item.Object); err != nil {
+				return err
+			}
+		case runtime.Object:
+			if err := fn(item); err != nil {
+				return err
+			}
+		default:
+			obj, ok := item.(runtime.Object)
+			if !ok {
+				return fmt.Errorf("%v: item[%v]: Expected object, got %#v(%s)", obj, i, raw.Interface(), raw.Kind())
+			}
+			if err := fn(obj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // ExtractList returns obj's Items element as an array of runtime.Objects.
 // Returns an error if obj is not a List type (does not have an Items member).
 func ExtractList(obj runtime.Object) ([]runtime.Object, error) {

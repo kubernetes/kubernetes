@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -141,17 +142,63 @@ func TestDeleteTriggerWatch(t *testing.T) {
 
 // TestWatchFromZero tests that
 // - watch from 0 should sync up and grab the object added before
-// - watch from non-0 should just watch changes after given version
+// - watch from 0 is able to return events for objects whose previous version has been compacted
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
 	w, err := store.Watch(ctx, key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
 	testCheckResult(t, 0, watch.Added, w, storedObj)
+	w.Stop()
+
+	// Update
+	out := &api.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
+		}))
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Make sure when we watch from 0 we receive an ADDED event
+	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, 1, watch.Added, w, out)
+	w.Stop()
+
+	// Update again
+	out = &api.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
+		}))
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Compact previous versions
+	revToCompact, err := strconv.Atoi(out.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Error converting %q to an int: %v", storedObj.ResourceVersion, err)
+	}
+	_, err = cluster.RandClient().Compact(ctx, int64(revToCompact), clientv3.WithCompactPhysical())
+	if err != nil {
+		t.Fatalf("Error compacting: %v", err)
+	}
+
+	// Make sure we can still watch from 0 and receive an ADDED event
+	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, 2, watch.Added, w, out)
 }
 
 // TestWatchFromNoneZero tests that

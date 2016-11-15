@@ -25,8 +25,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/util/clock:go_default_library",
+        "//pkg/util/ratelimit:go_default_library",
         "//pkg/util/runtime:go_default_library",
-        "//vendor:github.com/juju/ratelimit",
     ],
 )
 

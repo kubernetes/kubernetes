@@ -90,6 +90,7 @@ const (
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json"
 	redisServiceFilename     = "redis-master-service.json"
+	kubectlInPodFilename     = "kubectl-in-pod.json"
 )
 
 var (
@@ -193,7 +194,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 		})
 
 		AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "scheduledjobs", sjName, nsFlag)
+			framework.RunKubectlOrDie("delete", "cronjobs", sjName, nsFlag)
 		})
 
 		It("should create a ScheduledJob", func() {
@@ -203,7 +204,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 			framework.RunKubectlOrDie("run", sjName, "--restart=OnFailure", "--generator=scheduledjob/v2alpha1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			By("verifying the ScheduledJob " + sjName + " was created")
-			sj, err := c.Batch().ScheduledJobs(ns).Get(sjName)
+			sj, err := c.Batch().CronJobs(ns).Get(sjName)
 			if err != nil {
 				framework.Failf("Failed getting ScheduledJob %s: %v", sjName, err)
 			}
@@ -216,6 +217,43 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 			}
 			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
 				framework.Failf("Failed creating a ScheduledJob with correct restart policy for --restart=OnFailure")
+			}
+		})
+	})
+
+	framework.KubeDescribe("Kubectl run CronJob", func() {
+		var nsFlag string
+		var cjName string
+
+		BeforeEach(func() {
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			cjName = "e2e-test-echo-cronjob"
+		})
+
+		AfterEach(func() {
+			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
+		})
+
+		It("should create a CronJob", func() {
+			framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
+
+			schedule := "*/5 * * * ?"
+			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
+				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
+			By("verifying the CronJob " + cjName + " was created")
+			sj, err := c.Batch().CronJobs(ns).Get(cjName)
+			if err != nil {
+				framework.Failf("Failed getting CronJob %s: %v", cjName, err)
+			}
+			if sj.Spec.Schedule != schedule {
+				framework.Failf("Failed creating a CronJob with correct schedule %s", schedule)
+			}
+			containers := sj.Spec.JobTemplate.Spec.Template.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
+				framework.Failf("Failed creating CronJob %s for 1 pod with expected image %s: %#v", cjName, busyboxImage, containers)
+			}
+			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
+				framework.Failf("Failed creating a CronJob with correct restart policy for --restart=OnFailure")
 			}
 		})
 	})
@@ -500,9 +538,6 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				Expect(logOutput).ToNot(ContainSubstring("stdin closed"))
 				return strings.Contains(logOutput, "abcd1234"), nil
 			})
-			if err != nil {
-				os.Exit(1)
-			}
 			Expect(err).To(BeNil())
 
 			Expect(c.Batch().Jobs(ns).Delete("run-test-3", nil)).To(BeNil())
@@ -523,6 +558,30 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			if !strings.Contains(body, nginxDefaultOutput) {
 				framework.Failf("Container port output missing expected value. Wanted:'%s', got: %s", nginxDefaultOutput, body)
 			}
+		})
+	})
+
+	framework.KubeDescribe("Kubectl should be able to talk to api server", func() {
+		It("kubectl running in a pod could talk to api server [Conformance]", func() {
+			framework.SkipUnlessProviderIs("gke")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			podJson := readTestFileOrDie(kubectlInPodFilename)
+			By("validating api verions")
+			framework.RunKubectlOrDieInput(string(podJson), "create", "-f", "-", nsFlag)
+			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				output := framework.RunKubectlOrDie("get", "pods/kubectl-in-pod", nsFlag)
+				if strings.Contains(output, "Running") {
+					return true, nil
+				} else {
+					return false, nil
+				}
+			})
+			Expect(err).To(BeNil())
+			output := framework.RunKubectlOrDie("exec", "kubectl-in-pod", nsFlag, "--", "kubectl", "version")
+			if !strings.Contains(output, "Server Version") {
+				framework.Failf("kubectl in the pod fails to talk to api server")
+			}
+			framework.RunKubectlOrDie("delete", "pods", "kubectl-in-pod", nsFlag)
 		})
 	})
 

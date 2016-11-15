@@ -91,9 +91,10 @@ func (podDisruptionBudgetStrategy) ValidateUpdate(ctx api.Context, obj, old runt
 	return append(validationErrorList, updateErrorList...)
 }
 
-// AllowUnconditionalUpdate is the default update policy for PodDisruptionBudget objects.
+// AllowUnconditionalUpdate is the default update policy for PodDisruptionBudget objects. Status update should
+// only be allowed if version match.
 func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate() bool {
-	return true
+	return false
 }
 
 // PodDisruptionBudgetToSelectableFields returns a field set that represents the object.

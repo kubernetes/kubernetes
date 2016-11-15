@@ -383,6 +383,47 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h2 id="_definitions">Definitions</h2>
 <div class="sectionbody">
 <div class="sect2">
+<h3 id="_v1_photonpersistentdiskvolumesource">v1.PhotonPersistentDiskVolumeSource</h3>
+<div class="paragraph">
+<p>Represents a Photon Controller persistent disk resource.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pdID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ID that identifies Photon Controller persistent disk</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_versioned_event">versioned.Event</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1803,7 +1844,7 @@ Populated by the system. Read-only. Null for lists. More info: <a href="http://r
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">deletionTimestamp</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.<br>
+<td class="tableblock halign-left valign-top"><p class="tableblock">DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.<br>
 <br>
 Populated by the system when a graceful deletion is requested. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -3388,6 +3429,13 @@ The StatefulSet guarantees that a given network identity will always map to the 
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_azurediskvolumesource">v1.AzureDiskVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">photonPersistentDisk</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_photonpersistentdiskvolumesource">v1.PhotonPersistentDiskVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -4396,7 +4444,7 @@ The StatefulSet guarantees that a given network identity will always map to the 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-02 20:46:45 UTC
+Last updated 2016-11-06 03:50:37 UTC
 </div>
 </div>
 </body>

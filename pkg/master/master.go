@@ -44,6 +44,7 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -270,7 +271,8 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.
 	}
 
 	if c.EnableCoreControllers {
-		bootstrapController := c.NewBootstrapController(legacyRESTStorage)
+		serviceClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+		bootstrapController := c.NewBootstrapController(legacyRESTStorage, serviceClient)
 		if err := m.GenericAPIServer.AddPostStartHook("bootstrap-controller", bootstrapController.PostStartHook); err != nil {
 			glog.Fatalf("Error registering PostStartHook %q: %v", "bootstrap-controller", err)
 		}
@@ -354,6 +356,10 @@ type nodeAddressProvider struct {
 }
 
 func (n nodeAddressProvider) externalAddresses() (addresses []string, err error) {
+	preferredAddressTypes := []api.NodeAddressType{
+		api.NodeExternalIP,
+		api.NodeLegacyHostIP,
+	}
 	nodes, err := n.nodeClient.List(api.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -361,31 +367,13 @@ func (n nodeAddressProvider) externalAddresses() (addresses []string, err error)
 	addrs := []string{}
 	for ix := range nodes.Items {
 		node := &nodes.Items[ix]
-		addr, err := findExternalAddress(node)
+		addr, err := nodeutil.GetPreferredNodeAddress(node, preferredAddressTypes)
 		if err != nil {
 			return nil, err
 		}
 		addrs = append(addrs, addr)
 	}
 	return addrs, nil
-}
-
-// findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
-func findExternalAddress(node *api.Node) (string, error) {
-	var fallback string
-	for ix := range node.Status.Addresses {
-		addr := &node.Status.Addresses[ix]
-		if addr.Type == api.NodeExternalIP {
-			return addr.Address, nil
-		}
-		if fallback == "" && addr.Type == api.NodeLegacyHostIP {
-			fallback = addr.Address
-		}
-	}
-	if fallback != "" {
-		return fallback, nil
-	}
-	return "", fmt.Errorf("Couldn't find external address: %v", node)
 }
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {

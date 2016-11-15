@@ -24,6 +24,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 // This file contains helper functions to convert docker API types to runtime
@@ -56,13 +57,14 @@ func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeApi
 	}
 
 	size := uint64(image.VirtualSize)
+	user := dockertools.GetUserFromImageUser(image.Config.User)
 	return &runtimeApi.Image{
 		Id:          &image.ID,
 		RepoTags:    image.RepoTags,
 		RepoDigests: image.RepoDigests,
 		Size_:       &size,
+		User:        &user,
 	}, nil
-
 }
 
 func toPullableImageID(id string, image *dockertypes.ImageInspect) string {

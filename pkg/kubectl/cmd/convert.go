@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -161,26 +162,32 @@ func (o *ConvertOptions) RunConvert() error {
 		return err
 	}
 
-	count := 0
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-
-		infos := []*resource.Info{info}
-		objects, err := resource.AsVersionedObject(infos, false, o.outputVersion, o.encoder)
-		if err != nil {
-			return err
-		}
-
-		count++
-		return o.printer.PrintObj(objects, o.out)
-	})
+	singular := false
+	infos, err := r.IntoSingular(&singular).Infos()
 	if err != nil {
 		return err
 	}
-	if count == 0 {
+
+	if len(infos) == 0 {
 		return fmt.Errorf("no objects passed to convert")
 	}
-	return nil
+
+	objects, err := resource.AsVersionedObject(infos, !singular, o.outputVersion, o.encoder)
+	if err != nil {
+		return err
+	}
+
+	if meta.IsListType(objects) {
+		_, items, err := cmdutil.FilterResourceList(objects, nil, nil)
+		if err != nil {
+			return err
+		}
+		filteredObj, err := cmdutil.ObjectListToVersionedObject(items, o.outputVersion)
+		if err != nil {
+			return err
+		}
+		return o.printer.PrintObj(filteredObj, o.out)
+	}
+
+	return o.printer.PrintObj(objects, o.out)
 }

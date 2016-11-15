@@ -308,7 +308,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.CloudProvider = in.CloudProvider
 		out.CloudConfigFile = in.CloudConfigFile
 		out.KubeletCgroups = in.KubeletCgroups
-		out.CgroupsPerQOS = in.CgroupsPerQOS
+		out.ExperimentalCgroupsPerQOS = in.ExperimentalCgroupsPerQOS
 		out.CgroupDriver = in.CgroupDriver
 		out.RuntimeCgroups = in.RuntimeCgroups
 		out.SystemCgroups = in.SystemCgroups
@@ -319,7 +319,6 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
 		out.ExperimentalMounterPath = in.ExperimentalMounterPath
-		out.ExperimentalMounterRootfsPath = in.ExperimentalMounterRootfsPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		out.LockFilePath = in.LockFilePath
@@ -391,7 +390,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			out.AllowedUnsafeSysctls = nil
 		}
 		out.FeatureGates = in.FeatureGates
-		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
+		out.EnableCRI = in.EnableCRI
+		out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
+		out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 		return nil
 	}
 }

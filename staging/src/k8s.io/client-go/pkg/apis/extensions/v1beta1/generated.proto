@@ -550,6 +550,7 @@ message IngressTLS {
 }
 
 // Job represents the configuration of a single job.
+// DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.
 message Job {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
@@ -593,6 +594,7 @@ message JobCondition {
 }
 
 // JobList is a collection of jobs.
+// DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.
 message JobList {
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata

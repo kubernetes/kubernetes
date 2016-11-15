@@ -19,9 +19,11 @@ limitations under the License.
 package cm
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"strconv"
 	"sync"
@@ -35,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -164,10 +167,42 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
+	}
+
+	// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
+	cmd := exec.Command("cat", "/proc/swaps")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	var buf []string
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() { // Splits on newlines by default
+		buf = append(buf, scanner.Text())
+	}
+	if err := cmd.Wait(); err != nil { // Clean up
+		return nil, err
+	}
+
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	//     Running with swap enabled should be considered an error, but in order to maintain legacy
+	//     behavior we have to require an opt-in to this error for a period of time.
+
+	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should error out.
+	if len(buf) > 1 {
+		if failSwapOn {
+			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! /proc/swaps contained: %v", buf)
+		}
+		glog.Warningf("Running with swap on is not supported, please disable swap! " +
+			"This will be a fatal error by default starting in K8s v1.6! " +
+			"In the meantime, you can opt-in to making this a fatal error by enabling --experimental-fail-swap-on.")
 	}
 
 	// Check if Cgroup-root actually exists on the node
@@ -335,7 +370,7 @@ func (cm *containerManagerImpl) setupNode() error {
 	systemContainers := []*systemContainer{}
 	if cm.ContainerRuntime == "docker" {
 		dockerVersion := getDockerVersion(cm.cadvisorInterface)
-		if cm.RuntimeIntegrationType == "cri" {
+		if cm.EnableCRI {
 			// If kubelet uses CRI, dockershim will manage the cgroups and oom
 			// score for the docker processes.
 			// In the future, NodeSpec should mandate the cgroup that the
@@ -409,14 +444,8 @@ func (cm *containerManagerImpl) setupNode() error {
 			return fmt.Errorf("system container cannot be root (\"/\")")
 		}
 		cont := newSystemCgroups(cm.SystemCgroupsName)
-		rootContainer := &fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Parent: "/",
-				Name:   "/",
-			},
-		}
 		cont.ensureStateFunc = func(manager *fs.Manager) error {
-			return ensureSystemCgroups(rootContainer, manager)
+			return ensureSystemCgroups("/", manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	}
@@ -713,7 +742,7 @@ func getContainer(pid int) (string, error) {
 // The reason of leaving kernel threads at root cgroup is that we don't want to tie the
 // execution of these threads with to-be defined /system quota and create priority inversions.
 //
-func ensureSystemCgroups(rootContainer *fs.Manager, manager *fs.Manager) error {
+func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
 	var errs []error
@@ -722,7 +751,7 @@ func ensureSystemCgroups(rootContainer *fs.Manager, manager *fs.Manager) error {
 		errs = []error{}
 		attemptsRemaining--
 
-		allPids, err := rootContainer.GetPids()
+		allPids, err := cmutil.GetPids(rootCgroupPath)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to list PIDs for root: %v", err))
 			continue

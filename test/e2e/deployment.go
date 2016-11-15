@@ -398,8 +398,8 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Created new replica set %q and scaled up to 1", newRS.Name)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %q to 0", rsName)))
+	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 1", newRS.Name)))
+	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
 }
 
 func testRecreateDeployment(f *framework.Framework) {
@@ -450,8 +450,8 @@ func testRecreateDeployment(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %q to 0", rsName)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Created new replica set %q and scaled up to 3", newRS.Name)))
+	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
+	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 3", newRS.Name)))
 }
 
 // testDeploymentCleanUpPolicy tests that deployment supports cleanup policy
@@ -1044,20 +1044,13 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	d.Spec.Strategy.RollingUpdate = new(extensions.RollingUpdateDeployment)
 	d.Spec.Strategy.RollingUpdate.MaxSurge = intstr.FromInt(3)
 	d.Spec.Strategy.RollingUpdate.MaxUnavailable = intstr.FromInt(2)
-	By(fmt.Sprintf("Creating deployment %q", deploymentName))
-	_, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
 
-	// Check that deployment is created fine.
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	By(fmt.Sprintf("Creating deployment %q", deploymentName))
+	deployment, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Waiting for observed generation %d", deployment.Generation))
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
 	By("Waiting for all required pods to come up")
@@ -1066,8 +1059,8 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
 	}
-	err = framework.WaitForDeploymentStatus(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
+	By(fmt.Sprintf("Waiting for deployment %q to complete", deployment.Name))
+	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
 	first, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
@@ -1212,6 +1205,7 @@ func testOverlappingDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	deploymentName = "second-deployment"
 	By(fmt.Sprintf("Creating deployment %q with overlapping selector", deploymentName))
+	podLabels["other-label"] = "random-label"
 	d = newDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
 	deployOverlapping, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred(), "Failed creating the second deployment")
@@ -1443,7 +1437,10 @@ func testIterativeDeployments(f *framework.Framework) {
 				}
 				name := podList.Items[p].Name
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
-				Expect(c.Core().Pods(ns).Delete(name, nil)).NotTo(HaveOccurred())
+				err := c.Core().Pods(ns).Delete(name, nil)
+				if err != nil && !errors.IsNotFound(err) {
+					Expect(err).NotTo(HaveOccurred())
+				}
 			}
 		}
 	}

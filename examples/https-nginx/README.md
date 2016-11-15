@@ -22,7 +22,7 @@ Create a secret and a configmap.
 $ kubectl create -f /tmp/secret.json
 secret "nginxsecret" created
 
-$ kubectl create configmap nginxconfigmap --from-file=examples/https-nginx/default.conf 
+$ kubectl create configmap nginxconfigmap --from-file=examples/https-nginx/default.conf
 configmap "nginxconfigmap" created
 ```
 
@@ -103,34 +103,11 @@ $ curl https://104.198.1.26:30028 -k
 ...
 ```
 
-Then we will update the configmap. First check your kubectl version.
+Then we will update the configmap by changing `index.html` to `index2.html`.
 
 ```sh
-$ kubectl version 
-Client Version: version.Info{Major:"1", Minor:"3", GitVersion:"v1.3.4", GitCommit:"dd6b458ef8dbf24aff55795baa68f83383c9b3a9", GitTreeState:"clean", BuildDate:"2016-08-01T16:45:16Z", GoVersion:"go1.6.2", Compiler:"gc", Platform:"linux/amd64"}
-Server Version: version.Info{Major:"1", Minor:"3", GitVersion:"v1.3.5", GitCommit:"b0deb2eb8f4037421077f77cb163dbb4c0a2a9f5", GitTreeState:"clean", BuildDate:"2016-08-11T20:21:58Z", GoVersion:"go1.6.2", Compiler:"gc", Platform:"linux/amd64"}
-```
-
-If you are using 1.5 or higher:
-Edit file `default.conf`: change `index index.html;` in line 8 to `index index2.html;`.
-
-```sh
-$ kubectl replace configmap nginxconfigmap --from-file=default.conf
-configmap "nginxconfigmap" replaced
-```
-
-If you are using 1.4 or lower:
-Retrieve configmap nginxconfigmap.
-
-```sh
-$ kubectl get configmap nginxconfigmap -o yaml > examples/https-nginx/nginxcm.yaml
-```
-
-Edit file `nginxcm.yaml`: change `index index.html;` to `index index2.html;`.
-Apply the change.
-
-```sh
-$ kubectl apply -f examples/https-nginx/nginxcm.yaml 
+kubectl create configmap nginxconfigmap --from-file=examples/https-nginx/default.conf -o yaml --dry-run\
+| sed 's/index.html/index2.html/g' | kubectl apply -f -
 configmap "nginxconfigmap" configured
 ```
 

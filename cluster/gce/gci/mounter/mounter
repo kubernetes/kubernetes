@@ -14,23 +14,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
+set -o errexit
+set -o nounset
 set -o pipefail
 
-MOUNTER_DOCKER_IMAGE=gcr.io/google_containers/gci-mounter
-MOUNTER_DOCKER_VERSION=v2
+MOUNTER_VERSION=v2
 MOUNTER_USER=root
-RKT_BINARY=/home/kubernetes/bin/rkt
+ROOT_DIR=/home/kubernetes/bin
+RKT_BINARY=${ROOT_DIR}/rkt
+STAGE1_ACI=${ROOT_DIR}/stage1-fly.aci
+MOUNTER_ACI=${ROOT_DIR}/gci-mounter-${MOUNTER_VERSION}.aci
+MOUNTER_IMAGE=gcr.io/google_containers/gci-mounter:${MOUNTER_VERSION}
 
 function gc {
-    ${RKT_BINARY} gc --grace-period=0s &> /dev/null
+    # Attempt to garbage collect rkt pods with 5 retries.
+    # Rkt pods end up creating new copies of mounts on the host. Hence it is ideal to clean them up right away.
+    attempt=0
+    until [ $attempt -ge 5 ]; do
+	${RKT_BINARY} gc --grace-period=0s &> /dev/null && break
+	attempt=$[$attempt+1]
+	sleep 1
+    done
 }
 
 # Garbage collect old rkt containers on exit
 trap gc EXIT
 
-${RKT_BINARY} run --stage1-name="coreos.com/rkt/stage1-fly:1.18.0" \
+if [[ ! $(${RKT_BINARY} image list | grep ${MOUNTER_IMAGE}) ]]; then
+        ${RKT_BINARY} fetch --insecure-options=image file://${MOUNTER_ACI}
+fi
+
+echo "Running mount using a rkt fly container"
+
+${RKT_BINARY} run --stage1-path=${STAGE1_ACI} \
 	--insecure-options=image \
-	--volume=rootfs,kind=host,source=/,readOnly=false,recursive=true \
-	--mount volume=rootfs,target=/media/root \
-	docker://${MOUNTER_DOCKER_IMAGE}:${MOUNTER_DOCKER_VERSION} --user=${MOUNTER_USER} --exec /bin/mount -- "$@"
+	--volume=kubelet,kind=host,source=/var/lib/kubelet,readOnly=false,recursive=true \
+	--mount volume=kubelet,target=/var/lib/kubelet \
+	${MOUNTER_IMAGE} --user=${MOUNTER_USER} --exec /bin/mount -- "$@"
+
+echo "Successfully ran mount using a rkt fly container"

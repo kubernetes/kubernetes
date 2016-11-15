@@ -25,13 +25,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path"
 	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
 	utilExec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -54,8 +54,7 @@ const (
 // for the linux platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
 type Mounter struct {
-	mounterPath       string
-	mounterRootfsPath string
+	mounterPath string
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
@@ -63,18 +62,24 @@ type Mounter struct {
 // type, where kernel handles fs type for you. The mount 'options' is a list of options,
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
-// Update source path to include a root filesystem override to make a containerized mounter (specified via `mounterPath`) work.
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	// Path to mounter binary. Set to mount accessible via $PATH by default.
+	// All Linux distros are expected to be shipped with a mount utility that an support bind mounts.
+	mounterPath := defaultMountCommand
 	bind, bindRemountOpts := isBind(options)
 	if bind {
-		err := doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), path.Join(mounter.mounterRootfsPath, target), fstype, []string{"bind"})
+		err := doMount(mounterPath, source, target, fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}
-		return doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), path.Join(mounter.mounterRootfsPath, target), fstype, bindRemountOpts)
-	} else {
-		return doMount(mounter.mounterPath, source, path.Join(mounter.mounterRootfsPath, target), fstype, options)
+		return doMount(mounterPath, source, target, fstype, bindRemountOpts)
 	}
+	// These filesystem types are expected to be supported by the mount utility on the host across all Linux distros.
+	var defaultMounterFsTypes = sets.NewString("tmpfs", "ext4", "ext3", "ext2")
+	if !defaultMounterFsTypes.Has(fstype) {
+		mounterPath = mounter.mounterPath
+	}
+	return doMount(mounterPath, source, target, fstype, options)
 }
 
 // isBind detects whether a bind mount is being requested and makes the remount options to

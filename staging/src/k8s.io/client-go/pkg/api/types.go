@@ -114,15 +114,23 @@ type ObjectMeta struct {
 	// +optional
 	CreationTimestamp unversioned.Time `json:"creationTimestamp,omitempty"`
 
-	// DeletionTimestamp is the time after which this resource will be deleted. This
+	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
-	// directly settable by a client. The resource will be deleted (no longer visible from
-	// resource lists, and not reachable by name) after the time in this field. Once set, this
-	// value may not be unset or be set further into the future, although it may be shortened
+	// directly settable by a client. The resource is expected to be deleted (no longer visible
+	// from resource lists, and not reachable by name) after the time in this field. Once set,
+	// this value may not be unset or be set further into the future, although it may be shortened
 	// or the resource may be deleted prior to this time. For example, a user may request that
 	// a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
-	// signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet
-	// will send a hard termination signal to the container.
+	// signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard
+	// termination signal (SIGKILL) to the container and after cleanup, remove the pod from the
+	// API. In the presence of network partitions, this object may still exist after this
+	// timestamp, until an administrator or automated process can determine the resource is
+	// fully terminated.
+	// If not set, graceful deletion of the object has not been requested.
+	//
+	// Populated by the system when a graceful deletion is requested.
+	// Read-only.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
 	DeletionTimestamp *unversioned.Time `json:"deletionTimestamp,omitempty"`
 
@@ -281,6 +289,8 @@ type VolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
+	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
+	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -341,6 +351,8 @@ type PersistentVolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
+	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
+	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -925,6 +937,16 @@ type VsphereVirtualDiskVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
+	FSType string `json:"fsType,omitempty"`
+}
+
+// Represents a Photon Controller persistent disk resource.
+type PhotonPersistentDiskVolumeSource struct {
+	// ID that identifies Photon Controller persistent disk
+	PdID string `json:"pdID"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty"`
 }
 
@@ -2570,8 +2592,6 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
-	// NodeInodePressure means the kublet is under pressure due to insufficient available inodes.
-	NodeInodePressure NodeConditionType = "InodePressure"
 )
 
 type NodeCondition struct {
@@ -2592,6 +2612,7 @@ type NodeAddressType string
 // These are valid address types of node. NodeLegacyHostIP is used to transit
 // from out-dated HostIP field to NodeAddress.
 const (
+	// Deprecated: NodeLegacyHostIP will be removed in 1.7.
 	NodeLegacyHostIP NodeAddressType = "LegacyHostIP"
 	NodeHostName     NodeAddressType = "Hostname"
 	NodeExternalIP   NodeAddressType = "ExternalIP"

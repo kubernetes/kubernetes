@@ -115,7 +115,8 @@ func (es *e2eServices) stop() {
 // startEtcd starts the embedded etcd instance or returns an error.
 func (es *e2eServices) startEtcd() error {
 	glog.Info("Starting etcd")
-	dataDir, err := ioutil.TempDir("", "node-e2e")
+	// Create data directory in current working space.
+	dataDir, err := ioutil.TempDir(".", "etcd")
 	if err != nil {
 		return err
 	}

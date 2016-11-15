@@ -25,18 +25,18 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
-// ShortcutExpander is a RESTMapper that can be used for OpenShift resources.   It expands the resource first, then invokes the wrapped
+// ShortcutExpander is a RESTMapper that can be used for Kubernetes resources.   It expands the resource first, then invokes the wrapped
 type ShortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
 	All []unversioned.GroupResource
 
-	discoveryClient *discovery.DiscoveryClient
+	discoveryClient discovery.DiscoveryInterface
 }
 
 var _ meta.RESTMapper = &ShortcutExpander{}
 
-func NewShortcutExpander(delegate meta.RESTMapper, client *discovery.DiscoveryClient) ShortcutExpander {
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) ShortcutExpander {
 	return ShortcutExpander{All: userResources, RESTMapper: delegate, discoveryClient: client}
 }
 

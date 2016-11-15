@@ -19,14 +19,15 @@ package nfs
 import (
 	"fmt"
 	"os"
+	"runtime"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-
-	"github.com/golang/glog"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -36,18 +37,15 @@ import (
 func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
 		&nfsPlugin{
-			host:            nil,
-			newRecyclerFunc: newRecycler,
-			config:          volumeConfig,
+			host:   nil,
+			config: volumeConfig,
 		},
 	}
 }
 
 type nfsPlugin struct {
-	host volume.VolumeHost
-	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc func(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
-	config          volume.VolumeConfig
+	host   volume.VolumeHost
+	config volume.VolumeConfig
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
@@ -133,7 +131,7 @@ func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 }
 
 func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) (volume.Recycler, error) {
-	return plugin.newRecyclerFunc(pvName, spec, eventRecorder, plugin.host, plugin.config)
+	return newRecycler(pvName, spec, eventRecorder, plugin.host, plugin.config)
 }
 
 func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -154,14 +152,38 @@ type nfs struct {
 	pod     *api.Pod
 	mounter mount.Interface
 	plugin  *nfsPlugin
-	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	volume.MetricsNil
 }
 
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
 	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+}
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (nfsMounter *nfsMounter) CanMount() error {
+	exe := exec.New()
+	switch runtime.GOOS {
+	case "linux":
+		_, err1 := exe.Command("/bin/ls", "/sbin/mount.nfs").CombinedOutput()
+		_, err2 := exe.Command("/bin/ls", "/sbin/mount.nfs4").CombinedOutput()
+
+		if err1 != nil {
+			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
+		}
+		if err2 != nil {
+			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
+		}
+		return nil
+	case "darwin":
+		_, err := exe.Command("/bin/ls", "/sbin/mount_nfs").CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
+		}
+	}
+	return nil
 }
 
 type nfsMounter struct {

@@ -55,7 +55,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	var cfgPath string
 
 	cmd := &cobra.Command{
-		Use:   "join",
+		Use:   "join <master address>",
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Run: func(cmd *cobra.Command, args []string) {
 			j, err := NewJoin(cfgPath, args, &cfg, skipPreFlight)
@@ -104,11 +104,13 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		}
 	}
 
-	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
 	if len(args) == 0 && len(cfg.MasterAddresses) == 0 {
-		return nil, fmt.Errorf("must specify master IP address (see --help)")
+		return nil, fmt.Errorf("must specify master address (see --help)")
 	}
 	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
+	if len(cfg.MasterAddresses) > 1 {
+		return nil, fmt.Errorf("Must not specify more than one master address  (see --help)")
+	}
 
 	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")

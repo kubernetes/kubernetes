@@ -42,12 +42,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	triple "k8s.io/kubernetes/pkg/util/cert/triple"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/spf13/cobra"
 )
@@ -55,6 +58,7 @@ import (
 const (
 	APIServerCN                 = "federation-apiserver"
 	ControllerManagerCN         = "federation-controller-manager"
+	AdminCN                     = "admin"
 	HostClusterLocalDNSZoneName = "cluster.local."
 
 	lbAddrRetryInterval = 5 * time.Second
@@ -92,7 +96,7 @@ var (
 		"module": "federation-controller-manager",
 	}
 
-	hyperkubeImage = "gcr.io/google_containers/hyperkube-amd64:v1.5.0"
+	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
 )
 
 // NewCmdInit defines the `init` command that bootstraps a federation
@@ -109,8 +113,12 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 		},
 	}
 
+	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+
 	util.AddSubcommandFlags(cmd)
 	cmd.Flags().String("dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
+	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
+	cmd.Flags().String("dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
 	return cmd
 }
 
@@ -118,6 +126,7 @@ type entityKeyPairs struct {
 	ca                *triple.KeyPair
 	server            *triple.KeyPair
 	controllerManager *triple.KeyPair
+	admin             *triple.KeyPair
 }
 
 // initFederation initializes a federation control plane.
@@ -129,6 +138,8 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		return err
 	}
 	dnsZoneName := cmdutil.GetFlagString(cmd, "dns-zone-name")
+	image := cmdutil.GetFlagString(cmd, "image")
+	dnsProvider := cmdutil.GetFlagString(cmd, "dns-provider")
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -189,14 +200,26 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		advertiseAddress = ips[0]
 	}
 
+	endpoint := advertiseAddress
+	if advertiseAddress == "" && len(hostnames) > 0 {
+		endpoint = hostnames[0]
+	}
+
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, serverCredName, pvc.Name, advertiseAddress)
+	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress)
 	if err != nil {
 		return err
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, cmKubeconfigName, dnsZoneName)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider)
+	if err != nil {
+		return err
+	}
+
+	// 8. Write the federation API server endpoint info, credentials
+	// and context to kubeconfig
+	err = updateKubeconfig(config, initFlags.Name, endpoint, entKeyPairs)
 	if err != nil {
 		return err
 	}
@@ -282,10 +305,15 @@ func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnam
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federation controller manager client key and certificate: %v", err)
 	}
+	admin, err := triple.NewClientKeyPair(ca, AdminCN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client key and certificate for an admin: %v", err)
+	}
 	return &entityKeyPairs{
 		ca:                ca,
 		server:            server,
 		controllerManager: cm,
+		admin:             admin,
 	}, nil
 }
 
@@ -305,7 +333,6 @@ func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, cr
 
 	// Boilerplate to create the secret in the host cluster.
 	return clientset.Core().Secrets(namespace).Create(secret)
-
 }
 
 func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namespace, name, svcName, kubeconfigName string, entKeyPairs *entityKeyPairs) (*api.Secret, error) {
@@ -356,7 +383,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName string) (*api.Per
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, credentialsName, pvcName, advertiseAddress string) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress string) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -364,8 +391,6 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 		"--etcd-servers=http://localhost:2379",
 		"--service-cluster-ip-range=10.0.0.0/16",
 		"--secure-port=443",
-		"--token-auth-file=/etc/federation/apiserver/known_tokens.csv",
-		"--basic-auth-file=/etc/federation/apiserver/basic_auth.csv",
 		"--client-ca-file=/etc/federation/apiserver/ca.crt",
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
@@ -394,7 +419,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 					Containers: []api.Container{
 						{
 							Name:    "apiserver",
-							Image:   hyperkubeImage,
+							Image:   image,
 							Command: command,
 							Ports: []api.ContainerPort{
 								{
@@ -456,7 +481,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, cmName, kubeconfigName, dnsZoneName string) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName, dnsProvider string) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      cmName,
@@ -474,13 +499,13 @@ func createControllerManager(clientset *client.Clientset, namespace, name, cmNam
 					Containers: []api.Container{
 						{
 							Name:  "controller-manager",
-							Image: hyperkubeImage,
+							Image: image,
 							Command: []string{
 								"/hyperkube",
 								"federation-controller-manager",
 								"--master=https://federation-apiserver",
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-								"--dns-provider=gce",
+								fmt.Sprintf("--dns-provider=%s", dnsProvider),
 								"--dns-provider-config=",
 								fmt.Sprintf("--federation-name=%s", name),
 								fmt.Sprintf("--zone-name=%s", dnsZoneName),
@@ -526,4 +551,45 @@ func printSuccess(cmdOut io.Writer, ips, hostnames []string) error {
 	svcEndpoints := append(ips, hostnames...)
 	_, err := fmt.Fprintf(cmdOut, "Federation API server is running at: %s\n", strings.Join(svcEndpoints, ", "))
 	return err
+}
+
+func updateKubeconfig(config util.AdminConfig, name, endpoint string, entKeyPairs *entityKeyPairs) error {
+	po := config.PathOptions()
+	kubeconfig, err := po.GetStartingConfig()
+	if err != nil {
+		return err
+	}
+
+	// Populate API server endpoint info.
+	cluster := clientcmdapi.NewCluster()
+	// Prefix "https" as the URL scheme to endpoint.
+	if !strings.HasPrefix(endpoint, "https://") {
+		endpoint = fmt.Sprintf("https://%s", endpoint)
+	}
+	cluster.Server = endpoint
+	cluster.CertificateAuthorityData = certutil.EncodeCertPEM(entKeyPairs.ca.Cert)
+
+	// Populate credentials.
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.ClientCertificateData = certutil.EncodeCertPEM(entKeyPairs.admin.Cert)
+	authInfo.ClientKeyData = certutil.EncodePrivateKeyPEM(entKeyPairs.admin.Key)
+	authInfo.Username = AdminCN
+
+	// Populate context.
+	context := clientcmdapi.NewContext()
+	context.Cluster = name
+	context.AuthInfo = name
+
+	// Update the config struct with API server endpoint info,
+	// credentials and context.
+	kubeconfig.Clusters[name] = cluster
+	kubeconfig.AuthInfos[name] = authInfo
+	kubeconfig.Contexts[name] = context
+
+	// Write the update kubeconfig.
+	if err := clientcmd.ModifyConfig(po, *kubeconfig, true); err != nil {
+		return err
+	}
+
+	return nil
 }

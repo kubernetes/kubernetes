@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: registry
-        image: registry:2
+        image: registry:2.5.1
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:

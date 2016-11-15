@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -58,7 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/runtime"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	kubetypes "k8s.io/kubernetes/pkg/types"
@@ -360,16 +361,7 @@ var (
 // that the container passed is the infrastructure container of a pod and the responsibility
 // of the caller to ensure that the correct container is passed.
 func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *dockertypes.ContainerJSON) (string, error) {
-	result := ""
-
-	if container.NetworkSettings != nil {
-		result = container.NetworkSettings.IPAddress
-
-		// Fall back to IPv6 address if no IPv4 address is present
-		if result == "" {
-			result = container.NetworkSettings.GlobalIPv6Address
-		}
-	}
+	result := getContainerIP(container)
 
 	networkMode := getDockerNetworkMode(container)
 	isHostNetwork := networkMode == namespaceModeHost
@@ -450,7 +442,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		// Container that are running, restarting and paused
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = startedAt
-		if containerName == PodInfraContainerName {
+		if containerProvidesPodIP(dockerName) {
 			ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
 			// Kubelet doesn't handle the network error scenario
 			if err != nil {
@@ -628,7 +620,7 @@ func (dm *DockerManager) runContainer(
 		// TODO: This is kind of hacky, we should really just encode the bits we need.
 		// TODO: This is hacky because the Kubelet should be parameterized to encode a specific version
 		//   and needs to be able to migrate this whenever we deprecate v1. Should be a member of DockerManager.
-		if data, err := runtime.Encode(api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"}), pod); err == nil {
+		if data, err := kruntime.Encode(api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"}), pod); err == nil {
 			labels[kubernetesPodLabel] = string(data)
 		} else {
 			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
@@ -689,12 +681,18 @@ func (dm *DockerManager) runContainer(
 		}
 	}
 
+	userNsMode := ""
+	if opts.EnableHostUserNamespace {
+		userNsMode = "host"
+	}
+
 	hc := &dockercontainer.HostConfig{
 		Binds:          binds,
 		NetworkMode:    dockercontainer.NetworkMode(netMode),
 		IpcMode:        dockercontainer.IpcMode(ipcMode),
 		UTSMode:        dockercontainer.UTSMode(utsMode),
 		PidMode:        dockercontainer.PidMode(pidMode),
+		UsernsMode:     dockercontainer.UsernsMode(userNsMode),
 		ReadonlyRootfs: readOnlyRootFilesystem(container),
 		Resources: dockercontainer.Resources{
 			Memory:     memoryLimit,
@@ -703,6 +701,12 @@ func (dm *DockerManager) runContainer(
 			Devices:    devices,
 		},
 		SecurityOpt: fmtSecurityOpts,
+	}
+
+	// There is no /etc/resolv.conf in Windows, DNS and DNSSearch options would have to be passed to Docker runtime instead
+	if runtime.GOOS == "windows" {
+		hc.DNS = opts.DNS
+		hc.DNSSearch = opts.DNSSearch
 	}
 
 	// Set sysctls if requested
@@ -1107,8 +1111,8 @@ func (dm *DockerManager) APIVersion() (kubecontainer.Version, error) {
 // Now we do this by checking whether:
 // 1) `docker version` works
 // 2) docker version is compatible with minimum requirement
-func (dm *DockerManager) Status() error {
-	return dm.checkVersionCompatibility()
+func (dm *DockerManager) Status() (*kubecontainer.RuntimeStatus, error) {
+	return nil, dm.checkVersionCompatibility()
 }
 
 func (dm *DockerManager) checkVersionCompatibility() error {
@@ -1152,23 +1156,6 @@ func (dm *DockerManager) fmtDockerOpts(opts []dockerOpt) ([]string, error) {
 		fmtOpts[i] = fmt.Sprintf("%s%c%s", opt.key, sep, opt.value)
 	}
 	return fmtOpts, nil
-}
-
-func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
-	var securityOpts []dockerOpt
-	if seccompOpts, err := dm.getSeccompOpts(pod, ctrName); err != nil {
-		return nil, err
-	} else {
-		securityOpts = append(securityOpts, seccompOpts...)
-	}
-
-	if appArmorOpts, err := dm.getAppArmorOpts(pod, ctrName); err != nil {
-		return nil, err
-	} else {
-		securityOpts = append(securityOpts, appArmorOpts...)
-	}
-
-	return securityOpts, nil
 }
 
 type dockerOpt struct {
@@ -1284,7 +1271,7 @@ func (d *dockerExitError) ExitStatus() int {
 }
 
 // ExecInContainer runs the command inside the container identified by containerID.
-func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	if dm.execHandler == nil {
 		return errors.New("unable to exec without an exec handler")
 	}
@@ -1297,7 +1284,7 @@ func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, 
 		return fmt.Errorf("container not running (%s)", container.ID)
 	}
 
-	return dm.execHandler.ExecInContainer(dm.client, container, cmd, stdin, stdout, stderr, tty, resize)
+	return dm.execHandler.ExecInContainer(dm.client, container, cmd, stdin, stdout, stderr, tty, resize, timeout)
 }
 
 func (dm *DockerManager) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
@@ -1426,6 +1413,10 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gra
 
 // NOTE(random-liu): The pod passed in could be *nil* when kubelet restarted.
 func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+	// Short circuit if there's nothing to kill.
+	if len(runningPod.Containers) == 0 {
+		return
+	}
 	// Send the kills in parallel since they may take a long time.
 	// There may be len(runningPod.Containers) or len(runningPod.Containers)-1 of result in the channel
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
@@ -1650,7 +1641,7 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 	// the pod data may not be set
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
-		if err = runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
+		if err = kruntime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
 			name := labels[types.KubernetesContainerNameLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {
@@ -2359,7 +2350,14 @@ func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Po
 		restartCount = containerStatus.RestartCount + 1
 	}
 
-	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, podIP, restartCount)
+	// Allow override of networking mode for specific platforms (e.g. Windows)
+	netMode := getNetworkingMode()
+	if netMode == "" {
+		// If not overriden, use the namespace mode
+		netMode = namespaceMode
+	}
+
+	_, err = dm.runContainerInPod(pod, container, netMode, namespaceMode, pidMode, podIP, restartCount)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		return kubecontainer.ErrRunContainer, err.Error()
@@ -2482,7 +2480,7 @@ func (dm *DockerManager) isImageRoot(image string) (bool, error) {
 		return false, fmt.Errorf("unable to inspect image %s, nil Config", image)
 	}
 
-	user := getUidFromUser(img.Config.User)
+	user := GetUserFromImageUser(img.Config.User)
 	// if no user is defined container will run as root
 	if user == "" {
 		return true, nil
@@ -2496,16 +2494,16 @@ func (dm *DockerManager) isImageRoot(image string) (bool, error) {
 	return uid == 0, nil
 }
 
-// getUidFromUser splits the uid out of an uid:gid string.
-func getUidFromUser(id string) string {
+// GetUserFromImageUser splits the user out of an user:group string.
+func GetUserFromImageUser(id string) string {
 	if id == "" {
 		return id
 	}
-	// split instances where the id may contain uid:gid
+	// split instances where the id may contain user:group
 	if strings.Contains(id, ":") {
 		return strings.Split(id, ":")[0]
 	}
-	// no gid, just return the id
+	// no group, just return the id
 	return id
 }
 
@@ -2656,7 +2654,7 @@ func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string)
 			}
 		}
 		containerStatuses = append(containerStatuses, result)
-		if ip != "" {
+		if containerProvidesPodIP(dockerName) && ip != "" {
 			podStatus.IP = ip
 		}
 	}

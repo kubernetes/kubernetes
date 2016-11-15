@@ -2822,7 +2822,7 @@ func (x *JobCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *ScheduledJob) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *CronJob) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -2967,7 +2967,7 @@ func (x *ScheduledJob) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *ScheduledJob) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *CronJob) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -2997,7 +2997,7 @@ func (x *ScheduledJob) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *ScheduledJob) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *CronJob) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -3040,14 +3040,14 @@ func (x *ScheduledJob) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "spec":
 			if r.TryDecodeAsNil() {
-				x.Spec = ScheduledJobSpec{}
+				x.Spec = CronJobSpec{}
 			} else {
 				yyv269 := &x.Spec
 				yyv269.CodecDecodeSelf(d)
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
-				x.Status = ScheduledJobStatus{}
+				x.Status = CronJobStatus{}
 			} else {
 				yyv270 := &x.Status
 				yyv270.CodecDecodeSelf(d)
@@ -3059,7 +3059,7 @@ func (x *ScheduledJob) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *ScheduledJob) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *CronJob) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -3127,7 +3127,7 @@ func (x *ScheduledJob) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Spec = ScheduledJobSpec{}
+		x.Spec = CronJobSpec{}
 	} else {
 		yyv275 := &x.Spec
 		yyv275.CodecDecodeSelf(d)
@@ -3144,7 +3144,7 @@ func (x *ScheduledJob) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Status = ScheduledJobStatus{}
+		x.Status = CronJobStatus{}
 	} else {
 		yyv276 := &x.Status
 		yyv276.CodecDecodeSelf(d)
@@ -3165,7 +3165,7 @@ func (x *ScheduledJob) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *ScheduledJobList) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *CronJobList) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -3286,7 +3286,7 @@ func (x *ScheduledJobList) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym291
 					if false {
 					} else {
-						h.encSliceScheduledJob(([]ScheduledJob)(x.Items), e)
+						h.encSliceCronJob(([]CronJob)(x.Items), e)
 					}
 				}
 			} else {
@@ -3300,7 +3300,7 @@ func (x *ScheduledJobList) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym292
 					if false {
 					} else {
-						h.encSliceScheduledJob(([]ScheduledJob)(x.Items), e)
+						h.encSliceCronJob(([]CronJob)(x.Items), e)
 					}
 				}
 			}
@@ -3313,7 +3313,7 @@ func (x *ScheduledJobList) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *ScheduledJobList) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *CronJobList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -3343,7 +3343,7 @@ func (x *ScheduledJobList) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *ScheduledJobList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *CronJobList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -3399,7 +3399,7 @@ func (x *ScheduledJobList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				_ = yym301
 				if false {
 				} else {
-					h.decSliceScheduledJob((*[]ScheduledJob)(yyv300), d)
+					h.decSliceCronJob((*[]CronJob)(yyv300), d)
 				}
 			}
 		default:
@@ -3409,7 +3409,7 @@ func (x *ScheduledJobList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *ScheduledJobList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *CronJobList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -3490,7 +3490,7 @@ func (x *ScheduledJobList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 		_ = yym308
 		if false {
 		} else {
-			h.decSliceScheduledJob((*[]ScheduledJob)(yyv307), d)
+			h.decSliceCronJob((*[]CronJob)(yyv307), d)
 		}
 	}
 	for {
@@ -3509,7 +3509,7 @@ func (x *ScheduledJobList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *ScheduledJobSpec) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *CronJobSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -3666,7 +3666,7 @@ func (x *ScheduledJobSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *ScheduledJobSpec) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *CronJobSpec) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -3696,7 +3696,7 @@ func (x *ScheduledJobSpec) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *ScheduledJobSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *CronJobSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -3776,7 +3776,7 @@ func (x *ScheduledJobSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *ScheduledJobSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *CronJobSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -3926,7 +3926,7 @@ func (x *ConcurrencyPolicy) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *ScheduledJobStatus) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *CronJobStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -4043,7 +4043,7 @@ func (x *ScheduledJobStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *ScheduledJobStatus) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *CronJobStatus) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -4073,7 +4073,7 @@ func (x *ScheduledJobStatus) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *ScheduledJobStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *CronJobStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -4135,7 +4135,7 @@ func (x *ScheduledJobStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder)
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *ScheduledJobStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *CronJobStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -4443,7 +4443,7 @@ func (x codecSelfer1234) decSliceJobCondition(v *[]JobCondition, d *codec1978.De
 	}
 }
 
-func (x codecSelfer1234) encSliceScheduledJob(v []ScheduledJob, e *codec1978.Encoder) {
+func (x codecSelfer1234) encSliceCronJob(v []CronJob, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -4456,7 +4456,7 @@ func (x codecSelfer1234) encSliceScheduledJob(v []ScheduledJob, e *codec1978.Enc
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) decSliceScheduledJob(v *[]ScheduledJob, d *codec1978.Decoder) {
+func (x codecSelfer1234) decSliceCronJob(v *[]CronJob, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -4466,7 +4466,7 @@ func (x codecSelfer1234) decSliceScheduledJob(v *[]ScheduledJob, d *codec1978.De
 	var yyc382 bool
 	if yyl382 == 0 {
 		if yyv382 == nil {
-			yyv382 = []ScheduledJob{}
+			yyv382 = []CronJob{}
 			yyc382 = true
 		} else if len(yyv382) != 0 {
 			yyv382 = yyv382[:0]
@@ -4484,10 +4484,10 @@ func (x codecSelfer1234) decSliceScheduledJob(v *[]ScheduledJob, d *codec1978.De
 				if yyrl382 <= cap(yyv382) {
 					yyv382 = yyv382[:yyrl382]
 				} else {
-					yyv382 = make([]ScheduledJob, yyrl382)
+					yyv382 = make([]CronJob, yyrl382)
 				}
 			} else {
-				yyv382 = make([]ScheduledJob, yyrl382)
+				yyv382 = make([]CronJob, yyrl382)
 			}
 			yyc382 = true
 			yyrr382 = len(yyv382)
@@ -4502,7 +4502,7 @@ func (x codecSelfer1234) decSliceScheduledJob(v *[]ScheduledJob, d *codec1978.De
 		for ; yyj382 < yyrr382; yyj382++ {
 			yyh382.ElemContainerState(yyj382)
 			if r.TryDecodeAsNil() {
-				yyv382[yyj382] = ScheduledJob{}
+				yyv382[yyj382] = CronJob{}
 			} else {
 				yyv383 := &yyv382[yyj382]
 				yyv383.CodecDecodeSelf(d)
@@ -4511,10 +4511,10 @@ func (x codecSelfer1234) decSliceScheduledJob(v *[]ScheduledJob, d *codec1978.De
 		}
 		if yyrt382 {
 			for ; yyj382 < yyl382; yyj382++ {
-				yyv382 = append(yyv382, ScheduledJob{})
+				yyv382 = append(yyv382, CronJob{})
 				yyh382.ElemContainerState(yyj382)
 				if r.TryDecodeAsNil() {
-					yyv382[yyj382] = ScheduledJob{}
+					yyv382[yyj382] = CronJob{}
 				} else {
 					yyv384 := &yyv382[yyj382]
 					yyv384.CodecDecodeSelf(d)
@@ -4528,13 +4528,13 @@ func (x codecSelfer1234) decSliceScheduledJob(v *[]ScheduledJob, d *codec1978.De
 		for ; !r.CheckBreak(); yyj382++ {
 
 			if yyj382 >= len(yyv382) {
-				yyv382 = append(yyv382, ScheduledJob{}) // var yyz382 ScheduledJob
+				yyv382 = append(yyv382, CronJob{}) // var yyz382 CronJob
 				yyc382 = true
 			}
 			yyh382.ElemContainerState(yyj382)
 			if yyj382 < len(yyv382) {
 				if r.TryDecodeAsNil() {
-					yyv382[yyj382] = ScheduledJob{}
+					yyv382[yyj382] = CronJob{}
 				} else {
 					yyv385 := &yyv382[yyj382]
 					yyv385.CodecDecodeSelf(d)
@@ -4549,7 +4549,7 @@ func (x codecSelfer1234) decSliceScheduledJob(v *[]ScheduledJob, d *codec1978.De
 			yyv382 = yyv382[:yyj382]
 			yyc382 = true
 		} else if yyj382 == 0 && yyv382 == nil {
-			yyv382 = []ScheduledJob{}
+			yyv382 = []CronJob{}
 			yyc382 = true
 		}
 	}

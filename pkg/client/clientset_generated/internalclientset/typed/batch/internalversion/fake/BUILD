@@ -15,8 +15,8 @@ go_library(
     srcs = [
         "doc.go",
         "fake_batch_client.go",
+        "fake_cronjob.go",
         "fake_job.go",
-        "fake_scheduledjob.go",
     ],
     tags = ["automanaged"],
     deps = [

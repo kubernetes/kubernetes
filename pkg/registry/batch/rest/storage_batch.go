@@ -18,12 +18,13 @@ package rest
 
 import (
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	cronjobetcd "k8s.io/kubernetes/pkg/registry/batch/cronjob/etcd"
 	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
-	scheduledjobetcd "k8s.io/kubernetes/pkg/registry/batch/scheduledjob/etcd"
 )
 
 type RESTStorageProvider struct{}
@@ -36,6 +37,10 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv2alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[batchapiv2alpha1.SchemeGroupVersion.Version] = p.v2alpha1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = batchapiv2alpha1.SchemeGroupVersion
+		apiGroupInfo.SubresourceGroupVersionKind = map[string]unversioned.GroupVersionKind{
+			"scheduledjobs":        batchapiv2alpha1.SchemeGroupVersion.WithKind("ScheduledJob"),
+			"scheduledjobs/status": batchapiv2alpha1.SchemeGroupVersion.WithKind("ScheduledJob"),
+		}
 	}
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[batchapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
@@ -66,10 +71,12 @@ func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource genericapis
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
 	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("scheduledjobs")) {
-		scheduledJobsStorage, scheduledJobsStatusStorage := scheduledjobetcd.NewREST(restOptionsGetter(batch.Resource("scheduledjobs")))
-		storage["scheduledjobs"] = scheduledJobsStorage
-		storage["scheduledjobs/status"] = scheduledJobsStatusStorage
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("cronjobs")) {
+		cronJobsStorage, cronJobsStatusStorage := cronjobetcd.NewREST(restOptionsGetter(batch.Resource("cronjobs")))
+		storage["cronjobs"] = cronJobsStorage
+		storage["cronjobs/status"] = cronJobsStatusStorage
+		storage["scheduledjobs"] = cronJobsStorage
+		storage["scheduledjobs/status"] = cronJobsStatusStorage
 	}
 	return storage
 }

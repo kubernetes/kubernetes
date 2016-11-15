@@ -27,6 +27,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/homedir"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -77,6 +79,8 @@ type Factory interface {
 	// Returns internal flagset
 	FlagSet() *pflag.FlagSet
 
+	// Returns a discovery client
+	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns interfaces for dealing with arbitrary
@@ -194,6 +198,7 @@ const (
 	DeploymentBasicV1Beta1GeneratorName         = "deployment-basic/v1beta1"
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
 	JobV1GeneratorName                          = "job/v1"
+	CronJobV2Alpha1GeneratorName                = "cronjob/v2alpha1"
 	ScheduledJobV2Alpha1GeneratorName           = "scheduledjob/v2alpha1"
 	NamespaceV1GeneratorName                    = "namespace/v1"
 	ResourceQuotaV1GeneratorName                = "resourcequotas/v1"
@@ -236,7 +241,8 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			DeploymentV1Beta1GeneratorName:    kubectl.DeploymentV1Beta1{},
 			JobV1Beta1GeneratorName:           kubectl.JobV1Beta1{},
 			JobV1GeneratorName:                kubectl.JobV1{},
-			ScheduledJobV2Alpha1GeneratorName: kubectl.ScheduledJobV2Alpha1{},
+			ScheduledJobV2Alpha1GeneratorName: kubectl.CronJobV2Alpha1{},
+			CronJobV2Alpha1GeneratorName:      kubectl.CronJobV2Alpha1{},
 		}
 	case "autoscale":
 		generator = map[string]kubectl.Generator{
@@ -313,27 +319,36 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 	}
 
 	clients := NewClientCache(clientConfig)
-	return &factory{
+
+	f := &factory{
 		flags:        flags,
 		clientConfig: clientConfig,
 		clients:      clients,
 	}
+
+	return f
 }
 
 func (f *factory) FlagSet() *pflag.FlagSet {
 	return f.flags
 }
 
-func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	cfg, err := f.clientConfig.ClientConfig()
-	checkErrWithPrefix("failed to get client config: ", err)
-	cmdApiVersion := unversioned.GroupVersion{}
-	if cfg.GroupVersion != nil {
-		cmdApiVersion = *cfg.GroupVersion
+	if err != nil {
+		return nil, err
 	}
-
-	mapper := registered.RESTMapper()
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
+	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+}
+
+func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+	mapper := registered.RESTMapper()
+	discoveryClient, err := f.DiscoveryClient()
 	if err == nil {
 		mapper = meta.FirstHitRESTMapper{
 			MultiRESTMapper: meta.MultiRESTMapper{
@@ -345,23 +360,28 @@ func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 
 	// wrap with shortcuts
 	mapper = NewShortcutExpander(mapper, discoveryClient)
+
 	// wrap with output preferences
+	cfg, err := f.clients.ClientConfigForVersion(nil)
+	checkErrWithPrefix("failed to get client config: ", err)
+	cmdApiVersion := unversioned.GroupVersion{}
+	if cfg.GroupVersion != nil {
+		cmdApiVersion = *cfg.GroupVersion
+	}
 	mapper = kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
 	return mapper, api.Scheme
 }
 
 func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
-	cfg, err := f.clients.ClientConfigForVersion(nil)
+	discoveryClient, err := f.DiscoveryClient()
 	if err != nil {
 		return nil, nil, err
 	}
-
-	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return nil, nil, err
+	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
+	if err != nil && !discoveryClient.Fresh() {
+		discoveryClient.Invalidate()
+		groupResources, err = discovery.GetAPIGroupResources(discoveryClient)
 	}
-
-	groupResources, err := discovery.GetAPIGroupResources(dc)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -378,11 +398,9 @@ func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, er
 		}
 	}
 
-	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
-
+	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
-
-	return NewShortcutExpander(mapper, dc), typer, nil
+	return NewShortcutExpander(mapper, discoveryClient), typer, nil
 }
 
 func (f *factory) RESTClient() (*restclient.RESTClient, error) {
@@ -1315,4 +1333,17 @@ func (f *factory) SuggestedPodTemplateResources() []unversioned.GroupResource {
 		{Resource: "job"},
 		{Resource: "replicaset"},
 	}
+}
+
+// overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
+var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
+
+// computeDiscoverCacheDir takes the parentDir and the host and comes up with a "usually non-colliding" name.
+func computeDiscoverCacheDir(parentDir, host string) string {
+	// strip the optional scheme from host if its there:
+	schemelessHost := strings.Replace(strings.Replace(host, "https://", "", 1), "http://", "", 1)
+	// now do a simple collapse of non-AZ09 characters.  Collisions are possible but unlikely.  Even if we do collide the problem is short lived
+	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
+
+	return filepath.Join(parentDir, safeHost)
 }

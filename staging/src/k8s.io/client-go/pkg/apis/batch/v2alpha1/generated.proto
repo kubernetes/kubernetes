@@ -30,6 +30,70 @@ import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v2alpha1";
 
+// CronJob represents the configuration of a single cron job.
+message CronJob {
+  // Standard object's metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  // Spec is a structure defining the expected behavior of a job, including the schedule.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional CronJobSpec spec = 2;
+
+  // Status is a structure describing current status of a job.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional CronJobStatus status = 3;
+}
+
+// CronJobList is a collection of cron jobs.
+message CronJobList {
+  // Standard list metadata
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+
+  // Items is the list of CronJob.
+  repeated CronJob items = 2;
+}
+
+// CronJobSpec describes how the job execution will look like and when it will actually run.
+message CronJobSpec {
+  // Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+  optional string schedule = 1;
+
+  // Optional deadline in seconds for starting the job if it misses scheduled
+  // time for any reason.  Missed jobs executions will be counted as failed ones.
+  // +optional
+  optional int64 startingDeadlineSeconds = 2;
+
+  // ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
+  // +optional
+  optional string concurrencyPolicy = 3;
+
+  // Suspend flag tells the controller to suspend subsequent executions, it does
+  // not apply to already started executions.  Defaults to false.
+  // +optional
+  optional bool suspend = 4;
+
+  // JobTemplate is the object that describes the job that will be created when
+  // executing a CronJob.
+  optional JobTemplateSpec jobTemplate = 5;
+}
+
+// CronJobStatus represents the current state of a cron job.
+message CronJobStatus {
+  // Active holds pointers to currently running jobs.
+  // +optional
+  repeated k8s.io.kubernetes.pkg.api.v1.ObjectReference active = 1;
+
+  // LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
+  // +optional
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastScheduleTime = 4;
+}
+
 // Job represents the configuration of a single job.
 message Job {
   // Standard object's metadata.
@@ -189,69 +253,5 @@ message JobTemplateSpec {
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
   // +optional
   optional JobSpec spec = 2;
-}
-
-// ScheduledJob represents the configuration of a single scheduled job.
-message ScheduledJob {
-  // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
-
-  // Spec is a structure defining the expected behavior of a job, including the schedule.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  // +optional
-  optional ScheduledJobSpec spec = 2;
-
-  // Status is a structure describing current status of a job.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  // +optional
-  optional ScheduledJobStatus status = 3;
-}
-
-// ScheduledJobList is a collection of scheduled jobs.
-message ScheduledJobList {
-  // Standard list metadata
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
-
-  // Items is the list of ScheduledJob.
-  repeated ScheduledJob items = 2;
-}
-
-// ScheduledJobSpec describes how the job execution will look like and when it will actually run.
-message ScheduledJobSpec {
-  // Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
-  optional string schedule = 1;
-
-  // Optional deadline in seconds for starting the job if it misses scheduled
-  // time for any reason.  Missed jobs executions will be counted as failed ones.
-  // +optional
-  optional int64 startingDeadlineSeconds = 2;
-
-  // ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
-  // +optional
-  optional string concurrencyPolicy = 3;
-
-  // Suspend flag tells the controller to suspend subsequent executions, it does
-  // not apply to already started executions.  Defaults to false.
-  // +optional
-  optional bool suspend = 4;
-
-  // JobTemplate is the object that describes the job that will be created when
-  // executing a ScheduledJob.
-  optional JobTemplateSpec jobTemplate = 5;
-}
-
-// ScheduledJobStatus represents the current state of a Job.
-message ScheduledJobStatus {
-  // Active holds pointers to currently running jobs.
-  // +optional
-  repeated k8s.io.kubernetes.pkg.api.v1.ObjectReference active = 1;
-
-  // LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
-  // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastScheduleTime = 4;
 }
 

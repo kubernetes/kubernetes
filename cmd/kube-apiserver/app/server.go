@@ -172,7 +172,7 @@ func Run(s *options.ServerRunOptions) error {
 		s.GenericServerRunOptions.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
-		[]unversioned.GroupVersionResource{batch.Resource("scheduledjobs").WithVersion("v2alpha1")},
+		[]unversioned.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
 		master.DefaultAPIResourceConfigSource(), s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
 		glog.Fatalf("error in initializing storage factory: %s", err)
@@ -234,6 +234,7 @@ func Run(s *options.ServerRunOptions) error {
 		ServiceAccountLookup:        s.ServiceAccountLookup,
 		ServiceAccountTokenGetter:   serviceAccountGetter,
 		KeystoneURL:                 s.GenericServerRunOptions.KeystoneURL,
+		KeystoneCAFile:              s.GenericServerRunOptions.KeystoneCAFile,
 		WebhookTokenAuthnConfigFile: s.WebhookTokenAuthnConfigFile,
 		WebhookTokenAuthnCacheTTL:   s.WebhookTokenAuthnCacheTTL,
 		RequestHeaderConfig:         s.GenericServerRunOptions.AuthenticationRequestHeaderConfig(),

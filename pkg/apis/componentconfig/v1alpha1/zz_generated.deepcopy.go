@@ -302,12 +302,12 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.RuntimeCgroups = in.RuntimeCgroups
 		out.SystemCgroups = in.SystemCgroups
 		out.CgroupRoot = in.CgroupRoot
-		if in.CgroupsPerQOS != nil {
-			in, out := &in.CgroupsPerQOS, &out.CgroupsPerQOS
+		if in.ExperimentalCgroupsPerQOS != nil {
+			in, out := &in.ExperimentalCgroupsPerQOS, &out.ExperimentalCgroupsPerQOS
 			*out = new(bool)
 			**out = **in
 		} else {
-			out.CgroupsPerQOS = nil
+			out.ExperimentalCgroupsPerQOS = nil
 		}
 		out.CgroupDriver = in.CgroupDriver
 		out.ContainerRuntime = in.ContainerRuntime
@@ -316,7 +316,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
 		out.ExperimentalMounterPath = in.ExperimentalMounterPath
-		out.ExperimentalMounterRootfsPath = in.ExperimentalMounterRootfsPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		if in.LockFilePath != nil {
@@ -460,7 +459,9 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.AllowedUnsafeSysctls = nil
 		}
 		out.FeatureGates = in.FeatureGates
-		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
+		out.EnableCRI = in.EnableCRI
+		out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
+		out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 		return nil
 	}
 }

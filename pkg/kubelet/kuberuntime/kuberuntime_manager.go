@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -33,7 +32,6 @@ import (
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -114,8 +112,6 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
-	// TODO(timstclair): Remove this once the indirect path is fully functional.
-	kubecontainer.DirectStreamingRuntime
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -268,15 +264,14 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 	return newRuntimeVersion(typedVersion.GetRuntimeApiVersion())
 }
 
-// Status returns error if the runtime is unhealthy; nil otherwise.
-func (m *kubeGenericRuntimeManager) Status() error {
-	_, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
+// Status returns the status of the runtime. An error is returned if the Status
+// function itself fails, nil otherwise.
+func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, error) {
+	status, err := m.runtimeService.Status()
 	if err != nil {
-		glog.Errorf("Checkout remote runtime status failed: %v", err)
-		return err
+		return nil, err
 	}
-
-	return nil
+	return toKubeRuntimeStatus(status), nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter
@@ -895,36 +890,11 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	}, nil
 }
 
-// Returns the filesystem path of the pod's network namespace; if the
-// runtime does not handle namespace creation itself, or cannot return
-// the network namespace path, it returns an 'not supported' error.
-// TODO: Rename param name to sandboxID in kubecontainer.Runtime.GetNetNS().
-// TODO: Remove GetNetNS after networking is delegated to the container runtime.
-func (m *kubeGenericRuntimeManager) GetNetNS(sandboxID kubecontainer.ContainerID) (string, error) {
-	filter := &runtimeApi.PodSandboxFilter{
-		Id:            &sandboxID.ID,
-		LabelSelector: map[string]string{kubernetesManagedLabel: "true"},
-	}
-	sandboxes, err := m.runtimeService.ListPodSandbox(filter)
-	if err != nil {
-		glog.Errorf("ListPodSandbox with filter %q failed: %v", filter, err)
-		return "", err
-	}
-	if len(sandboxes) == 0 {
-		glog.Errorf("No sandbox is found with filter %q", filter)
-		return "", fmt.Errorf("Sandbox %q is not found", sandboxID)
-	}
-
-	sandboxStatus, err := m.runtimeService.PodSandboxStatus(sandboxes[0].GetId())
-	if err != nil {
-		glog.Errorf("PodSandboxStatus with id %q failed: %v", sandboxes[0].GetId(), err)
-		return "", err
-	}
-
-	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces != nil {
-		return sandboxStatus.Linux.Namespaces.GetNetwork(), nil
-	}
-
+// Returns the filesystem path of the pod's network namespace.
+//
+// For CRI, container network is handled by the runtime completely and this
+// function should never be called.
+func (m *kubeGenericRuntimeManager) GetNetNS(_ kubecontainer.ContainerID) (string, error) {
 	return "", fmt.Errorf("not supported")
 }
 
@@ -943,24 +913,6 @@ func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (k
 
 	// return sandboxID of the first sandbox since it is the latest one
 	return pod.Sandboxes[0].ID, nil
-}
-
-// Forward the specified port from the specified pod to the stream.
-// TODO: Remove this method once the indirect streaming path is fully functional.
-func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	formattedPod := kubecontainer.FormatPod(pod)
-	if len(pod.Sandboxes) == 0 {
-		glog.Errorf("No sandboxes are found for pod %q", formattedPod)
-		return fmt.Errorf("sandbox for pod %q not found", formattedPod)
-	}
-
-	// Use docker portforward directly for in-process docker integration
-	// now to unblock other tests.
-	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.LegacyPortForward(pod.Sandboxes[0].ID.ID, port, stream)
-	}
-
-	return fmt.Errorf("not implemented")
 }
 
 // UpdatePodCIDR is just a passthrough method to update the runtimeConfig of the shim

@@ -40,15 +40,18 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type ApplyOptions struct {
 	FilenameOptions resource.FilenameOptions
 	Selector        string
+	Force           bool
 	Prune           bool
 	Cascade         bool
 	GracePeriod     int
 	PruneResources  []pruneResource
+	Timeout         time.Duration
 }
 
 const (
@@ -101,6 +104,8 @@ func NewCmdApply(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.Prune, "prune", false, "Automatically delete resource objects that do not appear in the configs")
 	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "Only relevant during a prune. If true, cascade the deletion of the resources managed by pruned resources (e.g. Pods created by a ReplicationController).")
 	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", -1, "Period of time in seconds given to pruned resources to terminate gracefully. Ignored if negative.")
+	cmd.Flags().BoolVar(&options.Force, "force", false, "Delete and re-create the specified resource")
+	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
@@ -190,6 +195,11 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
 
+	smPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
+	if err != nil {
+		return err
+	}
+
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		// In this method, info.Object contains the object retrieved from the server
@@ -246,15 +256,27 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 		if !dryRun {
 			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 			helper := resource.NewHelper(info.Client, info.Mapping)
-			patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite)
+			patcher := &patcher{
+				encoder:       encoder,
+				decoder:       decoder,
+				mapping:       info.Mapping,
+				helper:        helper,
+				clientsetFunc: f.ClientSet,
+				overwrite:     overwrite,
+				backOff:       clockwork.NewRealClock(),
+				force:         options.Force,
+				cascade:       options.Cascade,
+				timeout:       options.Timeout,
+				gracePeriod:   options.GracePeriod,
+			}
 
-			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
+			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, smPatchVersion)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
+				patch, err := cmdutil.ChangeResourcePatch(info, f.Command(), smPatchVersion)
 				if err != nil {
 					return err
 				}
@@ -438,10 +460,17 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput 
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient) error {
-	if !p.cascade {
-		return resource.NewHelper(c, mapping).Delete(namespace, name)
+	return runDelete(namespace, name, mapping, c, nil, p.cascade, p.gracePeriod, p.clientsetFunc)
+}
+
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient, helper *resource.Helper, cascade bool, gracePeriod int, clientsetFunc func() (*internalclientset.Clientset, error)) error {
+	if !cascade {
+		if helper == nil {
+			helper = resource.NewHelper(c, mapping)
+		}
+		return helper.Delete(namespace, name)
 	}
-	cs, err := p.clientsetFunc()
+	cs, err := clientsetFunc()
 	if err != nil {
 		return err
 	}
@@ -452,35 +481,38 @@ func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, c res
 		}
 		return resource.NewHelper(c, mapping).Delete(namespace, name)
 	}
-	if err := r.Stop(namespace, name, 2*time.Minute, api.NewDeleteOptions(int64(p.gracePeriod))); err != nil {
+	var options *api.DeleteOptions
+	if gracePeriod >= 0 {
+		options = api.NewDeleteOptions(int64(gracePeriod))
+	}
+	if err := r.Stop(namespace, name, 2*time.Minute, options); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (p *patcher) delete(namespace, name string) error {
+	return runDelete(namespace, name, p.mapping, nil, p.helper, p.cascade, p.gracePeriod, p.clientsetFunc)
 }
 
 type patcher struct {
 	encoder runtime.Encoder
 	decoder runtime.Decoder
 
-	mapping *meta.RESTMapping
-	helper  *resource.Helper
+	mapping       *meta.RESTMapping
+	helper        *resource.Helper
+	clientsetFunc func() (*internalclientset.Clientset, error)
 
 	overwrite bool
 	backOff   clockwork.Clock
+
+	force       bool
+	cascade     bool
+	timeout     time.Duration
+	gracePeriod int
 }
 
-func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.RESTMapping, helper *resource.Helper, overwrite bool) *patcher {
-	return &patcher{
-		encoder:   encoder,
-		decoder:   decoder,
-		mapping:   mapping,
-		helper:    helper,
-		overwrite: overwrite,
-		backOff:   clockwork.NewRealClock(),
-	}
-}
-
-func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
+func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, smPatchVersion strategicpatch.StrategicMergePatchVersion) ([]byte, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(p.encoder, obj)
 	if err != nil {
@@ -504,7 +536,8 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	}
 
 	// Compute a three way strategic merge patch to send to server.
-	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
+	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite, smPatchVersion)
+
 	if err != nil {
 		format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
@@ -514,9 +547,9 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	return patch, err
 }
 
-func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
+func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string, smPatchVersion strategicpatch.StrategicMergePatchVersion) ([]byte, error) {
 	var getErr error
-	patchBytes, err := p.patchSimple(current, modified, source, namespace, name)
+	patchBytes, err := p.patchSimple(current, modified, source, namespace, name, smPatchVersion)
 	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
 			p.backOff.Sleep(backOffPeriod)
@@ -525,8 +558,32 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, getErr
 		}
-		patchBytes, err = p.patchSimple(current, modified, source, namespace, name)
+		patchBytes, err = p.patchSimple(current, modified, source, namespace, name, smPatchVersion)
 	}
-
+	if err != nil && p.force {
+		patchBytes, err = p.deleteAndCreate(modified, namespace, name)
+	}
 	return patchBytes, err
+}
+
+func (p *patcher) deleteAndCreate(modified []byte, namespace, name string) ([]byte, error) {
+	err := p.delete(namespace, name)
+	if err != nil {
+		return modified, err
+	}
+	err = wait.PollImmediate(kubectl.Interval, p.timeout, func() (bool, error) {
+		if _, err := p.helper.Get(namespace, name, false); !errors.IsNotFound(err) {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		return modified, err
+	}
+	versionedObject, _, err := p.decoder.Decode(modified, nil, nil)
+	if err != nil {
+		return modified, err
+	}
+	_, err = p.helper.Create(namespace, true, versionedObject)
+	return modified, err
 }

@@ -65,6 +65,7 @@ func DeepCopy_v1alpha1_KubeProxyConfiguration(in interface{}, out interface{}, c
 			out.IPTablesMasqueradeBit = nil
 		}
 		out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
+		out.IPTablesMinSyncPeriod = in.IPTablesMinSyncPeriod
 		out.KubeconfigPath = in.KubeconfigPath
 		out.MasqueradeAll = in.MasqueradeAll
 		out.Master = in.Master
@@ -83,6 +84,7 @@ func DeepCopy_v1alpha1_KubeProxyConfiguration(in interface{}, out interface{}, c
 		out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
 		out.ConntrackMin = in.ConntrackMin
 		out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
+		out.ConntrackTCPCloseWaitTimeout = in.ConntrackTCPCloseWaitTimeout
 		return nil
 	}
 }
@@ -314,7 +316,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
 		out.ExperimentalMounterPath = in.ExperimentalMounterPath
-		out.ExperimentalMounterRootfsPath = in.ExperimentalMounterRootfsPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		if in.LockFilePath != nil {
@@ -457,7 +458,10 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.AllowedUnsafeSysctls = nil
 		}
-		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
+		out.FeatureGates = in.FeatureGates
+		out.EnableCRI = in.EnableCRI
+		out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
+		out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 		return nil
 	}
 }

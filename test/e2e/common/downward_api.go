@@ -61,7 +61,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide pod IP as an env var", func() {
+	It("should provide pod IP as an env var [Conformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []api.EnvVar{
 			{
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide container's limits.cpu/memory and requests.cpu/memory as env vars", func() {
+	It("should provide container's limits.cpu/memory and requests.cpu/memory as env vars [Conformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []api.EnvVar{
 			{
@@ -128,7 +128,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide default limits.cpu/memory from node allocatable", func() {
+	It("should provide default limits.cpu/memory from node allocatable [Conformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []api.EnvVar{
 			{

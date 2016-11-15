@@ -50,6 +50,7 @@ type FakeRuntime struct {
 	KilledPods        []string
 	StartedContainers []string
 	KilledContainers  []string
+	RuntimeStatus     *RuntimeStatus
 	VersionInfo       string
 	APIVersionInfo    string
 	RuntimeType       string
@@ -137,6 +138,7 @@ func (f *FakeRuntime) ClearCalls() {
 	f.KilledPods = []string{}
 	f.StartedContainers = []string{}
 	f.KilledContainers = []string{}
+	f.RuntimeStatus = nil
 	f.VersionInfo = ""
 	f.RuntimeType = ""
 	f.Err = nil
@@ -207,12 +209,12 @@ func (f *FakeRuntime) APIVersion() (Version, error) {
 	return &FakeVersion{Version: f.APIVersionInfo}, f.Err
 }
 
-func (f *FakeRuntime) Status() error {
+func (f *FakeRuntime) Status() (*RuntimeStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "Status")
-	return f.StatusErr
+	return f.RuntimeStatus, f.StatusErr
 }
 
 func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
@@ -305,7 +307,7 @@ func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*PodS
 	return &status, f.Err
 }
 
-func (f *FakeDirectStreamingRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (f *FakeDirectStreamingRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -485,7 +487,7 @@ type FakeContainerCommandRunner struct {
 
 var _ ContainerCommandRunner = &FakeContainerCommandRunner{}
 
-func (f *FakeContainerCommandRunner) RunInContainer(containerID ContainerID, cmd []string) ([]byte, error) {
+func (f *FakeContainerCommandRunner) RunInContainer(containerID ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	// record invoked values
 	f.ContainerID = containerID
 	f.Cmd = cmd

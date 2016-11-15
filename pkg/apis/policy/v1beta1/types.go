@@ -38,17 +38,35 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
+	// Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
+	// status informatio is valid only if observedGeneration equals to PDB's object generation.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
+
+	// DisruptedPods contains information about pods whose eviction was
+	// processed by the API server eviction subresource handler but has not
+	// yet been observed by the PodDisruptionBudget controller.
+	// A pod will be in this map from the time when the API server processed the
+	// eviction request to the time when the pod is seen by PDB controller
+	// as having been marked for deletion (or after a timeout). The key in the map is the name of the pod
+	// and the value is the time when the API server processed the eviction request. If
+	// the deletion didn't occur and a pod is still there it will be removed from
+	// the list automatically by PodDisruptionBudget controller after some time.
+	// If everything goes smooth this map should be empty for the most of the time.
+	// Large number of entries in the map may indicate problems with pod deletions.
+	DisruptedPods map[string]unversioned.Time `json:"disruptedPods" protobuf:"bytes,2,rep,name=disruptedPods"`
+
 	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,1,opt,name=disruptionsAllowed"`
+	PodDisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
 
 	// current number of healthy pods
-	CurrentHealthy int32 `json:"currentHealthy" protobuf:"varint,2,opt,name=currentHealthy"`
+	CurrentHealthy int32 `json:"currentHealthy" protobuf:"varint,4,opt,name=currentHealthy"`
 
 	// minimum desired number of healthy pods
-	DesiredHealthy int32 `json:"desiredHealthy" protobuf:"varint,3,opt,name=desiredHealthy"`
+	DesiredHealthy int32 `json:"desiredHealthy" protobuf:"varint,5,opt,name=desiredHealthy"`
 
 	// total number of pods counted by this disruption budget
-	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,4,opt,name=expectedPods"`
+	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,6,opt,name=expectedPods"`
 }
 
 // +genclient=true

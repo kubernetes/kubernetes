@@ -844,7 +844,7 @@ func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions
 	// Look at the difference in seconds between now and the last time we reported any
 	// progress or tried to create a replica set, or resumed a paused deployment and
 	// compare against progressDeadlineSeconds.
-	from := condition.LastTransitionTime
+	from := condition.LastUpdateTime
 	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
 	return from.Add(delta).Before(nowFn())
 }
@@ -987,4 +987,23 @@ func (o BySelectorLastUpdateTime) Less(i, j int) bool {
 		return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 	}
 	return ti.Before(tj)
+}
+
+// OverlapsWith returns true when two given deployments are different and overlap with each other
+func OverlapsWith(current, other *extensions.Deployment) (bool, error) {
+	if current.UID == other.UID {
+		return false, nil
+	}
+	currentSelector, err := unversioned.LabelSelectorAsSelector(current.Spec.Selector)
+	if err != nil {
+		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", current.Namespace, current.Name, err)
+	}
+	otherSelector, err := unversioned.LabelSelectorAsSelector(other.Spec.Selector)
+	if err != nil {
+		// Broken selectors from other deployments shouldn't block current deployment. Just log the error and continue.
+		glog.V(2).Infof("Skip overlapping check: deployment %s/%s has invalid label selector: %v", other.Namespace, other.Name, err)
+		return false, nil
+	}
+	return (!currentSelector.Empty() && currentSelector.Matches(labels.Set(other.Spec.Template.Labels))) ||
+		(!otherSelector.Empty() && otherSelector.Matches(labels.Set(current.Spec.Template.Labels))), nil
 }

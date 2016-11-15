@@ -18,7 +18,6 @@ package fake
 
 import (
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 

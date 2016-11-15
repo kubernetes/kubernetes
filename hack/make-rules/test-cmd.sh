@@ -2464,7 +2464,7 @@ __EOF__
   # Pre-condition: no statefulset exists
   kube::test::get_object_assert statefulset "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: create statefulset
-  kubectl create -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/nginx-statefulset.yaml "${kube_flags[@]}"
 
   ### Scale statefulset test with current-replicas and replicas
   # Pre-condition: 0 replicas
@@ -2476,12 +2476,12 @@ __EOF__
   # Typically we'd wait and confirm that N>1 replicas are up, but this framework
   # doesn't start  the scheduler, so pet-0 will block all others.
   # TODO: test robust scaling in an e2e.
-  wait-for-pods-with-label "app=nginx-petset" "nginx-0"
+  wait-for-pods-with-label "app=nginx-statefulset" "nginx-0"
 
   ### Clean up
-  kubectl delete -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
+  kubectl delete -f hack/testdata/nginx-statefulset.yaml "${kube_flags[@]}"
   # Post-condition: no pods from statefulset controller
-  wait-for-pods-with-label "app=nginx-petset" ""
+  wait-for-pods-with-label "app=nginx-statefulset" ""
 
 
   ######################
@@ -2883,6 +2883,44 @@ __EOF__
   kubectl delete "${kube_flags[@]}" pod valid-pod --grace-period=0 --force
   # Post-condition: valid-pod doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ################
+  # Certificates #
+  ################
+
+  # approve
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
+  kubectl certificate approve foo "${kube_flags[@]}"
+  kubectl get csr "${kube_flags[@]}" -o json
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Approved'
+  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
+  kubectl certificate approve -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl get csr "${kube_flags[@]}" -o json
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Approved'
+  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+
+  # deny
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
+  kubectl certificate deny foo "${kube_flags[@]}"
+  kubectl get csr "${kube_flags[@]}" -o json
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Denied'
+  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
+  kubectl certificate deny -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl get csr "${kube_flags[@]}" -o json
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Denied'
+  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
 
   kube::test::clear_all
 }

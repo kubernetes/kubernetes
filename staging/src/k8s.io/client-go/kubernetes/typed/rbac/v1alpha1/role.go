@@ -50,7 +50,7 @@ type roles struct {
 }
 
 // newRoles returns a Roles
-func newRoles(c *RbacClient, namespace string) *roles {
+func newRoles(c *RbacV1alpha1Client, namespace string) *roles {
 	return &roles{
 		client: c.RESTClient(),
 		ns:     namespace,

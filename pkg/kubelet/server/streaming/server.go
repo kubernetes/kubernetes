@@ -19,15 +19,15 @@ package streaming
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"time"
 
 	restful "github.com/emicklei/go-restful"
 
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -39,7 +39,7 @@ import (
 type Server interface {
 	http.Handler
 
-	// Get the serving URL for the requests. Server must be started before these are called.
+	// Get the serving URL for the requests.
 	// Requests must not be nil. Responses may be nil iff an error is returned.
 	GetExec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
 	GetAttach(req *runtimeapi.AttachRequest, tty bool) (*runtimeapi.AttachResponse, error)
@@ -66,6 +66,9 @@ type Runtime interface {
 type Config struct {
 	// The host:port address the server will listen on.
 	Addr string
+	// The optional base URL for constructing streaming URLs. If empty, the baseURL will be
+	// constructed from the serve address.
+	BaseURL *url.URL
 
 	// How long to leave idle connections open for.
 	StreamIdleTimeout time.Duration
@@ -96,6 +99,16 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		runtime: &criAdapter{runtime},
 	}
 
+	if s.config.BaseURL == nil {
+		s.config.BaseURL = &url.URL{
+			Scheme: "http",
+			Host:   s.config.Addr,
+		}
+		if s.config.TLSConfig != nil {
+			s.config.BaseURL.Scheme = "https"
+		}
+	}
+
 	ws := &restful.WebService{}
 	endpoints := []struct {
 		path    string
@@ -105,11 +118,13 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		{"/attach/{containerID}", s.serveAttach},
 		{"/portforward/{podSandboxID}", s.servePortForward},
 	}
+	// If serving relative to a base path, set that here.
+	pathPrefix := path.Dir(s.config.BaseURL.Path)
 	for _, e := range endpoints {
 		for _, method := range []string{"GET", "POST"} {
 			ws.Route(ws.
 				Method(method).
-				Path(e.path).
+				Path(path.Join(pathPrefix, e.path)).
 				To(e.handler))
 		}
 	}
@@ -204,13 +219,8 @@ const (
 )
 
 func (s *server) buildURL(method, id string, opts streamOpts) string {
-	loc := url.URL{
-		Scheme: "http",
-		Host:   s.config.Addr,
-		Path:   fmt.Sprintf("/%s/%s", method, id),
-	}
-	if s.config.TLSConfig != nil {
-		loc.Scheme = "https"
+	loc := &url.URL{
+		Path: path.Join(method, id),
 	}
 
 	query := url.Values{}
@@ -231,7 +241,7 @@ func (s *server) buildURL(method, id string, opts streamOpts) string {
 	}
 	loc.RawQuery = query.Encode()
 
-	return loc.String()
+	return s.config.BaseURL.ResolveReference(loc).String()
 }
 
 func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
@@ -299,7 +309,7 @@ var _ remotecommand.Executor = &criAdapter{}
 var _ remotecommand.Attacher = &criAdapter{}
 var _ portforward.PortForwarder = &criAdapter{}
 
-func (a *criAdapter) ExecInContainer(podName string, podUID types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (a *criAdapter) ExecInContainer(podName string, podUID types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	return a.Exec(container, cmd, in, out, err, tty, resize)
 }
 

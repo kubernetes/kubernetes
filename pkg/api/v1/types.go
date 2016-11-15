@@ -151,13 +151,16 @@ type ObjectMeta struct {
 
 	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
-	// directly settable by a client. The resource will be deleted (no longer visible from
-	// resource lists, and not reachable by name) after the time in this field. Once set, this
-	// value may not be unset or be set further into the future, although it may be shortened
+	// directly settable by a client. The resource is expected to be deleted (no longer visible
+	// from resource lists, and not reachable by name) after the time in this field. Once set,
+	// this value may not be unset or be set further into the future, although it may be shortened
 	// or the resource may be deleted prior to this time. For example, a user may request that
 	// a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
-	// signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet
-	// will send a hard termination signal to the container.
+	// signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard
+	// termination signal (SIGKILL) to the container and after cleanup, remove the pod from the
+	// API. In the presence of network partitions, this object may still exist after this
+	// timestamp, until an administrator or automated process can determine the resource is
+	// fully terminated.
 	// If not set, graceful deletion of the object has not been requested.
 	//
 	// Populated by the system when a graceful deletion is requested.
@@ -319,6 +322,8 @@ type VolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
+	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -402,6 +407,8 @@ type PersistentVolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
+	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,17,opt,name=photonPersistentDisk"`
 }
 
 // +genclient=true
@@ -1020,6 +1027,17 @@ type VsphereVirtualDiskVolumeSource struct {
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 }
+
+// Represents a Photon Controller persistent disk resource.
+type PhotonPersistentDiskVolumeSource struct {
+	// ID that identifies Photon Controller persistent disk
+	PdID string `json:"pdID" protobuf:"bytes,1,opt,name=pdID"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+}
+
 type AzureDataDiskCachingMode string
 
 const (
@@ -1630,6 +1648,8 @@ const (
 	// PodReady means the pod is able to service requests and should be added to the
 	// load balancing pools of all matching services.
 	PodReady PodConditionType = "Ready"
+	// PodInitialized means that all init containers in the pod have started successfully.
+	PodInitialized PodConditionType = "Initialized"
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
@@ -2334,7 +2354,7 @@ type ReplicationControllerStatus struct {
 
 	// Represents the latest available observations of a replication controller's current state.
 	// +optional
-	Conditions []ReplicationControllerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []ReplicationControllerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
 }
 
 type ReplicationControllerConditionType string
@@ -2350,18 +2370,18 @@ const (
 // ReplicationControllerCondition describes the state of a replication controller at a certain point.
 type ReplicationControllerCondition struct {
 	// Type of replication controller condition.
-	Type ReplicationControllerConditionType `json:"type"`
+	Type ReplicationControllerConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ReplicationControllerConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	Status ConditionStatus `json:"status"`
+	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// The last time the condition transitioned from one status to another.
 	// +optional
-	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 	// The reason for the condition's last transition.
 	// +optional
-	Reason string `json:"reason,omitempty"`
+	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 	// A human readable message indicating details about the transition.
 	// +optional
-	Message string `json:"message,omitempty"`
+	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
 // +genclient=true
@@ -3001,9 +3021,11 @@ type NodeAddressType string
 
 // These are valid address type of node.
 const (
-	NodeHostName   NodeAddressType = "Hostname"
-	NodeExternalIP NodeAddressType = "ExternalIP"
-	NodeInternalIP NodeAddressType = "InternalIP"
+	// Deprecated: NodeLegacyHostIP will be removed in 1.7.
+	NodeLegacyHostIP NodeAddressType = "LegacyHostIP"
+	NodeHostName     NodeAddressType = "Hostname"
+	NodeExternalIP   NodeAddressType = "ExternalIP"
+	NodeInternalIP   NodeAddressType = "InternalIP"
 )
 
 // NodeAddress contains information for the node's address.

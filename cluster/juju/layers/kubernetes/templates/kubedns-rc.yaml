@@ -14,25 +14,26 @@
 
 # Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
 
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
-  name: kube-dns-v20
+  name: kube-dns
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v20
     kubernetes.io/cluster-service: "true"
 spec:
-  replicas: {{ pillar['dns_replicas'] }}
+  # replicas: not specified here:
+  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
+  # 2. Default is 1.
+  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
   selector:
-    k8s-app: kube-dns
-    version: v20
+    matchLabels:
+      k8s-app: kube-dns
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v20
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
@@ -72,14 +73,21 @@ spec:
         # command = "/kube-dns"
         - --domain={{ pillar['dns_domain'] }}.
         - --dns-port=10053
+        - --v=0
         - --kube_master_url=http://{{ private_address }}:8080
         {{ pillar['federations_domain_map'] }}
+        env:
+          - name: PROMETHEUS_PORT
+            value: "10055"
         ports:
         - containerPort: 10053
           name: dns-local
           protocol: UDP
         - containerPort: 10053
           name: dns-tcp-local
+          protocol: TCP
+        - containerPort: 10055
+          name: metrics
           protocol: TCP
       - name: dnsmasq
         image: gcr.io/google_containers/kube-dnsmasq-{{ arch }}:1.4
@@ -104,6 +112,27 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
+      - name: dnsmasq-metrics
+        image: gcr.io/google_containers/dnsmasq-metrics-amd64:1.0
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - --v=2
+        - --logtostderr
+        ports:
+        - containerPort: 10054
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            memory: 10Mi
       - name: healthz
         image: gcr.io/google_containers/exechealthz-{{ arch }}:1.2
         resources:

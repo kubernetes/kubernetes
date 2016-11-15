@@ -32,6 +32,7 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
@@ -328,7 +329,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		return
 	}
 
-	baseNamespaceObj, exist, err := nc.namespaceInformerStore.GetByKey(namespace)
+	namespaceObjFromStore, exist, err := nc.namespaceInformerStore.GetByKey(namespace)
 	if err != nil {
 		glog.Errorf("Failed to query main namespace store for %v: %v", namespace, err)
 		nc.deliverNamespace(namespace, 0, true)
@@ -339,7 +340,15 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		// Not federated namespace, ignoring.
 		return
 	}
-	baseNamespace := baseNamespaceObj.(*api_v1.Namespace)
+	// Create a copy before modifying the namespace to prevent race condition with
+	// other readers of namespace from store.
+	namespaceObj, err := conversion.NewCloner().DeepCopy(namespaceObjFromStore)
+	baseNamespace, ok := namespaceObj.(*api_v1.Namespace)
+	if err != nil || !ok {
+		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
+		nc.deliverNamespace(namespace, 0, true)
+		return
+	}
 	if baseNamespace.DeletionTimestamp != nil {
 		if err := nc.delete(baseNamespace); err != nil {
 			glog.Errorf("Failed to delete %s: %v", namespace, err)
@@ -352,11 +361,11 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 
 	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for namespace: %s",
 		baseNamespace.Name)
-	// Add the DeleteFromUnderlyingClusters finalizer before creating a namespace in
+	// Add the required finalizers before creating a namespace in
 	// underlying clusters.
 	// This ensures that the dependent namespaces are deleted in underlying
 	// clusters when the federated namespace is deleted.
-	updatedNamespaceObj, err := nc.deletionHelper.EnsureDeleteFromUnderlyingClustersFinalizer(baseNamespace)
+	updatedNamespaceObj, err := nc.deletionHelper.EnsureFinalizers(baseNamespace)
 	if err != nil {
 		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in namespace %s: %v",
 			baseNamespace.Name, err)
@@ -446,6 +455,7 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) error {
 	}
 	var err error
 	if namespace.Status.Phase != api_v1.NamespaceTerminating {
+		glog.V(2).Infof("Marking ns %s as terminating", namespace.Name)
 		nc.eventRecorder.Event(namespace, api.EventTypeNormal, "DeleteNamespace", fmt.Sprintf("Marking for deletion"))
 		_, err = nc.federatedApiClient.Core().Namespaces().Update(updatedNamespace)
 		if err != nil {
@@ -459,6 +469,7 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) error {
 		if err != nil {
 			return fmt.Errorf("error in deleting resources in namespace %s: %v", namespace.Name, err)
 		}
+		glog.V(2).Infof("Removed kubernetes finalizer from ns %s", namespace.Name)
 	}
 
 	// Delete the namespace from all underlying clusters.

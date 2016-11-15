@@ -38,6 +38,14 @@ Container Lifecycle Hook when create a pod with lifecycle hook when it is http h
 Container Runtime Conformance Test container runtime conformance blackbox test when running a container with a new image *,Random-Liu,0
 Container Runtime Conformance Test container runtime conformance blackbox test when starting a container that exits it should run with the expected status,luxas,1
 Container Runtime Conformance Test container runtime conformance blackbox test when starting a container that exits should report termination message if TerminationMessagePath is set,timothysc,1
+ContainerLogPath Pod with a container printed log to stdout should print log to correct log path,resouer,0
+CronJob should not emit unexpected warnings,soltysh,1
+CronJob should not schedule jobs when suspended,soltysh,1
+CronJob should not schedule new jobs when ForbidConcurrent,soltysh,1
+CronJob should replace jobs when ReplaceConcurrent,soltysh,1
+CronJob should schedule multiple jobs concurrently,soltysh,1
+DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios,MrHohn,0
+DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods when cluster size changed,MrHohn,0
 DNS should provide DNS for ExternalName services,rmmh,1
 DNS should provide DNS for pods for Hostname and Subdomain Annotation,mtaufen,1
 DNS should provide DNS for services,roberthbailey,1
@@ -69,6 +77,9 @@ Deployment overlapping deployment should not fight with each other,kargakis,1
 Deployment paused deployment should be able to scale,kargakis,1
 Deployment paused deployment should be ignored by the controller,kargakis,0
 Deployment scaled rollout deployment should not block on annotation check,kargakis,1
+DisruptionController evictions: * => *,rkouj,0
+DisruptionController should create a PodDisruptionBudget,rkouj,0
+DisruptionController should update PodDisruptionBudget status,rkouj,0
 Docker Containers should be able to override the image's default arguments (docker cmd),maisem,0
 Docker Containers should be able to override the image's default command and arguments,maisem,0
 Docker Containers should be able to override the image's default commmand (docker entrypoint),maisem,0
@@ -137,19 +148,30 @@ Federation API server authentication should not accept cluster resources when th
 Federation API server authentication should not accept cluster resources when the client has no authentication credentials,nikhiljindal,1
 Federation apiserver Admission control should not be able to create resources if namespace does not exist,alex-mohr,1
 Federation apiserver Cluster objects should be created and deleted successfully,ghodss,1
+Federation daemonsets DaemonSet objects should be created and deleted successfully,nikhiljindal,0
+Federation deployments Deployment objects should be created and deleted successfully,soltysh,1
+Federation deployments Federated Deployment should create and update matching deployments in underling clusters,soltysh,1
 Federation events Event objects should be created and deleted successfully,karlkfi,1
+Federation namespace Namespace objects all resources in the namespace should be deleted when namespace is deleted,nikhiljindal,0
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
+Federation namespace Namespace objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
+Federation namespace Namespace objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
 Federation replicasets Federated ReplicaSet should create and update matching replicasets in underling clusters,childsb,1
 Federation replicasets ReplicaSet objects should be created and deleted successfully,apelisse,1
 Federation secrets Secret objects should be created and deleted successfully,pmorie,1
+Federation secrets Secret objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
+Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
+GCP Volumes GlusterFS should be mountable,rkouj,0
+GCP Volumes NFSv4 should be mountable for NFSv4,rkouj,0
 GKE local SSD should write and read from node local SSD,fabioy,0
 GKE node pools should create a cluster with multiple node pools,fabioy,1
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1
 Garbage collector should orphan pods created by rc if delete options say so,fabioy,1
 Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1
 "Generated release_1_5 clientset should create pods, delete pods, watch pods",ghodss,1
-"Generated release_1_5 clientset should create v2alpha1 scheduleJobs, delete scheduleJobs, watch scheduleJobs",caesarxuchao,0
-HA-master pods survive addition/removal,roberthbailey,1
+"Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1
+HA-master pods survive addition/removal different zones,rkouj,0
+HA-master pods survive addition/removal same zone,rkouj,0
 Hazelcast should create and scale hazelcast,mikedanese,1
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
@@ -161,25 +183,23 @@ Horizontal pod autoscaling (scale resource: CPU) ReplicationController light Sho
 HostPath should give a volume the correct mode,thockin,1
 HostPath should support r/w,luxas,1
 HostPath should support subPath,sttts,1
-Image Container Conformance Test image conformance blackbox test when testing image that does not exist should ignore pull failures,jsafrane,1
-Image Container Conformance Test image conformance blackbox test when testing images that exist It should present successfully,yujuhong,1
-Image Container Conformance Test image conformance blackbox test when testing images that exist should list pulled images,maisem,1
 ImageID should be set to the manifest digest (from RepoDigests) when available,hurf,1
 InitContainer should invoke init containers on a RestartAlways pod,saad-ali,1
 InitContainer should invoke init containers on a RestartNever pod,vulpecula,1
 InitContainer should not start app containers and fail the pod if init containers fail on a RestartNever pod,maisem,0
 InitContainer should not start app containers if init containers fail on a RestartAlways pod,maisem,0
 Initial Resources should set initial resources based on historical data,piosz,0
-Job should delete a job,soltysh,0
-Job should fail a job,soltysh,0
-Job should keep restarting failed pods,soltysh,0
-Job should run a job to completion when tasks sometimes fail and are locally restarted,soltysh,0
-Job should run a job to completion when tasks sometimes fail and are not locally restarted,soltysh,0
-Job should run a job to completion when tasks succeed,soltysh,0
-Job should scale a job down,soltysh,0
-Job should scale a job up,soltysh,0
+Job should delete a job,soltysh,1
+Job should fail a job,soltysh,1
+Job should keep restarting failed pods,soltysh,1
+Job should run a job to completion when tasks sometimes fail and are locally restarted,soltysh,1
+Job should run a job to completion when tasks sometimes fail and are not locally restarted,soltysh,1
+Job should run a job to completion when tasks succeed,soltysh,1
+Job should scale a job down,soltysh,1
+Job should scale a job up,soltysh,1
 Kibana Logging Instances Is Alive should check that the Kibana logging instance is alive,swagiaal,0
-Kubectl alpha client Kubectl run ScheduledJob should create a ScheduledJob,kargakis,1
+Kubectl alpha client Kubectl run CronJob should create a CronJob,soltysh,1
+Kubectl alpha client Kubectl run ScheduledJob should create a ScheduledJob,soltysh,1
 Kubectl client Guestbook application should create and stop a working application,pwittrock,0
 Kubectl client Kubectl api-versions should check if v1 is in available api versions,pwittrock,0
 Kubectl client Kubectl apply should apply a new configuration to an existing RC,pwittrock,0
@@ -195,12 +215,13 @@ Kubectl client Kubectl logs should be able to retrieve and filter logs,jlowdermi
 Kubectl client Kubectl patch should add annotations for pods in rc,janetkuo,0
 Kubectl client Kubectl replace should update a single-container pod's image,karlkfi,1
 Kubectl client Kubectl rolling-update should support rolling-update to same image,janetkuo,0
-"Kubectl client Kubectl run --rm job should create a job from an image, then delete the job",soltysh,0
+"Kubectl client Kubectl run --rm job should create a job from an image, then delete the job",soltysh,1
 Kubectl client Kubectl run default should create an rc or deployment from an image,janetkuo,0
 Kubectl client Kubectl run deployment should create a deployment from an image,janetkuo,0
-Kubectl client Kubectl run job should create a job from an image when restart is OnFailure,soltysh,0
+Kubectl client Kubectl run job should create a job from an image when restart is OnFailure,soltysh,1
 Kubectl client Kubectl run pod should create a pod from an image when restart is Never,janetkuo,0
 Kubectl client Kubectl run rc should create an rc from an image,janetkuo,0
+Kubectl client Kubectl should be able to talk to api server kubectl running in a pod could talk to api server,ymqytw,0
 Kubectl client Kubectl taint should remove all the taints with the same key off a node,erictune,1
 Kubectl client Kubectl taint should update the taint on a node,pwittrock,0
 Kubectl client Kubectl version should check is all data is printed,janetkuo,0
@@ -324,6 +345,7 @@ PrivilegedPod should test privileged pod,vishh,0
 Probing container should *not* be restarted with a /healthz http liveness probe,Random-Liu,0
 "Probing container should *not* be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0
 Probing container should be restarted with a /healthz http liveness probe,Random-Liu,0
+Probing container should be restarted with a docker exec liveness probe with timeout,timstclair,0
 "Probing container should be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0
 Probing container should have monotonically increasing restart count,Random-Liu,0
 Probing container with readiness probe should not be ready before initial delay and never restart,Random-Liu,0
@@ -363,11 +385,6 @@ Restart Docker Daemon Network should recover from ip leak,bprashanth,0
 Restart should restart all nodes and ensure all nodes and pods recover,andyzheng0831,1
 RethinkDB should create and stop rethinkdb servers,mwielgus,1
 SSH should SSH to all nodes and run commands,quinton-hoole,0
-ScheduledJob should not emit unexpected warnings,soltysh,0
-ScheduledJob should not schedule jobs when suspended,soltysh,0
-ScheduledJob should not schedule new jobs when ForbidConcurrent,soltysh,0
-ScheduledJob should replace jobs when ReplaceConcurrent,soltysh,0
-ScheduledJob should schedule multiple jobs concurrently,soltysh,0
 SchedulerPredicates validates MaxPods limit number of pods that are allowed to run,gmarek,0
 SchedulerPredicates validates resource limits of pods that are allowed to run,gmarek,0
 SchedulerPredicates validates that Inter-pod-Affinity is respected if not matching,hurf,1
@@ -386,6 +403,7 @@ SchedulerPredicates validates that required NodeAffinity setting is respected if
 SchedulerPredicates validates that taints-tolerations is respected if matching,jlowdermilk,1
 SchedulerPredicates validates that taints-tolerations is respected if not matching,derekwaynecarr,1
 Secret should create a pod that reads a secret,luxas,1
+Secrets should be able to mount in a volume regardless of a different secret existing with same name in different namespace,rkouj,0
 Secrets should be consumable from pods in env vars,mml,1
 Secrets should be consumable from pods in volume,ghodss,1
 Secrets should be consumable from pods in volume with defaultMode set,derekwaynecarr,1
@@ -440,14 +458,14 @@ Upgrade cluster upgrade should maintain responsive services,mikedanese,1
 Upgrade master upgrade should maintain responsive services,mikedanese,1
 Upgrade node upgrade should maintain a functioning cluster,zmerlynn,1
 Upgrade node upgrade should maintain responsive services,childsb,1
-V1Job should delete a job,soltysh,0
-V1Job should fail a job,soltysh,0
-V1Job should keep restarting failed pods,soltysh,0
-V1Job should run a job to completion when tasks sometimes fail and are locally restarted,soltysh,0
-V1Job should run a job to completion when tasks sometimes fail and are not locally restarted,soltysh,0
-V1Job should run a job to completion when tasks succeed,soltysh,0
-V1Job should scale a job down,soltysh,0
-V1Job should scale a job up,soltysh,0
+V1Job should delete a job,soltysh,1
+V1Job should fail a job,soltysh,1
+V1Job should keep restarting failed pods,soltysh,1
+V1Job should run a job to completion when tasks sometimes fail and are locally restarted,soltysh,1
+V1Job should run a job to completion when tasks sometimes fail and are not locally restarted,soltysh,1
+V1Job should run a job to completion when tasks succeed,soltysh,1
+V1Job should scale a job down,soltysh,1
+V1Job should scale a job up,soltysh,1
 Variable Expansion should allow composing env vars into new env vars,ghodss,1
 Variable Expansion should allow substituting values in a container's args,dchen1107,1
 Variable Expansion should allow substituting values in a container's command,mml,1
@@ -543,6 +561,7 @@ k8s.io/kubernetes/pkg/auth/handlers,liggitt,0
 k8s.io/kubernetes/pkg/client/cache,xiang90,1
 k8s.io/kubernetes/pkg/client/chaosclient,deads2k,1
 k8s.io/kubernetes/pkg/client/leaderelection,xiang90,1
+k8s.io/kubernetes/pkg/client/listers/batch/internalversion,mqliang,0
 k8s.io/kubernetes/pkg/client/record,karlkfi,1
 k8s.io/kubernetes/pkg/client/restclient,kargakis,1
 k8s.io/kubernetes/pkg/client/retry,caesarxuchao,1
@@ -564,9 +583,11 @@ k8s.io/kubernetes/pkg/cloudprovider/providers/gce,yifan-gu,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/mesos,mml,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/openstack,Q-Lee,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt,girishkalele,1
+k8s.io/kubernetes/pkg/cloudprovider/providers/photon,luomiao,0
 k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace,caesarxuchao,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere,apelisse,1
 k8s.io/kubernetes/pkg/controller,mikedanese,1
+k8s.io/kubernetes/pkg/controller/cronjob,soltysh,1
 k8s.io/kubernetes/pkg/controller/daemon,Q-Lee,1
 k8s.io/kubernetes/pkg/controller/deployment,asalkeld,0
 k8s.io/kubernetes/pkg/controller/deployment/util,saad-ali,1
@@ -574,7 +595,7 @@ k8s.io/kubernetes/pkg/controller/disruption,fabioy,1
 k8s.io/kubernetes/pkg/controller/endpoint,mwielgus,1
 k8s.io/kubernetes/pkg/controller/garbagecollector,rmmh,1
 k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly,cjcullen,1
-k8s.io/kubernetes/pkg/controller/job,soltysh,0
+k8s.io/kubernetes/pkg/controller/job,soltysh,1
 k8s.io/kubernetes/pkg/controller/namespace,karlkfi,1
 k8s.io/kubernetes/pkg/controller/node,gmarek,0
 k8s.io/kubernetes/pkg/controller/petset,fgrzadkowski,1
@@ -585,7 +606,6 @@ k8s.io/kubernetes/pkg/controller/replicaset,fgrzadkowski,0
 k8s.io/kubernetes/pkg/controller/replication,fgrzadkowski,0
 k8s.io/kubernetes/pkg/controller/resourcequota,ghodss,1
 k8s.io/kubernetes/pkg/controller/route,gmarek,0
-k8s.io/kubernetes/pkg/controller/scheduledjob,soltysh,1
 k8s.io/kubernetes/pkg/controller/service,asalkeld,0
 k8s.io/kubernetes/pkg/controller/serviceaccount,liggitt,0
 k8s.io/kubernetes/pkg/controller/volume/attachdetach,luxas,1
@@ -598,6 +618,7 @@ k8s.io/kubernetes/pkg/credentialprovider,justinsb,1
 k8s.io/kubernetes/pkg/credentialprovider/aws,zmerlynn,1
 k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
 k8s.io/kubernetes/pkg/dns,jdef,1
+k8s.io/kubernetes/pkg/dns/treecache,bowei,0
 k8s.io/kubernetes/pkg/fieldpath,childsb,1
 k8s.io/kubernetes/pkg/fields,jsafrane,1
 k8s.io/kubernetes/pkg/genericapiserver,nikhiljindal,0
@@ -643,7 +664,7 @@ k8s.io/kubernetes/pkg/kubelet/qos,vishh,0
 k8s.io/kubernetes/pkg/kubelet/rkt,apelisse,1
 k8s.io/kubernetes/pkg/kubelet/rktshim,mml,1
 k8s.io/kubernetes/pkg/kubelet/server,timstclair,0
-k8s.io/kubernetes/pkg/kubelet/server/portforward,caesarxuchao,1
+k8s.io/kubernetes/pkg/kubelet/server/portforward,rkouj,0
 k8s.io/kubernetes/pkg/kubelet/server/stats,timstclair,0
 k8s.io/kubernetes/pkg/kubelet/server/streaming,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet/status,mwielgus,1
@@ -664,16 +685,17 @@ k8s.io/kubernetes/pkg/proxy/config,ixdy,1
 k8s.io/kubernetes/pkg/proxy/healthcheck,ghodss,1
 k8s.io/kubernetes/pkg/proxy/iptables,freehan,0
 k8s.io/kubernetes/pkg/proxy/userspace,luxas,1
+k8s.io/kubernetes/pkg/proxy/winuserspace,jbhurat,0
 k8s.io/kubernetes/pkg/quota,sttts,1
 k8s.io/kubernetes/pkg/quota/evaluator/core,yifan-gu,1
 k8s.io/kubernetes/pkg/registry/apps/petset,kevin-wangzefeng,1
 k8s.io/kubernetes/pkg/registry/apps/petset/etcd,piosz,1
 k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler,bgrant0607,1
 k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/etcd,justinsb,1
-k8s.io/kubernetes/pkg/registry/batch/job,kargakis,1
-k8s.io/kubernetes/pkg/registry/batch/job/etcd,Q-Lee,1
-k8s.io/kubernetes/pkg/registry/batch/scheduledjob,nikhiljindal,1
-k8s.io/kubernetes/pkg/registry/batch/scheduledjob/etcd,mtaufen,1
+k8s.io/kubernetes/pkg/registry/batch/cronjob,soltysh,1
+k8s.io/kubernetes/pkg/registry/batch/cronjob/etcd,soltysh,1
+k8s.io/kubernetes/pkg/registry/batch/job,soltysh,1
+k8s.io/kubernetes/pkg/registry/batch/job/etcd,soltysh,1
 k8s.io/kubernetes/pkg/registry/certificates/certificates,smarterclayton,1
 k8s.io/kubernetes/pkg/registry/core/componentstatus,krousey,1
 k8s.io/kubernetes/pkg/registry/core/configmap,janetkuo,1
@@ -800,6 +822,7 @@ k8s.io/kubernetes/pkg/util/parsers,derekwaynecarr,1
 k8s.io/kubernetes/pkg/util/procfs,roberthbailey,1
 k8s.io/kubernetes/pkg/util/proxy,cjcullen,1
 k8s.io/kubernetes/pkg/util/rand,madhusudancs,1
+k8s.io/kubernetes/pkg/util/ratelimit,justinsb,1
 k8s.io/kubernetes/pkg/util/runtime,davidopp,1
 k8s.io/kubernetes/pkg/util/sets,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/slice,quinton-hoole,0
@@ -834,6 +857,7 @@ k8s.io/kubernetes/pkg/volume/glusterfs,timstclair,1
 k8s.io/kubernetes/pkg/volume/host_path,jbeda,1
 k8s.io/kubernetes/pkg/volume/iscsi,cjcullen,1
 k8s.io/kubernetes/pkg/volume/nfs,justinsb,1
+k8s.io/kubernetes/pkg/volume/photon_pd,luomiao,0
 k8s.io/kubernetes/pkg/volume/quobyte,yujuhong,1
 k8s.io/kubernetes/pkg/volume/rbd,piosz,1
 k8s.io/kubernetes/pkg/volume/secret,rmmh,1
@@ -875,6 +899,7 @@ k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook,ghodss,1
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac,hurf,1
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy,mml,1
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook,hurf,1
+k8s.io/kubernetes/plugin/pkg/client/auth/gcp,jlowdermilk,0
 k8s.io/kubernetes/plugin/pkg/client/auth/oidc,cjcullen,1
 k8s.io/kubernetes/plugin/pkg/scheduler,fgrzadkowski,0
 k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates,fgrzadkowski,0
@@ -887,6 +912,7 @@ k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache,fgrzadkowski,0
 k8s.io/kubernetes/test/e2e,kevin-wangzefeng,1
 k8s.io/kubernetes/test/e2e/chaosmonkey,pmorie,1
 k8s.io/kubernetes/test/e2e_node,mml,1
+k8s.io/kubernetes/test/e2e_node/system,Random-Liu,0
 k8s.io/kubernetes/test/integration/auth,jbeda,1
 k8s.io/kubernetes/test/integration/client,Q-Lee,1
 k8s.io/kubernetes/test/integration/configmap,Q-Lee,1

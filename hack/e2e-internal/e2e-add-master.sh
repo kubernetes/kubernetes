@@ -16,7 +16,10 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-export KUBE_EXPERIMENTAL_REPLICATE_EXISTING_MASTER=true
+if [[ ! -z "${1:-}" ]]; then
+  export KUBE_GCE_ZONE="${1}"
+fi
+export KUBE_REPLICATE_EXISTING_MASTER=true
 
 source "${KUBE_ROOT}/hack/e2e-internal/e2e-up.sh"
 

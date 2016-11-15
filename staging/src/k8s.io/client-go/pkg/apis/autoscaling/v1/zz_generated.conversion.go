@@ -21,9 +21,11 @@ limitations under the License.
 package v1
 
 import (
+	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	autoscaling "k8s.io/client-go/pkg/apis/autoscaling"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -113,17 +115,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 
 func autoConvert_v1_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(in *HorizontalPodAutoscalerList, out *autoscaling.HorizontalPodAutoscalerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]autoscaling.HorizontalPodAutoscaler, len(*in))
-		for i := range *in {
-			if err := Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]autoscaling.HorizontalPodAutoscaler)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -133,17 +125,7 @@ func Convert_v1_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscal
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList(in *autoscaling.HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]HorizontalPodAutoscaler, len(*in))
-		for i := range *in {
-			if err := Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]HorizontalPodAutoscaler)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -155,9 +137,9 @@ func autoConvert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAuto
 	if err := Convert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(&in.ScaleTargetRef, &out.ScaleTargetRef, s); err != nil {
 		return err
 	}
-	out.MinReplicas = in.MinReplicas
+	out.MinReplicas = (*int32)(unsafe.Pointer(in.MinReplicas))
 	out.MaxReplicas = in.MaxReplicas
-	out.TargetCPUUtilizationPercentage = in.TargetCPUUtilizationPercentage
+	out.TargetCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.TargetCPUUtilizationPercentage))
 	return nil
 }
 
@@ -169,9 +151,9 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 	if err := Convert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectReference(&in.ScaleTargetRef, &out.ScaleTargetRef, s); err != nil {
 		return err
 	}
-	out.MinReplicas = in.MinReplicas
+	out.MinReplicas = (*int32)(unsafe.Pointer(in.MinReplicas))
 	out.MaxReplicas = in.MaxReplicas
-	out.TargetCPUUtilizationPercentage = in.TargetCPUUtilizationPercentage
+	out.TargetCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.TargetCPUUtilizationPercentage))
 	return nil
 }
 
@@ -180,11 +162,11 @@ func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscal
 }
 
 func autoConvert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.LastScaleTime = in.LastScaleTime
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	out.LastScaleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	out.CurrentCPUUtilizationPercentage = in.CurrentCPUUtilizationPercentage
+	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
 	return nil
 }
 
@@ -193,11 +175,11 @@ func Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutosc
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.LastScaleTime = in.LastScaleTime
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	out.LastScaleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	out.CurrentCPUUtilizationPercentage = in.CurrentCPUUtilizationPercentage
+	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
 	return nil
 }
 

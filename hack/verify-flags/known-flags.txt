@@ -59,7 +59,6 @@ cert-dir
 certificate-authority
 cgroup-driver
 cgroup-root
-cgroups-per-qos
 chaos-chance
 clean-start
 cleanup
@@ -152,6 +151,7 @@ duration-sec
 e2e-output-dir
 e2e-verify-service-account
 enable-controller-attach-detach
+enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
@@ -188,12 +188,14 @@ executor-suicide-timeout
 exit-on-lock-contention
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
+experimental-cgroups-per-qos
 experimental-keystone-url
+experimental-keystone-ca-file
 experimental-mounter-path
-experimental-mounter-rootfs-path
 experimental-nvidia-gpus
 experimental-prefix
-experimental-runtime-integration-type
+experimental-cri
+experimental-check-node-capabilities-before-mount
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints
@@ -201,6 +203,7 @@ external-etcd-keyfile
 external-hostname
 external-ip
 extra-peer-dirs
+experimental-fail-swap-on
 failover-timeout
 failure-domains
 fake-clientset
@@ -494,7 +497,6 @@ run-proxy
 run-services-mode
 runtime-cgroups
 runtime-config
-runtime-integration-type
 runtime-request-timeout
 save-config
 schedule-pods-here
@@ -554,6 +556,7 @@ system-cgroups
 system-container
 system-pods-startup-timeout
 system-reserved
+system-validate-mode
 target-port
 target-ram-mb
 tcp-services

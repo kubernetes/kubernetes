@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -79,7 +80,7 @@ type fakeContainerCommandRunner struct {
 	ID  kubecontainer.ContainerID
 }
 
-func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID, cmd []string) ([]byte, error) {
+func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	f.Cmd = cmd
 	f.ID = id
 	return nil, nil

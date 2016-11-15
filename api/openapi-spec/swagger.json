@@ -17768,6 +17768,2601 @@
      }
     }
    },
+   "/apis/batch/v2alpha1/cronjobs": {
+    "get": {
+     "description": "list or watch objects of kind CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "listBatchV2alpha1CronJobForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJobList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/jobs": {
+    "get": {
+     "description": "list or watch objects of kind Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "listBatchV2alpha1JobForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.JobList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/cronjobs": {
+    "get": {
+     "description": "list or watch objects of kind CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "listBatchV2alpha1NamespacedCronJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJobList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "createBatchV2alpha1NamespacedCronJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "deleteBatchV2alpha1CollectionNamespacedCronJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/cronjobs/{name}": {
+    "get": {
+     "description": "read the specified CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "readBatchV2alpha1NamespacedCronJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "replaceBatchV2alpha1NamespacedCronJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "deleteBatchV2alpha1NamespacedCronJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified CronJob",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "patchBatchV2alpha1NamespacedCronJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the CronJob",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/cronjobs/{name}/status": {
+    "get": {
+     "description": "read status of the specified CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "readBatchV2alpha1NamespacedCronJobStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace status of the specified CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "replaceBatchV2alpha1NamespacedCronJobStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified CronJob",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "patchBatchV2alpha1NamespacedCronJobStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the CronJob",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/jobs": {
+    "get": {
+     "description": "list or watch objects of kind Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "listBatchV2alpha1NamespacedJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.JobList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "createBatchV2alpha1NamespacedJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "deleteBatchV2alpha1CollectionNamespacedJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/jobs/{name}": {
+    "get": {
+     "description": "read the specified Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "readBatchV2alpha1NamespacedJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "replaceBatchV2alpha1NamespacedJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "deleteBatchV2alpha1NamespacedJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified Job",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "patchBatchV2alpha1NamespacedJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Job",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/jobs/{name}/status": {
+    "get": {
+     "description": "read status of the specified Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "readBatchV2alpha1NamespacedJobStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace status of the specified Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "replaceBatchV2alpha1NamespacedJobStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified Job",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "patchBatchV2alpha1NamespacedJobStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.Job"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Job",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/scheduledjobs": {
+    "get": {
+     "description": "list or watch objects of kind ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "listBatchV2alpha1NamespacedScheduledJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJobList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "createBatchV2alpha1NamespacedScheduledJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "deleteBatchV2alpha1CollectionNamespacedScheduledJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/scheduledjobs/{name}": {
+    "get": {
+     "description": "read the specified ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "readBatchV2alpha1NamespacedScheduledJob",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "replaceBatchV2alpha1NamespacedScheduledJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "deleteBatchV2alpha1NamespacedScheduledJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified ScheduledJob",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "patchBatchV2alpha1NamespacedScheduledJob",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the ScheduledJob",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/scheduledjobs/{name}/status": {
+    "get": {
+     "description": "read status of the specified ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "readBatchV2alpha1NamespacedScheduledJobStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace status of the specified ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "replaceBatchV2alpha1NamespacedScheduledJobStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified ScheduledJob",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "patchBatchV2alpha1NamespacedScheduledJobStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJob"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the ScheduledJob",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/scheduledjobs": {
+    "get": {
+     "description": "list or watch objects of kind ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "listBatchV2alpha1ScheduledJobForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.CronJobList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/cronjobs": {
+    "get": {
+     "description": "watch individual changes to a list of CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1CronJobListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/jobs": {
+    "get": {
+     "description": "watch individual changes to a list of Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1JobListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/namespaces/{namespace}/cronjobs": {
+    "get": {
+     "description": "watch individual changes to a list of CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1NamespacedCronJobList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/namespaces/{namespace}/cronjobs/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1NamespacedCronJob",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the CronJob",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/namespaces/{namespace}/jobs": {
+    "get": {
+     "description": "watch individual changes to a list of Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1NamespacedJobList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/namespaces/{namespace}/jobs/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind Job",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1NamespacedJob",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Job",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/namespaces/{namespace}/scheduledjobs": {
+    "get": {
+     "description": "watch individual changes to a list of ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1NamespacedScheduledJobList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/namespaces/{namespace}/scheduledjobs/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1NamespacedScheduledJob",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the ScheduledJob",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/watch/scheduledjobs": {
+    "get": {
+     "description": "watch individual changes to a list of ScheduledJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "watchBatchV2alpha1ScheduledJobListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/certificates.k8s.io/": {
     "get": {
      "description": "get information of a group",
@@ -31446,7 +34041,7 @@
       "format": "int64"
      },
      "deletionTimestamp": {
-      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/unversioned.Time"
      },
      "finalizers": {
@@ -33555,7 +36150,7 @@
     }
    },
    "v1beta1.Job": {
-    "description": "Job represents the configuration of a single job.",
+    "description": "Job represents the configuration of a single job. DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.",
     "properties": {
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -33605,7 +36200,7 @@
     }
    },
    "v1beta1.JobList": {
-    "description": "JobList is a collection of jobs.",
+    "description": "JobList is a collection of jobs. DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.",
     "required": [
      "items"
     ],
@@ -33876,6 +36471,7 @@
    "v1beta1.PodDisruptionBudgetStatus": {
     "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
     "required": [
+     "disruptedPods",
      "disruptionsAllowed",
      "currentHealthy",
      "desiredHealthy",
@@ -33892,6 +36488,13 @@
       "type": "integer",
       "format": "int32"
      },
+     "disruptedPods": {
+      "description": "DisruptedPods contains information about pods whose eviction was processed by the API server eviction subresource handler but has not yet been observed by the PodDisruptionBudget controller. A pod will be in this map from the time when the API server processed the eviction request to the time when the pod is seen by PDB controller as having been marked for deletion (or after a timeout). The key in the map is the name of the pod and the value is the time when the API server processed the eviction request. If the deletion didn't occur and a pod is still there it will be removed from the list automatically by PodDisruptionBudget controller after some time. If everything goes smooth this map should be empty for the most of the time. Large number of entries in the map may indicate problems with pod deletions.",
+      "type": "object",
+      "additionalProperties": {
+       "$ref": "#/definitions/unversioned.Time"
+      }
+     },
      "disruptionsAllowed": {
       "description": "Number of pod disruptions that are currently allowed.",
       "type": "integer",
@@ -33901,6 +36504,11 @@
       "description": "total number of pods counted by this disruption budget",
       "type": "integer",
       "format": "int32"
+     },
+     "observedGeneration": {
+      "description": "Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other status informatio is valid only if observedGeneration equals to PDB's object generation.",
+      "type": "integer",
+      "format": "int64"
      }
     }
    },
@@ -34501,6 +37109,240 @@
      "username": {
       "description": "The name that uniquely identifies this user among all active users.",
       "type": "string"
+     }
+    }
+   },
+   "v2alpha1.CronJob": {
+    "description": "CronJob represents the configuration of a single cron job.",
+    "properties": {
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v2alpha1.CronJobSpec"
+     },
+     "status": {
+      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v2alpha1.CronJobStatus"
+     }
+    }
+   },
+   "v2alpha1.CronJobList": {
+    "description": "CronJobList is a collection of cron jobs.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "description": "Items is the list of CronJob.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v2alpha1.CronJob"
+      }
+     },
+     "metadata": {
+      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v2alpha1.CronJobSpec": {
+    "description": "CronJobSpec describes how the job execution will look like and when it will actually run.",
+    "required": [
+     "schedule",
+     "jobTemplate"
+    ],
+    "properties": {
+     "concurrencyPolicy": {
+      "description": "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+      "type": "string"
+     },
+     "jobTemplate": {
+      "description": "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+      "$ref": "#/definitions/v2alpha1.JobTemplateSpec"
+     },
+     "schedule": {
+      "description": "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+      "type": "string"
+     },
+     "startingDeadlineSeconds": {
+      "description": "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "suspend": {
+      "description": "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+      "type": "boolean"
+     }
+    }
+   },
+   "v2alpha1.CronJobStatus": {
+    "description": "CronJobStatus represents the current state of a cron job.",
+    "properties": {
+     "active": {
+      "description": "Active holds pointers to currently running jobs.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.ObjectReference"
+      }
+     },
+     "lastScheduleTime": {
+      "description": "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+      "$ref": "#/definitions/unversioned.Time"
+     }
+    }
+   },
+   "v2alpha1.Job": {
+    "description": "Job represents the configuration of a single job.",
+    "properties": {
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v2alpha1.JobSpec"
+     },
+     "status": {
+      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v2alpha1.JobStatus"
+     }
+    }
+   },
+   "v2alpha1.JobCondition": {
+    "description": "JobCondition describes current state of a job.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time the condition was checked.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transit from one status to another.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "message": {
+      "description": "Human readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "(brief) reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of job condition, Complete or Failed.",
+      "type": "string"
+     }
+    }
+   },
+   "v2alpha1.JobList": {
+    "description": "JobList is a collection of jobs.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "description": "Items is the list of Job.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v2alpha1.Job"
+      }
+     },
+     "metadata": {
+      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v2alpha1.JobSpec": {
+    "description": "JobSpec describes how the job execution will look like.",
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "activeDeadlineSeconds": {
+      "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer",
+      "type": "integer",
+      "format": "int64"
+     },
+     "completions": {
+      "description": "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
+      "type": "integer",
+      "format": "int32"
+     },
+     "manualSelector": {
+      "description": "ManualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
+      "type": "boolean"
+     },
+     "parallelism": {
+      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
+      "type": "integer",
+      "format": "int32"
+     },
+     "selector": {
+      "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+      "$ref": "#/definitions/unversioned.LabelSelector"
+     },
+     "template": {
+      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
+      "$ref": "#/definitions/v1.PodTemplateSpec"
+     }
+    }
+   },
+   "v2alpha1.JobStatus": {
+    "description": "JobStatus represents the current state of a Job.",
+    "properties": {
+     "active": {
+      "description": "Active is the number of actively running pods.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "completionTime": {
+      "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "conditions": {
+      "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v2alpha1.JobCondition"
+      }
+     },
+     "failed": {
+      "description": "Failed is the number of pods which reached Phase Failed.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "startTime": {
+      "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "succeeded": {
+      "description": "Succeeded is the number of pods which reached Phase Succeeded.",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "v2alpha1.JobTemplateSpec": {
+    "description": "JobTemplateSpec describes the data a Job should have when created from a template",
+    "properties": {
+     "metadata": {
+      "description": "Standard object's metadata of the jobs created from this template. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Specification of the desired behavior of the job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v2alpha1.JobSpec"
      }
     }
    },

@@ -19,7 +19,7 @@ package flowcontrol
 import (
 	"sync"
 
-	"github.com/juju/ratelimit"
+	"k8s.io/client-go/pkg/util/ratelimit"
 )
 
 type RateLimiter interface {

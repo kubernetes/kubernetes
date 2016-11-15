@@ -146,6 +146,21 @@ func getContainerSpec(pod *api.Pod, containerName string) *api.Container {
 	return nil
 }
 
+// getImageUID gets uid that will run the command(s) from image.
+func (m *kubeGenericRuntimeManager) getImageUser(image string) (string, error) {
+	imageStatus, err := m.imageService.ImageStatus(&runtimeApi.ImageSpec{Image: &image})
+	if err != nil {
+		return "", err
+	}
+
+	user := imageStatus.GetUser()
+	// kuberuntime treats empty user as root.
+	if user == "" {
+		return "0", nil
+	}
+	return user, nil
+}
+
 // isContainerFailed returns true if container has exited and exitcode is not zero.
 func isContainerFailed(status *kubecontainer.ContainerStatus) bool {
 	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
@@ -215,4 +230,18 @@ func buildFullContainerLogsPath(podUID types.UID, containerName string, restartC
 // buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
 func buildPodLogsDirectory(podUID types.UID) string {
 	return filepath.Join(podLogsRootDirectory, string(podUID))
+}
+
+// toKubeRuntimeStatus converts the runtimeApi.RuntimeStatus to kubecontainer.RuntimeStatus.
+func toKubeRuntimeStatus(status *runtimeApi.RuntimeStatus) *kubecontainer.RuntimeStatus {
+	conditions := []kubecontainer.RuntimeCondition{}
+	for _, c := range status.GetConditions() {
+		conditions = append(conditions, kubecontainer.RuntimeCondition{
+			Type:    kubecontainer.RuntimeConditionType(c.GetType()),
+			Status:  c.GetStatus(),
+			Reason:  c.GetReason(),
+			Message: c.GetMessage(),
+		})
+	}
+	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }

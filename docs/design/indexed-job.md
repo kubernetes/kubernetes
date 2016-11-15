@@ -481,7 +481,7 @@ The multiple substitution approach:
 for very large jobs, the work-queue style or another type of controller, such as
 map-reduce or spark, may be a better fit.)
 - Drawback: is a form of server-side templating, which we want in Kubernetes but
-have not fully designed (see the [PetSets proposal](https://github.com/kubernetes/kubernetes/pull/18016/files?short_path=61f4179#diff-61f41798f4bced6e42e45731c1494cee)).
+have not fully designed (see the [StatefulSets proposal](https://github.com/kubernetes/kubernetes/pull/18016/files?short_path=61f4179#diff-61f41798f4bced6e42e45731c1494cee)).
 
 The index-only approach:
 
@@ -874,24 +874,24 @@ admission time; it will need to understand indexes.
 previous container failures.
 - modify the job template, affecting all indexes.
 
-#### Comparison to PetSets
+#### Comparison to StatefulSets (previously named PetSets)
 
-The *Index substitution-only* option corresponds roughly to PetSet Proposal 1b.
-The `perCompletionArgs` approach is similar to PetSet Proposal 1e, but more
+The *Index substitution-only* option corresponds roughly to StatefulSet Proposal 1b.
+The `perCompletionArgs` approach is similar to StatefulSet Proposal 1e, but more
 restrictive and thus less verbose.
 
-It would be easier for users if Indexed Job and PetSet are similar where
-possible. However, PetSet differs in several key respects:
+It would be easier for users if Indexed Job and StatefulSet are similar where
+possible. However, StatefulSet differs in several key respects:
 
-- PetSet is for ones to tens of instances.  Indexed job should work with tens of
+- StatefulSet is for ones to tens of instances.  Indexed job should work with tens of
 thousands of instances.
-- When you have few instances, you may want to given them pet names. When you
-have many instances, you that many instances, integer indexes make more sense.
+- When you have few instances, you may want to give them names. When you have many instances,
+integer indexes make more sense.
 - When you have thousands of instances, storing the work-list in the JobSpec
-is verbose.  For PetSet, this is less of a problem.
-- PetSets (apparently) need to differ in more fields than indexed Jobs.
+is verbose.  For StatefulSet, this is less of a problem.
+- StatefulSets (apparently) need to differ in more fields than indexed Jobs.
 
-This differs from PetSet in that PetSet uses names and not indexes. PetSet is
+This differs from StatefulSet in that StatefulSet uses names and not indexes. StatefulSet is
 intended to support ones to tens of things.
 
 

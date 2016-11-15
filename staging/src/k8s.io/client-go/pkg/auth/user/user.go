@@ -69,6 +69,7 @@ func (i *DefaultInfo) GetExtra() map[string][]string {
 // well-known user and group names
 const (
 	SystemPrivilegedGroup = "system:masters"
+	NodesGroup            = "system:nodes"
 	AllUnauthenticated    = "system:unauthenticated"
 	AllAuthenticated      = "system:authenticated"
 

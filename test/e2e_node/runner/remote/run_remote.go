@@ -507,7 +507,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			remote.AddHostnameIp(name, externalIp)
 		}
 		var output string
-		output, err = remote.RunSshCommand("ssh", remote.GetHostnameOrIp(name), "--", "sudo", "docker", "version")
+		output, err = remote.SSH(name, "docker", "version")
 		if err != nil {
 			err = fmt.Errorf("instance %s not running docker daemon - Command failed: %s", name, output)
 			continue

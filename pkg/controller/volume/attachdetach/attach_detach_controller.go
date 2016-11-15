@@ -120,7 +120,8 @@ func NewAttachDetachController(
 		operationexecutor.NewOperationExecutor(
 			kubeClient,
 			&adc.volumePluginMgr,
-			recorder)
+			recorder,
+			false) // flag for experimental binary check for volume mount
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer, adc.actualStateOfWorld)
 	adc.reconciler = reconciler.NewReconciler(
@@ -591,10 +592,6 @@ func (adc *attachDetachController) GetHostName() string {
 
 func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) GetRootContext() string {
-	return ""
 }
 
 func (adc *attachDetachController) GetNodeAllocatable() (api.ResourceList, error) {

@@ -13,14 +13,33 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "zz_generated.job.go",
-        "zz_generated.scheduledjob.go",
+        "cronjob.go",
+        "expansion_generated.go",
+        "job.go",
+        "job_expansion.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/labels:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["job_test.go"],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/apis/batch:go_default_library",
+        "//pkg/client/cache:go_default_library",
+        "//pkg/labels:go_default_library",
+        "//pkg/util/sets:go_default_library",
     ],
 )

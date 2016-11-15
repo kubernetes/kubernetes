@@ -2621,6 +2621,78 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			test: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
 				"should not be blocked from being scheduled onto any node, even there's no existing pod that match the rule anywhere.",
 		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{
+							"podAntiAffinity": {
+								"requiredDuringSchedulingIgnoredDuringExecution": [{
+									"labelSelector": {
+										"matchExpressions": [{
+											"key": "foo",
+											"operator": "In",
+											"values": ["abc"]
+										}]
+									},
+									"topologyKey": "region"
+								}]
+							}
+						}`,
+					},
+				},
+			},
+			pods: []*api.Pod{
+				{Spec: api.PodSpec{NodeName: "nodeA"}, ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
+			},
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
+				{ObjectMeta: api.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+			},
+			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{
+							"podAntiAffinity": {
+								"requiredDuringSchedulingIgnoredDuringExecution": [{
+									"labelSelector": {
+										"matchExpressions": [{
+											"key": "foo",
+											"operator": "In",
+											"values": ["abc"]
+										}]
+									},
+									"topologyKey": "region"
+								}]
+							}
+						}`,
+					},
+				},
+			},
+			pods: []*api.Pod{
+				{Spec: api.PodSpec{NodeName: "nodeA"}, ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
+			},
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
+				{ObjectMeta: api.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: api.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+				"nodeC": true,
+			},
+			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be schedulerd onto nodeC",
+		},
 	}
 	affinityExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}
 	selectorExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
@@ -3131,78 +3203,6 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 
 	for _, test := range tests {
 		fits, reasons, err := CheckNodeDiskPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
-		}
-	}
-}
-
-func TestPodSchedulesOnNodeWithInodePressureCondition(t *testing.T) {
-	pod := &api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:            "container",
-					Image:           "image",
-					ImagePullPolicy: "Always",
-				},
-			},
-		},
-	}
-
-	// specify a node with no inode pressure condition on
-	noPressureNode := &api.Node{
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{
-					Type:   api.NodeReady,
-					Status: api.ConditionTrue,
-				},
-			},
-		},
-	}
-
-	// specify a node with pressure condition on
-	pressureNode := &api.Node{
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{
-					Type:   api.NodeInodePressure,
-					Status: api.ConditionTrue,
-				},
-			},
-		},
-	}
-
-	tests := []struct {
-		pod      *api.Pod
-		nodeInfo *schedulercache.NodeInfo
-		fits     bool
-		name     string
-	}{
-		{
-			pod:      pod,
-			nodeInfo: makeEmptyNodeInfo(noPressureNode),
-			fits:     true,
-			name:     "pod schedulable on node without inode pressure condition on",
-		},
-		{
-			pod:      pod,
-			nodeInfo: makeEmptyNodeInfo(pressureNode),
-			fits:     false,
-			name:     "pod not schedulable on node with inode pressure condition on",
-		},
-	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderInodePressure}
-
-	for _, test := range tests {
-		fits, reasons, err := CheckNodeInodePressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 		}

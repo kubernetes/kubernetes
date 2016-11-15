@@ -15,6 +15,9 @@ docs/man/man1/kubectl-api-versions.1
 docs/man/man1/kubectl-apply.1
 docs/man/man1/kubectl-attach.1
 docs/man/man1/kubectl-autoscale.1
+docs/man/man1/kubectl-certificate-approve.1
+docs/man/man1/kubectl-certificate-deny.1
+docs/man/man1/kubectl-certificate.1
 docs/man/man1/kubectl-cluster-info-dump.1
 docs/man/man1/kubectl-cluster-info.1
 docs/man/man1/kubectl-completion.1
@@ -90,6 +93,9 @@ docs/user-guide/kubectl/kubectl_api-versions.md
 docs/user-guide/kubectl/kubectl_apply.md
 docs/user-guide/kubectl/kubectl_attach.md
 docs/user-guide/kubectl/kubectl_autoscale.md
+docs/user-guide/kubectl/kubectl_certificate.md
+docs/user-guide/kubectl/kubectl_certificate_approve.md
+docs/user-guide/kubectl/kubectl_certificate_deny.md
 docs/user-guide/kubectl/kubectl_cluster-info.md
 docs/user-guide/kubectl/kubectl_cluster-info_dump.md
 docs/user-guide/kubectl/kubectl_completion.md
@@ -162,6 +168,7 @@ docs/yaml/kubectl/kubectl_api-versions.yaml
 docs/yaml/kubectl/kubectl_apply.yaml
 docs/yaml/kubectl/kubectl_attach.yaml
 docs/yaml/kubectl/kubectl_autoscale.yaml
+docs/yaml/kubectl/kubectl_certificate.yaml
 docs/yaml/kubectl/kubectl_cluster-info.yaml
 docs/yaml/kubectl/kubectl_completion.yaml
 docs/yaml/kubectl/kubectl_config.yaml

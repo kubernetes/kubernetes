@@ -44,7 +44,7 @@ NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 CVM_VERSION=container-vm-v20161025
-GCI_VERSION="gci-dev-56-8938-0-0"
+GCI_VERSION="gci-dev-56-8977-0-0"
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
@@ -113,7 +113,9 @@ FEATURE_GATES="${KUBE_FEATURE_GATES:-}"
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="${KUBE_DNS_SERVER_IP:-10.0.0.10}"
 DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
-DNS_REPLICAS=1
+
+# Optional: Enable DNS horizontal autoscaler
+ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}"
 
 # Optional: Install cluster docker registry.
 ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-false}"

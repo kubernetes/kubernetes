@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -116,10 +117,11 @@ func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
 		extensions.Kind("Job"):                         &JobDescriber{c},
 		extensions.Kind("Ingress"):                     &IngressDescriber{c},
 		batch.Kind("Job"):                              &JobDescriber{c},
-		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{c},
+		batch.Kind("CronJob"):                          &CronJobDescriber{c},
 		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
+		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},
 	}
 
 	return m
@@ -572,6 +574,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, out)
 		case volume.VolumeSource.Cinder != nil:
 			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
+		case volume.VolumeSource.PhotonPersistentDisk != nil:
+			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -706,6 +710,14 @@ func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, out i
 		"    FSType:\t%v\n",
 		vsphere.VolumePath, vsphere.FSType)
 }
+
+func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tPhotonPersistentDisk (a Persistent Disk resource in photon platform)\n"+
+		"    PdID:\t%v\n"+
+		"    FSType:\t%v\n",
+		photon.PdID, photon.FSType)
+}
+
 func printCinderVolumeSource(cinder *api.CinderVolumeSource, out io.Writer) {
 	fmt.Fprintf(out, "    Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
@@ -772,6 +784,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printCinderVolumeSource(pv.Spec.Cinder, out)
 		case pv.Spec.AzureDisk != nil:
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, out)
+		case pv.Spec.PhotonPersistentDisk != nil:
+			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, out)
 		}
 
 		if events != nil {
@@ -1222,13 +1236,13 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 	})
 }
 
-// ScheduledJobDescriber generates information about a scheduled job and the jobs it has created.
-type ScheduledJobDescriber struct {
+// CronJobDescriber generates information about a scheduled job and the jobs it has created.
+type CronJobDescriber struct {
 	clientset.Interface
 }
 
-func (d *ScheduledJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	scheduledJob, err := d.Batch().ScheduledJobs(namespace).Get(name)
+func (d *CronJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	scheduledJob, err := d.Batch().CronJobs(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -1238,10 +1252,10 @@ func (d *ScheduledJobDescriber) Describe(namespace, name string, describerSettin
 		events, _ = d.Core().Events(namespace).Search(scheduledJob)
 	}
 
-	return describeScheduledJob(scheduledJob, events)
+	return describeCronJob(scheduledJob, events)
 }
 
-func describeScheduledJob(scheduledJob *batch.ScheduledJob, events *api.EventList) (string, error) {
+func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", scheduledJob.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", scheduledJob.Namespace)
@@ -1789,6 +1803,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events *api.EventList, canViewPods bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
+		fmt.Fprintf(out, "Role:\t%s\n", findNodeRole(node))
 		printLabelsMultiline(out, "Labels", node.Labels)
 		printTaintsInAnnotationMultiline(out, "Taints", node.Annotations)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
@@ -2161,6 +2176,13 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 			ru := d.Spec.Strategy.RollingUpdate
 			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
 		}
+		if len(d.Status.Conditions) > 0 {
+			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tReason\n")
+			fmt.Fprint(out, "  ----\t------\t------\n")
+			for _, c := range d.Status.Conditions {
+				fmt.Fprintf(out, "  %v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+			}
+		}
 		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd)
 		if err == nil {
 			fmt.Fprintf(out, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
@@ -2377,6 +2399,41 @@ func (s *StorageClassDescriber) Describe(namespace, name string, describerSettin
 		fmt.Fprintf(out, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
 		if describerSettings.ShowEvents {
 			events, err := s.Core().Events(namespace).Search(sc)
+			if err != nil {
+				return err
+			}
+			if events != nil {
+				DescribeEvents(events, out)
+			}
+		}
+		return nil
+	})
+}
+
+type PodDisruptionBudgetDescriber struct {
+	clientset.Interface
+}
+
+func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	pdb, err := p.Policy().PodDisruptionBudgets(namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", pdb.Name)
+		fmt.Fprintf(out, "Min available:\t%s\n", pdb.Spec.MinAvailable.String())
+		if pdb.Spec.Selector != nil {
+			fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(pdb.Spec.Selector))
+		} else {
+			fmt.Fprintf(out, "Selector:\t<unset>\n")
+		}
+		fmt.Fprintf(out, "Status:\n")
+		fmt.Fprintf(out, "    Allowed disruptions:\t%d\n", pdb.Status.PodDisruptionsAllowed)
+		fmt.Fprintf(out, "    Current:\t%d\n", pdb.Status.CurrentHealthy)
+		fmt.Fprintf(out, "    Desired:\t%d\n", pdb.Status.DesiredHealthy)
+		fmt.Fprintf(out, "    Total:\t%d\n", pdb.Status.ExpectedPods)
+		if describerSettings.ShowEvents {
+			events, err := p.Core().Events(namespace).Search(pdb)
 			if err != nil {
 				return err
 			}

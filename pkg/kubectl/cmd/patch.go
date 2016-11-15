@@ -154,6 +154,14 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return err
 	}
 
+	smPatchVersion := strategicpatch.SMPatchVersionLatest
+	if !options.Local {
+		smPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
+		if err != nil {
+			return err
+		}
+	}
+
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -177,7 +185,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
 				// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
 				// record hint is likely to be invalid anyway, so avoid the bad hint
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
+				patch, err := cmdutil.ChangeResourcePatch(info, f.Command(), smPatchVersion)
 				if err == nil {
 					helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 				}

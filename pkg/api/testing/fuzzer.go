@@ -172,7 +172,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				j.ManualSelector = nil
 			}
 		},
-		func(sj *batch.ScheduledJobSpec, c fuzz.Continue) {
+		func(sj *batch.CronJobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(sj)
 			suspend := c.RandBool()
 			sj.Suspend = &suspend

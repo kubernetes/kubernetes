@@ -22,25 +22,25 @@ import (
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeAuthorization struct {
+type FakeAuthorizationV1beta1 struct {
 	*testing.Fake
 }
 
-func (c *FakeAuthorization) LocalSubjectAccessReviews(namespace string) v1beta1.LocalSubjectAccessReviewInterface {
+func (c *FakeAuthorizationV1beta1) LocalSubjectAccessReviews(namespace string) v1beta1.LocalSubjectAccessReviewInterface {
 	return &FakeLocalSubjectAccessReviews{c, namespace}
 }
 
-func (c *FakeAuthorization) SelfSubjectAccessReviews() v1beta1.SelfSubjectAccessReviewInterface {
+func (c *FakeAuthorizationV1beta1) SelfSubjectAccessReviews() v1beta1.SelfSubjectAccessReviewInterface {
 	return &FakeSelfSubjectAccessReviews{c}
 }
 
-func (c *FakeAuthorization) SubjectAccessReviews() v1beta1.SubjectAccessReviewInterface {
+func (c *FakeAuthorizationV1beta1) SubjectAccessReviews() v1beta1.SubjectAccessReviewInterface {
 	return &FakeSubjectAccessReviews{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthorization) RESTClient() rest.Interface {
+func (c *FakeAuthorizationV1beta1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

@@ -134,13 +134,13 @@ func (p *testNamer) SetSelfLink(obj runtime.Object, url string) error {
 }
 
 // GenerateLink creates a path and query for a given runtime object that represents the canonical path.
-func (p *testNamer) GenerateLink(req *restful.Request, obj runtime.Object) (path, query string, err error) {
-	return "", "", errors.New("not implemented")
+func (p *testNamer) GenerateLink(req *restful.Request, obj runtime.Object) (uri string, err error) {
+	return "", errors.New("not implemented")
 }
 
 // GenerateLink creates a path and query for a list that represents the canonical path.
-func (p *testNamer) GenerateListLink(req *restful.Request) (path, query string, err error) {
-	return "", "", errors.New("not implemented")
+func (p *testNamer) GenerateListLink(req *restful.Request) (uri string, err error) {
+	return "", errors.New("not implemented")
 }
 
 type patchTestCase struct {
@@ -213,7 +213,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			continue
 
 		case api.StrategicMergePatchType:
-			patch, err = strategicpatch.CreateStrategicMergePatch(originalObjJS, changedJS, versionedObj)
+			patch, err = strategicpatch.CreateStrategicMergePatch(originalObjJS, changedJS, versionedObj, strategicpatch.SMPatchVersionLatest)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				return

@@ -170,6 +170,18 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for federation openapi spec that need updating... "
+if ! hack/verify-federation-openapi-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Federation OpenAPI spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-federation-openapi-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 if [[ "${exit_code}" != 0 ]]; then
   echo "${red}Aborting commit${reset}"
 fi

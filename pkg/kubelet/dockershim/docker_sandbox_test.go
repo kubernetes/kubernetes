@@ -186,7 +186,13 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 		map[string]string{"annotation": ns},
 	)
 	hostNetwork := true
-	c.Linux = &runtimeApi.LinuxPodSandboxConfig{NamespaceOptions: &runtimeApi.NamespaceOption{HostNetwork: &hostNetwork}}
+	c.Linux = &runtimeApi.LinuxPodSandboxConfig{
+		SecurityContext: &runtimeApi.LinuxSandboxSecurityContext{
+			NamespaceOptions: &runtimeApi.NamespaceOption{
+				HostNetwork: &hostNetwork,
+			},
+		},
+	}
 	cID := kubecontainer.ContainerID{Type: runtimeName, ID: fmt.Sprintf("/%v", makeSandboxName(c))}
 
 	// No calls to network plugin are expected

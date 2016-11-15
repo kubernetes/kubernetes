@@ -17,7 +17,6 @@ limitations under the License.
 package remote
 
 import (
-	"fmt"
 	"time"
 
 	"golang.org/x/net/context"
@@ -49,6 +48,14 @@ func NewDockerService(s dockershim.DockerService) DockerService {
 
 func (d *dockerService) Version(ctx context.Context, r *runtimeApi.VersionRequest) (*runtimeApi.VersionResponse, error) {
 	return d.runtimeService.Version(r.GetVersion())
+}
+
+func (d *dockerService) Status(ctx context.Context, r *runtimeApi.StatusRequest) (*runtimeApi.StatusResponse, error) {
+	status, err := d.runtimeService.Status()
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeApi.StatusResponse{Status: status}, nil
 }
 
 func (d *dockerService) RunPodSandbox(ctx context.Context, r *runtimeApi.RunPodSandboxRequest) (*runtimeApi.RunPodSandboxResponse, error) {
@@ -157,15 +164,15 @@ func (d *dockerService) ExecSync(ctx context.Context, r *runtimeApi.ExecSyncRequ
 }
 
 func (d *dockerService) Exec(ctx context.Context, r *runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.Exec(r)
 }
 
 func (d *dockerService) Attach(ctx context.Context, r *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.Attach(r)
 }
 
 func (d *dockerService) PortForward(ctx context.Context, r *runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.PortForward(r)
 }
 
 func (d *dockerService) UpdateRuntimeConfig(ctx context.Context, r *runtimeApi.UpdateRuntimeConfigRequest) (*runtimeApi.UpdateRuntimeConfigResponse, error) {

@@ -39,8 +39,10 @@ import (
 // A structure that distributes eventes to multiple watchers.
 type WatcherDispatcher struct {
 	sync.Mutex
-	watchers    []*watch.RaceFreeFakeWatcher
-	eventsSoFar []*watch.Event
+	watchers       []*watch.RaceFreeFakeWatcher
+	eventsSoFar    []*watch.Event
+	orderExecution chan func()
+	stopChan       chan struct{}
 }
 
 func (wd *WatcherDispatcher) register(watcher *watch.RaceFreeFakeWatcher) {
@@ -55,6 +57,7 @@ func (wd *WatcherDispatcher) register(watcher *watch.RaceFreeFakeWatcher) {
 func (wd *WatcherDispatcher) Stop() {
 	wd.Lock()
 	defer wd.Unlock()
+	close(wd.stopChan)
 	for _, watcher := range wd.watchers {
 		watcher.Stop()
 	}
@@ -136,9 +139,21 @@ func (wd *WatcherDispatcher) Action(action watch.EventType, obj runtime.Object) 
 // All subsequent requests for a watch on the client will result in returning this fake watcher.
 func RegisterFakeWatch(resource string, client *core.Fake) *WatcherDispatcher {
 	dispatcher := &WatcherDispatcher{
-		watchers:    make([]*watch.RaceFreeFakeWatcher, 0),
-		eventsSoFar: make([]*watch.Event, 0),
+		watchers:       make([]*watch.RaceFreeFakeWatcher, 0),
+		eventsSoFar:    make([]*watch.Event, 0),
+		orderExecution: make(chan func()),
+		stopChan:       make(chan struct{}),
 	}
+	go func() {
+		for {
+			select {
+			case fun := <-dispatcher.orderExecution:
+				fun()
+			case <-dispatcher.stopChan:
+				return
+			}
+		}
+	}()
 
 	client.AddWatchReactor(resource, func(action core.Action) (bool, watch.Interface, error) {
 		watcher := watch.NewRaceFreeFake()
@@ -166,11 +181,11 @@ func RegisterFakeCopyOnCreate(resource string, client *core.Fake, watcher *Watch
 		originalObj := createAction.GetObject()
 		// Create a copy of the object here to prevent data races while reading the object in go routine.
 		obj := copy(originalObj)
-		go func() {
+		watcher.orderExecution <- func() {
 			glog.V(4).Infof("Object created. Writing to channel: %v", obj)
 			watcher.Add(obj)
 			objChan <- obj
-		}()
+		}
 		return true, originalObj, nil
 	})
 	return objChan
@@ -186,23 +201,23 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 		originalObj := updateAction.GetObject()
 		// Create a copy of the object here to prevent data races while reading the object in go routine.
 		obj := copy(originalObj)
-		go func() {
+		watcher.orderExecution <- func() {
 			glog.V(4).Infof("Object updated. Writing to channel: %v", obj)
 			watcher.Modify(obj)
 			objChan <- obj
-		}()
+		}
 		return true, originalObj, nil
 	})
 	return objChan
 }
 
 // GetObjectFromChan tries to get an api object from the given channel
-// within a reasonable time (1 min).
+// within a reasonable time.
 func GetObjectFromChan(c chan runtime.Object) runtime.Object {
 	select {
 	case obj := <-c:
 		return obj
-	case <-time.After(20 * time.Second):
+	case <-time.After(wait.ForeverTestTimeout):
 		pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
 		return nil
 	}
@@ -242,11 +257,11 @@ func CompareObjectMeta(a, b api_v1.ObjectMeta) error {
 	if a.Name != b.Name {
 		return fmt.Errorf("Different name expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
-	if !reflect.DeepEqual(a.Annotations, b.Annotations) {
-		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Annotations, b.Annotations)
+	if !reflect.DeepEqual(a.Labels, b.Labels) && (len(a.Labels) != 0 || len(b.Labels) != 0) {
+		return fmt.Errorf("Labels are different expected:%v observerd:%v", a.Labels, b.Labels)
 	}
-	if !reflect.DeepEqual(a.Labels, b.Labels) {
-		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Labels, b.Labels)
+	if !reflect.DeepEqual(a.Annotations, b.Annotations) && (len(a.Annotations) != 0 || len(b.Annotations) != 0) {
+		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Annotations, b.Annotations)
 	}
 	return nil
 }
@@ -279,4 +294,31 @@ func WaitForStoreUpdate(store util.FederatedReadOnlyStore, clusterName, key stri
 		return found, err
 	})
 	return err
+}
+
+// Ensure a key is in the store before returning (or timeout w/ error)
+func WaitForStoreUpdateChecking(store util.FederatedReadOnlyStore, clusterName, key string, timeout time.Duration,
+	checkFunction CheckingFunction) error {
+	retryInterval := 500 * time.Millisecond
+	var lastError error
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		item, found, err := store.GetByKey(clusterName, key)
+		if err != nil || !found {
+			return found, err
+		}
+		runtimeObj := item.(runtime.Object)
+		lastError = checkFunction(runtimeObj)
+		glog.V(2).Infof("Check function failed for %s %v %v", key, runtimeObj, lastError)
+		return lastError == nil, nil
+	})
+	return err
+}
+
+func MetaAndSpecCheckingFunction(expected runtime.Object) CheckingFunction {
+	return func(obj runtime.Object) error {
+		if util.ObjectMetaAndSpecEquivalent(obj, expected) {
+			return nil
+		}
+		return fmt.Errorf("Object different expected=%#v  received=%#v", expected, obj)
+	}
 }

@@ -86,7 +86,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "scheduledjobs").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
@@ -116,7 +116,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "scheduledjobs").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
@@ -139,10 +139,59 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(Read...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
-				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "scheduledjobs").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
+			},
+		},
+		{
+			// a role for nodes to use to have the access they need for running pods
+			ObjectMeta: api.ObjectMeta{Name: "system:node"},
+			Rules: []rbac.PolicyRule{
+				// Needed to check API access.  These creates are non-mutating
+				rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
+				rbac.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews", "localsubjectaccessreviews").RuleOrDie(),
+				// Needed to build serviceLister, to populate env vars for services
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("services").RuleOrDie(),
+				// Nodes can register themselves
+				// TODO: restrict to creating a node with the same name they announce
+				rbac.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				// TODO: restrict to the bound node once supported
+				rbac.NewRule("update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+
+				// TODO: restrict to the bound node as creator once supported
+				rbac.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+
+				// TODO: restrict to pods scheduled on the bound node once supported
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("pods").RuleOrDie(),
+
+				// TODO: remove once mirror pods are removed
+				// TODO: restrict deletion to mirror pods created by the bound node once supported
+				// Needed for the node to create/delete mirror pods
+				rbac.NewRule("get", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				// TODO: restrict to pods scheduled on the bound node once supported
+				rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+
+				// TODO: restrict to secrets and configmaps used by pods scheduled on bound node once supported
+				// Needed for imagepullsecrets, rbd/ceph and secret volumes, and secrets in envs
+				// Needed for configmap volume and envs
+				rbac.NewRule("get").Groups(legacyGroup).Resources("secrets", "configmaps").RuleOrDie(),
+				// TODO: restrict to claims/volumes used by pods scheduled on bound node once supported
+				// Needed for persistent volumes
+				rbac.NewRule("get").Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+				// TODO: restrict to namespaces of pods scheduled on bound node once supported
+				// TODO: change glusterfs to use DNS lookup so this isn't needed?
+				// Needed for glusterfs volumes
+				rbac.NewRule("get").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+			},
+		},
+		{
+			// a role to use for setting up a proxy
+			ObjectMeta: api.ObjectMeta{Name: "system:node-proxier"},
+			Rules: []rbac.PolicyRule{
+				// Used to build serviceLister
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
 			},
 		},
 	}
@@ -154,5 +203,7 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
+		rbac.NewClusterBinding("system:node").Groups(user.NodesGroup).BindingOrDie(),
+		rbac.NewClusterBinding("system:node-proxier").Groups(user.NodesGroup).BindingOrDie(),
 	}
 }

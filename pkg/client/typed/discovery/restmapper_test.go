@@ -20,7 +20,15 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	"k8s.io/kubernetes/pkg/version"
+
+	"github.com/emicklei/go-restful/swagger"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRESTMapper(t *testing.T) {
@@ -173,4 +181,145 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("ResourceFor(%#v) = %#v, want %#v", tc.input, got, tc.want)
 		}
 	}
+}
+
+func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
+	assert := assert.New(t)
+
+	cdc := fakeCachedDiscoveryInterface{fresh: false}
+	m := NewDeferredDiscoveryRESTMapper(&cdc, registered.InterfacesFor)
+	assert.False(cdc.fresh, "should NOT be fresh after instantiation")
+	assert.Zero(cdc.invalidateCalls, "should not have called Invalidate()")
+
+	gvk, err := m.KindFor(unversioned.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "foo",
+	})
+	assert.NoError(err)
+	assert.True(cdc.fresh, "should be fresh after a cache-miss")
+	assert.Equal(cdc.invalidateCalls, 1, "should have called Invalidate() once")
+	assert.Equal(gvk.Kind, "Foo")
+
+	gvk, err = m.KindFor(unversioned.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "foo",
+	})
+	assert.NoError(err)
+	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again")
+
+	gvk, err = m.KindFor(unversioned.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "bar",
+	})
+	assert.Error(err)
+	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
+
+	cdc.fresh = false
+	gvk, err = m.KindFor(unversioned.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "bar",
+	})
+	assert.Error(err)
+	assert.Equal(cdc.invalidateCalls, 2, "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
+}
+
+type fakeCachedDiscoveryInterface struct {
+	invalidateCalls int
+	fresh           bool
+	enabledA        bool
+}
+
+var _ CachedDiscoveryInterface = &fakeCachedDiscoveryInterface{}
+
+func (c *fakeCachedDiscoveryInterface) Fresh() bool {
+	return c.fresh
+}
+
+func (c *fakeCachedDiscoveryInterface) Invalidate() {
+	c.invalidateCalls = c.invalidateCalls + 1
+	c.fresh = true
+	c.enabledA = true
+}
+
+func (c *fakeCachedDiscoveryInterface) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerGroups() (*unversioned.APIGroupList, error) {
+	if c.enabledA {
+		return &unversioned.APIGroupList{
+			Groups: []unversioned.APIGroup{
+				{
+					Name: "a",
+					Versions: []unversioned.GroupVersionForDiscovery{
+						{
+							GroupVersion: "a/v1",
+							Version:      "v1",
+						},
+					},
+					PreferredVersion: unversioned.GroupVersionForDiscovery{
+						GroupVersion: "a/v1",
+						Version:      "v1",
+					},
+				},
+			},
+		}, nil
+	}
+	return &unversioned.APIGroupList{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+	if c.enabledA && groupVersion == "a/v1" {
+		return &unversioned.APIResourceList{
+			GroupVersion: "a/v1",
+			APIResources: []unversioned.APIResource{
+				{
+					Name:       "foo",
+					Kind:       "Foo",
+					Namespaced: false,
+				},
+			},
+		}, nil
+	}
+
+	return nil, errors.NewNotFound(unversioned.GroupResource{}, "")
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+	if c.enabledA {
+		av1, _ := c.ServerResourcesForGroupVersion("a/v1")
+		return map[string]*unversioned.APIResourceList{
+			"a/v1": av1,
+		}, nil
+	}
+	return map[string]*unversioned.APIResourceList{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+	if c.enabledA {
+		return []unversioned.GroupVersionResource{
+			{
+				Group:    "a",
+				Version:  "v1",
+				Resource: "foo",
+			},
+		}, nil
+	}
+	return []unversioned.GroupVersionResource{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	return []unversioned.GroupVersionResource{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
+	return &version.Info{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+	return &swagger.ApiDeclaration{}, nil
 }

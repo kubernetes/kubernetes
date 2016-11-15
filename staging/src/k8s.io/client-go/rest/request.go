@@ -930,33 +930,21 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		}
 	}
 
-	// Did the server give us a status response?
-	isStatusResponse := false
-	status := &unversioned.Status{}
-	// Because release-1.1 server returns Status with empty APIVersion at paths
-	// to the Extensions resources, we need to use DecodeInto here to provide
-	// default groupVersion, otherwise a status response won't be correctly
-	// decoded.
-	err := runtime.DecodeInto(decoder, body, status)
-	if err == nil && len(status.Status) > 0 {
-		isStatusResponse = true
-	}
-
 	switch {
 	case resp.StatusCode == http.StatusSwitchingProtocols:
 		// no-op, we've been upgraded
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
-		if !isStatusResponse {
-			return Result{err: r.transformUnstructuredResponseError(resp, req, body)}
+		// calculate an unstructured error from the response which the Result object may use if the caller
+		// did not return a structured error.
+		retryAfter, _ := retryAfterSeconds(resp)
+		err := r.newUnstructuredResponseError(body, isTextResponse(resp), resp.StatusCode, req.Method, retryAfter)
+		return Result{
+			body:        body,
+			contentType: contentType,
+			statusCode:  resp.StatusCode,
+			decoder:     decoder,
+			err:         err,
 		}
-		return Result{err: errors.FromObject(status)}
-	}
-
-	// If the server gave us a status back, look at what it was.
-	success := resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent
-	if isStatusResponse && (status.Status != unversioned.StatusSuccess && !success) {
-		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return Result{err: errors.FromObject(status)}
 	}
 
 	return Result{
@@ -966,6 +954,9 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		decoder:     decoder,
 	}
 }
+
+// maxUnstructuredResponseTextBytes is an upper bound on how much output to include in the unstructured error.
+const maxUnstructuredResponseTextBytes = 2048
 
 // transformUnstructuredResponseError handles an error from the server that is not in a structured form.
 // It is expected to transform any response that is not recognizable as a clear server sent error from the
@@ -987,20 +978,29 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 // TODO: introduce transformation of generic http.Client.Do() errors that separates 4.
 func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *http.Request, body []byte) error {
 	if body == nil && resp.Body != nil {
-		if data, err := ioutil.ReadAll(resp.Body); err == nil {
+		if data, err := ioutil.ReadAll(&io.LimitedReader{R: resp.Body, N: maxUnstructuredResponseTextBytes}); err == nil {
 			body = data
 		}
+	}
+	retryAfter, _ := retryAfterSeconds(resp)
+	return r.newUnstructuredResponseError(body, isTextResponse(resp), resp.StatusCode, req.Method, retryAfter)
+}
+
+// newUnstructuredResponseError instantiates the appropriate generic error for the provided input. It also logs the body.
+func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool, statusCode int, method string, retryAfter int) error {
+	// cap the amount of output we create
+	if len(body) > maxUnstructuredResponseTextBytes {
+		body = body[:maxUnstructuredResponseTextBytes]
 	}
 	glog.V(8).Infof("Response Body: %#v", string(body))
 
 	message := "unknown"
-	if isTextResponse(resp) {
+	if isTextResponse {
 		message = strings.TrimSpace(string(body))
 	}
-	retryAfter, _ := retryAfterSeconds(resp)
 	return errors.NewGenericServerResponse(
-		resp.StatusCode,
-		req.Method,
+		statusCode,
+		method,
 		unversioned.GroupResource{
 			Group:    r.content.GroupVersion.Group,
 			Resource: r.resource,
@@ -1064,15 +1064,31 @@ func (r Result) Raw() ([]byte, error) {
 	return r.body, r.err
 }
 
-// Get returns the result as an object.
+// Get returns the result as an object, which means it passes through the decoder.
+// If the returned object is of type Status and has .Status != StatusSuccess, the
+// additional information in Status will be used to enrich the error.
 func (r Result) Get() (runtime.Object, error) {
 	if r.err != nil {
-		return nil, r.err
+		// Check whether the result has a Status object in the body and prefer that.
+		return nil, r.Error()
 	}
 	if r.decoder == nil {
 		return nil, fmt.Errorf("serializer for %s doesn't exist", r.contentType)
 	}
-	return runtime.Decode(r.decoder, r.body)
+
+	// decode, but if the result is Status return that as an error instead.
+	out, _, err := r.decoder.Decode(r.body, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	switch t := out.(type) {
+	case *unversioned.Status:
+		// any status besides StatusSuccess is considered an error.
+		if t.Status != unversioned.StatusSuccess {
+			return nil, errors.FromObject(t)
+		}
+	}
+	return out, nil
 }
 
 // StatusCode returns the HTTP status code of the request. (Only valid if no
@@ -1083,14 +1099,31 @@ func (r Result) StatusCode(statusCode *int) Result {
 }
 
 // Into stores the result into obj, if possible. If obj is nil it is ignored.
+// If the returned object is of type Status and has .Status != StatusSuccess, the
+// additional information in Status will be used to enrich the error.
 func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
-		return r.err
+		// Check whether the result has a Status object in the body and prefer that.
+		return r.Error()
 	}
 	if r.decoder == nil {
 		return fmt.Errorf("serializer for %s doesn't exist", r.contentType)
 	}
-	return runtime.DecodeInto(r.decoder, r.body, obj)
+
+	out, _, err := r.decoder.Decode(r.body, nil, obj)
+	if err != nil || out == obj {
+		return err
+	}
+	// if a different object is returned, see if it is Status and avoid double decoding
+	// the object.
+	switch t := out.(type) {
+	case *unversioned.Status:
+		// any status besides StatusSuccess is considered an error.
+		if t.Status != unversioned.StatusSuccess {
+			return errors.FromObject(t)
+		}
+	}
+	return nil
 }
 
 // WasCreated updates the provided bool pointer to whether the server returned
@@ -1101,7 +1134,29 @@ func (r Result) WasCreated(wasCreated *bool) Result {
 }
 
 // Error returns the error executing the request, nil if no error occurred.
+// If the returned object is of type Status and has Status != StatusSuccess, the
+// additional information in Status will be used to enrich the error.
 // See the Request.Do() comment for what errors you might get.
 func (r Result) Error() error {
+	// if we have received an unexpected server error, and we have a body and decoder, we can try to extract
+	// a Status object.
+	if r.err == nil || !errors.IsUnexpectedServerError(r.err) || len(r.body) == 0 || r.decoder == nil {
+		return r.err
+	}
+
+	// attempt to convert the body into a Status object
+	// to be backwards compatible with old servers that do not return a version, default to "v1"
+	out, _, err := r.decoder.Decode(r.body, &unversioned.GroupVersionKind{Version: "v1"}, nil)
+	if err != nil {
+		glog.V(5).Infof("body was not decodable (unable to check for Status): %v", err)
+		return r.err
+	}
+	switch t := out.(type) {
+	case *unversioned.Status:
+		// because we default the kind, we *must* check for StatusFailure
+		if t.Status == unversioned.StatusFailure {
+			return errors.FromObject(t)
+		}
+	}
 	return r.err
 }

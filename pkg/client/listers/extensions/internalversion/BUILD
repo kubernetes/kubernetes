@@ -13,14 +13,15 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "zz_generated.daemonset.go",
-        "zz_generated.deployment.go",
-        "zz_generated.ingress.go",
-        "zz_generated.networkpolicy.go",
-        "zz_generated.podsecuritypolicy.go",
-        "zz_generated.replicaset.go",
-        "zz_generated.scale.go",
-        "zz_generated.thirdpartyresource.go",
+        "daemonset.go",
+        "deployment.go",
+        "expansion_generated.go",
+        "ingress.go",
+        "networkpolicy.go",
+        "podsecuritypolicy.go",
+        "replicaset.go",
+        "scale.go",
+        "thirdpartyresource.go",
     ],
     tags = ["automanaged"],
     deps = [

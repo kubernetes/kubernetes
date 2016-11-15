@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 	yamlserializer "k8s.io/kubernetes/pkg/runtime/serializer/yaml"
@@ -677,6 +678,36 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
 			},
 			status: "Unknown,SchedulingDisabled",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo10",
+					Labels: map[string]string{"kubernetes.io/role": "master"},
+				},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,master",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo11",
+					Labels: map[string]string{"kubernetes.io/role": "node"},
+				},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,node",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo12",
+					Labels: map[string]string{"kubeadm.alpha.kubernetes.io/role": "node"},
+				},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,node",
 		},
 	}
 
@@ -1618,6 +1649,38 @@ func TestPrintService(t *testing.T) {
 		// We ignore time
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, got: %s %d", test.expect, buf.String(), strings.Compare(test.expect, buf.String()))
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintPodDisruptionBudget(t *testing.T) {
+	tests := []struct {
+		pdb    policy.PodDisruptionBudget
+		expect string
+	}{
+		{
+			policy.PodDisruptionBudget{
+				ObjectMeta: api.ObjectMeta{
+					Namespace:         "ns1",
+					Name:              "pdb1",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					MinAvailable: intstr.FromInt(22),
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					PodDisruptionsAllowed: 5,
+				},
+			},
+			"pdb1\t22\t5\t0s\n",
+		}}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printPodDisruptionBudget(&test.pdb, buf, PrintOptions{false, false, false, false, true, false, false, "", []string{}})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}

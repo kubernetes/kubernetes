@@ -19,6 +19,7 @@ package kubelet
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net"
 	"sort"
 	"testing"
@@ -28,10 +29,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/testing/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -1081,7 +1084,7 @@ func TestExec(t *testing.T) {
 			assert.Error(t, err, description)
 			assert.Nil(t, redirect, description)
 
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil)
+			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
 			assert.Error(t, err, description)
 		}
 		{ // Direct streaming case
@@ -1093,7 +1096,7 @@ func TestExec(t *testing.T) {
 			assert.NoError(t, err, description)
 			assert.Nil(t, redirect, description)
 
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil)
+			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
 			if tc.expectError {
 				assert.Error(t, err, description)
 			} else {
@@ -1119,7 +1122,7 @@ func TestExec(t *testing.T) {
 				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
 			}
 
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil)
+			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
 			assert.Error(t, err, description)
 		}
 	}
@@ -1262,5 +1265,232 @@ func TestMakeDevices(t *testing.T) {
 
 	for _, test := range testCases {
 		assert.Equal(t, test.devices, makeDevices(test.container), "[test %q]", test.test)
+	}
+}
+
+func TestHasPrivilegedContainer(t *testing.T) {
+	newBoolPtr := func(b bool) *bool {
+		return &b
+	}
+	tests := map[string]struct {
+		securityContext *api.SecurityContext
+		expected        bool
+	}{
+		"nil sc": {
+			securityContext: nil,
+			expected:        false,
+		},
+		"nil privleged": {
+			securityContext: &api.SecurityContext{},
+			expected:        false,
+		},
+		"false privleged": {
+			securityContext: &api.SecurityContext{Privileged: newBoolPtr(false)},
+			expected:        false,
+		},
+		"true privleged": {
+			securityContext: &api.SecurityContext{Privileged: newBoolPtr(true)},
+			expected:        true,
+		},
+	}
+
+	for k, v := range tests {
+		pod := &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{SecurityContext: v.securityContext},
+				},
+			},
+		}
+		actual := hasPrivilegedContainer(pod)
+		if actual != v.expected {
+			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
+		}
+	}
+}
+
+func TestHasHostMountPVC(t *testing.T) {
+	tests := map[string]struct {
+		pvError       error
+		pvcError      error
+		expected      bool
+		podHasPVC     bool
+		pvcIsHostPath bool
+	}{
+		"no pvc": {podHasPVC: false, expected: false},
+		"error fetching pvc": {
+			podHasPVC: true,
+			pvcError:  fmt.Errorf("foo"),
+			expected:  false,
+		},
+		"error fetching pv": {
+			podHasPVC: true,
+			pvError:   fmt.Errorf("foo"),
+			expected:  false,
+		},
+		"host path pvc": {
+			podHasPVC:     true,
+			pvcIsHostPath: true,
+			expected:      true,
+		},
+		"non host path pvc": {
+			podHasPVC:     true,
+			pvcIsHostPath: false,
+			expected:      false,
+		},
+	}
+
+	for k, v := range tests {
+		testKubelet := newTestKubelet(t, false)
+		pod := &api.Pod{
+			Spec: api.PodSpec{},
+		}
+
+		volumeToReturn := &api.PersistentVolume{
+			Spec: api.PersistentVolumeSpec{},
+		}
+
+		if v.podHasPVC {
+			pod.Spec.Volumes = []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{},
+					},
+				},
+			}
+
+			if v.pvcIsHostPath {
+				volumeToReturn.Spec.PersistentVolumeSource = api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{},
+				}
+			}
+
+		}
+
+		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+			return true, &api.PersistentVolumeClaim{
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName: "foo",
+				},
+			}, v.pvcError
+		})
+		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
+			return true, volumeToReturn, v.pvError
+		})
+
+		actual := testKubelet.kubelet.hasHostMountPVC(pod)
+		if actual != v.expected {
+			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
+		}
+
+	}
+}
+
+func TestHasNonNamespacedCapability(t *testing.T) {
+	createPodWithCap := func(caps []api.Capability) *api.Pod {
+		pod := &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{{}},
+			},
+		}
+
+		if len(caps) > 0 {
+			pod.Spec.Containers[0].SecurityContext = &api.SecurityContext{
+				Capabilities: &api.Capabilities{
+					Add: caps,
+				},
+			}
+		}
+		return pod
+	}
+
+	nilCaps := createPodWithCap([]api.Capability{api.Capability("foo")})
+	nilCaps.Spec.Containers[0].SecurityContext = nil
+
+	tests := map[string]struct {
+		pod      *api.Pod
+		expected bool
+	}{
+		"nil security contxt":           {createPodWithCap(nil), false},
+		"nil caps":                      {nilCaps, false},
+		"namespaced cap":                {createPodWithCap([]api.Capability{api.Capability("foo")}), false},
+		"non-namespaced cap MKNOD":      {createPodWithCap([]api.Capability{api.Capability("MKNOD")}), true},
+		"non-namespaced cap SYS_TIME":   {createPodWithCap([]api.Capability{api.Capability("SYS_TIME")}), true},
+		"non-namespaced cap SYS_MODULE": {createPodWithCap([]api.Capability{api.Capability("SYS_MODULE")}), true},
+	}
+
+	for k, v := range tests {
+		actual := hasNonNamespacedCapability(v.pod)
+		if actual != v.expected {
+			t.Errorf("%s failed, expected %t but got %t", k, v.expected, actual)
+		}
+	}
+}
+
+func TestHasHostVolume(t *testing.T) {
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+
+	result := hasHostVolume(pod)
+	if !result {
+		t.Errorf("expected host volume to enable host user namespace")
+	}
+
+	pod.Spec.Volumes[0].VolumeSource.HostPath = nil
+	result = hasHostVolume(pod)
+	if result {
+		t.Errorf("expected nil host volume to not enable host user namespace")
+	}
+}
+
+func TestHasHostNamespace(t *testing.T) {
+	tests := map[string]struct {
+		psc      *api.PodSecurityContext
+		expected bool
+	}{
+		"nil psc": {psc: nil, expected: false},
+		"host pid true": {
+			psc: &api.PodSecurityContext{
+				HostPID: true,
+			},
+			expected: true,
+		},
+		"host ipc true": {
+			psc: &api.PodSecurityContext{
+				HostIPC: true,
+			},
+			expected: true,
+		},
+		"host net true": {
+			psc: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
+			expected: true,
+		},
+		"no host ns": {
+			psc:      &api.PodSecurityContext{},
+			expected: false,
+		},
+	}
+
+	for k, v := range tests {
+		pod := &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: v.psc,
+			},
+		}
+		actual := hasHostNamespace(pod)
+		if actual != v.expected {
+			t.Errorf("%s failed, expected %t but got %t", k, v.expected, actual)
+		}
 	}
 }

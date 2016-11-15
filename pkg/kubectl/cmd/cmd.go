@@ -251,11 +251,12 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Cluster Management Commands:",
 			Commands: []*cobra.Command{
+				NewCmdCertificate(f, out),
 				NewCmdClusterInfo(f, out),
 				NewCmdTop(f, out, err),
 				NewCmdCordon(f, out),
 				NewCmdUncordon(f, out),
-				NewCmdDrain(f, out),
+				NewCmdDrain(f, out, err),
 				NewCmdTaint(f, out),
 			},
 		},

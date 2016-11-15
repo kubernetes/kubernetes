@@ -964,7 +964,7 @@ var map_ObjectMeta = map[string]string{
 	"resourceVersion":            "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency",
 	"generation":                 "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only.",
 	"creationTimestamp":          "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"deletionTimestamp":          "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"deletionTimestamp":          "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"deletionGracePeriodSeconds": "Number of seconds allowed for this object to gracefully terminate before it will be removed from the system. Only set when deletionTimestamp is also set. May only be shortened. Read-only.",
 	"labels":                     "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels",
 	"annotations":                "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations",
@@ -1098,6 +1098,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1125,6 +1126,16 @@ var map_PersistentVolumeStatus = map[string]string{
 
 func (PersistentVolumeStatus) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeStatus
+}
+
+var map_PhotonPersistentDiskVolumeSource = map[string]string{
+	"":       "Represents a Photon Controller persistent disk resource.",
+	"pdID":   "ID that identifies Photon Controller persistent disk",
+	"fsType": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+}
+
+func (PhotonPersistentDiskVolumeSource) SwaggerDoc() map[string]string {
+	return map_PhotonPersistentDiskVolumeSource
 }
 
 var map_Pod = map[string]string{
@@ -1787,18 +1798,19 @@ var map_VolumeSource = map[string]string{
 	"iscsi":                 "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
 	"glusterfs":             "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
-	"rbd":           "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
-	"flexVolume":    "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
-	"cinder":        "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
-	"cephfs":        "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
-	"flocker":       "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
-	"downwardAPI":   "DownwardAPI represents downward API about the pod that should populate this volume",
-	"fc":            "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
-	"azureFile":     "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
-	"configMap":     "ConfigMap represents a configMap that should populate this volume",
-	"vsphereVolume": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
-	"quobyte":       "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
-	"azureDisk":     "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"rbd":                  "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
+	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
+	"downwardAPI":          "DownwardAPI represents downward API about the pod that should populate this volume",
+	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"configMap":            "ConfigMap represents a configMap that should populate this volume",
+	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
+	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

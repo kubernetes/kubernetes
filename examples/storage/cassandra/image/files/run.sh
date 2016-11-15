@@ -18,7 +18,7 @@ set -e
 CONF_DIR=/etc/cassandra
 CFG=$CONF_DIR/cassandra.yaml
 
-# we are doing PetSet or just setting our seeds
+# we are doing StatefulSet or just setting our seeds
 if [ -z "$CASSANDRA_SEEDS" ]; then
   HOSTNAME=$(hostname -f)
 fi
@@ -78,7 +78,7 @@ echo "auto_bootstrap: ${CASSANDRA_AUTO_BOOTSTRAP}" >> $CFG
 # it will be able to get seeds from the seed provider
 if [[ $CASSANDRA_SEEDS == 'false' ]]; then
   sed -ri 's/- seeds:.*/- seeds: "'"$POD_IP"'"/' $CFG
-else # if we have seeds set them.  Probably PetSet
+else # if we have seeds set them.  Probably StatefulSet
   sed -ri 's/- seeds:.*/- seeds: "'"$CASSANDRA_SEEDS"'"/' $CFG
 fi
 

@@ -65,6 +65,80 @@
      }
     }
    },
+   "/api/v1/configmaps": {
+    "get": {
+     "description": "list or watch objects of kind ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listCoreV1ConfigMapForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMapList"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/events": {
     "get": {
      "description": "list or watch objects of kind Event",
@@ -74,7 +148,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -146,7 +222,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -310,6 +388,382 @@
      }
     ]
    },
+   "/api/v1/namespaces/{namespace}/configmaps": {
+    "get": {
+     "description": "list or watch objects of kind ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listCoreV1NamespacedConfigMap",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMapList"
+       }
+      }
+     }
+    },
+    "post": {
+     "description": "create a ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "createCoreV1NamespacedConfigMap",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1CollectionNamespacedConfigMap",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/namespaces/{namespace}/configmaps/{name}": {
+    "get": {
+     "description": "read the specified ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "readCoreV1NamespacedConfigMap",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.`",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "replaceCoreV1NamespacedConfigMap",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1NamespacedConfigMap",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified ConfigMap",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "patchCoreV1NamespacedConfigMap",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the ConfigMap",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/namespaces/{namespace}/events": {
     "get": {
      "description": "list or watch objects of kind Event",
@@ -319,7 +773,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -375,7 +831,7 @@
      }
     },
     "post": {
-     "description": "create a Event",
+     "description": "create an Event",
      "consumes": [
       "*/*"
      ],
@@ -571,7 +1027,7 @@
      }
     },
     "delete": {
-     "description": "delete a Event",
+     "description": "delete an Event",
      "consumes": [
       "*/*"
      ],
@@ -595,6 +1051,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -679,7 +1149,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -955,6 +1427,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -1039,7 +1525,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -1315,6 +1803,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -1621,6 +2123,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -1869,7 +2385,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -1941,7 +2459,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -2004,6 +2524,80 @@
      }
     ]
    },
+   "/api/v1/watch/configmaps": {
+    "get": {
+     "description": "watch individual changes to a list of ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1ConfigMapListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/watch/events": {
     "get": {
      "description": "watch individual changes to a list of Event",
@@ -2012,8 +2606,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2085,8 +2680,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2150,6 +2746,178 @@
      }
     ]
    },
+   "/api/v1/watch/namespaces/{namespace}/configmaps": {
+    "get": {
+     "description": "watch individual changes to a list of ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1NamespacedConfigMapList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/namespaces/{namespace}/configmaps/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1NamespacedConfigMap",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the ConfigMap",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/watch/namespaces/{namespace}/events": {
     "get": {
      "description": "watch individual changes to a list of Event",
@@ -2158,8 +2926,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2239,8 +3008,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2328,8 +3098,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2409,8 +3180,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2498,8 +3270,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2579,8 +3352,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2668,8 +3442,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2749,8 +3524,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2822,8 +3598,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2986,7 +3763,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3058,7 +3837,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3130,7 +3911,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3202,7 +3985,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3478,6 +4263,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -3689,7 +4488,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3965,6 +4766,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -4364,7 +5179,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -4420,7 +5237,7 @@
      }
     },
     "post": {
-     "description": "create a Ingress",
+     "description": "create an Ingress",
      "consumes": [
       "*/*"
      ],
@@ -4616,7 +5433,7 @@
      }
     },
     "delete": {
-     "description": "delete a Ingress",
+     "description": "delete an Ingress",
      "consumes": [
       "*/*"
      ],
@@ -4640,6 +5457,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -4851,7 +5682,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -5127,6 +5960,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -5465,7 +6312,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -5536,8 +6385,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5609,8 +6459,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5682,8 +6533,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5755,8 +6607,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5836,8 +6689,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5925,8 +6779,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6006,8 +6861,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6095,8 +6951,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6176,8 +7033,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6265,8 +7123,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6346,8 +7205,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6435,8 +7295,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6569,7 +7430,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -6837,6 +7700,20 @@
        "schema": {
         "$ref": "#/definitions/v1.DeleteOptions"
        }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
       }
      ],
      "responses": {
@@ -6965,8 +7842,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -7038,8 +7916,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -7330,6 +8209,49 @@
      }
     }
    },
+   "unversioned.LabelSelector": {
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchExpressions": {
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/unversioned.LabelSelectorRequirement"
+      }
+     },
+     "matchLabels": {
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "unversioned.LabelSelectorRequirement": {
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "description": "key is the label key that the selector applies to.",
+      "type": "string"
+     },
+     "operator": {
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+      "type": "string"
+     },
+     "values": {
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
    "unversioned.ListMeta": {
     "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
     "properties": {
@@ -7462,6 +8384,22 @@
      }
     }
    },
+   "v1.ConfigMap": {
+    "description": "ConfigMap holds configuration data for pods to consume.",
+    "properties": {
+     "data": {
+      "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     }
+    }
+   },
    "v1.ConfigMapKeySelector": {
     "description": "Selects a key from a ConfigMap.",
     "required": [
@@ -7471,6 +8409,25 @@
      "key": {
       "description": "The key to select.",
       "type": "string"
+     }
+    }
+   },
+   "v1.ConfigMapList": {
+    "description": "ConfigMapList is a resource containing a list of ConfigMap objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "description": "Items is the list of ConfigMaps.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.ConfigMap"
+      }
+     },
+     "metadata": {
+      "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/unversioned.ListMeta"
      }
     }
    },
@@ -7957,7 +8914,7 @@
       "format": "int64"
      },
      "deletionTimestamp": {
-      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/unversioned.Time"
      },
      "finalizers": {
@@ -8743,7 +9700,7 @@
     "properties": {
      "selector": {
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/v1beta1.LabelSelector"
+      "$ref": "#/definitions/unversioned.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
@@ -8799,6 +9756,43 @@
      }
     }
    },
+   "v1beta1.DeploymentCondition": {
+    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "required": [
+     "type",
+     "status",
+     "lastUpdateTime",
+     "lastTransitionTime",
+     "reason",
+     "message"
+    ],
+    "properties": {
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "lastUpdateTime": {
+      "description": "The last time this condition was updated.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "message": {
+      "description": "A human readable message indicating details about the transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "The reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of deployment condition.",
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.DeploymentList": {
     "description": "DeploymentList is a list of Deployments.",
     "required": [
@@ -8845,7 +9839,8 @@
    "v1beta1.DeploymentSpec": {
     "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
-     "template"
+     "template",
+     "progressDeadlineSeconds"
     ],
     "properties": {
      "minReadySeconds": {
@@ -8856,6 +9851,11 @@
      "paused": {
       "description": "Indicates that the deployment is paused and will not be processed by the deployment controller.",
       "type": "boolean"
+     },
+     "progressDeadlineSeconds": {
+      "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. This is not set by default.",
+      "type": "integer",
+      "format": "int32"
      },
      "replicas": {
       "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
@@ -8873,7 +9873,7 @@
      },
      "selector": {
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
-      "$ref": "#/definitions/v1beta1.LabelSelector"
+      "$ref": "#/definitions/unversioned.LabelSelector"
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
@@ -8887,11 +9887,21 @@
    },
    "v1beta1.DeploymentStatus": {
     "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "required": [
+     "conditions"
+    ],
     "properties": {
      "availableReplicas": {
       "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
       "type": "integer",
       "format": "int32"
+     },
+     "conditions": {
+      "description": "Represents the latest available observations of a deployment's current state.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.DeploymentCondition"
+      }
      },
      "observedGeneration": {
       "description": "The generation observed by the deployment controller.",
@@ -9038,49 +10048,6 @@
      }
     }
    },
-   "v1beta1.LabelSelector": {
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-    "properties": {
-     "matchExpressions": {
-      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1beta1.LabelSelectorRequirement"
-      }
-     },
-     "matchLabels": {
-      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-      "type": "object",
-      "additionalProperties": {
-       "type": "string"
-      }
-     }
-    }
-   },
-   "v1beta1.LabelSelectorRequirement": {
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-    "required": [
-     "key",
-     "operator"
-    ],
-    "properties": {
-     "key": {
-      "description": "key is the label key that the selector applies to.",
-      "type": "string"
-     },
-     "operator": {
-      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
-      "type": "string"
-     },
-     "values": {
-      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
-      "type": "array",
-      "items": {
-       "type": "string"
-      }
-     }
-    }
-   },
    "v1beta1.ReplicaSet": {
     "description": "ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
@@ -9161,7 +10128,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/v1beta1.LabelSelector"
+      "$ref": "#/definitions/unversioned.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",

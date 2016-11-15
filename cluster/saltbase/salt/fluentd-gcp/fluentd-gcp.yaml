@@ -1,5 +1,5 @@
 # This config should be kept as similar as possible to the one at
-# cluster/addons/gci/fluentd-gcp.yaml
+# cluster/saltbase/salt/fluentd-gcp-gci/fluentd-gcp-gci.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -11,7 +11,7 @@ spec:
   dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.25
+    image: gcr.io/google_containers/fluentd-gcp:1.26
     resources:
       limits:
         memory: 200Mi
@@ -23,6 +23,14 @@ spec:
     env:
     - name: FLUENTD_ARGS
       value: -q
+    # Jemalloc is a widely used way to decrease memory consumption
+    # in Ruby world. It's a better implementation of malloc(3).
+    - name: "LD_PRELOAD"
+      value: "/opt/td-agent/embedded/lib/libjemalloc.so"
+    # This is quite hacky, but forces Ruby GC to be ivoked more often
+    # resulting in lower memory consumption, which is important for us.
+    - name: "RUBY_GC_HEAP_OLDOBJECT_LIMIT_FACTOR"
+      value: "0.9"
     volumeMounts:
     - name: varlog
       mountPath: /var/log

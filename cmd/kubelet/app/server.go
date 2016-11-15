@@ -118,7 +118,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		return nil, err
 	}
 
-	mounter := mount.NewCustomMounter(s.ExperimentalMounterPath, s.ExperimentalMounterRootfsPath)
+	mounter := mount.New(s.ExperimentalMounterPath)
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
@@ -309,7 +309,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	done := make(chan struct{})
 	if s.LockFilePath != "" {
-		glog.Infof("acquiring lock on %q", s.LockFilePath)
+		glog.Infof("acquiring file lock on %q", s.LockFilePath)
 		if err := flock.Acquire(s.LockFilePath); err != nil {
 			return fmt.Errorf("unable to acquire file lock on %q: %v", s.LockFilePath, err)
 		}
@@ -434,17 +434,22 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if s.SystemCgroups != "" && s.CgroupRoot == "" {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
-		kubeDeps.ContainerManager, err = cm.NewContainerManager(kubeDeps.Mounter, kubeDeps.CAdvisorInterface, cm.NodeConfig{
-			RuntimeCgroupsName:     s.RuntimeCgroups,
-			SystemCgroupsName:      s.SystemCgroups,
-			KubeletCgroupsName:     s.KubeletCgroups,
-			ContainerRuntime:       s.ContainerRuntime,
-			CgroupsPerQOS:          s.CgroupsPerQOS,
-			CgroupRoot:             s.CgroupRoot,
-			CgroupDriver:           s.CgroupDriver,
-			ProtectKernelDefaults:  s.ProtectKernelDefaults,
-			RuntimeIntegrationType: s.ExperimentalRuntimeIntegrationType,
-		})
+		kubeDeps.ContainerManager, err = cm.NewContainerManager(
+			kubeDeps.Mounter,
+			kubeDeps.CAdvisorInterface,
+			cm.NodeConfig{
+				RuntimeCgroupsName:    s.RuntimeCgroups,
+				SystemCgroupsName:     s.SystemCgroups,
+				KubeletCgroupsName:    s.KubeletCgroups,
+				ContainerRuntime:      s.ContainerRuntime,
+				CgroupsPerQOS:         s.ExperimentalCgroupsPerQOS,
+				CgroupRoot:            s.CgroupRoot,
+				CgroupDriver:          s.CgroupDriver,
+				ProtectKernelDefaults: s.ProtectKernelDefaults,
+				EnableCRI:             s.EnableCRI,
+			},
+			s.ExperimentalFailSwapOn)
+
 		if err != nil {
 			return err
 		}
@@ -500,7 +505,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 
 	nodeName, err := instances.CurrentNodeName(hostname)
 	if err != nil {
-		return "", fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+		return "", fmt.Errorf("error fetching current node name from cloud provider: %v", err)
 	}
 
 	glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)

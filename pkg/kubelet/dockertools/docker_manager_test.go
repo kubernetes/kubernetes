@@ -1431,7 +1431,7 @@ func TestVerifyNonRoot(t *testing.T) {
 	}
 }
 
-func TestGetUidFromUser(t *testing.T) {
+func TestGetUserFromImageUser(t *testing.T) {
 	tests := map[string]struct {
 		input  string
 		expect string
@@ -1452,9 +1452,17 @@ func TestGetUidFromUser(t *testing.T) {
 			input:  "1:2:3",
 			expect: "1",
 		},
+		"root username": {
+			input:  "root:root",
+			expect: "root",
+		},
+		"username": {
+			input:  "test:test",
+			expect: "test",
+		},
 	}
 	for k, v := range tests {
-		actual := getUidFromUser(v.input)
+		actual := GetUserFromImageUser(v.input)
 		if actual != v.expect {
 			t.Errorf("%s failed.  Expected %s but got %s", k, v.expect, actual)
 		}

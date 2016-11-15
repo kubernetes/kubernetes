@@ -75,6 +75,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.TypeMeta = in.TypeMeta
 		out.Port = in.Port
 		out.Address = in.Address
+		out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
 		out.CloudProvider = in.CloudProvider
 		out.CloudConfigFile = in.CloudConfigFile
 		out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
@@ -153,6 +154,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interfa
 			out.IPTablesMasqueradeBit = nil
 		}
 		out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
+		out.IPTablesMinSyncPeriod = in.IPTablesMinSyncPeriod
 		out.KubeconfigPath = in.KubeconfigPath
 		out.MasqueradeAll = in.MasqueradeAll
 		out.Master = in.Master
@@ -171,6 +173,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interfa
 		out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
 		out.ConntrackMin = in.ConntrackMin
 		out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
+		out.ConntrackTCPCloseWaitTimeout = in.ConntrackTCPCloseWaitTimeout
 		return nil
 	}
 }
@@ -316,7 +319,6 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
 		out.ExperimentalMounterPath = in.ExperimentalMounterPath
-		out.ExperimentalMounterRootfsPath = in.ExperimentalMounterRootfsPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		out.LockFilePath = in.LockFilePath
@@ -387,7 +389,10 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		} else {
 			out.AllowedUnsafeSysctls = nil
 		}
-		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
+		out.FeatureGates = in.FeatureGates
+		out.EnableCRI = in.EnableCRI
+		out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
+		out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 		return nil
 	}
 }

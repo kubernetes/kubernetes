@@ -33,7 +33,7 @@ readonly use_kubectl="${LOG_DUMP_USE_KUBECTL:-}"
 readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws"
 
-readonly master_logfiles="kube-apiserver kube-scheduler kube-controller-manager etcd glbc cluster-autoscaler"
+readonly master_logfiles="kube-apiserver kube-scheduler rescheduler kube-controller-manager etcd glbc cluster-autoscaler kube-addon-manager"
 readonly node_logfiles="kube-proxy"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
@@ -132,7 +132,7 @@ function save-logs() {
     if log-dump-ssh "${node_name}" "sudo systemctl status kubelet.service" &> /dev/null; then
         log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u kubelet.service" > "${dir}/kubelet.log" || true
         log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u docker.service" > "${dir}/docker.log" || true
-        log-dump-ssh "${node_name}" "sudo journalctl --output=cat -k" > "${dir}/kern.log" || true
+        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -k" > "${dir}/kern.log" || true
     else
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi

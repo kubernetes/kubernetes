@@ -17,6 +17,7 @@ limitations under the License.
 package init
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -28,6 +29,23 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/client-go/pkg/util/diff"
+	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
+	"k8s.io/kubernetes/federation/pkg/kubefed/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 const (
@@ -38,15 +56,101 @@ const (
 	helloMsg = "Hello, certificate test!"
 )
 
-type clientServerTLSConfigs struct {
-	server *tls.Config
-	client *tls.Config
-}
+func TestInitFederation(t *testing.T) {
+	cmdErrMsg := ""
+	dnsProvider := ""
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		cmdErrMsg = str
+	})
 
-type certParams struct {
-	cAddr     string
-	ips       []string
-	hostnames []string
+	fakeKubeFiles, err := kubefedtesting.FakeKubeconfigFiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer kubefedtesting.RemoveFakeKubeconfigFiles(fakeKubeFiles)
+
+	testCases := []struct {
+		federation         string
+		kubeconfigGlobal   string
+		kubeconfigExplicit string
+		dnsZoneName        string
+		lbIP               string
+		image              string
+		expectedErr        string
+		dnsProvider        string
+	}{
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			expectedErr:        "",
+			dnsProvider:        "test-dns-provider",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			expectedErr:        "",
+			dnsProvider:        "", //test for default value of dns provider
+		},
+	}
+
+	for i, tc := range testCases {
+		cmdErrMsg = ""
+		dnsProvider = ""
+		buf := bytes.NewBuffer([]byte{})
+
+		if "" != tc.dnsProvider {
+			dnsProvider = tc.dnsProvider
+		} else {
+			dnsProvider = "google-clouddns" //default value of dns-provider
+		}
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider)
+		if err != nil {
+			t.Fatalf("[%d] unexpected error: %v", i, err)
+		}
+
+		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
+		if err != nil {
+			t.Fatalf("[%d] unexpected error: %v", i, err)
+		}
+
+		cmd := NewCmdInit(buf, adminConfig)
+
+		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
+		cmd.Flags().Set("host-cluster-context", "substrate")
+		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
+		cmd.Flags().Set("image", tc.image)
+		if "" != tc.dnsProvider {
+			cmd.Flags().Set("dns-provider", tc.dnsProvider)
+		}
+		cmd.Run(cmd, []string{tc.federation})
+
+		if tc.expectedErr == "" {
+			// uses the name from the federation, not the response
+			// Actual data passed are tested in the fake secret and cluster
+			// REST clients.
+			want := fmt.Sprintf("Federation API server is running at: %s\n", tc.lbIP)
+			if got := buf.String(); got != want {
+				t.Errorf("[%d] unexpected output: got: %s, want: %s", i, got, want)
+				if cmdErrMsg != "" {
+					t.Errorf("[%d] unexpected error message: %s", i, cmdErrMsg)
+				}
+			}
+		} else {
+			if cmdErrMsg != tc.expectedErr {
+				t.Errorf("[%d] expected error: %s, got: %s, output: %s", i, tc.expectedErr, cmdErrMsg, buf.String())
+			}
+		}
+
+		testKubeconfigUpdate(t, tc.federation, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
+	}
 }
 
 // TestCertsTLS tests TLS handshake with client authentication for any server
@@ -286,6 +390,446 @@ func TestCertsHTTPS(t *testing.T) {
 			t.Errorf("[%d] want %q, got %q", i, helloMsg, got)
 		}
 	}
+}
+
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider string) (cmdutil.Factory, error) {
+	svcName := federationName + "-apiserver"
+	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
+	credSecretName := svcName + "-credentials"
+	cmKubeconfigSecretName := federationName + "-controller-manager-kubeconfig"
+	capacity, err := resource.ParseQuantity("10Gi")
+	if err != nil {
+		return nil, err
+	}
+	pvcName := svcName + "-etcd-claim"
+	replicas := int32(1)
+
+	namespace := v1.Namespace{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: namespaceName,
+		},
+	}
+
+	svc := v1.Service{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Service",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: namespaceName,
+			Name:      svcName,
+			Labels:    componentLabel,
+		},
+		Spec: v1.ServiceSpec{
+			Type:     v1.ServiceTypeLoadBalancer,
+			Selector: apiserverSvcSelector,
+			Ports: []v1.ServicePort{
+				{
+					Name:       "https",
+					Protocol:   "TCP",
+					Port:       443,
+					TargetPort: intstr.FromInt(443),
+				},
+			},
+		},
+	}
+
+	svcWithLB := svc
+	svcWithLB.Status = v1.ServiceStatus{
+		LoadBalancer: v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{
+				{
+					IP: ip,
+				},
+			},
+		},
+	}
+
+	credSecret := v1.Secret{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      credSecretName,
+			Namespace: namespaceName,
+		},
+		Data: nil,
+	}
+
+	cmKubeconfigSecret := v1.Secret{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      cmKubeconfigSecretName,
+			Namespace: namespaceName,
+		},
+		Data: nil,
+	}
+
+	pvc := v1.PersistentVolumeClaim{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      pvcName,
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+			Annotations: map[string]string{
+				"volume.alpha.kubernetes.io/storage-class": "yes",
+			},
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: capacity,
+				},
+			},
+		},
+	}
+
+	apiserver := v1beta1.Deployment{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+		Spec: v1beta1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: nil,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   svcName,
+					Labels: apiserverPodLabels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "apiserver",
+							Image: image,
+							Command: []string{
+								"/hyperkube",
+								"federation-apiserver",
+								"--bind-address=0.0.0.0",
+								"--etcd-servers=http://localhost:2379",
+								"--service-cluster-ip-range=10.0.0.0/16",
+								"--secure-port=443",
+								"--client-ca-file=/etc/federation/apiserver/ca.crt",
+								"--tls-cert-file=/etc/federation/apiserver/server.crt",
+								"--tls-private-key-file=/etc/federation/apiserver/server.key",
+								"--advertise-address=" + ip,
+							},
+							Ports: []v1.ContainerPort{
+								{
+									Name:          "https",
+									ContainerPort: 443,
+								},
+								{
+									Name:          "local",
+									ContainerPort: 8080,
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      credSecretName,
+									MountPath: "/etc/federation/apiserver",
+									ReadOnly:  true,
+								},
+							},
+						},
+						{
+							Name:  "etcd",
+							Image: "quay.io/coreos/etcd:v2.3.3",
+							Command: []string{
+								"/etcd",
+								"--data-dir",
+								"/var/etcd/data",
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "etcddata",
+									MountPath: "/var/etcd",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: credSecretName,
+							VolumeSource: v1.VolumeSource{
+								Secret: &v1.SecretVolumeSource{
+									SecretName: credSecretName,
+								},
+							},
+						},
+						{
+							Name: "etcddata",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvcName,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	cmName := federationName + "-controller-manager"
+	cm := v1beta1.Deployment{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      cmName,
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+		Spec: v1beta1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: nil,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   cmName,
+					Labels: controllerManagerPodLabels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "controller-manager",
+							Image: image,
+							Command: []string{
+								"/hyperkube",
+								"federation-controller-manager",
+								"--master=https://federation-apiserver",
+								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
+								fmt.Sprintf("--dns-provider=%s", dnsProvider),
+								"--dns-provider-config=",
+								fmt.Sprintf("--federation-name=%s", federationName),
+								fmt.Sprintf("--zone-name=%s", dnsZoneName),
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      cmKubeconfigSecretName,
+									MountPath: "/etc/federation/controller-manager",
+									ReadOnly:  true,
+								},
+							},
+							Env: []v1.EnvVar{
+								{
+									Name: "POD_NAMESPACE",
+									ValueFrom: &v1.EnvVarSource{
+										FieldRef: &v1.ObjectFieldSelector{
+											FieldPath: "metadata.namespace",
+										},
+									},
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: cmKubeconfigSecretName,
+							VolumeSource: v1.VolumeSource{
+								Secret: &v1.SecretVolumeSource{
+									SecretName: cmKubeconfigSecretName,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	extCodec := testapi.Extensions.Codec()
+	ns := dynamic.ContentConfig().NegotiatedSerializer
+	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got v1.Namespace
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, namespace) {
+					return nil, fmt.Errorf("Unexpected namespace object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, namespace))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &namespace)}, nil
+			case p == svcUrlPrefix && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got v1.Service
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, svc) {
+					return nil, fmt.Errorf("Unexpected service object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, svc))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &svc)}, nil
+			case strings.HasPrefix(p, svcUrlPrefix) && m == http.MethodGet:
+				got := strings.TrimPrefix(p, svcUrlPrefix+"/")
+				if got != svcName {
+					return nil, errors.NewNotFound(api.Resource("services"), got)
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &svcWithLB)}, nil
+			case p == "/api/v1/namespaces/federation-system/secrets" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got, want v1.Secret
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				// Obtained secret contains generated data which cannot
+				// be compared, so we just nullify the generated part
+				// and compare the rest of the secret. The generated
+				// parts are tested in other tests.
+				got.Data = nil
+				switch got.Name {
+				case credSecretName:
+					want = credSecret
+				case cmKubeconfigSecretName:
+					want = cmKubeconfigSecret
+				}
+				if !api.Semantic.DeepEqual(got, want) {
+					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &want)}, nil
+			case p == "/api/v1/namespaces/federation-system/persistentvolumeclaims" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got v1.PersistentVolumeClaim
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, pvc) {
+					return nil, fmt.Errorf("Unexpected PVC object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, pvc))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &pvc)}, nil
+			case p == "/apis/extensions/v1beta1/namespaces/federation-system/deployments" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got, want v1beta1.Deployment
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				switch got.Name {
+				case svcName:
+					want = apiserver
+				case cmName:
+					want = cm
+				}
+				if !api.Semantic.DeepEqual(got, want) {
+					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
+			default:
+				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
+			}
+		}),
+	}
+	return f, nil
+}
+
+func testKubeconfigUpdate(t *testing.T, federationName, lbIP, kubeconfigGlobal, kubeconfigExplicit string) {
+	filename := kubeconfigGlobal
+	if kubeconfigExplicit != "" {
+		filename = kubeconfigExplicit
+	}
+	config, err := clientcmd.LoadFromFile(filename)
+	if err != nil {
+		t.Errorf("Failed to open kubeconfig file: %v", err)
+		return
+	}
+
+	cluster, ok := config.Clusters[federationName]
+	if !ok {
+		t.Errorf("No cluster info for %q", federationName)
+		return
+	}
+	endpoint := lbIP
+	if !strings.HasSuffix(lbIP, "https://") {
+		endpoint = fmt.Sprintf("https://%s", lbIP)
+	}
+	if cluster.Server != endpoint {
+		t.Errorf("Want federation API server endpoint %q, got %q", endpoint, cluster.Server)
+	}
+
+	authInfo, ok := config.AuthInfos[federationName]
+	if !ok {
+		t.Errorf("No credentials for %q", federationName)
+		return
+	}
+	if len(authInfo.ClientCertificateData) == 0 {
+		t.Errorf("Expected client certificate to be non-empty")
+		return
+	}
+	if len(authInfo.ClientKeyData) == 0 {
+		t.Errorf("Expected client key to be non-empty")
+		return
+	}
+	if authInfo.Username != AdminCN {
+		t.Errorf("Want username: %q, got: %q", AdminCN, authInfo.Username)
+	}
+
+	context, ok := config.Contexts[federationName]
+	if !ok {
+		t.Errorf("No context for %q", federationName)
+		return
+	}
+	if context.Cluster != federationName {
+		t.Errorf("Want context cluster name: %q, got: %q", federationName, context.Cluster)
+	}
+	if context.AuthInfo != federationName {
+		t.Errorf("Want context auth info: %q, got: %q", federationName, context.AuthInfo)
+	}
+}
+
+type clientServerTLSConfigs struct {
+	server *tls.Config
+	client *tls.Config
+}
+
+type certParams struct {
+	cAddr     string
+	ips       []string
+	hostnames []string
 }
 
 func tlsHandshake(t *testing.T, sCfg, cCfg *tls.Config) error {

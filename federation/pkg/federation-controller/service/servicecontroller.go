@@ -718,16 +718,6 @@ func (s *ServiceController) updateAllServicesToCluster(services []*cachedService
 	}
 }
 
-func (s *ServiceController) removeAllServicesFromCluster(services []*cachedService, clusterName string) {
-	client, ok := s.clusterCache.clientMap[clusterName]
-	if ok {
-		for _, cachedService := range services {
-			s.deleteClusterService(clusterName, cachedService, client.clientset)
-		}
-		glog.Infof("Synced all services to cluster %s", clusterName)
-	}
-}
-
 // updateDNSRecords updates all existing federation service DNS Records so that
 // they will match the list of cluster names provided.
 // Returns the list of services that couldn't be updated.

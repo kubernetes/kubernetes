@@ -78,6 +78,9 @@ func NewKubeletServer() *KubeletServer {
 
 // AddFlags adds flags for a specific KubeletServer to the specified FlagSet
 func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	fs.BoolVar(&s.ExperimentalFailSwapOn, "experimental-fail-swap-on", s.ExperimentalFailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. This is a temporary opton to maintain legacy behavior, failing due to swap enabled will happen by default in v1.6.")
+
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to connect to the API server. --api-servers will be used for the location unless --require-kubeconfig is set.")
 	fs.BoolVar(&s.RequireKubeConfig, "require-kubeconfig", s.RequireKubeConfig, "If true the Kubelet will exit if there are configuration errors, and will ignore the value of --api-servers in favor of the server defined in the kubeconfig file.")
 
@@ -150,9 +153,9 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableDebuggingHandlers, "enable-debugging-handlers", s.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
 	fs.DurationVar(&s.MinimumGCAge.Duration, "minimum-container-ttl-duration", s.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
-	fs.Int32Var(&s.MaxPerPodContainerCount, "maximum-dead-containers-per-container", s.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.  Default: 2.")
+	fs.Int32Var(&s.MaxPerPodContainerCount, "maximum-dead-containers-per-container", s.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.  Default: 1.")
 	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
-	fs.Int32Var(&s.MaxContainerCount, "maximum-dead-containers", s.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space.  Default: 100.")
+	fs.Int32Var(&s.MaxContainerCount, "maximum-dead-containers", s.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.  Default: -1.")
 	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.Int32Var(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
@@ -191,7 +194,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("system-container", "Use --system-cgroups instead. Will be removed in a future version.")
 	fs.StringVar(&s.SystemCgroups, "system-cgroups", s.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
 
-	fs.BoolVar(&s.CgroupsPerQOS, "cgroups-per-qos", s.CgroupsPerQOS, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
+	fs.BoolVar(&s.ExperimentalCgroupsPerQOS, "experimental-cgroups-per-qos", s.ExperimentalCgroupsPerQOS, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	fs.StringVar(&s.CgroupDriver, "cgroup-driver", s.CgroupDriver, "Driver that the kubelet uses to manipulate cgroups on the host.  Possible values: 'cgroupfs', 'systemd'")
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
@@ -200,7 +203,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ExitOnLockContention, "exit-on-lock-contention", s.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'.")
 	fs.StringVar(&s.ExperimentalMounterPath, "experimental-mounter-path", s.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
-	fs.StringVar(&s.ExperimentalMounterRootfsPath, "experimental-mounter-rootfs-path", s.ExperimentalMounterRootfsPath, "[Experimental] Absolute path to the root filesystem for the mounter binary.")
 	fs.StringVar(&s.RktAPIEndpoint, "rkt-api-endpoint", s.RktAPIEndpoint, "The endpoint of the rkt API service to communicate with. Only used if --container-runtime='rkt'.")
 	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used.")
 	fs.MarkDeprecated("rkt-stage1-image", "Will be removed in a future version. The default stage1 image will be specified by the rkt configurations, see https://github.com/coreos/rkt/blob/master/Documentation/configuration.md for more details.")
@@ -221,8 +223,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.AllowedUnsafeSysctls, "experimental-allowed-unsafe-sysctls", s.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
 
 	// Flags intended for testing, not recommended used in production environments.
-	fs.StringVar(&s.RemoteRuntimeEndpoint, "container-runtime-endpoint", s.RemoteRuntimeEndpoint, "The unix socket endpoint of remote runtime service. This is an experimental feature. Intended for testing only.")
-	fs.StringVar(&s.RemoteImageEndpoint, "image-service-endpoint", s.RemoteImageEndpoint, "The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. This is an experimental feature. Intended for testing only.")
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
 	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
@@ -249,7 +249,10 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.PodsPerCore, "pods-per-core", s.PodsPerCore, "Number of Pods per core that can run on this Kubelet. The total number of Pods on this Kubelet cannot exceed max-pods, so max-pods will be used if this calculation results in a larger number of Pods allowed on the Kubelet. A value of 0 disables this limit.")
 	fs.BoolVar(&s.ProtectKernelDefaults, "protect-kernel-defaults", s.ProtectKernelDefaults, "Default kubelet behaviour for kernel tuning. If set, kubelet errors if any of kernel tunables is different than kubelet defaults.")
 
-	// Hidden flags for experimental features that are still under development.
-	fs.StringVar(&s.ExperimentalRuntimeIntegrationType, "experimental-runtime-integration-type", s.ExperimentalRuntimeIntegrationType, "Choose the integration path for the container runtime (specified via --container-runtime). Currently, this supports only Docker. If set to \"cri\", Kubelet will use interact with docker through the new Container Runtime Interface.")
-	fs.MarkHidden("experimental-runtime-integration-type")
+	// CRI flags.
+	fs.BoolVar(&s.EnableCRI, "experimental-cri", s.EnableCRI, "[Experimental] Enable the Container Runtime Interface (CRI) integration. If --container-runtime is set to \"remote\", Kubelet will communicate with the runtime/image CRI server listening on the endpoint specified by --remote-runtime-endpoint/--remote-image-endpoint. If --container-runtime is set to \"docker\", Kubelet will launch a in-process CRI server on behalf of docker, and communicate over a default endpoint.")
+	fs.StringVar(&s.RemoteRuntimeEndpoint, "container-runtime-endpoint", s.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
+	fs.StringVar(&s.RemoteImageEndpoint, "image-service-endpoint", s.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
+
+	fs.BoolVar(&s.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", s.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
 }

@@ -17,28 +17,30 @@ limitations under the License.
 package v1beta1
 
 import (
+	fmt "fmt"
 	api "k8s.io/client-go/pkg/api"
+	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	registered "k8s.io/client-go/pkg/apimachinery/registered"
 	serializer "k8s.io/client-go/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 )
 
-type StorageInterface interface {
+type StorageV1beta1Interface interface {
 	RESTClient() rest.Interface
 	StorageClassesGetter
 }
 
-// StorageClient is used to interact with features provided by the Storage group.
-type StorageClient struct {
+// StorageV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type StorageV1beta1Client struct {
 	restClient rest.Interface
 }
 
-func (c *StorageClient) StorageClasses() StorageClassInterface {
+func (c *StorageV1beta1Client) StorageClasses() StorageClassInterface {
 	return newStorageClasses(c)
 }
 
-// NewForConfig creates a new StorageClient for the given config.
-func NewForConfig(c *rest.Config) (*StorageClient, error) {
+// NewForConfig creates a new StorageV1beta1Client for the given config.
+func NewForConfig(c *rest.Config) (*StorageV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +49,12 @@ func NewForConfig(c *rest.Config) (*StorageClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StorageClient{client}, nil
+	return &StorageV1beta1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new StorageClient for the given config and
+// NewForConfigOrDie creates a new StorageV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *StorageClient {
+func NewForConfigOrDie(c *rest.Config) *StorageV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,26 +62,26 @@ func NewForConfigOrDie(c *rest.Config) *StorageClient {
 	return client
 }
 
-// New creates a new StorageClient for the given RESTClient.
-func New(c rest.Interface) *StorageClient {
-	return &StorageClient{c}
+// New creates a new StorageV1beta1Client for the given RESTClient.
+func New(c rest.Interface) *StorageV1beta1Client {
+	return &StorageV1beta1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if storage group is not registered, return an error
-	g, err := registered.Group("storage.k8s.io")
+	gv, err := unversioned.ParseGroupVersion("storage.k8s.io/v1beta1")
 	if err != nil {
 		return err
+	}
+	// if storage.k8s.io/v1beta1 is not enabled, return an error
+	if !registered.IsEnabledVersion(gv) {
+		return fmt.Errorf("storage.k8s.io/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
+	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
-	//}
 
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
@@ -88,7 +90,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *StorageClient) RESTClient() rest.Interface {
+func (c *StorageV1beta1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

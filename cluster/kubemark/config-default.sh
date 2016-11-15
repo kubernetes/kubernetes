@@ -46,7 +46,7 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.240.0.0/11}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
-# Set etcd image (e.g. 3.0.13-experimental.1) version (e.g. 3.0.13) if you need
+# Set etcd image (e.g. 3.0.14-experimental.1) version (e.g. 3.0.14) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_VERSION="${TEST_ETCD_VERSION:-}"

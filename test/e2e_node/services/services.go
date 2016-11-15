@@ -78,16 +78,22 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // standard kubelet launcher)
 func (e *E2EServices) Start() error {
 	var err error
-	// Start kubelet
-	// Create the manifest path for kubelet.
-	// TODO(random-liu): Remove related logic when we move kubelet starting logic out of the test.
-	framework.TestContext.ManifestPath, err = ioutil.TempDir("", "node-e2e-pod")
-	if err != nil {
-		return fmt.Errorf("failed to create static pod manifest directory: %v", err)
-	}
-	e.kubelet, err = e.startKubelet()
-	if err != nil {
-		return fmt.Errorf("failed to start kubelet: %v", err)
+	if !framework.TestContext.NodeConformance {
+		// Start kubelet
+		// Create the manifest path for kubelet.
+		// TODO(random-liu): Remove related logic when we move kubelet starting logic out of the test.
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current working directory: %v", err)
+		}
+		framework.TestContext.ManifestPath, err = ioutil.TempDir(cwd, "pod-manifest")
+		if err != nil {
+			return fmt.Errorf("failed to create static pod manifest directory: %v", err)
+		}
+		e.kubelet, err = e.startKubelet()
+		if err != nil {
+			return fmt.Errorf("failed to start kubelet: %v", err)
+		}
 	}
 	e.services, err = e.startInternalServices()
 	return err
@@ -96,14 +102,16 @@ func (e *E2EServices) Start() error {
 // Stop stops the e2e services.
 func (e *E2EServices) Stop() {
 	defer func() {
-		// Collect log files.
-		e.getLogFiles()
-		// Cleanup the manifest path for kubelet.
-		manifestPath := framework.TestContext.ManifestPath
-		if manifestPath != "" {
-			err := os.RemoveAll(manifestPath)
-			if err != nil {
-				glog.Errorf("Failed to delete static pod manifest directory %s: %v", manifestPath, err)
+		if !framework.TestContext.NodeConformance {
+			// Collect log files.
+			e.getLogFiles()
+			// Cleanup the manifest path for kubelet.
+			manifestPath := framework.TestContext.ManifestPath
+			if manifestPath != "" {
+				err := os.RemoveAll(manifestPath)
+				if err != nil {
+					glog.Errorf("Failed to delete static pod manifest directory %s: %v", manifestPath, err)
+				}
 			}
 		}
 	}()
@@ -144,17 +152,8 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can't get current binary: %v", err)
 	}
-	startCmd := exec.Command("sudo", testBin,
-		// TODO(mtaufen): Flags e.g. that target the TestContext need to be manually forwarded to the
-		//                test binary when we start it up in run-services mode. This is not ideal.
-		//                Very unintuitive because it prevents any flags NOT manually forwarded here
-		//                from being set via TEST_ARGS when running tests from the command line.
-		"--run-services-mode",
-		"--server-start-timeout", serverStartTimeout.String(),
-		"--feature-gates", framework.TestContext.FeatureGates,
-		"--logtostderr",
-		"--vmodule=*="+LOG_VERBOSITY_LEVEL,
-	)
+	// Pass all flags into the child process, so that it will see the same flag set.
+	startCmd := exec.Command(testBin, append([]string{"--run-services-mode"}, os.Args[1:]...)...)
 	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
 	return server, server.start()
 }
@@ -180,8 +179,8 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// sense to test it that way
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
 		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", builder.GetKubeletServerBin())
-		killCommand = exec.Command("sudo", "systemctl", "kill", unitName)
-		restartCommand = exec.Command("sudo", "systemctl", "restart", unitName)
+		killCommand = exec.Command("systemctl", "kill", unitName)
+		restartCommand = exec.Command("systemctl", "restart", unitName)
 		e.logFiles["kubelet.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
@@ -200,7 +199,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--address", "0.0.0.0",
 		"--port", kubeletPort,
 		"--read-only-port", kubeletReadOnlyPort,
-		"--hostname-override", framework.TestContext.NodeName, // Required because hostname is inconsistent across hosts
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",
@@ -212,21 +210,20 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--feature-gates", framework.TestContext.FeatureGates,
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 
-		// Temporarily disabled:
-		// "--experimental-mounter-path", framework.TestContext.MounterPath,
-		// "--experimental-mounter-rootfs-path", framework.TestContext.MounterRootfsPath,
+		"--experimental-mounter-path", framework.TestContext.MounterPath,
 	)
-
-	if framework.TestContext.RuntimeIntegrationType != "" {
-		cmdArgs = append(cmdArgs, "--experimental-runtime-integration-type",
-			framework.TestContext.RuntimeIntegrationType) // Whether to use experimental cri integration.
+	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.
+		cmdArgs = append(cmdArgs, "--hostname-override", framework.TestContext.NodeName)
+	}
+	if framework.TestContext.EnableCRI {
+		cmdArgs = append(cmdArgs, "--experimental-cri", "true") // Whether to use experimental cri integration.
 	}
 	if framework.TestContext.ContainerRuntimeEndpoint != "" {
 		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", framework.TestContext.ContainerRuntimeEndpoint)
 	}
 	if framework.TestContext.CgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
-			"--cgroups-per-qos", "true",
+			"--experimental-cgroups-per-qos", "true",
 			"--cgroup-root", "/",
 		)
 	}
@@ -247,7 +244,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 			"--network-plugin-dir", filepath.Join(cwd, "cni", "bin")) // Enable kubenet
 	}
 
-	cmd := exec.Command("sudo", cmdArgs...)
+	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	server := newServer(
 		"kubelet",
 		cmd,
@@ -282,7 +279,7 @@ func (e *E2EServices) getLogFiles() {
 				continue
 			}
 			glog.Infof("Get log file %q with journalctl command %v.", targetFileName, logFileData.journalctlCommand)
-			out, err := exec.Command("sudo", append([]string{"journalctl"}, logFileData.journalctlCommand...)...).CombinedOutput()
+			out, err := exec.Command("journalctl", logFileData.journalctlCommand...).CombinedOutput()
 			if err != nil {
 				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
@@ -315,10 +312,10 @@ func isJournaldAvailable() bool {
 
 func copyLogFile(src, target string) error {
 	// If not a journald based distro, then just symlink files.
-	if out, err := exec.Command("sudo", "cp", src, target).CombinedOutput(); err != nil {
+	if out, err := exec.Command("cp", src, target).CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to copy %q to %q: %v, %v", src, target, out, err)
 	}
-	if out, err := exec.Command("sudo", "chmod", "a+r", target).CombinedOutput(); err != nil {
+	if out, err := exec.Command("chmod", "a+r", target).CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to make log file %q world readable: %v, %v", target, out, err)
 	}
 	return nil
