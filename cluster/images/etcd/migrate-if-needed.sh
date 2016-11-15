@@ -120,6 +120,7 @@ start_etcd() {
   ${ETCD_CMD} \
     --name="etcd-$(hostname)" \
     --debug \
+    --force-new-cluster \
     --data-dir=${DATA_DIRECTORY} \
     --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
     --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
