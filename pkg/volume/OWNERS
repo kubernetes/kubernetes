@@ -2,6 +2,7 @@ approvers:
 - saad-ali
 - thockin
 - jsafrane
+- matchstick
 reviewers:
 - thockin
 - smarterclayton
@@ -14,6 +15,4 @@ reviewers:
 - justinsb
 - jsafrane
 - rootfs
-- markturansky
 - jingxu97
-- matchstick
