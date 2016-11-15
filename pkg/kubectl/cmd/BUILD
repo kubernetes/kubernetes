@@ -107,6 +107,7 @@ go_library(
         "//pkg/util/validation/field:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/util/yaml:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/daviddengcn/go-colortext",
         "//vendor:github.com/docker/distribution/reference",
