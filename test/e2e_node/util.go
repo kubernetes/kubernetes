@@ -232,3 +232,15 @@ func updateConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletCon
 	}
 	return cmap, nil
 }
+
+func logPodEvents(f *framework.Framework) {
+	framework.Logf("Summary of pod events during the test:")
+	err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
+	framework.ExpectNoError(err)
+}
+
+func logNodeEvents(f *framework.Framework) {
+	framework.Logf("Summary of node events during the test:")
+	err := framework.ListNamespaceEvents(f.ClientSet, "")
+	framework.ExpectNoError(err)
+}

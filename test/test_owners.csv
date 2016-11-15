@@ -932,3 +932,4 @@ k8s.io/kubernetes/test/integration/storageclasses,andyzheng0831,1
 k8s.io/kubernetes/test/integration/thirdparty,davidopp,1
 k8s.io/kubernetes/test/list,maisem,1
 kubelet Clean up pods on node kubelet should be able to delete * pods per node in *.,yujuhong,0
+Garbage Collection Test: * Should eventually garbage collect containers when we exceed the number of dead containers per container,Random-Liu,0
