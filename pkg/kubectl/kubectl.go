@@ -92,6 +92,7 @@ var ShortForms = map[string]string{
 	"limits": "limitranges",
 	"no":     "nodes",
 	"ns":     "namespaces",
+	"pdb":    "poddisruptionbudgets",
 	"po":     "pods",
 	"psp":    "podSecurityPolicies",
 	"pvc":    "persistentvolumeclaims",
