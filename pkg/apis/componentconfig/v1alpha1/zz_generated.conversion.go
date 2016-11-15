@@ -330,7 +330,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.RuntimeCgroups = in.RuntimeCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
-	if err := api.Convert_Pointer_bool_To_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
+	if err := api.Convert_Pointer_bool_To_bool(&in.ExperimentalCgroupsPerQOS, &out.ExperimentalCgroupsPerQOS, s); err != nil {
 		return err
 	}
 	out.CgroupDriver = in.CgroupDriver
@@ -496,7 +496,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
 	out.KubeletCgroups = in.KubeletCgroups
-	if err := api.Convert_bool_To_Pointer_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
+	if err := api.Convert_bool_To_Pointer_bool(&in.ExperimentalCgroupsPerQOS, &out.ExperimentalCgroupsPerQOS, s); err != nil {
 		return err
 	}
 	out.CgroupDriver = in.CgroupDriver
