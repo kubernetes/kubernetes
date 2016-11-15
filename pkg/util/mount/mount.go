@@ -30,7 +30,8 @@ import (
 
 const (
 	// Default mount command if mounter path is not specified
-	defaultMountCommand = "mount"
+	defaultMountCommand  = "mount"
+	MountsInGlobalPDPath = "mounts"
 )
 
 type Interface interface {
@@ -189,9 +190,15 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 		glog.V(4).Infof("Directory %s is not mounted", mountPath)
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
+	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
 	for _, ref := range refs {
-		if strings.HasPrefix(ref, pluginDir) {
-			return path.Base(ref), nil
+		if strings.HasPrefix(ref, basemountPath) {
+			volumeID, err := filepath.Rel(basemountPath, ref)
+			if err != nil {
+				glog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				return "", err
+			}
+			return volumeID, nil
 		}
 	}
 

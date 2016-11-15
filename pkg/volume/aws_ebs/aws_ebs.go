@@ -189,10 +189,26 @@ func getVolumeSource(
 func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	volumeID, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
 	if err != nil {
 		return nil, err
 	}
+	// This is a workaround to fix the issue in converting aws volume id from globalPDPath
+	// There are three aws volume id formats and their globalPDPaths are:
+	// aws:///vol-1234 (../aws-ebs/mounts/aws/vol-1234)
+	// aws://us-east-1/vol-1234 (../aws-ebs/mounts/aws/us-east-1/vol-1234)
+	// vol-1234 (../aws-ebs/mounts/vol-1234)
+	// This code is for dealing with the first two cases.
+	sourceName := volumeID
+	if strings.HasPrefix(volumeID, "aws/") {
+		if len(strings.Split(volumeID, "/")) > 2 {
+			sourceName = strings.Replace(volumeID, "aws/", "aws://", 1)
+		} else {
+			sourceName = strings.Replace(volumeID, "aws/", "aws:///", 1)
+		}
+		glog.V(4).Info("Convert aws volume name from %q to %q ", volumeID, sourceName)
+	}
+
 	awsVolume := &api.Volume{
 		Name: volName,
 		VolumeSource: api.VolumeSource{
@@ -324,12 +340,12 @@ func makeGlobalPDPath(host volume.VolumeHost, volumeID aws.KubernetesVolumeID) s
 	// Clean up the URI to be more fs-friendly
 	name := string(volumeID)
 	name = strings.Replace(name, "://", "/", -1)
-	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts", name)
+	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath, name)
 }
 
 // Reverses the mapping done in makeGlobalPDPath
 func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
-	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts")
+	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath)
 	rel, err := filepath.Rel(basePath, globalPath)
 	if err != nil {
 		glog.Errorf("Failed to get volume id from global mount %s - %v", globalPath, err)
