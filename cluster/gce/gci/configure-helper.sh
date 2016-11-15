@@ -833,6 +833,8 @@ function start-kube-apiserver {
     remove-salt-config-comments "${abac_policy_json}"
     if [[ -n "${KUBE_USER:-}" ]]; then
       sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
+    else
+      sed -i -e "s/.*{{kube_user}}.*//g" "${abac_policy_json}"
     fi
     cp "${abac_policy_json}" /etc/srv/kubernetes/
   fi
