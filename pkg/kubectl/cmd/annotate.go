@@ -31,6 +31,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	. "k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
@@ -92,6 +93,7 @@ var (
 )
 
 func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
+	LoadTranslations()
 	options := &AnnotateOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -107,7 +109,7 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
-		Short:   "Update the annotations on a resource",
+		Short:   T("annotate_short"),
 		Long:    annotate_long,
 		Example: annotate_example,
 		Run: func(cmd *cobra.Command, args []string) {
