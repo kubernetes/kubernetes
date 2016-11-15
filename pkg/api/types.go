@@ -291,6 +291,8 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
+	//LibStorage represents a volume serviced by a storage provider in libStorage
+	LibStorage *LibStorageVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -353,6 +355,8 @@ type PersistentVolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
+	//LibStorage represents a volume serviced by a storage provider in libStorage
+	LibStorage *LibStorageVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -976,6 +980,25 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool
+}
+
+// LibStorageVolumeSource represents a volume backed by a storage provider in libStorage.
+type LibStorageVolumeSource struct {
+	// The host address for a libStorage API server.
+	Host string `json:"host" protobuf:"bytes,1,opt,name=host"`
+	// The name of the storage service as configured in libStorage.
+	Service string `json:"service" protobuf:"bytes,2,opt,name=service"`
+	// Additional options that can be passed to libStorage service.
+	Options map[string]string `json:"options,omitempty" protobuf:"bytes,3,rep,name=options"`
+	// A unique name to identify the volume source in libStorage.
+	VolumeName string `json:"volumeName" protobuf:"bytes,4,opt,name=volumeName"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,5,opt,name=fsType"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.

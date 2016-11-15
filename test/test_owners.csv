@@ -82,6 +82,9 @@ Deployment scaled rollout deployment should not block on annotation check,kargak
 DisruptionController evictions: * => *,rkouj,0
 DisruptionController should create a PodDisruptionBudget,rkouj,0
 DisruptionController should update PodDisruptionBudget status,rkouj,0
+DisruptionController evictions: * => *,vladimirvivien,0
+DisruptionController should create a PodDisruptionBudget,vladimirvivien,0
+DisruptionController should update PodDisruptionBudget status,vladimirvivien,0
 Docker Containers should be able to override the image's default arguments (docker cmd),maisem,0
 Docker Containers should be able to override the image's default command and arguments,maisem,0
 Docker Containers should be able to override the image's default commmand (docker entrypoint),maisem,0
@@ -183,6 +186,8 @@ Firewall rule should create valid firewall rules for LoadBalancer type service,r
 Firewall rule should have correct firewall rules for e2e cluster,rkouj,0
 GCP Volumes GlusterFS should be mountable,nikhiljindal,0
 GCP Volumes NFSv4 should be mountable for NFSv4,nikhiljindal,0
+GCP Volumes GlusterFS should be mountable,vladimirvivien,0
+GCP Volumes NFSv4 should be mountable for NFSv4,vladimirvivien,0
 GKE local SSD should write and read from node local SSD,fabioy,0
 GKE node pools should create a cluster with multiple node pools,fabioy,1
 Garbage Collection Test: * Should eventually garbage collect containers when we exceed the number of dead containers per container,Random-Liu,0
@@ -195,6 +200,12 @@ Garbage collector should orphan pods created by rc if deleteOptions.OrphanDepend
 "Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1
 HA-master survive addition/removal replicas different zones,derekwaynecarr,0
 HA-master survive addition/removal replicas same zone,derekwaynecarr,0
+HA-master pods survive addition/removal different zones,rkouj,0
+HA-master pods survive addition/removal same zone,rkouj,0
+HA-master pods survive addition/removal different zones,nikhiljindal,0
+HA-master pods survive addition/removal same zone,nikhiljindal,0
+HA-master pods survive addition/removal different zones,vladimirvivien,0
+HA-master pods survive addition/removal same zone,vladimirvivien,0
 Hazelcast should create and scale hazelcast,mikedanese,1
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
@@ -903,6 +914,7 @@ k8s.io/kubernetes/pkg/volume/git_repo,davidopp,1
 k8s.io/kubernetes/pkg/volume/glusterfs,timstclair,1
 k8s.io/kubernetes/pkg/volume/host_path,jbeda,1
 k8s.io/kubernetes/pkg/volume/iscsi,cjcullen,1
+k8s.io/kubernetes/pkg/volume/libstorage,vladimirvivien,0
 k8s.io/kubernetes/pkg/volume/nfs,justinsb,1
 k8s.io/kubernetes/pkg/volume/photon_pd,luomiao,0
 k8s.io/kubernetes/pkg/volume/quobyte,yujuhong,1

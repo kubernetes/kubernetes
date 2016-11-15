@@ -680,7 +680,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
 	}
-
+	if source.LibStorage != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("libStorage"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateLibStorageVolumeSource(source.LibStorage, fldPath.Child("libStorage"))...)
+		}
+	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
 	}
@@ -1027,6 +1034,21 @@ func validatePhotonPersistentDiskVolumeSource(cd *api.PhotonPersistentDiskVolume
 	return allErrs
 }
 
+func validateLibStorageVolumeSource(ls *api.LibStorageVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ls.Host == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("host"), ""))
+	}
+	if ls.Service == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("service"), ""))
+	}
+	if ls.VolumeName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
+	}
+
+	return allErrs
+}
+
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = NameIsDNSSubdomain
@@ -1190,7 +1212,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(pv.Spec.AzureDisk, specPath.Child("azureDisk"))...)
 	}
-
+	if pv.Spec.LibStorage != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateLibStorageVolumeSource(pv.Spec.LibStorage, specPath.Child("libStorage"))...)
+	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(specPath, "must specify a volume type"))
 	}

@@ -2331,6 +2331,80 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "azureDisk.diskURI",
 		},
+
+		// LibStorage
+		{
+			name: "Valid libstorage (with all filelds)",
+			vol: api.Volume{
+				Name: "libstorage",
+				VolumeSource: api.VolumeSource{
+					LibStorage: &api.LibStorageVolumeSource{
+						Host:       "tcp://:7979",
+						Service:    "virtualbox",
+						VolumeName: "vol-001",
+						FSType:     "ext4",
+						ReadOnly:   true,
+						Options:    map[string]string{"certFile": "/etc/svr.cert"},
+					},
+				},
+			},
+		},
+		{
+			name: "Valid libstorage (missing optional)",
+			vol: api.Volume{
+				Name: "libstorage",
+				VolumeSource: api.VolumeSource{
+					LibStorage: &api.LibStorageVolumeSource{
+						Host:       "tcp://:7979",
+						Service:    "virtualbox",
+						VolumeName: "vol-001",
+					},
+				},
+			},
+		},
+		{
+			name: "Invalid libstorage (Empty Host)",
+			vol: api.Volume{
+				Name: "libstorage",
+				VolumeSource: api.VolumeSource{
+					LibStorage: &api.LibStorageVolumeSource{
+						Service:    "virtualbox",
+						VolumeName: "vol-001",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "libStorage.host",
+		},
+		{
+			name: "Invalid libstorage (empty service)",
+			vol: api.Volume{
+				Name: "libstorage",
+				VolumeSource: api.VolumeSource{
+					LibStorage: &api.LibStorageVolumeSource{
+						Host:       "tcp://:7979",
+						Service:    "",
+						VolumeName: "vol-001",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "libStorage.service",
+		},
+		{
+			name: "Invalid libstorage (missing volumeName)",
+			vol: api.Volume{
+				Name: "libstorage",
+				VolumeSource: api.VolumeSource{
+					LibStorage: &api.LibStorageVolumeSource{
+						Host:    "tcp://:7979",
+						Service: "virtualbox",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "libStorage.volumeName",
+		},
 	}
 
 	for i, tc := range testCases {

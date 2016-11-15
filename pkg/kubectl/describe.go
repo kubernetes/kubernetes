@@ -609,6 +609,8 @@ func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 			printCinderVolumeSource(volume.VolumeSource.Cinder, w)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
+		case volume.VolumeSource.LibStorage != nil:
+			printLibStorageVolumeSource(volume.VolumeSource.LibStorage, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -757,6 +759,15 @@ func printCinderVolumeSource(cinder *api.CinderVolumeSource, w *PrefixWriter) {
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
+}
+func printLibStorageVolumeSource(ls *api.LibStorageVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "    Type:\tLibStorage (a volume managed by LibStorage)\n"+
+		"    Host:\t%v\n"+
+		"    Service:\t%v\n"+
+		"    VolumeName:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		ls.Host, ls.Service, ls.VolumeName, ls.FSType, ls.ReadOnly)
 }
 
 type PersistentVolumeDescriber struct {
