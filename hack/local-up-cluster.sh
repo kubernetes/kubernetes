@@ -317,12 +317,22 @@ function set_service_accounts {
 }
 
 function create_client_certkey {
-    local CN=${2:-$1}
-    echo "{\"CN\":\"${CN}\",\"hosts\":[\"\"],\"key\":{\"algo\":\"rsa\",\"size\":2048}}" | docker run -i  --entrypoint /bin/bash -v "${CERT_DIR}:/certs" -w /certs cfssl/cfssl:latest -ec "cfssl gencert -ca=client-ca.crt -ca-key=client-ca.key -config=client-ca-config.json - | cfssljson -bare client-$1"
+    local CA=$1
+    local ID=$2
+    local CN=${3:-$2}
+    local NAMES=""
+    local SEP=""
+    shift 3
+    while [ -n "${1:-}" ]; do
+        NAMES+="${SEP}{\"O\":\"$1\"}"
+        SEP=","
+        shift 1
+    done
+    echo "{\"CN\":\"${CN}\",\"names\":[${NAMES}],\"hosts\":[\"\"],\"key\":{\"algo\":\"rsa\",\"size\":2048}}" | docker run -i  --entrypoint /bin/bash -v "${CERT_DIR}:/certs" -w /certs cfssl/cfssl:latest -ec "cfssl gencert -ca=${CA}.crt -ca-key=${CA}.key -config=client-ca-config.json - | cfssljson -bare client-${ID}"
     sudo /bin/bash -e <<EOF
-    mv "${CERT_DIR}/client-$1-key.pem" "${CERT_DIR}/client-$1.key"
-    mv "${CERT_DIR}/client-$1.pem" "${CERT_DIR}/client-$1.crt"
-    rm -f "${CERT_DIR}/client-$1.csr"
+    mv "${CERT_DIR}/client-${ID}-key.pem" "${CERT_DIR}/client-${ID}.key"
+    mv "${CERT_DIR}/client-${ID}.pem" "${CERT_DIR}/client-${ID}.crt"
+    rm -f "${CERT_DIR}/client-${ID}.csr"
 EOF
 }
 
@@ -397,11 +407,14 @@ function start_apiserver {
     openssl req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/client-ca.key" -out "${CERT_DIR}/client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "${CERT_DIR}/client-ca-config.json"
 EOF
-    create_client_certkey kubelet system:node:${HOSTNAME_OVERRIDE}
-    create_client_certkey kube-proxy system:kube-proxy:${HOSTNAME_OVERRIDE}
-    create_client_certkey controller system:controller
-    create_client_certkey scheduler system:scheduler
-    create_client_certkey admin
+
+    # Create client certs signed with client-ca, given id, given CN and a number of groups
+    # NOTE: system:masters will be removed in the future
+    create_client_certkey client-ca kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
+    create_client_certkey client-ca kube-proxy system:proxy system:nodes
+    create_client_certkey client-ca controller system:controller system:masters
+    create_client_certkey client-ca scheduler system:scheduler system:masters
+    create_client_certkey client-ca admin system:admin system:cluster-admins
 
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
