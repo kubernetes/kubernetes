@@ -106,8 +106,6 @@ func deletePersistentVolume(c clientset.Interface, pvName string) {
 			framework.Logf("Deleting PersistentVolume %v", pvName)
 			err := c.Core().PersistentVolumes().Delete(pvName, nil)
 			Expect(err).NotTo(HaveOccurred())
-		} else {
-			framework.Logf("", pvName)
 		}
 	}
 }
