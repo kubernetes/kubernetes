@@ -212,7 +212,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider)
 	if err != nil {
 		return err
 	}
@@ -481,7 +481,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName, dnsProvider string) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider string) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      cmName,
@@ -503,7 +503,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, cmNam
 							Command: []string{
 								"/hyperkube",
 								"federation-controller-manager",
-								"--master=https://federation-apiserver",
+								fmt.Sprintf("--master=https://%s", svcName),
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
 								fmt.Sprintf("--dns-provider=%s", dnsProvider),
 								"--dns-provider-config=",
