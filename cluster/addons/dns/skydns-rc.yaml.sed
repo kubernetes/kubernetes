@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
       - name: kubedns
-        image: gcr.io/google_containers/kubedns-amd64:1.8
+        image: gcr.io/google_containers/kubedns-amd64:1.9
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -76,6 +76,7 @@ spec:
         args:
         - --domain=$DNS_DOMAIN.
         - --dns-port=10053
+        - --config-map=kube-dns
         # This should be set to v=2 only after the new image (cut from 1.5) has
         # been released, otherwise we will flood the logs.
         - --v=0
