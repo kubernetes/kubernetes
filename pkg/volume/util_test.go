@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -335,6 +336,157 @@ func TestZones2Set(t *testing.T) {
 	for _, tt := range tests {
 		if got, err := Zones2Set(tt.zones); err != nil || !got.Equal(tt.want) {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, tt.zones, got, tt.want)
+		}
+	}
+}
+
+func TestValidatePVCSelector(t *testing.T) {
+	functionUnderTest := "ValidatePVCSelector"
+	// First part: want no error
+	succTests := []struct {
+		pvc       v1.PersistentVolumeClaim
+		wantEmpty bool
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			wantEmpty: true,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{},
+					},
+				},
+			},
+			wantEmpty: true,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchLabels: map[string]string{},
+					},
+				},
+			},
+			wantEmpty: true,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
+							{
+								Key:      unversioned.LabelZoneFailureDomain,
+								Operator: unversioned.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			wantEmpty: false,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
+							{
+								Key:      unversioned.LabelZoneRegion,
+								Operator: unversioned.LabelSelectorOpNotIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			wantEmpty: false,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchLabels: map[string]string{unversioned.LabelZoneFailureDomain: "us-east-1a"},
+					},
+				},
+			},
+			wantEmpty: false,
+		},
+	}
+	for _, succTest := range succTests {
+		if empty, err := ValidatePVCSelector(&succTest.pvc); err != nil {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, empty, err.Error(), succTest.wantEmpty, nil)
+		} else if empty != succTest.wantEmpty {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, empty, err, succTest.wantEmpty, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []v1.PersistentVolumeClaim{
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchExpressions: []unversioned.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "In",
+							Values:   []string{"value1", "value2"},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchExpressions: []unversioned.LabelSelectorRequirement{
+						{
+							Key:      unversioned.LabelZoneFailureDomain,
+							Operator: unversioned.LabelSelectorOpExists,
+							Values:   []string{"value1", "value2"},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"foo": "bar"},
+				},
+			},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchExpressions: []unversioned.LabelSelectorRequirement{
+						{
+							Key:      unversioned.LabelZoneFailureDomain,
+							Operator: unversioned.LabelSelectorOpIn,
+							Values:   []string{},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, errCase := range errCases {
+		if empty, err := ValidatePVCSelector(&errCase); err == nil {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase, empty, err, false, "an error")
+		} else if empty != false {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase, empty, err.Error(), false, "an error")
 		}
 	}
 }
