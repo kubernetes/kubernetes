@@ -2,6 +2,16 @@
 
 set -o nounset
 
+fail() {
+  echo FAIL
+  exit 1
+}
+
+pass() {
+  echo PASS
+  exit 0
+}
+
 migrate_if_needed() {
   export TARGET_STORAGE="$1"
   export TARGET_VERSION="$2"
@@ -76,12 +86,12 @@ for what in nodes pods; do
   echo "Checking ${what}..."
   for dump in 237 upgraded; do
     echo -n " start vs ${dump}..."
-    diff -u /var/log/kubectl-${what}-start* /var/log/kubectl-${what}-${dump}* || exit 1
+    diff -u /var/log/kubectl-${what}-start* /var/log/kubectl-${what}-${dump}* || fail
     echo OK
   done
 done
 
-echo PASS!
+pass
 
 # TODO(mml): Currently busted: https://github.com/kubernetes/kubernetes/issues/36555
 # migrate_if_needed etcd2 2.3.7
