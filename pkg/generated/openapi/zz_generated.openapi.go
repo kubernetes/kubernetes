@@ -2630,7 +2630,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"cgroupRoot": {
 						SchemaProps: spec.SchemaProps{
-							Description: "CgroupRoot is the root cgroup to use for pods. If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.",
+							Description: "CgroupRoot is the root cgroup to use for pods. If ExperimentalCgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
