@@ -307,7 +307,7 @@ type KubeletConfiguration struct {
 	// +optional
 	SystemCgroups string `json:"systemCgroups,omitempty"`
 	// CgroupRoot is the root cgroup to use for pods.
-	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
+	// If ExperimentalCgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	// +optional
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
