@@ -2163,6 +2163,10 @@ func (f *Framework) MatchContainerOutput(
 	ns := f.Namespace.Name
 
 	createdPod := podClient.Create(pod)
+	defer func() {
+		By("delete the pod")
+		podClient.DeleteSync(createdPod.Name, &api.DeleteOptions{}, podNoLongerRunningTimeout)
+	}()
 
 	// Wait for client pod to complete.
 	if err := WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns); err != nil {
