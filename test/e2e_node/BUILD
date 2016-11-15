@@ -57,6 +57,7 @@ go_test(
         "disk_eviction_test.go",
         "dynamic_kubelet_configuration_test.go",
         "e2e_node_suite_test.go",
+        "garbage_collector_test.go",
         "image_id_test.go",
         "kubelet_test.go",
         "lifecycle_hook_test.go",
