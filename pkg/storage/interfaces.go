@@ -112,6 +112,8 @@ type Interface interface {
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
+	// If resource version is "0", this interface will get current object at given key
+	// and send it in an "ADDED" event, before watch starts.
 	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
@@ -119,6 +121,8 @@ type Interface interface {
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
+	// If resource version is "0", this interface will list current objects directory defined by key
+	// and send them in "ADDED" events, before watch starts.
 	WatchList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
