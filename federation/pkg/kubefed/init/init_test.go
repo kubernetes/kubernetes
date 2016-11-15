@@ -147,13 +147,13 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
-		if "" != tc.dnsProvider {
+		if tc.dnsProvider != "" {
 			cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		}
-		if "" != tc.etcdPVCapacity {
+		if tc.etcdPVCapacity != "" {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
 		}
-		if "valid-run" == tc.dryRun {
+		if tc.dryRun == "valid-run" {
 			cmd.Flags().Set("dry-run", "true")
 		}
 
@@ -163,12 +163,11 @@ func TestInitFederation(t *testing.T) {
 			// uses the name from the federation, not the response
 			// Actual data passed are tested in the fake secret and cluster
 			// REST clients.
-			want := ""
-			if "" != tc.dryRun {
+			want := fmt.Sprintf("Federation API server is running at: %s\n", tc.lbIP)
+			if tc.dryRun != "" {
 				want = fmt.Sprintf("Federation control plane runs (dry run)\n")
-			} else {
-				want = fmt.Sprintf("Federation API server is running at: %s\n", tc.lbIP)
 			}
+
 			if got := buf.String(); got != want {
 				t.Errorf("[%d] unexpected output: got: %s, want: %s", i, got, want)
 				if cmdErrMsg != "" {

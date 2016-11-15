@@ -230,10 +230,10 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 
 	if !dryRun {
 		return printSuccess(cmdOut, ips, hostnames)
-	} else {
-		_, err := fmt.Fprintf(cmdOut, "Federation control plane runs (dry run)\n")
-		return err
 	}
+	_, err = fmt.Fprintf(cmdOut, "Federation control plane runs (dry run)\n")
+	return err
+
 }
 
 func createNamespace(clientset *client.Clientset, namespace string, dryRun bool) (*api.Namespace, error) {
@@ -374,14 +374,10 @@ func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namesp
 		certutil.EncodeCertPEM(entKeyPairs.controllerManager.Cert),
 	)
 
-	if dryRun {
-		return nil, nil
-	}
-	return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, false)
+	return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, dryRun)
 }
 
 func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity string, dryRun bool) (*api.PersistentVolumeClaim, error) {
-
 	capacity, err := resource.ParseQuantity(etcdPVCapacity)
 	if err != nil {
 		return nil, err
