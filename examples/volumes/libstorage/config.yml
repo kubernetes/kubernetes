@@ -1,0 +1,14 @@
+libstorage:
+  service: virtualbox
+  host: tcp://127.0.0.1:7979
+  embedded: true
+  server:
+    services:
+      virtualbox:
+        driver: virtualbox
+
+virtualbox:
+  endpoint: http://10.0.2.2:18083
+  tls: false
+  volumePath: /Users/vladimir/VirtualBox Volumes
+  controllerName: SATA

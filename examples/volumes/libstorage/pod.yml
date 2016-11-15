@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-0001
+spec:
+  containers:
+  - image: gcr.io/google_containers/test-webserver
+    name: pod-0001-container
+    volumeMounts:
+    - mountPath: /test-pd
+      name: vol-0001
+  volumes:
+  - name: vol-0001
+    libStorage:
+      host: http://127.0.0.1:7979
+      volumeName: vol-0001
+      service: virtualbox
