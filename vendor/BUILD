@@ -11716,3 +11716,49 @@ go_library(
     srcs = ["k8s.io/client-go/pkg/util/ratelimit/bucket.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "github.com/nicksnyder/go-i18n/i18n",
+    srcs = ["github.com/nicksnyder/go-i18n/i18n/i18n.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/nicksnyder/go-i18n/i18n/bundle",
+        "//vendor:github.com/nicksnyder/go-i18n/i18n/language",
+        "//vendor:github.com/nicksnyder/go-i18n/i18n/translation",
+    ],
+)
+
+go_library(
+    name = "github.com/nicksnyder/go-i18n/i18n/bundle",
+    srcs = ["github.com/nicksnyder/go-i18n/i18n/bundle/bundle.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/nicksnyder/go-i18n/i18n/language",
+        "//vendor:github.com/nicksnyder/go-i18n/i18n/translation",
+        "//vendor:gopkg.in/yaml.v2",
+    ],
+)
+
+go_library(
+    name = "github.com/nicksnyder/go-i18n/i18n/language",
+    srcs = [
+        "github.com/nicksnyder/go-i18n/i18n/language/language.go",
+        "github.com/nicksnyder/go-i18n/i18n/language/operands.go",
+        "github.com/nicksnyder/go-i18n/i18n/language/plural.go",
+        "github.com/nicksnyder/go-i18n/i18n/language/pluralspec.go",
+        "github.com/nicksnyder/go-i18n/i18n/language/pluralspec_gen.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/nicksnyder/go-i18n/i18n/translation",
+    srcs = [
+        "github.com/nicksnyder/go-i18n/i18n/translation/plural_translation.go",
+        "github.com/nicksnyder/go-i18n/i18n/translation/single_translation.go",
+        "github.com/nicksnyder/go-i18n/i18n/translation/template.go",
+        "github.com/nicksnyder/go-i18n/i18n/translation/translation.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/nicksnyder/go-i18n/i18n/language"],
+)

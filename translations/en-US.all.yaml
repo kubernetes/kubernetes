@@ -1,0 +1,17 @@
+- id: "Update the annotations on a resource"
+  translation: "Update the annotations on a resource"
+
+- id: "watch is only supported on individual resources and resource collections - {{.Count}} resources were found"
+  translation:
+    one: "watch is only supported on individual resources and resource collections - {{.Count}} resources was found"
+    other: "watch is only supported on individual resources and resource collections - {{.Count}} resources were found"
+
+# These translations are used in unit tests.
+- id: "test_string"
+  translation: "foo"
+
+# An example pluralized string
+- id: "test_plural"
+  translation:
+    one: "there was {{.Count}} item"
+    other: "there were {{.Count}} items"
