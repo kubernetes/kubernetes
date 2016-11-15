@@ -209,7 +209,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--eviction-pressure-transition-period", "30s",
 		"--feature-gates", framework.TestContext.FeatureGates,
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
-
 		"--experimental-mounter-path", framework.TestContext.MounterPath,
 	)
 	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.

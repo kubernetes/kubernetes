@@ -223,7 +223,7 @@ func nodeHasDiskPressure(cs clientset.Interface) bool {
 }
 
 func evictionOptionIsSet() bool {
-	return len(framework.TestContext.EvictionHard) > 0
+	return len(framework.TestContext.KubeletConfig.EvictionHard) > 0
 }
 
 // TODO(random-liu): Use OSImage in node status to do the check.
