@@ -23,6 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -125,6 +126,9 @@ type NodeTestContextType struct {
 	ContainerRuntimeEndpoint string
 	// MounterPath is the path to the program to run to perform a mount
 	MounterPath string
+	// KubeletConfig is the kubelet configuration the test is running against.
+	// TODO(random-liu): Remove kubelet configuration related fields above after removing kubelet start logic out.
+	KubeletConfig componentconfig.KubeletConfiguration
 }
 
 type CloudConfig struct {
