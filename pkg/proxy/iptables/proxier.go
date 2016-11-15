@@ -250,6 +250,10 @@ func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec ut
 		nodeIP = net.ParseIP("127.0.0.1")
 	}
 
+	if len(clusterCIDR) == 0 {
+		glog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
+	}
+
 	go healthcheck.Run()
 
 	var throttle flowcontrol.RateLimiter
@@ -1221,13 +1225,17 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		// First rule in the chain redirects all pod -> external vip traffic to the
 		// Service's ClusterIP instead. This happens whether or not we have local
-		// endpoints.
-		args = []string{
-			"-A", string(svcXlbChain),
-			"-m", "comment", "--comment",
-			fmt.Sprintf(`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`),
+		// endpoints; only if clusterCIDR is specified
+		if len(proxier.clusterCIDR) > 0 {
+			args = []string{
+				"-A", string(svcXlbChain),
+				"-m", "comment", "--comment",
+				fmt.Sprintf(`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`),
+				"-s", proxier.clusterCIDR,
+				"-j", string(svcChain),
+			}
+			writeLine(natRules, args...)
 		}
-		writeLine(natRules, append(args, "-s", proxier.clusterCIDR, "-j", string(svcChain))...)
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {
@@ -1300,7 +1308,7 @@ func (proxier *Proxier) syncProxyRules() {
 	glog.V(3).Infof("Restoring iptables rules: %s", lines)
 	err = proxier.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		glog.Errorf("Failed to execute iptables-restore: %v", err)
+		glog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, lines)
 		// Revert new local ports.
 		revertPorts(replacementPortsMap, proxier.portsMap)
 		return
