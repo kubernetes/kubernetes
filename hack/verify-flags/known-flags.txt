@@ -105,6 +105,7 @@ container-port
 container-runtime
 container-runtime-endpoint
 contain-pod-resources
+contention-profiling
 controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
