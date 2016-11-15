@@ -507,15 +507,22 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 			// - NodeReady condition status is ConditionTrue,
 			// - NodeOutOfDisk condition status is ConditionFalse,
 			// - NodeNetworkUnavailable condition status is ConditionFalse.
-			if cond.Type == api.NodeReady && cond.Status != api.ConditionTrue {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			} else if cond.Type == api.NodeOutOfDisk && cond.Status != api.ConditionFalse {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			} else if cond.Type == api.NodeNetworkUnavailable && cond.Status != api.ConditionFalse {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
+			switch cond.Type {
+			case api.NodeReady:
+				if cond.Status != api.ConditionTrue {
+					glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+					return false
+				}
+
+			case api.NodeMemoryPressure, api.NodeDiskPressure:
+			// We don't block on "pressure" conditions; these are warnings, not errors!
+
+			default:
+				// We assume everything else is blocking if the condition is True or Unknown
+				if cond.Status != api.ConditionFalse {
+					glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+					return false
+				}
 			}
 		}
 		// Ignore nodes that are marked unschedulable
