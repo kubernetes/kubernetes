@@ -133,6 +133,7 @@ write_supervisor_conf "kube-apiserver" "${ulimit_command} /kubernetes/server/bin
 	--secure-port=443 \
 	--basic-auth-file=/srv/kubernetes/basic_auth.csv \
 	--target-ram-mb=$((${NUM_NODES} * 60)) \
+	--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota \
 	$(cat /apiserver_flags | tr '\n' ' ')\""
 write_supervisor_conf "kube-contoller-manager" "${ulimit_command} /kubernetes/server/bin/kube-controller-manager \
   --master=127.0.0.1:8080 \

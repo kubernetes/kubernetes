@@ -29,7 +29,7 @@
 					{
 						"name": "logs-volume",
 						"hostPath": {
-							"path": "/var/logs"
+							"path": "/var/log"
 						}
 					}
 				],
@@ -64,7 +64,7 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=kubelet $(CONTENT_TYPE) --v=2 1>>/var/logs/kubelet_$(MY_POD_NAME).log 2>&1"
+						"./kubemark.sh --morph=kubelet $(CONTENT_TYPE) --v=2 1>>/var/log/kubelet_$(MY_POD_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -73,7 +73,7 @@
 						},
 						{
 							"name": "logs-volume",
-							"mountPath": "/var/logs"
+							"mountPath": "/var/log"
 						}
 					],
 					"resources": {
@@ -81,6 +81,9 @@
 							"cpu": "50m",
 							"memory": "100M"
 						}
+					},
+					"securityContext": {
+						"privileged": true
 					}
 
 				},
@@ -109,7 +112,7 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=proxy $(CONTENT_TYPE) --v=2 1>>/var/logs/kube_proxy_$(MY_POD_NAME).log 2>&1"
+						"./kubemark.sh --morph=proxy $(CONTENT_TYPE) --v=2 1>>/var/log/kube_proxy_$(MY_POD_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -118,7 +121,7 @@
 						},
 						{
 							"name": "logs-volume",
-							"mountPath": "/var/logs"
+							"mountPath": "/var/log"
 						}
 					],
 					"resources": {
