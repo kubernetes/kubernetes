@@ -2666,7 +2666,13 @@ func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 	}
 
 	// TODO(freehan): allow user to update loadbalancerSourceRanges
-	allErrs = append(allErrs, ValidateImmutableField(service.Spec.LoadBalancerSourceRanges, oldService.Spec.LoadBalancerSourceRanges, field.NewPath("spec", "loadBalancerSourceRanges"))...)
+	// Only allow removing LoadBalancerSourceRanges when change service type from LoadBalancer
+	// to non-LoadBalancer or adding LoadBalancerSourceRanges when change service type from
+	// non-LoadBalancer to LoadBalancer.
+	if service.Spec.Type != api.ServiceTypeLoadBalancer && oldService.Spec.Type != api.ServiceTypeLoadBalancer ||
+		service.Spec.Type == api.ServiceTypeLoadBalancer && oldService.Spec.Type == api.ServiceTypeLoadBalancer {
+		allErrs = append(allErrs, ValidateImmutableField(service.Spec.LoadBalancerSourceRanges, oldService.Spec.LoadBalancerSourceRanges, field.NewPath("spec", "loadBalancerSourceRanges"))...)
+	}
 
 	allErrs = append(allErrs, validateServiceFields(service)...)
 	allErrs = append(allErrs, validateServiceAnnotations(service, oldService)...)
