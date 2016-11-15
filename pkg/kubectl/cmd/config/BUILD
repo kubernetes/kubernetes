@@ -61,6 +61,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
+        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util/diff:go_default_library",
         "//pkg/util/flag:go_default_library",
     ],

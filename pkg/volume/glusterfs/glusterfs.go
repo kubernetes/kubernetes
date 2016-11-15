@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+	"runtime"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -55,17 +56,18 @@ var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
-	glusterfsPluginName       = "kubernetes.io/glusterfs"
-	volPrefix                 = "vol_"
-	dynamicEpSvcPrefix        = "glusterfs-dynamic-"
-	replicaCount              = 3
-	durabilityType            = "replicate"
-	secretKeyName             = "key" // key name used in secret
-	annGlusterURL             = "glusterfs.kubernetes.io/url"
-	annGlusterSecretName      = "glusterfs.kubernetes.io/secretname"
-	annGlusterSecretNamespace = "glusterfs.kubernetes.io/secretnamespace"
-	annGlusterUserKey         = "glusterfs.kubernetes.io/userkey"
-	annGlusterUser            = "glusterfs.kubernetes.io/userid"
+	glusterfsPluginName         = "kubernetes.io/glusterfs"
+	volPrefix                   = "vol_"
+	dynamicEpSvcPrefix          = "glusterfs-dynamic-"
+	replicaCount                = 3
+	durabilityType              = "replicate"
+	secretKeyName               = "key" // key name used in secret
+	annGlusterURL               = "glusterfs.kubernetes.io/url"
+	annGlusterSecretName        = "glusterfs.kubernetes.io/secretname"
+	annGlusterSecretNamespace   = "glusterfs.kubernetes.io/secretnamespace"
+	annGlusterUserKey           = "glusterfs.kubernetes.io/userkey"
+	annGlusterUser              = "glusterfs.kubernetes.io/userid"
+	gciGlusterMountBinariesPath = "/sbin/mount.glusterfs"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -211,6 +213,13 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
 func (b *glusterfsMounter) CanMount() error {
+	exe := exec.New()
+	switch runtime.GOOS {
+	case "linux":
+		if _, err := exe.Command("/bin/ls", gciGlusterMountBinariesPath).CombinedOutput(); err != nil {
+			return fmt.Errorf("Required binary %s is missing", gciGlusterMountBinariesPath)
+		}
+	}
 	return nil
 }
 

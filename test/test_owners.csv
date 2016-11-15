@@ -38,6 +38,7 @@ Container Lifecycle Hook when create a pod with lifecycle hook when it is http h
 Container Runtime Conformance Test container runtime conformance blackbox test when running a container with a new image *,Random-Liu,0
 Container Runtime Conformance Test container runtime conformance blackbox test when starting a container that exits it should run with the expected status,luxas,1
 Container Runtime Conformance Test container runtime conformance blackbox test when starting a container that exits should report termination message if TerminationMessagePath is set,timothysc,1
+ContainerLogPath Pod with a container printed log to stdout should print log to correct log path,resouer,0
 CronJob should not emit unexpected warnings,soltysh,1
 CronJob should not schedule jobs when suspended,soltysh,1
 CronJob should not schedule new jobs when ForbidConcurrent,soltysh,1
@@ -45,7 +46,6 @@ CronJob should replace jobs when ReplaceConcurrent,soltysh,1
 CronJob should schedule multiple jobs concurrently,soltysh,1
 DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios,MrHohn,0
 DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods when cluster size changed,MrHohn,0
-ContainerLogPath Pod with a container printed log to stdout should print log to correct log path,resouer,0
 DNS should provide DNS for ExternalName services,rmmh,1
 DNS should provide DNS for pods for Hostname and Subdomain Annotation,mtaufen,1
 DNS should provide DNS for services,roberthbailey,1
@@ -77,6 +77,9 @@ Deployment overlapping deployment should not fight with each other,kargakis,1
 Deployment paused deployment should be able to scale,kargakis,1
 Deployment paused deployment should be ignored by the controller,kargakis,0
 Deployment scaled rollout deployment should not block on annotation check,kargakis,1
+DisruptionController evictions: * => *,rkouj,0
+DisruptionController should create a PodDisruptionBudget,rkouj,0
+DisruptionController should update PodDisruptionBudget status,rkouj,0
 Docker Containers should be able to override the image's default arguments (docker cmd),maisem,0
 Docker Containers should be able to override the image's default command and arguments,maisem,0
 Docker Containers should be able to override the image's default commmand (docker entrypoint),maisem,0
@@ -145,10 +148,9 @@ Federation API server authentication should not accept cluster resources when th
 Federation API server authentication should not accept cluster resources when the client has no authentication credentials,nikhiljindal,1
 Federation apiserver Admission control should not be able to create resources if namespace does not exist,alex-mohr,1
 Federation apiserver Cluster objects should be created and deleted successfully,ghodss,1
-Federation daemonsets DaemonSet objects should be created and deleted successfully,soltysh,1
+Federation daemonsets DaemonSet objects should be created and deleted successfully,nikhiljindal,0
 Federation deployments Deployment objects should be created and deleted successfully,soltysh,1
 Federation deployments Federated Deployment should create and update matching deployments in underling clusters,soltysh,1
-Federation daemonsets DaemonSet objects should be created and deleted successfully,nikhiljindal,0
 Federation events Event objects should be created and deleted successfully,karlkfi,1
 Federation namespace Namespace objects all resources in the namespace should be deleted when namespace is deleted,nikhiljindal,0
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
@@ -159,6 +161,8 @@ Federation replicasets ReplicaSet objects should be created and deleted successf
 Federation secrets Secret objects should be created and deleted successfully,pmorie,1
 Federation secrets Secret objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
+GCP Volumes GlusterFS should be mountable,rkouj,0
+GCP Volumes NFSv4 should be mountable for NFSv4,rkouj,0
 GKE local SSD should write and read from node local SSD,fabioy,0
 GKE node pools should create a cluster with multiple node pools,fabioy,1
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1
@@ -166,7 +170,8 @@ Garbage collector should orphan pods created by rc if delete options say so,fabi
 Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1
 "Generated release_1_5 clientset should create pods, delete pods, watch pods",ghodss,1
 "Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1
-HA-master pods survive addition/removal,roberthbailey,1
+HA-master pods survive addition/removal different zones,rkouj,0
+HA-master pods survive addition/removal same zone,rkouj,0
 Hazelcast should create and scale hazelcast,mikedanese,1
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
@@ -398,6 +403,7 @@ SchedulerPredicates validates that required NodeAffinity setting is respected if
 SchedulerPredicates validates that taints-tolerations is respected if matching,jlowdermilk,1
 SchedulerPredicates validates that taints-tolerations is respected if not matching,derekwaynecarr,1
 Secret should create a pod that reads a secret,luxas,1
+Secrets should be able to mount in a volume regardless of a different secret existing with same name in different namespace,rkouj,0
 Secrets should be consumable from pods in env vars,mml,1
 Secrets should be consumable from pods in volume,ghodss,1
 Secrets should be consumable from pods in volume with defaultMode set,derekwaynecarr,1
@@ -658,7 +664,7 @@ k8s.io/kubernetes/pkg/kubelet/qos,vishh,0
 k8s.io/kubernetes/pkg/kubelet/rkt,apelisse,1
 k8s.io/kubernetes/pkg/kubelet/rktshim,mml,1
 k8s.io/kubernetes/pkg/kubelet/server,timstclair,0
-k8s.io/kubernetes/pkg/kubelet/server/portforward,caesarxuchao,1
+k8s.io/kubernetes/pkg/kubelet/server/portforward,rkouj,0
 k8s.io/kubernetes/pkg/kubelet/server/stats,timstclair,0
 k8s.io/kubernetes/pkg/kubelet/server/streaming,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet/status,mwielgus,1

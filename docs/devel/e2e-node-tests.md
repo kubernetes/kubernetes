@@ -208,10 +208,10 @@ make test_e2e_node TEST_ARGS="--disable-kubenet=false" # disable kubenet
 
 ## Additional QoS Cgroups Hierarchy level testing
 
-For testing with the QoS Cgroup Hierarchy enabled, you can pass --cgroups-per-qos flag as an argument into Ginkgo using TEST_ARGS
+For testing with the QoS Cgroup Hierarchy enabled, you can pass --experimental-cgroups-per-qos flag as an argument into Ginkgo using TEST_ARGS
 
 ```sh
-make test_e2e_node TEST_ARGS="--cgroups-per-qos=true"
+make test_e2e_node TEST_ARGS="--experimental-cgroups-per-qos=true"
 ```
 
 # Notes on tests run by the Kubernetes project during pre-, post- submit.
