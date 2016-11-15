@@ -122,6 +122,7 @@ kubernetes/server/bin/kube-apiserver \
 	--secure-port=443 \
 	--basic-auth-file=/srv/kubernetes/basic_auth.csv \
 	--target-ram-mb=$((${NUM_NODES} * 60)) \
+	--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota \
 	$(cat apiserver_flags) &> /var/log/kube-apiserver.log &
 
 # kube-contoller-manager now needs running kube-api server to actually start
