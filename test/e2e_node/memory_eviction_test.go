@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -34,13 +35,33 @@ import (
 // https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/kubelet-eviction.md
 
 var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", func() {
+	const (
+		evictionHard = "memory.available<40%"
+	)
+
 	f := framework.NewDefaultFramework("eviction-test")
+	var oldCfg *componentconfig.KubeletConfiguration = nil
 
 	// This is a dummy context to wrap the outer AfterEach, which will run after the inner AfterEach.
 	// We want to list all of the node and pod events, including any that occur while waiting for
 	// memory pressure reduction, even if we time out while waiting.
 	Context("", func() {
+		BeforeEach(func() {
+			// Set memory eviction thresholds specifically for this test
+			oldCfg, err := getCurrentKubeletConfig()
+			framework.ExpectNoError(err)
+			newCfg := *oldCfg // copy to newCfg so we maintain oldCfg
+			newCfg.EvictionHard = evictionHard
+			framework.ExpectNoError(setKubeletConfiguration(f, &newCfg))
+		})
 		AfterEach(func() {
+			// Set memory eviction thresholds back to what they were before this test
+			if oldCfg != nil {
+				err := setKubeletConfiguration(f, oldCfg)
+				framework.ExpectNoError(err)
+			}
+
+			// Print events
 			glog.Infof("Summary of node events during the memory eviction test:")
 			err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
 			framework.ExpectNoError(err)
