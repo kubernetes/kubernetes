@@ -19,7 +19,6 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/types:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/vmware/photon-controller-go-sdk/photon",
         "//vendor:gopkg.in/gcfg.v1",
     ],
 )

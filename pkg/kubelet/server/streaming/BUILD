@@ -44,6 +44,5 @@ go_test(
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
-        "//vendor:k8s.io/client-go/pkg/api",
     ],
 )

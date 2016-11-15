@@ -32,6 +32,5 @@ go_library(
         "//plugin/pkg/auth/authenticator/token/oidc:go_default_library",
         "//plugin/pkg/auth/authenticator/token/tokenfile:go_default_library",
         "//plugin/pkg/auth/authenticator/token/webhook:go_default_library",
-        "//vendor:github.com/go-openapi/spec",
     ],
 )

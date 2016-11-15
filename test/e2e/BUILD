@@ -191,7 +191,6 @@ go_library(
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/google/cadvisor/info/v1",
-        "//vendor:github.com/influxdata/influxdb/client",
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/ginkgo/config",
         "//vendor:github.com/onsi/ginkgo/reporters",
@@ -201,12 +200,6 @@ go_library(
         "//vendor:google.golang.org/api/compute/v1",
         "//vendor:google.golang.org/api/googleapi",
         "//vendor:gopkg.in/inf.v0",
-        "//vendor:k8s.io/client-go/kubernetes",
-        "//vendor:k8s.io/client-go/pkg/api/unversioned",
-        "//vendor:k8s.io/client-go/pkg/api/v1",
-        "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
-        "//vendor:k8s.io/client-go/pkg/apis/policy/v1beta1",
-        "//vendor:k8s.io/client-go/pkg/util/intstr",
     ],
 )
 

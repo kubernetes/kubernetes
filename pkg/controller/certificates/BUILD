@@ -32,9 +32,6 @@ go_library(
         "//pkg/util/wait:go_default_library",
         "//pkg/util/workqueue:go_default_library",
         "//pkg/watch:go_default_library",
-        "//vendor:github.com/cloudflare/cfssl/config",
-        "//vendor:github.com/cloudflare/cfssl/signer",
-        "//vendor:github.com/cloudflare/cfssl/signer/local",
         "//vendor:github.com/golang/glog",
     ],
 )

@@ -31,7 +31,6 @@ go_library(
         "//pkg/watch:go_default_library",
         "//vendor:github.com/coreos/etcd/clientv3",
         "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-        "//vendor:github.com/coreos/etcd/mvcc/mvccpb",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
     ],

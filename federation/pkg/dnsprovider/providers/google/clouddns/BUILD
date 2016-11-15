@@ -29,7 +29,6 @@ go_library(
         "//federation/pkg/dnsprovider/providers/google/clouddns/internal/stubs:go_default_library",
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
-        "//vendor:cloud.google.com/go/compute/metadata",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/oauth2",
         "//vendor:golang.org/x/oauth2/google",

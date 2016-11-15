@@ -22,7 +22,6 @@ go_library(
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/dns:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/skynetservices/skydns/metrics",
         "//vendor:github.com/skynetservices/skydns/server",
         "//vendor:github.com/spf13/pflag",
     ],

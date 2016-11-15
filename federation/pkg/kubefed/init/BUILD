@@ -55,6 +55,5 @@ go_test(
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//vendor:k8s.io/client-go/pkg/util/diff",
     ],
 )

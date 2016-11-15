@@ -22,7 +22,6 @@ go_library(
         "//pkg/apis/batch:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/util/validation/field:go_default_library",
-        "//vendor:github.com/robfig/cron",
     ],
 )
 

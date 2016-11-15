@@ -32,16 +32,8 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/errors:go_default_library",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/network",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/storage",
-        "//vendor:github.com/Azure/azure-sdk-for-go/storage",
-        "//vendor:github.com/Azure/go-autorest/autorest",
-        "//vendor:github.com/Azure/go-autorest/autorest/azure",
-        "//vendor:github.com/Azure/go-autorest/autorest/to",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/rubiojr/go-vhd/vhd",
     ],
 )
 
@@ -54,8 +46,5 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/types:go_default_library",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/network",
-        "//vendor:github.com/Azure/go-autorest/autorest/to",
     ],
 )

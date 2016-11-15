@@ -57,7 +57,6 @@ go_library(
         "//pkg/util/sets:go_default_library",
         "//vendor:github.com/coreos/go-semver/semver",
         "//vendor:github.com/docker/docker/pkg/jsonlog",
-        "//vendor:github.com/fsnotify/fsnotify",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/google/cadvisor/info/v1",

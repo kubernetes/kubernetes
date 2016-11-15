@@ -37,7 +37,6 @@ go_library(
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/net:go_default_library",
         "//pkg/version:go_default_library",
-        "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
     ],
 )

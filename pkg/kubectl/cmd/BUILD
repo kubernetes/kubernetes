@@ -114,7 +114,6 @@ go_library(
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/jonboulle/clockwork",
-        "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
     ],
 )
@@ -198,6 +197,5 @@ go_test(
         "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
 )

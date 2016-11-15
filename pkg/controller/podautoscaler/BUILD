@@ -66,6 +66,5 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
         "//vendor:k8s.io/heapster/metrics/api/v1/types",
-        "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
 )
