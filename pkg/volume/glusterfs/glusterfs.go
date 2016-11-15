@@ -536,6 +536,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 	clusterinfo, err := cli.ClusterInfo(volume.Cluster)
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get cluster details")
+		err = cli.VolumeDelete(volume.Id)
+		if err != nil {
+			glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", err)
+		}
 		return nil, 0, fmt.Errorf("failed to get cluster details %v", err)
 	}
 	// For the above dynamically provisioned volume, we gather the list of node IPs
@@ -546,6 +550,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 		nodei, err := cli.NodeInfo(string(node))
 		if err != nil {
 			glog.Errorf("glusterfs: failed to get hostip %v ", err)
+			err = cli.VolumeDelete(volume.Id)
+			if err != nil {
+				glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", err)
+			}
 			return nil, 0, fmt.Errorf("failed to get hostip %v", err)
 		}
 		ipaddr := dstrings.Join(nodei.NodeAddRequest.Hostnames.Storage, "")
@@ -554,6 +562,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 	glog.V(3).Infof("glusterfs: hostlist :%v", dynamicHostIps)
 	if len(dynamicHostIps) == 0 {
 		glog.Errorf("glusterfs: no hosts found %v ", err)
+		err = cli.VolumeDelete(volume.Id)
+		if err != nil {
+			glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", err)
+		}
 		return nil, 0, fmt.Errorf("no hosts found %v", err)
 	}
 
