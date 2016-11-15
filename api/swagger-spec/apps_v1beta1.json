@@ -1458,6 +1458,10 @@
      "photonPersistentDisk": {
       "$ref": "v1.PhotonPersistentDiskVolumeSource",
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
+     },
+     "libStorage": {
+      "$ref": "v1.LibStorageVolumeSource",
+      "description": "LibStorage represents a volume serviced by a storage provider in libStorage"
      }
     }
    },
@@ -2105,6 +2109,41 @@
      "fsType": {
       "type": "string",
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.LibStorageVolumeSource": {
+    "id": "v1.LibStorageVolumeSource",
+    "description": "LibStorageVolumeSource represents a volume serviced by a storage provider in libStorage",
+    "required": [
+     "host",
+     "service",
+     "volumeName"
+    ],
+    "properties": {
+     "host": {
+      "type": "string",
+      "description": "The host address for a LibStorage API server."
+     },
+     "service": {
+      "type": "string",
+      "description": "The name of the storage service as configured in LibStorage."
+     },
+     "options": {
+      "type": "object",
+      "description": "Additional options that can be passed to LibStorage service."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "A unique name to identify the volume source in LibStorage."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
      }
     }
    },

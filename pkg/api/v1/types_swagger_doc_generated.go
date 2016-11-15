@@ -649,6 +649,20 @@ func (KeyToPath) SwaggerDoc() map[string]string {
 	return map_KeyToPath
 }
 
+var map_LibStorageVolumeSource = map[string]string{
+	"":           "LibStorageVolumeSource represents a volume serviced by a storage provider in libStorage",
+	"host":       "The host address for a LibStorage API server.",
+	"service":    "The name of the storage service as configured in LibStorage.",
+	"options":    "Additional options that can be passed to LibStorage service.",
+	"volumeName": "A unique name to identify the volume source in LibStorage.",
+	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":   "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+}
+
+func (LibStorageVolumeSource) SwaggerDoc() map[string]string {
+	return map_LibStorageVolumeSource
+}
+
 var map_Lifecycle = map[string]string{
 	"":          "Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
 	"postStart": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details",
@@ -1095,6 +1109,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"libStorage":           "LibStorage represents a volume serviced by a storage provider in libStorage",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1809,6 +1824,7 @@ var map_VolumeSource = map[string]string{
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"libStorage":           "LibStorage represents a volume serviced by a storage provider in libStorage",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

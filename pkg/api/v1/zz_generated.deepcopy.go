@@ -91,6 +91,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HostPathVolumeSource, InType: reflect.TypeOf(&HostPathVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ISCSIVolumeSource, InType: reflect.TypeOf(&ISCSIVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_KeyToPath, InType: reflect.TypeOf(&KeyToPath{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LibStorageVolumeSource, InType: reflect.TypeOf(&LibStorageVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Lifecycle, InType: reflect.TypeOf(&Lifecycle{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LimitRange, InType: reflect.TypeOf(&LimitRange{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LimitRangeItem, InType: reflect.TypeOf(&LimitRangeItem{})},
@@ -1322,6 +1323,28 @@ func DeepCopy_v1_KeyToPath(in interface{}, out interface{}, c *conversion.Cloner
 	}
 }
 
+func DeepCopy_v1_LibStorageVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LibStorageVolumeSource)
+		out := out.(*LibStorageVolumeSource)
+		out.Host = in.Host
+		out.Service = in.Service
+		if in.Options != nil {
+			in, out := &in.Options, &out.Options
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		} else {
+			out.Options = nil
+		}
+		out.VolumeName = in.VolumeName
+		out.FSType = in.FSType
+		out.ReadOnly = in.ReadOnly
+		return nil
+	}
+}
+
 func DeepCopy_v1_Lifecycle(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Lifecycle)
@@ -2263,6 +2286,15 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 			**out = **in
 		} else {
 			out.PhotonPersistentDisk = nil
+		}
+		if in.LibStorage != nil {
+			in, out := &in.LibStorage, &out.LibStorage
+			*out = new(LibStorageVolumeSource)
+			if err := DeepCopy_v1_LibStorageVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.LibStorage = nil
 		}
 		return nil
 	}
@@ -3775,6 +3807,15 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			**out = **in
 		} else {
 			out.PhotonPersistentDisk = nil
+		}
+		if in.LibStorage != nil {
+			in, out := &in.LibStorage, &out.LibStorage
+			*out = new(LibStorageVolumeSource)
+			if err := DeepCopy_v1_LibStorageVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.LibStorage = nil
 		}
 		return nil
 	}

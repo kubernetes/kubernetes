@@ -47,6 +47,7 @@ CronJob should not schedule new jobs when ForbidConcurrent,soltysh,1
 CronJob should replace jobs when ReplaceConcurrent,soltysh,1
 CronJob should schedule multiple jobs concurrently,soltysh,1
 DNS config map should be able to change configuration,rkouj,0
+DNS config map should be able to change configuration,vladimirvivien,0
 DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios,MrHohn,0
 DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods when cluster size changed,MrHohn,0
 DNS should provide DNS for ExternalName services,rmmh,1
@@ -64,6 +65,8 @@ Density create a batch of pods with higher API QPS latency/resource should be wi
 Density create a sequence of pods latency/resource should be within limit when create * pods with * background pods,wojtek-t,1
 Density should allow running maximum capacity pods on nodes,smarterclayton,1
 Density should allow starting * pods per node using * with * secrets,brendandburns,0
+Density should allow starting * pods per node using * with * secrets,derekwaynecarr,0
+Density should allow starting * pods per node using * with * secrets,vladimirvivien,0
 Deployment RecreateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment deployment reaping should cascade to its replica sets and pods,wojtek-t,1
@@ -79,9 +82,6 @@ Deployment overlapping deployment should not fight with each other,kargakis,1
 Deployment paused deployment should be able to scale,kargakis,1
 Deployment paused deployment should be ignored by the controller,kargakis,0
 Deployment scaled rollout deployment should not block on annotation check,kargakis,1
-DisruptionController evictions: * => *,rkouj,0
-DisruptionController should create a PodDisruptionBudget,rkouj,0
-DisruptionController should update PodDisruptionBudget status,rkouj,0
 DisruptionController evictions: * => *,vladimirvivien,0
 DisruptionController should create a PodDisruptionBudget,vladimirvivien,0
 DisruptionController should update PodDisruptionBudget status,vladimirvivien,0
@@ -200,12 +200,6 @@ Garbage collector should orphan pods created by rc if deleteOptions.OrphanDepend
 "Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1
 HA-master survive addition/removal replicas different zones,derekwaynecarr,0
 HA-master survive addition/removal replicas same zone,derekwaynecarr,0
-HA-master pods survive addition/removal different zones,rkouj,0
-HA-master pods survive addition/removal same zone,rkouj,0
-HA-master pods survive addition/removal different zones,nikhiljindal,0
-HA-master pods survive addition/removal same zone,nikhiljindal,0
-HA-master pods survive addition/removal different zones,vladimirvivien,0
-HA-master pods survive addition/removal same zone,vladimirvivien,0
 Hazelcast should create and scale hazelcast,mikedanese,1
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
@@ -280,6 +274,8 @@ Kubelet Container Manager Validate OOM score adjustments once the node is setup 
 Kubelet Container Manager Validate OOM score adjustments once the node is setup pod infra containers oom-score-adj should be -998 and best effort container's should be 1000,timothysc,1
 Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,rkouj,0
 Kubelet Volume Manager Volume Manager On terminatation of pod with memory backed volume should remove the volume from the node,rkouj,0
+Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,derekwaynecarr,0
+Kubelet Volume Manager Volume Manager On terminatation of pod with memory backed volume should remove the volume from the node,vladimirvivien,0
 Kubelet experimental resource usage tracking resource tracking for * pods per node,yujuhong,0
 Kubelet regular resource usage tracking resource tracking for * pods per node,yujuhong,0
 Kubelet when scheduling a busybox command in a pod it should print the output to logs,ixdy,1
@@ -291,6 +287,8 @@ Kubernetes Dashboard should check that the kubernetes-dashboard instance is aliv
 LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied.,cjcullen,1
 Liveness liveness pods should be automatically restarted,derekwaynecarr,0
 Load capacity should be able to handle * pods per node * with * secrets,brendandburns,0
+Load capacity should be able to handle * pods per node * with * secrets,derekwaynecarr,0
+Load capacity should be able to handle * pods per node * with * secrets,vladimirvivien,0
 Loadbalancing: L7 GCE shoud create ingress with given static-ip,derekwaynecarr,0
 Loadbalancing: L7 GCE should conform to Ingress spec,derekwaynecarr,0
 Loadbalancing: L7 Nginx should conform to Ingress spec,ncdc,1
@@ -319,6 +317,8 @@ Network Partition should come back up if node goes down,foxish,0
 Network Partition should create new pods when node is partitioned,foxish,0
 Network Partition should eagerly create replacement pod during network partition when termination grace is non-zero,foxish,0
 Network Partition should not reschedule stateful pods if there is a network partition,brendandburns,0
+Network Partition should not reschedule stateful pods if there is a network partition,foxish,0
+Network Partition should not reschedule stateful pods if there is a network partition,vladimirvivien,0
 Network should set TCP CLOSE_WAIT timeout,bowei,0
 Networking Granular Checks: Pods should function for intra-pod communication: http,stts,0
 Networking Granular Checks: Pods should function for intra-pod communication: udp,freehan,0
@@ -488,6 +488,11 @@ StatefulSet Basic StatefulSet functionality should allow template updates,rkouj,
 StatefulSet Basic StatefulSet functionality should handle healthy stateful pod restarts during scale,kevin-wangzefeng,1
 StatefulSet Basic StatefulSet functionality should provide basic identity,bprashanth,1
 StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,rkouj,0
+StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any stateful pod is unhealthy,vladimirvivien,0
+StatefulSet Basic StatefulSet functionality should allow template updates,vladimirvivien,0
+StatefulSet Basic StatefulSet functionality should handle healthy stateful pod restarts during scale,vladimirvivien,0
+StatefulSet Basic StatefulSet functionality should provide basic identity,bprashanth,1
+StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,vladimirvivien,0
 StatefulSet Deploy clustered applications should creating a working mysql cluster,yujuhong,1
 StatefulSet Deploy clustered applications should creating a working redis cluster,yifan-gu,1
 StatefulSet Deploy clustered applications should creating a working zookeeper cluster,pmorie,1
@@ -529,6 +534,8 @@ k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
 k8s.io/kubernetes/cmd/kubelet/app,derekwaynecarr,0
 k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver,brendandburns,0
+k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver,deads2k,0
+k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver,vladimirvivien,0
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1
@@ -540,6 +547,8 @@ k8s.io/kubernetes/federation/cmd/federation-controller-manager/app,kzwang,0
 k8s.io/kubernetes/federation/pkg/dnsprovider,sttts,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53,cjcullen,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns,brendandburns,0
+k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns,quinton-hoole,0
+k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns,vladimirvivien,0
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,jsafrane,1
 k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0
 k8s.io/kubernetes/federation/pkg/federation-controller/configmap,mwielgus,0
@@ -673,6 +682,11 @@ k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
 k8s.io/kubernetes/pkg/dns,rkouj,0
 k8s.io/kubernetes/pkg/dns/config,rkouj,0
 k8s.io/kubernetes/pkg/dns/federation,rkouj,0
+k8s.io/kubernetes/pkg/credentialprovider/azure,vladimirvivien,0
+k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
+k8s.io/kubernetes/pkg/dns,derekwaynecarr,0
+k8s.io/kubernetes/pkg/dns/config,vladimirvivien,0
+k8s.io/kubernetes/pkg/dns/federation,vladimirvivien,0
 k8s.io/kubernetes/pkg/dns/treecache,bowei,0
 k8s.io/kubernetes/pkg/fieldpath,childsb,1
 k8s.io/kubernetes/pkg/fields,jsafrane,1
@@ -978,6 +992,8 @@ k8s.io/kubernetes/test/integration/client,Q-Lee,1
 k8s.io/kubernetes/test/integration/configmap,Q-Lee,1
 k8s.io/kubernetes/test/integration/discoverysummarizer,fabioy,1
 k8s.io/kubernetes/test/integration/evictions,brendandburns,0
+k8s.io/kubernetes/test/integration/evictions,wojtek-t,1
+k8s.io/kubernetes/test/integration/evictions,vladimirvivien,0
 k8s.io/kubernetes/test/integration/examples,maisem,1
 k8s.io/kubernetes/test/integration/federation,rrati,0
 k8s.io/kubernetes/test/integration/garbagecollector,jlowdermilk,1
