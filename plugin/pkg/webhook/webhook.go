@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -38,7 +39,7 @@ type GenericWebhook struct {
 	initialBackoff time.Duration
 }
 
-// New creates a new GenericWebhook from the provided kubeconfig file.
+// NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
 func NewGenericWebhook(kubeConfigFile string, groupVersions []unversioned.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
 		if !registered.IsEnabledVersion(groupVersion) {
@@ -55,10 +56,7 @@ func NewGenericWebhook(kubeConfigFile string, groupVersions []unversioned.GroupV
 		return nil, err
 	}
 	codec := api.Codecs.LegacyCodec(groupVersions...)
-	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(
-		runtime.SerializerInfo{Serializer: codec},
-		runtime.StreamSerializerInfo{},
-	)
+	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
 	restClient, err := restclient.UnversionedRESTClientFor(clientConfig)
 	if err != nil {
@@ -70,28 +68,40 @@ func NewGenericWebhook(kubeConfigFile string, groupVersions []unversioned.GroupV
 	return &GenericWebhook{restClient, initialBackoff}, nil
 }
 
-// WithExponentialBackoff will retry webhookFn 5 times w/ exponentially
-// increasing backoff when a 429 or a 5xx response code is returned.
+// WithExponentialBackoff will retry webhookFn() up to 5 times with exponentially increasing backoff when
+// it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
 func (g *GenericWebhook) WithExponentialBackoff(webhookFn func() restclient.Result) restclient.Result {
+	var result restclient.Result
+	WithExponentialBackoff(g.initialBackoff, func() error {
+		result = webhookFn()
+		return result.Error()
+	})
+	return result
+}
+
+// WithExponentialBackoff will retry webhookFn() up to 5 times with exponentially increasing backoff when
+// it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
+func WithExponentialBackoff(initialBackoff time.Duration, webhookFn func() error) error {
 	backoff := wait.Backoff{
-		Duration: g.initialBackoff,
+		Duration: initialBackoff,
 		Factor:   1.5,
 		Jitter:   0.2,
 		Steps:    5,
 	}
-	var result restclient.Result
+
+	var err error
 	wait.ExponentialBackoff(backoff, func() (bool, error) {
-		result = webhookFn()
-		// Return from Request.Do() errors immediately.
-		if err := result.Error(); err != nil {
-			return false, err
-		}
-		// Retry 429s, and 5xxs.
-		var statusCode int
-		if result.StatusCode(&statusCode); statusCode == 429 || statusCode >= 500 {
+		err = webhookFn()
+		if _, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
 			return false, nil
+		}
+		if apierrors.IsInternalError(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
 		}
 		return true, nil
 	})
-	return result
+	return err
 }

@@ -18,6 +18,7 @@ package kubectl
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -30,20 +31,22 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 type describeClient struct {
 	T         *testing.T
 	Namespace string
 	Err       error
-	client.Interface
+	internalclientset.Interface
 }
 
 func TestDescribePod(t *testing.T) {
-	fake := testclient.NewSimpleFake(&api.Pod{
+	fake := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -60,8 +63,50 @@ func TestDescribePod(t *testing.T) {
 	}
 }
 
+func TestDescribePodTolerations(t *testing.T) {
+
+	podTolerations := []api.Toleration{{Key: "key1", Value: "value1"},
+		{Key: "key2", Value: "value2"}}
+	pt, _ := json.Marshal(podTolerations)
+	fake := fake.NewSimpleClientset(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+			Annotations: map[string]string{
+				api.TolerationsAnnotationKey: string(pt),
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "key1=value1") || !strings.Contains(out, "key2=value2") || !strings.Contains(out, "Tolerations:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeNamespace(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name: "myns",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := NamespaceDescriber{c}
+	out, err := d.Describe("", "myns", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "myns") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeService(t *testing.T) {
-	fake := testclient.NewSimpleFake(&api.Service{
+	fake := fake.NewSimpleClientset(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -80,34 +125,40 @@ func TestDescribeService(t *testing.T) {
 
 func TestPodDescribeResultsSorted(t *testing.T) {
 	// Arrange
-	fake := testclient.NewSimpleFake(&api.EventList{
-		Items: []api.Event{
-			{
-				Source:         api.EventSource{Component: "kubelet"},
-				Message:        "Item 1",
-				FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-				Count:          1,
-				Type:           api.EventTypeNormal,
-			},
-			{
-				Source:         api.EventSource{Component: "scheduler"},
-				Message:        "Item 2",
-				FirstTimestamp: unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
-				Count:          1,
-				Type:           api.EventTypeNormal,
-			},
-			{
-				Source:         api.EventSource{Component: "kubelet"},
-				Message:        "Item 3",
-				FirstTimestamp: unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
-				Count:          1,
-				Type:           api.EventTypeNormal,
+	fake := fake.NewSimpleClientset(
+		&api.EventList{
+			Items: []api.Event{
+				{
+					ObjectMeta:     api.ObjectMeta{Name: "one"},
+					Source:         api.EventSource{Component: "kubelet"},
+					Message:        "Item 1",
+					FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           api.EventTypeNormal,
+				},
+				{
+					ObjectMeta:     api.ObjectMeta{Name: "two"},
+					Source:         api.EventSource{Component: "scheduler"},
+					Message:        "Item 2",
+					FirstTimestamp: unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           api.EventTypeNormal,
+				},
+				{
+					ObjectMeta:     api.ObjectMeta{Name: "three"},
+					Source:         api.EventSource{Component: "kubelet"},
+					Message:        "Item 3",
+					FirstTimestamp: unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           api.EventTypeNormal,
+				},
 			},
 		},
-	})
+		&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"}},
+	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
 
@@ -119,6 +170,30 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "\t" /* columnDelimiter */, t)
+}
+
+// VerifyDatesInOrder checks the start of each line for a RFC1123Z date
+// and posts error if all subsequent dates are not equal or increasing
+func VerifyDatesInOrder(
+	resultToTest, rowDelimiter, columnDelimiter string, t *testing.T) {
+	lines := strings.Split(resultToTest, rowDelimiter)
+	var previousTime time.Time
+	for _, str := range lines {
+		columns := strings.Split(str, columnDelimiter)
+		if len(columns) > 0 {
+			currentTime, err := time.Parse(time.RFC1123Z, columns[0])
+			if err == nil {
+				if previousTime.After(currentTime) {
+					t.Errorf(
+						"Output is not sorted by time. %s should be listed after %s. Complete output: %s",
+						previousTime.Format(time.RFC1123Z),
+						currentTime.Format(time.RFC1123Z),
+						resultToTest)
+				}
+				previousTime = currentTime
+			}
+		}
+	}
 }
 
 func TestDescribeContainers(t *testing.T) {
@@ -456,6 +531,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 	tests := map[string]*api.PersistentVolume{
 
 		"hostpath": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{},
@@ -463,6 +539,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 		},
 		"gce": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -470,6 +547,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 		},
 		"ebs": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
@@ -477,6 +555,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 		},
 		"nfs": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					NFS: &api.NFSVolumeSource{},
@@ -484,6 +563,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 		},
 		"iscsi": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					ISCSI: &api.ISCSIVolumeSource{},
@@ -491,6 +571,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 		},
 		"gluster": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					Glusterfs: &api.GlusterfsVolumeSource{},
@@ -498,16 +579,33 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 		},
 		"rbd": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					RBD: &api.RBDVolumeSource{},
 				},
 			},
 		},
+		"quobyte": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Quobyte: &api.QuobyteVolumeSource{},
+				},
+			},
+		},
+		"cinder": {
+			ObjectMeta: api.ObjectMeta{Name: "bar"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Cinder: &api.CinderVolumeSource{},
+				},
+			},
+		},
 	}
 
 	for name, pv := range tests {
-		fake := testclient.NewSimpleFake(pv)
+		fake := fake.NewSimpleClientset(pv)
 		c := PersistentVolumeDescriber{fake}
 		str, err := c.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 		if err != nil {
@@ -573,6 +671,55 @@ func TestDescribeCluster(t *testing.T) {
 	}
 }
 
+func TestDescribeStorageClass(t *testing.T) {
+	f := fake.NewSimpleClientset(&storage.StorageClass{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "4",
+			Annotations: map[string]string{
+				"name": "foo",
+			},
+		},
+		Provisioner: "my-provisioner",
+		Parameters: map[string]string{
+			"param1": "value1",
+			"param2": "value2",
+		},
+	})
+	s := StorageClassDescriber{f}
+	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodDisruptionBudget(t *testing.T) {
+	f := fake.NewSimpleClientset(&policy.PodDisruptionBudget{
+		ObjectMeta: api.ObjectMeta{
+			Namespace:         "ns1",
+			Name:              "pdb1",
+			CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable: intstr.FromInt(22),
+		},
+		Status: policy.PodDisruptionBudgetStatus{
+			PodDisruptionsAllowed: 5,
+		},
+	})
+	s := PodDisruptionBudgetDescriber{f}
+	out, err := s.Describe("ns1", "pdb1", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "pdb1") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeEvents(t *testing.T) {
 
 	events := &api.EventList{
@@ -593,7 +740,7 @@ func TestDescribeEvents(t *testing.T) {
 
 	m := map[string]Describer{
 		"DaemonSetDescriber": &DaemonSetDescriber{
-			testclient.NewSimpleFake(&extensions.DaemonSet{
+			fake.NewSimpleClientset(&extensions.DaemonSet{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -609,7 +756,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"EndpointsDescriber": &EndpointsDescriber{
-			testclient.NewSimpleFake(&api.Endpoints{
+			fake.NewSimpleClientset(&api.Endpoints{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -621,25 +768,23 @@ func TestDescribeEvents(t *testing.T) {
 		// - IngressDescriber
 		// - JobDescriber
 		"NodeDescriber": &NodeDescriber{
-			testclient.NewSimpleFake(&api.Node{
+			fake.NewSimpleClientset(&api.Node{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "bar",
-					Namespace: "foo",
-					SelfLink:  "url/url/url",
+					Name:     "bar",
+					SelfLink: "url/url/url",
 				},
 			}, events),
 		},
 		"PersistentVolumeDescriber": &PersistentVolumeDescriber{
-			testclient.NewSimpleFake(&api.PersistentVolume{
+			fake.NewSimpleClientset(&api.PersistentVolume{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "bar",
-					Namespace: "foo",
-					SelfLink:  "url/url/url",
+					Name:     "bar",
+					SelfLink: "url/url/url",
 				},
 			}, events),
 		},
 		"PodDescriber": &PodDescriber{
-			testclient.NewSimpleFake(&api.Pod{
+			fake.NewSimpleClientset(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -648,7 +793,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"ReplicaSetDescriber": &ReplicaSetDescriber{
-			testclient.NewSimpleFake(&extensions.ReplicaSet{
+			fake.NewSimpleClientset(&extensions.ReplicaSet{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -656,7 +801,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"ReplicationControllerDescriber": &ReplicationControllerDescriber{
-			testclient.NewSimpleFake(&api.ReplicationController{
+			fake.NewSimpleClientset(&api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -664,10 +809,17 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"Service": &ServiceDescriber{
-			testclient.NewSimpleFake(&api.Service{
+			fake.NewSimpleClientset(&api.Service{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
+				},
+			}, events),
+		},
+		"StorageClass": &StorageClassDescriber{
+			fake.NewSimpleClientset(&storage.StorageClass{
+				ObjectMeta: api.ObjectMeta{
+					Name: "bar",
 				},
 			}, events),
 		},

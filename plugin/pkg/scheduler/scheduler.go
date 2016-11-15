@@ -16,9 +16,6 @@ limitations under the License.
 
 package scheduler
 
-// Note: if you change code in this file, you might need to change code in
-// contrib/mesos/pkg/scheduler/.
-
 import (
 	"time"
 
@@ -93,17 +90,17 @@ func (s *Scheduler) Run() {
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
 
-	glog.V(3).Infof("Attempting to schedule: %+v", pod)
+	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 	start := time.Now()
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister)
 	if err != nil {
-		glog.V(1).Infof("Failed to schedule: %+v", pod)
+		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
 		s.config.Error(pod, err)
 		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
 		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
 			Type:   api.PodScheduled,
 			Status: api.ConditionFalse,
-			Reason: "Unschedulable",
+			Reason: api.PodReasonUnschedulable,
 		})
 		return
 	}
@@ -111,12 +108,8 @@ func (s *Scheduler) scheduleOne() {
 
 	// Optimistically assume that the binding will succeed and send it to apiserver
 	// in the background.
-	// The only risk in this approach is that if the binding fails because of some
-	// reason, scheduler will be assuming that it succeeded while scheduling next
-	// pods, until the assumption in the internal cache expire (expiration is
-	// defined as "didn't read the binding via watch within a given timeout",
-	// timeout is currently set to 30s). However, after this timeout, the situation
-	// will self-repair.
+	// If the binding fails, scheduler will release resources allocated to assumed pod
+	// immediately.
 	assumed := *pod
 	assumed.Spec.NodeName = dest
 	if err := s.config.SchedulerCache.AssumePod(&assumed); err != nil {
@@ -140,6 +133,9 @@ func (s *Scheduler) scheduleOne() {
 		err := s.config.Binder.Bind(b)
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %v/%v", pod.Namespace, pod.Name)
+			if err := s.config.SchedulerCache.ForgetPod(&assumed); err != nil {
+				glog.Errorf("scheduler cache ForgetPod failed: %v", err)
+			}
 			s.config.Error(pod, err)
 			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.PodConditionUpdater.Update(pod, &api.PodCondition{

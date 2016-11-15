@@ -31,6 +31,7 @@ import (
 const volumeAvailableStatus = "available"
 const volumeInUseStatus = "in-use"
 const volumeCreateTimeoutSeconds = 30
+const testClusterName = "testCluster"
 
 func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string, timeoutSeconds int) {
 	timeout := timeoutSeconds
@@ -75,6 +76,8 @@ func TestReadConfig(t *testing.T) {
  monitor-delay = 1m
  monitor-timeout = 30s
  monitor-max-retries = 3
+ [BlockStorage]
+ trust-device-path = yes
  `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -94,6 +97,9 @@ func TestReadConfig(t *testing.T) {
 	}
 	if cfg.LoadBalancer.MonitorMaxRetries != 3 {
 		t.Errorf("incorrect lb.monitormaxretries: %d", cfg.LoadBalancer.MonitorMaxRetries)
+	}
+	if cfg.BlockStorage.TrustDevicePath != true {
+		t.Errorf("incorrect bs.trustdevicepath: %v", cfg.BlockStorage.TrustDevicePath)
 	}
 }
 
@@ -204,54 +210,36 @@ func TestLoadBalancer(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	cfg.LoadBalancer.LBVersion = "v2"
+	versions := []string{"v1", "v2", ""}
 
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
+	for _, v := range versions {
+		t.Logf("Trying LBVersion = '%s'\n", v)
+		cfg.LoadBalancer.LBVersion = v
 
-	lb, ok := os.LoadBalancer()
-	if !ok {
-		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
-	}
+		os, err := newOpenStack(cfg)
+		if err != nil {
+			t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+		}
 
-	_, exists, err := lb.GetLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
-	if err != nil {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
-	}
-	if exists {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
-	}
-}
+		lb, ok := os.LoadBalancer()
+		if !ok {
+			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
+		}
 
-func TestLoadBalancerV2(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
-		t.Skipf("No config found in environment")
-	}
-	cfg.LoadBalancer.LBVersion = "v2"
-
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
-
-	lbaas, ok := os.LoadBalancer()
-	if !ok {
-		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
-	}
-
-	_, exists, err := lbaas.GetLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
-	if err != nil {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
-	}
-	if exists {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
+		_, exists, err := lb.GetLoadBalancer(testClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
+		if err != nil {
+			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
+		}
+		if exists {
+			t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
+		}
 	}
 }
 
 func TestZones(t *testing.T) {
+	SetMetadataFixture(&FakeMetadata)
+	defer ClearMetadata()
+
 	os := OpenStack{
 		provider: &gophercloud.ProviderClient{
 			IdentityBase: "http://auth.url/",
@@ -272,6 +260,10 @@ func TestZones(t *testing.T) {
 	if zone.Region != "myRegion" {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
 	}
+
+	if zone.FailureDomain != "nova" {
+		t.Fatalf("GetZone() returned wrong failure domain (%s)", zone.FailureDomain)
+	}
 }
 
 func TestVolumes(t *testing.T) {
@@ -288,7 +280,7 @@ func TestVolumes(t *testing.T) {
 	tags := map[string]string{
 		"test": "value",
 	}
-	vol, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, &tags)
+	vol, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, "", "", &tags)
 	if err != nil {
 		t.Fatalf("Cannot create a new Cinder volume: %v", err)
 	}
@@ -303,6 +295,12 @@ func TestVolumes(t *testing.T) {
 	t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
 
 	WaitForVolumeStatus(t, os, vol, volumeInUseStatus, volumeCreateTimeoutSeconds)
+
+	devicePath := os.GetDevicePath(diskId)
+	if !strings.HasPrefix(devicePath, "/dev/disk/by-id/") {
+		t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
+	}
+	t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
 
 	err = os.DetachDisk(os.localInstanceID, vol)
 	if err != nil {

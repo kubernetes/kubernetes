@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -30,11 +30,11 @@ import (
 
 var _ = framework.KubeDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
-	var c *client.Client
+	var c clientset.Interface
 	var grabber *metrics.MetricsGrabber
 	BeforeEach(func() {
 		var err error
-		c = f.Client
+		c = f.ClientSet
 		framework.ExpectNoError(err)
 		grabber, err = metrics.NewMetricsGrabber(c, true, true, true, true)
 		framework.ExpectNoError(err)
@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 
 	It("should grab all metrics from a Kubelet.", func() {
 		By("Proxying to Node through the API server")
-		nodes := framework.GetReadySchedulableNodesOrDie(c)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(nodes.Items).NotTo(BeEmpty())
 		response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
 		framework.ExpectNoError(err)
@@ -59,7 +59,7 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 	It("should grab all metrics from a Scheduler.", func() {
 		By("Proxying to Pod through the API server")
 		// Check if master Node is registered
-		nodes, err := c.Nodes().List(api.ListOptions{})
+		nodes, err := c.Core().Nodes().List(api.ListOptions{})
 		framework.ExpectNoError(err)
 
 		var masterRegistered = false
@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 	It("should grab all metrics from a ControllerManager.", func() {
 		By("Proxying to Pod through the API server")
 		// Check if master Node is registered
-		nodes, err := c.Nodes().List(api.ListOptions{})
+		nodes, err := c.Core().Nodes().List(api.ListOptions{})
 		framework.ExpectNoError(err)
 
 		var masterRegistered = false

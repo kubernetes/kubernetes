@@ -17,10 +17,23 @@
 function start()
 {
 
+    unset gid
+    # accept "-G gid" option
+    while getopts "G:" opt; do
+        case ${opt} in
+            G) gid=${OPTARG};;
+        esac
+    done
+    shift $(($OPTIND - 1))
+
     # prepare /etc/exports
     for i in "$@"; do
         # fsid=0: needed for NFSv4
         echo "$i *(rw,fsid=0,insecure,no_root_squash)" >> /etc/exports
+        if [ -v gid ] ; then
+            chmod 070 $i
+            chgrp $gid $i
+        fi
         # move index.html to here
         /bin/cp /tmp/index.html $i/
         chmod 644 $i/index.html
@@ -36,13 +49,12 @@ function start()
 
     mount -t nfsd nfds /proc/fs/nfsd
 
-    # -N 4.x: disable NFSv4
     # -V 3: enable NFSv3
-    /usr/sbin/rpc.mountd -N 2 -V 3 -N 4 -N 4.1
+    /usr/sbin/rpc.mountd -N 2 -V 3
 
     /usr/sbin/exportfs -r
     # -G 10 to reduce grace time to 10 seconds (the lowest allowed)
-    /usr/sbin/rpc.nfsd -G 10 -N 2 -V 3 -N 4 -N 4.1 2
+    /usr/sbin/rpc.nfsd -G 10 -N 2 -V 3
     /usr/sbin/rpc.statd --no-notify
     echo "NFS started"
 }

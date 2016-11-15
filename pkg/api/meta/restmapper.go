@@ -183,17 +183,17 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, e
 		if !ok {
 			continue
 		}
-		if singular.IsEmpty() {
+		if singular.Empty() {
 			singular = currSingular
 			continue
 		}
 
 		if currSingular.Resource != singular.Resource {
-			return resourceType, fmt.Errorf("multiple possibile singular resources (%v) found for %v", resources, resourceType)
+			return resourceType, fmt.Errorf("multiple possible singular resources (%v) found for %v", resources, resourceType)
 		}
 	}
 
-	if singular.IsEmpty() {
+	if singular.Empty() {
 		return resourceType, fmt.Errorf("no singular of resource %v has been defined", resourceType)
 	}
 
@@ -223,8 +223,8 @@ func (m *DefaultRESTMapper) ResourcesFor(input unversioned.GroupVersionResource)
 
 	ret := []unversioned.GroupVersionResource{}
 	switch {
-	// fully qualified.  Find the exact match
 	case hasGroup && hasVersion:
+		// fully qualified.  Find the exact match
 		for plural, singular := range m.pluralToSingular {
 			if singular == resource {
 				ret = append(ret, plural)
@@ -237,14 +237,35 @@ func (m *DefaultRESTMapper) ResourcesFor(input unversioned.GroupVersionResource)
 		}
 
 	case hasGroup:
+		// given a group, prefer an exact match.  If you don't find one, resort to a prefix match on group
+		foundExactMatch := false
 		requestedGroupResource := resource.GroupResource()
 		for plural, singular := range m.pluralToSingular {
 			if singular.GroupResource() == requestedGroupResource {
+				foundExactMatch = true
 				ret = append(ret, plural)
 			}
 			if plural.GroupResource() == requestedGroupResource {
+				foundExactMatch = true
 				ret = append(ret, plural)
 			}
+		}
+
+		// if you didn't find an exact match, match on group prefixing. This allows storageclass.storage to match
+		// storageclass.storage.k8s.io
+		if !foundExactMatch {
+			for plural, singular := range m.pluralToSingular {
+				if !strings.HasPrefix(plural.Group, requestedGroupResource.Group) {
+					continue
+				}
+				if singular.Resource == requestedGroupResource.Resource {
+					ret = append(ret, plural)
+				}
+				if plural.Resource == requestedGroupResource.Resource {
+					ret = append(ret, plural)
+				}
+			}
+
 		}
 
 	case hasVersion:
@@ -309,11 +330,27 @@ func (m *DefaultRESTMapper) KindsFor(input unversioned.GroupVersionResource) ([]
 		}
 
 	case hasGroup:
+		foundExactMatch := false
 		requestedGroupResource := resource.GroupResource()
 		for currResource, currKind := range m.resourceToKind {
 			if currResource.GroupResource() == requestedGroupResource {
+				foundExactMatch = true
 				ret = append(ret, currKind)
 			}
+		}
+
+		// if you didn't find an exact match, match on group prefixing. This allows storageclass.storage to match
+		// storageclass.storage.k8s.io
+		if !foundExactMatch {
+			for currResource, currKind := range m.resourceToKind {
+				if !strings.HasPrefix(currResource.Group, requestedGroupResource.Group) {
+					continue
+				}
+				if currResource.Resource == requestedGroupResource.Resource {
+					ret = append(ret, currKind)
+				}
+			}
+
 		}
 
 	case hasVersion:
@@ -431,6 +468,7 @@ func (o resourceByPreferredGroupVersion) Less(i, j int) bool {
 // RESTClient should use to operate on the provided group/kind in order of versions. If a version search
 // order is not provided, the search order provided to DefaultRESTMapper will be used to resolve which
 // version should be used to access the named group/kind.
+// TODO: consider refactoring to use RESTMappings in a way that preserves version ordering and preference
 func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error) {
 	// Pick an appropriate version
 	var gvk *unversioned.GroupVersionKind
@@ -462,7 +500,7 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 		}
 	}
 	if gvk == nil {
-		return nil, fmt.Errorf("no kind named %q is registered in versions %q", gk, versions)
+		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
 	}
 
 	// Ensure we have a REST mapping
@@ -488,7 +526,7 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 
 	interfaces, err := m.interfacesFunc(gvk.GroupVersion())
 	if err != nil {
-		return nil, fmt.Errorf("the provided version %q has no relevant versions", gvk.GroupVersion().String())
+		return nil, fmt.Errorf("the provided version %q has no relevant versions: %v", gvk.GroupVersion().String(), err)
 	}
 
 	retVal := &RESTMapping{
@@ -501,6 +539,49 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 	}
 
 	return retVal, nil
+}
+
+// RESTMappings returns the RESTMappings for the provided group kind in a rough internal preferred order. If no
+// kind is found it will return a NoResourceMatchError.
+func (m *DefaultRESTMapper) RESTMappings(gk unversioned.GroupKind) ([]*RESTMapping, error) {
+	// Use the default preferred versions
+	var mappings []*RESTMapping
+	for _, gv := range m.defaultGroupVersions {
+		if gv.Group != gk.Group {
+			continue
+		}
+
+		gvk := gk.WithVersion(gv.Version)
+		gvr, ok := m.kindToPluralResource[gvk]
+		if !ok {
+			continue
+		}
+
+		// Ensure we have a REST scope
+		scope, ok := m.kindToScope[gvk]
+		if !ok {
+			return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", gvk.GroupVersion(), gvk.Kind)
+		}
+
+		interfaces, err := m.interfacesFunc(gvk.GroupVersion())
+		if err != nil {
+			return nil, fmt.Errorf("the provided version %q has no relevant versions: %v", gvk.GroupVersion().String(), err)
+		}
+
+		mappings = append(mappings, &RESTMapping{
+			Resource:         gvr.Resource,
+			GroupVersionKind: gvk,
+			Scope:            scope,
+
+			ObjectConvertor:  interfaces.ObjectConvertor,
+			MetadataAccessor: interfaces.MetadataAccessor,
+		})
+	}
+
+	if len(mappings) == 0 {
+		return nil, &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: gk.Group, Resource: gk.Kind}}
+	}
+	return mappings, nil
 }
 
 // AddResourceAlias maps aliases to resources

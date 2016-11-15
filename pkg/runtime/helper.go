@@ -35,7 +35,7 @@ var _ ObjectConvertor = unsafeObjectConvertor{}
 
 // ConvertToVersion converts in to the provided outVersion without copying the input first, which
 // is only safe if the output object is not mutated or reused.
-func (c unsafeObjectConvertor) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
+func (c unsafeObjectConvertor) ConvertToVersion(in Object, outVersion GroupVersioner) (Object, error) {
 	return c.Scheme.UnsafeConvertToVersion(in, outVersion)
 }
 

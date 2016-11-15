@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package federation_controller contains code for controllers (like the cluster
 // controller).
-package federation_controller
+package federation_controller // import "k8s.io/kubernetes/federation/pkg/federation-controller"

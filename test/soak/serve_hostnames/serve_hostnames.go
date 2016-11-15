@@ -33,7 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -82,14 +83,14 @@ func main() {
 		glog.Fatalf("Failed to construct config: %v", err)
 	}
 
-	c, err := client.New(config)
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
 
 	var nodes *api.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = c.Nodes().List(api.ListOptions{})
+		nodes, err = client.Nodes().List(api.ListOptions{})
 		if err == nil {
 			break
 		}
@@ -111,18 +112,18 @@ func main() {
 	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
 
 	// Create the namespace
-	got, err := c.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{GenerateName: "serve-hostnames-"}})
+	got, err := client.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{GenerateName: "serve-hostnames-"}})
 	if err != nil {
 		glog.Fatalf("Failed to create namespace: %v", err)
 	}
 	ns := got.Name
 	defer func(ns string) {
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := client.Core().Namespaces().Delete(ns, nil); err != nil {
 			glog.Warningf("Failed to delete namespace ns: %e", ns, err)
 		} else {
 			// wait until the namespace disappears
 			for i := 0; i < int(namespaceDeleteTimeout/time.Second); i++ {
-				if _, err := c.Namespaces().Get(ns); err != nil {
+				if _, err := client.Namespaces().Get(ns); err != nil {
 					if errors.IsNotFound(err) {
 						return
 					}
@@ -139,7 +140,7 @@ func main() {
 	var svc *api.Service
 	for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(2 * time.Second) {
 		t := time.Now()
-		svc, err = c.Services(ns).Create(&api.Service{
+		svc, err = client.Services(ns).Create(&api.Service{
 			ObjectMeta: api.ObjectMeta{
 				Name: "serve-hostnames",
 				Labels: map[string]string{
@@ -172,7 +173,7 @@ func main() {
 		glog.Infof("Cleaning up service %s/serve-hostnames", ns)
 		// Make several attempts to delete the service.
 		for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-			if err := c.Services(ns).Delete(svc.Name); err == nil {
+			if err := client.Services(ns).Delete(svc.Name, nil); err == nil {
 				return
 			}
 			glog.Warningf("After %v unable to delete service %s/%s: %v", time.Since(start), ns, svc.Name, err)
@@ -189,7 +190,7 @@ func main() {
 			for start := time.Now(); time.Since(start) < podCreateTimeout; time.Sleep(2 * time.Second) {
 				glog.Infof("Creating pod %s/%s on node %s", ns, podName, node.Name)
 				t := time.Now()
-				_, err = c.Pods(ns).Create(&api.Pod{
+				_, err = client.Pods(ns).Create(&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name: podName,
 						Labels: map[string]string{
@@ -225,7 +226,7 @@ func main() {
 		// Make several attempts to delete the pods.
 		for _, podName := range podNames {
 			for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-				if err = c.Pods(ns).Delete(podName, nil); err == nil {
+				if err = client.Pods(ns).Delete(podName, nil); err == nil {
 					break
 				}
 				glog.Warningf("After %v failed to delete pod %s/%s: %v", time.Since(start), ns, podName, err)
@@ -237,7 +238,7 @@ func main() {
 	for _, podName := range podNames {
 		var pod *api.Pod
 		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-			pod, err = c.Pods(ns).Get(podName)
+			pod, err = client.Pods(ns).Get(podName)
 			if err != nil {
 				glog.Warningf("Get pod %s/%s failed, ignoring for %v: %v", ns, podName, err, podStartTimeout)
 				continue
@@ -253,7 +254,12 @@ func main() {
 		}
 	}
 
-	proxyRequest, errProxy := e2e.GetServicesProxyRequest(c, c.Get())
+	rclient, err := restclient.RESTClientFor(config)
+	if err != nil {
+		glog.Warningf("Failed to build restclient: %v", err)
+		return
+	}
+	proxyRequest, errProxy := e2e.GetServicesProxyRequest(client, rclient.Get())
 	if errProxy != nil {
 		glog.Warningf("Get services proxy request failed: %v", errProxy)
 		return

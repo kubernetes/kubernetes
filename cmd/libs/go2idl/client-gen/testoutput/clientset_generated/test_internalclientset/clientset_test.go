@@ -35,7 +35,7 @@ func ClientSetRateLimiterTest(t *testing.T) {
 	if err != nil {
 		t.Errorf("creating clientset for config %v failed: %v", config, err)
 	}
-	testGroupThrottler := clientSet.Testgroup().GetRESTClient().GetRateLimiter()
+	testGroupThrottler := clientSet.Testgroup().RESTClient().GetRateLimiter()
 
 	if rateLimiter != testGroupThrottler {
 		t.Errorf("Clients in client set should use rateLimiter passed in config:\noriginal: %v\ntestGroup: %v", rateLimiter, testGroupThrottler)

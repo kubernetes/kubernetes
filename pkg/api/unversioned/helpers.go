@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/selection"
 )
 
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
@@ -35,31 +35,60 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	}
 	selector := labels.NewSelector()
 	for k, v := range ps.MatchLabels {
-		r, err := labels.NewRequirement(k, labels.EqualsOperator, sets.NewString(v))
+		r, err := labels.NewRequirement(k, selection.Equals, []string{v})
 		if err != nil {
 			return nil, err
 		}
 		selector = selector.Add(*r)
 	}
 	for _, expr := range ps.MatchExpressions {
-		var op labels.Operator
+		var op selection.Operator
 		switch expr.Operator {
 		case LabelSelectorOpIn:
-			op = labels.InOperator
+			op = selection.In
 		case LabelSelectorOpNotIn:
-			op = labels.NotInOperator
+			op = selection.NotIn
 		case LabelSelectorOpExists:
-			op = labels.ExistsOperator
+			op = selection.Exists
 		case LabelSelectorOpDoesNotExist:
-			op = labels.DoesNotExistOperator
+			op = selection.DoesNotExist
 		default:
 			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
 		}
-		r, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
+		r, err := labels.NewRequirement(expr.Key, op, append([]string(nil), expr.Values...))
 		if err != nil {
 			return nil, err
 		}
 		selector = selector.Add(*r)
+	}
+	return selector, nil
+}
+
+// LabelSelectorAsMap converts the LabelSelector api type into a map of strings, ie. the
+// original structure of a label selector. Operators that cannot be converted into plain
+// labels (Exists, DoesNotExist, NotIn, and In with more than one value) will result in
+// an error.
+func LabelSelectorAsMap(ps *LabelSelector) (map[string]string, error) {
+	if ps == nil {
+		return nil, nil
+	}
+	selector := map[string]string{}
+	for k, v := range ps.MatchLabels {
+		selector[k] = v
+	}
+	for _, expr := range ps.MatchExpressions {
+		switch expr.Operator {
+		case LabelSelectorOpIn:
+			if len(expr.Values) != 1 {
+				return selector, fmt.Errorf("operator %q without a single value cannot be converted into the old label selector format", expr.Operator)
+			}
+			// Should we do anything in case this will override a previous key-value pair?
+			selector[expr.Key] = expr.Values[0]
+		case LabelSelectorOpNotIn, LabelSelectorOpExists, LabelSelectorOpDoesNotExist:
+			return selector, fmt.Errorf("operator %q cannot be converted into the old label selector format", expr.Operator)
+		default:
+			return selector, fmt.Errorf("%q is not a valid selector operator", expr.Operator)
+		}
 	}
 	return selector, nil
 }
@@ -79,7 +108,7 @@ func ParseToLabelSelector(selector string) (*LabelSelector, error) {
 	for _, req := range reqs {
 		var op LabelSelectorOperator
 		switch req.Operator() {
-		case labels.EqualsOperator, labels.DoubleEqualsOperator:
+		case selection.Equals, selection.DoubleEquals:
 			vals := req.Values()
 			if vals.Len() != 1 {
 				return nil, fmt.Errorf("equals operator must have exactly one value")
@@ -90,15 +119,15 @@ func ParseToLabelSelector(selector string) (*LabelSelector, error) {
 			}
 			labelSelector.MatchLabels[req.Key()] = val
 			continue
-		case labels.InOperator:
+		case selection.In:
 			op = LabelSelectorOpIn
-		case labels.NotInOperator:
+		case selection.NotIn:
 			op = LabelSelectorOpNotIn
-		case labels.ExistsOperator:
+		case selection.Exists:
 			op = LabelSelectorOpExists
-		case labels.DoesNotExistOperator:
+		case selection.DoesNotExist:
 			op = LabelSelectorOpDoesNotExist
-		case labels.GreaterThanOperator, labels.LessThanOperator:
+		case selection.GreaterThan, selection.LessThan:
 			// Adding a separate case for these operators to indicate that this is deliberate
 			return nil, fmt.Errorf("%q isn't supported in label selectors", req.Operator())
 		default:

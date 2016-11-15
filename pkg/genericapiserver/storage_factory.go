@@ -19,14 +19,12 @@ package genericapiserver
 import (
 	"fmt"
 	"mime"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
-	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	storagebackendfactory "k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -36,7 +34,13 @@ import (
 type StorageFactory interface {
 	// New finds the storage destination for the given group and resource. It will
 	// return an error if the group has no storage destination configured.
-	New(groupResource unversioned.GroupResource) (storage.Interface, error)
+	NewConfig(groupResource unversioned.GroupResource) (*storagebackend.Config, error)
+
+	// ResourcePrefix returns the overridden resource prefix for the GroupResource
+	// This allows for cohabitation of resources with different native types and provides
+	// centralized control over the shape of etcd directories
+	ResourcePrefix(groupResource unversioned.GroupResource) string
+
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
 	Backends() []string
@@ -52,6 +56,8 @@ type DefaultStorageFactory struct {
 	StorageConfig storagebackend.Config
 
 	Overrides map[unversioned.GroupResource]groupResourceOverrides
+
+	DefaultResourcePrefixes map[unversioned.GroupResource]string
 
 	// DefaultMediaType is the media type used to store resources. If it is not set, "application/json" is used.
 	DefaultMediaType string
@@ -69,17 +75,18 @@ type DefaultStorageFactory struct {
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
 	newStorageCodecFn func(storageMediaType string, ns runtime.StorageSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (codec runtime.Codec, err error)
-
-	// newStorageFn exists to be overwritten for unit testing.
-	newStorageFn func(config storagebackend.Config, codec runtime.Codec) (etcdStorage storage.Interface, err error)
 }
 
 type groupResourceOverrides struct {
 	// etcdLocation contains the list of "special" locations that are used for particular GroupResources
 	// These are merged on top of the StorageConfig when requesting the storage.Interface for a given GroupResource
 	etcdLocation []string
-	// etcdPrefix contains the list of "special" prefixes for a GroupResource.  Resource=* means for the entire group
+	// etcdPrefix is the base location for a GroupResource.
 	etcdPrefix string
+	// etcdResourcePrefix is the location to use to store a particular type under the `etcdPrefix` location
+	// If empty, the default mapping is used.  If the default mapping doesn't contain an entry, it will use
+	// the ToLowered name of the resource, not including the group.
+	etcdResourcePrefix string
 	// mediaType is the desired serializer to choose. If empty, the default is chosen.
 	mediaType string
 	// serializer contains the list of "special" serializers for a GroupResource.  Resource=* means for the entire group
@@ -94,6 +101,17 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
+// specialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
+// TODO: move out of this package, it is not generic
+var specialDefaultResourcePrefixes = map[unversioned.GroupResource]string{
+	unversioned.GroupResource{Group: "", Resource: "replicationControllers"}: "controllers",
+	unversioned.GroupResource{Group: "", Resource: "replicationcontrollers"}: "controllers",
+	unversioned.GroupResource{Group: "", Resource: "endpoints"}:              "services/endpoints",
+	unversioned.GroupResource{Group: "", Resource: "nodes"}:                  "minions",
+	unversioned.GroupResource{Group: "", Resource: "services"}:               "services/specs",
+	unversioned.GroupResource{Group: "extensions", Resource: "ingresses"}:    "ingress",
+}
+
 func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
@@ -105,9 +123,9 @@ func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType str
 		DefaultSerializer:       defaultSerializer,
 		ResourceEncodingConfig:  resourceEncodingConfig,
 		APIResourceConfigSource: resourceConfig,
+		DefaultResourcePrefixes: specialDefaultResourcePrefixes,
 
 		newStorageCodecFn: NewStorageCodec,
-		newStorageFn:      newStorage,
 	}
 }
 
@@ -120,6 +138,13 @@ func (s *DefaultStorageFactory) SetEtcdLocation(groupResource unversioned.GroupR
 func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource unversioned.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdPrefix = prefix
+	s.Overrides[groupResource] = overrides
+}
+
+// SetResourceEtcdPrefix sets the prefix for a resource, but not the base-dir.  You'll end up in `etcdPrefix/resourceEtcdPrefix`.
+func (s *DefaultStorageFactory) SetResourceEtcdPrefix(groupResource unversioned.GroupResource, prefix string) {
+	overrides := s.Overrides[groupResource]
+	overrides.etcdResourcePrefix = prefix
 	s.Overrides[groupResource] = overrides
 }
 
@@ -155,7 +180,7 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource unversione
 
 // New finds the storage destination for the given group and resource. It will
 // return an error if the group has no storage destination configured.
-func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (storage.Interface, error) {
+func (s *DefaultStorageFactory) NewConfig(groupResource unversioned.GroupResource) (*storagebackend.Config, error) {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 
 	groupOverride := s.Overrides[getAllResourcesAlias(chosenStorageResource)]
@@ -214,12 +239,8 @@ func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (st
 	}
 
 	glog.V(3).Infof("storing %v in %v, reading as %v from %v", groupResource, storageEncodingVersion, internalVersion, config)
-	return s.newStorageFn(config, codec)
-}
-
-// newStorage is the default implementation for creating a storage backend.
-func newStorage(config storagebackend.Config, codec runtime.Codec) (etcdStorage storage.Interface, err error) {
-	return storagebackendfactory.Create(config, codec)
+	config.Codec = codec
+	return &config, nil
 }
 
 // Get all backends for all registered storage destinations.
@@ -236,11 +257,11 @@ func (s *DefaultStorageFactory) Backends() []string {
 // NewStorageCodec assembles a storage codec for the provided storage media type, the provided serializer, and the requested
 // storage and memory versions.
 func NewStorageCodec(storageMediaType string, ns runtime.StorageSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (runtime.Codec, error) {
-	mediaType, options, err := mime.ParseMediaType(storageMediaType)
+	mediaType, _, err := mime.ParseMediaType(storageMediaType)
 	if err != nil {
 		return nil, fmt.Errorf("%q is not a valid mime-type", storageMediaType)
 	}
-	serializer, ok := ns.SerializerForMediaType(mediaType, options)
+	serializer, ok := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return nil, fmt.Errorf("unable to find serializer for %q", storageMediaType)
 	}
@@ -254,17 +275,43 @@ func NewStorageCodec(storageMediaType string, ns runtime.StorageSerializer, stor
 		s = runtime.NewBase64Serializer(s)
 	}
 
+	encoder := ns.EncoderForVersion(
+		s,
+		runtime.NewMultiGroupVersioner(
+			storageVersion,
+			unversioned.GroupKind{Group: storageVersion.Group},
+			unversioned.GroupKind{Group: memoryVersion.Group},
+		),
+	)
+
 	ds := recognizer.NewDecoder(s, ns.UniversalDeserializer())
-	encoder := ns.EncoderForVersion(s, storageVersion)
-	decoder := ns.DecoderToVersion(ds, memoryVersion)
-	if memoryVersion.Group != storageVersion.Group {
-		// Allow this codec to translate between groups.
-		if err := versioning.EnableCrossGroupEncoding(encoder, memoryVersion.Group, storageVersion.Group); err != nil {
-			return nil, fmt.Errorf("error setting up encoder from %v to %v: %v", memoryVersion, storageVersion, err)
-		}
-		if err := versioning.EnableCrossGroupDecoding(decoder, storageVersion.Group, memoryVersion.Group); err != nil {
-			return nil, fmt.Errorf("error setting up decoder from %v to %v: %v", storageVersion, memoryVersion, err)
-		}
-	}
+	decoder := ns.DecoderToVersion(
+		ds,
+		runtime.NewMultiGroupVersioner(
+			memoryVersion,
+			unversioned.GroupKind{Group: memoryVersion.Group},
+			unversioned.GroupKind{Group: storageVersion.Group},
+		),
+	)
+
 	return runtime.NewCodec(encoder, decoder), nil
+}
+
+func (s *DefaultStorageFactory) ResourcePrefix(groupResource unversioned.GroupResource) string {
+	chosenStorageResource := s.getStorageGroupResource(groupResource)
+	groupOverride := s.Overrides[getAllResourcesAlias(chosenStorageResource)]
+	exactResourceOverride := s.Overrides[chosenStorageResource]
+
+	etcdResourcePrefix := s.DefaultResourcePrefixes[chosenStorageResource]
+	if len(groupOverride.etcdResourcePrefix) > 0 {
+		etcdResourcePrefix = groupOverride.etcdResourcePrefix
+	}
+	if len(exactResourceOverride.etcdResourcePrefix) > 0 {
+		etcdResourcePrefix = exactResourceOverride.etcdResourcePrefix
+	}
+	if len(etcdResourcePrefix) == 0 {
+		etcdResourcePrefix = strings.ToLower(chosenStorageResource.Resource)
+	}
+
+	return etcdResourcePrefix
 }

@@ -18,17 +18,23 @@ package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // SchemeGroupVersion is group version used to register these objects
 // TODO this should be in the "kubeconfig" group
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 
-func init() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addConversionFuncs)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Config{},
 	)
+	return nil
 }
 
 func (obj *Config) GetObjectKind() unversioned.ObjectKind { return obj }

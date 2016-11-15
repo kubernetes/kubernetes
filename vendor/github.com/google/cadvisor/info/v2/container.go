@@ -217,8 +217,11 @@ type FsInfo struct {
 	// Labels associated with this filesystem.
 	Labels []string `json:"labels"`
 
-	// Number of available Inodes.
-	InodesFree uint64 `json:"inodes_free"`
+	// Number of Inodes.
+	Inodes *uint64 `json:"inodes,omitempty"`
+
+	// Number of available Inodes (if known)
+	InodesFree *uint64 `json:"inodes_free,omitempty"`
 }
 
 type RequestOptions struct {
@@ -298,4 +301,8 @@ type FilesystemStats struct {
 	TotalUsageBytes *uint64 `json:"totalUsageBytes,omitempty"`
 	// Number of bytes consumed by a container through its root filesystem.
 	BaseUsageBytes *uint64 `json:"baseUsageBytes,omitempty"`
+	// Number of inodes used within the container's root filesystem.
+	// This only accounts for inodes that are shared across containers,
+	// and does not include inodes used in mounted directories.
+	InodeUsage *uint64 `json:"containter_inode_usage,omitempty"`
 }

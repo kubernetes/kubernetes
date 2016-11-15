@@ -71,7 +71,11 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 			mask = roMask
 		}
 
-		err = chmodRunner.Chmod(path, info.Mode()|mask|os.ModeSetgid)
+		if info.IsDir() {
+			mask |= os.ModeSetgid
+		}
+
+		err = chmodRunner.Chmod(path, info.Mode()|mask)
 		if err != nil {
 			glog.Errorf("Chmod failed on %v: %v", path, err)
 		}

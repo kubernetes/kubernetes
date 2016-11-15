@@ -37,6 +37,9 @@ func (r *TestRuntimeCache) GetCachedPods() []*Pod {
 }
 
 func NewTestRuntimeCache(getter podsGetter) *TestRuntimeCache {
-	c, _ := NewRuntimeCache(getter)
-	return &TestRuntimeCache{*c.(*runtimeCache)}
+	return &TestRuntimeCache{
+		runtimeCache: runtimeCache{
+			getter: getter,
+		},
+	}
 }

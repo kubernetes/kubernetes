@@ -19,8 +19,11 @@ package app
 import (
 	"os"
 
+	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/logs"
+	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 )
 
 /*
@@ -28,6 +31,9 @@ WARNING: this logic is duplicated, with minor changes, in cmd/hyperkube/kubectl.
 Any salient changes here will need to be manually reflected in that file.
 */
 func Run() error {
+	logs.InitLogs()
+	defer logs.FlushLogs()
+
 	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
 }

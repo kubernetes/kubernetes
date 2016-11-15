@@ -120,6 +120,9 @@ fi
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 
+IAM_PROFILE_MASTER="kubernetes-master-${CLUSTER_ID}-${VPC_NAME}"
+IAM_PROFILE_NODE="kubernetes-minion-${CLUSTER_ID}-${VPC_NAME}"
+
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
 #  only affects the big storage instance types, which aren't a typical use case right now.
@@ -136,7 +139,7 @@ fi
 # TODO (bburns) Parameterize this for multiple cluster per project
 function get_vpc_id {
   $AWS_CMD describe-vpcs \
-           --filters Name=tag:Name,Values=kubernetes-vpc \
+           --filters Name=tag:Name,Values=${VPC_NAME} \
                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
            --query Vpcs[].VpcId
 }
@@ -606,9 +609,9 @@ function upload-server-tars() {
       local project_hash=
       local key=$(aws configure get aws_access_key_id)
       if which md5 > /dev/null 2>&1; then
-        project_hash=$(md5 -q -s "${USER} ${key}")
+        project_hash=$(md5 -q -s "${USER} ${key} ${INSTANCE_PREFIX}")
       else
-        project_hash=$(echo -n "${USER} ${key}" | md5sum | awk '{ print $1 }')
+        project_hash=$(echo -n "${USER} ${key} ${INSTANCE_PREFIX}" | md5sum | awk '{ print $1 }')
       fi
       AWS_S3_BUCKET="kubernetes-staging-${project_hash}"
   fi
@@ -701,16 +704,18 @@ function add-tag {
 }
 
 # Creates the IAM profile, based on configuration files in templates/iam
+# usage: create-iam-profile kubernetes-master-us-west-1a-chom kubernetes-master
 function create-iam-profile {
   local key=$1
+  local role=$2
 
   local conf_dir=file://${KUBE_ROOT}/cluster/aws/templates/iam
 
   echo "Creating IAM role: ${key}"
-  aws iam create-role --role-name ${key} --assume-role-policy-document ${conf_dir}/${key}-role.json > $LOG
+  aws iam create-role --role-name ${key} --assume-role-policy-document ${conf_dir}/${role}-role.json > $LOG
 
   echo "Creating IAM role-policy: ${key}"
-  aws iam put-role-policy --role-name ${key} --policy-name ${key} --policy-document ${conf_dir}/${key}-policy.json > $LOG
+  aws iam put-role-policy --role-name ${key} --policy-name ${key} --policy-document ${conf_dir}/${role}-policy.json > $LOG
 
   echo "Creating IAM instance-policy: ${key}"
   aws iam create-instance-profile --instance-profile-name ${key} > $LOG
@@ -721,14 +726,11 @@ function create-iam-profile {
 
 # Creates the IAM roles (if they do not already exist)
 function ensure-iam-profiles {
-  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_MASTER} || {
-    echo "Creating master IAM profile: ${IAM_PROFILE_MASTER}"
-    create-iam-profile ${IAM_PROFILE_MASTER}
-  }
-  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_NODE} || {
-    echo "Creating minion IAM profile: ${IAM_PROFILE_NODE}"
-    create-iam-profile ${IAM_PROFILE_NODE}
-  }
+  echo "Creating master IAM profile: ${IAM_PROFILE_MASTER}"
+  create-iam-profile ${IAM_PROFILE_MASTER} kubernetes-master
+
+  echo "Creating minion IAM profile: ${IAM_PROFILE_NODE}"
+  create-iam-profile ${IAM_PROFILE_NODE} kubernetes-minion
 }
 
 # Wait for instance to be in specified state
@@ -785,13 +787,53 @@ function delete_security_group {
   echo "Deleting security group: ${sg_id}"
 
   # We retry in case there's a dependent resource - typically an ELB
-  n=0
+  local n=0
   until [ $n -ge 20 ]; do
     $AWS_CMD delete-security-group --group-id ${sg_id} > $LOG && return
     n=$[$n+1]
     sleep 3
   done
   echo "Unable to delete security group: ${sg_id}"
+  exit 1
+}
+
+
+
+# Deletes master and minion IAM roles and instance profiles
+# usage: delete-iam-instance-profiles
+function delete-iam-profiles {
+  for iam_profile_name in ${IAM_PROFILE_MASTER} ${IAM_PROFILE_NODE};do
+    echo "Removing role from instance profile: ${iam_profile_name}"
+    conceal-no-such-entity-response aws iam remove-role-from-instance-profile --instance-profile-name "${iam_profile_name}" --role-name "${iam_profile_name}"
+
+    echo "Deleting IAM Instance-Profile: ${iam_profile_name}"
+    conceal-no-such-entity-response aws iam delete-instance-profile --instance-profile-name "${iam_profile_name}"
+
+    echo "Delete IAM role policy: ${iam_profile_name}"
+    conceal-no-such-entity-response aws iam delete-role-policy --role-name "${iam_profile_name}" --policy-name "${iam_profile_name}"
+
+    echo "Deleting IAM Role: ${iam_profile_name}"
+    conceal-no-such-entity-response aws iam delete-role --role-name "${iam_profile_name}"
+  done
+}
+
+# Detects NoSuchEntity response from AWS cli stderr output and conceals error
+# Otherwise the error is treated as fatal
+# usage: conceal-no-such-entity-response ...args
+function conceal-no-such-entity-response {
+  # in plain english: redirect stderr to stdout, and stdout to the log file
+  local -r errMsg=$($@ 2>&1 > $LOG)
+  if [[ "$errMsg" == "" ]];then
+    return
+  fi
+
+  echo $errMsg
+  if [[ "$errMsg" =~ " (NoSuchEntity) " ]];then
+    echo " -> no such entity response detected. will assume operation is not necessary due to prior incomplete teardown"
+    return
+  fi
+
+  echo "Error message is fatal. Will exit"
   exit 1
 }
 
@@ -819,7 +861,7 @@ function vpc-setup {
 	  VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} --query Vpc.VpcId)
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
-	  add-tag $VPC_ID Name kubernetes-vpc
+	  add-tag $VPC_ID Name ${VPC_NAME}
 	  add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
   fi
 
@@ -931,14 +973,12 @@ function kube-up {
   authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${NODE_SG_ID} --protocol all"
   authorize-security-group-ingress "${NODE_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
 
-  # TODO(justinsb): Would be fairly easy to replace 0.0.0.0/0 in these rules
-
   # SSH is open to the world
-  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
-  authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 22 --cidr ${SSH_CIDR}"
+  authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 22 --cidr ${SSH_CIDR}"
 
   # HTTPS to the master is allowed (for API access)
-  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr ${HTTP_API_CIDR}"
 
   # KUBE_USE_EXISTING_MASTER is used to add minions to an existing master
   if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
@@ -1345,6 +1385,11 @@ function kube-down {
       done
       echo "All instances deleted"
     fi
+    if [[ -n $(${AWS_ASG_CMD} describe-launch-configurations --launch-configuration-names ${ASG_NAME} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
+      echo "Warning: default auto-scaling launch configuration ${ASG_NAME} still exists, attempting to delete"
+      echo "  (This may happen if kube-up leaves just the launch configuration but no auto-scaling group.)"
+      ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${ASG_NAME} || true
+    fi
 
     find-master-pd
     find-tagged-master-ip
@@ -1439,8 +1484,13 @@ function kube-down {
     echo "If you are trying to delete a cluster in a shared VPC," >&2
     echo "please consider using one of the methods in the kube-deploy repo." >&2
     echo "See: https://github.com/kubernetes/kube-deploy/blob/master/docs/delete_cluster.md" >&2
-    exit 1
+    echo "" >&2
+    echo "Note: You may be seeing this message may be because the cluster was already deleted, or" >&2
+    echo "has a name other than '${CLUSTER_ID}'." >&2
   fi
+
+  echo "Deleting IAM Instance profiles"
+  delete-iam-profiles
 }
 
 # Update a kubernetes cluster with latest source
@@ -1484,7 +1534,7 @@ function kube-push {
 #   KUBE_ROOT
 function test-build-release {
   # Make a release
-  "${KUBE_ROOT}/build/release.sh"
+  "${KUBE_ROOT}/build-tools/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -1547,7 +1597,7 @@ function ssh-to-node {
 
   local ip=$(get_ssh_hostname ${node})
 
-  for try in $(seq 1 5); do
+  for try in {1..5}; do
     if ssh -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${ip} "echo test > /dev/null"; then
       break
     fi

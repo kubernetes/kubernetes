@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package proxy provides transport and upgrade support for proxies
-package proxy
+package proxy // import "k8s.io/kubernetes/pkg/util/proxy"

@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/mysql-wordpress-pd/README.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Persistent Installation of MySQL and WordPress on Kubernetes
 
 This example describes how to run a persistent installation of
@@ -55,11 +21,13 @@ Demonstrated Kubernetes Concepts:
 * [Secrets](http://kubernetes.io/docs/user-guide/secrets/) to store sensitive
   passwords.
 
-## tl;dr Quickstart
+## Quickstart
 
-Put your desired mysql password in a file called `password.txt` with
+Put your desired MySQL password in a file called `password.txt` with
 no trailing newline. The first `tr` command will remove the newline if
 your editor added one.
+
+**Note:** if your cluster enforces **_selinux_** and you will be using [Host Path](#host-path) for storage, then please follow this [extra step](#selinux).
 
 ```shell
 tr --delete '\n' <password.txt >.strippedpassword.txt && mv .strippedpassword.txt password.txt
@@ -74,11 +42,12 @@ kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
 - [Persistent Installation of MySQL and WordPress on Kubernetes](#persistent-installation-of-mysql-and-wordpress-on-kubernetes)
-  - [tl;dr Quickstart](#tldr-quickstart)
+  - [Quickstart](#quickstart)
   - [Table of Contents](#table-of-contents)
   - [Cluster Requirements](#cluster-requirements)
   - [Decide where you will store your data](#decide-where-you-will-store-your-data)
     - [Host Path](#host-path)
+        - [SELinux](#selinux)
     - [GCE Persistent Disk](#gce-persistent-disk)
   - [Create the MySQL Password Secret](#create-the-mysql-password-secret)
   - [Deploy MySQL](#deploy-mysql)
@@ -98,7 +67,7 @@ this example.
 * Kubernetes version 1.2 is required due to using newer features, such
   at PV Claims and Deployments. Run `kubectl version` to see your
   cluster version.
-* [Cluster DNS](../../build/kube-dns/) will be used for service discovery.
+* [Cluster DNS](../../build-tools/kube-dns/) will be used for service discovery.
 * An [external load balancer](http://kubernetes.io/docs/user-guide/services/#type-loadbalancer)
   will be used to access WordPress.
 * [Persistent Volume Claims](http://kubernetes.io/docs/user-guide/persistent-volumes/)
@@ -129,13 +98,32 @@ will not be moved between nodes if the pod is recreated on a new
 node. If the pod is deleted and recreated on a new node, data will be
 lost.
 
-Create the persistent volume objects in Kubernetes using
+##### SELinux
+
+On systems supporting selinux it is preferred to leave it enabled/enforcing.
+However, docker containers mount the host path with the "_svirt_sandbox_file_t_"
+label type, which is incompatible with the default label type for /tmp ("_tmp_t_"),
+resulting in a permissions error when the mysql container attempts to `chown`
+_/var/lib/mysql_.
+Therefore, on selinx systems using host path, you should pre-create the host path
+directory (/tmp/data/) and change it's selinux label type to "_svirt_sandbox_file_t_",
+as follows:
+
+```shell
+## on every node:
+mkdir -p /tmp/data
+chmod a+rwt /tmp/data  # match /tmp permissions
+chcon -Rt svirt_sandbox_file_t /tmp/data
+```
+
+Continuing with host path, create the persistent volume objects in Kubernetes using
 [local-volumes.yaml](local-volumes.yaml):
 
 ```shell
 export KUBE_REPO=https://raw.githubusercontent.com/kubernetes/kubernetes/master
 kubectl create -f $KUBE_REPO/examples/mysql-wordpress-pd/local-volumes.yaml
 ```
+
 
 ### GCE Persistent Disk
 
@@ -166,7 +154,8 @@ kubectl create -f $KUBE_REPO/examples/mysql-wordpress-pd/gce-volumes.yaml
 ## Create the MySQL Password Secret
 
 Use a [Secret](http://kubernetes.io/docs/user-guide/secrets/) object
-to store the MySQL password. First create a temporary file called
+to store the MySQL password. First create a file (in the same directory
+as the wordpress sample files) called
 `password.txt` and save your password in it. Make sure to not have a
 trailing newline at the end of the password. The first `tr` command
 will remove the newline if your editor added one. Then, create the
@@ -244,6 +233,33 @@ Version: '5.6.29'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Comm
 Also in [mysql-deployment.yaml](mysql-deployment.yaml) we created a
 service to allow other pods to reach this mysql instance. The name is
 `wordpress-mysql` which resolves to the pod IP.
+
+Up to this point one Deployment, one Pod, one PVC, one Service, one Endpoint,
+two PVs, and one Secret have been created, shown below:
+
+```shell
+kubectl get deployment,pod,svc,endpoints,pvc -l app=wordpress -o wide && \
+  kubectl get secret mysql-pass && \
+  kubectl get pv
+```
+
+```shell
+NAME                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+deploy/wordpress-mysql   1         1         1            1           3m
+NAME                                  READY     STATUS    RESTARTS   AGE       IP           NODE
+po/wordpress-mysql-3040864217-40soc   1/1       Running   0          3m        172.17.0.2   127.0.0.1
+NAME                  CLUSTER-IP   EXTERNAL-IP   PORT(S)    AGE       SELECTOR
+svc/wordpress-mysql   None         <none>        3306/TCP   3m        app=wordpress,tier=mysql
+NAME                 ENDPOINTS         AGE
+ep/wordpress-mysql   172.17.0.2:3306   3m
+NAME                 STATUS    VOLUME       CAPACITY   ACCESSMODES   AGE
+pvc/mysql-pv-claim   Bound     local-pv-2   20Gi       RWO           3m
+NAME         TYPE      DATA      AGE
+mysql-pass   Opaque    1         3m
+NAME         CAPACITY   ACCESSMODES   STATUS      CLAIM                    REASON    AGE
+local-pv-1   20Gi       RWO           Available                                      3m
+local-pv-2   20Gi       RWO           Bound       default/mysql-pv-claim             3m
+```
 
 ## Deploy WordPress
 

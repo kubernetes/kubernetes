@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package empty_dir contains the internal representation of emptyDir
 // volumes.
-package empty_dir
+package empty_dir // import "k8s.io/kubernetes/pkg/volume/empty_dir"

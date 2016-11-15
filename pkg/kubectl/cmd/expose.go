@@ -22,42 +22,34 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
-// ExposeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type ExposeOptions struct {
-	Filenames []string
-	Recursive bool
-}
-
 var (
-	expose_resources = dedent.Dedent(`
-		pod (po), service (svc), replicationcontroller (rc),
-		deployment, replicaset (rs)
-	`)
+	expose_resources = `pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`
 
-	expose_long = dedent.Dedent(`
+	expose_long = templates.LongDesc(`
 		Expose a resource as a new Kubernetes service.
 
 		Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
 		for that resource as the selector for a new service on the specified port. A deployment or replica set
 		will be exposed as a service only if its selector is convertible to a selector that service supports,
 		i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
-		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no 
+		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no
 		labels are specified, the new service will re-use the labels from the resource it exposes.
 
-		Possible resources include (case insensitive): `) + expose_resources
+		Possible resources include (case insensitive):
 
-	expose_example = dedent.Dedent(`
+		` + expose_resources)
+
+	expose_example = templates.Examples(`
 		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 		kubectl expose rc nginx --port=80 --target-port=8000
 
@@ -80,8 +72,8 @@ var (
 		kubectl expose deployment nginx --port=80 --target-port=8000`)
 )
 
-func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &ExposeOptions{}
+func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &resource.FilenameOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
 	resources := regexp.MustCompile(`\s*,`).Split(expose_resources, -1)
@@ -110,7 +102,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	// TODO: remove create-external-load-balancer in code on or after Aug 25, 2016.
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.")
 	cmd.Flags().MarkDeprecated("create-external-load-balancer", "use --type=\"LoadBalancer\" instead")
-	cmd.Flags().String("load-balancer-ip", "", "IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
+	cmd.Flags().String("load-balancer-ip", "", "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
 	cmd.Flags().String("selector", "", "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().String("container-port", "", "Synonym for --target-port")
@@ -120,33 +112,33 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("name", "", "The name for the newly created object.")
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
+	cmd.Flags().String("cluster-ip", "", "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.")
 
-	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	usage := "identifying the resource to expose a service"
+	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
-func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *ExposeOptions) error {
+func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	mapper, typer := f.Object(false)
+	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
 	err = r.Err()
 	if err != nil {
-		return err
+		return cmdutil.UsageError(cmd, err.Error())
 	}
 
 	// Get the generator, setup and validate all required parameters
@@ -170,8 +162,8 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 		params := kubectl.MakeParams(cmd, names)
 		name := info.Name
-		if len(name) > validation.DNS952LabelMaxLength {
-			name = name[:validation.DNS952LabelMaxLength]
+		if len(name) > validation.DNS1035LabelMaxLength {
+			name = name[:validation.DNS1035LabelMaxLength]
 		}
 		params["default-name"] = name
 
@@ -260,7 +252,11 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 		info.Refresh(object, true)
 		if cmdutil.GetDryRunFlag(cmd) {
-			return f.PrintObject(cmd, mapper, object, out)
+			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
+				return f.PrintObject(cmd, mapper, object, out)
+			}
+			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, true, "exposed")
+			return nil
 		}
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
 			return err
@@ -276,7 +272,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			return f.PrintObject(cmd, mapper, object, out)
 		}
 
-		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "exposed")
+		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "exposed")
 		return nil
 	})
 	if err != nil {

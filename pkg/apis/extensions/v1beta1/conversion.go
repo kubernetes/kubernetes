@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) {
+func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
@@ -53,12 +53,12 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_v1beta1_JobSpec_To_batch_JobSpec,
 	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, kind := range []string{"DaemonSet", "Deployment", "Ingress"} {
+	for _, k := range []string{"DaemonSet", "Deployment", "Ingress"} {
+		kind := k // don't close over range variables
 		err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
 			func(label, value string) (string, string, error) {
 				switch label {
@@ -67,14 +67,14 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 				default:
 					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
 				}
-			})
+			},
+		)
 		if err != nil {
-			// If one of the conversion functions is malformed, detect it immediately.
-			panic(err)
+			return err
 		}
 	}
 
-	err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
+	return api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
@@ -82,11 +82,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+		},
+	)
 }
 
 func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
@@ -137,14 +134,7 @@ func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out 
 
 func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
 	out.Replicas = &in.Replicas
-	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -163,6 +153,10 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	} else {
 		out.RollbackTo = nil
 	}
+	if in.ProgressDeadlineSeconds != nil {
+		out.ProgressDeadlineSeconds = new(int32)
+		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
+	}
 	return nil
 }
 
@@ -170,15 +164,7 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
-
-	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -193,6 +179,10 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 		out.RollbackTo.Revision = in.RollbackTo.Revision
 	} else {
 		out.RollbackTo = nil
+	}
+	if in.ProgressDeadlineSeconds != nil {
+		out.ProgressDeadlineSeconds = new(int32)
+		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
 	}
 	return nil
 }
@@ -252,15 +242,8 @@ func Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 func Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = new(int32)
 	*out.Replicas = int32(in.Replicas)
-	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-
+	out.MinReadySeconds = in.MinReadySeconds
+	out.Selector = in.Selector
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -271,14 +254,8 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
-	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.MinReadySeconds = in.MinReadySeconds
+	out.Selector = in.Selector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -289,16 +266,7 @@ func Convert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpec, s
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
-	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-
+	out.Selector = in.Selector
 	// BEGIN non-standard conversion
 	// autoSelector has opposite meaning as manualSelector.
 	// in both cases, unset means false, and unset is always preferred to false.
@@ -323,16 +291,7 @@ func Convert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
-	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-
+	out.Selector = in.Selector
 	// BEGIN non-standard conversion
 	// autoSelector has opposite meaning as manualSelector.
 	// in both cases, unset means false, and unset is always preferred to false.

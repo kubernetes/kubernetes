@@ -41,7 +41,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins(), "" /* rootContext */)
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -103,10 +103,12 @@ func TestLabels(t *testing.T) {
 	defer os.RemoveAll(rootDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	defaultMode := int32(0644)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
 				Items: []api.DownwardAPIVolumeFile{
 					{Path: "labels", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.labels"}}}},
@@ -167,10 +169,12 @@ func TestAnnotations(t *testing.T) {
 		"a1": "value1",
 		"a2": "value2"}
 
+	defaultMode := int32(0644)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
 				Items: []api.DownwardAPIVolumeFile{
 					{Path: "annotations", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.annotations"}}}},
@@ -230,10 +234,12 @@ func TestName(t *testing.T) {
 		testName       = "test_metadata_name"
 	)
 
+	defaultMode := int32(0644)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
 				Items: []api.DownwardAPIVolumeFile{
 					{Path: "name_file_name", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.name"}}}},
@@ -293,10 +299,12 @@ func TestNamespace(t *testing.T) {
 		testName       = "test_metadata_name"
 	)
 
+	defaultMode := int32(0644)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
 				Items: []api.DownwardAPIVolumeFile{
 					{Path: "namespace_file_name", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.namespace"}}}},
@@ -371,10 +379,12 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	defaultMode := int32(0644)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
 				Items: []api.DownwardAPIVolumeFile{
 					{Path: "labels", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.labels"}}}},
@@ -457,10 +467,12 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	defaultMode := int32(0644)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
 				Items: []api.DownwardAPIVolumeFile{
 					{Path: "labels", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.labels"}}}},
@@ -563,10 +575,12 @@ func TestWriteWithUnixPath(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	defaultMode := int32(0644)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
 				Items: []api.DownwardAPIVolumeFile{
 					{Path: "this/is/mine/labels", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.labels"}},
@@ -643,10 +657,12 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
+	defaultMode := int32(0644)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
 				Items: []api.DownwardAPIVolumeFile{
 					{
 						Path: "this//labels",
@@ -683,4 +699,139 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(labels)) {
 		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(labels))
 	}
+}
+
+func TestDefaultMode(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid")
+		testVolumeName = "test_name"
+		testNamespace  = "test_metadata_namespace"
+		testName       = "test_metadata_name"
+	)
+
+	defaultMode := int32(0644)
+	volumeSpec := &api.Volume{
+		Name: testVolumeName,
+		VolumeSource: api.VolumeSource{
+			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
+				Items: []api.DownwardAPIVolumeFile{
+					{Path: "name_file_name", FieldRef: &api.ObjectFieldSelector{
+						FieldPath: "metadata.name"}}}},
+		},
+	}
+
+	clientset := fake.NewSimpleClientset(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      testName,
+			Namespace: testNamespace,
+		},
+	})
+
+	pluginMgr := volume.VolumePluginMgr{}
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Name: testName}}
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
+	}
+
+	volumePath := mounter.GetPath()
+
+	err = mounter.SetUp(nil)
+	if err != nil {
+		t.Errorf("Failed to setup volume: %v", err)
+	}
+
+	fileInfo, err := os.Stat(path.Join(volumePath, "name_file_name"))
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	actualMode := fileInfo.Mode()
+	expectedMode := os.FileMode(defaultMode)
+	if actualMode != expectedMode {
+		t.Errorf("Found mode `%v` expected %v", actualMode, expectedMode)
+	}
+
+	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
+}
+
+func TestItemMode(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid")
+		testVolumeName = "test_name"
+		testNamespace  = "test_metadata_namespace"
+		testName       = "test_metadata_name"
+	)
+
+	defaultMode := int32(0644)
+	itemMode := int32(0400)
+	volumeSpec := &api.Volume{
+		Name: testVolumeName,
+		VolumeSource: api.VolumeSource{
+			DownwardAPI: &api.DownwardAPIVolumeSource{
+				DefaultMode: &defaultMode,
+				Items: []api.DownwardAPIVolumeFile{
+					{
+						Path: "name_file_name", FieldRef: &api.ObjectFieldSelector{FieldPath: "metadata.name"},
+						Mode: &itemMode,
+					},
+				},
+			},
+		},
+	}
+
+	clientset := fake.NewSimpleClientset(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      testName,
+			Namespace: testNamespace,
+		},
+	})
+
+	pluginMgr := volume.VolumePluginMgr{}
+	tmpDir, host := newTestHost(t, clientset)
+	defer os.RemoveAll(tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Name: testName}}
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
+	}
+
+	volumePath := mounter.GetPath()
+
+	err = mounter.SetUp(nil)
+	if err != nil {
+		t.Errorf("Failed to setup volume: %v", err)
+	}
+
+	fileInfo, err := os.Stat(path.Join(volumePath, "name_file_name"))
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	actualMode := fileInfo.Mode()
+	expectedMode := os.FileMode(itemMode)
+	if actualMode != expectedMode {
+		t.Errorf("Found mode `%v` expected %v", actualMode, expectedMode)
+	}
+
+	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 }

@@ -124,6 +124,10 @@ The user can also using the generated Size method to check that his reusable buf
 
 The generated tests and benchmarks will keep you safe and show that this is really a significant speed improvement.
 
+An additional message-level option `stable_marshaler` (and the file-level
+option `stable_marshaler_all`) exists which causes the generated marshalling
+code to behave deterministically. Today, this only changes the serialization of
+maps; they are serialized in sort order.
 */
 package marshalto
 
@@ -377,6 +381,7 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 	required := field.IsRequired()
 
 	protoSizer := gogoproto.IsProtoSizer(file.FileDescriptorProto, message.DescriptorProto)
+	doNilCheck := gogoproto.NeedsNilCheck(proto3, field)
 	if required && nullable {
 		p.P(`if m.`, fieldname, `== nil {`)
 		p.In()
@@ -390,8 +395,7 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 	} else if repeated {
 		p.P(`if len(m.`, fieldname, `) > 0 {`)
 		p.In()
-	} else if ((!proto3 || field.IsMessage()) && nullable) ||
-		(*field.Type == descriptor.FieldDescriptorProto_TYPE_BYTES && !gogoproto.IsCustomType(field)) {
+	} else if doNilCheck {
 		p.P(`if m.`, fieldname, ` != nil {`)
 		p.In()
 	}
@@ -822,15 +826,32 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
 		panic(fmt.Errorf("marshaler does not support group %v", fieldname))
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		if generator.IsMap(file.FileDescriptorProto, field) {
+		if p.IsMap(field) {
 			m := p.GoMapType(nil, field)
-			_, keywire := p.GoType(nil, m.KeyField)
+			keygoTyp, keywire := p.GoType(nil, m.KeyField)
+			keygoAliasTyp, _ := p.GoType(nil, m.KeyAliasField)
+			// keys may not be pointers
+			keygoTyp = strings.Replace(keygoTyp, "*", "", 1)
+			keygoAliasTyp = strings.Replace(keygoAliasTyp, "*", "", 1)
+			keyCapTyp := generator.CamelCase(keygoTyp)
 			valuegoTyp, valuewire := p.GoType(nil, m.ValueField)
 			valuegoAliasTyp, _ := p.GoType(nil, m.ValueAliasField)
 			nullable, valuegoTyp, valuegoAliasTyp = generator.GoMapValueTypes(field, m.ValueField, valuegoTyp, valuegoAliasTyp)
 			keyKeySize := keySize(1, wireToType(keywire))
 			valueKeySize := keySize(2, wireToType(valuewire))
-			p.P(`for k, _ := range m.`, fieldname, ` {`)
+			if gogoproto.IsStableMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
+				keysName := `keysFor` + fieldname
+				p.P(keysName, ` := make([]`, keygoTyp, `, 0, len(m.`, fieldname, `))`)
+				p.P(`for k, _ := range m.`, fieldname, ` {`)
+				p.In()
+				p.P(keysName, ` = append(`, keysName, `, `, keygoTyp, `(k))`)
+				p.Out()
+				p.P(`}`)
+				p.P(p.sortKeysPkg.Use(), `.`, keyCapTyp, `s(`, keysName, `)`)
+				p.P(`for _, k := range `, keysName, ` {`)
+			} else {
+				p.P(`for k, _ := range m.`, fieldname, ` {`)
+			}
 			p.In()
 			p.encodeKey(fieldNumber, wireType)
 			sum := []string{strconv.Itoa(keyKeySize)}
@@ -858,7 +879,11 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 				descriptor.FieldDescriptorProto_TYPE_SINT64:
 				sum = append(sum, `soz`+p.localName+`(uint64(k))`)
 			}
-			p.P(`v := m.`, fieldname, `[k]`)
+			if gogoproto.IsStableMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
+				p.P(`v := m.`, fieldname, `[`, keygoAliasTyp, `(k)]`)
+			} else {
+				p.P(`v := m.`, fieldname, `[k]`)
+			}
 			accessor := `v`
 			sum = append(sum, strconv.Itoa(valueKeySize))
 			switch m.ValueField.GetType() {
@@ -1103,10 +1128,7 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 	default:
 		panic("not implemented")
 	}
-	if (required && nullable) ||
-		((!proto3 || field.IsMessage()) && nullable) ||
-		repeated ||
-		(*field.Type == descriptor.FieldDescriptorProto_TYPE_BYTES && !gogoproto.IsCustomType(field)) {
+	if (required && nullable) || repeated || doNilCheck {
 		p.Out()
 		p.P(`}`)
 	}

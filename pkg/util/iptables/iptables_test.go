@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func getIptablesCommand(protocol Protocol) string {
+func getIPTablesCommand(protocol Protocol) string {
 	if protocol == ProtocolIpv4 {
-		return cmdIptables
+		return cmdIPTables
 	}
 	if protocol == ProtocolIpv6 {
 		return cmdIp6tables
@@ -70,7 +70,7 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	if fcmd.CombinedOutputCalls != 2 {
 		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	cmd := getIptablesCommand(protocol)
+	cmd := getIPTablesCommand(protocol)
 	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
@@ -427,7 +427,7 @@ func TestDeleteRuleErrorCreating(t *testing.T) {
 	}
 }
 
-func TestGetIptablesHasCheckCommand(t *testing.T) {
+func TestGetIPTablesHasCheckCommand(t *testing.T) {
 	testCases := []struct {
 		Version  string
 		Err      bool
@@ -451,12 +451,12 @@ func TestGetIptablesHasCheckCommand(t *testing.T) {
 				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			},
 		}
-		version, err := getIptablesVersionString(&fexec)
+		version, err := getIPTablesVersionString(&fexec)
 		if (err != nil) != testCase.Err {
 			t.Errorf("Expected error: %v, Got error: %v", testCase.Err, err)
 		}
 		if err == nil {
-			check := getIptablesHasCheckCommand(version)
+			check := getIPTablesHasCheckCommand(version)
 			if testCase.Expected != check {
 				t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, check)
 			}
@@ -540,7 +540,7 @@ COMMIT
 	}
 }
 
-func TestIptablesWaitFlag(t *testing.T) {
+func TestIPTablesWaitFlag(t *testing.T) {
 	testCases := []struct {
 		Version string
 		Result  string
@@ -556,7 +556,7 @@ func TestIptablesWaitFlag(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		result := getIptablesWaitFlag(testCase.Version)
+		result := getIPTablesWaitFlag(testCase.Version)
 		if strings.Join(result, "") != testCase.Result {
 			t.Errorf("For %s expected %v got %v", testCase.Version, testCase.Result, result)
 		}

@@ -26,18 +26,20 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.
 type ExecHandler interface {
-	ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
+	ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
 }
 
 // NsenterExecHandler executes commands in Docker containers using nsenter.
 type NsenterExecHandler struct{}
 
 // TODO should we support nsenter in a container, running with elevated privs and --pid=host?
-func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	nsenter, err := exec.LookPath("nsenter")
 	if err != nil {
 		return fmt.Errorf("exec unavailable - unable to locate nsenter")
@@ -61,6 +63,10 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 		// make sure to close the stdout stream
 		defer stdout.Close()
 
+		kubecontainer.HandleResizing(resize, func(size term.Size) {
+			term.SetSize(p.Fd(), size)
+		})
+
 		if stdin != nil {
 			go io.Copy(p, stdin)
 		}
@@ -69,7 +75,7 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 			go io.Copy(stdout, p)
 		}
 
-		return command.Wait()
+		err = command.Wait()
 	} else {
 		if stdin != nil {
 			// Use an os.Pipe here as it returns true *os.File objects.
@@ -91,14 +97,19 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 			command.Stderr = stderr
 		}
 
-		return command.Run()
+		err = command.Run()
 	}
+
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return &utilexec.ExitErrorWrapper{ExitError: exitErr}
+	}
+	return err
 }
 
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.
 type NativeExecHandler struct{}
 
-func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	createOpts := dockertypes.ExecConfig{
 		Cmd:          cmd,
 		AttachStdin:  stdin != nil,
@@ -110,6 +121,13 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 	if err != nil {
 		return fmt.Errorf("failed to exec in container - Exec setup failed - %v", err)
 	}
+
+	// Have to start this before the call to client.StartExec because client.StartExec is a blocking
+	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
+	kubecontainer.HandleResizing(resize, func(size term.Size) {
+		client.ResizeExecTTY(execObj.ID, int(size.Height), int(size.Width))
+	})
+
 	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
 	streamOpts := StreamOptions{
 		InputStream:  stdin,
@@ -121,6 +139,7 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 	if err != nil {
 		return err
 	}
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	count := 0

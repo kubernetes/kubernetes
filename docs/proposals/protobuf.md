@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/proposals/protobuf.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Protobuf serialization and internal storage
 
 @smarterclayton
@@ -117,7 +83,7 @@ resembles:
   reduce the amount of memory garbage created during serialization and
   deserialization.
 * More efficient formats like Msgpack were considered, but they only offer
-  2x speed up vs the 10x observed for Protobuf
+  2x speed up vs. the 10x observed for Protobuf
 * gRPC was considered, but is a larger change that requires more core
   refactoring. This approach does not eliminate the possibility of switching
   to gRPC in the future.
@@ -196,13 +162,13 @@ option go_package = "v1";
 // ownership management and SELinux relabeling.
 message AWSElasticBlockStoreVolumeSource {
   // Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   optional string volumeID = 1;
 
   // Filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   // TODO: how do we prevent errors in the filesystem from compromising the machine
   optional string fsType = 2;
 
@@ -214,7 +180,7 @@ message AWSElasticBlockStoreVolumeSource {
 
   // Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
   // If omitted, the default is "false".
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   optional bool readOnly = 4;
 }
 
@@ -256,13 +222,13 @@ option go_package = "v1";
 // ownership management and SELinux relabeling.
 message AWSElasticBlockStoreVolumeSource {
   // Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   optional string volumeID = 1 [(gogoproto.customname) = "VolumeID", (gogoproto.nullable) = false];
 
   // Filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   // TODO: how do we prevent errors in the filesystem from compromising the machine
   optional string fsType = 2 [(gogoproto.customname) = "FSType", (gogoproto.nullable) = false];
 
@@ -274,7 +240,7 @@ message AWSElasticBlockStoreVolumeSource {
 
   // Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
   // If omitted, the default is "false".
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   optional bool readOnly = 4 [(gogoproto.customname) = "ReadOnly", (gogoproto.nullable) = false];
 }
 
@@ -356,7 +322,7 @@ deserialization of the remaining bytes into the `runtime.Unknown` type.
 ## Streaming wire format
 
 While the majority of Kubernetes APIs return single objects that can vary
-in type (Pod vs Status, PodList vs Status), the watch APIs return a stream
+in type (Pod vs. Status, PodList vs. Status), the watch APIs return a stream
 of identical objects (Events). At the time of this writing, this is the only
 current or anticipated streaming RESTful protocol (logging, port-forwarding,
 and exec protocols use a binary protocol over Websockets or SPDY).

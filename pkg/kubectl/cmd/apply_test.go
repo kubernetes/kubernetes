@@ -25,15 +25,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -41,7 +42,7 @@ import (
 func TestApplyExtraArgsFail(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
-	f, _, _ := NewAPIFactory()
+	f, _, _, _ := cmdtesting.NewAPIFactory()
 	c := NewCmdApply(f, buf)
 	if validateApplyArgs(c, []string{"rc"}) == nil {
 		t.Fatalf("unexpected non-error")
@@ -66,6 +67,7 @@ func readBytesFromFile(t *testing.T, filename string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
@@ -78,8 +80,7 @@ func readBytesFromFile(t *testing.T, filename string) []byte {
 func readReplicationControllerFromFile(t *testing.T, filename string) *api.ReplicationController {
 	data := readBytesFromFile(t, filename)
 	rc := api.ReplicationController{}
-	// TODO(jackgr): Replace with a call to testapi.Codec().Decode().
-	if err := yaml.Unmarshal(data, &rc); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &rc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,8 +90,7 @@ func readReplicationControllerFromFile(t *testing.T, filename string) *api.Repli
 func readServiceFromFile(t *testing.T, filename string) *api.Service {
 	data := readBytesFromFile(t, filename)
 	svc := api.Service{}
-	// TODO(jackgr): Replace with a call to testapi.Codec().Decode().
-	if err := yaml.Unmarshal(data, &svc); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &svc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,7 +106,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	originalLabels := originalAccessor.GetLabels()
 	originalLabels["DELETE_ME"] = "DELETE_ME"
 	originalAccessor.SetLabels(originalLabels)
-	original, err := json.Marshal(originalObj)
+	original, err := runtime.Encode(testapi.Default.Codec(), originalObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	}
 	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
-	current, err := json.Marshal(currentObj)
+	current, err := runtime.Encode(testapi.Default.Codec(), currentObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,12 +182,18 @@ func TestApplyObject(t *testing.T) {
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/version" && m == "GET":
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
@@ -202,6 +208,7 @@ func TestApplyObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -224,12 +231,18 @@ func TestApplyRetry(t *testing.T) {
 	firstPatch := true
 	retry := false
 	getCount := 0
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/version" && m == "GET":
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == pathRC && m == "GET":
 				getCount++
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
@@ -253,6 +266,7 @@ func TestApplyRetry(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -276,12 +290,20 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/version" && m == "GET":
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
+			case p == "/api/v1/namespaces/test" && m == "GET":
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathNameRC && m == "GET":
 				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathRC && m == "POST":
@@ -294,6 +316,7 @@ func TestApplyNonExistObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -323,12 +346,18 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	nameSVC, currentSVC := readAndAnnotateService(t, filenameSVC)
 	pathSVC := "/namespaces/test/services/" + nameSVC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/version" && m == "GET":
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
@@ -350,6 +379,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)

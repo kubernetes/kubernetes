@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -175,16 +176,16 @@ func TestHTTPHeaders(t *testing.T) {
 	}{
 		{[]api.HTTPHeader{}, http.Header{}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"}}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
-			{"X-Muffins-Or-Plumcakes", "Muffins!"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
+			{Name: "X-Muffins-Or-Plumcakes", Value: "Muffins!"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"},
 			"X-Muffins-Or-Plumcakes": {"Muffins!"}}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
-			{"X-Muffins-Or-Cupcakes", "Cupcakes, too"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Cupcakes, too"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins", "Cupcakes, too"}}},
 	}
 	for _, test := range testCases {
@@ -273,6 +274,52 @@ func TestProbe(t *testing.T) {
 			if test.expectedResult != result {
 				t.Errorf("[%s] Expected result to be %v but was %v", testID, test.expectedResult, result)
 			}
+		}
+	}
+}
+
+func TestNewExecInContainer(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "no error",
+			err:  nil,
+		},
+		{
+			name: "error - make sure we get output",
+			err:  errors.New("bad"),
+		},
+	}
+
+	for _, test := range tests {
+		runner := &containertest.FakeContainerCommandRunner{
+			Stdout: "foo",
+			Err:    test.err,
+		}
+		prober := &prober{
+			runner: runner,
+		}
+
+		container := api.Container{}
+		containerID := kubecontainer.ContainerID{Type: "docker", ID: "containerID"}
+		cmd := []string{"/foo", "bar"}
+		exec := prober.newExecInContainer(container, containerID, cmd, 0)
+
+		actualOutput, err := exec.CombinedOutput()
+		if e, a := containerID, runner.ContainerID; e != a {
+			t.Errorf("%s: container id: expected %v, got %v", test.name, e, a)
+		}
+		if e, a := cmd, runner.Cmd; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s: cmd: expected %v, got %v", test.name, e, a)
+		}
+		// this isn't 100% foolproof as a bug in a real ContainerCommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
+		if e, a := "foo", string(actualOutput); e != a {
+			t.Errorf("%s: output: expected %q, got %q", test.name, e, a)
+		}
+		if e, a := fmt.Sprintf("%v", test.err), fmt.Sprintf("%v", err); e != a {
+			t.Errorf("%s: error: expected %s, got %s", test.name, e, a)
 		}
 	}
 }

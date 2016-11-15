@@ -44,7 +44,6 @@ import (
 	"io"
 	"net"
 	"sync"
-	"time"
 
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
@@ -63,13 +62,11 @@ type recvMsg struct {
 	err error
 }
 
-func (recvMsg) isItem() bool {
-	return true
-}
+func (*recvMsg) item() {}
 
 // All items in an out of a recvBuffer should be the same type.
 type item interface {
-	isItem() bool
+	item()
 }
 
 // recvBuffer is an unbounded channel of item.
@@ -89,12 +86,14 @@ func newRecvBuffer() *recvBuffer {
 func (b *recvBuffer) put(r item) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.backlog = append(b.backlog, r)
-	select {
-	case b.c <- b.backlog[0]:
-		b.backlog = b.backlog[1:]
-	default:
+	if len(b.backlog) == 0 {
+		select {
+		case b.c <- r:
+			return
+		default:
+		}
 	}
+	b.backlog = append(b.backlog, r)
 }
 
 func (b *recvBuffer) load() {
@@ -120,10 +119,11 @@ func (b *recvBuffer) get() <-chan item {
 // recvBufferReader implements io.Reader interface to read the data from
 // recvBuffer.
 type recvBufferReader struct {
-	ctx  context.Context
-	recv *recvBuffer
-	last *bytes.Reader // Stores the remaining data in the previous calls.
-	err  error
+	ctx    context.Context
+	goAway chan struct{}
+	recv   *recvBuffer
+	last   *bytes.Reader // Stores the remaining data in the previous calls.
+	err    error
 }
 
 // Read reads the next len(p) bytes from last. If last is drained, it tries to
@@ -141,6 +141,8 @@ func (r *recvBufferReader) Read(p []byte) (n int, err error) {
 	select {
 	case <-r.ctx.Done():
 		return 0, ContextErr(r.ctx.Err())
+	case <-r.goAway:
+		return 0, ErrStreamDrain
 	case i := <-r.recv.get():
 		r.recv.load()
 		m := i.(*recvMsg)
@@ -158,7 +160,7 @@ const (
 	streamActive    streamState = iota
 	streamWriteDone             // EndStream sent
 	streamReadDone              // EndStream received
-	streamDone                  // sendDone and recvDone or RSTStreamFrame is sent or received.
+	streamDone                  // the entire stream is finished.
 )
 
 // Stream represents an RPC in the transport layer.
@@ -169,6 +171,10 @@ type Stream struct {
 	// ctx is the associated context of the stream.
 	ctx    context.Context
 	cancel context.CancelFunc
+	// done is closed when the final status arrives.
+	done chan struct{}
+	// goAway is closed when the server sent GoAways signal before this stream was initiated.
+	goAway chan struct{}
 	// method records the associated RPC method of the stream.
 	method       string
 	recvCompress string
@@ -214,6 +220,18 @@ func (s *Stream) SetSendCompress(str string) {
 	s.sendCompress = str
 }
 
+// Done returns a chanel which is closed when it receives the final status
+// from the server.
+func (s *Stream) Done() <-chan struct{} {
+	return s.done
+}
+
+// GoAway returns a channel which is closed when the server sent GoAways signal
+// before this stream was initiated.
+func (s *Stream) GoAway() <-chan struct{} {
+	return s.goAway
+}
+
 // Header acquires the key-value pairs of header metadata once it
 // is available. It blocks until i) the metadata is ready or ii) there is no
 // header metadata or iii) the stream is cancelled/expired.
@@ -221,6 +239,8 @@ func (s *Stream) Header() (metadata.MD, error) {
 	select {
 	case <-s.ctx.Done():
 		return nil, ContextErr(s.ctx.Err())
+	case <-s.goAway:
+		return nil, ErrStreamDrain
 	case <-s.headerChan:
 		return s.header.Copy(), nil
 	}
@@ -299,20 +319,18 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return
 }
 
-type key int
-
 // The key to save transport.Stream in the context.
-const streamKey = key(0)
+type streamKey struct{}
 
 // newContextWithStream creates a new context from ctx and attaches stream
 // to it.
 func newContextWithStream(ctx context.Context, stream *Stream) context.Context {
-	return context.WithValue(ctx, streamKey, stream)
+	return context.WithValue(ctx, streamKey{}, stream)
 }
 
 // StreamFromContext returns the stream saved in ctx.
 func StreamFromContext(ctx context.Context) (s *Stream, ok bool) {
-	s, ok = ctx.Value(streamKey).(*Stream)
+	s, ok = ctx.Value(streamKey{}).(*Stream)
 	return
 }
 
@@ -323,6 +341,7 @@ const (
 	reachable transportState = iota
 	unreachable
 	closing
+	draining
 )
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error
@@ -336,52 +355,66 @@ type ConnectOptions struct {
 	// UserAgent is the application user agent.
 	UserAgent string
 	// Dialer specifies how to dial a network address.
-	Dialer func(string, time.Duration) (net.Conn, error)
-	// AuthOptions stores the credentials required to setup a client connection and/or issue RPCs.
-	AuthOptions []credentials.Credentials
-	// Timeout specifies the timeout for dialing a client connection.
-	Timeout time.Duration
+	Dialer func(context.Context, string) (net.Conn, error)
+	// PerRPCCredentials stores the PerRPCCredentials required to issue RPCs.
+	PerRPCCredentials []credentials.PerRPCCredentials
+	// TransportCredentials stores the Authenticator required to setup a client connection.
+	TransportCredentials credentials.TransportCredentials
 }
 
 // NewClientTransport establishes the transport with the required ConnectOptions
 // and returns it to the caller.
-func NewClientTransport(target string, opts *ConnectOptions) (ClientTransport, error) {
-	return newHTTP2Client(target, opts)
+func NewClientTransport(ctx context.Context, target string, opts ConnectOptions) (ClientTransport, error) {
+	return newHTTP2Client(ctx, target, opts)
 }
 
 // Options provides additional hints and information for message
 // transmission.
 type Options struct {
-	// Indicate whether it is the last piece for this stream.
+	// Last indicates whether this write is the last piece for
+	// this stream.
 	Last bool
-	// The hint to transport impl whether the data could be buffered for
-	// batching write. Transport impl can feel free to ignore it.
+
+	// Delay is a hint to the transport implementation for whether
+	// the data could be buffered for a batching write. The
+	// Transport implementation may ignore the hint.
 	Delay bool
 }
 
 // CallHdr carries the information of a particular RPC.
 type CallHdr struct {
-	// Host specifies peer host.
+	// Host specifies the peer's host.
 	Host string
+
 	// Method specifies the operation to perform.
 	Method string
-	// RecvCompress specifies the compression algorithm applied on inbound messages.
+
+	// RecvCompress specifies the compression algorithm applied on
+	// inbound messages.
 	RecvCompress string
-	// SendCompress specifies the compression algorithm applied on outbound message.
+
+	// SendCompress specifies the compression algorithm applied on
+	// outbound message.
 	SendCompress string
-	// Flush indicates if new stream command should be sent to the peer without
-	// waiting for the first data. This is a hint though. The transport may modify
-	// the flush decision for performance purpose.
+
+	// Flush indicates whether a new stream command should be sent
+	// to the peer without waiting for the first data. This is
+	// only a hint. The transport may modify the flush decision
+	// for performance purposes.
 	Flush bool
 }
 
-// ClientTransport is the common interface for all gRPC client side transport
+// ClientTransport is the common interface for all gRPC client-side transport
 // implementations.
 type ClientTransport interface {
 	// Close tears down this transport. Once it returns, the transport
 	// should not be accessed any more. The caller must make sure this
 	// is called only once.
 	Close() error
+
+	// GracefulClose starts to tear down the transport. It stops accepting
+	// new RPCs and wait the completion of the pending RPCs.
+	GracefulClose() error
 
 	// Write sends the data for the given stream. A nil stream indicates
 	// the write is to be performed on the transport as a whole.
@@ -402,25 +435,45 @@ type ClientTransport interface {
 	// and create a new one) in error case. It should not return nil
 	// once the transport is initiated.
 	Error() <-chan struct{}
+
+	// GoAway returns a channel that is closed when ClientTranspor
+	// receives the draining signal from the server (e.g., GOAWAY frame in
+	// HTTP/2).
+	GoAway() <-chan struct{}
 }
 
-// ServerTransport is the common interface for all gRPC server side transport
+// ServerTransport is the common interface for all gRPC server-side transport
 // implementations.
+//
+// Methods may be called concurrently from multiple goroutines, but
+// Write methods for a given Stream will be called serially.
 type ServerTransport interface {
-	// WriteStatus sends the status of a stream to the client.
-	WriteStatus(s *Stream, statusCode codes.Code, statusDesc string) error
-	// Write sends the data for the given stream.
-	Write(s *Stream, data []byte, opts *Options) error
-	// WriteHeader sends the header metedata for the given stream.
-	WriteHeader(s *Stream, md metadata.MD) error
 	// HandleStreams receives incoming streams using the given handler.
 	HandleStreams(func(*Stream))
+
+	// WriteHeader sends the header metadata for the given stream.
+	// WriteHeader may not be called on all streams.
+	WriteHeader(s *Stream, md metadata.MD) error
+
+	// Write sends the data for the given stream.
+	// Write may not be called on all streams.
+	Write(s *Stream, data []byte, opts *Options) error
+
+	// WriteStatus sends the status of a stream to the client.
+	// WriteStatus is the final call made on a stream and always
+	// occurs.
+	WriteStatus(s *Stream, statusCode codes.Code, statusDesc string) error
+
 	// Close tears down the transport. Once it is called, the transport
 	// should not be accessed any more. All the pending streams and their
 	// handlers will be terminated asynchronously.
 	Close() error
+
 	// RemoteAddr returns the remote network address.
 	RemoteAddr() net.Addr
+
+	// Drain notifies the client this ServerTransport stops accepting new RPCs.
+	Drain()
 }
 
 // StreamErrorf creates an StreamError with the specified error code and description.
@@ -432,9 +485,11 @@ func StreamErrorf(c codes.Code, format string, a ...interface{}) StreamError {
 }
 
 // ConnectionErrorf creates an ConnectionError with the specified error description.
-func ConnectionErrorf(format string, a ...interface{}) ConnectionError {
+func ConnectionErrorf(temp bool, e error, format string, a ...interface{}) ConnectionError {
 	return ConnectionError{
 		Desc: fmt.Sprintf(format, a...),
+		temp: temp,
+		err:  e,
 	}
 }
 
@@ -442,14 +497,36 @@ func ConnectionErrorf(format string, a ...interface{}) ConnectionError {
 // entire connection and the retry of all the active streams.
 type ConnectionError struct {
 	Desc string
+	temp bool
+	err  error
 }
 
 func (e ConnectionError) Error() string {
 	return fmt.Sprintf("connection error: desc = %q", e.Desc)
 }
 
-// Define some common ConnectionErrors.
-var ErrConnClosing = ConnectionError{Desc: "transport is closing"}
+// Temporary indicates if this connection error is temporary or fatal.
+func (e ConnectionError) Temporary() bool {
+	return e.temp
+}
+
+// Origin returns the original error of this connection error.
+func (e ConnectionError) Origin() error {
+	// Never return nil error here.
+	// If the original error is nil, return itself.
+	if e.err == nil {
+		return e
+	}
+	return e.err
+}
+
+var (
+	// ErrConnClosing indicates that the transport is closing.
+	ErrConnClosing = ConnectionError{Desc: "transport is closing", temp: true}
+	// ErrStreamDrain indicates that the stream is rejected by the server because
+	// the server stops accepting new RPCs.
+	ErrStreamDrain = StreamErrorf(codes.Unavailable, "the server stops accepting new RPCs")
+)
 
 // StreamError is an error that only affects one stream within a connection.
 type StreamError struct {
@@ -474,12 +551,25 @@ func ContextErr(err error) StreamError {
 
 // wait blocks until it can receive from ctx.Done, closing, or proceed.
 // If it receives from ctx.Done, it returns 0, the StreamError for ctx.Err.
+// If it receives from done, it returns 0, io.EOF if ctx is not done; otherwise
+// it return the StreamError for ctx.Err.
+// If it receives from goAway, it returns 0, ErrStreamDrain.
 // If it receives from closing, it returns 0, ErrConnClosing.
 // If it receives from proceed, it returns the received integer, nil.
-func wait(ctx context.Context, closing <-chan struct{}, proceed <-chan int) (int, error) {
+func wait(ctx context.Context, done, goAway, closing <-chan struct{}, proceed <-chan int) (int, error) {
 	select {
 	case <-ctx.Done():
 		return 0, ContextErr(ctx.Err())
+	case <-done:
+		// User cancellation has precedence.
+		select {
+		case <-ctx.Done():
+			return 0, ContextErr(ctx.Err())
+		default:
+		}
+		return 0, io.EOF
+	case <-goAway:
+		return 0, ErrStreamDrain
 	case <-closing:
 		return 0, ErrConnClosing
 	case i := <-proceed:

@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/cmd/km/hyperkube.go
 package main
 
 import (
@@ -26,10 +24,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"runtime"
 
 	"k8s.io/kubernetes/pkg/util"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -64,7 +62,7 @@ func (hk *HyperKube) FindServer(name string) (*Server, error) {
 	return nil, fmt.Errorf("Server not found: %s", name)
 }
 
-// Servers returns a list of all of the registred servers
+// Servers returns a list of all of the registered servers
 func (hk *HyperKube) Servers() []Server {
 	return hk.servers
 }
@@ -149,7 +147,7 @@ func (hk *HyperKube) Run(args []string) error {
 			baseCommand = baseCommand + " " + serverName
 			args = args[1:]
 		} else {
-			err = errors.New("No server specified")
+			err = errors.New("no server specified")
 			hk.Printf("Error: %v\n\n", err)
 			hk.Usage()
 			return err
@@ -175,8 +173,8 @@ func (hk *HyperKube) Run(args []string) error {
 
 	verflag.PrintAndExitIfRequested()
 
-	util.InitLogs()
-	defer util.FlushLogs()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	err = s.Run(s, s.Flags().Args())
 	if err != nil {
@@ -188,7 +186,6 @@ func (hk *HyperKube) Run(args []string) error {
 
 // RunToExit will run the hyperkube and then call os.Exit with an appropriate exit code.
 func (hk *HyperKube) RunToExit(args []string) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	err := hk.Run(args)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())

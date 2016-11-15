@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"syscall"
@@ -32,8 +33,10 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -53,7 +56,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -82,7 +85,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -108,7 +111,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -149,7 +152,7 @@ func TestMerge(t *testing.T) {
 			obj: &api.Service{
 				Spec: api.ServiceSpec{},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
@@ -172,7 +175,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
@@ -213,72 +216,88 @@ func (f *fileHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	res.Write(f.data)
 }
 
+type checkErrTestCase struct {
+	err          error
+	expectedErr  string
+	expectedCode int
+}
+
 func TestCheckInvalidErr(t *testing.T) {
-	tests := []struct {
-		err      error
-		expected string
-	}{
+	testCheckError(t, []checkErrTestCase{
 		{
 			errors.NewInvalid(api.Kind("Invalid1"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
-			`Error from server: Invalid1 "invalidation" is invalid: field: Invalid value: "single": details`,
+			"The Invalid1 \"invalidation\" is invalid: field: Invalid value: \"single\": details\n",
+			DefaultErrorExitCode,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid2"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
-			`Error from server: Invalid2 "invalidation" is invalid: [field1: Invalid value: "multi1": details, field2: Invalid value: "multi2": details]`,
+			"The Invalid2 \"invalidation\" is invalid: \n* field1: Invalid value: \"multi1\": details\n* field2: Invalid value: \"multi2\": details\n",
+			DefaultErrorExitCode,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid3"), "invalidation", field.ErrorList{}),
-			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
+			"The Invalid3 \"invalidation\" is invalid",
+			DefaultErrorExitCode,
 		},
-	}
-
-	var errReturned string
-	errHandle := func(err string) {
-		errReturned = err
-	}
-
-	for _, test := range tests {
-		checkErr("", test.err, errHandle)
-
-		if errReturned != test.expected {
-			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
-		}
-	}
+		{
+			errors.NewInvalid(api.Kind("Invalid4"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
+			"The Invalid4 \"invalidation\" is invalid: field4: Invalid value: \"multi4\": details\n",
+			DefaultErrorExitCode,
+		},
+	})
 }
 
 func TestCheckNoResourceMatchError(t *testing.T) {
-	tests := []struct {
-		err      error
-		expected string
-	}{
+	testCheckError(t, []checkErrTestCase{
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
 			`the server doesn't have a resource type "foo"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Version: "theversion", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in version "theversion"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Version: "theversion", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in group "thegroup" and version "theversion"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in group "thegroup"`,
+			DefaultErrorExitCode,
 		},
-	}
+	})
+}
 
+func TestCheckExitError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			uexec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
+			"",
+			42,
+		},
+	})
+}
+
+func testCheckError(t *testing.T, tests []checkErrTestCase) {
 	var errReturned string
-	errHandle := func(err string) {
+	var codeReturned int
+	errHandle := func(err string, code int) {
 		errReturned = err
+		codeReturned = code
 	}
 
 	for _, test := range tests {
 		checkErr("", test.err, errHandle)
 
-		if errReturned != test.expected {
-			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
+		if errReturned != test.expectedErr {
+			t.Fatalf("Got: %s, expected: %s", errReturned, test.expectedErr)
+		}
+		if codeReturned != test.expectedCode {
+			t.Fatalf("Got: %d, expected: %d", codeReturned, test.expectedCode)
 		}
 	}
 }
@@ -291,6 +310,11 @@ func TestDumpReaderToFile(t *testing.T) {
 	}
 	defer syscall.Unlink(tempFile.Name())
 	defer tempFile.Close()
+	defer func() {
+		if !t.Failed() {
+			os.Remove(tempFile.Name())
+		}
+	}()
 	err = DumpReaderToFile(strings.NewReader(testString), tempFile.Name())
 	if err != nil {
 		t.Errorf("error in DumpReaderToFile: %v", err)

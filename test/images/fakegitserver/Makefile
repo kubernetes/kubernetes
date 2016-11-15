@@ -24,7 +24,7 @@ image:
 	docker build -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/$(IMAGE):$(TAG)
+	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
 
 all: push
 

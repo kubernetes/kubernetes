@@ -50,10 +50,11 @@ function download-releases() {
   curl -L ${ETCD_DOWNLOAD_URL} -o ${RELEASES_DIR}/etcd.tar.gz
 
   echo "Download kubernetes release v${K8S_VERSION} ..."
-  curl -L ${K8S_DOWNLOAD_URL} -o ${RELEASES_DIR}/kubernetes.tar.gz
+  curl -L ${K8S_CLIENT_DOWNLOAD_URL} -o ${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz
+  curl -L ${K8S_SERVER_DOWNLOAD_URL} -o ${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz
 
-  echo "Download docker-latest ..."
-  curl -L https://get.docker.com/builds/Linux/x86_64/docker-latest -o ${RELEASES_DIR}/docker
+  echo "Download docker release v${DOCKER_VERSION} ..."
+  curl -L ${DOCKER_DOWNLOAD_URL} -o ${RELEASES_DIR}/docker.tar.gz
 }
 
 function unpack-releases() {
@@ -79,24 +80,25 @@ function unpack-releases() {
   fi
 
   # k8s
-  if [[ -f ${RELEASES_DIR}/kubernetes.tar.gz ]] ; then
-    tar xzf ${RELEASES_DIR}/kubernetes.tar.gz -C ${RELEASES_DIR}
-
-    pushd ${RELEASES_DIR}/kubernetes/server
-    tar xzf kubernetes-server-linux-amd64.tar.gz
-    popd
-    cp ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kube-apiserver \
-       ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kube-controller-manager \
-       ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kube-scheduler ${BINARY_DIR}/master/bin
-
-    cp ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kubelet \
-       ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kube-proxy ${BINARY_DIR}/node/bin
-
-    cp ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kubectl ${BINARY_DIR}
+  if [[ -f ${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz ]] ; then
+    tar xzf ${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz -C ${RELEASES_DIR}
+    cp ${RELEASES_DIR}/kubernetes/client/bin/kubectl ${BINARY_DIR}
   fi
 
-  if [[ -f ${RELEASES_DIR}/docker ]]; then
-    cp ${RELEASES_DIR}/docker ${BINARY_DIR}/node/bin
+  if [[ -f ${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz ]] ; then
+    tar xzf ${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz -C ${RELEASES_DIR}
+    cp ${RELEASES_DIR}/kubernetes/server/bin/kube-apiserver \
+       ${RELEASES_DIR}/kubernetes/server/bin/kube-controller-manager \
+       ${RELEASES_DIR}/kubernetes/server/bin/kube-scheduler ${BINARY_DIR}/master/bin
+    cp ${RELEASES_DIR}/kubernetes/server/bin/kubelet \
+       ${RELEASES_DIR}/kubernetes/server/bin/kube-proxy ${BINARY_DIR}/node/bin
+  fi
+
+  # docker
+  if [[ -f ${RELEASES_DIR}/docker.tar.gz ]]; then
+    tar xzf ${RELEASES_DIR}/docker.tar.gz -C ${RELEASES_DIR}
+
+    cp ${RELEASES_DIR}/docker/docker* ${BINARY_DIR}/node/bin
   fi
 
   chmod -R +x ${BINARY_DIR}

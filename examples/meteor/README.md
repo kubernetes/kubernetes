@@ -1,38 +1,5 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/meteor/README.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-Meteor on Kuberenetes
-=====================
+Meteor on Kubernetes
+====================
 
 This example shows you how to package and run a
 [Meteor](https://www.meteor.com/) app on Kubernetes.
@@ -131,7 +98,7 @@ your app image with your project ID, and push to GCR. Replace
 
 ```
 docker tag my-meteor gcr.io/<project>/my-meteor
-gcloud docker push gcr.io/<project>/my-meteor
+gcloud docker -- push gcr.io/<project>/my-meteor
 ```
 
 Running
@@ -180,7 +147,7 @@ You will have to open up port 80 if it's not open yet in your
 environment. On Google Compute Engine, you may run the below command.
 
 ```
-gcloud compute firewall-rules create meteor-80 --allow=tcp:80 --target-tags kubernetes-minion
+gcloud compute firewall-rules create meteor-80 --allow=tcp:80 --target-tags kubernetes-node
 ```
 
 What is going on?

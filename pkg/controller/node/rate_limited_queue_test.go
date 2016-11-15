@@ -40,9 +40,9 @@ func CheckSetEq(lhs, rhs sets.String) bool {
 
 func TestAddNode(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 
 	queuePattern := []string{"first", "second", "third"}
 	if len(evictor.queue.queue) != len(queuePattern) {
@@ -70,9 +70,9 @@ func TestDelNode(t *testing.T) {
 		return t
 	}
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 	evictor.Remove("first")
 
 	queuePattern := []string{"second", "third"}
@@ -92,9 +92,9 @@ func TestDelNode(t *testing.T) {
 	}
 
 	evictor = NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 	evictor.Remove("second")
 
 	queuePattern = []string{"first", "third"}
@@ -114,9 +114,9 @@ func TestDelNode(t *testing.T) {
 	}
 
 	evictor = NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 	evictor.Remove("third")
 
 	queuePattern = []string{"first", "second"}
@@ -138,9 +138,9 @@ func TestDelNode(t *testing.T) {
 
 func TestTry(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 	evictor.Remove("second")
 
 	deletedMap := sets.NewString()
@@ -173,9 +173,9 @@ func TestTryOrdering(t *testing.T) {
 		return current
 	}
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 
 	order := []string{}
 	count := 0
@@ -225,9 +225,9 @@ func TestTryOrdering(t *testing.T) {
 
 func TestTryRemovingWhileTry(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 
 	processing := make(chan struct{})
 	wait := make(chan struct{})
@@ -271,13 +271,64 @@ func TestTryRemovingWhileTry(t *testing.T) {
 
 func TestClear(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 
 	evictor.Clear()
 
 	if len(evictor.queue.queue) != 0 {
 		t.Fatalf("Clear should remove all elements from the queue.")
 	}
+}
+
+func TestSwapLimiter(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
+	fakeAlways := flowcontrol.NewFakeAlwaysRateLimiter()
+	qps := evictor.limiter.QPS()
+	if qps != fakeAlways.QPS() {
+		t.Fatalf("QPS does not match create one: %v instead of %v", qps, fakeAlways.QPS())
+	}
+
+	evictor.SwapLimiter(0)
+	qps = evictor.limiter.QPS()
+	fakeNever := flowcontrol.NewFakeNeverRateLimiter()
+	if qps != fakeNever.QPS() {
+		t.Fatalf("QPS does not match create one: %v instead of %v", qps, fakeNever.QPS())
+	}
+
+	createdQPS := float32(5.5)
+	evictor.SwapLimiter(createdQPS)
+	qps = evictor.limiter.QPS()
+	if qps != createdQPS {
+		t.Fatalf("QPS does not match create one: %v instead of %v", qps, createdQPS)
+	}
+}
+
+func TestAddAfterTry(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
+	evictor.Remove("second")
+
+	deletedMap := sets.NewString()
+	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+		deletedMap.Insert(value.Value)
+		return true, 0
+	})
+
+	setPattern := sets.NewString("first", "third")
+	if len(deletedMap) != len(setPattern) {
+		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
+	}
+	if !CheckSetEq(setPattern, deletedMap) {
+		t.Errorf("Invalid map. Got %v, expected %v", deletedMap, setPattern)
+	}
+
+	evictor.Add("first", "11111")
+	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+		t.Errorf("We shouldn't process the same value if the explicit remove wasn't called.")
+		return true, 0
+	})
 }

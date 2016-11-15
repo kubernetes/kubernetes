@@ -180,7 +180,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 		if runningContainers {
 			glog.V(5).Infof(
-				"Pod %q has been removed from pod manager. However, it still has one or more containers in the non-exited state. Therefore it will not be removed from volume manager.",
+				"Pod %q has been removed from pod manager. However, it still has one or more containers in the non-exited state. Therefore, it will not be removed from volume manager.",
 				format.Pod(volumeToMount.Pod))
 			continue
 		}
@@ -369,7 +369,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	return pvc.Spec.VolumeName, pvc.UID, nil
 }
 
-// getPVSpec fetches the PV object with the given name from the the API server
+// getPVSpec fetches the PV object with the given name from the API server
 // and returns a volume.Spec representing it.
 // An error is returned if the call to fetch the PV object fails.
 func (dswp *desiredStateOfWorldPopulator) getPVSpec(

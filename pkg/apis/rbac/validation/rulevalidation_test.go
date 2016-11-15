@@ -73,13 +73,13 @@ func TestDefaultRuleResolver(t *testing.T) {
 	}
 
 	staticRoles1 := staticRoles{
-		roles: []rbac.Role{
+		roles: []*rbac.Role{
 			{
 				ObjectMeta: api.ObjectMeta{Namespace: "namespace1", Name: "readthings"},
 				Rules:      []rbac.PolicyRule{ruleReadPods, ruleReadServices},
 			},
 		},
-		clusterRoles: []rbac.ClusterRole{
+		clusterRoles: []*rbac.ClusterRole{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "cluster-admin"},
 				Rules:      []rbac.PolicyRule{ruleAdmin},
@@ -89,23 +89,23 @@ func TestDefaultRuleResolver(t *testing.T) {
 				Rules:      []rbac.PolicyRule{ruleWriteNodes},
 			},
 		},
-		roleBindings: []rbac.RoleBinding{
+		roleBindings: []*rbac.RoleBinding{
 			{
 				ObjectMeta: api.ObjectMeta{Namespace: "namespace1"},
 				Subjects: []rbac.Subject{
 					{Kind: rbac.UserKind, Name: "foobar"},
 					{Kind: rbac.GroupKind, Name: "group1"},
 				},
-				RoleRef: api.ObjectReference{Kind: "Role", Namespace: "namespace1", Name: "readthings"},
+				RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: "readthings"},
 			},
 		},
-		clusterRoleBindings: []rbac.ClusterRoleBinding{
+		clusterRoleBindings: []*rbac.ClusterRoleBinding{
 			{
 				Subjects: []rbac.Subject{
 					{Kind: rbac.UserKind, Name: "admin"},
 					{Kind: rbac.GroupKind, Name: "admin"},
 				},
-				RoleRef: api.ObjectReference{Kind: "ClusterRole", Name: "cluster-admin"},
+				RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: "cluster-admin"},
 			},
 		},
 	}
@@ -114,52 +114,38 @@ func TestDefaultRuleResolver(t *testing.T) {
 		staticRoles
 
 		// For a given context, what are the rules that apply?
-		ctx            api.Context
+		user           user.Info
+		namespace      string
 		effectiveRules []rbac.PolicyRule
 	}{
 		{
-			staticRoles: staticRoles1,
-			ctx: api.WithNamespace(
-				api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "foobar"}), "namespace1",
-			),
+			staticRoles:    staticRoles1,
+			user:           &user.DefaultInfo{Name: "foobar"},
+			namespace:      "namespace1",
 			effectiveRules: []rbac.PolicyRule{ruleReadPods, ruleReadServices},
 		},
 		{
-			staticRoles: staticRoles1,
-			ctx: api.WithNamespace(
-				// Same as above but diffrerent namespace. Should return no rules.
-				api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "foobar"}), "namespace2",
-			),
+			staticRoles:    staticRoles1,
+			user:           &user.DefaultInfo{Name: "foobar"},
+			namespace:      "namespace2",
 			effectiveRules: []rbac.PolicyRule{},
 		},
 		{
 			staticRoles: staticRoles1,
-			// GetEffectivePolicyRules only returns the policies for the namespace, not the master namespace.
-			ctx: api.WithNamespace(
-				api.WithUser(api.NewContext(), &user.DefaultInfo{
-					Name: "foobar", Groups: []string{"admin"},
-				}), "namespace1",
-			),
-			effectiveRules: []rbac.PolicyRule{ruleReadPods, ruleReadServices},
-		},
-		{
-			staticRoles: staticRoles1,
 			// Same as above but without a namespace. Only cluster rules should apply.
-			ctx: api.WithUser(api.NewContext(), &user.DefaultInfo{
-				Name: "foobar", Groups: []string{"admin"},
-			}),
+			user:           &user.DefaultInfo{Name: "foobar", Groups: []string{"admin"}},
 			effectiveRules: []rbac.PolicyRule{ruleAdmin},
 		},
 		{
 			staticRoles:    staticRoles1,
-			ctx:            api.WithUser(api.NewContext(), &user.DefaultInfo{}),
+			user:           &user.DefaultInfo{},
 			effectiveRules: []rbac.PolicyRule{},
 		},
 	}
 
 	for i, tc := range tests {
 		ruleResolver := newMockRuleResolver(&tc.staticRoles)
-		rules, err := ruleResolver.GetEffectivePolicyRules(tc.ctx)
+		rules, err := ruleResolver.RulesFor(tc.user, tc.namespace)
 		if err != nil {
 			t.Errorf("case %d: GetEffectivePolicyRules(context)=%v", i, err)
 			continue
@@ -179,7 +165,8 @@ func TestDefaultRuleResolver(t *testing.T) {
 func TestAppliesTo(t *testing.T) {
 	tests := []struct {
 		subjects  []rbac.Subject
-		ctx       api.Context
+		user      user.Info
+		namespace string
 		appliesTo bool
 		testCase  string
 	}{
@@ -187,7 +174,7 @@ func TestAppliesTo(t *testing.T) {
 			subjects: []rbac.Subject{
 				{Kind: rbac.UserKind, Name: "foobar"},
 			},
-			ctx:       api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "foobar"}),
+			user:      &user.DefaultInfo{Name: "foobar"},
 			appliesTo: true,
 			testCase:  "single subject that matches username",
 		},
@@ -196,7 +183,7 @@ func TestAppliesTo(t *testing.T) {
 				{Kind: rbac.UserKind, Name: "barfoo"},
 				{Kind: rbac.UserKind, Name: "foobar"},
 			},
-			ctx:       api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "foobar"}),
+			user:      &user.DefaultInfo{Name: "foobar"},
 			appliesTo: true,
 			testCase:  "multiple subjects, one that matches username",
 		},
@@ -205,7 +192,7 @@ func TestAppliesTo(t *testing.T) {
 				{Kind: rbac.UserKind, Name: "barfoo"},
 				{Kind: rbac.UserKind, Name: "foobar"},
 			},
-			ctx:       api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "zimzam"}),
+			user:      &user.DefaultInfo{Name: "zimzam"},
 			appliesTo: false,
 			testCase:  "multiple subjects, none that match username",
 		},
@@ -214,7 +201,7 @@ func TestAppliesTo(t *testing.T) {
 				{Kind: rbac.UserKind, Name: "barfoo"},
 				{Kind: rbac.GroupKind, Name: "foobar"},
 			},
-			ctx:       api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "zimzam", Groups: []string{"foobar"}}),
+			user:      &user.DefaultInfo{Name: "zimzam", Groups: []string{"foobar"}},
 			appliesTo: true,
 			testCase:  "multiple subjects, one that match group",
 		},
@@ -223,10 +210,8 @@ func TestAppliesTo(t *testing.T) {
 				{Kind: rbac.UserKind, Name: "barfoo"},
 				{Kind: rbac.GroupKind, Name: "foobar"},
 			},
-			ctx: api.WithNamespace(
-				api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "zimzam", Groups: []string{"foobar"}}),
-				"namespace1",
-			),
+			user:      &user.DefaultInfo{Name: "zimzam", Groups: []string{"foobar"}},
+			namespace: "namespace1",
 			appliesTo: true,
 			testCase:  "multiple subjects, one that match group, should ignore namespace",
 		},
@@ -234,12 +219,10 @@ func TestAppliesTo(t *testing.T) {
 			subjects: []rbac.Subject{
 				{Kind: rbac.UserKind, Name: "barfoo"},
 				{Kind: rbac.GroupKind, Name: "foobar"},
-				{Kind: rbac.ServiceAccountKind, Name: "kube-system", Namespace: "default"},
+				{Kind: rbac.ServiceAccountKind, Namespace: "kube-system", Name: "default"},
 			},
-			ctx: api.WithNamespace(
-				api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "system:serviceaccount:kube-system:default"}),
-				"default",
-			),
+			user:      &user.DefaultInfo{Name: "system:serviceaccount:kube-system:default"},
+			namespace: "default",
 			appliesTo: true,
 			testCase:  "multiple subjects with a service account that matches",
 		},
@@ -247,21 +230,15 @@ func TestAppliesTo(t *testing.T) {
 			subjects: []rbac.Subject{
 				{Kind: rbac.UserKind, Name: "*"},
 			},
-			ctx: api.WithNamespace(
-				api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "foobar"}),
-				"default",
-			),
+			user:      &user.DefaultInfo{Name: "foobar"},
+			namespace: "default",
 			appliesTo: true,
 			testCase:  "multiple subjects with a service account that matches",
 		},
 	}
 
 	for _, tc := range tests {
-		got, err := appliesTo(tc.ctx, tc.subjects)
-		if err != nil {
-			t.Errorf("case %q %v", tc.testCase, err)
-			continue
-		}
+		got := appliesTo(tc.user, tc.subjects, tc.namespace)
 		if got != tc.appliesTo {
 			t.Errorf("case %q want appliesTo=%t, got appliesTo=%t", tc.testCase, tc.appliesTo, got)
 		}

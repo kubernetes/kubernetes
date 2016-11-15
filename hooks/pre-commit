@@ -7,7 +7,7 @@ readonly green=$(tput bold; tput setaf 2)
 exit_code=0
 
 echo -ne "Checking that it builds... "
-if ! OUT=$("hack/build-go.sh" 2>&1); then
+if ! OUT=$(make 2>&1); then
   echo
   echo "${red}${OUT}"
   exit_code=1
@@ -152,6 +152,30 @@ if ! hack/verify-swagger-spec.sh > /dev/null; then
   echo "Swagger spec needs to be updated."
   echo "To regenerate the spec, run:"
   echo "  hack/update-swagger-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for openapi spec that need updating... "
+if ! hack/verify-openapi-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Openapi spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-openapi-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for federation openapi spec that need updating... "
+if ! hack/verify-federation-openapi-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Federation OpenAPI spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-federation-openapi-spec.sh"
   exit_code=1
 else
   echo "${green}OK"

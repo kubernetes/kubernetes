@@ -25,9 +25,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	kcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
@@ -54,7 +55,11 @@ const (
 
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 5 * time.Minute
+	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
+
+	// reconcilerSyncDuration is the amount of time the reconciler sync states loop
+	// wait between successive executions
+	reconcilerSyncDuration time.Duration = 5 * time.Second
 )
 
 // AttachDetachController defines the operations supported by this controller.
@@ -65,12 +70,13 @@ type AttachDetachController interface {
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
 	kubeClient internalclientset.Interface,
-	podInformer framework.SharedInformer,
-	nodeInformer framework.SharedInformer,
-	pvcInformer framework.SharedInformer,
-	pvInformer framework.SharedInformer,
+	podInformer kcache.SharedInformer,
+	nodeInformer kcache.SharedInformer,
+	pvcInformer kcache.SharedInformer,
+	pvInformer kcache.SharedInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin) (AttachDetachController, error) {
+	plugins []volume.VolumePlugin,
+	recorder record.EventRecorder) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -92,13 +98,13 @@ func NewAttachDetachController(
 		cloud:       cloud,
 	}
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.podAdd,
 		UpdateFunc: adc.podUpdate,
 		DeleteFunc: adc.podDelete,
 	})
 
-	nodeInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	nodeInformer.AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.nodeAdd,
 		UpdateFunc: adc.nodeUpdate,
 		DeleteFunc: adc.nodeDelete,
@@ -113,12 +119,15 @@ func NewAttachDetachController(
 	adc.attacherDetacher =
 		operationexecutor.NewOperationExecutor(
 			kubeClient,
-			&adc.volumePluginMgr)
+			&adc.volumePluginMgr,
+			recorder,
+			false) // flag for experimental binary check for volume mount
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer, adc.actualStateOfWorld)
 	adc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
 		reconcilerMaxWaitForUnmountDuration,
+		reconcilerSyncDuration,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
@@ -140,12 +149,12 @@ type attachDetachController struct {
 	// pvcInformer is the shared PVC informer used to fetch and store PVC
 	// objects from the API server. It is shared with other controllers and
 	// therefore the PVC objects in its store should be treated as immutable.
-	pvcInformer framework.SharedInformer
+	pvcInformer kcache.SharedInformer
 
 	// pvInformer is the shared PV informer used to fetch and store PV objects
 	// from the API server. It is shared with other controllers and therefore
 	// the PV objects in its store should be treated as immutable.
-	pvInformer framework.SharedInformer
+	pvInformer kcache.SharedInformer
 
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
@@ -184,6 +193,9 @@ type attachDetachController struct {
 	// desiredStateOfWorldPopulator runs an asynchronous periodic loop to
 	// populate the current pods using podInformer.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
+
+	// recorder is used to record events in the API server
+	recorder record.EventRecorder
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -231,7 +243,7 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 		return
 	}
 
-	nodeName := node.Name
+	nodeName := types.NodeName(node.Name)
 	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
@@ -252,7 +264,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 		return
 	}
 
-	nodeName := node.Name
+	nodeName := types.NodeName(node.Name)
 	if err := adc.desiredStateOfWorld.DeleteNode(nodeName); err != nil {
 		glog.V(10).Infof("%v", err)
 	}
@@ -272,7 +284,9 @@ func (adc *attachDetachController) processPodVolumes(
 		return
 	}
 
-	if !adc.desiredStateOfWorld.NodeExists(pod.Spec.NodeName) {
+	nodeName := types.NodeName(pod.Spec.NodeName)
+
+	if !adc.desiredStateOfWorld.NodeExists(nodeName) {
 		// If the node the pod is scheduled to does not exist in the desired
 		// state of the world data structure, that indicates the node is not
 		// yet managed by the controller. Therefore, ignore the pod.
@@ -282,7 +296,7 @@ func (adc *attachDetachController) processPodVolumes(
 			"Skipping processing of pod %q/%q: it is scheduled to node %q which is not managed by the controller.",
 			pod.Namespace,
 			pod.Name,
-			pod.Spec.NodeName)
+			nodeName)
 		return
 	}
 
@@ -315,7 +329,7 @@ func (adc *attachDetachController) processPodVolumes(
 		if addVolumes {
 			// Add volume to desired state of world
 			_, err := adc.desiredStateOfWorld.AddPod(
-				uniquePodName, pod, volumeSpec, pod.Spec.NodeName)
+				uniquePodName, pod, volumeSpec, nodeName)
 			if err != nil {
 				glog.V(10).Infof(
 					"Failed to add volume %q for pod %q/%q to desiredStateOfWorld. %v",
@@ -339,7 +353,7 @@ func (adc *attachDetachController) processPodVolumes(
 				continue
 			}
 			adc.desiredStateOfWorld.DeletePod(
-				uniquePodName, uniqueVolumeName, pod.Spec.NodeName)
+				uniquePodName, uniqueVolumeName, nodeName)
 		}
 	}
 
@@ -510,7 +524,8 @@ func (adc *attachDetachController) getPVSpecFromCache(
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName string, volumesInUse []api.UniqueVolumeName) {
+	nodeName types.NodeName, volumesInUse []api.UniqueVolumeName) {
+	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false
 		for _, volumeInUse := range volumesInUse {
@@ -579,6 +594,6 @@ func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
-func (adc *attachDetachController) GetRootContext() string {
-	return ""
+func (adc *attachDetachController) GetNodeAllocatable() (api.ResourceList, error) {
+	return api.ResourceList{}, nil
 }

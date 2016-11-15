@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package errors implements various utility functions and types around errors.
-package errors
+package errors // import "k8s.io/kubernetes/pkg/util/errors"

@@ -31,7 +31,7 @@ export NUM_NODES=${NUM_NODES:-2}
 export NUM_NODES=${NUM_NODES}
 
 # By default, the cluster will use the etcd installed on master.
-export ETCD_SERVERS=${ETCD_SERVERS:-"http://$MASTER_IP:4001"}
+export ETCD_SERVERS=${ETCD_SERVERS:-"http://$MASTER_IP:2379"}
 
 # define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
@@ -41,8 +41,8 @@ export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-"192.168.3.0/24"}
 export FLANNEL_NET=${FLANNEL_NET:-"172.16.0.0/16"}
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-# If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
-export ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,ServiceAccount,SecurityContextDeny,ResourceQuota
+# If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
+export ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,ServiceAccount,SecurityContextDeny,DefaultStorageClass,ResourceQuota
 
 # Extra options to set on the Docker command line.
 # This is useful for setting --insecure-registry for local registries.

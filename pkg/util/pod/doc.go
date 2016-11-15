@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package pod provides utilities to work with Kubernetes pod and pod templates.
-package pod
+package pod // import "k8s.io/kubernetes/pkg/util/pod"

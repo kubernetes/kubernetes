@@ -18,4 +18,4 @@ limitations under the License.
 // The Conn type allows callers to multiplex multiple read/write channels over
 // a single websocket. The Reader type allows an io.Reader to be copied over
 // a websocket channel as binary content.
-package wsstream
+package wsstream // import "k8s.io/kubernetes/pkg/util/wsstream"

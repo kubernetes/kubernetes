@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package scheduler contains a generic Scheduler interface and several
 // implementations.
-package algorithm
+package algorithm // import "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"

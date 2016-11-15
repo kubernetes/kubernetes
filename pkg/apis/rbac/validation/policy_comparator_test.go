@@ -284,10 +284,10 @@ func TestCoversEnumerationNotCoveringResourceNameEmpty(t *testing.T) {
 func TestCoversNonResourceURLs(t *testing.T) {
 	escalationTest{
 		ownerRules: []rbac.PolicyRule{
-			{NonResourceURLs: []string{"/apis"}},
+			{NonResourceURLs: []string{"/apis"}, Verbs: []string{"*"}},
 		},
 		servantRules: []rbac.PolicyRule{
-			{NonResourceURLs: []string{"/apis"}},
+			{NonResourceURLs: []string{"/apis"}, Verbs: []string{"*"}},
 		},
 
 		expectedCovered:        true,
@@ -298,10 +298,40 @@ func TestCoversNonResourceURLs(t *testing.T) {
 func TestCoversNonResourceURLsStar(t *testing.T) {
 	escalationTest{
 		ownerRules: []rbac.PolicyRule{
-			{NonResourceURLs: []string{"*"}},
+			{NonResourceURLs: []string{"*"}, Verbs: []string{"*"}},
 		},
 		servantRules: []rbac.PolicyRule{
-			{NonResourceURLs: []string{"/apis", "/apis/v1", "/"}},
+			{NonResourceURLs: []string{"/apis", "/apis/v1", "/"}, Verbs: []string{"*"}},
+		},
+
+		expectedCovered:        true,
+		expectedUncoveredRules: []rbac.PolicyRule{},
+	}.test(t)
+}
+
+func TestCoversNonResourceURLsStarAfterPrefixDoesntCover(t *testing.T) {
+	escalationTest{
+		ownerRules: []rbac.PolicyRule{
+			{NonResourceURLs: []string{"/apis/*"}, Verbs: []string{"*"}},
+		},
+		servantRules: []rbac.PolicyRule{
+			{NonResourceURLs: []string{"/apis", "/apis/v1"}, Verbs: []string{"get"}},
+		},
+
+		expectedCovered: false,
+		expectedUncoveredRules: []rbac.PolicyRule{
+			{NonResourceURLs: []string{"/apis"}, Verbs: []string{"get"}},
+		},
+	}.test(t)
+}
+
+func TestCoversNonResourceURLsStarAfterPrefix(t *testing.T) {
+	escalationTest{
+		ownerRules: []rbac.PolicyRule{
+			{NonResourceURLs: []string{"/apis/*"}, Verbs: []string{"*"}},
+		},
+		servantRules: []rbac.PolicyRule{
+			{NonResourceURLs: []string{"/apis/v1/foo", "/apis/v1"}, Verbs: []string{"get"}},
 		},
 
 		expectedCovered:        true,
@@ -333,7 +363,7 @@ func TestCoversNonResourceURLsWithOtherFieldsFailure(t *testing.T) {
 		},
 
 		expectedCovered:        false,
-		expectedUncoveredRules: []rbac.PolicyRule{{NonResourceURLs: []string{"/apis"}}},
+		expectedUncoveredRules: []rbac.PolicyRule{{NonResourceURLs: []string{"/apis"}, Verbs: []string{"get"}}},
 	}.test(t)
 }
 
@@ -359,6 +389,7 @@ func rulesMatch(expectedRules, actualRules []rbac.PolicyRule) bool {
 		for _, actualRule := range actualRules {
 			if reflect.DeepEqual(expectedRule, actualRule) {
 				found = true
+				break
 			}
 		}
 

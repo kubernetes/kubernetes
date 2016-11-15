@@ -155,7 +155,7 @@ assemble_kubelet_flags() {
     if [ ! -z "${KUBELET_APISERVER:-}" ] && \
        [ ! -z "${KUBELET_CERT:-}" ] && \
        [ ! -z "${KUBELET_KEY:-}" ]; then
-      KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --api-servers=https://${KUBELET_APISERVER} --register-schedulable=false --reconcile-cidr=false --pod-cidr=10.123.45.0/30"
+      KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --api-servers=https://${KUBELET_APISERVER} --register-schedulable=false"
     else
       KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=${MASTER_IP_RANGE}"
     fi
@@ -175,9 +175,6 @@ assemble_kubelet_flags() {
   fi
   if [ -n "${NODE_LABELS:-}" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --node-labels=${NODE_LABELS}"
-  fi
-  if [ "${ALLOCATE_NODE_CIDRS:-}" = "true" ]; then
-     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
   fi
   # Add the unconditional flags
   KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --cloud-provider=gce --allow-privileged=true --cgroup-root=/ --system-cgroups=/system --kubelet-cgroups=/kubelet --babysit-daemons=true --config=/etc/kubernetes/manifests --cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
@@ -332,8 +329,13 @@ EOF
   fi
   if [ -n "${NODE_INSTANCE_PREFIX:-}" ]; then
     use_cloud_config="true"
+    if [[ -n "${NODE_TAGS:-}" ]]; then
+      local -r node_tags="${NODE_TAGS}"
+    else
+      local -r node_tags="${NODE_INSTANCE_PREFIX}"
+    fi
     cat <<EOF >>/etc/gce.conf
-node-tags = ${NODE_INSTANCE_PREFIX}
+node-tags = ${node_tags}
 node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
   fi
@@ -384,6 +386,36 @@ contexts:
   name: webhook
 EOF
   fi
+
+if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
+    # This is the config file for the image review webhook.
+    cat <<EOF >/etc/gcp_image_review.config
+clusters:
+  - name: gcp-image-review-server
+    cluster:
+      server: ${GCP_IMAGE_VERIFICATION_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-image-review-server
+    user: kube-apiserver
+  name: webhook
+EOF
+    # This is the config for the image review admission controller.
+    cat <<EOF >/etc/admission_controller.config
+imagePolicy:
+  kubeConfigFile: /etc/gcp_image_review.config
+  allowTTL: 30
+  denyTTL: 30
+  retryBackoff: 500
+  defaultAllow: true
+EOF
+  fi
 }
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
@@ -396,6 +428,15 @@ create_master_kubelet_auth() {
   fi
 }
 
+function create-master-etcd-auth {
+  if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
+    local -r auth_dir="/etc/srv/kubernetes"
+    echo "${ETCD_CA_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-ca.crt"
+    echo "${ETCD_PEER_KEY}" | base64 --decode > "${auth_dir}/etcd-peer.key"
+    echo "${ETCD_PEER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-peer.crt"
+  fi
+}
+
 # Replaces the variables in the etcd manifest file with the real values, and then
 # copy the file to the manifest dir
 # $1: value for variable 'suffix'
@@ -404,12 +445,55 @@ create_master_kubelet_auth() {
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 prepare_etcd_manifest() {
+  local host_name=$(hostname)
+  local etcd_cluster=""
+  local cluster_state="new"
+  local etcd_protocol="http"
+  local etcd_creds=""
+
+  if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
+    etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
+    etcd_protocol="https"
+  fi
+
+  for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
+    etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
+    if [[ -n "${etcd_cluster}" ]]; then
+      etcd_cluster+=","
+      cluster_state="existing"
+    fi
+    etcd_cluster+="${etcd_host}"
+  done
+
   etcd_temp_file="/tmp/$5"
   cp /home/kubernetes/kube-manifests/kubernetes/gci-trusty/etcd.manifest "${etcd_temp_file}"
+  remove_salt_config_comments "${etcd_temp_file}"
   sed -i -e "s@{{ *suffix *}}@$1@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *port *}}@$2@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *server_port *}}@$3@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *cpulimit *}}@\"$4\"@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *srv_kube_path *}}@/etc/srv/kubernetes@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *hostname *}}@$host_name@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+  if [[ "${STORAGE_BACKEND:-}" == "etcd3" ]]; then
+    sed -i -e "s@{{ *quota_bytes *}}@--quota-backend-bytes=4294967296@g" "${temp_file}"
+  else
+    sed -i -e "s@{{ *quota_bytes *}}@@g" "${temp_file}"
+  fi
+  sed -i -e "s@{{ *cluster_state *}}@$cluster_state@g" "${etcd_temp_file}"
+  if [[ -n "${ETCD_IMAGE:-}" ]]; then
+    sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@${ETCD_IMAGE}@g" "${etcd_temp_file}"
+  else
+    sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@\1@g" "${etcd_temp_file}"
+  fi
+  sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${etcd_temp_file}"
+  if [[ -n "${ETCD_VERSION:-}" ]]; then
+    sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${etcd_temp_file}"
+  else
+    sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@\1@g" "${etcd_temp_file}"
+  fi
   # Replace the volume host path
   sed -i -e "s@/mnt/master-pd/var/etcd@/mnt/disks/master-pd/var/etcd@g" "${etcd_temp_file}"
   mv "${etcd_temp_file}" /etc/kubernetes/manifests
@@ -432,7 +516,7 @@ start_etcd_servers() {
     rm -f /etc/init.d/etcd
   fi
   prepare_log_file /var/log/etcd.log
-  prepare_etcd_manifest "" "4001" "2380" "200m" "etcd.manifest"
+  prepare_etcd_manifest "" "2379" "2380" "200m" "etcd.manifest"
 
   prepare_log_file /var/log/etcd-events.log
   prepare_etcd_manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
@@ -488,7 +572,7 @@ start_kube_apiserver() {
   params="${APISERVER_TEST_ARGS:-} ${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${CLOUD_CONFIG_OPT}"
   params="${params} --cloud-provider=gce"
   params="${params} --address=127.0.0.1"
-  params="${params} --etcd-servers=http://127.0.0.1:4001"
+  params="${params} --etcd-servers=http://127.0.0.1:2379"
   params="${params} --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params="${params} --tls-private-key-file=/etc/srv/kubernetes/server.key"
   params="${params} --secure-port=443"
@@ -499,12 +583,40 @@ start_kube_apiserver() {
   params="${params} --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
 
+  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+    params="${params} --storage-backend=${STORAGE_BACKEND}"
+  fi
+  if [ -n "${NUM_NODES:-}" ]; then
+    # If the cluster is large, increase max-requests-inflight limit in apiserver.
+    if [[ "${NUM_NODES}" -ge 1000 ]]; then
+      params+=" --max-requests-inflight=1500"
+    fi
+    # Set amount of memory available for apiserver based on number of nodes.
+    # TODO: Once we start setting proper requests and limits for apiserver
+    # we should reuse the same logic here instead of current heuristic.
+    params="${params} --target-ram-mb=$((${NUM_NODES} * 60))"
+  fi
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
+
+  local admission_controller_config_mount=""
+  local admission_controller_config_volume=""
+  local image_policy_webhook_config_mount=""
+  local image_policy_webhook_config_volume=""
   if [ -n "${ADMISSION_CONTROL:-}" ]; then
     params="${params} --admission-control=${ADMISSION_CONTROL}"
+    if [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
+      params+=" --admission-control-config-file=/etc/admission_controller.config"
+      # Mount the file to configure admission controllers if ImagePolicyWebhook is set.
+      admission_controller_config_mount="{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"/etc/admission_controller.config\", \"readOnly\": false},"
+      admission_controller_config_volume="{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"/etc/admission_controller.config\"}},"
+      # Mount the file to configure the ImagePolicyWebhook's webhook.
+      image_policy_webhook_config_mount="{\"name\": \"imagepolicywebhookconfigmount\",\"mountPath\": \"/etc/gcp_image_review.config\", \"readOnly\": false},"
+      image_policy_webhook_config_volume="{\"name\": \"imagepolicywebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_image_review.config\"}},"
+    fi
   fi
+
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
     params="${params} --min-request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT}"
   fi
@@ -516,11 +628,13 @@ start_kube_apiserver() {
     params="${params} --advertise-address=${vm_external_ip}"
     params="${params} --ssh-user=${PROXY_SSH_USER}"
     params="${params} --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+  else [ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]
+    params="${params} --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
   fi
   readonly kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
 
-  webhook_authn_config_mount=""
-  webhook_authn_config_volume=""
+  local webhook_authn_config_mount=""
+  local webhook_authn_config_volume=""
   if [ -n "${GCP_AUTHN_URL:-}" ]; then
     params="${params} --authentication-token-webhook-config-file=/etc/gcp_authn.config"
     webhook_authn_config_mount="{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"/etc/gcp_authn.config\", \"readOnly\": false},"
@@ -528,8 +642,8 @@ start_kube_apiserver() {
   fi
 
   params="${params} --authorization-mode=ABAC"
-  webhook_config_mount=""
-  webhook_config_volume=""
+  local webhook_config_mount=""
+  local webhook_config_volume=""
   if [ -n "${GCP_AUTHZ_URL:-}" ]; then
     params="${params},Webhook --authorization-webhook-config-file=/etc/gcp_authz.config"
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
@@ -537,7 +651,14 @@ start_kube_apiserver() {
   fi
 
   src_dir="/home/kubernetes/kube-manifests/kubernetes/gci-trusty"
-  cp "${src_dir}/abac-authz-policy.jsonl" /etc/srv/kubernetes/
+
+  if [[ -n "${KUBE_USER:-}" ]]; then
+    local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
+    remove_salt_config_comments "${abac_policy_json}"
+    sed -i -e "s@{{kube_user}}@${KUBE_USER}@g" "${abac_policy_json}"
+    cp "${abac_policy_json}" /etc/srv/kubernetes/
+  fi
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove_salt_config_comments "${src_file}"
   # Evaluate variables
@@ -557,6 +678,10 @@ start_kube_apiserver() {
   sed -i -e "s@{{webhook_authn_config_volume}}@${webhook_authn_config_volume}@g" "${src_file}"
   sed -i -e "s@{{webhook_config_mount}}@${webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{webhook_config_volume}}@${webhook_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{admission_controller_config_mount}}@${admission_controller_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{admission_controller_config_volume}}@${admission_controller_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{image_policy_webhook_config_mount}}@${image_policy_webhook_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{image_policy_webhook_config_volume}}@${image_policy_webhook_config_volume}@g" "${src_file}"
 
   cp "${src_file}" /etc/kubernetes/manifests
 }
@@ -633,6 +758,10 @@ start_kube_scheduler() {
     log_level="${SCHEDULER_TEST_LOG_LEVEL}"
   fi
   params="${log_level} ${SCHEDULER_TEST_ARGS:-}"
+  if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
+    params="${params} --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
+  fi
+  
   readonly kube_scheduler_docker_tag=$(cat "${kube_home}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values
@@ -662,6 +791,15 @@ start_cluster_autoscaler() {
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
     cp "${src_file}" /etc/kubernetes/manifests
+  fi
+}
+
+# Starts rescheduler.
+start-rescheduler() {
+  if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
+    prepare-log-file /var/log/rescheduler.log
+    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
+       /etc/kubernetes/manifests/
   fi
 }
 
@@ -716,11 +854,8 @@ start_kube_addons() {
     setup_addon_manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
     base_metrics_memory="140Mi"
-    metrics_memory="${base_metrics_memory}"
     base_eventer_memory="190Mi"
     base_metrics_cpu="80m"
-    metrics_cpu="${base_metrics_cpu}"
-    eventer_memory="${base_eventer_memory}"
     nanny_memory="90Mi"
     readonly metrics_memory_per_node="4"
     readonly metrics_cpu_per_node="0.5"
@@ -728,10 +863,7 @@ start_kube_addons() {
     readonly nanny_memory_per_node="200"
     if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -ge 1 ]; then
       num_kube_nodes="$((${NUM_NODES}+1))"
-      metrics_memory="$((${num_kube_nodes} * ${metrics_memory_per_node} + 200))Mi"
-      eventer_memory="$((${num_kube_nodes} * ${eventer_memory_per_node} + 200 * 1024))Ki"
       nanny_memory="$((${num_kube_nodes} * ${nanny_memory_per_node} + 90 * 1024))Ki"
-      metrics_cpu=$(echo - | awk "{print ${num_kube_nodes} * ${metrics_cpu_per_node} + 80}")m
     fi
     controller_yaml="${addon_dst_dir}/${file_dir}"
     if [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then
@@ -741,11 +873,8 @@ start_kube_addons() {
     fi
     remove_salt_config_comments "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *metrics_cpu *}}@${metrics_cpu}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
@@ -764,9 +893,12 @@ start_kube_addons() {
     mv "${addon_dst_dir}/dns/skydns-rc.yaml.in" "${dns_rc_file}"
     mv "${addon_dst_dir}/dns/skydns-svc.yaml.in" "${dns_svc_file}"
     # Replace the salt configurations with variable values.
-    sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
+
+    if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
+      setup_addon_manifests "addons" "dns-horizontal-autoscaler"
+    fi
 
     if [[ "${FEDERATION:-}" == "true" ]]; then
       FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"

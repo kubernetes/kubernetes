@@ -1,0 +1,14 @@
+{
+  "Rules": [
+    {
+      "SelectorRegexp": "k8s[.]io",
+      "AllowedPrefixes": [
+        "k8s.io/kubernetes/cmd/libs/go2idl",
+        "k8s.io/kubernetes/pkg/genericapiserver/openapi/common",
+        "k8s.io/gengo",
+        "k8s.io/kubernetes/third_party",
+        "k8s.io/kubernetes/pkg/util/sets"
+      ]
+    }
+  ]
+}

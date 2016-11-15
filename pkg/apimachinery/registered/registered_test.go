@@ -23,6 +23,83 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 )
 
+func TestAddThirdPartyVersionsBasic(t *testing.T) {
+	m, err := NewAPIRegistrationManager("")
+	if err != nil {
+		t.Fatalf("Unexpected failure to make a manager: %v", err)
+	}
+
+	registered := []unversioned.GroupVersion{
+		{
+			Group:   "",
+			Version: "v1",
+		},
+	}
+	skipped := registered
+	thirdParty := []unversioned.GroupVersion{
+		{
+			Group:   "company.com",
+			Version: "v1",
+		},
+		{
+			Group:   "company.com",
+			Version: "v2",
+		},
+	}
+	gvs := append(registered, thirdParty...)
+
+	m.RegisterVersions(registered)
+	wasSkipped := m.AddThirdPartyAPIGroupVersions(gvs...)
+	if len(wasSkipped) != len(skipped) {
+		t.Errorf("Expected %v, found %v", skipped, wasSkipped)
+	}
+	for ix := range wasSkipped {
+		found := false
+		for _, gv := range skipped {
+			if gv.String() == wasSkipped[ix].String() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Couldn't find %v in %v", wasSkipped[ix], skipped)
+		}
+	}
+	for _, gv := range thirdParty {
+		if !m.IsThirdPartyAPIGroupVersion(gv) {
+			t.Errorf("Expected %v to be third party.", gv)
+		}
+	}
+}
+
+func TestAddThirdPartyVersionsMultiple(t *testing.T) {
+	thirdParty := []unversioned.GroupVersion{
+		{
+			Group:   "company.com",
+			Version: "v1",
+		},
+		{
+			Group:   "company.com",
+			Version: "v2",
+		},
+	}
+	m, err := NewAPIRegistrationManager("")
+	if err != nil {
+		t.Fatalf("Unexpected failure to make a manager: %v", err)
+	}
+	for _, gv := range thirdParty {
+		wasSkipped := m.AddThirdPartyAPIGroupVersions(gv)
+		if len(wasSkipped) != 0 {
+			t.Errorf("Expected length 0, found %v", wasSkipped)
+		}
+	}
+	for _, gv := range thirdParty {
+		if !m.IsThirdPartyAPIGroupVersion(gv) {
+			t.Errorf("Expected %v to be third party.", gv)
+		}
+	}
+}
+
 func TestAllPreferredGroupVersions(t *testing.T) {
 	testCases := []struct {
 		groupMetas []apimachinery.GroupMeta
@@ -56,13 +133,16 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		for _, groupMeta := range testCase.groupMetas {
-			RegisterGroup(groupMeta)
+		m, err := NewAPIRegistrationManager("")
+		if err != nil {
+			t.Fatalf("Unexpected failure to make a manager: %v", err)
 		}
-		output := AllPreferredGroupVersions()
+		for _, groupMeta := range testCase.groupMetas {
+			m.RegisterGroup(groupMeta)
+		}
+		output := m.AllPreferredGroupVersions()
 		if testCase.expect != output {
 			t.Errorf("Error. expect: %s, got: %s", testCase.expect, output)
 		}
-		reset()
 	}
 }

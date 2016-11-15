@@ -16,10 +16,33 @@ limitations under the License.
 
 package types
 
+import "strings"
+
 func NewBool(v bool) *bool {
 	return &v
 }
 
 func NewReference(r ManagedObjectReference) *ManagedObjectReference {
 	return &r
+}
+
+func (r ManagedObjectReference) Reference() ManagedObjectReference {
+	return r
+}
+
+func (r ManagedObjectReference) String() string {
+	return strings.Join([]string{r.Type, r.Value}, ":")
+}
+
+func (r *ManagedObjectReference) FromString(o string) bool {
+	s := strings.SplitN(o, ":", 2)
+
+	if len(s) < 2 {
+		return false
+	}
+
+	r.Type = s[0]
+	r.Value = s[1]
+
+	return true
 }

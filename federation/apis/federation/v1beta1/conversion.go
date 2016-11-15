@@ -19,12 +19,11 @@ package v1beta1
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) {
-	err := api.Scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "Cluster",
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "Cluster",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
@@ -32,9 +31,6 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+		},
+	)
 }

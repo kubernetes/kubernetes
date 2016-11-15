@@ -18,4 +18,4 @@ limitations under the License.
 dnsprovider supplies interfaces for dns service providers (e.g. Google Cloud DNS, AWS route53, etc).
 Implementations exist in the providers sub-package
 */
-package dnsprovider
+package dnsprovider // import "k8s.io/kubernetes/federation/pkg/dnsprovider"

@@ -1,42 +1,8 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/client-libraries.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 ## Kubernetes API client libraries
 
 ### Supported
 
-   * [Go](http://releases.k8s.io/HEAD/pkg/client/)
+   * [Go](https://github.com/kubernetes/client-go)
 
 ### User Contributed
 
@@ -47,6 +13,7 @@ the core Kubernetes team*
    * [Java (OSGi)](https://bitbucket.org/amdatulabs/amdatu-kubernetes)
    * [Java (Fabric8, OSGi)](https://github.com/fabric8io/kubernetes-client)
    * [Node.js](https://github.com/tenxcloud/node-kubernetes-client)
+   * [Node.js](https://github.com/godaddy/kubernetes-client)
    * [Perl](https://metacpan.org/pod/Net::Kubernetes)
    * [PHP](https://github.com/devstub/kubernetes-api-php-client)
    * [PHP](https://github.com/maclof/kubernetes-client)

@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,11 @@ import (
 )
 
 func PurgeFile(dirname string, suffix string, max uint, interval time.Duration, stop <-chan struct{}) <-chan error {
+	return purgeFile(dirname, suffix, max, interval, stop, nil)
+}
+
+// purgeFile is the internal implementation for PurgeFile which can post purged files to purgec if non-nil.
+func purgeFile(dirname string, suffix string, max uint, interval time.Duration, stop <-chan struct{}, purgec chan<- string) <-chan error {
 	errC := make(chan error, 1)
 	go func() {
 		for {
@@ -38,9 +43,10 @@ func PurgeFile(dirname string, suffix string, max uint, interval time.Duration, 
 				}
 			}
 			sort.Strings(newfnames)
+			fnames = newfnames
 			for len(newfnames) > int(max) {
 				f := path.Join(dirname, newfnames[0])
-				l, err := TryLockFile(f, os.O_WRONLY, 0600)
+				l, err := TryLockFile(f, os.O_WRONLY, PrivateFileMode)
 				if err != nil {
 					break
 				}
@@ -55,6 +61,11 @@ func PurgeFile(dirname string, suffix string, max uint, interval time.Duration, 
 				}
 				plog.Infof("purged file %s successfully", f)
 				newfnames = newfnames[1:]
+			}
+			if purgec != nil {
+				for i := 0; i < len(fnames)-len(newfnames); i++ {
+					purgec <- fnames[i]
+				}
 			}
 			select {
 			case <-time.After(interval):

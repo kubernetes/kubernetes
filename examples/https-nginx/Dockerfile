@@ -13,6 +13,13 @@
 # limitations under the License.
 
 FROM nginx
-MAINTAINER Prashanth B <beeps@google.com>
-COPY default.conf /etc/nginx/conf.d/default.conf
-CMD ["nginx", "-g", "daemon off;"]
+
+MAINTAINER Mengqi Yu <mengqiy@google.com>
+
+COPY index2.html /usr/share/nginx/html/index2.html
+RUN chmod +r /usr/share/nginx/html/index2.html
+COPY auto-reload-nginx.sh /home/auto-reload-nginx.sh
+RUN chmod +x /home/auto-reload-nginx.sh
+
+# install inotify
+RUN apt-get update && apt-get install -y inotify-tools

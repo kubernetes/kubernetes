@@ -19,6 +19,7 @@ package app
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/util/config"
 )
 
@@ -56,7 +57,7 @@ func TestValueOfAllocatableResources(t *testing.T) {
 		kubeReservedCM.Set(test.kubeReserved)
 		systemReservedCM.Set(test.systemReserved)
 
-		_, err := parseReservation(kubeReservedCM, systemReservedCM)
+		_, err := kubelet.ParseReservation(kubeReservedCM, systemReservedCM)
 		if err != nil {
 			t.Logf("%s: error returned: %v", test.name, err)
 		}

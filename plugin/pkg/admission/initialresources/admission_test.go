@@ -61,6 +61,9 @@ func createPod(name string, image string, request api.ResourceList) *api.Pod {
 		Spec:       api.PodSpec{},
 	}
 	pod.Spec.Containers = []api.Container{}
+	addContainer(pod, "i0", image, request)
+	pod.Spec.InitContainers = pod.Spec.Containers
+	pod.Spec.Containers = []api.Container{}
 	addContainer(pod, "c0", image, request)
 	return pod
 }
@@ -86,6 +89,7 @@ func verifyContainer(t *testing.T, c *api.Container, cpu, mem int64) {
 
 func verifyPod(t *testing.T, pod *api.Pod, cpu, mem int64) {
 	verifyContainer(t, &pod.Spec.Containers[0], cpu, mem)
+	verifyContainer(t, &pod.Spec.InitContainers[0], cpu, mem)
 }
 
 func verifyAnnotation(t *testing.T, pod *api.Pod, expected string) {
@@ -94,13 +98,13 @@ func verifyAnnotation(t *testing.T, pod *api.Pod, expected string) {
 		t.Errorf("No annotation but expected %v", expected)
 	}
 	if a != expected {
-		t.Errorf("Wrong annatation set by Initial Resources: got %v, expected %v", a, expected)
+		t.Errorf("Wrong annotation set by Initial Resources: got %v, expected %v", a, expected)
 	}
 }
 
 func expectNoAnnotation(t *testing.T, pod *api.Pod) {
 	if a, ok := pod.ObjectMeta.Annotations[initialResourcesAnnotation]; ok {
-		t.Errorf("Expected no annatation but got %v", a)
+		t.Errorf("Expected no annotation but got %v", a)
 	}
 }
 
@@ -122,9 +126,9 @@ func performTest(t *testing.T, ir admission.Interface) {
 	verifyPod(t, pods[2], 300, 100)
 	verifyPod(t, pods[3], 300, 300)
 
-	verifyAnnotation(t, pods[0], "Initial Resources plugin set: cpu, memory request for container c0")
-	verifyAnnotation(t, pods[1], "Initial Resources plugin set: cpu request for container c0")
-	verifyAnnotation(t, pods[2], "Initial Resources plugin set: memory request for container c0")
+	verifyAnnotation(t, pods[0], "Initial Resources plugin set: cpu, memory request for init container i0; cpu, memory request for container c0")
+	verifyAnnotation(t, pods[1], "Initial Resources plugin set: cpu request for init container i0")
+	verifyAnnotation(t, pods[2], "Initial Resources plugin set: memory request for init container i0")
 	expectNoAnnotation(t, pods[3])
 }
 
@@ -229,7 +233,7 @@ func TestManyContainers(t *testing.T) {
 	verifyContainer(t, &pod.Spec.Containers[2], 300, 100)
 	verifyContainer(t, &pod.Spec.Containers[3], 300, 300)
 
-	verifyAnnotation(t, pod, "Initial Resources plugin set: cpu, memory request for container c0; cpu request for container c1; memory request for container c2")
+	verifyAnnotation(t, pod, "Initial Resources plugin set: cpu, memory request for init container i0; cpu, memory request for container c0; cpu request for container c1; memory request for container c2")
 }
 
 func TestNamespaceAware(t *testing.T) {

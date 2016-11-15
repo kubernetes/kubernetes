@@ -24,21 +24,21 @@ import (
 
 // ObjectCache is a simple wrapper of expiration cache that
 // 1. use string type key
-// 2. has a updater to get value directly if it is expired
+// 2. has an updater to get value directly if it is expired
 // 3. then update the cache
 type ObjectCache struct {
 	cache   expirationCache.Store
 	updater func() (interface{}, error)
 }
 
-// objectEntry is a object with string type key.
+// objectEntry is an object with string type key.
 type objectEntry struct {
 	key string
 	obj interface{}
 }
 
-// NewObjectCache creates ObjectCache with a updater.
-// updater returns a object to cache.
+// NewObjectCache creates ObjectCache with an updater.
+// updater returns an object to cache.
 func NewObjectCache(f func() (interface{}, error), ttl time.Duration) *ObjectCache {
 	return &ObjectCache{
 		updater: f,

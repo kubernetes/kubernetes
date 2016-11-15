@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/on-call-user-support.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 ## Kubernetes "User Support" Rotation
 
 ### Traffic sources and responsibilities
@@ -91,8 +57,8 @@ ensure your questions don't go unanswered.
 Before posting a new question, please search stackoverflow for answers to
 similar questions, and also familiarize yourself with:
 
-  * [user guide](http://kubernetes.io/v1.1/)
-  * [troubleshooting guide](http://kubernetes.io/v1.1/docs/troubleshooting.html)
+  * [user guide](http://kubernetes.io/docs/user-guide/)
+  * [troubleshooting guide](http://kubernetes.io/docs/troubleshooting/)
 
 Again, thanks for using Kubernetes.
 

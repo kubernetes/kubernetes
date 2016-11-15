@@ -14,5 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +genconversion=true
-package v1alpha1
+// +k8s:deepcopy-gen=package,register
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/componentconfig
+// +k8s:openapi-gen=true
+// +k8s:defaulter-gen=TypeMeta
+
+package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"

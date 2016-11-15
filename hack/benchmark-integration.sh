@@ -40,7 +40,7 @@ runTests() {
     KUBE_TEST_ETCD_PREFIXES="registry" \
     ETCD_CUSTOM_PREFIX="None" \
     KUBE_TEST_ARGS="${ARGS}" \
-    "${KUBE_ROOT}/hack/test-go.sh" test/integration
+    make test WHAT=test/integration
   cleanup
 }
 

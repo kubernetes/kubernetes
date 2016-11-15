@@ -40,7 +40,7 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = api.Scheme.Convert(obj2, obj3)
+	err = api.Scheme.Convert(obj2, obj3, nil)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil
@@ -239,6 +239,72 @@ func TestSetDefaultService(t *testing.T) {
 	}
 	if svc2.Spec.Type != versioned.ServiceTypeClusterIP {
 		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeClusterIP, svc2.Spec.Type)
+	}
+}
+
+func TestSetDefaultSecretVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				Secret: &versioned.SecretVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.Secret.DefaultMode
+	expectedMode := versioned.SecretVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected secret DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
+func TestSetDefaultConfigMapVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				ConfigMap: &versioned.ConfigMapVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode
+	expectedMode := versioned.ConfigMapVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
+func TestSetDefaultDownwardAPIVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				DownwardAPI: &versioned.DownwardAPIVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode
+	expectedMode := versioned.DownwardAPIVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected DownwardAPI DefaultMode %v, got %v", expectedMode, defaultMode)
 	}
 }
 
@@ -505,6 +571,31 @@ func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 	apiVersion := s2.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion
 	if apiVersion != "v1" {
 		t.Errorf("Expected default APIVersion v1, got: %v", apiVersion)
+	}
+}
+
+func TestSetMinimumScalePod(t *testing.T) {
+	// verify we default if limits are specified (and that request=0 is preserved)
+	s := versioned.PodSpec{}
+	s.Containers = []versioned.Container{
+		{
+			Resources: versioned.ResourceRequirements{
+				Requests: versioned.ResourceList{
+					versioned.ResourceMemory: resource.MustParse("1n"),
+				},
+				Limits: versioned.ResourceList{
+					versioned.ResourceCPU: resource.MustParse("2n"),
+				},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	versioned.SetObjectDefaults_Pod(pod)
+
+	if expect := resource.MustParse("1m"); expect.Cmp(pod.Spec.Containers[0].Resources.Requests[versioned.ResourceMemory]) != 0 {
+		t.Errorf("did not round resources: %#v", pod.Spec.Containers[0].Resources)
 	}
 }
 

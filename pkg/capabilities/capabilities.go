@@ -59,7 +59,7 @@ func Initialize(c Capabilities) {
 	})
 }
 
-// Setup the capability set.  It wraps Initialize for improving usibility.
+// Setup the capability set.  It wraps Initialize for improving usability.
 func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnectionBytesPerSec int64) {
 	Initialize(Capabilities{
 		AllowPrivileged:                        allowPrivileged,

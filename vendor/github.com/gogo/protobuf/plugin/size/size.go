@@ -119,13 +119,14 @@ package size
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/proto"
 	descriptor "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
 	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
 	"github.com/gogo/protobuf/vanity"
-	"strconv"
-	"strings"
 )
 
 type size struct {
@@ -201,10 +202,11 @@ func (p *size) generateField(proto3 bool, file *generator.FileDescriptor, messag
 	fieldname := p.GetOneOfFieldName(message, field)
 	nullable := gogoproto.IsNullable(field)
 	repeated := field.IsRepeated()
+	doNilCheck := gogoproto.NeedsNilCheck(proto3, field)
 	if repeated {
 		p.P(`if len(m.`, fieldname, `) > 0 {`)
 		p.In()
-	} else if ((!proto3 || field.IsMessage()) && nullable) || (!gogoproto.IsCustomType(field) && *field.Type == descriptor.FieldDescriptorProto_TYPE_BYTES) {
+	} else if doNilCheck {
 		p.P(`if m.`, fieldname, ` != nil {`)
 		p.In()
 	}
@@ -324,7 +326,7 @@ func (p *size) generateField(proto3 bool, file *generator.FileDescriptor, messag
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
 		panic(fmt.Errorf("size does not support group %v", fieldname))
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		if generator.IsMap(file.FileDescriptorProto, field) {
+		if p.IsMap(field) {
 			m := p.GoMapType(nil, field)
 			_, keywire := p.GoType(nil, m.KeyAliasField)
 			valuegoTyp, _ := p.GoType(nil, m.ValueField)
@@ -488,7 +490,7 @@ func (p *size) generateField(proto3 bool, file *generator.FileDescriptor, messag
 	default:
 		panic("not implemented")
 	}
-	if ((!proto3 || field.IsMessage()) && nullable) || repeated || (!gogoproto.IsCustomType(field) && *field.Type == descriptor.FieldDescriptorProto_TYPE_BYTES) {
+	if repeated || doNilCheck {
 		p.Out()
 		p.P(`}`)
 	}

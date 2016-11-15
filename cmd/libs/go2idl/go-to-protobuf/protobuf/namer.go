@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
-	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/gengo/generator"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 )
 
 type localNamer struct {
@@ -94,7 +94,8 @@ func (n *protobufNamer) GoNameToProtoName(name types.Name) types.Name {
 }
 
 func protoSafePackage(name string) string {
-	return strings.Replace(name, "/", ".", -1)
+	pkg := strings.Replace(name, "/", ".", -1)
+	return strings.Replace(pkg, "-", "_", -1)
 }
 
 type typeNameSet map[types.Name]*protobufPackage

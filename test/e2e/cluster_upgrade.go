@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -43,7 +43,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.MasterUpgrade(v))
-				framework.ExpectNoError(checkMasterVersion(f.Client, v))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
 			})
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
@@ -58,8 +58,8 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm := chaosmonkey.New(func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.NodeUpgrade(f, v))
-				framework.ExpectNoError(checkNodesVersions(f.Client, v))
+				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
 			})
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
@@ -72,8 +72,8 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm := chaosmonkey.New(func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.NodeUpgrade(f, v))
-				framework.ExpectNoError(checkNodesVersions(f.Client, v))
+				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
 			})
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
@@ -89,9 +89,9 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.MasterUpgrade(v))
-				framework.ExpectNoError(checkMasterVersion(f.Client, v))
-				framework.ExpectNoError(framework.NodeUpgrade(f, v))
-				framework.ExpectNoError(checkNodesVersions(f.Client, v))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
+				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
 			})
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
@@ -105,9 +105,9 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.MasterUpgrade(v))
-				framework.ExpectNoError(checkMasterVersion(f.Client, v))
-				framework.ExpectNoError(framework.NodeUpgrade(f, v))
-				framework.ExpectNoError(checkNodesVersions(f.Client, v))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
+				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
 			})
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
@@ -146,7 +146,7 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	// Setup
 	serviceName := "service-test"
 
-	jig := NewServiceTestJig(f.Client, serviceName)
+	jig := NewServiceTestJig(f.ClientSet, serviceName)
 	// nodeIP := pickNodeIP(jig.Client) // for later
 
 	By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + f.Namespace.Name)
@@ -155,7 +155,7 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	tcpService := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(s *api.Service) {
 		s.Spec.Type = api.ServiceTypeLoadBalancer
 	})
-	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name)
+	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name, loadBalancerCreateTimeoutDefault)
 	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 
 	// Get info to hit it with
@@ -191,7 +191,7 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 }
 
-func checkMasterVersion(c *client.Client, want string) error {
+func checkMasterVersion(c clientset.Interface, want string) error {
 	framework.Logf("Checking master version")
 	v, err := c.Discovery().ServerVersion()
 	if err != nil {
@@ -209,8 +209,8 @@ func checkMasterVersion(c *client.Client, want string) error {
 	return nil
 }
 
-func checkNodesVersions(c *client.Client, want string) error {
-	l := framework.GetReadySchedulableNodesOrDie(c)
+func checkNodesVersions(cs clientset.Interface, want string) error {
+	l := framework.GetReadySchedulableNodesOrDie(cs)
 	for _, n := range l.Items {
 		// We do prefix trimming and then matching because:
 		// want   looks like:  0.19.3-815-g50e67d4

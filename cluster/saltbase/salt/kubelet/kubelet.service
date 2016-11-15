@@ -6,6 +6,8 @@ Documentation=https://github.com/kubernetes/kubernetes
 EnvironmentFile=/etc/sysconfig/kubelet
 ExecStart=/usr/local/bin/kubelet "$DAEMON_ARGS"
 Restart=always
+RestartSec=2s
+StartLimitInterval=0
 KillMode=process
 
 [Install]

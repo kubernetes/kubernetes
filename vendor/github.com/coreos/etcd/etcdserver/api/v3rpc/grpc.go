@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,15 +19,24 @@ import (
 
 	"github.com/coreos/etcd/etcdserver"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+	"github.com/coreos/pkg/capnslog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/grpclog"
 )
+
+func init() {
+	grpclog.SetLogger(capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver", "v3rpc/grpc"))
+}
 
 func Server(s *etcdserver.EtcdServer, tls *tls.Config) *grpc.Server {
 	var opts []grpc.ServerOption
+	opts = append(opts, grpc.CustomCodec(&codec{}))
 	if tls != nil {
 		opts = append(opts, grpc.Creds(credentials.NewTLS(tls)))
 	}
+	opts = append(opts, grpc.UnaryInterceptor(newUnaryInterceptor(s)))
+	opts = append(opts, grpc.StreamInterceptor(newStreamInterceptor(s)))
 
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterKVServer(grpcServer, NewQuotaKVServer(s))
@@ -36,5 +45,6 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config) *grpc.Server {
 	pb.RegisterClusterServer(grpcServer, NewClusterServer(s))
 	pb.RegisterAuthServer(grpcServer, NewAuthServer(s))
 	pb.RegisterMaintenanceServer(grpcServer, NewMaintenanceServer(s))
+
 	return grpcServer
 }

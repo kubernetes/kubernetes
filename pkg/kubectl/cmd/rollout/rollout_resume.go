@@ -17,13 +17,16 @@ limitations under the License.
 package rollout
 
 import (
+	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,31 +36,36 @@ import (
 // ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ResumeConfig struct {
-	ResumeObject func(object runtime.Object) (bool, error)
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Infos        []*resource.Info
+	resource.FilenameOptions
 
-	Out       io.Writer
-	Filenames []string
-	Recursive bool
+	f       cmdutil.Factory
+	Resumer func(object *resource.Info) (bool, error)
+	Mapper  meta.RESTMapper
+	Typer   runtime.ObjectTyper
+	Encoder runtime.Encoder
+	Infos   []*resource.Info
+
+	Out io.Writer
 }
 
 var (
-	resume_long = dedent.Dedent(`
+	resume_long = templates.LongDesc(`
 		Resume a paused resource
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
 		Currently only deployments support being resumed.`)
 
-	resume_example = dedent.Dedent(`
+	resume_example = templates.Examples(`
 		# Resume an already paused deployment
 		kubectl rollout resume deployment/nginx`)
 )
 
-func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	opts := &ResumeConfig{}
+func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &ResumeConfig{}
+
+	validArgs := []string{"deployment"}
+	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use:     "resume RESOURCE",
@@ -66,31 +74,35 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: resume_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := opts.CompleteResume(f, cmd, out, args)
+			err := options.CompleteResume(f, cmd, out, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = opts.RunResume()
+			err = options.RunResume()
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
 			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &opts.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &opts.Recursive)
+	usage := "identifying the resource to get from a server."
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	return cmd
 }
 
-func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
-	if len(args) == 0 && len(o.Filenames) == 0 {
+func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}
 
-	o.Mapper, o.Typer = f.Object(false)
-	o.ResumeObject = f.ResumeObject
+	o.f = f
+	o.Mapper, o.Typer = f.Object()
+	o.Encoder = f.JSONEncoder()
+
+	o.Resumer = f.Resumer
 	o.Out = out
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -100,7 +112,7 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 
 	r := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
@@ -126,17 +138,28 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 
 func (o ResumeConfig) RunResume() error {
 	allErrs := []error{}
-	for _, info := range o.Infos {
-		isAlreadyResumed, err := o.ResumeObject(info.Object)
+	for _, patch := range set.CalculatePatches(o.f, o.Infos, o.Encoder, false, o.Resumer) {
+		info := patch.Info
+
+		if patch.Err != nil {
+			allErrs = append(allErrs, fmt.Errorf("error: %s %q %v", info.Mapping.Resource, info.Name, patch.Err))
+			continue
+		}
+
+		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
+			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
+			continue
+		}
+
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch.Patch)
 		if err != nil {
-			allErrs = append(allErrs, cmdutil.AddSourceToErr("resuming", info.Source, err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch: %v", err))
 			continue
 		}
-		if isAlreadyResumed {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "already resumed")
-			continue
-		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "resumed")
+
+		info.Refresh(obj, true)
+		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
 	}
+
 	return utilerrors.NewAggregate(allErrs)
 }

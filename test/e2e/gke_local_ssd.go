@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -69,7 +69,7 @@ func testPodWithSsd(command string) *api.Pod {
 	containerName := "test-container"
 	volumeName := "test-ssd-volume"
 	path := "/mnt/disks/ssd0"
-	podName := "pod-" + string(util.NewUUID())
+	podName := "pod-" + string(uuid.NewUUID())
 	image := "ubuntu:14.04"
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{

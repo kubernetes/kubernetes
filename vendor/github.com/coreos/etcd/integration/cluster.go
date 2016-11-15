@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -37,6 +37,7 @@ import (
 	"github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver"
+	"github.com/coreos/etcd/etcdserver/api"
 	"github.com/coreos/etcd/etcdserver/api/v2http"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
@@ -44,20 +45,25 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/rafthttp"
+	"github.com/coreos/pkg/capnslog"
 )
 
 const (
 	tickDuration   = 10 * time.Millisecond
 	clusterName    = "etcd"
 	requestTimeout = 20 * time.Second
+
+	basePort     = 21000
+	UrlScheme    = "unix"
+	UrlSchemeTLS = "unixs"
 )
 
 var (
 	electionTicks = 10
 
-	// integration test uses well-known ports to listen for each running member,
-	// which ensures restarted member could listen on specific port again.
-	nextListenPort int64 = 20000
+	// integration test uses unique ports, counting up, to listen for each
+	// member, ensuring restarted members can listen on the same port again.
+	localListenCount int64 = 0
 
 	testTLSInfo = transport.TLSInfo{
 		KeyFile:        "./fixtures/server.key.insecure",
@@ -65,19 +71,34 @@ var (
 		TrustedCAFile:  "./fixtures/ca.crt",
 		ClientCertAuth: true,
 	}
+
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "integration")
 )
 
 type ClusterConfig struct {
-	Size         int
-	PeerTLS      *transport.TLSInfo
-	ClientTLS    *transport.TLSInfo
-	DiscoveryURL string
-	UseGRPC      bool
+	Size              int
+	PeerTLS           *transport.TLSInfo
+	ClientTLS         *transport.TLSInfo
+	DiscoveryURL      string
+	UseGRPC           bool
+	QuotaBackendBytes int64
 }
 
 type cluster struct {
 	cfg     *ClusterConfig
 	Members []*member
+}
+
+func init() {
+	// manually enable v3 capability since we know the cluster members all support v3.
+	api.EnableCapability(api.V3rpcCapability)
+}
+
+func schemeFromTLSInfo(tls *transport.TLSInfo) string {
+	if tls == nil {
+		return UrlScheme
+	}
+	return UrlSchemeTLS
 }
 
 func (c *cluster) fillClusterForMembers() error {
@@ -88,10 +109,7 @@ func (c *cluster) fillClusterForMembers() error {
 
 	addrs := make([]string, 0)
 	for _, m := range c.Members {
-		scheme := "http"
-		if m.PeerTLSInfo != nil {
-			scheme = "https"
-		}
+		scheme := schemeFromTLSInfo(m.PeerTLSInfo)
 		for _, l := range m.PeerListeners {
 			addrs = append(addrs, fmt.Sprintf("%s=%s://%s", m.Name, scheme, l.Addr().String()))
 		}
@@ -175,13 +193,8 @@ func (c *cluster) URLs() []string {
 func (c *cluster) HTTPMembers() []client.Member {
 	ms := []client.Member{}
 	for _, m := range c.Members {
-		pScheme, cScheme := "http", "http"
-		if m.PeerTLSInfo != nil {
-			pScheme = "https"
-		}
-		if m.ClientTLSInfo != nil {
-			cScheme = "https"
-		}
+		pScheme := schemeFromTLSInfo(m.PeerTLSInfo)
+		cScheme := schemeFromTLSInfo(m.ClientTLSInfo)
 		cm := client.Member{Name: m.Name}
 		for _, ln := range m.PeerListeners {
 			cm.PeerURLs = append(cm.PeerURLs, pScheme+"://"+ln.Addr().String())
@@ -195,8 +208,13 @@ func (c *cluster) HTTPMembers() []client.Member {
 }
 
 func (c *cluster) mustNewMember(t *testing.T) *member {
-	name := c.name(rand.Int())
-	m := mustNewMember(t, name, c.cfg.PeerTLS, c.cfg.ClientTLS)
+	m := mustNewMember(t,
+		memberConfig{
+			name:              c.name(rand.Int()),
+			peerTLS:           c.cfg.PeerTLS,
+			clientTLS:         c.cfg.ClientTLS,
+			quotaBackendBytes: c.cfg.QuotaBackendBytes,
+		})
 	m.DiscoveryURL = c.cfg.DiscoveryURL
 	if c.cfg.UseGRPC {
 		if err := m.listenGRPC(); err != nil {
@@ -209,10 +227,7 @@ func (c *cluster) mustNewMember(t *testing.T) *member {
 func (c *cluster) addMember(t *testing.T) {
 	m := c.mustNewMember(t)
 
-	scheme := "http"
-	if c.cfg.PeerTLS != nil {
-		scheme = "https"
-	}
+	scheme := schemeFromTLSInfo(c.cfg.PeerTLS)
 
 	// send add request to the cluster
 	var err error
@@ -242,7 +257,7 @@ func (c *cluster) addMember(t *testing.T) {
 }
 
 func (c *cluster) addMemberByURL(t *testing.T, clientURL, peerURL string) error {
-	cc := mustNewHTTPClient(t, []string{clientURL}, c.cfg.ClientTLS)
+	cc := MustNewHTTPClient(t, []string{clientURL}, c.cfg.ClientTLS)
 	ma := client.NewMembersAPI(cc)
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	if _, err := ma.Add(ctx, peerURL); err != nil {
@@ -262,7 +277,7 @@ func (c *cluster) AddMember(t *testing.T) {
 
 func (c *cluster) RemoveMember(t *testing.T, id uint64) {
 	// send remove request to the cluster
-	cc := mustNewHTTPClient(t, c.URLs(), c.cfg.ClientTLS)
+	cc := MustNewHTTPClient(t, c.URLs(), c.cfg.ClientTLS)
 	ma := client.NewMembersAPI(cc)
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	if err := ma.Remove(ctx, types.ID(id).String()); err != nil {
@@ -297,7 +312,7 @@ func (c *cluster) Terminate(t *testing.T) {
 
 func (c *cluster) waitMembersMatch(t *testing.T, membs []client.Member) {
 	for _, u := range c.URLs() {
-		cc := mustNewHTTPClient(t, []string{u}, c.cfg.ClientTLS)
+		cc := MustNewHTTPClient(t, []string{u}, c.cfg.ClientTLS)
 		ma := client.NewMembersAPI(cc)
 		for {
 			ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
@@ -311,6 +326,8 @@ func (c *cluster) waitMembersMatch(t *testing.T, membs []client.Member) {
 	}
 	return
 }
+
+func (c *cluster) WaitLeader(t *testing.T) int { return c.waitLeader(t, c.Members) }
 
 func (c *cluster) waitLeader(t *testing.T, membs []*member) int {
 	possibleLead := make(map[uint64]bool)
@@ -329,11 +346,11 @@ func (c *cluster) waitLeader(t *testing.T, membs []*member) int {
 			}
 			if lead != 0 && lead != m.s.Lead() {
 				lead = 0
+				time.Sleep(10 * tickDuration)
 				break
 			}
 			lead = m.s.Lead()
 		}
-		time.Sleep(10 * tickDuration)
 	}
 
 	for i, m := range membs {
@@ -372,26 +389,13 @@ func isMembersEqual(membs []client.Member, wmembs []client.Member) bool {
 }
 
 func newLocalListener(t *testing.T) net.Listener {
-	port := atomic.AddInt64(&nextListenPort, 1)
-	l, err := net.Listen("tcp", "127.0.0.1:"+strconv.FormatInt(port, 10))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return l
+	c := atomic.AddInt64(&localListenCount, 1)
+	addr := fmt.Sprintf("127.0.0.1:%d.%d.sock", c+basePort, os.Getpid())
+	return NewListenerWithAddr(t, addr)
 }
 
-func newListenerWithAddr(t *testing.T, addr string) net.Listener {
-	var err error
-	var l net.Listener
-	// TODO: we want to reuse a previous closed port immediately.
-	// a better way is to set SO_REUSExx instead of doing retry.
-	for i := 0; i < 5; i++ {
-		l, err = net.Listen("tcp", addr)
-		if err == nil {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
+func NewListenerWithAddr(t *testing.T, addr string) net.Listener {
+	l, err := transport.NewUnixListener(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -413,21 +417,26 @@ type member struct {
 
 	grpcServer *grpc.Server
 	grpcAddr   string
+	grpcBridge *bridge
+}
+
+func (m *member) GRPCAddr() string { return m.grpcAddr }
+
+type memberConfig struct {
+	name              string
+	peerTLS           *transport.TLSInfo
+	clientTLS         *transport.TLSInfo
+	quotaBackendBytes int64
 }
 
 // mustNewMember return an inited member with the given name. If peerTLS is
 // set, it will use https scheme to communicate between peers.
-func mustNewMember(t *testing.T, name string, peerTLS *transport.TLSInfo, clientTLS *transport.TLSInfo) *member {
+func mustNewMember(t *testing.T, mcfg memberConfig) *member {
 	var err error
 	m := &member{}
 
-	peerScheme, clientScheme := "http", "http"
-	if peerTLS != nil {
-		peerScheme = "https"
-	}
-	if clientTLS != nil {
-		clientScheme = "https"
-	}
+	peerScheme := schemeFromTLSInfo(mcfg.peerTLS)
+	clientScheme := schemeFromTLSInfo(mcfg.clientTLS)
 
 	pln := newLocalListener(t)
 	m.PeerListeners = []net.Listener{pln}
@@ -435,7 +444,7 @@ func mustNewMember(t *testing.T, name string, peerTLS *transport.TLSInfo, client
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.PeerTLSInfo = peerTLS
+	m.PeerTLSInfo = mcfg.peerTLS
 
 	cln := newLocalListener(t)
 	m.ClientListeners = []net.Listener{cln}
@@ -443,15 +452,15 @@ func mustNewMember(t *testing.T, name string, peerTLS *transport.TLSInfo, client
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.ClientTLSInfo = clientTLS
+	m.ClientTLSInfo = mcfg.clientTLS
 
-	m.Name = name
+	m.Name = mcfg.name
 
 	m.DataDir, err = ioutil.TempDir(os.TempDir(), "etcd")
 	if err != nil {
 		t.Fatal(err)
 	}
-	clusterStr := fmt.Sprintf("%s=%s://%s", name, peerScheme, pln.Addr().String())
+	clusterStr := fmt.Sprintf("%s=%s://%s", mcfg.name, peerScheme, pln.Addr().String())
 	m.InitialPeerURLsMap, err = types.NewURLsMap(clusterStr)
 	if err != nil {
 		t.Fatal(err)
@@ -464,6 +473,7 @@ func mustNewMember(t *testing.T, name string, peerTLS *transport.TLSInfo, client
 	}
 	m.ElectionTicks = electionTicks
 	m.TickMs = uint(tickDuration / time.Millisecond)
+	m.QuotaBackendBytes = mcfg.quotaBackendBytes
 	return m
 }
 
@@ -471,17 +481,21 @@ func mustNewMember(t *testing.T, name string, peerTLS *transport.TLSInfo, client
 func (m *member) listenGRPC() error {
 	// prefix with localhost so cert has right domain
 	m.grpcAddr = "localhost:" + m.Name + ".sock"
-	if err := os.RemoveAll(m.grpcAddr); err != nil {
-		return err
-	}
-	l, err := net.Listen("unix", m.grpcAddr)
+	l, err := transport.NewUnixListener(m.grpcAddr)
 	if err != nil {
 		return fmt.Errorf("listen failed on grpc socket %s (%v)", m.grpcAddr, err)
 	}
-	m.grpcAddr = "unix://" + m.grpcAddr
+	m.grpcBridge, err = newBridge(m.grpcAddr)
+	if err != nil {
+		l.Close()
+		return err
+	}
+	m.grpcAddr = m.grpcBridge.URL()
 	m.grpcListener = l
 	return nil
 }
+
+func (m *member) DropConnections() { m.grpcBridge.Reset() }
 
 // NewClientV3 creates a new grpc client connection to the member
 func NewClientV3(m *member) (*clientv3.Client, error) {
@@ -539,6 +553,7 @@ func (m *member) Clone(t *testing.T) *member {
 // Launch starts a member based on ServerConfig, PeerListeners
 // and ClientListeners.
 func (m *member) Launch() error {
+	plog.Printf("launching %s (%s)", m.Name, m.grpcAddr)
 	var err error
 	if m.s, err = etcdserver.NewServer(&m.ServerConfig); err != nil {
 		return fmt.Errorf("failed to initialize the etcd server: %v", err)
@@ -593,11 +608,13 @@ func (m *member) Launch() error {
 		m.grpcServer = v3rpc.Server(m.s, tlscfg)
 		go m.grpcServer.Serve(m.grpcListener)
 	}
+
+	plog.Printf("launched %s (%s)", m.Name, m.grpcAddr)
 	return nil
 }
 
 func (m *member) WaitOK(t *testing.T) {
-	cc := mustNewHTTPClient(t, []string{m.URL()}, m.ClientTLSInfo)
+	cc := MustNewHTTPClient(t, []string{m.URL()}, m.ClientTLSInfo)
 	kapi := client.NewKeysAPI(cc)
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
@@ -628,6 +645,10 @@ func (m *member) Resume() {
 
 // Close stops the member's etcdserver and closes its connections
 func (m *member) Close() {
+	if m.grpcBridge != nil {
+		m.grpcBridge.Close()
+		m.grpcBridge = nil
+	}
 	if m.grpcServer != nil {
 		m.grpcServer.Stop()
 		m.grpcServer = nil
@@ -641,8 +662,10 @@ func (m *member) Close() {
 
 // Stop stops the member, but the data dir of the member is preserved.
 func (m *member) Stop(t *testing.T) {
+	plog.Printf("stopping %s (%s)", m.Name, m.grpcAddr)
 	m.Close()
 	m.hss = nil
+	plog.Printf("stopped %s (%s)", m.Name, m.grpcAddr)
 }
 
 // StopNotify unblocks when a member stop completes
@@ -652,14 +675,15 @@ func (m *member) StopNotify() <-chan struct{} {
 
 // Restart starts the member using the preserved data dir.
 func (m *member) Restart(t *testing.T) error {
+	plog.Printf("restarting %s (%s)", m.Name, m.grpcAddr)
 	newPeerListeners := make([]net.Listener, 0)
 	for _, ln := range m.PeerListeners {
-		newPeerListeners = append(newPeerListeners, newListenerWithAddr(t, ln.Addr().String()))
+		newPeerListeners = append(newPeerListeners, NewListenerWithAddr(t, ln.Addr().String()))
 	}
 	m.PeerListeners = newPeerListeners
 	newClientListeners := make([]net.Listener, 0)
 	for _, ln := range m.ClientListeners {
-		newClientListeners = append(newClientListeners, newListenerWithAddr(t, ln.Addr().String()))
+		newClientListeners = append(newClientListeners, NewListenerWithAddr(t, ln.Addr().String()))
 	}
 	m.ClientListeners = newClientListeners
 
@@ -669,18 +693,22 @@ func (m *member) Restart(t *testing.T) error {
 		}
 	}
 
-	return m.Launch()
+	err := m.Launch()
+	plog.Printf("restarted %s (%s)", m.Name, m.grpcAddr)
+	return err
 }
 
 // Terminate stops the member and removes the data dir.
 func (m *member) Terminate(t *testing.T) {
+	plog.Printf("terminating %s (%s)", m.Name, m.grpcAddr)
 	m.Close()
 	if err := os.RemoveAll(m.ServerConfig.DataDir); err != nil {
 		t.Fatal(err)
 	}
+	plog.Printf("terminated %s (%s)", m.Name, m.grpcAddr)
 }
 
-func mustNewHTTPClient(t *testing.T, eps []string, tls *transport.TLSInfo) client.Client {
+func MustNewHTTPClient(t *testing.T, eps []string, tls *transport.TLSInfo) client.Client {
 	cfgtls := transport.TLSInfo{}
 	if tls != nil {
 		cfgtls = *tls
@@ -712,6 +740,8 @@ func (p SortableMemberSliceByPeerURLs) Swap(i, j int) { p[i], p[j] = p[j], p[i] 
 
 type ClusterV3 struct {
 	*cluster
+
+	mu      sync.Mutex
 	clients []*clientv3.Client
 }
 
@@ -719,24 +749,38 @@ type ClusterV3 struct {
 // for each cluster member.
 func NewClusterV3(t *testing.T, cfg *ClusterConfig) *ClusterV3 {
 	cfg.UseGRPC = true
-	clus := &ClusterV3{cluster: NewClusterByConfig(t, cfg)}
+	clus := &ClusterV3{
+		cluster: NewClusterByConfig(t, cfg),
+	}
+	clus.Launch(t)
 	for _, m := range clus.Members {
 		client, err := NewClientV3(m)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("cannot create client: %v", err)
 		}
 		clus.clients = append(clus.clients, client)
 	}
-	clus.Launch(t)
+
 	return clus
 }
 
+func (c *ClusterV3) TakeClient(idx int) {
+	c.mu.Lock()
+	c.clients[idx] = nil
+	c.mu.Unlock()
+}
+
 func (c *ClusterV3) Terminate(t *testing.T) {
+	c.mu.Lock()
 	for _, client := range c.clients {
+		if client == nil {
+			continue
+		}
 		if err := client.Close(); err != nil {
 			t.Error(err)
 		}
 	}
+	c.mu.Unlock()
 	c.cluster.Terminate(t)
 }
 

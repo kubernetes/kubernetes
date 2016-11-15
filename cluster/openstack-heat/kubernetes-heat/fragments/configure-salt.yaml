@@ -24,6 +24,7 @@ write_files:
         docker_opts: ""
         master_extra_sans: "DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local,DNS:kubernetes-master"
         keep_host_etcd: true
+        kube_user: $KUBE_USER
   - path: /srv/kubernetes/openstack.conf
     content: |
       [Global]
@@ -32,6 +33,10 @@ write_files:
       password=$OS_PASSWORD
       region=$OS_REGION_NAME
       tenant-id=$OS_TENANT_ID
+      [LoadBalancer]
+      lb-version=$LBAAS_VERSION
+      subnet-id=$SUBNET_ID
+      floating-network-id=$FLOATING_NETWORK_ID
   - path: /srv/salt-overlay/pillar/cluster-params.sls
     content: |
       service_cluster_ip_range: 10.246.0.0/16
@@ -43,12 +48,12 @@ write_files:
       logging_destination: elasticsearch
       elasticsearch_replicas: "1"
       enable_cluster_dns: "true"
-      dns_replicas: "1"
       dns_server: 10.246.0.10
       dns_domain: cluster.local
+      enable_dns_horizontal_autoscaler: "false"
       federations_domain_map: ''
       instance_prefix: kubernetes
-      admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,ResourceQuota
       enable_cpu_cfs_quota: "true"
       network_provider: none
       opencontrail_tag: R2.20

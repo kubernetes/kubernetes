@@ -29,7 +29,11 @@ import (
 // DockerConfigProvider is the interface that registered extensions implement
 // to materialize 'dockercfg' credentials.
 type DockerConfigProvider interface {
+	// Enabled returns true if the config provider is enabled.
+	// Implementations can be blocking - e.g. metadata server unavailable.
 	Enabled() bool
+	// Provide returns docker configuration.
+	// Implementations can be blocking - e.g. metadata server unavailable.
 	Provide() DockerConfig
 	// LazyProvide() gets called after URL matches have been performed, so the
 	// location used as the key in DockerConfig would be redundant.

@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,15 +19,15 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/coreos/etcd/mvcc/backend"
 	"github.com/coreos/etcd/pkg/types"
-	"github.com/coreos/etcd/storage/backend"
 	"github.com/coreos/etcd/store"
+
+	"github.com/coreos/go-semver/semver"
 )
 
 const (
-	// TODO: make this private after moving all membership storage logic
-	// from etcdserver pkg
-	AttributesSuffix     = "attributes"
+	attributesSuffix     = "attributes"
 	raftAttributesSuffix = "raftAttributes"
 
 	// the prefix for stroing membership related information in store provided by store pkg.
@@ -37,6 +37,7 @@ const (
 var (
 	membersBucketName        = []byte("members")
 	membersRemovedBuckedName = []byte("members_removed")
+	clusterBucketName        = []byte("cluster")
 
 	StoreMembersPrefix        = path.Join(storePrefix, "members")
 	storeRemovedMembersPrefix = path.Join(storePrefix, "removed_members")
@@ -44,7 +45,7 @@ var (
 
 func mustSaveMemberToBackend(be backend.Backend, m *Member) {
 	mkey := backendMemberKey(m.ID)
-	mvalue, err := json.Marshal(m.RaftAttributes)
+	mvalue, err := json.Marshal(m)
 	if err != nil {
 		plog.Panicf("marshal raftAttributes should never fail: %v", err)
 	}
@@ -63,6 +64,15 @@ func mustDeleteMemberFromBackend(be backend.Backend, id types.ID) {
 	tx.UnsafeDelete(membersBucketName, mkey)
 	tx.UnsafePut(membersRemovedBuckedName, mkey, []byte("removed"))
 	tx.Unlock()
+}
+
+func mustSaveClusterVersionToBackend(be backend.Backend, ver *semver.Version) {
+	ckey := backendClusterVersionKey()
+
+	tx := be.BatchTx()
+	tx.Lock()
+	defer tx.Unlock()
+	tx.UnsafePut(clusterBucketName, ckey, []byte(ver.String()))
 }
 
 func mustSaveMemberToStore(s store.Store, m *Member) {
@@ -96,13 +106,30 @@ func mustUpdateMemberInStore(s store.Store, m *Member) {
 	}
 }
 
+func mustUpdateMemberAttrInStore(s store.Store, m *Member) {
+	b, err := json.Marshal(m.Attributes)
+	if err != nil {
+		plog.Panicf("marshal raftAttributes should never fail: %v", err)
+	}
+	p := path.Join(MemberStoreKey(m.ID), attributesSuffix)
+	if _, err := s.Set(p, false, string(b), store.TTLOptionSet{ExpireTime: store.Permanent}); err != nil {
+		plog.Panicf("update raftAttributes should never fail: %v", err)
+	}
+}
+
+func mustSaveClusterVersionToStore(s store.Store, ver *semver.Version) {
+	if _, err := s.Set(StoreClusterVersionKey(), false, ver.String(), store.TTLOptionSet{ExpireTime: store.Permanent}); err != nil {
+		plog.Panicf("save cluster version should never fail: %v", err)
+	}
+}
+
 // nodeToMember builds member from a key value node.
 // the child nodes of the given node MUST be sorted by key.
 func nodeToMember(n *store.NodeExtern) (*Member, error) {
 	m := &Member{ID: MustParseMemberIDFromKey(n.Key)}
 	attrs := make(map[string][]byte)
 	raftAttrKey := path.Join(n.Key, raftAttributesSuffix)
-	attrKey := path.Join(n.Key, AttributesSuffix)
+	attrKey := path.Join(n.Key, attributesSuffix)
 	for _, nn := range n.Nodes {
 		if nn.Key != raftAttrKey && nn.Key != attrKey {
 			return nil, fmt.Errorf("unknown key %q", nn.Key)
@@ -125,15 +152,32 @@ func nodeToMember(n *store.NodeExtern) (*Member, error) {
 }
 
 func backendMemberKey(id types.ID) []byte {
-	return []byte(path.Join(id.String(), raftAttributesSuffix))
+	return []byte(id.String())
+}
+
+func backendClusterVersionKey() []byte {
+	return []byte("clusterVersion")
+}
+
+func mustCreateBackendBuckets(be backend.Backend) {
+	tx := be.BatchTx()
+	tx.Lock()
+	defer tx.Unlock()
+	tx.UnsafeCreateBucket(membersBucketName)
+	tx.UnsafeCreateBucket(membersRemovedBuckedName)
+	tx.UnsafeCreateBucket(clusterBucketName)
 }
 
 func MemberStoreKey(id types.ID) string {
 	return path.Join(StoreMembersPrefix, id.String())
 }
 
+func StoreClusterVersionKey() string {
+	return path.Join(storePrefix, "version")
+}
+
 func MemberAttributesStorePath(id types.ID) string {
-	return path.Join(MemberStoreKey(id), AttributesSuffix)
+	return path.Join(MemberStoreKey(id), attributesSuffix)
 }
 
 func MustParseMemberIDFromKey(key string) types.ID {

@@ -17,9 +17,7 @@ limitations under the License.
 package etcd
 
 import (
-	"math/rand"
 	rt "runtime"
-	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -54,11 +52,8 @@ func TestWatchInterpretations(t *testing.T) {
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 	podBaz := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "baz"}}
-	firstLetterIsB := func(obj runtime.Object) bool {
-		return obj.(*api.Pod).Name[0] == 'b'
-	}
 
-	// All of these test cases will be run with the firstLetterIsB FilterFunc.
+	// All of these test cases will be run with the firstLetterIsB Filter.
 	table := map[string]struct {
 		actions       []string // Run this test item for every action here.
 		prevNodeValue string
@@ -128,7 +123,9 @@ func TestWatchInterpretations(t *testing.T) {
 			expectEmit: false,
 		},
 	}
-
+	firstLetterIsB := func(obj runtime.Object) bool {
+		return obj.(*api.Pod).Name[0] == 'b'
+	}
 	for name, item := range table {
 		for _, action := range item.actions {
 			w := newEtcdWatcher(true, false, nil, firstLetterIsB, codec, versioner, nil, &fakeEtcdCache{})
@@ -170,7 +167,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 	_, codec := testScheme(t)
-	w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+	w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -185,7 +182,7 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 	_, codec := testScheme(t)
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -200,7 +197,7 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	_, codec := testScheme(t)
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -545,36 +542,5 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	event, open := <-watching.ResultChan()
 	if open && event.Type != watch.Error {
 		t.Errorf("Unexpected event from stopped watcher: %#v", event)
-	}
-}
-
-func TestHighWaterMark(t *testing.T) {
-	var h HighWaterMark
-
-	for i := int64(10); i < 20; i++ {
-		if !h.Update(i) {
-			t.Errorf("unexpected false for %v", i)
-		}
-		if h.Update(i - 1) {
-			t.Errorf("unexpected true for %v", i-1)
-		}
-	}
-
-	m := int64(0)
-	wg := sync.WaitGroup{}
-	for i := 0; i < 300; i++ {
-		wg.Add(1)
-		v := rand.Int63()
-		go func(v int64) {
-			defer wg.Done()
-			h.Update(v)
-		}(v)
-		if v > m {
-			m = v
-		}
-	}
-	wg.Wait()
-	if m != int64(h) {
-		t.Errorf("unexpected value, wanted %v, got %v", m, int64(h))
 	}
 }

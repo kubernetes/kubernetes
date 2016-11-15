@@ -36,13 +36,52 @@ func TestCompact(t *testing.T) {
 		t.Fatalf("Put failed: %v", err)
 	}
 
-	_, err = compact(ctx, client, putResp.Header.Revision)
+	putResp1, err := client.Put(ctx, "/somekey", "data2")
+	if err != nil {
+		t.Fatalf("Put failed: %v", err)
+	}
+
+	_, _, err = compact(ctx, client, 0, putResp1.Header.Revision)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
 	}
 
-	_, err = client.Get(ctx, "/somekey", clientv3.WithRev(putResp.Header.Revision))
+	obj, err := client.Get(ctx, "/somekey", clientv3.WithRev(putResp.Header.Revision))
 	if err != etcdrpc.ErrCompacted {
-		t.Errorf("Expecting ErrCompacted, but get=%v", err)
+		t.Errorf("Expecting ErrCompacted, but get=%v err=%v", obj, err)
+	}
+}
+
+// TestCompactConflict tests that two compactors (Let's use C1, C2) are trying to compact etcd cluster with the same
+// logical time.
+// - C1 compacts first. It will succeed.
+// - C2 compacts after. It will fail. But it will get latest logical time, which should be larger by one.
+func TestCompactConflict(t *testing.T) {
+	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
+	defer cluster.Terminate(t)
+	client := cluster.RandClient()
+	ctx := context.Background()
+
+	putResp, err := client.Put(ctx, "/somekey", "data")
+	if err != nil {
+		t.Fatalf("Put failed: %v", err)
+	}
+
+	// Compact first. It would do the compaction and return compact time which is incremented by 1.
+	curTime, _, err := compact(ctx, client, 0, putResp.Header.Revision)
+	if err != nil {
+		t.Fatalf("compact failed: %v", err)
+	}
+	if curTime != 1 {
+		t.Errorf("Expect current logical time = 1, get = %v", curTime)
+	}
+
+	// Compact again with the same parameters. It won't do compaction but return the latest compact time.
+	curTime2, _, err := compact(ctx, client, 0, putResp.Header.Revision)
+	if err != nil {
+		t.Fatalf("compact failed: %v", err)
+	}
+	if curTime != curTime2 {
+		t.Errorf("Unexpected curTime (%v) != curTime2 (%v)", curTime, curTime2)
 	}
 }

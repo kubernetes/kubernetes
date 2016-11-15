@@ -29,6 +29,16 @@ message unix_sk {
 	required uint32		inode 	= 1;
 };
 
+enum criu_cg_mode {
+	IGNORE	= 0;
+	NONE	= 1;
+	PROPS	= 2;
+	SOFT	= 3;
+	FULL	= 4;
+	STRICT	= 5;
+	DEFAULT = 6;
+};
+
 message criu_opts {
 	required int32			images_dir_fd	= 1;
 	optional int32			pid		= 2; /* if not set on dump, will dump requesting process */
@@ -75,7 +85,12 @@ message criu_opts {
 
 	repeated unix_sk                unix_sk_ino     = 33;
 
-	optional uint32                 manage_cgroups_mode = 34;
+	optional criu_cg_mode		manage_cgroups_mode = 34;
+	optional uint32			ghost_limit	= 35 [default = 0x100000];
+	repeated string			irmap_scan_paths = 36;
+	repeated string			external	= 37;
+	optional uint32			empty_ns	= 38;
+	optional bool			no_seccomp	= 39;
 }
 
 message criu_dump_resp {
@@ -103,6 +118,16 @@ enum criu_req_type {
 
 	CPUINFO_DUMP	= 7;
 	CPUINFO_CHECK	= 8;
+
+	FEATURE_CHECK	= 9;
+}
+
+/*
+ * List of features which can queried via
+ * CRIU_REQ_TYPE__FEATURE_CHECK
+ */
+message criu_features {
+	optional bool			mem_track	= 1;
 }
 
 /*
@@ -122,11 +147,17 @@ message criu_req {
 	 * for all request types.
 	 */
 	optional bool			keep_open	= 4;
+	/*
+	 * 'features' can be used to query which features
+	 * are supported by the installed criu/kernel
+	 * via RPC.
+	 */
+	optional criu_features		features	= 5;
 }
 
 /*
- * Responce -- it states whether the request was served
- * and additional request-specific informarion
+ * Response -- it states whether the request was served
+ * and additional request-specific information
  */
 
 message criu_resp {
@@ -139,4 +170,5 @@ message criu_resp {
 	optional criu_page_server_info	ps		= 6;
 
 	optional int32			cr_errno	= 7;
+	optional criu_features		features	= 8;
 }

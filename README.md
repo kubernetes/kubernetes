@@ -11,7 +11,7 @@
 
 ### Are you ...
 
-  * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io)
+  * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io) or try the [Scalable Microservices with Kubernetes](https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615) course
   * Interested in hacking on the core Kubernetes code base?  Keep reading!
 
 <hr>
@@ -32,7 +32,7 @@ Kubernetes builds upon a [decade and a half of experience at Google running prod
 
 ### Kubernetes is ready for Production!
 
-With the [1.0.1 release](https://github.com/kubernetes/kubernetes/releases/tag/v1.0.1) Kubernetes is ready to serve your production workloads.
+Since the Kubernetes 1.0 release in July 2015 Kubernetes is ready for your production workloads.
 
 ### Kubernetes can run anywhere!
 
@@ -68,19 +68,19 @@ Kubernetes documentation is organized into several categories.
 
   - **Getting started guides**
     - for people who want to create a Kubernetes cluster
-      - in [Creating a Kubernetes Cluster](docs/getting-started-guides/README.md)
+      - in [Creating a Kubernetes Cluster](http://kubernetes.github.io/docs/getting-started-guides/)
     - for people who want to port Kubernetes to a new environment
-      - in [Getting Started from Scratch](docs/getting-started-guides/scratch.md)
+      - in [Getting Started from Scratch](http://kubernetes.github.io/docs/getting-started-guides/scratch/)
   - **User documentation**
     - for people who want to run programs on an existing Kubernetes cluster
-    - in the [Kubernetes User Guide: Managing Applications](docs/user-guide/README.md)
+    - in the [Kubernetes User Guide: Managing Applications](http://kubernetes.github.io/docs/user-guide/)
 	*Tip: You can also view help documentation out on [http://kubernetes.io/docs/](http://kubernetes.io/docs/).*
-    - the [Kubectl Command Line Interface](docs/user-guide/kubectl/kubectl.md) is a detailed reference on
+    - the [Kubectl Command Line Interface](http://kubernetes.io/docs/user-guide/kubectl-overview/) is a detailed reference on
       the `kubectl` CLI
     - [User FAQ](https://github.com/kubernetes/kubernetes/wiki/User-FAQ)
   - **Cluster administrator documentation**
     - for people who want to create a Kubernetes cluster and administer it
-    - in the [Kubernetes Cluster Admin Guide](docs/admin/README.md)
+    - in the [Kubernetes Cluster Admin Guide](http://kubernetes.io/docs/admin/)
   - **Developer and API documentation**
     - for people who want to write programs that access the Kubernetes API, write plugins
       or extensions, or modify the core Kubernetes code
@@ -90,7 +90,7 @@ Kubernetes documentation is organized into several categories.
       detailed description of all fields found in the core API objects
   - **Walkthroughs and examples**
     - hands-on introduction and example config files
-    - in the [user guide](docs/user-guide/README.md#quick-walkthrough)
+    - in the [user guide](http://kubernetes.github.io/docs/user-guide/)
     - in the [docs/examples directory](examples/)
   - **Contributions from the Kubernetes community**
     - in the [docs/contrib directory](contrib/)
@@ -100,7 +100,7 @@ Kubernetes documentation is organized into several categories.
     - proposals in the [docs/proposals directory](docs/proposals/)
   - **Wiki/FAQ**
     - in the [wiki](https://github.com/kubernetes/kubernetes/wiki)
-    - troubleshooting information in the [troubleshooting guide](docs/troubleshooting.md)
+    - troubleshooting information in the [troubleshooting guide](http://kubernetes.io/docs/troubleshooting/)
 
 ## Community, discussion, contribution, and support
 
@@ -129,9 +129,14 @@ For Q&A, our threads are at:
  * [Stack Overflow](http://stackoverflow.com/questions/tagged/kubernetes)
  * [Slack](http://slack.k8s.io/)
 
-### Want to do more than just 'discuss' Kubernetes?
+### Want to contribute to Kubernetes?
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
+
+Or, if you just have an idea for a new feature, see the [Kubernetes Features](https://github.com/kubernetes/features) repository for details on how to propose it.
+
+Also, please see our [expectations](docs/devel/community-expectations.md) for members of
+the Kubernetes community.
 
 ### Support
 
@@ -141,9 +146,9 @@ If you need support, start with the [troubleshooting guide](docs/troubleshooting
 
 That said, if you have questions, reach out to us one way or another.  We don't bite!
 
-### Community resources:
+### Community resources
 
-* **Awesome-kubernetes**:
+* **Awesome-kubernetes** - [http://ramitsurana.github.io/awesome-kubernetes](http://ramitsurana.github.io/awesome-kubernetes)
 
 You can find more projects, tools and articles related to Kubernetes on the  [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list. Add your project there and help us make it better.
 
@@ -151,5 +156,8 @@ You can find more projects, tools and articles related to Kubernetes on the  [aw
 
 Instructive & educational resources for the Kubernetes community. By the community.
 
+* **Community Documentation**
+
+Here you can learn more about the current happenings in the [kubernetes community](https://github.com/kubernetes/community).
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()

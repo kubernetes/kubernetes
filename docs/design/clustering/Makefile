@@ -35,9 +35,7 @@ docker:
 	docker build -t clustering-seqdiag .
 	docker run --rm clustering-seqdiag | tar xvf -
 
+.PHONY: docker-clean
 docker-clean:
 	docker rmi clustering-seqdiag || true
 	docker images -q --filter "dangling=true" | xargs docker rmi
-
-fix-clock-skew:
-	boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(shell date -u +%Y%m%d%H%M.%S)"

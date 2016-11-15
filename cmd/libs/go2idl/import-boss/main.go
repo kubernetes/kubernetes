@@ -33,7 +33,7 @@ limitations under the License.
 //     {
 //       "SelectorRegexp": "k8s[.]io",
 //       "AllowedPrefixes": [
-//         "k8s.io/kubernetes/cmd/libs/go2idl",
+//         "k8s.io/gengo/examples",
 //         "k8s.io/kubernetes/third_party"
 //       ],
 //       "ForbiddenPrefixes": [
@@ -57,9 +57,10 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/import-boss/generators"
+	"k8s.io/gengo/args"
+	"k8s.io/gengo/examples/import-boss/generators"
 
 	"github.com/golang/glog"
 )
@@ -70,11 +71,11 @@ func main() {
 	// Override defaults. These are Kubernetes specific input and output
 	// locations.
 	arguments.InputDirs = []string{
-		"k8s.io/kubernetes/pkg/",
-		"k8s.io/kubernetes/cmd/",
-		"k8s.io/kubernetes/plugin/",
+		"k8s.io/kubernetes/pkg/...",
+		"k8s.io/kubernetes/cmd/...",
+		"k8s.io/kubernetes/plugin/...",
 	}
-	arguments.Recursive = true
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 	// arguments.VerifyOnly = true
 
 	if err := arguments.Execute(
@@ -85,5 +86,5 @@ func main() {
 		glog.Errorf("Error: %v", err)
 		os.Exit(1)
 	}
-	glog.Info("Completed successfully.")
+	glog.V(2).Info("Completed successfully.")
 }

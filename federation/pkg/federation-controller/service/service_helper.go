@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	federation_release_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
@@ -35,16 +35,36 @@ import (
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
 func (sc *ServiceController) clusterServiceWorker() {
-	fedClient := sc.federationClient
+	// process all pending events in serviceWorkerDoneChan
+ForLoop:
+	for {
+		select {
+		case clusterName := <-sc.serviceWorkerDoneChan:
+			sc.serviceWorkerMap[clusterName] = false
+		default:
+			// non-blocking, comes here if all existing events are processed
+			break ForLoop
+		}
+	}
+
 	for clusterName, cache := range sc.clusterCache.clientMap {
+		workerExist, found := sc.serviceWorkerMap[clusterName]
+		if found && workerExist {
+			continue
+		}
+
+		// create a worker only if the previous worker has finished and gone out of scope
 		go func(cache *clusterCache, clusterName string) {
+			fedClient := sc.federationClient
 			for {
 				func() {
 					key, quit := cache.serviceQueue.Get()
-					defer cache.serviceQueue.Done(key)
 					if quit {
+						// send signal that current worker has finished tasks and is going out of scope
+						sc.serviceWorkerDoneChan <- clusterName
 						return
 					}
+					defer cache.serviceQueue.Done(key)
 					err := sc.clusterCache.syncService(key.(string), clusterName, cache, sc.serviceCache, fedClient, sc)
 					if err != nil {
 						glog.Errorf("Failed to sync service: %+v", err)
@@ -52,20 +72,21 @@ func (sc *ServiceController) clusterServiceWorker() {
 				}()
 			}
 		}(cache, clusterName)
+		sc.serviceWorkerMap[clusterName] = true
 	}
 }
 
 // Whenever there is change on service, the federation service should be updated
-func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_3.Interface, sc *ServiceController) error {
+func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient fedclientset.Interface, sc *ServiceController) error {
 	// obj holds the latest service info from apiserver, return if there is no federation cache for the service
 	cachedService, ok := serviceCache.get(key)
 	if !ok {
 		// if serviceCache does not exists, that means the service is not created by federation, we should skip it
 		return nil
 	}
-	serviceInterface, exists, err := clusterCache.serviceStore.GetByKey(key)
+	serviceInterface, exists, err := clusterCache.serviceStore.Indexer.GetByKey(key)
 	if err != nil {
-		glog.Infof("Did not successfully get %v from store: %v, will retry later", key, err)
+		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
 		clusterCache.serviceQueue.Add(key)
 		return err
 	}
@@ -202,6 +223,7 @@ func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService,
 			for _, fed := range cachedFedServiceStatus.Ingress {
 				if new.IP == fed.IP && new.Hostname == fed.Hostname {
 					found = true
+					break
 				}
 			}
 			if !found {
@@ -236,7 +258,7 @@ func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService,
 	return needUpdate
 }
 
-func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedService, fedClient federation_release_1_3.Interface) error {
+func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedService, fedClient fedclientset.Interface) error {
 	service := cachedService.lastState
 	glog.V(5).Infof("Persist federation service status %s/%s", service.Namespace, service.Name)
 	var err error

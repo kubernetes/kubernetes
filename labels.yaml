@@ -1,0 +1,285 @@
+labels:
+  - name: kind/bug
+    color: e11d21
+  - name: kind/enhancement
+    color: c7def8
+  - name: help-wanted
+    color: 006b75
+  - name: area/test
+    color: fad8c7
+  - name: kind/design
+    color: c7def8
+  - name: priority/P0
+    color: e11d21
+  - name: priority/P1
+    color: eb6420
+  - name: priority/P2
+    color: fbca04
+  - name: 'cncf-cla: no'
+    color: e11d21
+  - name: area/networking
+    color: 006b75
+  - name: dependency/docker
+    color: fbfa04
+  - name: area/security
+    color: d4c5f9
+  - name: component/kubelet
+    color: 0052cc
+  - name: kind/documentation
+    color: c7def8
+  - name: kind/cleanup
+    color: c7def8
+  - name: area/performance
+    color: d4c5f9
+  - name: area/introspection
+    color: bfe5bf
+  - name: area/api
+    color: e1ed21
+  - name: area/build-release
+    color: bfe5bf
+  - name: area/scheduling
+    color: ab6420
+  - name: area/isolation
+    color: aba420
+  - name: area/app-config-deployment
+    color: fb6420
+  - name: dependency/etcd
+    color: fbfa04
+  - name: component/clientlib
+    color: 0052cc
+  - name: component/kube-proxy
+    color: 0052cc
+  - name: area/os/ubuntu
+    color: d4c5f9
+  - name: kind/support
+    color: eb6420
+  - name: area/downward-api
+    color: 8fffcf
+  - name: area/upward-api
+    color: a0c280
+  - name: area/usability
+    color: bfe5bf
+  - name: area/kubelet-api
+    color: fbca04
+  - name: area/platform/gce
+    color: d4c5f9
+  - name: area/platform/azure
+    color: d4c5f9
+  - name: area/platform/vagrant
+    color: d4c5f9
+  - name: area/platform/vsphere
+    color: d4c5f9
+  - name: area/os/fedora
+    color: d4c5f9
+  - name: area/os/coreos
+    color: d4c5f9
+  - name: kind/example
+    color: c7def8
+  - name: area/images-registry
+    color: eba420
+  - name: component/controller-manager
+    color: 0052cc
+  - name: component/apiserver
+    color: 0052cc
+  - name: component/ui
+    color: 0052cc
+  - name: area/batch
+    color: c7def8
+  - name: area/HA
+    color: bfd4f2
+  - name: area/extensibility
+    color: ffaa04
+  - name: component/kubectl
+    color: 0052cc
+  - name: component/nodecontroller
+    color: 0052cc
+  - name: lgtm
+    color: 15dd18
+  - name: area/monitoring
+    color: fef2c0
+  - name: area/logging
+    color: fef2c0
+  - name: area/cadvisor
+    color: fef2c0
+  - name: area/platform/aws
+    color: d4c5f9
+  - name: priority/P3
+    color: fef2c0
+  - name: area/cloudprovider
+    color: f1fd21
+  - name: area/platform/gke
+    color: d4c5f9
+  - name: area/reliability
+    color: a10d01
+  - name: area/storage
+    color: 006b75
+  - name: '[deprecated--DO NOT USE]old-team/master'
+    color: ffffff
+  - name: team/node
+    color: d2b48c
+  - name: team/cluster
+    color: d2b48c
+  - name: team/CSI-API Machinery SIG
+    color: d2b48c
+  - name: area/cluster-lifecycle
+    color: d4c5f9
+  - name: 'cncf-cla: yes'
+    color: bfe5bf
+  - name: team/test-infra
+    color: d2b48c
+  - name: team/none
+    color: d2b48c
+  - name: area/platform/mesos
+    color: d4c5f9
+  - name: area/upgrade
+    color: bfd4f2
+  - name: release-note
+    color: c2e0c6
+  - name: dependency/rkt
+    color: fbfa04
+  - name: area/volumes
+    color: bfe5bf
+  - name: ok-to-merge
+    color: fbca04
+  - name: team/mesosphere
+    color: d2b48c
+  - name: area/autoscaling
+    color: "5319e7"
+  - name: area/platform/openstack
+    color: d4c5f9
+  - name: needs-rebase
+    color: BDBDBD
+  - name: cherrypick-candidate
+    color: fef2c0
+  - name: team/ux
+    color: d2b48c
+  - name: team/api
+    color: d2b48c
+  - name: team/control-plane
+    color: d2b48c
+  - name: size/XS
+    color: "009900"
+  - name: size/S
+    color: 77bb00
+  - name: size/M
+    color: eebb00
+  - name: size/L
+    color: ee9900
+  - name: size/XL
+    color: ee5500
+  - name: size/XXL
+    color: ee0000
+  - name: area/swagger
+    color: d4c5f9
+  - name: needs-ok-to-merge
+    color: ededed
+  - name: retest-not-required
+    color: eb6420
+  - name: kind/postmortem
+    color: bfe5bf
+  - name: area/cluster-federation
+    color: fad8c7
+  - name: team/redhat
+    color: d2b48c
+  - name: kind/api-change
+    color: c7def8
+  - name: kind/new-api
+    color: c7def8
+  - name: kind/technical-debt
+    color: c7def8
+  - name: kind/velocity-improvement
+    color: c7def8
+  - name: kind/flake
+    color: f7c6c7
+  - name: kind/feature
+    color: c7def8
+  - name: team/release-infra
+    color: d2b48c
+  - name: area/system-requirement
+    color: bfdadc
+  - name: team/gke
+    color: d2b48c
+  - name: kind/workaround-removal
+    color: c7def8
+  - name: area/admin
+    color: "009800"
+  - name: 'cla: human-approved'
+    color: bfe5bf
+  - name: area/devexp
+    color: "5319e7"
+  - name: 0 - Backlog
+    color: CCCCCC
+  - name: 1 - Ready
+    color: CCCCCC
+  - name: 2 - Working <= 5
+    color: CCCCCC
+  - name: 3 - Review
+    color: CCCCCC
+  - name: 4 - Done
+    color: CCCCCC
+  - name: davidopp
+    color: bfdadc
+  - name: kind/mesos-flake
+    color: f7c6c7
+  - name: team/huawei
+    color: d2b48c
+  - name: team/sig-aws
+    color: d2b48c
+  - name: kind/old-docs
+    color: c7def8
+  - name: kind/ecosystem-enablement
+    color: c7def8
+  - name: do-not-merge
+    color: e11d21
+  - name: kind/friction
+    color: c7def8
+  - name: cherrypick-approved
+    color: fef2c0
+  - name: release-note-label-needed
+    color: db5a64
+  - name: release-note-none
+    color: c2e0c6
+  - name: area/stateful-apps
+    color: ff6060
+  - name: release-note-action-required
+    color: c2e0c6
+  - name: area/auth
+    color: 00cc00
+  - name: area/example/cassandra
+    color: d4c5f9
+  - name: stale
+    color: "795548"
+  - name: area/os/gci
+    color: e99695
+  - name: documentation/content-gap
+    color: f9d0c4
+  - name: documentation/out-of-date
+    color: f9d0c4
+  - name: documentation/confusing
+    color: f9d0c4
+  - name: documentation/better-examples
+    color: f9d0c4
+  - name: component/node-e2e
+    color: 0052cc
+  - name: component/deployment
+    color: 0052cc
+  - name: release-note-experimental
+    color: c2e0c6
+  - name: e2e-not-required [deprecated use retest-not-required]
+    color: ededed
+  - name: component/dns
+    color: 1d76db
+  - name: 0 - Triage
+    color: AAAAAA
+  - name: team/rktnetes
+    color: d2b48c
+  - name: team/workloads
+    color: d2b48c
+  - name: keep-open
+    color: fbca04
+  - name: component/daemonset
+    color: 0052cc
+  - name: retest-not-required-docs-only
+    color: fbca04
+  - name: approved
+    color: 0ffa16

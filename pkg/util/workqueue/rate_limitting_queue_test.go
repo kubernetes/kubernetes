@@ -20,19 +20,20 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
 
 func TestRateLimitingQueue(t *testing.T) {
 	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second)
 	queue := NewRateLimitingQueue(limiter).(*rateLimitingType)
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	delayingQueue := &delayingType{
 		Interface:       New(),
 		clock:           fakeClock,
 		heartbeat:       fakeClock.Tick(maxWait),
 		stopCh:          make(chan struct{}),
 		waitingForAddCh: make(chan waitFor, 1000),
+		metrics:         newRetryMetrics(""),
 	}
 	queue.DelayingInterface = delayingQueue
 
@@ -43,7 +44,7 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 	queue.AddRateLimited("one")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 10*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 2, queue.NumRequeues("one"); e != a {
@@ -57,7 +58,7 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 	queue.AddRateLimited("two")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 10*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 

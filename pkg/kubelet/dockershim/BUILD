@@ -1,0 +1,88 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+load(
+    "@io_bazel_rules_go//go:def.bzl",
+    "go_binary",
+    "go_library",
+    "go_test",
+    "cgo_library",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "convert.go",
+        "doc.go",
+        "docker_container.go",
+        "docker_image.go",
+        "docker_sandbox.go",
+        "docker_service.go",
+        "docker_streaming.go",
+        "helpers.go",
+        "naming.go",
+        "security_context.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/kubelet/api:go_default_library",
+        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/dockershim/cm:go_default_library",
+        "//pkg/kubelet/dockertools:go_default_library",
+        "//pkg/kubelet/leaky:go_default_library",
+        "//pkg/kubelet/network:go_default_library",
+        "//pkg/kubelet/network/cni:go_default_library",
+        "//pkg/kubelet/network/kubenet:go_default_library",
+        "//pkg/kubelet/qos:go_default_library",
+        "//pkg/kubelet/server/streaming:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
+        "//pkg/kubelet/util/ioutils:go_default_library",
+        "//pkg/securitycontext:go_default_library",
+        "//pkg/util/term:go_default_library",
+        "//vendor:github.com/docker/engine-api/types",
+        "//vendor:github.com/docker/engine-api/types/container",
+        "//vendor:github.com/docker/engine-api/types/filters",
+        "//vendor:github.com/docker/engine-api/types/strslice",
+        "//vendor:github.com/docker/engine-api/types/versions",
+        "//vendor:github.com/docker/go-connections/nat",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/golang/protobuf/proto",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "convert_test.go",
+        "docker_container_test.go",
+        "docker_image_test.go",
+        "docker_sandbox_test.go",
+        "docker_service_test.go",
+        "helpers_test.go",
+        "naming_test.go",
+        "security_context_test.go",
+    ],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/container/testing:go_default_library",
+        "//pkg/kubelet/dockertools:go_default_library",
+        "//pkg/kubelet/network:go_default_library",
+        "//pkg/kubelet/network/mock_network:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
+        "//pkg/security/apparmor:go_default_library",
+        "//pkg/securitycontext:go_default_library",
+        "//pkg/util/clock:go_default_library",
+        "//vendor:github.com/docker/engine-api/types",
+        "//vendor:github.com/docker/engine-api/types/container",
+        "//vendor:github.com/golang/mock/gomock",
+        "//vendor:github.com/stretchr/testify/assert",
+    ],
+)

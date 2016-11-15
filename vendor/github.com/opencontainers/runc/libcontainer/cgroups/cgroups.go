@@ -9,7 +9,7 @@ import (
 )
 
 type Manager interface {
-	// Apply cgroup configuration to the process with the specified pid
+	// Applies cgroup configuration to the process with the specified pid
 	Apply(pid int) error
 
 	// Returns the PIDs inside the cgroup set
@@ -37,7 +37,7 @@ type Manager interface {
 	// restore the object later.
 	GetPaths() map[string]string
 
-	// Set the cgroup as configured.
+	// Sets the cgroup as configured.
 	Set(container *configs.Config) error
 }
 

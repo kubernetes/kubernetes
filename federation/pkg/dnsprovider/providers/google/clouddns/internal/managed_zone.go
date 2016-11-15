@@ -30,6 +30,10 @@ func (m ManagedZone) Name() string {
 	return m.impl.Name
 }
 
+func (m ManagedZone) Id() uint64 {
+	return m.impl.Id
+}
+
 func (m ManagedZone) DnsName() string {
 	return m.impl.DnsName
 }

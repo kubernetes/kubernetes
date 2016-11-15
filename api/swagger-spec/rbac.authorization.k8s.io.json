@@ -3,6 +3,10 @@
   "apiVersion": "",
   "basePath": "https://10.10.10.10:6443",
   "resourcePath": "/apis/rbac.authorization.k8s.io",
+  "info": {
+   "title": "",
+   "description": ""
+  },
   "apis": [
    {
     "path": "/apis/rbac.authorization.k8s.io",
@@ -72,7 +76,7 @@
    },
    "unversioned.GroupVersionForDiscovery": {
     "id": "unversioned.GroupVersionForDiscovery",
-    "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensiblity.",
+    "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
     "required": [
      "groupVersion",
      "version"

@@ -1,0 +1,12 @@
+#cloud-config
+
+runcmd:
+  - mount /tmp /tmp -o remount,exec,suid
+  - usermod -a -G docker jenkins
+  - mkdir -p /home/kubernetes/bin/
+  - mount -B /home/kubernetes/bin /home/kubernetes/bin
+  - mount -B -o remount,exec /home/kubernetes/bin 
+  - wget https://storage.googleapis.com/kubernetes-release/rkt/v1.18.0/rkt -O /home/kubernetes/bin/rkt
+  - wget https://storage.googleapis.com/kubernetes-release/rkt/v1.18.0/stage1-fly.aci -O /home/kubernetes/bin/stage1-fly.aci
+  - wget https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-v2.aci -O /home/kubernetes/bin/gci-mounter-v2.aci
+  - chmod a+x /home/kubernetes/bin/rkt

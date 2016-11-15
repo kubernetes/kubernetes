@@ -26,16 +26,16 @@ import (
 	"github.com/golang/glog"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
-	federation_release_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	release_1_3 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -68,6 +68,8 @@ const (
 	UserAgentName = "federation-service-controller"
 	KubeAPIQPS    = 20.0
 	KubeAPIBurst  = 30
+
+	maxNoOfClusters = 100
 )
 
 type cachedService struct {
@@ -99,9 +101,12 @@ type serviceCache struct {
 
 type ServiceController struct {
 	dns              dnsprovider.Interface
-	federationClient federation_release_1_3.Interface
+	federationClient fedclientset.Interface
 	federationName   string
-	zoneName         string
+	// serviceDnsSuffix is the DNS suffix we use when publishing service DNS names
+	serviceDnsSuffix string
+	// zoneName is used to identify the zone in which to put records
+	zoneName string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
 	dnsZones     dnsprovider.Zones
 	serviceCache *serviceCache
@@ -109,22 +114,33 @@ type ServiceController struct {
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
-	serviceController *framework.Controller
+	serviceController *cache.Controller
 	// A store of services, populated by the serviceController
 	clusterStore federationcache.StoreToClusterLister
 	// Watches changes to all services
-	clusterController *framework.Controller
+	clusterController *cache.Controller
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
 	// services that need to be synced
 	queue           *workqueue.Type
 	knownClusterSet sets.String
+	// endpoint worker map contains all the clusters registered with an indication that worker exist
+	// key clusterName
+	endpointWorkerMap map[string]bool
+	// channel for worker to signal that it is going out of existence
+	endpointWorkerDoneChan chan string
+	// service worker map contains all the clusters registered with an indication that worker exist
+	// key clusterName
+	serviceWorkerMap map[string]bool
+	// channel for worker to signal that it is going out of existence
+	serviceWorkerDoneChan chan string
 }
 
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 
-func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Interface, federationName, zoneName string) *ServiceController {
+func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
+	federationName, serviceDnsSuffix, zoneName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -134,6 +150,7 @@ func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Inte
 		dns:              dns,
 		federationClient: federationClient,
 		federationName:   federationName,
+		serviceDnsSuffix: serviceDnsSuffix,
 		zoneName:         zoneName,
 		serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 		clusterCache: &clusterClientCache{
@@ -145,18 +162,20 @@ func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Inte
 		queue:            workqueue.New(),
 		knownClusterSet:  make(sets.String),
 	}
-	s.serviceStore.Store, s.serviceController = framework.NewInformer(
+	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return s.federationClient.Core().Services(v1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&v1.Service{},
 		serviceSyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: s.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
 				// there is case that old and new are equals but we still catch the event now.
@@ -166,19 +185,22 @@ func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Inte
 			},
 			DeleteFunc: s.enqueueService,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-	s.clusterStore.Store, s.clusterController = framework.NewInformer(
+	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return s.federationClient.Federation().Clusters().List(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return s.federationClient.Federation().Clusters().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Federation().Clusters().Watch(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return s.federationClient.Federation().Clusters().Watch(versionedOptions)
 			},
 		},
 		&v1beta1.Cluster{},
 		clusterSyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			DeleteFunc: s.clusterCache.delFromClusterSet,
 			AddFunc:    s.clusterCache.addToClientMap,
 			UpdateFunc: func(old, cur interface{}) {
@@ -205,6 +227,11 @@ func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Inte
 			},
 		},
 	)
+
+	s.endpointWorkerMap = make(map[string]bool)
+	s.serviceWorkerMap = make(map[string]bool)
+	s.endpointWorkerDoneChan = make(chan string, maxNoOfClusters)
+	s.serviceWorkerDoneChan = make(chan string, maxNoOfClusters)
 	return s
 }
 
@@ -254,6 +281,13 @@ func (s *ServiceController) init() error {
 	}
 	if s.zoneName == "" {
 		return fmt.Errorf("ServiceController should not be run without zoneName.")
+	}
+	if s.serviceDnsSuffix == "" {
+		// TODO: Is this the right place to do defaulting?
+		if s.zoneName == "" {
+			return fmt.Errorf("ServiceController must be run with zoneName, if serviceDnsSuffix is not set.")
+		}
+		s.serviceDnsSuffix = s.zoneName
 	}
 	if s.dns == nil {
 		return fmt.Errorf("ServiceController should not be run without a dnsprovider.")
@@ -305,7 +339,7 @@ func wantsDNSRecords(service *v1.Service) bool {
 // processServiceForCluster creates or updates service to all registered running clusters,
 // update DNS records and update the service info with DNS entries to federation apiserver.
 // the function returns any error caught
-func (s *ServiceController) processServiceForCluster(cachedService *cachedService, clusterName string, service *v1.Service, client *release_1_3.Clientset) error {
+func (s *ServiceController) processServiceForCluster(cachedService *cachedService, clusterName string, service *v1.Service, client *kubeclientset.Clientset) error {
 	glog.V(4).Infof("Process service %s/%s for cluster %s", service.Namespace, service.Name, clusterName)
 	// Create or Update k8s Service
 	err := s.ensureClusterService(cachedService, clusterName, service, client)
@@ -365,12 +399,12 @@ func (s *ServiceController) deleteFederationService(cachedService *cachedService
 	return nil, !retryable
 }
 
-func (s *ServiceController) deleteClusterService(clusterName string, cachedService *cachedService, clientset *release_1_3.Clientset) error {
+func (s *ServiceController) deleteClusterService(clusterName string, cachedService *cachedService, clientset *kubeclientset.Clientset) error {
 	service := cachedService.lastState
 	glog.V(4).Infof("Deleting service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		err = clientset.Core().Services(service.Namespace).Delete(service.Name, &api.DeleteOptions{})
+		err = clientset.Core().Services(service.Namespace).Delete(service.Name, &v1.DeleteOptions{})
 		if err == nil || errors.IsNotFound(err) {
 			glog.V(4).Infof("Service %s/%s deleted from cluster %s", service.Namespace, service.Name, clusterName)
 			delete(cachedService.endpointMap, clusterName)
@@ -382,7 +416,7 @@ func (s *ServiceController) deleteClusterService(clusterName string, cachedServi
 	return err
 }
 
-func (s *ServiceController) ensureClusterService(cachedService *cachedService, clusterName string, service *v1.Service, client *release_1_3.Clientset) error {
+func (s *ServiceController) ensureClusterService(cachedService *cachedService, clusterName string, service *v1.Service, client *kubeclientset.Clientset) error {
 	var err error
 	var needUpdate bool
 	for i := 0; i < clientRetryCount; i++ {
@@ -684,16 +718,6 @@ func (s *ServiceController) updateAllServicesToCluster(services []*cachedService
 	}
 }
 
-func (s *ServiceController) removeAllServicesFromCluster(services []*cachedService, clusterName string) {
-	client, ok := s.clusterCache.clientMap[clusterName]
-	if ok {
-		for _, cachedService := range services {
-			s.deleteClusterService(clusterName, cachedService, client.clientset)
-		}
-		glog.Infof("Synced all services to cluster %s", clusterName)
-	}
-}
-
 // updateDNSRecords updates all existing federation service DNS Records so that
 // they will match the list of cluster names provided.
 // Returns the list of services that couldn't be updated.
@@ -724,18 +748,26 @@ func (s *ServiceController) lockedUpdateDNSRecords(service *cachedService, clust
 	if !wantsDNSRecords(service.appliedState) {
 		return nil
 	}
+
 	ensuredCount := 0
+	unensuredCount := 0
 	for key := range s.clusterCache.clientMap {
 		for _, clusterName := range clusterNames {
 			if key == clusterName {
-				s.ensureDnsRecords(clusterName, service)
-				ensuredCount += 1
+				err := s.ensureDnsRecords(clusterName, service)
+				if err != nil {
+					unensuredCount += 1
+					glog.V(4).Infof("Failed to update DNS records for service %v from cluster %s: %v", service, clusterName, err)
+				} else {
+					ensuredCount += 1
+				}
 			}
 		}
 	}
-	if ensuredCount < len(clusterNames) {
-		return fmt.Errorf("Failed to update DNS records for %d of %d clusters for service %v due to missing clients for those clusters",
-			len(clusterNames)-ensuredCount, len(clusterNames), service)
+	missedCount := len(clusterNames) - ensuredCount - unensuredCount
+	if missedCount > 0 || unensuredCount > 0 {
+		return fmt.Errorf("Failed to update DNS records for %d clusters for service %v due to missing clients [missed count: %d] and/or failing to ensure DNS records [unensured count: %d]",
+			len(clusterNames), service, missedCount, unensuredCount)
 	}
 	return nil
 }
@@ -809,9 +841,9 @@ func (s *ServiceController) syncService(key string) error {
 		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Now().Sub(startTime))
 	}()
 	// obj holds the latest service info from apiserver
-	obj, exists, err := s.serviceStore.Store.GetByKey(key)
+	obj, exists, err := s.serviceStore.Indexer.GetByKey(key)
 	if err != nil {
-		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
+		glog.Errorf("Unable to retrieve service %v from store: %v", key, err)
 		s.queue.Add(key)
 		return err
 	}

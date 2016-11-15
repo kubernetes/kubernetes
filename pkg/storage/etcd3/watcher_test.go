@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -51,43 +54,46 @@ func TestWatchList(t *testing.T) {
 func testWatch(t *testing.T, recursive bool) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
 	tests := []struct {
 		key        string
-		filter     storage.FilterFunc
+		pred       storage.SelectionPredicate
 		watchTests []*testWatchStruct
 	}{{ // create a key
 		key:        "/somekey-1",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
-		filter:     storage.Everything,
-	}, { // create a key but obj gets filtered
-		key:        "/somekey-2",
-		watchTests: []*testWatchStruct{{podFoo, false, ""}},
-		filter:     func(runtime.Object) bool { return false },
+		pred:       storage.Everything,
 	}, { // create a key but obj gets filtered. Then update it with unfiltered obj
 		key:        "/somekey-3",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
-		filter: func(obj runtime.Object) bool {
-			pod := obj.(*api.Pod)
-			return pod.Name == "bar"
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name=bar"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*api.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
 		},
 	}, { // update
 		key:        "/somekey-4",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
-		filter:     storage.Everything,
+		pred:       storage.Everything,
 	}, { // delete because of being filtered
 		key:        "/somekey-5",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
-		filter: func(obj runtime.Object) bool {
-			pod := obj.(*api.Pod)
-			return pod.Name != "bar"
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*api.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
 		},
 	}}
 	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, "0", tt.filter, recursive)
+		w, err := store.watch(ctx, tt.key, "0", tt.pred, recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
@@ -123,7 +129,7 @@ func testWatch(t *testing.T, recursive bool) {
 func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -134,13 +140,13 @@ func TestDeleteTriggerWatch(t *testing.T) {
 	testCheckEventType(t, watch.Deleted, w)
 }
 
-// TestWatchSync tests that
+// TestWatchFromZero tests that
 // - watch from 0 should sync up and grab the object added before
-// - watch from non-0 should just watch changes after given version
-func TestWatchFromZeroAndNoneZero(t *testing.T) {
+// - watch from 0 is able to return events for objects whose previous version has been compacted
+func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
 	w, err := store.Watch(ctx, key, "0", storage.Everything)
 	if err != nil {
@@ -148,9 +154,61 @@ func TestWatchFromZeroAndNoneZero(t *testing.T) {
 	}
 	testCheckResult(t, 0, watch.Added, w, storedObj)
 	w.Stop()
-	testCheckStop(t, 0, w)
 
-	w, err = store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+	// Update
+	out := &api.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
+		}))
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Make sure when we watch from 0 we receive an ADDED event
+	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, 1, watch.Added, w, out)
+	w.Stop()
+
+	// Update again
+	out = &api.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
+		}))
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Compact previous versions
+	revToCompact, err := strconv.Atoi(out.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Error converting %q to an int: %v", storedObj.ResourceVersion, err)
+	}
+	_, err = cluster.RandClient().Compact(ctx, int64(revToCompact), clientv3.WithCompactPhysical())
+	if err != nil {
+		t.Fatalf("Error compacting: %v", err)
+	}
+
+	// Make sure we can still watch from 0 and receive an ADDED event
+	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, 2, watch.Added, w, out)
+}
+
+// TestWatchFromNoneZero tests that
+// - watch from non-0 should just watch changes after given version
+func TestWatchFromNoneZero(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+
+	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -165,13 +223,13 @@ func TestWatchFromZeroAndNoneZero(t *testing.T) {
 func TestWatchError(t *testing.T) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	invalidStore := newStore(cluster.RandClient(), &testCodec{testapi.Default.Codec()}, "")
+	invalidStore := newStore(cluster.RandClient(), false, &testCodec{testapi.Default.Codec()}, "")
 	ctx := context.Background()
 	w, err := invalidStore.Watch(ctx, "/abc", "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	validStore := newStore(cluster.RandClient(), testapi.Default.Codec(), "")
+	validStore := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
 	validStore.GuaranteedUpdate(ctx, "/abc", &api.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, nil
@@ -184,17 +242,20 @@ func TestWatchContextCancel(t *testing.T) {
 	defer cluster.Terminate(t)
 	canceledCtx, cancel := context.WithCancel(ctx)
 	cancel()
-	w := store.watcher.createWatchChan(canceledCtx, "/abc", 0, false, storage.Everything)
-	// When we do a client.Get with a canceled context, it will return error.
-	// Nonetheless, when we try to send it over internal errChan, we should detect
-	// it's context canceled and not send it.
-	err := w.sync()
-	w.ctx = ctx
-	w.sendError(err)
+	// When we watch with a canceled context, we should detect that it's context canceled.
+	// We won't take it as error and also close the watcher.
+	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.Everything)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	select {
-	case err := <-w.errChan:
-		t.Errorf("cancelling context shouldn't return any error. Err: %v", err)
-	default:
+	case _, ok := <-w.ResultChan():
+		if ok {
+			t.Error("ResultChan() should be closed")
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
 	}
 }
 
@@ -224,7 +285,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {

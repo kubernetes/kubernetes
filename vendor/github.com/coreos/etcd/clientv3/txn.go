@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,15 +21,17 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Txn is the interface that wraps mini-transactions.
 //
-// Tx.If(
-//  Compare(Value(k1), ">", v1),
-//  Compare(Version(k1), "=", 2)
-// ).Then(
-//  OpPut(k2,v2), OpPut(k3,v3)
-// ).Else(
-//  OpPut(k4,v4), OpPut(k5,v5)
-// ).Commit()
+//	 Tx.If(
+//	  Compare(Value(k1), ">", v1),
+//	  Compare(Version(k1), "=", 2)
+//	 ).Then(
+//	  OpPut(k2,v2), OpPut(k3,v3)
+//	 ).Else(
+//	  OpPut(k4,v4), OpPut(k5,v5)
+//	 ).Commit()
+//
 type Txn interface {
 	// If takes a list of comparison. If all comparisons passed in succeed,
 	// the operations passed into Then() will be executed. Or the operations
@@ -63,8 +65,8 @@ type txn struct {
 
 	cmps []*pb.Compare
 
-	sus []*pb.RequestUnion
-	fas []*pb.RequestUnion
+	sus []*pb.RequestOp
+	fas []*pb.RequestOp
 }
 
 func (txn *txn) If(cs ...Cmp) Txn {
@@ -107,7 +109,7 @@ func (txn *txn) Then(ops ...Op) Txn {
 
 	for _, op := range ops {
 		txn.isWrite = txn.isWrite || op.isWrite()
-		txn.sus = append(txn.sus, op.toRequestUnion())
+		txn.sus = append(txn.sus, op.toRequestOp())
 	}
 
 	return txn
@@ -125,7 +127,7 @@ func (txn *txn) Else(ops ...Op) Txn {
 
 	for _, op := range ops {
 		txn.isWrite = txn.isWrite || op.isWrite()
-		txn.fas = append(txn.fas, op.toRequestUnion())
+		txn.fas = append(txn.fas, op.toRequestOp())
 	}
 
 	return txn
@@ -134,27 +136,25 @@ func (txn *txn) Else(ops ...Op) Txn {
 func (txn *txn) Commit() (*TxnResponse, error) {
 	txn.mu.Lock()
 	defer txn.mu.Unlock()
-
-	kv := txn.kv
-
 	for {
-		r := &pb.TxnRequest{Compare: txn.cmps, Success: txn.sus, Failure: txn.fas}
-		resp, err := kv.getRemote().Txn(txn.ctx, r)
+		resp, err := txn.commit()
 		if err == nil {
-			return (*TxnResponse)(resp), nil
+			return resp, err
 		}
-
-		if isHalted(txn.ctx, err) {
-			return nil, err
+		if isHaltErr(txn.ctx, err) {
+			return nil, toErr(txn.ctx, err)
 		}
-
 		if txn.isWrite {
-			go kv.switchRemote(err)
-			return nil, err
-		}
-
-		if nerr := kv.switchRemote(err); nerr != nil {
-			return nil, nerr
+			return nil, toErr(txn.ctx, err)
 		}
 	}
+}
+
+func (txn *txn) commit() (*TxnResponse, error) {
+	r := &pb.TxnRequest{Compare: txn.cmps, Success: txn.sus, Failure: txn.fas}
+	resp, err := txn.kv.remote.Txn(txn.ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	return (*TxnResponse)(resp), nil
 }

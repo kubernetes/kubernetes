@@ -42,6 +42,7 @@ const (
 	kubernetesContainerRestartCountLabel           = "io.kubernetes.container.restartCount"
 	kubernetesContainerTerminationMessagePathLabel = "io.kubernetes.container.terminationMessagePath"
 	kubernetesContainerPreStopHandlerLabel         = "io.kubernetes.container.preStopHandler"
+	kubernetesContainerPortsLabel                  = "io.kubernetes.container.ports" // Added in 1.4
 
 	// TODO(random-liu): Keep this for old containers, remove this when we drop support for v1.1.
 	kubernetesPodLabel = "io.kubernetes.pod.data"
@@ -62,6 +63,7 @@ type labelledContainerInfo struct {
 	RestartCount              int
 	TerminationMessagePath    string
 	PreStopHandler            *api.Handler
+	Ports                     []api.ContainerPort
 }
 
 func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableCustomMetrics bool) map[string]string {
@@ -89,7 +91,14 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableC
 			labels[kubernetesContainerPreStopHandlerLabel] = string(rawPreStop)
 		}
 	}
-
+	if len(container.Ports) > 0 {
+		rawContainerPorts, err := json.Marshal(container.Ports)
+		if err != nil {
+			glog.Errorf("Unable to marshal container ports for container %q for pod %q: %v", container.Name, format.Pod(pod), err)
+		} else {
+			labels[kubernetesContainerPortsLabel] = string(rawContainerPorts)
+		}
+	}
 	if enableCustomMetrics {
 		path, err := custommetrics.GetCAdvisorCustomMetricsDefinitionPath(container)
 		if path != nil && err == nil {
@@ -124,6 +133,12 @@ func getContainerInfoFromLabel(labels map[string]string) *labelledContainerInfo 
 		logError(containerInfo, kubernetesContainerPreStopHandlerLabel, err)
 	} else if found {
 		containerInfo.PreStopHandler = preStopHandler
+	}
+	containerPorts := []api.ContainerPort{}
+	if found, err := getJsonObjectFromLabel(labels, kubernetesContainerPortsLabel, &containerPorts); err != nil {
+		logError(containerInfo, kubernetesContainerPortsLabel, err)
+	} else if found {
+		containerInfo.Ports = containerPorts
 	}
 	supplyContainerInfoWithOldLabel(labels, containerInfo)
 	return containerInfo

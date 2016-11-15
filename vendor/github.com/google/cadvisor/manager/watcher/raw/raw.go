@@ -19,6 +19,7 @@ package raw
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 
@@ -133,9 +134,15 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
-			// TODO(vmarmol): We don't have to fail here, maybe we can recover and try to get as many registrations as we can.
-			_, err = self.watchDirectory(path.Join(dir, entry.Name()), path.Join(containerName, entry.Name()))
+			entryPath := path.Join(dir, entry.Name())
+			_, err = self.watchDirectory(entryPath, path.Join(containerName, entry.Name()))
 			if err != nil {
+				glog.Errorf("Failed to watch directory %q: %v", entryPath, err)
+				if os.IsNotExist(err) {
+					// The directory may have been removed before watching. Try to watch the other
+					// subdirectories. (https://github.com/kubernetes/kubernetes/issues/28997)
+					continue
+				}
 				return alreadyWatching, err
 			}
 		}

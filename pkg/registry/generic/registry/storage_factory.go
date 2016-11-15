@@ -18,37 +18,51 @@ package registry
 
 import (
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
 
-// Creates a cacher on top of the given 'storageInterface'.
+// Creates a cacher based given storageConfig.
 func StorageWithCacher(
-	storageInterface storage.Interface,
+	storageConfig *storagebackend.Config,
 	capacity int,
 	objectType runtime.Object,
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
-	newListFunc func() runtime.Object) storage.Interface {
+	newListFunc func() runtime.Object,
+	triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 
-	config := storage.CacherConfig{
-		CacheCapacity:  capacity,
-		Storage:        storageInterface,
-		Versioner:      etcdstorage.APIObjectVersioner{},
-		Type:           objectType,
-		ResourcePrefix: resourcePrefix,
-		NewListFunc:    newListFunc,
+	s, d := generic.NewRawStorage(storageConfig)
+	// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
+	// Currently it has two layers of same storage interface -- cacher and low level kv.
+	cacherConfig := storage.CacherConfig{
+		CacheCapacity:        capacity,
+		Storage:              s,
+		Versioner:            etcdstorage.APIObjectVersioner{},
+		Type:                 objectType,
+		ResourcePrefix:       resourcePrefix,
+		NewListFunc:          newListFunc,
+		TriggerPublisherFunc: triggerFunc,
+		Codec:                storageConfig.Codec,
 	}
 	if scopeStrategy.NamespaceScoped() {
-		config.KeyFunc = func(obj runtime.Object) (string, error) {
+		cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
 			return storage.NamespaceKeyFunc(resourcePrefix, obj)
 		}
 	} else {
-		config.KeyFunc = func(obj runtime.Object) (string, error) {
+		cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
 			return storage.NoNamespaceKeyFunc(resourcePrefix, obj)
 		}
 	}
+	cacher := storage.NewCacherFromConfig(cacherConfig)
+	destroyFunc := func() {
+		cacher.Stop()
+		d()
+	}
 
-	return storage.NewCacherFromConfig(config)
+	return cacher, destroyFunc
 }

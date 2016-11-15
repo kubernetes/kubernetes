@@ -29,7 +29,7 @@ while read -ra LINE; do
         sed -i -e "s|^bind.*$|bind ${LINE}|" ${CFG}
     elif [ "$(/opt/redis/redis-cli -h $LINE info | grep role | sed 's,\r$,,')" = "role:master" ]; then
         # TODO: More restrictive regex?
-        sed -i -e "s|^.*slaveof.*$|slaveof ${LINE} ${PORT}|" ${CFG}
+        sed -i -e "s|^# slaveof.*$|slaveof ${LINE} ${PORT}|" ${CFG}
     fi
 done
 

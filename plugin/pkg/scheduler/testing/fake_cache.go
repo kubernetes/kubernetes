@@ -32,6 +32,8 @@ func (f *FakeCache) AssumePod(pod *api.Pod) error {
 	return nil
 }
 
+func (f *FakeCache) ForgetPod(pod *api.Pod) error { return nil }
+
 func (f *FakeCache) AddPod(pod *api.Pod) error { return nil }
 
 func (f *FakeCache) UpdatePod(oldPod, newPod *api.Pod) error { return nil }
@@ -44,8 +46,8 @@ func (f *FakeCache) UpdateNode(oldNode, newNode *api.Node) error { return nil }
 
 func (f *FakeCache) RemoveNode(node *api.Node) error { return nil }
 
-func (f *FakeCache) GetNodeNameToInfoMap() (map[string]*schedulercache.NodeInfo, error) {
-	return nil, nil
+func (f *FakeCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
+	return nil
 }
 
 func (f *FakeCache) List(s labels.Selector) ([]*api.Pod, error) { return nil, nil }

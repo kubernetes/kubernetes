@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package util holds generic etcd-related utility functions that any user of ectd might want to
 // use, without pulling in kubernetes-specific code.
-package util
+package util // import "k8s.io/kubernetes/pkg/storage/etcd/util"

@@ -57,6 +57,16 @@ CNI_KUBELET_TRIGGER=${CNI_KUBELET_TRIGGER:-networking}
 # drawn.
 export FLANNEL_NET=${FLANNEL_NET:-172.16.0.0/16}
 
+# If Flannel networking is used then the following variable can be
+# used to customize the Flannel backend.  The variable's value should
+# be a JSON object.  An empty string means to use the default, which
+# is `{"Type": "vxlan"}`.  See
+# https://github.com/coreos/flannel#configuration for details on
+# configuring Flannel.
+
+export FLANNEL_BACKEND
+FLANNEL_BACKEND=''
+
 # Optionally add other contents to the Flannel configuration JSON
 # object normally stored in etcd as /coreos.com/network/config.  Use
 # JSON syntax suitable for insertion into a JSON object constructor
@@ -64,11 +74,17 @@ export FLANNEL_NET=${FLANNEL_NET:-172.16.0.0/16}
 # FLANNEL_OTHER_NET_CONFIG=', "SubnetMin": "172.16.10.0", "SubnetMax": "172.16.90.0"'
 
 export FLANNEL_OTHER_NET_CONFIG
-FLANNEL_OTHER_NET_CONFIG=''
+FLANNEL_OTHER_NET_CONFIG=${FLANNEL_OTHER_NET_CONFIG:-""}
 
-# Admission Controllers to invoke prior to persisting objects in cluster
-# If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
-export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,SecurityContextDeny,ResourceQuota
+# Admission Controllers to invoke prior to persisting objects in
+# cluster.  If we included ResourceQuota, we should keep it at the end
+# of the list to prevent incrementing quota usage prematurely.  The
+# list below is what
+# http://kubernetes.io/docs/admin/admission-controllers/ recommends
+# for release >= 1.4.0; see that doc for the recommended settings for
+# earlier releases.
+
+export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
 
 # Path to the config file or directory of files of kubelet
 export KUBELET_CONFIG=${KUBELET_CONFIG:-""}
@@ -100,7 +116,9 @@ ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 # DNS_SERVER_IP must be a IP in SERVICE_CLUSTER_IP_RANGE
 DNS_SERVER_IP=${DNS_SERVER_IP:-"192.168.3.10"}
 DNS_DOMAIN=${DNS_DOMAIN:-"cluster.local"}
-DNS_REPLICAS=${DNS_REPLICAS:-1}
+
+# Optional: Enable DNS horizontal autoscaler
+ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}"
 
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
@@ -117,3 +135,5 @@ ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-"false"}
 
 DEBUG=${DEBUG:-"false"}
 
+# Add SSH_OPTS: Add this to config ssh port
+SSH_OPTS="-oPort=22 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"

@@ -19,7 +19,7 @@
 # exit on any error
 set -e
 
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.

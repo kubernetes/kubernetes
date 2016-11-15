@@ -29,22 +29,18 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
-
-// EnableGarbageCollector affects the handling of Update and Delete requests. It
-// must be synced with the corresponding flag in kube-controller-manager.
-var EnableGarbageCollector bool
 
 // Store implements generic.Registry.
 // It's intended to be embeddable, so that you can implement any
@@ -88,17 +84,24 @@ type Store struct {
 	TTLFunc func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 
 	// Returns a matcher corresponding to the provided labels and fields.
-	PredicateFunc func(label labels.Selector, field fields.Selector) generic.Matcher
+	PredicateFunc func(label labels.Selector, field fields.Selector) storage.SelectionPredicate
+
+	// Called to cleanup storage clients.
+	DestroyFunc func()
+
+	// EnableGarbageCollection affects the handling of Update and Delete requests. It
+	// must be synced with the corresponding flag in kube-controller-manager.
+	EnableGarbageCollection bool
 
 	// DeleteCollectionWorkers is the maximum number of workers in a single
 	// DeleteCollection call.
 	DeleteCollectionWorkers int
 
-	// Called on all objects returned from the underlying store, after
-	// the exit hooks are invoked. Decorators are intended for integrations
-	// that are above storage and should only be used for specific cases where
-	// storage of the value is not appropriate, since they cannot
-	// be watched.
+	// Decorator is called as exit hook on object returned from the underlying storage.
+	// The returned object could be individual object (e.g. Pod) or the list type (e.g. PodList).
+	// Decorator is intended for integrations that are above storage and
+	// should only be used for specific cases where storage of the value is
+	// not appropriate, since they cannot be watched.
 	Decorator rest.ObjectFunc
 	// Allows extended behavior during creation, required
 	CreateStrategy rest.RESTCreateStrategy
@@ -145,7 +148,7 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
 	}
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
 	key = key + "/" + name
@@ -157,7 +160,7 @@ func NoNamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, er
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
 	}
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
 	key := prefix + "/" + name
@@ -184,26 +187,53 @@ func (e *Store) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
-	return e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
+	out, err := e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
+	if err != nil {
+		return nil, err
+	}
+	if e.Decorator != nil {
+		if err := e.Decorator(out); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Store) ListPredicate(ctx api.Context, m generic.Matcher, options *api.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx api.Context, p storage.SelectionPredicate, options *api.ListOptions) (runtime.Object, error) {
+	if options == nil {
+		options = &api.ListOptions{ResourceVersion: "0"}
+	}
 	list := e.NewListFunc()
-	filterFunc := e.filterAndDecorateFunction(m)
-	if name, ok := m.MatchesSingle(); ok {
+	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			err := e.Storage.GetToList(ctx, key, filterFunc, list)
+			err := e.Storage.GetToList(ctx, key, options.ResourceVersion, p, list)
 			return list, storeerr.InterpretListError(err, e.QualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	if options == nil {
-		options = &api.ListOptions{ResourceVersion: "0"}
-	}
-	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, filterFunc, list)
+	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
 	return list, storeerr.InterpretListError(err, e.QualifiedResource)
+}
+
+// TODO: remove this function after 1.6
+// returns if the user agent is is kubectl older than v1.4.0
+func isOldKubectl(userAgent string) bool {
+	// example userAgent string: kubectl-1.3/v1.3.8 (linux/amd64) kubernetes/e328d5b
+	if !strings.Contains(userAgent, "kubectl") {
+		return false
+	}
+	userAgent = strings.Split(userAgent, " ")[0]
+	subs := strings.Split(userAgent, "/")
+	if len(subs) != 2 {
+		return false
+	}
+	kubectlVersion, versionErr := version.Parse(subs[1])
+	if versionErr != nil {
+		return false
+	}
+	return kubectlVersion.LT(version.MustParse("v1.4.0"))
 }
 
 // Create inserts a new item according to the unique key from the object.
@@ -227,6 +257,29 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
 		err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
+		if !kubeerr.IsAlreadyExists(err) {
+			return nil, err
+		}
+		if errGet := e.Storage.Get(ctx, key, out, false); errGet != nil {
+			return nil, err
+		}
+		accessor, errGetAcc := meta.Accessor(out)
+		if errGetAcc != nil {
+			return nil, err
+		}
+		if accessor.GetDeletionTimestamp() != nil {
+			msg := &err.(*kubeerr.StatusError).ErrStatus.Message
+			*msg = fmt.Sprintf("object is being deleted: %s", *msg)
+			// TODO: remove this block after 1.6
+			userAgent, _ := api.UserAgentFrom(ctx)
+			if !isOldKubectl(userAgent) {
+				return nil, err
+			}
+			if e.QualifiedResource.Resource != "replicationcontrollers" {
+				return nil, err
+			}
+			*msg = fmt.Sprintf("%s: if you're using \"kubectl rolling-update\" with kubectl version older than v1.4.0, your rolling update has failed, though the pods are correctly updated. Please see https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#kubectl-rolling-update for a workaround", *msg)
+		}
 		return nil, err
 	}
 	if e.AfterCreate != nil {
@@ -246,7 +299,7 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 // it further checks if the object's DeletionGracePeriodSeconds is 0. If so, it
 // returns true.
 func (e *Store) shouldDelete(ctx api.Context, key string, obj, existing runtime.Object) bool {
-	if !EnableGarbageCollector {
+	if !e.EnableGarbageCollection {
 		return false
 	}
 	newMeta, err := api.ObjectMetaFor(obj)
@@ -445,29 +498,49 @@ var (
 	errEmptiedFinalizers = fmt.Errorf("emptied finalizers")
 )
 
-// return if we need to update the finalizers of the object, and the desired list of finalizers
-func shouldUpdateFinalizers(accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
-	if options == nil || options.OrphanDependents == nil {
-		return false, accessor.GetFinalizers()
+// shouldUpdateFinalizers returns if we need to update the finalizers of the
+// object, and the desired list of finalizers.
+// When deciding whether to add the OrphanDependent finalizer, factors in the
+// order of highest to lowest priority are: options.OrphanDependents, existing
+// finalizers of the object, e.DeleteStrategy.DefaultGarbageCollectionPolicy.
+func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
+	shouldOrphan := false
+	// Get default orphan policy from this REST object type
+	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
+		if gcStrategy.DefaultGarbageCollectionPolicy() == rest.OrphanDependents {
+			shouldOrphan = true
+		}
 	}
-	shouldOrphan := *options.OrphanDependents
-	alreadyOrphan := false
+	// If a finalizer is set in the object, it overrides the default
+	hasOrphanFinalizer := false
 	finalizers := accessor.GetFinalizers()
-	newFinalizers = make([]string, 0, len(finalizers))
 	for _, f := range finalizers {
 		if f == api.FinalizerOrphan {
-			alreadyOrphan = true
-			if !shouldOrphan {
+			shouldOrphan = true
+			hasOrphanFinalizer = true
+			break
+		}
+		// TODO: update this when we add a finalizer indicating a preference for the other behavior
+	}
+	// If an explicit policy was set at deletion time, that overrides both
+	if options != nil && options.OrphanDependents != nil {
+		shouldOrphan = *options.OrphanDependents
+	}
+	if shouldOrphan && !hasOrphanFinalizer {
+		finalizers = append(finalizers, api.FinalizerOrphan)
+		return true, finalizers
+	}
+	if !shouldOrphan && hasOrphanFinalizer {
+		var newFinalizers []string
+		for _, f := range finalizers {
+			if f == api.FinalizerOrphan {
 				continue
 			}
+			newFinalizers = append(newFinalizers, f)
 		}
-		newFinalizers = append(newFinalizers, f)
+		return true, newFinalizers
 	}
-	if shouldOrphan && !alreadyOrphan {
-		newFinalizers = append(newFinalizers, api.FinalizerOrphan)
-	}
-	shouldUpdate = shouldOrphan != alreadyOrphan
-	return shouldUpdate, newFinalizers
+	return false, finalizers
 }
 
 // markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the
@@ -560,14 +633,14 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, ke
 			if err != nil {
 				return nil, err
 			}
-			shouldUpdate, newFinalizers := shouldUpdateFinalizers(existingAccessor, options)
+			shouldUpdate, newFinalizers := shouldUpdateFinalizers(e, existingAccessor, options)
 			if shouldUpdate {
 				existingAccessor.SetFinalizers(newFinalizers)
 			}
 
+			pendingFinalizers = len(existingAccessor.GetFinalizers()) != 0
 			if !graceful {
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
-				pendingFinalizers = len(existingAccessor.GetFinalizers()) != 0
 				if pendingFinalizers {
 					glog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
 					err = markAsDeleting(existing)
@@ -648,13 +721,13 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 	var ignoreNotFound bool
 	var deleteImmediately bool = true
 	var lastExisting, out runtime.Object
-	if !EnableGarbageCollector {
+	if !e.EnableGarbageCollection {
 		// TODO: remove the check on graceful, because we support no-op updates now.
 		if graceful {
 			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)
 		}
 	} else {
-		shouldUpdateFinalizers, _ := shouldUpdateFinalizers(accessor, options)
+		shouldUpdateFinalizers, _ := shouldUpdateFinalizers(e, accessor, options)
 		// TODO: remove the check, because we support no-op updates now.
 		if graceful || pendingFinalizers || shouldUpdateFinalizers {
 			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
@@ -778,7 +851,7 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 
 // Watch makes a matcher for the given label and field, and calls
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
-// matcher that matches by key. generic.SelectionPredicate does this for you
+// matcher that matches by key. SelectionPredicate does this for you
 // automatically.
 func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
@@ -797,37 +870,32 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 }
 
 // WatchPredicate starts a watch for the items that m matches.
-func (e *Store) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
-	filterFunc := e.filterAndDecorateFunction(m)
-
-	if name, ok := m.MatchesSingle(); ok {
+func (e *Store) WatchPredicate(ctx api.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
+	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			if err != nil {
 				return nil, err
 			}
-			return e.Storage.Watch(ctx, key, resourceVersion, filterFunc)
+			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
+			if err != nil {
+				return nil, err
+			}
+			if e.Decorator != nil {
+				return newDecoratedWatcher(w, e.Decorator), nil
+			}
+			return w, nil
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filterFunc)
-}
-
-func (e *Store) filterAndDecorateFunction(m generic.Matcher) func(runtime.Object) bool {
-	return func(obj runtime.Object) bool {
-		matches, err := m.Matches(obj)
-		if err != nil {
-			glog.Errorf("unable to match watch: %v", err)
-			return false
-		}
-		if matches && e.Decorator != nil {
-			if err := e.Decorator(obj); err != nil {
-				glog.Errorf("unable to decorate watch: %v", err)
-				return false
-			}
-		}
-		return matches
+	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, p)
+	if err != nil {
+		return nil, err
 	}
+	if e.Decorator != nil {
+		return newDecoratedWatcher(w, e.Decorator), nil
+	}
+	return w, nil
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or returning an error
@@ -874,11 +942,11 @@ func (e *Store) Export(ctx api.Context, name string, opts unversioned.ExportOpti
 	}
 
 	if e.ExportStrategy != nil {
-		if err = e.ExportStrategy.Export(obj, opts.Exact); err != nil {
+		if err = e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
 			return nil, err
 		}
 	} else {
-		e.CreateStrategy.PrepareForCreate(obj)
+		e.CreateStrategy.PrepareForCreate(ctx, obj)
 	}
 	return obj, nil
 }

@@ -154,6 +154,19 @@ func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UI
 	}, nil
 }
 
+func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	cephfsVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			CephFS: &api.CephFSVolumeSource{
+				Monitors: []string{},
+				Path:     volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(cephfsVolume), nil
+}
+
 // CephFS volumes represent a bare host file or directory mount of an CephFS export.
 type cephfs struct {
 	volName     string
@@ -181,6 +194,13 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
+}
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (caphfsMounter *cephfsMounter) CanMount() error {
+	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

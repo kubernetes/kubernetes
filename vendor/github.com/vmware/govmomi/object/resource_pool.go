@@ -17,43 +17,20 @@ limitations under the License.
 package object
 
 import (
-	"fmt"
-
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
-	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 )
 
 type ResourcePool struct {
 	Common
-
-	InventoryPath string
-}
-
-func (p ResourcePool) String() string {
-	if p.InventoryPath == "" {
-		return p.Common.String()
-	}
-	return fmt.Sprintf("%v @ %v", p.Common, p.InventoryPath)
 }
 
 func NewResourcePool(c *vim25.Client, ref types.ManagedObjectReference) *ResourcePool {
 	return &ResourcePool{
 		Common: NewCommon(c, ref),
 	}
-}
-
-func (p ResourcePool) Name(ctx context.Context) (string, error) {
-	var o mo.ResourcePool
-
-	err := p.Properties(ctx, p.Reference(), []string{"name"}, &o)
-	if err != nil {
-		return "", err
-	}
-
-	return o.Name, nil
 }
 
 func (p ResourcePool) ImportVApp(ctx context.Context, spec types.BaseImportSpec, folder *Folder, host *HostSystem) (*HttpNfcLease, error) {

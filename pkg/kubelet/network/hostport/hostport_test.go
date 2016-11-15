@@ -52,11 +52,11 @@ type ruleMatch struct {
 }
 
 func TestOpenPodHostports(t *testing.T) {
-	fakeIptables := NewFakeIptables()
+	fakeIPTables := NewFakeIPTables()
 
 	h := &handler{
 		hostPortMap: make(map[hostport]closeable),
-		iptables:    fakeIptables,
+		iptables:    fakeIPTables,
 		portOpener:  openFakeSocket,
 	}
 
@@ -158,7 +158,7 @@ func TestOpenPodHostports(t *testing.T) {
 		},
 	}
 
-	runningPods := make([]*RunningPod, 0)
+	activePods := make([]*ActivePod, 0)
 
 	// Fill in any match rules missing chain names
 	for _, test := range tests {
@@ -179,13 +179,13 @@ func TestOpenPodHostports(t *testing.T) {
 				}
 			}
 		}
-		runningPods = append(runningPods, &RunningPod{
+		activePods = append(activePods, &ActivePod{
 			Pod: test.pod,
 			IP:  net.ParseIP(test.ip),
 		})
 	}
 
-	err := h.OpenPodHostportsAndSync(&RunningPod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", runningPods)
+	err := h.OpenPodHostportsAndSync(&ActivePod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", activePods)
 	if err != nil {
 		t.Fatalf("Failed to OpenPodHostportsAndSync: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestOpenPodHostports(t *testing.T) {
 	}
 
 	for _, rule := range genericRules {
-		_, chain, err := fakeIptables.getChain(utiliptables.TableNAT, utiliptables.Chain(rule.chain))
+		_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain(rule.chain))
 		if err != nil {
 			t.Fatalf("Expected NAT chain %s did not exist", rule.chain)
 		}
@@ -211,7 +211,7 @@ func TestOpenPodHostports(t *testing.T) {
 	for _, test := range tests {
 		for _, match := range test.matches {
 			// Ensure chain exists
-			_, chain, err := fakeIptables.getChain(utiliptables.TableNAT, utiliptables.Chain(match.chain))
+			_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain(match.chain))
 			if err != nil {
 				t.Fatalf("Expected NAT chain %s did not exist", match.chain)
 			}

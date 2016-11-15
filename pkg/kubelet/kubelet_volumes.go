@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +18,15 @@ package kubelet
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -33,6 +38,12 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 	podVolumes := kl.volumeManager.GetMountedVolumesForPod(
 		volumetypes.UniquePodName(podUID))
 	for outerVolumeSpecName, volume := range podVolumes {
+		// TODO: volume.Mounter could be nil if volume object is recovered
+		// from reconciler's sync state process. PR 33616 will fix this problem
+		// to create Mounter object when recovering volume state.
+		if volume.Mounter == nil {
+			continue
+		}
 		volumesToReturn[outerVolumeSpecName] = volume.Mounter
 	}
 
@@ -65,4 +76,58 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *api.Pod, 
 	}
 	glog.V(10).Infof("Using volume plugin %q to mount %s", plugin.GetPluginName(), spec.Name())
 	return physicalMounter, nil
+}
+
+// cleanupOrphanedPodDirs removes the volumes of pods that should not be
+// running and that have no containers running.
+func (kl *Kubelet) cleanupOrphanedPodDirs(
+	pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+	allPods := sets.NewString()
+	for _, pod := range pods {
+		allPods.Insert(string(pod.UID))
+	}
+	for _, pod := range runningPods {
+		allPods.Insert(string(pod.ID))
+	}
+
+	found, err := kl.listPodsFromDisk()
+	if err != nil {
+		return err
+	}
+	errlist := []error{}
+	for _, uid := range found {
+		if allPods.Has(string(uid)) {
+			continue
+		}
+		// If volumes have not been unmounted/detached, do not delete directory.
+		// Doing so may result in corruption of data.
+		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
+			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up", uid)
+			continue
+		}
+		// Check whether volume is still mounted on disk. If so, do not delete directory
+		volumePaths, err := kl.getPodVolumePathListFromDisk(uid)
+		if err != nil {
+			glog.Errorf("Orphaned pod %q found, but error %v occured during reading volume dir from disk", uid, err)
+			continue
+		} else if len(volumePaths) > 0 {
+			for _, path := range volumePaths {
+				notMount, err := mount.IsNotMountPoint(path)
+				if err == nil && notMount {
+					glog.V(2).Infof("Volume path %q is no longer mounted, remove it", path)
+					os.Remove(path)
+				} else {
+					glog.Errorf("Orphaned pod %q found, but it might still mounted with error %v", uid, err)
+				}
+			}
+			continue
+		}
+
+		glog.V(3).Infof("Orphaned pod %q found, removing", uid)
+		if err := os.RemoveAll(kl.getPodDir(uid)); err != nil {
+			glog.Errorf("Failed to remove orphaned pod %q dir; err: %v", uid, err)
+			errlist = append(errlist, err)
+		}
+	}
+	return utilerrors.NewAggregate(errlist)
 }

@@ -18,33 +18,40 @@ package etcd3
 
 import (
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/storage/storagepb"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 )
 
 type event struct {
 	key       string
 	value     []byte
+	prevValue []byte
 	rev       int64
 	isDeleted bool
 	isCreated bool
 }
 
-func parseKV(kv *storagepb.KeyValue) *event {
+// parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.
+func parseKV(kv *mvccpb.KeyValue) *event {
 	return &event{
 		key:       string(kv.Key),
 		value:     kv.Value,
+		prevValue: nil,
 		rev:       kv.ModRevision,
 		isDeleted: false,
-		isCreated: kv.ModRevision == kv.CreateRevision,
+		isCreated: true,
 	}
 }
 
 func parseEvent(e *clientv3.Event) *event {
-	return &event{
+	ret := &event{
 		key:       string(e.Kv.Key),
 		value:     e.Kv.Value,
 		rev:       e.Kv.ModRevision,
 		isDeleted: e.Type == clientv3.EventTypeDelete,
 		isCreated: e.IsCreate(),
 	}
+	if e.PrevKv != nil {
+		ret.prevValue = e.PrevKv.Value
+	}
+	return ret
 }

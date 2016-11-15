@@ -19,6 +19,8 @@ package stubs
 
 import (
 	"fmt"
+
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
 )
 
@@ -27,16 +29,16 @@ var _ Route53API = &Route53APIStub{}
 
 /* Route53API is the subset of the AWS Route53 API that we actually use.  Add methods as required. Signatures must match exactly. */
 type Route53API interface {
-	ListResourceRecordSets(*route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error)
+	ListResourceRecordSetsPages(input *route53.ListResourceRecordSetsInput, fn func(p *route53.ListResourceRecordSetsOutput, lastPage bool) (shouldContinue bool)) error
 	ChangeResourceRecordSets(*route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error)
-	ListHostedZones(*route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error)
+	ListHostedZonesPages(input *route53.ListHostedZonesInput, fn func(p *route53.ListHostedZonesOutput, lastPage bool) (shouldContinue bool)) error
 	CreateHostedZone(*route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error)
 	DeleteHostedZone(*route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error)
 }
 
 // Route53APIStub is a minimal implementation of Route53API, used primarily for unit testing.
 // See http://http://docs.aws.amazon.com/sdk-for-go/api/service/route53.html for descriptions
-// of all of it's methods.
+// of all of its methods.
 type Route53APIStub struct {
 	zones      map[string]*route53.HostedZone
 	recordSets map[string]map[string][]*route53.ResourceRecordSet
@@ -50,7 +52,7 @@ func NewRoute53APIStub() *Route53APIStub {
 	}
 }
 
-func (r *Route53APIStub) ListResourceRecordSets(input *route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error) {
+func (r *Route53APIStub) ListResourceRecordSetsPages(input *route53.ListResourceRecordSetsInput, fn func(p *route53.ListResourceRecordSetsOutput, lastPage bool) (shouldContinue bool)) error {
 	output := route53.ListResourceRecordSetsOutput{} // TODO: Support optional input args.
 	if len(r.recordSets) <= 0 {
 		output.ResourceRecordSets = []*route53.ResourceRecordSet{}
@@ -63,7 +65,9 @@ func (r *Route53APIStub) ListResourceRecordSets(input *route53.ListResourceRecor
 			}
 		}
 	}
-	return &output, nil
+	lastPage := true
+	fn(&output, lastPage)
+	return nil
 }
 
 func (r *Route53APIStub) ChangeResourceRecordSets(input *route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error) {
@@ -74,42 +78,47 @@ func (r *Route53APIStub) ChangeResourceRecordSets(input *route53.ChangeResourceR
 	}
 
 	for _, change := range input.ChangeBatch.Changes {
+		key := *change.ResourceRecordSet.Name + "::" + *change.ResourceRecordSet.Type
 		switch *change.Action {
 		case route53.ChangeActionCreate:
-			if _, found := recordSets[*change.ResourceRecordSet.Name]; found {
-				return nil, fmt.Errorf("Attempt to create duplicate rrset %s", *change.ResourceRecordSet.Name) // TODO: Return AWS errors with codes etc
+			if _, found := recordSets[key]; found {
+				return nil, fmt.Errorf("Attempt to create duplicate rrset %s", key) // TODO: Return AWS errors with codes etc
 			}
-			recordSets[*change.ResourceRecordSet.Name] = append(recordSets[*change.ResourceRecordSet.Name], change.ResourceRecordSet)
+			recordSets[key] = append(recordSets[key], change.ResourceRecordSet)
 		case route53.ChangeActionDelete:
-			if _, found := recordSets[*change.ResourceRecordSet.Name]; !found {
-				return nil, fmt.Errorf("Attempt to delete non-existant rrset %s", *change.ResourceRecordSet.Name) // TODO: Check other fields too
+			if _, found := recordSets[key]; !found {
+				return nil, fmt.Errorf("Attempt to delete non-existent rrset %s", key) // TODO: Check other fields too
 			}
-			delete(recordSets, *change.ResourceRecordSet.Name)
+			delete(recordSets, key)
 		case route53.ChangeActionUpsert:
 			// TODO - not used yet
 		}
 	}
 	r.recordSets[*input.HostedZoneId] = recordSets
-	return output, nil // TODO: We should ideally return status etc, but we dont' use that yet.
+	return output, nil // TODO: We should ideally return status etc, but we don't' use that yet.
 }
 
-func (r *Route53APIStub) ListHostedZones(*route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error) {
+func (r *Route53APIStub) ListHostedZonesPages(input *route53.ListHostedZonesInput, fn func(p *route53.ListHostedZonesOutput, lastPage bool) (shouldContinue bool)) error {
 	output := &route53.ListHostedZonesOutput{}
 	for _, zone := range r.zones {
 		output.HostedZones = append(output.HostedZones, zone)
 	}
-	return output, nil
+	lastPage := true
+	fn(output, lastPage)
+	return nil
 }
 
 func (r *Route53APIStub) CreateHostedZone(input *route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error) {
-	if _, ok := r.zones[*input.Name]; ok {
-		return nil, fmt.Errorf("Error creating hosted DNS zone: %s already exists", *input.Name)
+	name := aws.StringValue(input.Name)
+	id := "/hostedzone/" + name
+	if _, ok := r.zones[id]; ok {
+		return nil, fmt.Errorf("Error creating hosted DNS zone: %s already exists", id)
 	}
-	r.zones[*input.Name] = &route53.HostedZone{
-		Id:   input.Name,
-		Name: input.Name,
+	r.zones[id] = &route53.HostedZone{
+		Id:   aws.String(id),
+		Name: aws.String(name),
 	}
-	return &route53.CreateHostedZoneOutput{HostedZone: r.zones[*input.Name]}, nil
+	return &route53.CreateHostedZoneOutput{HostedZone: r.zones[id]}, nil
 }
 
 func (r *Route53APIStub) DeleteHostedZone(input *route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error) {

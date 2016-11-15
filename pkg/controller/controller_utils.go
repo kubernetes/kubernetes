@@ -31,10 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -54,7 +53,7 @@ const (
 )
 
 var (
-	KeyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
+	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 type ResyncPeriodFunc func() time.Duration
@@ -167,12 +166,12 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 // TODO: Make this possible to disable in tests.
 // TODO: Support injection of clock.
 func (exp *ControlleeExpectations) isExpired() bool {
-	return util.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
+	return clock.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
 }
 
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
-	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: util.RealClock{}.Now()}
+	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
 	glog.V(4).Infof("Setting expectations %#v", exp)
 	return r.Add(exp)
 }
@@ -190,7 +189,7 @@ func (r *ControllerExpectations) LowerExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(-add), int64(-del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Lowered expectations %+v", exp)
+		glog.V(4).Infof("Lowered expectations %#v", exp)
 	}
 }
 
@@ -199,11 +198,11 @@ func (r *ControllerExpectations) RaiseExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(add), int64(del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Raised expectations %+v", exp)
+		glog.V(4).Infof("Raised expectations %#v", exp)
 	}
 }
 
-// CreationObserved atomically decrements the `add` expecation count of the given controller.
+// CreationObserved atomically decrements the `add` expectation count of the given controller.
 func (r *ControllerExpectations) CreationObserved(controllerKey string) {
 	r.LowerExpectations(controllerKey, 1, 0)
 }
@@ -220,6 +219,8 @@ type Expectations interface {
 
 // ControlleeExpectations track controllee creates/deletes.
 type ControlleeExpectations struct {
+	// Important: Since these two int64 fields are using sync/atomic, they have to be at the top of the struct due to a bug on 32-bit platforms
+	// See: https://golang.org/pkg/sync/atomic/ for more information
 	add       int64
 	del       int64
 	key       string
@@ -342,15 +343,35 @@ func NewUIDTrackingControllerExpectations(ce ControllerExpectationsInterface) *U
 	return &UIDTrackingControllerExpectations{ControllerExpectationsInterface: ce, uidStore: cache.NewStore(UIDSetKeyFunc)}
 }
 
+// Reasons for pod events
+const (
+	// FailedCreatePodReason is added in an event and in a replica set condition
+	// when a pod for a replica set is failed to be created.
+	FailedCreatePodReason = "FailedCreate"
+	// SuccessfulCreatePodReason is added in an event when a pod for a replica set
+	// is successfully created.
+	SuccessfulCreatePodReason = "SuccessfulCreate"
+	// FailedDeletePodReason is added in an event and in a replica set condition
+	// when a pod for a replica set is failed to be deleted.
+	FailedDeletePodReason = "FailedDelete"
+	// SuccessfulDeletePodReason is added in an event when a pod for a replica set
+	// is successfully deleted.
+	SuccessfulDeletePodReason = "SuccessfulDelete"
+)
+
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
 	// CreatePods creates new pods according to the spec.
 	CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error
-	// CreatePodsOnNode creates a new pod accorting to the spec on the specified node.
+	// CreatePodsOnNode creates a new pod according to the spec on the specified node.
 	CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error
+	// CreatePodsWithControllerRef creates new pods according to the spec, and sets object as the pod's controller.
+	CreatePodsWithControllerRef(namespace string, template *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string, object runtime.Object) error
+	// PatchPod patches the pod.
+	PatchPod(namespace, name string, data []byte) error
 }
 
 // RealPodControl is the default implementation of PodControlInterface.
@@ -367,6 +388,12 @@ func getPodsLabelSet(template *api.PodTemplateSpec) labels.Set {
 		desiredLabels[k] = v
 	}
 	return desiredLabels
+}
+
+func getPodsFinalizers(template *api.PodTemplateSpec) []string {
+	desiredFinalizers := make([]string, len(template.Finalizers))
+	copy(desiredFinalizers, template.Finalizers)
+	return desiredFinalizers
 }
 
 func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) (labels.Set, error) {
@@ -404,15 +431,37 @@ func getPodsPrefix(controllerName string) string {
 }
 
 func (r RealPodControl) CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods("", namespace, template, object)
+	return r.createPods("", namespace, template, object, nil)
+}
+
+func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *api.PodTemplateSpec, controllerObject runtime.Object, controllerRef *api.OwnerReference) error {
+	if controllerRef == nil {
+		return fmt.Errorf("controllerRef is nil")
+	}
+	if len(controllerRef.APIVersion) == 0 {
+		return fmt.Errorf("controllerRef has empty APIVersion")
+	}
+	if len(controllerRef.Kind) == 0 {
+		return fmt.Errorf("controllerRef has empty Kind")
+	}
+	if controllerRef.Controller == nil || *controllerRef.Controller != true {
+		return fmt.Errorf("controllerRef.Controller is not set")
+	}
+	return r.createPods("", namespace, template, controllerObject, controllerRef)
 }
 
 func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods(nodeName, namespace, template, object)
+	return r.createPods(nodeName, namespace, template, object, nil)
 }
 
-func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Object) (*api.Pod, error) {
+func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
+	_, err := r.KubeClient.Core().Pods(namespace).Patch(name, api.StrategicMergePatchType, data)
+	return err
+}
+
+func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Object, controllerRef *api.OwnerReference) (*api.Pod, error) {
 	desiredLabels := getPodsLabelSet(template)
+	desiredFinalizers := getPodsFinalizers(template)
 	desiredAnnotations, err := getPodsAnnotationSet(template, parentObject)
 	if err != nil {
 		return nil, err
@@ -428,27 +477,31 @@ func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Obje
 			Labels:       desiredLabels,
 			Annotations:  desiredAnnotations,
 			GenerateName: prefix,
+			Finalizers:   desiredFinalizers,
 		},
 	}
-	if err := api.Scheme.Convert(&template.Spec, &pod.Spec); err != nil {
+	if controllerRef != nil {
+		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
+	}
+	if err := api.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
 		return nil, fmt.Errorf("unable to convert pod template: %v", err)
 	}
 	return pod, nil
 }
 
-func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	pod, err := GetPodFromTemplate(template, object)
+func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error {
+	pod, err := GetPodFromTemplate(template, object, controllerRef)
 	if err != nil {
 		return err
 	}
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
 	}
-	if labels.Set(pod.Labels).AsSelector().Empty() {
+	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
 	if newPod, err := r.KubeClient.Core().Pods(namespace).Create(pod); err != nil {
-		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
+		r.Recorder.Eventf(object, api.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
 		return fmt.Errorf("unable to create pods: %v", err)
 	} else {
 		accessor, err := meta.Accessor(object)
@@ -457,7 +510,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 			return nil
 		}
 		glog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulCreate", "Created pod: %v", newPod.Name)
+		r.Recorder.Eventf(object, api.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
 	}
 	return nil
 }
@@ -468,51 +521,74 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
 	if err := r.KubeClient.Core().Pods(namespace).Delete(podID, nil); err != nil {
-		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
+		r.Recorder.Eventf(object, api.EventTypeWarning, FailedDeletePodReason, "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	} else {
 		glog.V(4).Infof("Controller %v deleted pod %v", accessor.GetName(), podID)
-		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulDelete", "Deleted pod: %v", podID)
+		r.Recorder.Eventf(object, api.EventTypeNormal, SuccessfulDeletePodReason, "Deleted pod: %v", podID)
 	}
 	return nil
 }
 
 type FakePodControl struct {
 	sync.Mutex
-	Templates     []api.PodTemplateSpec
-	DeletePodName []string
-	Err           error
+	Templates      []api.PodTemplateSpec
+	ControllerRefs []api.OwnerReference
+	DeletePodName  []string
+	Patches        [][]byte
+	Err            error
 }
 
 var _ PodControlInterface = &FakePodControl{}
 
-func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
+func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 	f.Lock()
 	defer f.Unlock()
+	f.Patches = append(f.Patches, data)
 	if f.Err != nil {
 		return f.Err
 	}
+	return nil
+}
+
+func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
 	f.Templates = append(f.Templates, *spec)
+	if f.Err != nil {
+		return f.Err
+	}
+	return nil
+}
+
+func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error {
+	f.Lock()
+	defer f.Unlock()
+	f.Templates = append(f.Templates, *spec)
+	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
+	if f.Err != nil {
+		return f.Err
+	}
 	return nil
 }
 
 func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
+	f.Templates = append(f.Templates, *template)
 	if f.Err != nil {
 		return f.Err
 	}
-	f.Templates = append(f.Templates, *template)
 	return nil
 }
 
 func (f *FakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
+	f.DeletePodName = append(f.DeletePodName, podID)
 	if f.Err != nil {
 		return f.Err
 	}
-	f.DeletePodName = append(f.DeletePodName, podID)
 	return nil
 }
 
@@ -521,6 +597,8 @@ func (f *FakePodControl) Clear() {
 	defer f.Unlock()
 	f.DeletePodName = []string{}
 	f.Templates = []api.PodTemplateSpec{}
+	f.ControllerRefs = []api.OwnerReference{}
+	f.Patches = [][]byte{}
 }
 
 // ByLogging allows custom sorting of pods so the best one can be picked for getting its logs.
@@ -630,12 +708,11 @@ func maxContainerRestarts(pod *api.Pod) int {
 }
 
 // FilterActivePods returns pods that have not terminated.
-func FilterActivePods(pods []api.Pod) []*api.Pod {
+func FilterActivePods(pods []*api.Pod) []*api.Pod {
 	var result []*api.Pod
-	for i := range pods {
-		p := pods[i]
+	for _, p := range pods {
 		if IsPodActive(p) {
-			result = append(result, &p)
+			result = append(result, p)
 		} else {
 			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
 				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
@@ -644,7 +721,7 @@ func FilterActivePods(pods []api.Pod) []*api.Pod {
 	return result
 }
 
-func IsPodActive(p api.Pod) bool {
+func IsPodActive(p *api.Pod) bool {
 	return api.PodSucceeded != p.Status.Phase &&
 		api.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
@@ -666,7 +743,7 @@ func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions
 // PodKey returns a key unique to the given pod within a cluster.
 // It's used so we consistently use the same key scheme in this module.
 // It does exactly what cache.MetaNamespaceKeyFunc would have done
-// expcept there's not possibility for error since we know the exact type.
+// except there's not possibility for error since we know the exact type.
 func PodKey(pod *api.Pod) string {
 	return fmt.Sprintf("%v/%v", pod.Namespace, pod.Name)
 }

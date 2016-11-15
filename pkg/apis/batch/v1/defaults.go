@@ -20,8 +20,9 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	RegisterDefaults(scheme)
+	return scheme.AddDefaultingFuncs(
 		SetDefaults_Job,
 	)
 }
@@ -38,5 +39,9 @@ func SetDefaults_Job(obj *Job) {
 	if obj.Spec.Parallelism == nil {
 		obj.Spec.Parallelism = new(int32)
 		*obj.Spec.Parallelism = 1
+	}
+	labels := obj.Spec.Template.Labels
+	if labels != nil && len(obj.Labels) == 0 {
+		obj.Labels = labels
 	}
 }

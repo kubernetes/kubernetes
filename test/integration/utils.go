@@ -20,11 +20,15 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/errors"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -39,7 +43,7 @@ func newEtcdClient() etcd.Client {
 	return client
 }
 
-func requireEtcd() {
+func RequireEtcd() {
 	if _, err := etcd.NewKeysAPI(newEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
 		glog.Fatalf("unable to connect to etcd for integration testing: %v", err)
 	}
@@ -51,8 +55,37 @@ func withEtcdKey(f func(string)) {
 	f(prefix)
 }
 
-func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.Pods(ns).Delete(name, nil); err != nil {
+func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
+	if err := c.Core().Pods(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
+}
+
+// Requests to try.  Each one should be forbidden or not forbidden
+// depending on the authentication and authorization setup of the master.
+var Code200 = map[int]bool{200: true}
+var Code201 = map[int]bool{201: true}
+var Code400 = map[int]bool{400: true}
+var Code403 = map[int]bool{403: true}
+var Code404 = map[int]bool{404: true}
+var Code405 = map[int]bool{405: true}
+var Code409 = map[int]bool{409: true}
+var Code422 = map[int]bool{422: true}
+var Code500 = map[int]bool{500: true}
+var Code503 = map[int]bool{503: true}
+
+// WaitForPodToDisappear polls the API server if the pod has been deleted.
+func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, interval, timeout time.Duration) error {
+	return wait.PollImmediate(interval, timeout, func() (bool, error) {
+		_, err := podClient.Get(podName)
+		if err == nil {
+			return false, nil
+		} else {
+			if errors.IsNotFound(err) {
+				return true, nil
+			} else {
+				return false, err
+			}
+		}
+	})
 }

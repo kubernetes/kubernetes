@@ -122,7 +122,7 @@ func TestStringMapConversion(t *testing.T) {
 
 	for k, tc := range testCases {
 		out := &ExternalComplex{}
-		if err := scheme.Convert(&tc.input, out); (tc.errFn == nil && err != nil) || (tc.errFn != nil && !tc.errFn(err)) {
+		if err := scheme.Convert(&tc.input, out, nil); (tc.errFn == nil && err != nil) || (tc.errFn != nil && !tc.errFn(err)) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
 		} else if err != nil {

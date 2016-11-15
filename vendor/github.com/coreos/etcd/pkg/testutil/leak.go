@@ -48,7 +48,7 @@ func CheckLeakedGoroutine() bool {
 	}
 
 	stackCount := make(map[string]int)
-	re := regexp.MustCompile("\\(0[0-9a-fx, ]*\\)")
+	re := regexp.MustCompile(`\(0[0-9a-fx, ]*\)`)
 	for _, g := range gs {
 		// strip out pointer arguments in first function of stack dump
 		normalized := string(re.ReplaceAll([]byte(g), []byte("(...)")))

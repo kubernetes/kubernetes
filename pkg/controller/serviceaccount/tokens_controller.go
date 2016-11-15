@@ -26,10 +26,9 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	clientretry "k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/registry/secret"
+	"k8s.io/kubernetes/pkg/registry/core/secret"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/types"
@@ -81,16 +80,16 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		token:  options.TokenGenerator,
 		rootCA: options.RootCA,
 
-		syncServiceAccountQueue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		syncSecretQueue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		syncServiceAccountQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_service"),
+		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
 
 		maxRetries: maxRetries,
 	}
-	if cl != nil && cl.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().GetRESTClient().GetRateLimiter())
+	if cl != nil && cl.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().RESTClient().GetRateLimiter())
 	}
 
-	e.serviceAccounts, e.serviceAccountController = framework.NewInformer(
+	e.serviceAccounts, e.serviceAccountController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Core().ServiceAccounts(api.NamespaceAll).List(options)
@@ -101,7 +100,7 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		},
 		&api.ServiceAccount{},
 		options.ServiceAccountResync,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
 			UpdateFunc: e.queueServiceAccountUpdateSync,
 			DeleteFunc: e.queueServiceAccountSync,
@@ -109,7 +108,7 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 	)
 
 	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
-	e.secrets, e.secretController = framework.NewIndexerInformer(
+	e.secrets, e.secretController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = tokenSelector
@@ -122,7 +121,7 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		},
 		&api.Secret{},
 		options.SecretResync,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueSecretSync,
 			UpdateFunc: e.queueSecretUpdateSync,
 			DeleteFunc: e.queueSecretSync,
@@ -144,8 +143,8 @@ type TokensController struct {
 	secrets         cache.Indexer
 
 	// Since we join two objects, we'll watch both of them with controllers.
-	serviceAccountController *framework.Controller
-	secretController         *framework.Controller
+	serviceAccountController *cache.Controller
+	secretController         *cache.Controller
 
 	// syncServiceAccountQueue handles service account events:
 	//   * ensures a referenced token exists for service accounts which still exist
@@ -299,7 +298,7 @@ func (e *TokensController) syncSecret() {
 		// If the service account exists
 		if sa, saErr := e.getServiceAccount(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, false); saErr == nil && sa != nil {
 			// secret no longer exists, so delete references to this secret from the service account
-			if err := client.RetryOnConflict(RemoveTokenBackoff, func() error {
+			if err := clientretry.RetryOnConflict(RemoveTokenBackoff, func() error {
 				return e.removeSecretReference(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, secretInfo.name)
 			}); err != nil {
 				glog.Error(err)

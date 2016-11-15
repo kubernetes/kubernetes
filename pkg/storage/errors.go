@@ -107,24 +107,20 @@ func IsUnreachable(err error) bool {
 
 // IsTestFailed returns true if and only if err is a write conflict.
 func IsTestFailed(err error) bool {
-	return isErrCode(err, ErrCodeResourceVersionConflicts, ErrCodeInvalidObj)
+	return isErrCode(err, ErrCodeResourceVersionConflicts)
 }
 
-// IsInvalidUID returns true if and only if err is invalid UID error
+// IsInvalidObj returns true if and only if err is invalid error
 func IsInvalidObj(err error) bool {
 	return isErrCode(err, ErrCodeInvalidObj)
 }
 
-func isErrCode(err error, codes ...int) bool {
+func isErrCode(err error, code int) bool {
 	if err == nil {
 		return false
 	}
 	if e, ok := err.(*StorageError); ok {
-		for _, code := range codes {
-			if e.Code == code {
-				return true
-			}
-		}
+		return e.Code == code
 	}
 	return false
 }

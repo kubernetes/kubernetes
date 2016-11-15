@@ -85,7 +85,7 @@ func ObjectReflectDiff(a, b interface{}) string {
 	}
 	diffs := objectReflectDiff(field.NewPath("object"), vA, vB)
 	if len(diffs) == 0 {
-		return ""
+		return "<no diffs>"
 	}
 	out := []string{""}
 	for _, d := range diffs {
@@ -136,16 +136,20 @@ func objectReflectDiff(path *field.Path, a, b reflect.Value) []diff {
 		for i := 0; i < a.Type().NumField(); i++ {
 			if !public(a.Type().Field(i).Name) {
 				if reflect.DeepEqual(a.Interface(), b.Interface()) {
-					return nil
+					continue
 				}
 				return []diff{{path: path, a: fmt.Sprintf("%#v", a), b: fmt.Sprintf("%#v", b)}}
 			}
 			if sub := objectReflectDiff(path.Child(a.Type().Field(i).Name), a.Field(i), b.Field(i)); len(sub) > 0 {
 				changes = append(changes, sub...)
+			} else {
+				if !reflect.DeepEqual(a.Field(i).Interface(), b.Field(i).Interface()) {
+					changes = append(changes, diff{path: path, a: a.Field(i).Interface(), b: b.Field(i).Interface()})
+				}
 			}
 		}
 		return changes
-	case reflect.Ptr:
+	case reflect.Ptr, reflect.Interface:
 		if a.IsNil() || b.IsNil() {
 			switch {
 			case a.IsNil() && b.IsNil():
@@ -163,13 +167,16 @@ func objectReflectDiff(path *field.Path, a, b reflect.Value) []diff {
 		}
 		return nil
 	case reflect.Slice:
-		if reflect.DeepEqual(a, b) {
-			return nil
-		}
 		lA, lB := a.Len(), b.Len()
 		l := lA
 		if lB < lA {
 			l = lB
+		}
+		if lA == lB && lA == 0 {
+			if a.IsNil() != b.IsNil() {
+				return []diff{{path: path, a: a.Interface(), b: b.Interface()}}
+			}
+			return nil
 		}
 		for i := 0; i < l; i++ {
 			if !reflect.DeepEqual(a.Index(i), b.Index(i)) {
@@ -177,15 +184,18 @@ func objectReflectDiff(path *field.Path, a, b reflect.Value) []diff {
 			}
 		}
 		var diffs []diff
-		for i := l; l < lA; i++ {
+		for i := l; i < lA; i++ {
 			diffs = append(diffs, diff{path: path.Index(i), a: a.Index(i), b: nil})
 		}
-		for i := l; l < lB; i++ {
+		for i := l; i < lB; i++ {
 			diffs = append(diffs, diff{path: path.Index(i), a: nil, b: b.Index(i)})
+		}
+		if len(diffs) == 0 {
+			diffs = append(diffs, diff{path: path, a: a, b: b})
 		}
 		return diffs
 	case reflect.Map:
-		if reflect.DeepEqual(a, b) {
+		if reflect.DeepEqual(a.Interface(), b.Interface()) {
 			return nil
 		}
 		aKeys := make(map[interface{}]interface{})
@@ -199,13 +209,16 @@ func objectReflectDiff(path *field.Path, a, b reflect.Value) []diff {
 				if reflect.DeepEqual(a.MapIndex(key).Interface(), b.MapIndex(key).Interface()) {
 					continue
 				}
-				missing = append(missing, diff{path: path.Key(fmt.Sprintf("%s", key.Interface())), a: a.MapIndex(key).Interface(), b: b.MapIndex(key).Interface()})
+				missing = append(missing, objectReflectDiff(path.Key(fmt.Sprintf("%s", key.Interface())), a.MapIndex(key), b.MapIndex(key))...)
 				continue
 			}
 			missing = append(missing, diff{path: path.Key(fmt.Sprintf("%s", key.Interface())), a: nil, b: b.MapIndex(key).Interface()})
 		}
 		for key, value := range aKeys {
 			missing = append(missing, diff{path: path.Key(fmt.Sprintf("%s", key)), a: value, b: nil})
+		}
+		if len(missing) == 0 {
+			missing = append(missing, diff{path: path, a: a.Interface(), b: b.Interface()})
 		}
 		sort.Sort(orderedDiffs(missing))
 		return missing

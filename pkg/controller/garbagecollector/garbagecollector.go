@@ -29,12 +29,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -43,11 +43,11 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const ResourceResyncTime = 60 * time.Second
+const ResourceResyncTime time.Duration = 0
 
 type monitor struct {
 	store      cache.Store
-	controller *framework.Controller
+	controller *cache.Controller
 }
 
 type objectReference struct {
@@ -67,7 +67,7 @@ func (s objectReference) String() string {
 type node struct {
 	identity objectReference
 	// dependents will be read by the orphan() routine, we need to protect it with a lock.
-	dependentsLock *sync.RWMutex
+	dependentsLock sync.RWMutex
 	dependents     map[*node]struct{}
 	// When processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
@@ -126,7 +126,7 @@ func (m *concurrentUIDToNode) Delete(uid types.UID) {
 }
 
 type Propagator struct {
-	eventQueue *workqueue.Type
+	eventQueue *workqueue.TimedWorkQueue
 	// uidToNode doesn't require a lock to protect, because only the
 	// single-threaded Propagator.processEvent() reads/writes it.
 	uidToNode *concurrentUIDToNode
@@ -151,11 +151,11 @@ func (p *Propagator) addDependentToOwners(n *node, owners []metatypes.OwnerRefer
 					OwnerReference: owner,
 					Namespace:      n.identity.Namespace,
 				},
-				dependentsLock: &sync.RWMutex{},
-				dependents:     make(map[*node]struct{}),
+				dependents: make(map[*node]struct{}),
 			}
+			glog.V(6).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			p.uidToNode.Write(ownerNode)
-			p.gc.dirtyQueue.Add(ownerNode)
+			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: ownerNode})
 		}
 		ownerNode.addDependent(n)
 	}
@@ -212,7 +212,7 @@ func referencesDiffs(old []metatypes.OwnerReference, new []metatypes.OwnerRefere
 	return added, removed
 }
 
-func shouldOrphanDependents(e event, accessor meta.Object) bool {
+func shouldOrphanDependents(e *event, accessor meta.Object) bool {
 	// The delta_fifo may combine the creation and update of the object into one
 	// event, so we need to check AddEvent as well.
 	if e.oldObj == nil {
@@ -279,6 +279,7 @@ func (gc *GarbageCollector) removeOrphanFinalizer(owner *node) error {
 		for _, f := range finalizers {
 			if f == api.FinalizerOrphan {
 				found = true
+				break
 			} else {
 				newFinalizers = append(newFinalizers, f)
 			}
@@ -308,14 +309,14 @@ func (gc *GarbageCollector) removeOrphanFinalizer(owner *node) error {
 // the "Orphan" finalizer. The node is add back into the orphanQueue if any of
 // these steps fail.
 func (gc *GarbageCollector) orphanFinalizer() {
-	key, quit := gc.orphanQueue.Get()
+	timedItem, quit := gc.orphanQueue.Get()
 	if quit {
 		return
 	}
-	defer gc.orphanQueue.Done(key)
-	owner, ok := key.(*node)
+	defer gc.orphanQueue.Done(timedItem)
+	owner, ok := timedItem.Object.(*node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", key))
+		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", timedItem.Object))
 	}
 	// we don't need to lock each element, because they never get updated
 	owner.dependentsLock.RLock()
@@ -328,27 +329,28 @@ func (gc *GarbageCollector) orphanFinalizer() {
 	err := gc.orhpanDependents(owner.identity, dependents)
 	if err != nil {
 		glog.V(6).Infof("orphanDependents for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.Add(owner)
+		gc.orphanQueue.Add(timedItem)
 		return
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeOrphanFinalizer(owner)
 	if err != nil {
 		glog.V(6).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.Add(owner)
+		gc.orphanQueue.Add(timedItem)
 	}
+	OrphanProcessingLatency.Observe(sinceInMicroseconds(gc.clock, timedItem.StartTime))
 }
 
 // Dequeueing an event from eventQueue, updating graph, populating dirty_queue.
 func (p *Propagator) processEvent() {
-	key, quit := p.eventQueue.Get()
+	timedItem, quit := p.eventQueue.Get()
 	if quit {
 		return
 	}
-	defer p.eventQueue.Done(key)
-	event, ok := key.(event)
+	defer p.eventQueue.Done(timedItem)
+	event, ok := timedItem.Object.(*event)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect an event, got %v", key))
+		utilruntime.HandleError(fmt.Errorf("expect a *event, got %v", timedItem.Object))
 		return
 	}
 	obj := event.obj
@@ -377,22 +379,21 @@ func (p *Propagator) processEvent() {
 				},
 				Namespace: accessor.GetNamespace(),
 			},
-			dependentsLock: &sync.RWMutex{},
-			dependents:     make(map[*node]struct{}),
-			owners:         accessor.GetOwnerReferences(),
+			dependents: make(map[*node]struct{}),
+			owners:     accessor.GetOwnerReferences(),
 		}
 		p.insertNode(newNode)
 		// the underlying delta_fifo may combine a creation and deletion into one event
 		if shouldOrphanDependents(event, accessor) {
 			glog.V(6).Infof("add %s to the orphanQueue", newNode.identity)
-			p.gc.orphanQueue.Add(newNode)
+			p.gc.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: newNode})
 		}
 	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
 		// caveat: if GC observes the creation of the dependents later than the
 		// deletion of the owner, then the orphaning finalizer won't be effective.
 		if shouldOrphanDependents(event, accessor) {
 			glog.V(6).Infof("add %s to the orphanQueue", existingNode.identity)
-			p.gc.orphanQueue.Add(existingNode)
+			p.gc.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: existingNode})
 		}
 		// add/remove owner refs
 		added, removed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())
@@ -415,26 +416,38 @@ func (p *Propagator) processEvent() {
 		p.removeNode(existingNode)
 		existingNode.dependentsLock.RLock()
 		defer existingNode.dependentsLock.RUnlock()
+		if len(existingNode.dependents) > 0 {
+			p.gc.absentOwnerCache.Add(accessor.GetUID())
+		}
 		for dep := range existingNode.dependents {
-			p.gc.dirtyQueue.Add(dep)
+			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: dep})
 		}
 	}
+	EventProcessingLatency.Observe(sinceInMicroseconds(p.gc.clock, timedItem.StartTime))
 }
 
 // GarbageCollector is responsible for carrying out cascading deletion, and
 // removing ownerReferences from the dependents if the owner is deleted with
 // DeleteOptions.OrphanDependents=true.
 type GarbageCollector struct {
-	restMapper  meta.RESTMapper
-	clientPool  dynamic.ClientPool
-	dirtyQueue  *workqueue.Type
-	orphanQueue *workqueue.Type
-	monitors    []monitor
-	propagator  *Propagator
+	restMapper meta.RESTMapper
+	// metaOnlyClientPool uses a special codec, which removes fields except for
+	// apiVersion, kind, and metadata during decoding.
+	metaOnlyClientPool dynamic.ClientPool
+	// clientPool uses the regular dynamicCodec. We need it to update
+	// finalizers. It can be removed if we support patching finalizers.
+	clientPool                       dynamic.ClientPool
+	dirtyQueue                       *workqueue.TimedWorkQueue
+	orphanQueue                      *workqueue.TimedWorkQueue
+	monitors                         []monitor
+	propagator                       *Propagator
+	clock                            clock.Clock
+	registeredRateLimiter            *RegisteredRateLimiter
+	registeredRateLimiterForMonitors *RegisteredRateLimiter
+	// GC caches the owners that do not exist according to the API server.
+	absentOwnerCache *UIDCache
 }
 
-// TODO: make special List and Watch function that removes fields other than
-// ObjectMeta.
 func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -460,41 +473,52 @@ func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionReso
 	}
 }
 
-func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (monitor, error) {
+func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource, kind unversioned.GroupVersionKind) (monitor, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
 	var monitor monitor
-	client, err := clientPool.ClientForGroupVersion(resource.GroupVersion())
+	client, err := gc.metaOnlyClientPool.ClientForGroupVersionKind(kind)
 	if err != nil {
 		return monitor, err
 	}
-	monitor.store, monitor.controller = framework.NewInformer(
+	gc.registeredRateLimiterForMonitors.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
+	setObjectTypeMeta := func(obj interface{}) {
+		runtimeObject, ok := obj.(runtime.Object)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
+		}
+		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
+	}
+	monitor.store, monitor.controller = cache.NewInformer(
 		gcListWatcher(client, resource),
 		nil,
 		ResourceResyncTime,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			// add the event to the propagator's eventQueue.
 			AddFunc: func(obj interface{}) {
-				event := event{
+				setObjectTypeMeta(obj)
+				event := &event{
 					eventType: addEvent,
 					obj:       obj,
 				}
-				p.eventQueue.Add(event)
+				gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				event := event{updateEvent, newObj, oldObj}
-				p.eventQueue.Add(event)
+				setObjectTypeMeta(newObj)
+				event := &event{updateEvent, newObj, oldObj}
+				gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
 			},
 			DeleteFunc: func(obj interface{}) {
 				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
 				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 					obj = deletedFinalStateUnknown.Obj
 				}
-				event := event{
+				setObjectTypeMeta(obj)
+				event := &event{
 					eventType: deleteEvent,
 					obj:       obj,
 				}
-				p.eventQueue.Add(event)
+				gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
 			},
 		},
 	)
@@ -502,22 +526,30 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 }
 
 var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}: {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                              {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                     {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                {},
+	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                             {},
+	unversioned.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
+	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
+	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
+	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
 }
 
-func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
+func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
 	gc := &GarbageCollector{
-		clientPool:  clientPool,
-		dirtyQueue:  workqueue.New(),
-		orphanQueue: workqueue.New(),
-		// TODO: should use a dynamic RESTMapper built from the discovery results.
-		restMapper: registered.RESTMapper(),
+		metaOnlyClientPool:               metaOnlyClientPool,
+		clientPool:                       clientPool,
+		restMapper:                       mapper,
+		clock:                            clock.RealClock{},
+		dirtyQueue:                       workqueue.NewTimedWorkQueue(),
+		orphanQueue:                      workqueue.NewTimedWorkQueue(),
+		registeredRateLimiter:            NewRegisteredRateLimiter(resources),
+		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(resources),
+		absentOwnerCache:                 NewUIDCache(500),
 	}
 	gc.propagator = &Propagator{
-		eventQueue: workqueue.New(),
+		eventQueue: workqueue.NewTimedWorkQueue(),
 		uidToNode: &concurrentUIDToNode{
 			RWMutex:   &sync.RWMutex{},
 			uidToNode: make(map[types.UID]*node),
@@ -529,7 +561,11 @@ func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.
 			glog.V(6).Infof("ignore resource %#v", resource)
 			continue
 		}
-		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource)
+		kind, err := gc.restMapper.KindFor(resource)
+		if err != nil {
+			return nil, err
+		}
+		monitor, err := gc.monitorFor(resource, kind)
 		if err != nil {
 			return nil, err
 		}
@@ -539,15 +575,19 @@ func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.
 }
 
 func (gc *GarbageCollector) worker() {
-	key, quit := gc.dirtyQueue.Get()
+	timedItem, quit := gc.dirtyQueue.Get()
 	if quit {
 		return
 	}
-	defer gc.dirtyQueue.Done(key)
-	err := gc.processItem(key.(*node))
+	defer gc.dirtyQueue.Done(timedItem)
+	err := gc.processItem(timedItem.Object.(*node))
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error syncing item %v: %v", key, err))
+		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", timedItem.Object, err))
+		// retry if garbage collection of an object failed.
+		gc.dirtyQueue.Add(timedItem)
+		return
 	}
+	DirtyProcessingLatency.Observe(sinceInMicroseconds(gc.clock, timedItem.StartTime))
 }
 
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
@@ -569,7 +609,8 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool
 
 func (gc *GarbageCollector) deleteObject(item objectReference) error {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
+	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return err
@@ -582,7 +623,8 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 
 func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
+	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return nil, err
@@ -592,7 +634,8 @@ func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructur
 
 func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unstructured) (*runtime.Unstructured, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
+	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return nil, err
@@ -602,7 +645,8 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unst
 
 func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*runtime.Unstructured, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
+	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return nil, err
@@ -620,6 +664,20 @@ func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
 	return ret
 }
 
+func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.MetadataOnlyObject {
+	return &metaonly.MetadataOnlyObject{
+		TypeMeta: unversioned.TypeMeta{
+			APIVersion: ref.APIVersion,
+			Kind:       ref.Kind,
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: ref.Namespace,
+			UID:       ref.UID,
+			Name:      ref.Name,
+		},
+	}
+}
+
 func (gc *GarbageCollector) processItem(item *node) error {
 	// Get the latest item from the API server
 	latest, err := gc.getObject(item.identity)
@@ -629,17 +687,24 @@ func (gc *GarbageCollector) processItem(item *node) error {
 			// exist yet, so we need to enqueue a virtual Delete event to remove
 			// the virtual node from Propagator.uidToNode.
 			glog.V(6).Infof("item %v not found, generating a virtual delete event", item.identity)
-			event := event{
+			event := &event{
 				eventType: deleteEvent,
-				obj:       objectReferenceToUnstructured(item.identity),
+				obj:       objectReferenceToMetadataOnlyObject(item.identity),
 			}
-			gc.propagator.eventQueue.Add(event)
+			glog.V(6).Infof("generating virtual delete event for %s\n\n", event.obj)
+			gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
 			return nil
 		}
 		return err
 	}
 	if latest.GetUID() != item.identity.UID {
-		glog.V(6).Infof("UID doesn't match, item %v not found, ignore it", item.identity)
+		glog.V(6).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
+		event := &event{
+			eventType: deleteEvent,
+			obj:       objectReferenceToMetadataOnlyObject(item.identity),
+		}
+		glog.V(6).Infof("generating virtual delete event for %s\n\n", event.obj)
+		gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
 		return nil
 	}
 	ownerReferences := latest.GetOwnerReferences()
@@ -650,6 +715,10 @@ func (gc *GarbageCollector) processItem(item *node) error {
 	// TODO: we need to remove dangling references if the object is not to be
 	// deleted.
 	for _, reference := range ownerReferences {
+		if gc.absentOwnerCache.Has(reference.UID) {
+			glog.V(6).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			continue
+		}
 		// TODO: we need to verify the reference resource is supported by the
 		// system. If it's not a valid resource, the garbage collector should i)
 		// ignore the reference when decide if the object should be deleted, and
@@ -657,7 +726,7 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		// prevent objects having references to an old resource from being
 		// deleted during a cluster upgrade.
 		fqKind := unversioned.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
-		client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
+		client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 		if err != nil {
 			return err
 		}
@@ -669,11 +738,13 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		if err == nil {
 			if owner.GetUID() != reference.UID {
 				glog.V(6).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+				gc.absentOwnerCache.Add(reference.UID)
 				continue
 			}
 			glog.V(6).Infof("object %s has at least an existing owner, will not garbage collect", item.identity.UID)
 			return nil
 		} else if errors.IsNotFound(err) {
+			gc.absentOwnerCache.Add(reference.UID)
 			glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		} else {
 			return err
@@ -684,9 +755,21 @@ func (gc *GarbageCollector) processItem(item *node) error {
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
+	glog.Infof("Garbage Collector: Initializing")
 	for _, monitor := range gc.monitors {
 		go monitor.controller.Run(stopCh)
 	}
+
+	wait.PollInfinite(10*time.Second, func() (bool, error) {
+		for _, monitor := range gc.monitors {
+			if !monitor.controller.HasSynced() {
+				glog.Infof("Garbage Collector: Waiting for resource monitors to be synced...")
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	glog.Infof("Garbage Collector: All monitored resources synced. Proceeding to collect garbage")
 
 	// worker
 	go wait.Until(gc.propagator.processEvent, 0, stopCh)
@@ -695,17 +778,12 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(gc.worker, 0, stopCh)
 		go wait.Until(gc.orphanFinalizer, 0, stopCh)
 	}
+	Register()
 	<-stopCh
-	glog.Infof("Shutting down garbage collector")
+	glog.Infof("Garbage Collector: Shutting down")
 	gc.dirtyQueue.ShutDown()
 	gc.orphanQueue.ShutDown()
 	gc.propagator.eventQueue.ShutDown()
-}
-
-// QueueDrained returns if the dirtyQueue and eventQueue are drained. It's
-// useful for debugging. Note that it doesn't guarantee the workers are idle.
-func (gc *GarbageCollector) QueuesDrained() bool {
-	return gc.dirtyQueue.Len() == 0 && gc.propagator.eventQueue.Len() == 0 && gc.orphanQueue.Len() == 0
 }
 
 // *FOR TEST USE ONLY* It's not safe to call this function when the GC is still

@@ -47,12 +47,12 @@ func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, conta
 	}
 }
 
-// ModifyHostConfig is called before the Docker runContainer call.
-// The security context provider can make changes to the HostConfig, affecting
+// ModifyHostConfig is called before the Docker runContainer call. The
+// security context provider can make changes to the HostConfig, affecting
 // security options, whether the container is privileged, volume binds, etc.
-func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig) {
-	// Apply pod security context
-	if container.Name != leaky.PodInfraContainerName && pod.Spec.SecurityContext != nil {
+func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
+	// Apply supplemental groups
+	if container.Name != leaky.PodInfraContainerName {
 		// TODO: We skip application of supplemental groups to the
 		// infra container to work around a runc issue which
 		// requires containers to have the '/etc/group'. For
@@ -60,15 +60,17 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container 
 		// https://github.com/opencontainers/runc/pull/313
 		// This can be removed once the fix makes it into the
 		// required version of docker.
-		if pod.Spec.SecurityContext.SupplementalGroups != nil {
-			hostConfig.GroupAdd = make([]string, len(pod.Spec.SecurityContext.SupplementalGroups))
-			for i, group := range pod.Spec.SecurityContext.SupplementalGroups {
-				hostConfig.GroupAdd[i] = strconv.Itoa(int(group))
+		if pod.Spec.SecurityContext != nil {
+			for _, group := range pod.Spec.SecurityContext.SupplementalGroups {
+				hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.Itoa(int(group)))
+			}
+			if pod.Spec.SecurityContext.FSGroup != nil {
+				hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.Itoa(int(*pod.Spec.SecurityContext.FSGroup)))
 			}
 		}
 
-		if pod.Spec.SecurityContext.FSGroup != nil {
-			hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.Itoa(int(*pod.Spec.SecurityContext.FSGroup)))
+		for _, group := range supplementalGids {
+			hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.Itoa(int(group)))
 		}
 	}
 
@@ -89,11 +91,18 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container 
 	}
 
 	if effectiveSC.SELinuxOptions != nil {
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelUser, effectiveSC.SELinuxOptions.User)
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelRole, effectiveSC.SELinuxOptions.Role)
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelType, effectiveSC.SELinuxOptions.Type)
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelLevel, effectiveSC.SELinuxOptions.Level)
+		hostConfig.SecurityOpt = ModifySecurityOptions(hostConfig.SecurityOpt, effectiveSC.SELinuxOptions)
 	}
+}
+
+// ModifySecurityOptions adds SELinux options to config.
+func ModifySecurityOptions(config []string, selinuxOpts *api.SELinuxOptions) []string {
+	config = modifySecurityOption(config, DockerLabelUser, selinuxOpts.User)
+	config = modifySecurityOption(config, DockerLabelRole, selinuxOpts.Role)
+	config = modifySecurityOption(config, DockerLabelType, selinuxOpts.Type)
+	config = modifySecurityOption(config, DockerLabelLevel, selinuxOpts.Level)
+
+	return config
 }
 
 // modifySecurityOption adds the security option of name to the config array with value in the form

@@ -1,5 +1,56 @@
 ## `jwt-go` Version History
 
+#### 3.0.0
+
+* **Compatibility Breaking Changes**: See MIGRATION_GUIDE.md for tips on updating your code
+	* Dropped support for `[]byte` keys when using RSA signing methods.  This convenience feature could contribute to security vulnerabilities involving mismatched key types with signing methods.
+	* `ParseFromRequest` has been moved to `request` subpackage and usage has changed
+	* The `Claims` property on `Token` is now type `Claims` instead of `map[string]interface{}`.  The default value is type `MapClaims`, which is an alias to `map[string]interface{}`.  This makes it possible to use a custom type when decoding claims.
+* Other Additions and Changes
+	* Added `Claims` interface type to allow users to decode the claims into a custom type
+	* Added `ParseWithClaims`, which takes a third argument of type `Claims`.  Use this function instead of `Parse` if you have a custom type you'd like to decode into.
+	* Dramatically improved the functionality and flexibility of `ParseFromRequest`, which is now in the `request` subpackage
+	* Added `ParseFromRequestWithClaims` which is the `FromRequest` equivalent of `ParseWithClaims`
+	* Added new interface type `Extractor`, which is used for extracting JWT strings from http requests.  Used with `ParseFromRequest` and `ParseFromRequestWithClaims`.
+	* Added several new, more specific, validation errors to error type bitmask
+	* Moved examples from README to executable example files
+	* Signing method registry is now thread safe
+	* Added new property to `ValidationError`, which contains the raw error returned by calls made by parse/verify (such as those returned by keyfunc or json parser)
+
+#### 2.7.0
+
+This will likely be the last backwards compatible release before 3.0.0, excluding essential bug fixes.
+
+* Added new option `-show` to the `jwt` command that will just output the decoded token without verifying
+* Error text for expired tokens includes how long it's been expired
+* Fixed incorrect error returned from `ParseRSAPublicKeyFromPEM`
+* Documentation updates
+
+#### 2.6.0
+
+* Exposed inner error within ValidationError
+* Fixed validation errors when using UseJSONNumber flag
+* Added several unit tests
+
+#### 2.5.0
+
+* Added support for signing method none.  You shouldn't use this.  The API tries to make this clear.
+* Updated/fixed some documentation
+* Added more helpful error message when trying to parse tokens that begin with `BEARER `
+
+#### 2.4.0
+
+* Added new type, Parser, to allow for configuration of various parsing parameters
+	* You can now specify a list of valid signing methods.  Anything outside this set will be rejected.
+	* You can now opt to use the `json.Number` type instead of `float64` when parsing token JSON
+* Added support for [Travis CI](https://travis-ci.org/dgrijalva/jwt-go)
+* Fixed some bugs with ECDSA parsing
+
+#### 2.3.0
+
+* Added support for ECDSA signing methods
+* Added support for RSA PSS signing methods (requires go v1.4)
+
 #### 2.2.0
 
 * Gracefully handle a `nil` `Keyfunc` being passed to `Parse`.  Result will now be the parsed token and an error, instead of a panic.

@@ -32,12 +32,26 @@ type RESTDeleteStrategy interface {
 	runtime.ObjectTyper
 }
 
+type GarbageCollectionPolicy string
+
+const (
+	DeleteDependents GarbageCollectionPolicy = "DeleteDependents"
+	OrphanDependents GarbageCollectionPolicy = "OrphanDependents"
+)
+
+// GarbageCollectionDeleteStrategy must be implemented by the registry that wants to
+// orphan dependents by default.
+type GarbageCollectionDeleteStrategy interface {
+	// DefaultGarbageCollectionPolicy returns the default garbage collection behavior.
+	DefaultGarbageCollectionPolicy() GarbageCollectionPolicy
+}
+
 // RESTGracefulDeleteStrategy must be implemented by the registry that supports
 // graceful deletion.
 type RESTGracefulDeleteStrategy interface {
 	// CheckGracefulDelete should return true if the object can be gracefully deleted and set
 	// any default values on the DeleteOptions.
-	CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool
+	CheckGracefulDelete(ctx api.Context, obj runtime.Object, options *api.DeleteOptions) bool
 }
 
 // BeforeDelete tests whether the object can be gracefully deleted. If graceful is set the object
@@ -72,13 +86,14 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 		// only a shorter grace period may be provided by a user
 		if options.GracePeriodSeconds != nil {
 			period := int64(*options.GracePeriodSeconds)
-			if period > *objectMeta.DeletionGracePeriodSeconds {
+			if period >= *objectMeta.DeletionGracePeriodSeconds {
 				return false, true, nil
 			}
-			now := unversioned.NewTime(unversioned.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
-			objectMeta.DeletionTimestamp = &now
+			newDeletionTimestamp := unversioned.NewTime(
+				objectMeta.DeletionTimestamp.Add(-time.Second * time.Duration(*objectMeta.DeletionGracePeriodSeconds)).
+					Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+			objectMeta.DeletionTimestamp = &newDeletionTimestamp
 			objectMeta.DeletionGracePeriodSeconds = &period
-			options.GracePeriodSeconds = &period
 			return true, false, nil
 		}
 		// graceful deletion is pending, do nothing
@@ -86,7 +101,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 		return false, true, nil
 	}
 
-	if !gracefulStrategy.CheckGracefulDelete(obj, options) {
+	if !gracefulStrategy.CheckGracefulDelete(ctx, obj, options) {
 		return false, false, nil
 	}
 	now := unversioned.NewTime(unversioned.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))

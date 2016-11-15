@@ -18,12 +18,14 @@ package testing
 
 import (
 	"io"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/pkg/api"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -53,9 +55,9 @@ func (r *Mock) APIVersion() (Version, error) {
 	return args.Get(0).(Version), args.Error(1)
 }
 
-func (r *Mock) Status() error {
+func (r *Mock) Status() (*RuntimeStatus, error) {
 	args := r.Called()
-	return args.Error(0)
+	return args.Get(0).(*RuntimeStatus), args.Error(0)
 }
 
 func (r *Mock) GetPods(all bool) ([]*Pod, error) {
@@ -88,12 +90,12 @@ func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, 
 	return args.Get(0).(*PodStatus), args.Error(1)
 }
 
-func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
 
-func (r *Mock) AttachContainer(containerID ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (r *Mock) AttachContainer(containerID ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	args := r.Called(containerID, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
@@ -143,7 +145,17 @@ func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
 	return args.Error(0)
 }
 
+func (r *Mock) DeleteContainer(containerID ContainerID) error {
+	args := r.Called(containerID)
+	return args.Error(0)
+}
+
 func (r *Mock) ImageStats() (*ImageStats, error) {
 	args := r.Called()
 	return args.Get(0).(*ImageStats), args.Error(1)
+}
+
+// UpdatePodCIDR fulfills the cri interface.
+func (r *Mock) UpdatePodCIDR(c string) error {
+	return nil
 }

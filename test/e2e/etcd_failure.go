@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,11 +41,11 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 		// providers that provide those capabilities.
 		framework.SkipUnlessProviderIs("gce")
 
-		Expect(framework.RunRC(framework.RCConfig{
-			Client:    f.Client,
+		Expect(framework.RunRC(testutils.RCConfig{
+			Client:    f.ClientSet,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,
-			Image:     framework.GetPauseImageName(f.Client),
+			Image:     framework.GetPauseImageName(f.ClientSet),
 			Replicas:  1,
 		})).NotTo(HaveOccurred())
 	})
@@ -52,8 +53,8 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 	It("should recover from network partition with master", func() {
 		etcdFailTest(
 			f,
-			"sudo iptables -A INPUT -p tcp --destination-port 4001 -j DROP",
-			"sudo iptables -D INPUT -p tcp --destination-port 4001 -j DROP",
+			"sudo iptables -A INPUT -p tcp --destination-port 2379 -j DROP",
+			"sudo iptables -D INPUT -p tcp --destination-port 2379 -j DROP",
 		)
 	})
 
@@ -100,7 +101,7 @@ func masterExec(cmd string) {
 
 func checkExistingRCRecovers(f *framework.Framework) {
 	By("assert that the pre-existing replication controller recovers")
-	podClient := f.Client.Pods(f.Namespace.Name)
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 	rcSelector := labels.Set{"name": "baz"}.AsSelector()
 
 	By("deleting pods from existing replication controller")

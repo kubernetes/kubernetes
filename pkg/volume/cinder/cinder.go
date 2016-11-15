@@ -45,11 +45,13 @@ type CinderProvider interface {
 	AttachDisk(instanceID string, diskName string) (string, error)
 	DetachDisk(instanceID string, partialDiskId string) error
 	DeleteVolume(volumeName string) error
-	CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error)
+	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error)
 	GetDevicePath(diskId string) string
 	InstanceID() (string, error)
 	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
 	DiskIsAttached(diskName, instanceID string) (bool, error)
+	DisksAreAttached(diskNames []string, instanceID string) (map[string]bool, error)
+	ShouldTrustDevicePath() bool
 	Instances() (cloudprovider.Instances, bool)
 }
 
@@ -161,9 +163,6 @@ func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdMana
 }
 
 func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &CinderDiskUtil{})
 }
 
@@ -202,6 +201,25 @@ func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
 	default:
 		return nil, errors.New("Invalid cloud provider: expected OpenStack or Rackspace.")
 	}
+}
+
+func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(4).Infof("Found volume %s mounted to %s", sourceName, mountPath)
+	cinderVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			Cinder: &api.CinderVolumeSource{
+				VolumeID: sourceName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(cinderVolume), nil
 }
 
 // Abstract interface to PD operations.
@@ -263,6 +281,13 @@ func (b *cinderVolumeMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *cinderVolumeMounter) CanMount() error {
+	return nil
+}
+
 func (b *cinderVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
@@ -277,7 +302,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.V(4).Infof("IsLikelyNotMountPoint failed: %v", err)
+		glog.Errorf("Cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notmnt {
@@ -299,6 +324,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
+	glog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, options)
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		glog.V(4).Infof("Mount failed: %v", err)
@@ -326,6 +352,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		os.Remove(dir)
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(b.cinderVolume)
+		glog.Errorf("Failed to mount %s: %v", dir, err)
 		return err
 	}
 
@@ -453,7 +480,7 @@ func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
+			AccessModes:                   c.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
@@ -466,6 +493,10 @@ func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 			},
 		},
 	}
+	if len(c.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = c.plugin.GetAccessModes()
+	}
+
 	return pv, nil
 }
 

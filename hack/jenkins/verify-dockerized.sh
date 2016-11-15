@@ -32,10 +32,15 @@ retry() {
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 retry go get github.com/tools/godep && godep version
+retry go get github.com/jteeuwen/go-bindata/go-bindata
 
 export LOG_LEVEL=4
 
 cd /go/src/k8s.io/kubernetes
 
+# hack/verify-client-go.sh requires all dependencies exist in the GOPATH.
+# the retry helps avoid flakes while keeping total time bounded.
+godep restore || godep restore
+
 ./hack/install-etcd.sh
-./hack/verify-all.sh -v
+make verify

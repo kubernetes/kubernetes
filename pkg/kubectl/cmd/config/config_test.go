@@ -294,7 +294,7 @@ func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
 
 func TestEmptyTokenAndCertAllowed(t *testing.T) {
 	fakeCertFile, _ := ioutil.TempFile("", "cert-file")
-
+	defer os.Remove(fakeCertFile.Name())
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientCertificate = path.Base(fakeCertFile.Name())
@@ -507,7 +507,7 @@ func TestUnsetBytes(t *testing.T) {
 
 func TestCAClearsInsecure(t *testing.T) {
 	fakeCAFile, _ := ioutil.TempFile("", "ca-file")
-
+	defer os.Remove(fakeCAFile.Name())
 	clusterInfoWithInsecure := clientcmdapi.NewCluster()
 	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
 
@@ -770,7 +770,7 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf)
+	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf, buf)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 

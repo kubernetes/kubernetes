@@ -24,11 +24,11 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -37,21 +37,38 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
-// LabelOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
+// LabelOptions have the data required to perform the label operation
 type LabelOptions struct {
-	Filenames []string
-	Recursive bool
+	// Filename options
+	resource.FilenameOptions
+
+	// Common user flags
+	overwrite       bool
+	local           bool
+	dryrun          bool
+	all             bool
+	resourceVersion string
+	selector        string
+	outputFormat    string
+
+	// results of arg parsing
+	resources    []string
+	newLabels    map[string]string
+	removeLabels []string
+
+	// Common shared fields
+	out io.Writer
 }
 
 var (
-	label_long = dedent.Dedent(`
+	label_long = templates.LongDesc(`
 		Update the labels on a resource.
 
-		A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-		If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
-		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`)
-	label_example = dedent.Dedent(`
+		* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
+		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`)
+
+	label_example = templates.Examples(`
 		# Update pod 'foo' with the label 'unhealthy' and the value 'true'.
 		kubectl label pods foo unhealthy=true
 
@@ -72,12 +89,14 @@ var (
 		kubectl label pods foo bar-`)
 )
 
-func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &LabelOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
+	p, err := f.Printer(nil, kubectl.PrintOptions{
+		ColumnLabels: []string{},
+	})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -90,25 +109,179 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    fmt.Sprintf(label_long, validation.LabelValueMaxLength),
 		Example: label_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunLabel(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			if err := options.Complete(f, out, cmd, args); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+			}
+			if err := options.Validate(); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+			}
+			cmdutil.CheckErr(options.RunLabel(f, cmd))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
+	cmd.Flags().Bool("local", false, "If true, label will NOT contact api-server but run locally.")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().String("resource-version", "", "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
-	usage := "Filename, directory, or URL to a file identifying the resource to update the labels"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	usage := "identifying the resource to update the labels"
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
+}
+
+// Complete adapts from the command line args and factory to the data required.
+func (o *LabelOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+	o.out = out
+	o.local = cmdutil.GetFlagBool(cmd, "local")
+	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
+	o.all = cmdutil.GetFlagBool(cmd, "all")
+	o.resourceVersion = cmdutil.GetFlagString(cmd, "resource-version")
+	o.selector = cmdutil.GetFlagString(cmd, "selector")
+	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
+	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+
+	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label")
+	if err != nil {
+		return err
+	}
+	o.resources = resources
+	o.newLabels, o.removeLabels, err = parseLabels(labelArgs)
+	return err
+}
+
+// Validate checks to the LabelOptions to see if there is sufficient information run the command.
+func (o *LabelOptions) Validate() error {
+	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.FilenameOptions.Filenames) {
+		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+	}
+	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 {
+		return fmt.Errorf("at least one label update is required")
+	}
+	return nil
+}
+
+// RunLabel does the work
+func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+
+	changeCause := f.Command()
+	mapper, typer := f.Object()
+	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		Flatten()
+
+	if !o.local {
+		b = b.SelectorParam(o.selector).
+			ResourceTypeOrNameArgs(o.all, o.resources...).
+			Latest()
+	}
+	one := false
+	r := b.Do().IntoSingular(&one)
+	if err := r.Err(); err != nil {
+		return err
+	}
+
+	smPatchVersion := strategicpatch.SMPatchVersionLatest
+	if !o.local {
+		smPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
+		if err != nil {
+			return err
+		}
+	}
+
+	// only apply resource version locking on a single resource
+	if !one && len(o.resourceVersion) > 0 {
+		return fmt.Errorf("--resource-version may only be used with a single resource")
+	}
+
+	// TODO: support bulk generic output a la Get
+	return r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+
+		var outputObj runtime.Object
+		dataChangeMsg := "not labeled"
+		if o.dryrun || o.local {
+			err = labelFunc(info.Object, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			if err != nil {
+				return err
+			}
+			outputObj = info.Object
+		} else {
+			obj, err := cmdutil.MaybeConvertObject(info.Object, info.Mapping.GroupVersionKind.GroupVersion(), info.Mapping)
+			if err != nil {
+				return err
+			}
+			name, namespace := info.Name, info.Namespace
+			oldData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return err
+			}
+			for _, label := range o.removeLabels {
+				if _, ok := accessor.GetLabels()[label]; !ok {
+					fmt.Fprintf(o.out, "label %q not found.\n", label)
+				}
+			}
+
+			if err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels); err != nil {
+				return err
+			}
+			if cmdutil.ShouldRecord(cmd, info) {
+				if err := cmdutil.RecordChangeCause(obj, changeCause); err != nil {
+					return err
+				}
+			}
+			newData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(oldData, newData) {
+				dataChangeMsg = "labeled"
+			}
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, smPatchVersion)
+			createdPatch := err == nil
+			if err != nil {
+				glog.V(2).Infof("couldn't compute patch: %v", err)
+			}
+
+			mapping := info.ResourceMapping()
+			client, err := f.ClientForMapping(mapping)
+			if err != nil {
+				return err
+			}
+			helper := resource.NewHelper(client, mapping)
+
+			if createdPatch {
+				outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+			} else {
+				outputObj, err = helper.Replace(namespace, name, false, obj)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		if o.outputFormat != "" {
+			return f.PrintObject(cmd, mapper, outputObj, o.out)
+		}
+		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, dataChangeMsg)
+		return nil
+	})
 }
 
 func validateNoOverwrites(accessor meta.Object, labels map[string]string) error {
@@ -127,7 +300,7 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	for _, labelSpec := range spec {
 		if strings.Index(labelSpec, "=") != -1 {
 			parts := strings.Split(labelSpec, "=")
-			if len(parts) != 2 || len(parts[1]) == 0 {
+			if len(parts) != 2 {
 				return nil, nil, fmt.Errorf("invalid label spec: %v", labelSpec)
 			}
 			if errs := validation.IsValidLabelValue(parts[1]); len(errs) != 0 {
@@ -176,131 +349,4 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 		accessor.SetResourceVersion(resourceVersion)
 	}
 	return nil
-}
-
-func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *LabelOptions) error {
-	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label")
-	if err != nil {
-		return err
-	}
-	if len(resources) < 1 && len(options.Filenames) == 0 {
-		return cmdutil.UsageError(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
-	}
-	if len(labelArgs) < 1 {
-		return cmdutil.UsageError(cmd, "at least one label update is required")
-	}
-
-	selector := cmdutil.GetFlagString(cmd, "selector")
-	all := cmdutil.GetFlagBool(cmd, "all")
-	overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
-	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
-
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-
-	lbls, remove, err := parseLabels(labelArgs)
-	if err != nil {
-		return cmdutil.UsageError(cmd, err.Error())
-	}
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
-		SelectorParam(selector).
-		ResourceTypeOrNameArgs(all, resources...).
-		Flatten().
-		Latest()
-
-	one := false
-	r := b.Do().IntoSingular(&one)
-	if err := r.Err(); err != nil {
-		return err
-	}
-
-	// only apply resource version locking on a single resource
-	if !one && len(resourceVersion) > 0 {
-		return cmdutil.UsageError(cmd, "--resource-version may only be used with a single resource")
-	}
-
-	// TODO: support bulk generic output a la Get
-	return r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-
-		var outputObj runtime.Object
-		dataChangeMsg := "not labeled"
-		if cmdutil.GetDryRunFlag(cmd) {
-			err = labelFunc(info.Object, overwrite, resourceVersion, lbls, remove)
-			if err != nil {
-				return err
-			}
-			outputObj = info.Object
-		} else {
-			obj, err := cmdutil.MaybeConvertObject(info.Object, info.Mapping.GroupVersionKind.GroupVersion(), info.Mapping)
-			if err != nil {
-				return err
-			}
-			name, namespace := info.Name, info.Namespace
-			oldData, err := json.Marshal(obj)
-			if err != nil {
-				return err
-			}
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				return err
-			}
-			for _, label := range remove {
-				if _, ok := accessor.GetLabels()[label]; !ok {
-					fmt.Fprintf(out, "label %q not found.\n", label)
-				}
-			}
-
-			if err := labelFunc(obj, overwrite, resourceVersion, lbls, remove); err != nil {
-				return err
-			}
-			if cmdutil.ShouldRecord(cmd, info) {
-				if err := cmdutil.RecordChangeCause(obj, f.Command()); err != nil {
-					return err
-				}
-			}
-			newData, err := json.Marshal(obj)
-			if err != nil {
-				return err
-			}
-			if !reflect.DeepEqual(oldData, newData) {
-				dataChangeMsg = "labeled"
-			}
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
-			createdPatch := err == nil
-			if err != nil {
-				glog.V(2).Infof("couldn't compute patch: %v", err)
-			}
-
-			mapping := info.ResourceMapping()
-			client, err := f.ClientForMapping(mapping)
-			if err != nil {
-				return err
-			}
-			helper := resource.NewHelper(client, mapping)
-
-			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
-			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj)
-			}
-			if err != nil {
-				return err
-			}
-		}
-		outputFormat := cmdutil.GetFlagString(cmd, "output")
-		if outputFormat != "" {
-			return f.PrintObject(cmd, mapper, outputObj, out)
-		}
-		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, dataChangeMsg)
-		return nil
-	})
 }

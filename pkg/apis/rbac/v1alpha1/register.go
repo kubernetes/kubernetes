@@ -19,20 +19,22 @@ package v1alpha1
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: rbac.GroupName, Version: "v1alpha1"}
+const GroupName = "rbac.authorization.k8s.io"
 
-func AddToScheme(scheme *runtime.Scheme) {
-	addKnownTypes(scheme)
-}
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1alpha1"}
+
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Role{},
 		&RoleBinding{},
@@ -49,4 +51,5 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&v1.ExportOptions{},
 	)
 	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
+	return nil
 }

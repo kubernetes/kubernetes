@@ -55,6 +55,8 @@ def get_all_files(rootdir):
         # don't visit certain dirs
         if 'vendor' in dirs:
             dirs.remove('vendor')
+        if 'staging' in dirs:
+            dirs.remove('staging')
         if '_output' in dirs:
             dirs.remove('_output')
         if '_gopath' in dirs:
@@ -63,6 +65,10 @@ def get_all_files(rootdir):
             dirs.remove('third_party')
         if '.git' in dirs:
             dirs.remove('.git')
+        if '.make' in dirs:
+            dirs.remove('.make')
+        if 'BUILD' in files:
+           files.remove('BUILD')
         if 'exceptions.txt' in files:
             files.remove('exceptions.txt')
         if 'known-flags.txt' in files:
@@ -233,7 +239,7 @@ def main():
 
     if len(bad_lines) != 0:
         if not args.skip_exceptions:
-            print("Found illegal 'flag' usage. If these are false positives you should run `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
+            print("Found illegal 'flag' usage. If these are false negatives you should run `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
         bad_lines.sort()
         for (relname, line) in bad_lines:
             print("%s:%s" % (relname, line))

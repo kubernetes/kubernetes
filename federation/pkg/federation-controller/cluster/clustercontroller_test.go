@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	controller_util "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -32,14 +32,14 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 func newCluster(clusterName string, serverUrl string) *federation_v1beta1.Cluster {
 	cluster := federation_v1beta1.Cluster{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
 		ObjectMeta: v1.ObjectMeta{
-			UID:  util.NewUUID(),
+			UID:  uuid.NewUUID(),
 			Name: clusterName,
 		},
 		Spec: federation_v1beta1.ClusterSpec{

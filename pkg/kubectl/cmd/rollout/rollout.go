@@ -21,31 +21,32 @@ import (
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	rollout_long = dedent.Dedent(`
-		Manages a deployment using subcommands like "kubectl rollout undo deployment/abc"`)
-	rollout_example = dedent.Dedent(`
+	rollout_long = templates.LongDesc(`
+		Manage a deployment using subcommands like "kubectl rollout undo deployment/abc"`)
+
+	rollout_example = templates.Examples(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc`)
+
 	rollout_valid_resources = dedent.Dedent(`
 		Valid resource types include:
 		   * deployments
 		`)
 )
 
-func NewCmdRollout(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRollout(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "rollout SUBCOMMAND",
-		Short:   "rollout manages a deployment",
+		Short:   "Manage a deployment rollout",
 		Long:    rollout_long,
 		Example: rollout_example,
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
-		},
+		Run:     cmdutil.DefaultSubCommandRun(errOut),
 	}
 	// subcommands
 	cmd.AddCommand(NewCmdRolloutHistory(f, out))

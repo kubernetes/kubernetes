@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,9 +25,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -34,87 +35,84 @@ import (
 )
 
 var _ = framework.KubeDescribe("MirrorPod", func() {
-	f := NewDefaultFramework("mirror-pod")
+	f := framework.NewDefaultFramework("mirror-pod")
 	Context("when create a mirror pod ", func() {
-		var staticPodName, mirrorPodName string
+		var ns, staticPodName, mirrorPodName string
 		BeforeEach(func() {
-			ns := f.Namespace.Name
-			staticPodName = "static-pod-" + string(util.NewUUID())
-			mirrorPodName = staticPodName + "-" + e2es.nodeName
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
 			By("create the static pod")
-			err := createStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns, ImageRegistry[nginxImage], api.RestartPolicyAlways)
+			err := createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns,
+				"gcr.io/google_containers/nginx-slim:0.7", api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")
 			Eventually(func() error {
-				return checkMirrorPodRunning(f.Client, mirrorPodName, ns)
+				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
-		It("should be updated when static pod updated", func() {
-			ns := f.Namespace.Name
+		It("should be updated when static pod updated [Conformance]", func() {
 			By("get mirror pod uid")
-			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
+			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
 			By("update the static pod container image")
-			image := ImageRegistry[pauseImage]
-			err = createStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns, image, api.RestartPolicyAlways)
+			image := framework.GetPauseImageNameForHostArch()
+			err = createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns, image, api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be updated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(f.Client, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunnig(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 
 			By("check the mirror pod container image is updated")
-			pod, err = f.Client.Pods(ns).Get(mirrorPodName)
+			pod, err = f.ClientSet.Core().Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(len(pod.Spec.Containers)).Should(Equal(1))
 			Expect(pod.Spec.Containers[0].Image).Should(Equal(image))
 		})
-		It("should be recreated when mirror pod gracefully deleted", func() {
-			ns := f.Namespace.Name
+		It("should be recreated when mirror pod gracefully deleted [Conformance]", func() {
 			By("get mirror pod uid")
-			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
+			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
 			By("delete the mirror pod with grace period 30s")
-			err = f.Client.Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(30))
+			err = f.ClientSet.Core().Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(30))
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be recreated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(f.Client, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunnig(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
-		It("should be recreated when mirror pod forcibly deleted", func() {
-			ns := f.Namespace.Name
+		It("should be recreated when mirror pod forcibly deleted [Conformance]", func() {
 			By("get mirror pod uid")
-			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
+			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
 			By("delete the mirror pod with grace period 0s")
-			err = f.Client.Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(0))
+			err = f.ClientSet.Core().Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(0))
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be recreated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(f.Client, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunnig(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		AfterEach(func() {
-			ns := f.Namespace.Name
 			By("delete the static pod")
-			err := deleteStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns)
+			err := deleteStaticPod(framework.TestContext.ManifestPath, staticPodName, ns)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to disappear")
 			Eventually(func() error {
-				return checkMirrorPodDisappear(f.Client, mirrorPodName, ns)
+				return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 	})
@@ -155,16 +153,16 @@ func deleteStaticPod(dir, name, namespace string) error {
 	return os.Remove(file)
 }
 
-func checkMirrorPodDisappear(cl *client.Client, name, namespace string) error {
-	_, err := cl.Pods(namespace).Get(name)
+func checkMirrorPodDisappear(cl clientset.Interface, name, namespace string) error {
+	_, err := cl.Core().Pods(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		return nil
 	}
-	return err
+	return goerrors.New("pod not disappear")
 }
 
-func checkMirrorPodRunning(cl *client.Client, name, namespace string) error {
-	pod, err := cl.Pods(namespace).Get(name)
+func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error {
+	pod, err := cl.Core().Pods(namespace).Get(name)
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
 	}
@@ -174,8 +172,8 @@ func checkMirrorPodRunning(cl *client.Client, name, namespace string) error {
 	return nil
 }
 
-func checkMirrorPodRecreatedAndRunnig(cl *client.Client, name, namespace string, oUID types.UID) error {
-	pod, err := cl.Pods(namespace).Get(name)
+func checkMirrorPodRecreatedAndRunnig(cl clientset.Interface, name, namespace string, oUID types.UID) error {
+	pod, err := cl.Core().Pods(namespace).Get(name)
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
 	}

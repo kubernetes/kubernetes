@@ -17,16 +17,18 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +47,7 @@ __kubectl_override_flags()
         for of in "${__kubectl_override_flag_list[@]}"; do
             case "${w}" in
                 --${of}=*)
-                    eval "${of}=\"--${of}=\${w}\""
+                    eval "${of}=\"${w}\""
                     ;;
                 --${of})
                     two_word_of="${of}"
@@ -100,6 +102,11 @@ __kubectl_get_resource_rc()
     __kubectl_parse_get "rc"
 }
 
+__kubectl_get_resource_node()
+{
+    __kubectl_parse_get "node"
+}
+
 # $1 is the name of the pod we want to get the list of containers inside
 __kubectl_get_containers()
 {
@@ -113,7 +120,7 @@ __kubectl_get_containers()
     fi
     local last=${nouns[${len} -1]}
     local kubectl_out
-    if kubectl_out=$(kubectl get $(__kubectl_namespace_flag) -o template --template="${template}" pods "${last}" 2>/dev/null); then
+    if kubectl_out=$(kubectl get $(__kubectl_override_flags) -o template --template="${template}" pods "${last}" 2>/dev/null); then
         COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
@@ -132,20 +139,24 @@ __kubectl_require_pod_and_container()
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit | kubectl_patch |\
-        kubectl_annotate | kubectl_expose)
+        kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_*)
             __kubectl_get_resource
             return
             ;;
-        kubectl_logs)
+        kubectl_logs | kubectl_attach)
             __kubectl_require_pod_and_container
             return
             ;;
-        kubectl_exec)
+        kubectl_exec | kubectl_port-forward | kubectl_top_pod)
             __kubectl_get_resource_pod
             return
             ;;
         kubectl_rolling-update)
             __kubectl_get_resource_rc
+            return
+            ;;
+        kubectl_cordon | kubectl_uncordon | kubectl_drain | kubectl_top_node)
+            __kubectl_get_resource_node
             return
             ;;
         *)
@@ -156,41 +167,49 @@ __custom_func() {
 
 	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
+	// TODO: This should be populated using the discovery information from apiserver.
 	valid_resources = `Valid resource types include:
-   * componentstatuses (aka 'cs')
-   * configmaps
-   * daemonsets (aka 'ds')
-   * deployments
-   * events (aka 'ev')
-   * endpoints (aka 'ep')
-   * horizontalpodautoscalers (aka 'hpa')
-   * ingress (aka 'ing')
-   * jobs
-   * limitranges (aka 'limits')
-   * nodes (aka 'no')
-   * namespaces (aka 'ns')
-   * pods (aka 'po')
-   * persistentvolumes (aka 'pv')
-   * persistentvolumeclaims (aka 'pvc')
-   * quota
-   * resourcequotas (aka 'quota')
-   * replicasets (aka 'rs')
-   * replicationcontrollers (aka 'rc')
-   * secrets
-   * serviceaccounts (aka 'sa')
-   * services (aka 'svc')
-`
+
+    * clusters (valid only for federation apiservers)
+    * componentstatuses (aka 'cs')
+    * configmaps (aka 'cm')
+    * daemonsets (aka 'ds')
+    * deployments (aka 'deploy')
+    * endpoints (aka 'ep')
+    * events (aka 'ev')
+    * horizontalpodautoscalers (aka 'hpa')
+    * ingresses (aka 'ing')
+    * jobs
+    * limitranges (aka 'limits')
+    * namespaces (aka 'ns')
+    * networkpolicies
+    * nodes (aka 'no')
+    * persistentvolumeclaims (aka 'pvc')
+    * persistentvolumes (aka 'pv')
+    * pods (aka 'po')
+    * podsecuritypolicies (aka 'psp')
+    * podtemplates
+    * replicasets (aka 'rs')
+    * replicationcontrollers (aka 'rc')
+    * resourcequotas (aka 'quota')
+    * secrets
+    * serviceaccounts (aka 'sa')
+    * services (aka 'svc')
+    * storageclasses
+    * thirdpartyresources
+    `
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func NewKubectlCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
 		Short: "kubectl controls the Kubernetes cluster manager",
-		Long: `kubectl controls the Kubernetes cluster manager.
+		Long: templates.LongDesc(`
+      kubectl controls the Kubernetes cluster manager.
 
-Find more information at https://github.com/kubernetes/kubernetes.`,
+      Find more information at https://github.com/kubernetes/kubernetes.`),
 		Run: runHelp,
 		BashCompletionFunction: bash_completion_func,
 	}
@@ -198,51 +217,86 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	f.BindFlags(cmds.PersistentFlags())
 	f.BindExternalFlags(cmds.PersistentFlags())
 
-	cmds.SetHelpCommand(NewCmdHelp(f, out))
-
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
-	cmds.AddCommand(NewCmdGet(f, out))
-	cmds.AddCommand(set.NewCmdSet(f, out))
-	cmds.AddCommand(NewCmdDescribe(f, out))
-	cmds.AddCommand(NewCmdCreate(f, out))
-	cmds.AddCommand(NewCmdReplace(f, out))
-	cmds.AddCommand(NewCmdPatch(f, out))
-	cmds.AddCommand(NewCmdDelete(f, out))
-	cmds.AddCommand(NewCmdEdit(f, out, err))
-	cmds.AddCommand(NewCmdApply(f, out))
+	groups := templates.CommandGroups{
+		{
+			Message: "Basic Commands (Beginner):",
+			Commands: []*cobra.Command{
+				NewCmdCreate(f, out, err),
+				NewCmdExposeService(f, out),
+				NewCmdRun(f, in, out, err),
+				set.NewCmdSet(f, out, err),
+			},
+		},
+		{
+			Message: "Basic Commands (Intermediate):",
+			Commands: []*cobra.Command{
+				NewCmdGet(f, out, err),
+				NewCmdExplain(f, out, err),
+				NewCmdEdit(f, out, err),
+				NewCmdDelete(f, out),
+			},
+		},
+		{
+			Message: "Deploy Commands:",
+			Commands: []*cobra.Command{
+				rollout.NewCmdRollout(f, out, err),
+				NewCmdRollingUpdate(f, out),
+				NewCmdScale(f, out),
+				NewCmdAutoscale(f, out),
+			},
+		},
+		{
+			Message: "Cluster Management Commands:",
+			Commands: []*cobra.Command{
+				NewCmdCertificate(f, out),
+				NewCmdClusterInfo(f, out),
+				NewCmdTop(f, out, err),
+				NewCmdCordon(f, out),
+				NewCmdUncordon(f, out),
+				NewCmdDrain(f, out, err),
+				NewCmdTaint(f, out),
+			},
+		},
+		{
+			Message: "Troubleshooting and Debugging Commands:",
+			Commands: []*cobra.Command{
+				NewCmdDescribe(f, out, err),
+				NewCmdLogs(f, out),
+				NewCmdAttach(f, in, out, err),
+				NewCmdExec(f, in, out, err),
+				NewCmdPortForward(f, out, err),
+				NewCmdProxy(f, out),
+				NewCmdCp(f, in, out, err),
+			},
+		},
+		{
+			Message: "Advanced Commands:",
+			Commands: []*cobra.Command{
+				NewCmdApply(f, out),
+				NewCmdPatch(f, out),
+				NewCmdReplace(f, out),
+				NewCmdConvert(f, out),
+			},
+		},
+		{
+			Message: "Settings Commands:",
+			Commands: []*cobra.Command{
+				NewCmdLabel(f, out),
+				NewCmdAnnotate(f, out),
+				NewCmdCompletion(f, out),
+			},
+		},
+	}
+	groups.Add(cmds)
 
-	cmds.AddCommand(NewCmdNamespace(out))
-	cmds.AddCommand(NewCmdLogs(f, out))
-	cmds.AddCommand(NewCmdRollingUpdate(f, out))
-	cmds.AddCommand(NewCmdScale(f, out))
-	cmds.AddCommand(NewCmdCordon(f, out))
-	cmds.AddCommand(NewCmdDrain(f, out))
-	cmds.AddCommand(NewCmdUncordon(f, out))
-
-	cmds.AddCommand(NewCmdAttach(f, in, out, err))
-	cmds.AddCommand(NewCmdExec(f, in, out, err))
-	cmds.AddCommand(NewCmdPortForward(f, out, err))
-	cmds.AddCommand(NewCmdProxy(f, out))
-
-	cmds.AddCommand(NewCmdRun(f, in, out, err))
-	cmds.AddCommand(NewCmdStop(f, out))
-	cmds.AddCommand(NewCmdExposeService(f, out))
-	cmds.AddCommand(NewCmdAutoscale(f, out))
-	cmds.AddCommand(rollout.NewCmdRollout(f, out))
-
-	cmds.AddCommand(NewCmdLabel(f, out))
-	cmds.AddCommand(NewCmdAnnotate(f, out))
-	cmds.AddCommand(NewCmdTaint(f, out))
-
-	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out))
-	cmds.AddCommand(NewCmdClusterInfo(f, out))
-	cmds.AddCommand(NewCmdApiVersions(f, out))
-	cmds.AddCommand(NewCmdVersion(f, out))
-	cmds.AddCommand(NewCmdExplain(f, out))
-	cmds.AddCommand(NewCmdConvert(f, out))
-	cmds.AddCommand(NewCmdCompletion(f, out))
+	filters := []string{
+		"options",
+		Deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
+	}
+	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	if cmds.Flag("namespace") != nil {
 		if cmds.Flag("namespace").Annotations == nil {
@@ -254,6 +308,11 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		)
 	}
 
+	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
+	cmds.AddCommand(NewCmdVersion(f, out))
+	cmds.AddCommand(NewCmdApiVersions(f, out))
+	cmds.AddCommand(NewCmdOptions(out))
+
 	return cmds
 }
 
@@ -263,4 +322,11 @@ func runHelp(cmd *cobra.Command, args []string) {
 
 func printDeprecationWarning(command, alias string) {
 	glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
+}
+
+func Deprecated(baseName, to string, parent, cmd *cobra.Command) string {
+	cmd.Long = fmt.Sprintf("Deprecated: This command is deprecated, all its functionalities are covered by \"%s %s\"", baseName, to)
+	cmd.Short = fmt.Sprintf("Deprecated: %s", to)
+	parent.AddCommand(cmd)
+	return cmd.Name()
 }

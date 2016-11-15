@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 )
@@ -41,11 +41,12 @@ type ViewOptions struct {
 }
 
 var (
-	view_long = dedent.Dedent(`
-		Displays merged kubeconfig settings or a specified kubeconfig file.
+	view_long = templates.LongDesc(`
+		Display merged kubeconfig settings or a specified kubeconfig file.
 
 		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
-	view_example = dedent.Dedent(`
+
+	view_example = templates.Examples(`
 		# Show Merged kubeconfig settings.
 		kubectl config view
 
@@ -60,7 +61,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   "Displays merged kubeconfig settings or a specified kubeconfig file.",
+		Short:   "Display merged kubeconfig settings or a specified kubeconfig file",
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -71,7 +72,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 			if outputFormat == "" {
-				fmt.Printf("reset to default output format (%s) as --output is empty", defaultOutputFormat)
+				fmt.Printf("Reset to default output format (%s) as --output is empty\n", defaultOutputFormat)
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 
@@ -79,7 +80,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 			cmdutil.CheckErr(err)
 			version, err := cmdutil.OutputVersion(cmd, &latest.ExternalVersion)
 			cmdutil.CheckErr(err)
-			printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
+			printer = kubectl.NewVersionedPrinter(printer, latest.Scheme, version)
 
 			cmdutil.CheckErr(options.Run(out, printer))
 		},
@@ -89,10 +90,10 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 	cmd.Flags().Set("output", defaultOutputFormat)
 
 	options.Merge.Default(true)
-	f := cmd.Flags().VarPF(&options.Merge, "merge", "", "merge together the full hierarchy of kubeconfig files")
+	f := cmd.Flags().VarPF(&options.Merge, "merge", "", "merge the full hierarchy of kubeconfig files")
 	f.NoOptDefVal = "true"
 	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "display raw byte data")
-	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
 	cmd.Flags().BoolVar(&options.Minify, "minify", false, "remove all information not used by current-context from the output")
 	return cmd
 }

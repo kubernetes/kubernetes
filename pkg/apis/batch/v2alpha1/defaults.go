@@ -20,10 +20,11 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	RegisterDefaults(scheme)
+	return scheme.AddDefaultingFuncs(
 		SetDefaults_Job,
-		SetDefaults_ScheduledJob,
+		SetDefaults_CronJob,
 	)
 }
 
@@ -40,10 +41,17 @@ func SetDefaults_Job(obj *Job) {
 		obj.Spec.Parallelism = new(int32)
 		*obj.Spec.Parallelism = 1
 	}
+	labels := obj.Spec.Template.Labels
+	if labels != nil && len(obj.Labels) == 0 {
+		obj.Labels = labels
+	}
 }
 
-func SetDefaults_ScheduledJob(obj *ScheduledJob) {
+func SetDefaults_CronJob(obj *CronJob) {
 	if obj.Spec.ConcurrencyPolicy == "" {
 		obj.Spec.ConcurrencyPolicy = AllowConcurrent
+	}
+	if obj.Spec.Suspend == nil {
+		obj.Spec.Suspend = new(bool)
 	}
 }

@@ -43,9 +43,8 @@ func stringSetFromPointers(in []*string) sets.String {
 	return out
 }
 
+// orZero returns the value, or 0 if the pointer is nil
+// Deprecated: prefer aws.Int64Value
 func orZero(v *int64) int64 {
-	if v == nil {
-		return 0
-	}
-	return *v
+	return aws.Int64Value(v)
 }

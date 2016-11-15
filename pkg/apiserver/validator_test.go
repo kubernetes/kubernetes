@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/probe"
 	"net/http"
 	"net/url"
 	"time"
+
+	"k8s.io/kubernetes/pkg/probe"
 )
 
 type fakeHttpProber struct {

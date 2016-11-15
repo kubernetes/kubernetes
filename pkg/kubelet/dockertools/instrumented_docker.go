@@ -30,7 +30,7 @@ type instrumentedDockerInterface struct {
 }
 
 // Creates an instrumented DockerInterface from an existing DockerInterface.
-func newInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterface {
+func NewInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterface {
 	return instrumentedDockerInterface{
 		client: dockerClient,
 	}
@@ -107,11 +107,20 @@ func (in instrumentedDockerInterface) RemoveContainer(id string, opts dockertype
 	return err
 }
 
-func (in instrumentedDockerInterface) InspectImage(image string) (*dockertypes.ImageInspect, error) {
+func (in instrumentedDockerInterface) InspectImageByRef(image string) (*dockertypes.ImageInspect, error) {
 	const operation = "inspect_image"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.client.InspectImage(image)
+	out, err := in.client.InspectImageByRef(image)
+	recordError(operation, err)
+	return out, err
+}
+
+func (in instrumentedDockerInterface) InspectImageByID(image string) (*dockertypes.ImageInspect, error) {
+	const operation = "inspect_image"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.InspectImageByID(image)
 	recordError(operation, err)
 	return out, err
 }
@@ -212,4 +221,22 @@ func (in instrumentedDockerInterface) ImageHistory(id string) ([]dockertypes.Ima
 	out, err := in.client.ImageHistory(id)
 	recordError(operation, err)
 	return out, err
+}
+
+func (in instrumentedDockerInterface) ResizeExecTTY(id string, height, width int) error {
+	const operation = "resize_exec"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.ResizeExecTTY(id, height, width)
+	recordError(operation, err)
+	return err
+}
+
+func (in instrumentedDockerInterface) ResizeContainerTTY(id string, height, width int) error {
+	const operation = "resize_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.ResizeContainerTTY(id, height, width)
+	recordError(operation, err)
+	return err
 }

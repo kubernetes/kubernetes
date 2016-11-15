@@ -25,8 +25,21 @@ type unsupportedCgroupManager struct{}
 // Make sure that unsupportedCgroupManager implements the CgroupManager interface
 var _ CgroupManager = &unsupportedCgroupManager{}
 
+type CgroupSubsystems struct {
+	Mounts      []interface{}
+	MountPoints map[string]string
+}
+
 func NewCgroupManager(_ interface{}) CgroupManager {
 	return &unsupportedCgroupManager{}
+}
+
+func (m *unsupportedCgroupManager) Name(_ CgroupName) string {
+	return ""
+}
+
+func (m *unsupportedCgroupManager) Exists(_ CgroupName) bool {
+	return false
 }
 
 func (m *unsupportedCgroupManager) Destroy(_ *CgroupConfig) error {
@@ -39,4 +52,24 @@ func (m *unsupportedCgroupManager) Update(_ *CgroupConfig) error {
 
 func (m *unsupportedCgroupManager) Create(_ *CgroupConfig) error {
 	return fmt.Errorf("Cgroup Manager is not supported in this build")
+}
+
+func (m *unsupportedCgroupManager) Pids(_ CgroupName) []int {
+	return nil
+}
+
+func (m *unsupportedCgroupManager) CgroupName(name string) CgroupName {
+	return ""
+}
+
+func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error {
+	return nil
+}
+
+func ConvertCgroupFsNameToSystemd(cgroupfsName string) (string, error) {
+	return "", nil
+}
+
+func ConvertCgroupNameToSystemd(cgroupName CgroupName, outputToCgroupFs bool) string {
+	return ""
 }

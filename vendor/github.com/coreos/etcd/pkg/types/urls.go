@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ func NewURLs(strs []string) (URLs, error) {
 		if err != nil {
 			return nil, err
 		}
-		if u.Scheme != "http" && u.Scheme != "https" {
-			return nil, fmt.Errorf("URL scheme must be http or https: %s", in)
+		if u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "unix" && u.Scheme != "unixs" {
+			return nil, fmt.Errorf("URL scheme must be http, https, unix, or unixs: %s", in)
 		}
 		if _, _, err := net.SplitHostPort(u.Host); err != nil {
 			return nil, fmt.Errorf(`URL address does not have the form "host:port": %s`, in)

@@ -24,6 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -43,6 +45,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -51,6 +54,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     1,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 		},
@@ -75,6 +79,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -87,6 +92,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: -1,
 					NumberMisscheduled:     -1,
 					DesiredNumberScheduled: -3,
+					NumberReady:            -1,
 				},
 			},
 		},
@@ -660,6 +666,13 @@ func TestValidateDeployment(t *testing.T) {
 	invalidRollbackRevisionDeployment.Spec.RollbackTo.Revision = -3
 	errorCases["must be greater than or equal to 0"] = invalidRollbackRevisionDeployment
 
+	// ProgressDeadlineSeconds should be greater than MinReadySeconds
+	invalidProgressDeadlineDeployment := validDeployment()
+	seconds := int32(600)
+	invalidProgressDeadlineDeployment.Spec.ProgressDeadlineSeconds = &seconds
+	invalidProgressDeadlineDeployment.Spec.MinReadySeconds = seconds
+	errorCases["must be greater than minReadySeconds"] = invalidProgressDeadlineDeployment
+
 	for k, v := range errorCases {
 		errs := ValidateDeployment(v)
 		if len(errs) == 0 {
@@ -795,6 +808,82 @@ func TestValidateIngress(t *testing.T) {
 	}
 	errorCases[badPathErr] = badRegexPath
 	errorCases[badHostIPErr] = badHostIP
+
+	wildcardHost := "foo.*.bar.com"
+	badWildcard := newValid()
+	badWildcard.Spec.Rules[0].Host = wildcardHost
+	badWildcardErr := fmt.Sprintf("spec.rules[0].host: Invalid value: '%v'", wildcardHost)
+	errorCases[badWildcardErr] = badWildcard
+
+	for k, v := range errorCases {
+		errs := ValidateIngress(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %q", k)
+		} else {
+			s := strings.Split(k, ":")
+			err := errs[0]
+			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+				t.Errorf("unexpected error: %q, expected: %q", err, k)
+			}
+		}
+	}
+}
+
+func TestValidateIngressTLS(t *testing.T) {
+	defaultBackend := extensions.IngressBackend{
+		ServiceName: "default-backend",
+		ServicePort: intstr.FromInt(80),
+	}
+
+	newValid := func() extensions.Ingress {
+		return extensions.Ingress{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "foo",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.IngressSpec{
+				Backend: &extensions.IngressBackend{
+					ServiceName: "default-backend",
+					ServicePort: intstr.FromInt(80),
+				},
+				Rules: []extensions.IngressRule{
+					{
+						Host: "foo.bar.com",
+						IngressRuleValue: extensions.IngressRuleValue{
+							HTTP: &extensions.HTTPIngressRuleValue{
+								Paths: []extensions.HTTPIngressPath{
+									{
+										Path:    "/foo",
+										Backend: defaultBackend,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Status: extensions.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{IP: "127.0.0.1"},
+					},
+				},
+			},
+		}
+	}
+
+	errorCases := map[string]extensions.Ingress{}
+
+	wildcardHost := "foo.*.bar.com"
+	badWildcardTLS := newValid()
+	badWildcardTLS.Spec.Rules[0].Host = "*.foo.bar.com"
+	badWildcardTLS.Spec.TLS = []extensions.IngressTLS{
+		{
+			Hosts: []string{wildcardHost},
+		},
+	}
+	badWildcardTLSErr := fmt.Sprintf("spec.tls[0].hosts: Invalid value: '%v'", wildcardHost)
+	errorCases[badWildcardTLSErr] = badWildcardTLS
 
 	for k, v := range errorCases {
 		errs := ValidateIngress(&v)
@@ -1434,7 +1523,10 @@ func TestValidateReplicaSet(t *testing.T) {
 func TestValidatePodSecurityPolicy(t *testing.T) {
 	validPSP := func() *extensions.PodSecurityPolicy {
 		return &extensions.PodSecurityPolicy{
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo",
+				Annotations: map[string]string{},
+			},
 			Spec: extensions.PodSecurityPolicySpec{
 				SELinux: extensions.SELinuxStrategyOptions{
 					Rule: extensions.SELinuxStrategyRunAsAny,
@@ -1508,11 +1600,33 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	allowedCapListedInRequiredDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
 	allowedCapListedInRequiredDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
 
-	errorCases := map[string]struct {
+	invalidAppArmorDefault := validPSP()
+	invalidAppArmorDefault.Annotations = map[string]string{
+		apparmor.DefaultProfileAnnotationKey: "not-good",
+	}
+	invalidAppArmorAllowed := validPSP()
+	invalidAppArmorAllowed.Annotations = map[string]string{
+		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
+	}
+
+	invalidSysctlPattern := validPSP()
+	invalidSysctlPattern.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
+
+	invalidSeccompDefault := validPSP()
+	invalidSeccompDefault.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey: "not-good",
+	}
+	invalidSeccompAllowed := validPSP()
+	invalidSeccompAllowed.Annotations = map[string]string{
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
+	}
+
+	type testCase struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
 		errorDetail string
-	}{
+	}
+	errorCases := map[string]testCase{
 		"no user options": {
 			psp:         noUserOptions,
 			errorType:   field.ErrorTypeNotSupported,
@@ -1588,6 +1702,31 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "capability is listed in allowedCapabilities and requiredDropCapabilities",
 		},
+		"invalid AppArmor default profile": {
+			psp:         invalidAppArmorDefault,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "invalid AppArmor profile name: \"not-good\"",
+		},
+		"invalid AppArmor allowed profile": {
+			psp:         invalidAppArmorAllowed,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "invalid AppArmor profile name: \"not-good\"",
+		},
+		"invalid sysctl pattern": {
+			psp:         invalidSysctlPattern,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
+		"invalid seccomp default profile": {
+			psp:         invalidSeccompDefault,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
+		"invalid seccomp allowed profile": {
+			psp:         invalidSeccompAllowed,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
 	}
 
 	for k, v := range errorCases {
@@ -1597,10 +1736,33 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			continue
 		}
 		if errs[0].Type != v.errorType {
-			t.Errorf("%s received an unexpected error type.  Expected: %v got: %v", k, v.errorType, errs[0].Type)
+			t.Errorf("[%s] received an unexpected error type.  Expected: '%s' got: '%s'", k, v.errorType, errs[0].Type)
 		}
 		if errs[0].Detail != v.errorDetail {
-			t.Errorf("%s received an unexpected error detail.  Expected %v got: %v", k, v.errorDetail, errs[0].Detail)
+			t.Errorf("[%s] received an unexpected error detail.  Expected '%s' got: '%s'", k, v.errorDetail, errs[0].Detail)
+		}
+	}
+
+	// Update error is different for 'missing object meta name'.
+	errorCases["missing object meta name"] = testCase{
+		psp:         errorCases["missing object meta name"].psp,
+		errorType:   field.ErrorTypeInvalid,
+		errorDetail: "field is immutable",
+	}
+
+	// Should not be able to update to an invalid policy.
+	for k, v := range errorCases {
+		v.psp.ResourceVersion = "444" // Required for updates.
+		errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp)
+		if len(errs) == 0 {
+			t.Errorf("[%s] expected update errors but got none", k)
+			continue
+		}
+		if errs[0].Type != v.errorType {
+			t.Errorf("[%s] received an unexpected error type.  Expected: '%s' got: '%s'", k, v.errorType, errs[0].Type)
+		}
+		if errs[0].Detail != v.errorDetail {
+			t.Errorf("[%s] received an unexpected error detail.  Expected '%s' got: '%s'", k, v.errorDetail, errs[0].Detail)
 		}
 	}
 
@@ -1624,6 +1786,21 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	caseInsensitiveAllowedDrop.Spec.RequiredDropCapabilities = []api.Capability{"FOO"}
 	caseInsensitiveAllowedDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
 
+	validAppArmor := validPSP()
+	validAppArmor.Annotations = map[string]string{
+		apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
+		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
+	}
+
+	withSysctl := validPSP()
+	withSysctl.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "net.*"
+
+	validSeccomp := validPSP()
+	validSeccomp.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey:  "docker/default",
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo",
+	}
+
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -1642,11 +1819,26 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"comparison for allowed -> drop is case sensitive": {
 			psp: caseInsensitiveAllowedDrop,
 		},
+		"valid AppArmor annotations": {
+			psp: validAppArmor,
+		},
+		"with network sysctls": {
+			psp: withSysctl,
+		},
+		"valid seccomp annotations": {
+			psp: validSeccomp,
+		},
 	}
 
 	for k, v := range successCases {
 		if errs := ValidatePodSecurityPolicy(v.psp); len(errs) != 0 {
 			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+
+		// Should be able to update to a valid PSP.
+		v.psp.ResourceVersion = "444" // Required for updates.
+		if errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp); len(errs) != 0 {
+			t.Errorf("Expected success for %s update, got %v", k, errs)
 		}
 	}
 }
@@ -1920,6 +2112,58 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	for testName, errorCase := range errorCases {
 		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
+		}
+	}
+}
+
+func TestIsValidSysctlPattern(t *testing.T) {
+	valid := []string{
+		"a.b.c.d",
+		"a",
+		"a_b",
+		"a-b",
+		"abc",
+		"abc.def",
+		"*",
+		"a.*",
+		"*",
+		"abc*",
+		"a.abc*",
+		"a.b.*",
+	}
+	invalid := []string{
+		"",
+		"ä",
+		"a_",
+		"_",
+		"_a",
+		"_a._b",
+		"__",
+		"-",
+		".",
+		"a.",
+		".a",
+		"a.b.",
+		"a*.b",
+		"a*b",
+		"*a",
+		"Abc",
+		func(n int) string {
+			x := make([]byte, n)
+			for i := range x {
+				x[i] = byte('a')
+			}
+			return string(x)
+		}(256),
+	}
+	for _, s := range valid {
+		if !IsValidSysctlPattern(s) {
+			t.Errorf("%q expected to be a valid sysctl pattern", s)
+		}
+	}
+	for _, s := range invalid {
+		if IsValidSysctlPattern(s) {
+			t.Errorf("%q expected to be an invalid sysctl pattern", s)
 		}
 	}
 }

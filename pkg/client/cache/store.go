@@ -99,7 +99,7 @@ func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
 		// name only, no namespace
 		return "", parts[0], nil
 	case 2:
-		// name and namespace
+		// namespace and name
 		return parts[0], parts[1], nil
 	}
 

@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: kubernetes-serve-hostname
+  name: kubernetes-serve-hostname-testing-sixty-three-characters-in-length
   labels:
     name: kubernetes-serve-hostname
 spec:

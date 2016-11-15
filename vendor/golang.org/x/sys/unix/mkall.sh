@@ -161,7 +161,7 @@ freebsd_arm)
 	mkerrors="$mkerrors"
 	mksyscall="./mksyscall.pl -l32 -arm"
 	mksysnum="curl -s 'http://svn.freebsd.org/base/stable/10/sys/kern/syscalls.master' | ./mksysnum_freebsd.pl"
-	# Let the type of C char be singed for making the bare syscall
+	# Let the type of C char be signed for making the bare syscall
 	# API consistent across over platforms.
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
 	;;
@@ -194,7 +194,7 @@ linux_arm64)
 		exit 1
 	fi
 	mksysnum="./mksysnum_linux.pl $unistd_h"
-	# Let the type of C char be singed for making the bare syscall
+	# Let the type of C char be signed for making the bare syscall
 	# API consistent across over platforms.
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
 	;;
@@ -211,6 +211,17 @@ linux_ppc64le)
 	mkerrors="$mkerrors -m64"
 	mksysnum="./mksysnum_linux.pl $unistd_h"
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
+	;;
+linux_s390x)
+	GOOSARCH_in=syscall_linux_s390x.go
+	unistd_h=/usr/include/asm/unistd.h
+	mkerrors="$mkerrors -m64"
+	mksysnum="./mksysnum_linux.pl $unistd_h"
+	# Let the type of C char be signed to make the bare sys
+	# API more consistent between platforms.
+	# This is a deliberate departure from the way the syscall
+	# package generates its version of the types file.
+	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
 	;;
 netbsd_386)
 	mkerrors="$mkerrors -m32"
@@ -269,6 +280,6 @@ esac
 	if [ -n "$mksysnum" ]; then echo "$mksysnum |gofmt >zsysnum_$GOOSARCH.go"; fi
 	if [ -n "$mktypes" ]; then
 		echo "echo // +build $GOARCH,$GOOS > ztypes_$GOOSARCH.go";
-		echo "$mktypes types_$GOOS.go | gofmt >>ztypes_$GOOSARCH.go";
+		echo "$mktypes types_$GOOS.go | go run mkpost.go >>ztypes_$GOOSARCH.go";
 	fi
 ) | $run

@@ -17,16 +17,13 @@ limitations under the License.
 package vsphere_volume
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -121,26 +118,20 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 		}}, nil
 }
 
-func (plugin *vsphereVolumePlugin) getCloudProvider() (*vsphere.VSphere, error) {
-	cloud := plugin.host.GetCloudProvider()
-	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return nil, errors.New("Cloud provider not initialized properly")
+func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	vsphereVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
+				VolumePath: volumeName,
+			},
+		},
 	}
-
-	vs := cloud.(*vsphere.VSphere)
-	if vs == nil {
-		return nil, errors.New("Invalid cloud provider: expected vSphere")
-	}
-	return vs, nil
+	return volume.NewSpecFromVolume(vsphereVolume), nil
 }
 
 // Abstract interface to disk operations.
 type vdManager interface {
-	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(mounter *vsphereVolumeMounter, globalPDPath string) error
-	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(unmounter *vsphereVolumeUnmounter) error
 	// Creates a volume
 	CreateVolume(provisioner *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeGB int, err error)
 	// Deletes a volume
@@ -167,13 +158,6 @@ type vsphereVolume struct {
 	volume.MetricsNil
 }
 
-func detachDiskLogError(vv *vsphereVolume) {
-	err := vv.manager.DetachDisk(&vsphereVolumeUnmounter{vv})
-	if err != nil {
-		glog.Warningf("Failed to detach disk: %v (%v)", vv, err)
-	}
-}
-
 var _ volume.Mounter = &vsphereVolumeMounter{}
 
 type vsphereVolumeMounter struct {
@@ -193,6 +177,13 @@ func (b *vsphereVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *vsphereVolumeMounter) CanMount() error {
+	return nil
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)
@@ -207,23 +198,16 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.V(4).Infof("Something is already mounted to target %s", dir)
 		return nil
 	}
-	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volPath)
-	if err := b.manager.AttachDisk(b, globalPDPath); err != nil {
-		glog.V(3).Infof("AttachDisk failed: %v", err)
+
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		glog.V(4).Infof("Could not create directory %s: %v", dir, err)
 		return err
 	}
-	glog.V(3).Infof("vSphere volume %s attached", b.volPath)
 
 	options := []string{"bind"}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		// TODO: we should really eject the attach/detach out into its own control loop.
-		glog.V(4).Infof("Could not create directory %s: %v", dir, err)
-		detachDiskLogError(b.vsphereVolume)
-		return err
-	}
-
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
+	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volPath)
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
@@ -247,7 +231,6 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 			}
 		}
 		os.Remove(dir)
-		detachDiskLogError(b.vsphereVolume)
 		return err
 	}
 	glog.V(3).Infof("vSphere volume %s mounted to %s", b.volPath, dir)
@@ -271,67 +254,25 @@ func (v *vsphereVolumeUnmounter) TearDown() error {
 // resource was the last reference to that disk on the kubelet.
 func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
 	glog.V(5).Infof("vSphere Volume TearDown of %s", dir)
-	notmnt, err := v.mounter.IsLikelyNotMountPoint(dir)
+	notMnt, err := v.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.V(4).Infof("Error checking if mountpoint ", dir, ": ", err)
 		return err
 	}
-	if notmnt {
-		glog.V(4).Infof("Not mount point,deleting")
+	if notMnt {
 		return os.Remove(dir)
 	}
-
-	// Find vSphere volumeID to lock the right volume
-	refs, err := mount.GetMountRefs(v.mounter, dir)
-	if err != nil {
-		glog.V(4).Infof("Error getting mountrefs for ", dir, ": ", err)
-		return err
-	}
-	if len(refs) == 0 {
-		glog.V(4).Infof("Directory %s is not mounted", dir)
-		return fmt.Errorf("directory %s is not mounted", dir)
-	}
-
-	// space between datastore and vmdk name in volumePath is encoded as '\040' when returned by GetMountRefs().
-	// volumePath eg: "[local] xxx.vmdk" provided to attach/mount
-	// replacing \040 with space to match the actual volumePath
-	mountPath := strings.Replace(path.Base(refs[0]), "\\040", " ", -1)
-	v.volPath = mountPath
-	glog.V(4).Infof("Found volume %s mounted to %s", v.volPath, dir)
-
-	// Reload list of references, there might be SetUpAt finished in the meantime
-	refs, err = mount.GetMountRefs(v.mounter, dir)
-	if err != nil {
-		glog.V(4).Infof("GetMountRefs failed: %v", err)
-		return err
-	}
 	if err := v.mounter.Unmount(dir); err != nil {
-		glog.V(4).Infof("Unmount failed: %v", err)
 		return err
 	}
-	glog.V(3).Infof("Successfully unmounted: %s\n", dir)
-
-	// If refCount is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		if err := v.manager.DetachDisk(v); err != nil {
-			glog.V(4).Infof("DetachDisk failed: %v", err)
-			return err
-		}
-		glog.V(3).Infof("Volume %s detached", v.volPath)
-	}
-	notmnt, mntErr := v.mounter.IsLikelyNotMountPoint(dir)
+	notMnt, mntErr := v.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
 	}
-	if notmnt {
-		if err := os.Remove(dir); err != nil {
-			glog.V(4).Infof("Failed to remove directory after unmount: %v", err)
-			return err
-		}
+	if notMnt {
+		return os.Remove(dir)
 	}
-	return nil
+	return fmt.Errorf("Failed to unmount volume dir")
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
@@ -387,9 +328,6 @@ type vsphereVolumeProvisioner struct {
 var _ volume.Provisioner = &vsphereVolumeProvisioner{}
 
 func (plugin *vsphereVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &VsphereDiskUtil{})
 }
 
@@ -419,7 +357,7 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: v.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   v.options.AccessModes,
+			AccessModes:                   v.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dKi", sizeKB)),
 			},
@@ -431,6 +369,10 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 			},
 		},
 	}
+	if len(v.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = v.plugin.GetAccessModes()
+	}
+
 	return pv, nil
 }
 

@@ -34,9 +34,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const TestClusterId = "clusterid.test"
+const TestClusterName = "testCluster"
 
 func TestReadAWSCloudConfig(t *testing.T) {
 	tests := []struct {
@@ -496,6 +498,14 @@ func (elb *FakeELB) SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancer
 	panic("Not implemented")
 }
 
+func (elb *FakeELB) DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error) {
+	panic("Not implemented")
+}
+
+func (elb *FakeELB) ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttributesInput) (*elb.ModifyLoadBalancerAttributesOutput, error) {
+	panic("Not implemented")
+}
+
 type FakeASG struct {
 	aws *FakeAWSServices
 }
@@ -596,17 +606,17 @@ func TestList(t *testing.T) {
 
 	table := []struct {
 		input  string
-		expect []string
+		expect []types.NodeName
 	}{
-		{"blahonga", []string{}},
-		{"quux", []string{"instance3.ec2.internal"}},
-		{"a", []string{"instance1.ec2.internal", "instance2.ec2.internal"}},
+		{"blahonga", []types.NodeName{}},
+		{"quux", []types.NodeName{"instance3.ec2.internal"}},
+		{"a", []types.NodeName{"instance1.ec2.internal", "instance2.ec2.internal"}},
 	}
 
 	for _, item := range table {
 		result, err := aws.List(item.input)
 		if err != nil {
-			t.Errorf("Expected call with %v to succeed, failed with %s", item.input, err)
+			t.Errorf("Expected call with %v to succeed, failed with %v", item.input, err)
 		}
 		if e, a := item.expect, result; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
@@ -696,7 +706,7 @@ func TestNodeAddresses(t *testing.T) {
 	fakeServices.selfInstance.PublicIpAddress = aws.String("2.3.4.5")
 	fakeServices.selfInstance.PrivateIpAddress = aws.String("192.168.0.2")
 
-	addrs4, err4 := aws4.NodeAddresses(*instance0.PrivateDnsName)
+	addrs4, err4 := aws4.NodeAddresses(mapInstanceToNodeName(&instance0))
 	if err4 != nil {
 		t.Errorf("unexpected error: %v", err4)
 	}
@@ -1053,7 +1063,7 @@ func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 
-	nodeName := "my-dns.internal"
+	nodeName := types.NodeName("my-dns.internal")
 
 	var tag ec2.Tag
 	tag.Key = aws.String(TagNameKubernetesCluster)
@@ -1062,13 +1072,13 @@ func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 
 	var runningInstance ec2.Instance
 	runningInstance.InstanceId = aws.String("i-running")
-	runningInstance.PrivateDnsName = aws.String(nodeName)
+	runningInstance.PrivateDnsName = aws.String(string(nodeName))
 	runningInstance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
 	runningInstance.Tags = tags
 
 	var terminatedInstance ec2.Instance
 	terminatedInstance.InstanceId = aws.String("i-terminated")
-	terminatedInstance.PrivateDnsName = aws.String(nodeName)
+	terminatedInstance.PrivateDnsName = aws.String(string(nodeName))
 	terminatedInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("terminated")}
 	terminatedInstance.Tags = tags
 
@@ -1153,16 +1163,16 @@ func TestGetVolumeLabels(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	assert.Nil(t, err, "Error building aws cloud: %v", err)
-	volumeId := aws.String("vol-VolumeId")
-	expectedVolumeRequest := &ec2.DescribeVolumesInput{VolumeIds: []*string{volumeId}}
+	volumeId := awsVolumeID("vol-VolumeId")
+	expectedVolumeRequest := &ec2.DescribeVolumesInput{VolumeIds: []*string{volumeId.awsString()}}
 	awsServices.ec2.On("DescribeVolumes", expectedVolumeRequest).Return([]*ec2.Volume{
 		{
-			VolumeId:         volumeId,
+			VolumeId:         volumeId.awsString(),
 			AvailabilityZone: aws.String("us-east-1a"),
 		},
 	})
 
-	labels, err := c.GetVolumeLabels(*volumeId)
+	labels, err := c.GetVolumeLabels(KubernetesVolumeID("aws:///" + string(volumeId)))
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
@@ -1182,7 +1192,7 @@ func TestDescribeLoadBalancerOnDelete(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancerDeleted(&api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}})
+	c.EnsureLoadBalancerDeleted(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}})
 }
 
 func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
@@ -1190,7 +1200,7 @@ func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.UpdateLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+	c.UpdateLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
 }
 
 func TestDescribeLoadBalancerOnGet(t *testing.T) {
@@ -1198,7 +1208,7 @@ func TestDescribeLoadBalancerOnGet(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.GetLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}})
+	c.GetLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}})
 }
 
 func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
@@ -1206,7 +1216,7 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+	c.EnsureLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
 }
 
 func TestBuildListener(t *testing.T) {
@@ -1289,6 +1299,11 @@ func TestBuildListener(t *testing.T) {
 			"Named port not in whitelist, passthrough",
 			443, "", 8011, "tcp", "cert", "foo,bar",
 			false, "tcp", "tcp", "",
+		},
+		{
+			"HTTP->HTTP",
+			80, "", 8012, "http", "", "",
+			false, "http", "http", "",
 		},
 	}
 

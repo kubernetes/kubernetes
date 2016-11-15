@@ -17,14 +17,12 @@ limitations under the License.
 package clouddns
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ dnsprovider.ResourceRecordSets = ResourceRecordSets{}
 
 type ResourceRecordSets struct {
@@ -44,38 +42,14 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	return list, nil
 }
 
-func (rrsets ResourceRecordSets) Add(rrset dnsprovider.ResourceRecordSet) (dnsprovider.ResourceRecordSet, error) {
-	service := rrsets.zone.zones.interface_.service.Changes()
-	additions := []interfaces.ResourceRecordSet{rrset.(*ResourceRecordSet).impl}
-	change := service.NewChange(additions, []interfaces.ResourceRecordSet{})
-	newChange, err := service.Create(rrsets.project(), rrsets.zone.impl.Name(), change).Do()
-	if err != nil {
-		return nil, err
+func (r ResourceRecordSets) StartChangeset() dnsprovider.ResourceRecordChangeset {
+	return &ResourceRecordChangeset{
+		rrsets: &r,
 	}
-	newAdditions := newChange.Additions()
-	if len(newAdditions) != len(additions) {
-		return nil, fmt.Errorf("Internal error when adding resource record set.  Call succeeded but number of records returned is incorrect.  Records sent=%d, records returned=%d, record set:%v", len(additions), len(newAdditions), rrset)
-	}
-	return ResourceRecordSet{newChange.Additions()[0], &rrsets}, nil
 }
 
-func (rrsets ResourceRecordSets) Remove(rrset dnsprovider.ResourceRecordSet) error {
-	service := rrsets.zone.zones.interface_.service.Changes()
-	deletions := []interfaces.ResourceRecordSet{rrset.(ResourceRecordSet).impl}
-	change := service.NewChange([]interfaces.ResourceRecordSet{}, deletions)
-	newChange, err := service.Create(rrsets.project(), rrsets.zone.impl.Name(), change).Do()
-	if err != nil {
-		return err
-	}
-	newDeletions := newChange.Deletions()
-	if len(newDeletions) != len(deletions) {
-		return fmt.Errorf("Internal error when deleting resource record set.  Call succeeded but number of records returned is incorrect.  Records sent=%d, records returned=%d, record set:%v", len(deletions), len(newDeletions), rrset)
-	}
-	return nil
-}
-
-func (rrsets ResourceRecordSets) New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) dnsprovider.ResourceRecordSet {
-	return &ResourceRecordSet{rrsets.impl.NewResourceRecordSet(name, rrdatas, ttl, rrstype), &rrsets}
+func (r ResourceRecordSets) New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) dnsprovider.ResourceRecordSet {
+	return ResourceRecordSet{r.impl.NewResourceRecordSet(name, rrdatas, ttl, rrstype), &r}
 }
 
 func (rrsets ResourceRecordSets) project() string {

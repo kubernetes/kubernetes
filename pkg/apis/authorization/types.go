@@ -17,13 +17,19 @@ limitations under the License.
 package authorization
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
+
+// +genclient=true
+// +nonNamespaced=true
+// +noMethods=true
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".
 type SubjectAccessReview struct {
 	unversioned.TypeMeta
+	api.ObjectMeta
 
 	// Spec holds information about the request being evaluated
 	Spec SubjectAccessReviewSpec
@@ -32,11 +38,16 @@ type SubjectAccessReview struct {
 	Status SubjectAccessReviewStatus
 }
 
+// +genclient=true
+// +nonNamespaced=true
+// +noMethods=true
+
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
 // to check whether they can perform an action
 type SelfSubjectAccessReview struct {
 	unversioned.TypeMeta
+	api.ObjectMeta
 
 	// Spec holds information about the request being evaluated.
 	Spec SelfSubjectAccessReviewSpec
@@ -45,11 +56,15 @@ type SelfSubjectAccessReview struct {
 	Status SubjectAccessReviewStatus
 }
 
+// +genclient=true
+// +noMethods=true
+
 // LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace.
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions
 // checking.
 type LocalSubjectAccessReview struct {
 	unversioned.TypeMeta
+	api.ObjectMeta
 
 	// Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
 	// you made the request against.  If empty, it is defaulted.
@@ -103,8 +118,12 @@ type SubjectAccessReviewSpec struct {
 	Groups []string
 	// Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
 	// it needs a reflection here.
-	Extra map[string][]string
+	Extra map[string]ExtraValue
 }
+
+// ExtraValue masks the value so protobuf can generate
+// +protobuf.nullable=true
+type ExtraValue []string
 
 // SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAttributes
 // and NonResourceAttributes must be set
@@ -121,4 +140,8 @@ type SubjectAccessReviewStatus struct {
 	Allowed bool
 	// Reason is optional.  It indicates why a request was allowed or denied.
 	Reason string
+	// EvaluationError is an indication that some error occurred during the authorization check.
+	// It is entirely possible to get an error and be able to continue determine authorization status in spite of it.
+	// For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
+	EvaluationError string
 }

@@ -94,6 +94,11 @@ func GetProcessLabel() (string, error) {
 	return selinux.Getexeccon()
 }
 
+// GetFileLabel returns the label for specified path
+func GetFileLabel(path string) (string, error) {
+	return selinux.Getfilecon(path)
+}
+
 // SetFileLabel modifies the "path" label to the specified file label
 func SetFileLabel(path string, fileLabel string) error {
 	if selinux.SelinuxEnabled() && fileLabel != "" {
@@ -102,7 +107,7 @@ func SetFileLabel(path string, fileLabel string) error {
 	return nil
 }
 
-// Tell the kernel the label for all files to be created
+// SetFileCreateLabel tells the kernel the label for all files to be created
 func SetFileCreateLabel(fileLabel string) error {
 	if selinux.SelinuxEnabled() {
 		return selinux.Setfscreatecon(fileLabel)
@@ -110,7 +115,7 @@ func SetFileCreateLabel(fileLabel string) error {
 	return nil
 }
 
-// Change the label of path to the filelabel string.
+// Relabel changes the label of path to the filelabel string.
 // It changes the MCS label to s0 if shared is true.
 // This will allow all containers to share the content.
 func Relabel(path string, fileLabel string, shared bool) error {
@@ -124,7 +129,7 @@ func Relabel(path string, fileLabel string, shared bool) error {
 
 	exclude_paths := map[string]bool{"/": true, "/usr": true, "/etc": true}
 	if exclude_paths[path] {
-		return fmt.Errorf("Relabeling of %s is not allowed", path)
+		return fmt.Errorf("SELinux relabeling of %s is not allowed", path)
 	}
 
 	if shared {
@@ -132,7 +137,10 @@ func Relabel(path string, fileLabel string, shared bool) error {
 		c["level"] = "s0"
 		fileLabel = c.Get()
 	}
-	return selinux.Chcon(path, fileLabel, true)
+	if err := selinux.Chcon(path, fileLabel, true); err != nil {
+		return fmt.Errorf("SELinux relabeling of %s is not allowed: %q", path, err)
+	}
+	return nil
 }
 
 // GetPidLabel will return the label of the process running with the specified pid

@@ -23,8 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -33,8 +35,27 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
+// listPodsByNamespaceFuncUsingClient returns a pod listing function based on the provided client.
+func listPodsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.ListFuncByNamespace {
+	// TODO: ideally, we could pass dynamic client pool down into this code, and have one way of doing this.
+	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
+	// structured objects.
+	return func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		itemList, err := kubeClient.Core().Pods(namespace).List(options)
+		if err != nil {
+			return nil, err
+		}
+		results := make([]runtime.Object, 0, len(itemList.Items))
+		for i := range itemList.Items {
+			results = append(results, &itemList.Items[i])
+		}
+		return results, nil
+	}
+}
+
 // NewPodEvaluator returns an evaluator that can evaluate pods
-func NewPodEvaluator(kubeClient clientset.Interface) quota.Evaluator {
+// if the specified shared informer factory is not nil, evaluator may use it to support listing functions.
+func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
 	computeResources := []api.ResourceName{
 		api.ResourceCPU,
 		api.ResourceMemory,
@@ -44,6 +65,10 @@ func NewPodEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		api.ResourceLimitsMemory,
 	}
 	allResources := append(computeResources, api.ResourcePods)
+	listFuncByNamespace := listPodsByNamespaceFuncUsingClient(kubeClient)
+	if f != nil {
+		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, unversioned.GroupResource{Resource: "pods"})
+	}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Pod",
 		InternalGroupKind: api.Kind("Pod"),
@@ -59,9 +84,7 @@ func NewPodEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     PodMatchesScopeFunc,
 		UsageFunc:            PodUsageFunc,
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
-			return kubeClient.Core().Pods(namespace).List(options)
-		},
+		ListFuncByNamespace:  listFuncByNamespace,
 	}
 }
 
@@ -79,8 +102,11 @@ func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) erro
 	allErrs := field.ErrorList{}
 	fldPath := field.NewPath("spec").Child("containers")
 	for i, ctr := range pod.Spec.Containers {
-		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
+		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"))...)
+	}
+	fldPath = field.NewPath("spec").Child("initContainers")
+	for i, ctr := range pod.Spec.InitContainers {
+		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"))...)
 	}
 	if len(allErrs) > 0 {
 		return allErrs.ToAggregate()
@@ -92,19 +118,28 @@ func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) erro
 	requiredSet := quota.ToSet(required)
 	missingSet := sets.NewString()
 	for i := range pod.Spec.Containers {
-		requests := pod.Spec.Containers[i].Resources.Requests
-		limits := pod.Spec.Containers[i].Resources.Limits
-		containerUsage := podUsageHelper(requests, limits)
-		containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
-		if !containerSet.Equal(requiredSet) {
-			difference := requiredSet.Difference(containerSet)
-			missingSet.Insert(difference.List()...)
-		}
+		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSet)
+	}
+	for i := range pod.Spec.InitContainers {
+		enforcePodContainerConstraints(&pod.Spec.InitContainers[i], requiredSet, missingSet)
 	}
 	if len(missingSet) == 0 {
 		return nil
 	}
 	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
+}
+
+// enforcePodContainerConstraints checks for required resources that are not set on this container and
+// adds them to missingSet.
+func enforcePodContainerConstraints(container *api.Container, requiredSet, missingSet sets.String) {
+	requests := container.Resources.Requests
+	limits := container.Resources.Limits
+	containerUsage := podUsageHelper(requests, limits)
+	containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
+	if !containerSet.Equal(requiredSet) {
+		difference := requiredSet.Difference(containerSet)
+		missingSet.Insert(difference.List()...)
+	}
 }
 
 // podUsageHelper can summarize the pod quota usage based on requests and limits
@@ -144,9 +179,17 @@ func PodUsageFunc(object runtime.Object) api.ResourceList {
 	// when we have pod level cgroups, we can just read pod level requests/limits
 	requests := api.ResourceList{}
 	limits := api.ResourceList{}
+
 	for i := range pod.Spec.Containers {
 		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
 		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
+	}
+	// InitContainers are run sequentially before other containers start, so the highest
+	// init container resource is compared against the sum of app containers to determine
+	// the effective usage for both requests and limits.
+	for i := range pod.Spec.InitContainers {
+		requests = quota.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
+		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
 	return podUsageHelper(requests, limits)

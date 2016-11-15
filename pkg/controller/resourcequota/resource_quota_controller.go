@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -60,9 +59,11 @@ type ResourceQuotaController struct {
 	// An index of resource quota objects by namespace
 	rqIndexer cache.Indexer
 	// Watches changes to all resource quota
-	rqController *framework.Controller
+	rqController *cache.Controller
 	// ResourceQuota objects that need to be synchronized
 	queue workqueue.RateLimitingInterface
+	// missingUsageQueue holds objects that are missing the initial usage informatino
+	missingUsageQueue workqueue.RateLimitingInterface
 	// To allow injection of syncUsage for testing.
 	syncHandler func(key string) error
 	// function that controls full recalculation of quota usage
@@ -70,26 +71,27 @@ type ResourceQuotaController struct {
 	// knows how to calculate usage
 	registry quota.Registry
 	// controllers monitoring to notify for replenishment
-	replenishmentControllers []framework.ControllerInterface
+	replenishmentControllers []cache.ControllerInterface
 }
 
 func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *ResourceQuotaController {
 	// build the resource quota controller
 	rq := &ResourceQuotaController{
 		kubeClient:               options.KubeClient,
-		queue:                    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_primary"),
+		missingUsageQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
 		resyncPeriod:             options.ResyncPeriod,
 		registry:                 options.Registry,
-		replenishmentControllers: []framework.ControllerInterface{},
+		replenishmentControllers: []cache.ControllerInterface{},
 	}
-	if options.KubeClient != nil && options.KubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", options.KubeClient.Core().GetRESTClient().GetRateLimiter())
+	if options.KubeClient != nil && options.KubeClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", options.KubeClient.Core().RESTClient().GetRateLimiter())
 	}
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
 
 	// build the controller that observes quota
-	rq.rqIndexer, rq.rqController = framework.NewIndexerInformer(
+	rq.rqIndexer, rq.rqController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rq.kubeClient.Core().ResourceQuotas(api.NamespaceAll).List(options)
@@ -100,8 +102,8 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 		},
 		&api.ResourceQuota{},
 		rq.resyncPeriod(),
-		framework.ResourceEventHandlerFuncs{
-			AddFunc: rq.enqueueResourceQuota,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: rq.addQuota,
 			UpdateFunc: func(old, cur interface{}) {
 				// We are only interested in observing updates to quota.spec to drive updates to quota.status.
 				// We ignore all updates to quota.Status because they are all driven by this controller.
@@ -116,7 +118,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 				if quota.Equals(curResourceQuota.Spec.Hard, oldResourceQuota.Spec.Hard) {
 					return
 				}
-				rq.enqueueResourceQuota(curResourceQuota)
+				rq.addQuota(curResourceQuota)
 			},
 			// This will enter the sync loop and no-op, because the controller has been deleted from the store.
 			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
@@ -160,28 +162,63 @@ func (rq *ResourceQuotaController) enqueueResourceQuota(obj interface{}) {
 	rq.queue.Add(key)
 }
 
+func (rq *ResourceQuotaController) addQuota(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return
+	}
+
+	resourceQuota := obj.(*api.ResourceQuota)
+
+	// if we declared an intent that is not yet captured in status (prioritize it)
+	if !api.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
+		rq.missingUsageQueue.Add(key)
+		return
+	}
+
+	// if we declared a constraint that has no usage (which this controller can calculate, prioritize it)
+	for constraint := range resourceQuota.Status.Hard {
+		if _, usageFound := resourceQuota.Status.Used[constraint]; !usageFound {
+			matchedResources := []api.ResourceName{constraint}
+
+			for _, evaluator := range rq.registry.Evaluators() {
+				if intersection := quota.Intersection(evaluator.MatchesResources(), matchedResources); len(intersection) != 0 {
+					rq.missingUsageQueue.Add(key)
+					return
+				}
+			}
+		}
+	}
+
+	// no special priority, go in normal recalc queue
+	rq.queue.Add(key)
+}
+
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
-// It enforces that the syncHandler is never invoked concurrently with the same key.
-func (rq *ResourceQuotaController) worker() {
+func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface) func() {
 	workFunc := func() bool {
-		key, quit := rq.queue.Get()
+		key, quit := queue.Get()
 		if quit {
 			return true
 		}
-		defer rq.queue.Done(key)
+		defer queue.Done(key)
 		err := rq.syncHandler(key.(string))
 		if err == nil {
-			rq.queue.Forget(key)
+			queue.Forget(key)
 			return false
 		}
 		utilruntime.HandleError(err)
-		rq.queue.AddRateLimited(key)
+		queue.AddRateLimited(key)
 		return false
 	}
-	for {
-		if quit := workFunc(); quit {
-			glog.Infof("resource quota controller worker shutting down")
-			return
+
+	return func() {
+		for {
+			if quit := workFunc(); quit {
+				glog.Infof("resource quota controller worker shutting down")
+				return
+			}
 		}
 	}
 }
@@ -196,7 +233,8 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 	}
 	// the workers that chug through the quota calculation backlog
 	for i := 0; i < workers; i++ {
-		go wait.Until(rq.worker, time.Second, stopCh)
+		go wait.Until(rq.worker(rq.queue), time.Second, stopCh)
+		go wait.Until(rq.worker(rq.missingUsageQueue), time.Second, stopCh)
 	}
 	// the timer for how often we do a full recalculation across all quotas
 	go wait.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
@@ -236,12 +274,26 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 	// if this is our first sync, it will be dirty by default, since we need track usage
 	dirty = dirty || (resourceQuota.Status.Hard == nil || resourceQuota.Status.Used == nil)
 
+	used := api.ResourceList{}
+	if resourceQuota.Status.Used != nil {
+		used = quota.Add(api.ResourceList{}, resourceQuota.Status.Used)
+	}
+	hardLimits := quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard)
+
+	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry)
+	if err != nil {
+		return err
+	}
+	for key, value := range newUsage {
+		used[key] = value
+	}
+
+	// ensure set of used values match those that have hard constraints
+	hardResources := quota.ResourceNames(hardLimits)
+	used = quota.Mask(used, hardResources)
+
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
-	previousUsed := api.ResourceList{}
-	if resourceQuota.Status.Used != nil {
-		previousUsed = quota.Add(api.ResourceList{}, resourceQuota.Status.Used)
-	}
 	usage := api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{
 			Name:            resourceQuota.Name,
@@ -250,39 +302,9 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 			Labels:          resourceQuota.Labels,
 			Annotations:     resourceQuota.Annotations},
 		Status: api.ResourceQuotaStatus{
-			Hard: quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard),
-			Used: previousUsed,
+			Hard: hardLimits,
+			Used: used,
 		},
-	}
-
-	// find the intersection between the hard resources on the quota
-	// and the resources this controller can track to know what we can
-	// look to measure updated usage stats for
-	hardResources := quota.ResourceNames(usage.Status.Hard)
-	potentialResources := []api.ResourceName{}
-	evaluators := rq.registry.Evaluators()
-	for _, evaluator := range evaluators {
-		potentialResources = append(potentialResources, evaluator.MatchesResources()...)
-	}
-	matchedResources := quota.Intersection(hardResources, potentialResources)
-
-	// sum the observed usage from each evaluator
-	newUsage := api.ResourceList{}
-	usageStatsOptions := quota.UsageStatsOptions{Namespace: resourceQuota.Namespace, Scopes: resourceQuota.Spec.Scopes}
-	for _, evaluator := range evaluators {
-		stats, err := evaluator.UsageStats(usageStatsOptions)
-		if err != nil {
-			return err
-		}
-		newUsage = quota.Add(newUsage, stats.Used)
-	}
-
-	// mask the observed usage to only the set of resources tracked by this quota
-	// merge our observed usage with the quota usage status
-	// if the new usage is different than the last usage, we will need to do an update
-	newUsage = quota.Mask(newUsage, matchedResources)
-	for key, value := range newUsage {
-		usage.Status.Used[key] = value
 	}
 
 	dirty = dirty || !quota.Equals(usage.Status.Used, resourceQuota.Status.Used)

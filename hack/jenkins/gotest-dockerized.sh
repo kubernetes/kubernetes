@@ -36,6 +36,7 @@ mkdir -p "${HOST_ARTIFACTS_DIR}"
 # provided must be resolvable on the *HOST*, not the container.
 
 docker run --rm=true \
+  --privileged=true \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "${REPO_DIR}":/go/src/k8s.io/kubernetes \
   -v "${WORKSPACE}/_artifacts":/workspace/artifacts \
@@ -44,5 +45,5 @@ docker run --rm=true \
   -e "KUBE_VERIFY_GIT_BRANCH=${KUBE_VERIFY_GIT_BRANCH:-}" \
   -e "REPO_DIR=${REPO_DIR}" \
   -e "HOST_ARTIFACTS_DIR=${HOST_ARTIFACTS_DIR}" \
-  -i gcr.io/google_containers/kubekins-test:go1.6.2-docker1.9.1-rev2 \
+  -i gcr.io/k8s-testimages/kubekins-test:1.5-v20161109-d9a98f2 \
   bash -c "cd kubernetes && ${KUBE_TEST_SCRIPT:-./hack/jenkins/test-dockerized.sh}"

@@ -24,11 +24,27 @@ import (
 	"io/ioutil"
 	"strings"
 	"unicode"
+
+	go2idlparser "k8s.io/gengo/parser"
+	"k8s.io/gengo/types"
 )
 
 // GetPublicFunctions lists all public functions (not methods) from a golang source file.
-func GetPublicFunctions(filePath string) ([]string, error) {
-	var functionNames []string
+func GetPublicFunctions(pkg, filePath string) ([]*types.Type, error) {
+	builder := go2idlparser.New()
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	if err := builder.AddFile(pkg, filePath, data); err != nil {
+		return nil, err
+	}
+	universe, err := builder.FindTypes()
+	if err != nil {
+		return nil, err
+	}
+
+	var functions []*types.Type
 
 	// Create the AST by parsing src.
 	fset := token.NewFileSet() // positions are relative to fset
@@ -45,13 +61,13 @@ func GetPublicFunctions(filePath string) ([]string, error) {
 			s = x.Name.Name
 			// It's a function (not method), and is public, record it.
 			if x.Recv == nil && isPublic(s) {
-				functionNames = append(functionNames, s)
+				functions = append(functions, universe[pkg].Function(x.Name.Name))
 			}
 		}
 		return true
 	})
 
-	return functionNames, nil
+	return functions, nil
 }
 
 // isPublic checks if a given string is a public function name.

@@ -22,22 +22,21 @@ import (
 	"net/url"
 
 	"github.com/golang/glog"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
 var (
-	attach_example = dedent.Dedent(`
+	attach_example = templates.Examples(`
 		# Get output from running pod 123456-7890, using the first container by default
 		kubectl attach 123456-7890
 
@@ -49,17 +48,19 @@ var (
 		kubectl attach 123456-7890 -c ruby-container -i -t`)
 )
 
-func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &AttachOptions{
-		In:  cmdIn,
-		Out: cmdOut,
-		Err: cmdErr,
+		StreamOptions: StreamOptions{
+			In:  cmdIn,
+			Out: cmdOut,
+			Err: cmdErr,
+		},
 
 		Attach: &DefaultRemoteAttach{},
 	}
 	cmd := &cobra.Command{
 		Use:     "attach POD -c CONTAINER",
-		Short:   "Attach to a running container.",
+		Short:   "Attach to a running container",
 		Long:    "Attach to a process that is already running inside an existing container.",
 		Example: attach_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -77,45 +78,42 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 
 // RemoteAttach defines the interface accepted by the Attach command - provided for test stubbing
 type RemoteAttach interface {
-	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error
 }
 
 // DefaultRemoteAttach is the standard implementation of attaching
 type DefaultRemoteAttach struct{}
 
-func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error {
 	exec, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
-	return exec.Stream(remotecommandserver.SupportedStreamingProtocols, stdin, stdout, stderr, tty)
+	return exec.Stream(remotecommand.StreamOptions{
+		SupportedProtocols: remotecommandserver.SupportedStreamingProtocols,
+		Stdin:              stdin,
+		Stdout:             stdout,
+		Stderr:             stderr,
+		Tty:                tty,
+		TerminalSizeQueue:  terminalSizeQueue,
+	})
 }
 
 // AttachOptions declare the arguments accepted by the Exec command
 type AttachOptions struct {
-	Namespace     string
-	PodName       string
-	ContainerName string
-	Stdin         bool
-	TTY           bool
-	CommandName   string
+	StreamOptions
 
-	// InterruptParent, if set, is used to handle interrupts while attached
-	InterruptParent *interrupt.Handler
-
-	In  io.Reader
-	Out io.Writer
-	Err io.Writer
+	CommandName string
 
 	Pod *api.Pod
 
-	Attach RemoteAttach
-	Client *client.Client
-	Config *restclient.Config
+	Attach    RemoteAttach
+	PodClient coreclient.PodsGetter
+	Config    *restclient.Config
 }
 
 // Complete verifies command line arguments and loads data from the command environment
-func (p *AttachOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
+func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
 	if len(argsIn) == 0 {
 		return cmdutil.UsageError(cmd, "POD is required for attach")
 	}
@@ -136,11 +134,11 @@ func (p *AttachOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn 
 	}
 	p.Config = config
 
-	client, err := f.Client()
+	clientset, err := f.ClientSet()
 	if err != nil {
 		return err
 	}
-	p.Client = client
+	p.PodClient = clientset.Core()
 
 	if p.CommandName == "" {
 		p.CommandName = cmd.CommandPath()
@@ -158,7 +156,7 @@ func (p *AttachOptions) Validate() error {
 	if p.Out == nil || p.Err == nil {
 		allErrs = append(allErrs, fmt.Errorf("both output and error output must be provided"))
 	}
-	if p.Attach == nil || p.Client == nil || p.Config == nil {
+	if p.Attach == nil || p.PodClient == nil || p.Config == nil {
 		allErrs = append(allErrs, fmt.Errorf("client, client config, and attach must be provided"))
 	}
 	return utilerrors.NewAggregate(allErrs)
@@ -167,7 +165,7 @@ func (p *AttachOptions) Validate() error {
 // Run executes a validated remote execution against a pod.
 func (p *AttachOptions) Run() error {
 	if p.Pod == nil {
-		pod, err := p.Client.Pods(p.Namespace).Get(p.PodName)
+		pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName)
 		if err != nil {
 			return err
 		}
@@ -181,54 +179,78 @@ func (p *AttachOptions) Run() error {
 	}
 	pod := p.Pod
 
-	// ensure we can recover the terminal while attached
-	t := term.TTY{Parent: p.InterruptParent}
-
 	// check for TTY
-	tty := p.TTY
 	containerToAttach, err := p.containerToAttachTo(pod)
 	if err != nil {
 		return fmt.Errorf("cannot attach to the container: %v", err)
 	}
-	if tty && !containerToAttach.TTY {
-		tty = false
-		fmt.Fprintf(p.Err, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
-	}
-	if p.Stdin {
-		t.In = p.In
-		if tty && !t.IsTerminal() {
-			tty = false
-			fmt.Fprintln(p.Err, "Unable to use a TTY - input is not a terminal or the right kind of file")
+	if p.TTY && !containerToAttach.TTY {
+		p.TTY = false
+		if p.Err != nil {
+			fmt.Fprintf(p.Err, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
 		}
+	} else if !p.TTY && containerToAttach.TTY {
+		// the container was launched with a TTY, so we have to force a TTY here, otherwise you'll get
+		// an error "Unrecognized input header"
+		p.TTY = true
 	}
-	t.Raw = tty
+
+	// ensure we can recover the terminal while attached
+	t := p.setupTTY()
+
+	// save p.Err so we can print the command prompt message below
+	stderr := p.Err
+
+	var sizeQueue term.TerminalSizeQueue
+	if t.Raw {
+		if size := t.GetSize(); size != nil {
+			// fake resizing +1 and then back to normal so that attach-detach-reattach will result in the
+			// screen being redrawn
+			sizePlusOne := *size
+			sizePlusOne.Width++
+			sizePlusOne.Height++
+
+			// this call spawns a goroutine to monitor/update the terminal size
+			sizeQueue = t.MonitorSize(&sizePlusOne, size)
+		}
+
+		// unset p.Err if it was previously set because both stdout and stderr go over p.Out when tty is
+		// true
+		p.Err = nil
+	}
 
 	fn := func() error {
-		if tty {
-			fmt.Fprintln(p.Out, "\nHit enter for command prompt")
+
+		if !p.Quiet && stderr != nil {
+			fmt.Fprintln(stderr, "If you don't see a command prompt, try pressing enter.")
+		}
+
+		restClient, err := restclient.RESTClientFor(p.Config)
+		if err != nil {
+			return err
 		}
 		// TODO: consider abstracting into a client invocation or client helper
-		req := p.Client.RESTClient.Post().
+		req := restClient.Post().
 			Resource("pods").
 			Name(pod.Name).
 			Namespace(pod.Namespace).
 			SubResource("attach")
 		req.VersionedParams(&api.PodAttachOptions{
 			Container: containerToAttach.Name,
-			Stdin:     p.In != nil,
+			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
 			Stderr:    p.Err != nil,
-			TTY:       tty,
+			TTY:       t.Raw,
 		}, api.ParameterCodec)
 
-		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, tty)
+		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {
 		return err
 	}
 
-	if p.Stdin && tty && pod.Spec.RestartPolicy == api.RestartPolicyAlways {
+	if p.Stdin && t.Raw && pod.Spec.RestartPolicy == api.RestartPolicyAlways {
 		fmt.Fprintf(p.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", p.CommandName, pod.Name, containerToAttach.Name)
 	}
 	return nil

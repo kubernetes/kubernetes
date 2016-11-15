@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/indexed-job.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Design: Indexed Feature of Job object
 
 
@@ -103,7 +69,7 @@ and can refer to it from other resource types, such as
 Here are several examples of *work lists*: lists of command lines that the user
 wants to run, each line its own Pod. (Note that in practice, a work list may not
 ever be written out in this form, but it exists in the mind of the Job creator,
-and it is a useful way to talk about the the intent of the user when discussing
+and it is a useful way to talk about the intent of the user when discussing
 alternatives for specifying Indexed Jobs).
 
 Note that we will not have the user express their requirements in work list
@@ -387,7 +353,7 @@ equal to the number of work items in the work list.
 
 Each pod that the job controller creates is intended to complete one work item
 from the work list. Since a pod may fail, several pods may, serially, attempt to
-complete the same index. Therefore, we call it a a *completion index* (or just
+complete the same index. Therefore, we call it a *completion index* (or just
 *index*), but not a *pod index*.
 
 For each completion index, in the range 1 to `.job.Spec.Completions`, the job
@@ -515,14 +481,14 @@ The multiple substitution approach:
 for very large jobs, the work-queue style or another type of controller, such as
 map-reduce or spark, may be a better fit.)
 - Drawback: is a form of server-side templating, which we want in Kubernetes but
-have not fully designed (see the [PetSets proposal](https://github.com/kubernetes/kubernetes/pull/18016/files?short_path=61f4179#diff-61f41798f4bced6e42e45731c1494cee)).
+have not fully designed (see the [StatefulSets proposal](https://github.com/kubernetes/kubernetes/pull/18016/files?short_path=61f4179#diff-61f41798f4bced6e42e45731c1494cee)).
 
 The index-only approach:
 
 - Requires that the user keep the *per completion parameters* in a separate
 storage, such as a configData or networked storage.
 - Makes no changes to the JobSpec.
-- Drawback: while in separate storage, they could be mutatated, which would have
+- Drawback: while in separate storage, they could be mutated, which would have
 unexpected effects.
 - Drawback: Logic for using index to lookup parameters needs to be in the Pod.
 - Drawback: CLIs and UIs are limited to using the "index" as the identity of a
@@ -564,7 +530,7 @@ before. They will have a new annotation, but pod are expected to tolerate
 unfamiliar annotations.
 
 However, if the job controller version is reverted, to a version before this
-change, the jobs whose pod specs depend on the the new annotation will fail.
+change, the jobs whose pod specs depend on the new annotation will fail.
 This is okay for a Beta resource.
 
 #### Job Controller Changes
@@ -865,8 +831,8 @@ list of parameters.  However, some popular base images do not include
 `/bin/bash`.  For example, `busybox` uses a compact `/bin/sh` implementation
 that does not support array syntax.
 
-Kubelet does support [expanding varaibles without a
-shell](http://kubernetes.io/v1.1/docs/design/expansion.html).  But it does not
+Kubelet does support [expanding variables without a
+shell](http://kubernetes.io/kubernetes/v1.1/docs/design/expansion.html).  But it does not
 allow for recursive substitution, which is required to extract the correct
 parameter from a list based on the completion index of the pod.  The syntax
 could be extended, but doing so seems complex and will be an unfamiliar syntax
@@ -908,24 +874,24 @@ admission time; it will need to understand indexes.
 previous container failures.
 - modify the job template, affecting all indexes.
 
-#### Comparison to PetSets
+#### Comparison to StatefulSets (previously named PetSets)
 
-The *Index substitution-only* option corresponds roughly to PetSet Proposal 1b.
-The `perCompletionArgs` approach is similar to PetSet Proposal 1e, but more
+The *Index substitution-only* option corresponds roughly to StatefulSet Proposal 1b.
+The `perCompletionArgs` approach is similar to StatefulSet Proposal 1e, but more
 restrictive and thus less verbose.
 
-It would be easier for users if Indexed Job and PetSet are similar where
-possible. However, PetSet differs in several key respects:
+It would be easier for users if Indexed Job and StatefulSet are similar where
+possible. However, StatefulSet differs in several key respects:
 
-- PetSet is for ones to tens of instances.  Indexed job should work with tens of
+- StatefulSet is for ones to tens of instances.  Indexed job should work with tens of
 thousands of instances.
-- When you have few instances, you may want to given them pet names. When you
-have many instances, you that many instances, integer indexes make more sense.
+- When you have few instances, you may want to give them names. When you have many instances,
+integer indexes make more sense.
 - When you have thousands of instances, storing the work-list in the JobSpec
-is verbose.  For PetSet, this is less of a problem.
-- PetSets (apparently) need to differ in more fields than indexed Jobs.
+is verbose.  For StatefulSet, this is less of a problem.
+- StatefulSets (apparently) need to differ in more fields than indexed Jobs.
 
-This differs from PetSet in that PetSet uses names and not indexes. PetSet is
+This differs from StatefulSet in that StatefulSet uses names and not indexes. StatefulSet is
 intended to support ones to tens of things.
 
 

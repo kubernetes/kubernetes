@@ -18,7 +18,6 @@ package clientcmd
 
 import (
 	"io"
-	"reflect"
 	"sync"
 
 	"github.com/golang/glog"
@@ -39,16 +38,25 @@ type DeferredLoadingClientConfig struct {
 
 	clientConfig ClientConfig
 	loadingLock  sync.Mutex
+
+	// provided for testing
+	icc InClusterConfig
+}
+
+// InClusterConfig abstracts details of whether the client is running in a cluster for testing.
+type InClusterConfig interface {
+	ClientConfig
+	Possible() bool
 }
 
 // NewNonInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name
 func NewNonInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides) ClientConfig {
-	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides}
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: inClusterClientConfig{}}
 }
 
 // NewInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name and the fallback auth reader
 func NewInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
-	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, fallbackReader: fallbackReader}
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: inClusterClientConfig{}, fallbackReader: fallbackReader}
 }
 
 func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
@@ -92,18 +100,31 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 		return nil, err
 	}
 
+	// load the configuration and return on non-empty errors and if the
+	// content differs from the default config
 	mergedConfig, err := mergedClientConfig.ClientConfig()
-	if err != nil {
-		return nil, err
+	switch {
+	case err != nil:
+		if !IsEmptyConfig(err) {
+			// return on any error except empty config
+			return nil, err
+		}
+	case mergedConfig != nil:
+		// the configuration is valid, but if this is equal to the defaults we should try
+		// in-cluster configuration
+		if !config.loader.IsDefaultConfig(mergedConfig) {
+			return mergedConfig, nil
+		}
 	}
-	// Are we running in a cluster and were no other configs found? If so, use the in-cluster-config.
-	icc := inClusterClientConfig{}
-	defaultConfig, err := DefaultClientConfig.ClientConfig()
-	if icc.Possible() && err == nil && reflect.DeepEqual(mergedConfig, defaultConfig) {
-		glog.V(2).Info("No kubeconfig could be created, falling back to service account.")
-		return icc.ClientConfig()
+
+	// check for in-cluster configuration and use it
+	if config.icc.Possible() {
+		glog.V(4).Infof("Using in-cluster configuration")
+		return config.icc.ClientConfig()
 	}
-	return mergedConfig, nil
+
+	// return the result of the merged client config
+	return mergedConfig, err
 }
 
 // Namespace implements KubeConfig
@@ -113,7 +134,18 @@ func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 		return "", false, err
 	}
 
-	return mergedKubeConfig.Namespace()
+	ns, ok, err := mergedKubeConfig.Namespace()
+	// if we get an error and it is not empty config, or if the merged config defined an explicit namespace, or
+	// if in-cluster config is not possible, return immediately
+	if (err != nil && !IsEmptyConfig(err)) || ok || !config.icc.Possible() {
+		// return on any error except empty config
+		return ns, ok, err
+	}
+
+	glog.V(4).Infof("Using in-cluster namespace")
+
+	// allow the namespace from the service account token directory to be used.
+	return config.icc.Namespace()
 }
 
 // ConfigAccess implements ClientConfig

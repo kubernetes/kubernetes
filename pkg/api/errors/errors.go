@@ -31,11 +31,9 @@ import (
 const (
 	StatusUnprocessableEntity = 422
 	StatusTooManyRequests     = 429
-	// HTTP recommendations are for servers to define 5xx error codes
-	// for scenarios not covered by behavior. In this case, ServerTimeout
-	// is an indication that a transient server error has occurred and the
-	// client *should* retry, with an optional Retry-After header to specify
-	// the back off window.
+	// StatusServerTimeout is an indication that a transient server error has
+	// occurred and the client *should* retry, with an optional Retry-After
+	// header to specify the back off window.
 	StatusServerTimeout = 504
 )
 
@@ -325,13 +323,13 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource unversion
 	default:
 		if code >= 500 {
 			reason = unversioned.StatusReasonInternalError
-			message = "an error on the server has prevented the request from succeeding"
+			message = fmt.Sprintf("an error on the server (%q) has prevented the request from succeeding", serverMessage)
 		}
 	}
 	switch {
-	case !qualifiedResource.IsEmpty() && len(name) > 0:
+	case !qualifiedResource.Empty() && len(name) > 0:
 		message = fmt.Sprintf("%s (%s %s %s)", message, strings.ToLower(verb), qualifiedResource.String(), name)
-	case !qualifiedResource.IsEmpty():
+	case !qualifiedResource.Empty():
 		message = fmt.Sprintf("%s (%s %s)", message, strings.ToLower(verb), qualifiedResource.String())
 	}
 	var causes []unversioned.StatusCause
@@ -408,6 +406,22 @@ func IsForbidden(err error) bool {
 // by the client.
 func IsServerTimeout(err error) bool {
 	return reasonForError(err) == unversioned.StatusReasonServerTimeout
+}
+
+// IsInternalError determines if err is an error which indicates an internal server error.
+func IsInternalError(err error) bool {
+	return reasonForError(err) == unversioned.StatusReasonInternalError
+}
+
+// IsTooManyRequests determines if err is an error which indicates that there are too many requests
+// that the server cannot handle.
+// TODO: update IsTooManyRequests() when the TooManyRequests(429) error returned from the API server has a non-empty Reason field
+func IsTooManyRequests(err error) bool {
+	switch t := err.(type) {
+	case APIStatus:
+		return t.Status().Code == StatusTooManyRequests
+	}
+	return false
 }
 
 // IsUnexpectedServerError returns true if the server response was not in the expected API format,

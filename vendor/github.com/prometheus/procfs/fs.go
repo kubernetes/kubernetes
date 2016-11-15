@@ -34,3 +34,7 @@ func (fs FS) stat(p string) (os.FileInfo, error) {
 func (fs FS) open(p string) (*os.File, error) {
 	return os.Open(path.Join(string(fs), p))
 }
+
+func (fs FS) readlink(p string) (string, error) {
+	return os.Readlink(path.Join(string(fs), p))
+}

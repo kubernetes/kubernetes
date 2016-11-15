@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
@@ -41,10 +41,10 @@ const (
 	// updateRetries is the number of Get/Update cycles we perform when an
 	// update fails.
 	updateRetries = 3
-	// PetSetInitAnnotation is an annotation which when set, indicates that the
+	// StatefulSetInitAnnotation is an annotation which when set, indicates that the
 	// pet has finished initializing itself.
 	// TODO: Replace this with init container status.
-	PetSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
+	StatefulSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
 )
 
 // pcb is the control block used to transmit all updates about a single pet.
@@ -59,8 +59,8 @@ type pcb struct {
 	event petLifeCycleEvent
 	// id is the identity index of this pet.
 	id string
-	// parent is a pointer to the parent petset.
-	parent *apps.PetSet
+	// parent is a pointer to the parent statefulset.
+	parent *apps.StatefulSet
 }
 
 // pvcClient is a client for managing persistent volume claims.
@@ -81,6 +81,15 @@ type petSyncer struct {
 	blockingPet *pcb
 }
 
+// errUnhealthyPet is returned when a we either know for sure a pet is unhealthy,
+// or don't know its state but assume it is unhealthy. It's used as a signal to the caller for further operations like updating status.replicas.
+// This is not a fatal error.
+type errUnhealthyPet string
+
+func (e errUnhealthyPet) Error() string {
+	return string(e)
+}
+
 // Sync syncs the given pet.
 func (p *petSyncer) Sync(pet *pcb) error {
 	if pet == nil {
@@ -96,15 +105,22 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	if err := p.SyncPVCs(pet); err != nil {
 		return err
 	}
-	if exists {
+	// if pet failed - we need to remove old one because of consistent naming
+	if exists && realPet.pod.Status.Phase == api.PodFailed {
+		glog.V(4).Infof("Delete evicted pod %v", realPet.pod.Name)
+		if err := p.petClient.Delete(realPet); err != nil {
+			return err
+		}
+	} else if exists {
 		if !p.isHealthy(realPet.pod) {
-			glog.Infof("PetSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
+			glog.V(4).Infof("StatefulSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
 		}
 		return p.Update(realPet, pet)
 	}
 	if p.blockingPet != nil {
-		glog.Infof("Create of %v in PetSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
-		return nil
+		message := errUnhealthyPet(fmt.Sprintf("Create of %v in StatefulSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
+		glog.V(4).Infof(message.Error())
+		return message
 	}
 	// This is counted as a create, even if it fails. We can't skip indices
 	// because some pets might allocate a special role to earlier indices.
@@ -119,7 +135,7 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	return nil
 }
 
-// Delete deletes the given pet, if no other pet in the petset is blocking a
+// Delete deletes the given pet, if no other pet in the statefulset is blocking a
 // scale event.
 func (p *petSyncer) Delete(pet *pcb) error {
 	if pet == nil {
@@ -133,17 +149,17 @@ func (p *petSyncer) Delete(pet *pcb) error {
 		return nil
 	}
 	if p.blockingPet != nil {
-		glog.Infof("Delete of %v in PetSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
+		glog.V(4).Infof("Delete of %v in StatefulSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
 		return nil
 	}
 	// This is counted as a delete, even if it fails.
 	// The returned error will force a requeue.
 	p.blockingPet = realPet
 	if !p.isDying(realPet.pod) {
-		glog.Infof("PetSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
+		glog.V(4).Infof("StatefulSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
 		return p.petClient.Delete(pet)
 	}
-	glog.Infof("PetSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
+	glog.V(4).Infof("StatefulSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
 	return nil
 }
 
@@ -157,24 +173,22 @@ type petClient interface {
 	Update(*pcb, *pcb) error
 }
 
-// apiServerPetClient is a petset aware Kubernetes client.
+// apiServerPetClient is a statefulset aware Kubernetes client.
 type apiServerPetClient struct {
-	c        *client.Client
+	c        internalclientset.Interface
 	recorder record.EventRecorder
 	petHealthChecker
 }
 
 // Get gets the pet in the pcb from the apiserver.
 func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
-	found := true
 	ns := pet.parent.Namespace
-	pod, err := podClient(p.c, ns).Get(pet.pod.Name)
+	pod, err := p.c.Core().Pods(ns).Get(pet.pod.Name)
 	if errors.IsNotFound(err) {
-		found = false
-		err = nil
+		return nil, false, nil
 	}
-	if err != nil || !found {
-		return nil, found, err
+	if err != nil {
+		return nil, false, err
 	}
 	realPet := *pet
 	realPet.pod = pod
@@ -183,7 +197,7 @@ func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
 
 // Delete deletes the pet in the pcb from the apiserver.
 func (p *apiServerPetClient) Delete(pet *pcb) error {
-	err := podClient(p.c, pet.parent.Namespace).Delete(pet.pod.Name, nil)
+	err := p.c.Core().Pods(pet.parent.Namespace).Delete(pet.pod.Name, nil)
 	if errors.IsNotFound(err) {
 		err = nil
 	}
@@ -193,29 +207,32 @@ func (p *apiServerPetClient) Delete(pet *pcb) error {
 
 // Create creates the pet in the pcb.
 func (p *apiServerPetClient) Create(pet *pcb) error {
-	_, err := podClient(p.c, pet.parent.Namespace).Create(pet.pod)
+	_, err := p.c.Core().Pods(pet.parent.Namespace).Create(pet.pod)
 	p.event(pet.parent, "Create", fmt.Sprintf("pet: %v", pet.pod.Name), err)
 	return err
 }
 
 // Update updates the pet in the 'pet' pcb to match the pet in the 'expectedPet' pcb.
+// If the pod object of a pet which to be updated has been changed in server side, we
+// will get the actual value and set pet identity before retries.
 func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error) {
-	var getErr error
-	pc := podClient(p.c, pet.parent.Namespace)
+	pc := p.c.Core().Pods(pet.parent.Namespace)
 
-	pod, needsUpdate, err := copyPetID(pet, expectedPet)
-	if err != nil || !needsUpdate {
-		return err
-	}
-	glog.Infof("Resetting pet %v to match PetSet %v spec", pod.Name, pet.parent.Name)
-	for i, p := 0, &pod; ; i++ {
-		_, updateErr = pc.Update(p)
+	for i := 0; ; i++ {
+		updatePod, needsUpdate, err := copyPetID(pet, expectedPet)
+		if err != nil || !needsUpdate {
+			return err
+		}
+		glog.V(4).Infof("Resetting pet %v/%v to match StatefulSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
+		_, updateErr = pc.Update(&updatePod)
 		if updateErr == nil || i >= updateRetries {
 			return updateErr
 		}
-		if p, getErr = pc.Get(pod.Name); getErr != nil {
+		getPod, getErr := pc.Get(updatePod.Name)
+		if getErr != nil {
 			return getErr
 		}
+		pet.pod = getPod
 	}
 }
 
@@ -225,41 +242,37 @@ func (p *apiServerPetClient) DeletePVCs(pet *pcb) error {
 	return nil
 }
 
-func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*api.PersistentVolumeClaim, bool, error) {
-	found := true
-	pvc, err := claimClient(p.c, pvcNamespace).Get(pvcName)
-	if errors.IsNotFound(err) {
-		found = false
-	}
-	if err != nil || !found {
-		return nil, found, err
-	}
-	return pvc, true, nil
+func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*api.PersistentVolumeClaim, error) {
+	pvc, err := p.c.Core().PersistentVolumeClaims(pvcNamespace).Get(pvcName)
+	return pvc, err
 }
 
 func (p *apiServerPetClient) createPVC(pvc *api.PersistentVolumeClaim) error {
-	_, err := claimClient(p.c, pvc.Namespace).Create(pvc)
+	_, err := p.c.Core().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 	return err
 }
 
 // SyncPVCs syncs pvcs in the given pcb.
 func (p *apiServerPetClient) SyncPVCs(pet *pcb) error {
-	errMsg := ""
+	errmsg := ""
 	// Create new claims.
 	for i, pvc := range pet.pvcs {
-		_, exists, err := p.getPVC(pvc.Name, pet.parent.Namespace)
-		if !exists {
-			if err := p.createPVC(&pet.pvcs[i]); err != nil {
-				errMsg += fmt.Sprintf("Failed to create %v: %v", pvc.Name, err)
+		_, err := p.getPVC(pvc.Name, pet.parent.Namespace)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				var err error
+				if err = p.createPVC(&pet.pvcs[i]); err != nil {
+					errmsg += fmt.Sprintf("Failed to create %v: %v", pvc.Name, err)
+				}
+				p.event(pet.parent, "Create", fmt.Sprintf("pvc: %v", pvc.Name), err)
+			} else {
+				errmsg += fmt.Sprintf("Error trying to get pvc %v, %v.", pvc.Name, err)
 			}
-			p.event(pet.parent, "Create", fmt.Sprintf("pvc: %v", pvc.Name), err)
-		} else if err != nil {
-			errMsg += fmt.Sprintf("Error trying to get pvc %v, %v.", pvc.Name, err)
 		}
 		// TODO: Check resource requirements and accessmodes, update if necessary
 	}
-	if len(errMsg) != 0 {
-		return fmt.Errorf("%v", errMsg)
+	if len(errmsg) != 0 {
+		return fmt.Errorf("%v", errmsg)
 	}
 	return nil
 }
@@ -284,22 +297,25 @@ type petHealthChecker interface {
 // It doesn't update, probe or get the pod.
 type defaultPetHealthChecker struct{}
 
-// isHealthy returns true if the pod is running and has the
-// "pod.alpha.kubernetes.io/initialized" set to "true".
+// isHealthy returns true if the pod is ready & running. If the pod has the
+// "pod.alpha.kubernetes.io/initialized" annotation set to "false", pod state is ignored.
 func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
 	if pod == nil || pod.Status.Phase != api.PodRunning {
 		return false
 	}
-	initialized, ok := pod.Annotations[PetSetInitAnnotation]
-	if !ok {
-		glog.Infof("PetSet pod %v in %v, waiting on annotation %v", api.PodRunning, pod.Name, PetSetInitAnnotation)
-		return false
+	podReady := api.IsPodReady(pod)
+
+	// User may have specified a pod readiness override through a debug annotation.
+	initialized, ok := pod.Annotations[StatefulSetInitAnnotation]
+	if ok {
+		if initAnnotation, err := strconv.ParseBool(initialized); err != nil {
+			glog.V(4).Infof("Failed to parse %v annotation on pod %v: %v", StatefulSetInitAnnotation, pod.Name, err)
+		} else if !initAnnotation {
+			glog.V(4).Infof("StatefulSet pod %v waiting on annotation %v", pod.Name, StatefulSetInitAnnotation)
+			podReady = initAnnotation
+		}
 	}
-	b, err := strconv.ParseBool(initialized)
-	if err != nil {
-		return false
-	}
-	return b && api.IsPodReady(pod)
+	return podReady
 }
 
 // isDying returns true if the pod has a non-nil deletion timestamp. Since the

@@ -35,7 +35,7 @@ coreos:
         Type=oneshot
         RemainAfterExit=yes
         ExecStartPre=/usr/bin/mkdir -p /opt/cni
-        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/cni.tar.gz https://storage.googleapis.com/kubernetes-release/network-plugins/cni-c864f0e1ea73719b8f4582402b0847064f9883b0.tar.gz
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/cni.tar.gz https://storage.googleapis.com/kubernetes-release/network-plugins/cni-07a8a28637e97b22eb8dfe710eeae1344f69d16e.tar.gz
         ExecStart=/usr/bin/tar xf /opt/downloads/cni.tar.gz -C /opt/cni/
 
     - name: kubernetes-install-docker2aci.service
@@ -182,10 +182,8 @@ coreos:
         --container-runtime=rkt \
         --rkt-path=/opt/rkt/rkt \
         --rkt-stage1-image=${RKT_STAGE_IMAGE} \
-        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
         --pod-cidr=${MASTER_IP_RANGE} \
-        --register-schedulable=false \
-        --reconcile-cidr=false
+        --register-schedulable=false
         Restart=always
         RestartSec=10
         KillMode=process

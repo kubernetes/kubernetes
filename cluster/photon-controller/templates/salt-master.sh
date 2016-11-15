@@ -29,6 +29,7 @@ grains:
   cloud: photon-controller
   master_extra_sans: $MASTER_EXTRA_SANS
   api_servers: $MASTER_NAME
+  kube_user: $KUBE_USER
 EOF
 
 # Auto accept all keys from minions that try to join

@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func NewClusterServer(s *etcdserver.EtcdServer) *ClusterServer {
 func (cs *ClusterServer) MemberAdd(ctx context.Context, r *pb.MemberAddRequest) (*pb.MemberAddResponse, error) {
 	urls, err := types.NewURLs(r.PeerURLs)
 	if err != nil {
-		return nil, rpctypes.ErrMemberBadURLs
+		return nil, rpctypes.ErrGRPCMemberBadURLs
 	}
 
 	now := time.Now()
@@ -53,16 +53,16 @@ func (cs *ClusterServer) MemberAdd(ctx context.Context, r *pb.MemberAddRequest) 
 	err = cs.server.AddMember(ctx, *m)
 	switch {
 	case err == membership.ErrIDExists:
-		return nil, rpctypes.ErrMemberExist
+		return nil, rpctypes.ErrGRPCMemberExist
 	case err == membership.ErrPeerURLexists:
-		return nil, rpctypes.ErrPeerURLExist
+		return nil, rpctypes.ErrGRPCPeerURLExist
 	case err != nil:
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
 	return &pb.MemberAddResponse{
 		Header: cs.header(),
-		Member: &pb.Member{ID: uint64(m.ID), IsLeader: m.ID == cs.server.Leader(), PeerURLs: m.PeerURLs},
+		Member: &pb.Member{ID: uint64(m.ID), PeerURLs: m.PeerURLs},
 	}, nil
 }
 
@@ -72,7 +72,7 @@ func (cs *ClusterServer) MemberRemove(ctx context.Context, r *pb.MemberRemoveReq
 	case err == membership.ErrIDRemoved:
 		fallthrough
 	case err == membership.ErrIDNotFound:
-		return nil, rpctypes.ErrMemberNotFound
+		return nil, rpctypes.ErrGRPCMemberNotFound
 	case err != nil:
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -88,9 +88,9 @@ func (cs *ClusterServer) MemberUpdate(ctx context.Context, r *pb.MemberUpdateReq
 	err := cs.server.UpdateMember(ctx, m)
 	switch {
 	case err == membership.ErrPeerURLexists:
-		return nil, rpctypes.ErrPeerURLExist
+		return nil, rpctypes.ErrGRPCPeerURLExist
 	case err == membership.ErrIDNotFound:
-		return nil, rpctypes.ErrMemberNotFound
+		return nil, rpctypes.ErrGRPCMemberNotFound
 	case err != nil:
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -106,7 +106,6 @@ func (cs *ClusterServer) MemberList(ctx context.Context, r *pb.MemberListRequest
 		protoMembs[i] = &pb.Member{
 			Name:       membs[i].Name,
 			ID:         uint64(membs[i].ID),
-			IsLeader:   membs[i].ID == cs.server.Leader(),
 			PeerURLs:   membs[i].PeerURLs,
 			ClientURLs: membs[i].ClientURLs,
 		}

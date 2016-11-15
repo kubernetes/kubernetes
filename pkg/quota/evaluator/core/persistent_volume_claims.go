@@ -17,17 +17,48 @@ limitations under the License.
 package core
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+// listPersistentVolumeClaimsByNamespaceFuncUsingClient returns a pvc listing function based on the provided client.
+func listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.ListFuncByNamespace {
+	// TODO: ideally, we could pass dynamic client pool down into this code, and have one way of doing this.
+	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
+	// structured objects.
+	return func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		itemList, err := kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
+		if err != nil {
+			return nil, err
+		}
+		results := make([]runtime.Object, 0, len(itemList.Items))
+		for i := range itemList.Items {
+			results = append(results, &itemList.Items[i])
+		}
+		return results, nil
+	}
+}
+
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
-func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourcePersistentVolumeClaims}
+// if the specified shared informer factory is not nil, evaluator may use it to support listing functions.
+func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
+	allResources := []api.ResourceName{api.ResourcePersistentVolumeClaims, api.ResourceRequestsStorage}
+	listFuncByNamespace := listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient)
+	if f != nil {
+		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, unversioned.GroupResource{Resource: "persistentvolumeclaims"})
+	}
+
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.PersistentVolumeClaim",
 		InternalGroupKind: api.Kind("PersistentVolumeClaim"),
@@ -36,10 +67,43 @@ func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Eva
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourcePersistentVolumeClaims),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourcePersistentVolumeClaims),
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
-			return kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
-		},
+		ConstraintsFunc:      PersistentVolumeClaimConstraintsFunc,
+		UsageFunc:            PersistentVolumeClaimUsageFunc,
+		ListFuncByNamespace:  listFuncByNamespace,
 	}
+}
+
+// PersistentVolumeClaimUsageFunc knows how to measure usage associated with persistent volume claims
+func PersistentVolumeClaimUsageFunc(object runtime.Object) api.ResourceList {
+	pvc, ok := object.(*api.PersistentVolumeClaim)
+	if !ok {
+		return api.ResourceList{}
+	}
+	result := api.ResourceList{}
+	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+	if request, found := pvc.Spec.Resources.Requests[api.ResourceStorage]; found {
+		result[api.ResourceRequestsStorage] = request
+	}
+	return result
+}
+
+// PersistentVolumeClaimConstraintsFunc verifies that all required resources are present on the claim
+// In addition, it validates that the resources are valid (i.e. requests < limits)
+func PersistentVolumeClaimConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
+	pvc, ok := object.(*api.PersistentVolumeClaim)
+	if !ok {
+		return fmt.Errorf("unexpected input object %v", object)
+	}
+
+	requiredSet := quota.ToSet(required)
+	missingSet := sets.NewString()
+	pvcUsage := PersistentVolumeClaimUsageFunc(pvc)
+	pvcSet := quota.ToSet(quota.ResourceNames(pvcUsage))
+	if diff := requiredSet.Difference(pvcSet); len(diff) > 0 {
+		missingSet.Insert(diff.List()...)
+	}
+	if len(missingSet) == 0 {
+		return nil
+	}
+	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
 }

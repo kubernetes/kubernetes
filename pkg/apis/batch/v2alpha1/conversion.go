@@ -18,29 +18,26 @@ package v2alpha1
 
 import (
 	"fmt"
-	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) {
+func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		Convert_batch_JobSpec_To_v2alpha1_JobSpec,
 		Convert_v2alpha1_JobSpec_To_batch_JobSpec,
 	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, kind := range []string{"Job", "JobTemplate", "ScheduledJob"} {
+	for _, kind := range []string{"Job", "JobTemplate", "CronJob"} {
 		err = api.Scheme.AddFieldLabelConversionFunc("batch/v2alpha1", kind,
 			func(label, value string) (string, string, error) {
 				switch label {
@@ -50,29 +47,18 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 					return "", "", fmt.Errorf("field label not supported: %s", label)
 				}
 			})
+		if err != nil {
+			return err
+		}
 	}
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	return nil
 }
 
 func Convert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*batch.JobSpec))(in)
-	}
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1.LabelSelector
-	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	if in.ManualSelector != nil {
 		out.ManualSelector = new(bool)
 		*out.ManualSelector = *in.ManualSelector
@@ -87,21 +73,10 @@ func Convert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSpec, 
 }
 
 func Convert_v2alpha1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*JobSpec))(in)
-	}
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1.LabelSelector
-	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	if in.ManualSelector != nil {
 		out.ManualSelector = new(bool)
 		*out.ManualSelector = *in.ManualSelector

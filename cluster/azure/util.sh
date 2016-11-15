@@ -165,9 +165,9 @@ EOF
 }
 
 function get-common-params() {
-    declare -a AZKUBE_AUTH_PARAMS
-    declare -a AZKUBE_DOCKER_PARAMS
-    declare -a AZKUBE_RESOURCE_GROUP_PARAM
+    declare -ag AZKUBE_AUTH_PARAMS
+    declare -ag AZKUBE_DOCKER_PARAMS
+    declare -ag AZKUBE_RESOURCE_GROUP_PARAM
 
     case "${AZURE_AUTH_METHOD}" in
         "client_secret")
@@ -180,17 +180,13 @@ function get-common-params() {
 
 
     if [[ ! -z "${AZURE_HTTPS_PROXY:-}" ]]; then
-        docker_params+=("--net=host" "--env=https_proxy=${AZURE_HTTPS_PROXY}")
+        AZKUBE_DOCKER_PARAMS+=("--net=host" "--env=https_proxy=${AZURE_HTTPS_PROXY}")
     fi
 
-    if [[ ! -z "${AZURE_RESOURCE_GROUP_PARAM:-}" ]]; then
-        echo "Forcing use of resource group ${AZURE_RESOURCE_GROUP_PARAM}"
-        resource_group_params+=("--resource-group=${AZURE_RESOURCE_GROUP_PARAM}")
+    if [[ ! -z "${AZURE_RESOURCE_GROUP:-}" ]]; then
+        echo "Forcing use of resource group ${AZURE_RESOURCE_GROUP}"
+        AZKUBE_RESOURCE_GROUP_PARAM+=("--resource-group=${AZURE_RESOURCE_GROUP}")
     fi
-
-    export AZKUBE_AUTH_PARAMS
-    export AZKUBE_DOCKER_PARAMS
-    export AZKUBE_RESOURCE_GROUP_PARAM
 }
 
 function azure-deploy(){

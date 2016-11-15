@@ -71,7 +71,6 @@ that are required for executing a container's process.
 | /dev/tty     | 0666 |  rwm       |
 | /dev/random  | 0666 |  rwm       |
 | /dev/urandom | 0666 |  rwm       |
-| /dev/fuse    | 0666 |  rwm       |
 
 
 **ptmx**
@@ -90,7 +89,7 @@ in tmpfs.
 
 After `/dev/null` has been setup we check for any external links between
 the container's io, STDIN, STDOUT, STDERR.  If the container's io is pointing
-to `/dev/null` outside the container we close and `dup2` the the `/dev/null` 
+to `/dev/null` outside the container we close and `dup2` the `/dev/null` 
 that is local to the container's rootfs.
 
 
@@ -142,6 +141,7 @@ system resources like cpu, memory, and device access.
 | perf_event | 1       |
 | freezer    | 1       |
 | hugetlb    | 1       |
+| pids       | 1       |
 
 
 All cgroup subsystem are joined so that statistics can be collected from
@@ -199,7 +199,7 @@ provide a good default for security and flexibility for the applications.
 | CAP_SYS_BOOT         | 0       |
 | CAP_LEASE            | 0       |
 | CAP_WAKE_ALARM       | 0       |
-| CAP_BLOCK_SUSPE      | 0       |
+| CAP_BLOCK_SUSPEND    | 0       |
 
 
 Additional security layers like [apparmor](https://wiki.ubuntu.com/AppArmor)
@@ -296,7 +296,7 @@ a container.
 | -------------- | ------------------------------------------------------------------ |
 | Get processes  | Return all the pids for processes running inside a container       | 
 | Get Stats      | Return resource statistics for the container as a whole            |
-| Wait           | Wait waits on the container's init process ( pid 1 )               |
+| Wait           | Waits on the container's init process ( pid 1 )                    |
 | Wait Process   | Wait on any of the container's processes returning the exit status | 
 | Destroy        | Kill the container's init process and remove any filesystem state  |
 | Signal         | Send a signal to the container's init process                      |

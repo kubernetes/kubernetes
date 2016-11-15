@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package record has all client logic for recording and reporting events.
-package record
+package record // import "k8s.io/kubernetes/pkg/client/record"

@@ -143,3 +143,24 @@ func TestAuthenticateRequestAdditiveErrors(t *testing.T) {
 		t.Errorf("Unexpectedly authenticated: %v", isAuthenticated)
 	}
 }
+
+func TestAuthenticateRequestFailEarly(t *testing.T) {
+	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
+	handler2 := &mockAuthRequestHandler{err: errors.New("second")}
+	authRequestHandler := NewFailOnError(handler1, handler2)
+	req, _ := http.NewRequest("GET", "http://example.org", nil)
+
+	_, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
+	if err == nil {
+		t.Errorf("Expected an error")
+	}
+	if !strings.Contains(err.Error(), "first") {
+		t.Errorf("Expected error containing %v, got %v", "first", err)
+	}
+	if strings.Contains(err.Error(), "second") {
+		t.Errorf("Did not expect second error, got %v", err)
+	}
+	if isAuthenticated {
+		t.Errorf("Unexpectedly authenticated: %v", isAuthenticated)
+	}
+}

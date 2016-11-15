@@ -34,8 +34,8 @@ block:
 
 push: image
 	# Push image tagged as latest to repository
-	gcloud docker push $(PREFIX)/volume-iscsi
+	gcloud docker -- push $(PREFIX)/volume-iscsi
 	# Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
-	gcloud docker push $(PREFIX)/volume-iscsi:$(TAG)
+	gcloud docker -- push $(PREFIX)/volume-iscsi:$(TAG)
 
 clean:

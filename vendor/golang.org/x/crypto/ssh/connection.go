@@ -33,7 +33,7 @@ type ConnMetadata interface {
 	// into the session ID.
 	ClientVersion() []byte
 
-	// ServerVersion returns the client's version string as hashed
+	// ServerVersion returns the server's version string as hashed
 	// into the session ID.
 	ServerVersion() []byte
 

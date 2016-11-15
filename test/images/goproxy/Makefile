@@ -24,7 +24,7 @@ image: goproxy
 	docker build -t $(PREFIX)/goproxy:$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/goproxy:$(TAG)
+	gcloud docker -- push $(PREFIX)/goproxy:$(TAG)
 
 clean:
 	rm -f goproxy

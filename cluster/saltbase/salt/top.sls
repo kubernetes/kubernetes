@@ -13,9 +13,6 @@ base:
   'roles:kubernetes-pool':
     - match: grain
     - docker
-{% if pillar.get('network_provider', '').lower() == 'flannel' %}
-    - flannel
-{% endif %}
 {% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - cni
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
@@ -58,10 +55,7 @@ base:
     - match: grain
     - generate-cert
     - etcd
-{% if pillar.get('network_provider', '').lower() == 'flannel' %}
-    - flannel-server
-    - flannel
-{% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
+{% if pillar.get('network_provider', '').lower() == 'kubenet' %}
     - cni
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
@@ -100,6 +94,9 @@ base:
 {% endif %}
 {% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
     - cluster-autoscaler
+{% endif %}
+{% if pillar.get('enable_rescheduler', '').lower() == 'true' %}
+    - rescheduler
 {% endif %}
 {% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - calico.master

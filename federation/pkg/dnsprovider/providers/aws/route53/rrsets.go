@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ dnsprovider.ResourceRecordSets = ResourceRecordSets{}
 
 type ResourceRecordSets struct {
@@ -34,103 +34,42 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	input := route53.ListResourceRecordSetsInput{
 		HostedZoneId: rrsets.zone.impl.Id,
 	}
-	response, err := rrsets.zone.zones.interface_.service.ListResourceRecordSets(&input)
-	// TODO: Handle truncated responses
+
+	var list []dnsprovider.ResourceRecordSet
+	err := rrsets.zone.zones.interface_.service.ListResourceRecordSetsPages(&input, func(page *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
+		for _, rrset := range page.ResourceRecordSets {
+			list = append(list, &ResourceRecordSet{rrset, &rrsets})
+		}
+		return true
+	})
 	if err != nil {
 		return nil, err
-	}
-	list := make([]dnsprovider.ResourceRecordSet, len(response.ResourceRecordSets))
-	for i, rrset := range response.ResourceRecordSets {
-		list[i] = &ResourceRecordSet{rrset, &rrsets}
 	}
 	return list, nil
 }
 
-func (rrsets ResourceRecordSets) Add(rrset dnsprovider.ResourceRecordSet) (dnsprovider.ResourceRecordSet, error) {
-	service := rrsets.zone.zones.interface_.service
-	input := getChangeResourceRecordSetsInput("CREATE", rrset.Name(), string(rrset.Type()), *rrset.(ResourceRecordSet).rrsets.zone.impl.Id, rrset.Rrdatas(), rrset.Ttl())
-	_, err := service.ChangeResourceRecordSets(input)
-	if err != nil {
-		// Cast err to awserr.Error to get the Code and
-		// Message from an error.
-		return nil, err
+func (r ResourceRecordSets) StartChangeset() dnsprovider.ResourceRecordChangeset {
+	return &ResourceRecordChangeset{
+		zone:   r.zone,
+		rrsets: &r,
 	}
-	return ResourceRecordSet{input.ChangeBatch.Changes[0].ResourceRecordSet, &rrsets}, nil
 }
 
-func (rrsets ResourceRecordSets) Remove(rrset dnsprovider.ResourceRecordSet) error {
-	input := getChangeResourceRecordSetsInput("DELETE", rrset.Name(), string(rrset.Type()), *rrset.(ResourceRecordSet).rrsets.zone.impl.Id, rrset.Rrdatas(), rrset.Ttl())
-	_, err := rrsets.zone.zones.interface_.service.ChangeResourceRecordSets(input)
-	if err != nil {
-		// Cast err to awserr.Error to get the Code and
-		// Message from an error.
-		return err
-	}
-	return nil
-}
-
-func getChangeResourceRecordSetsInput(action, name, type_, hostedZoneId string, rrdatas []string, ttl int64) *route53.ChangeResourceRecordSetsInput {
-	input := &route53.ChangeResourceRecordSetsInput{
-		ChangeBatch: &route53.ChangeBatch{ // Required
-			Changes: []*route53.Change{ // Required
-				{ // Required
-					Action: aws.String(action), // Required
-					ResourceRecordSet: &route53.ResourceRecordSet{ // Required
-						Name: aws.String(name),  // Required
-						Type: aws.String(type_), // Required
-						/*
-							AliasTarget: &route53.AliasTarget{
-								DNSName:              aws.String("DNSName"),    // Required
-								EvaluateTargetHealth: aws.Bool(true),           // Required
-								HostedZoneId:         aws.String("ResourceId"), // Required
-							},
-							Failover: aws.String("ResourceRecordSetFailover"),
-							GeoLocation: &route53.GeoLocation{
-								ContinentCode:   aws.String("GeoLocationContinentCode"),
-								CountryCode:     aws.String("GeoLocationCountryCode"),
-								SubdivisionCode: aws.String("GeoLocationSubdivisionCode"),
-							},
-							HealthCheckId: aws.String("HealthCheckId"),
-							Region:        aws.String("ResourceRecordSetRegion"),
-						*/
-						ResourceRecords: []*route53.ResourceRecord{
-							{ // Required
-								Value: aws.String(rrdatas[0]), // Required
-							},
-							// More values...
-						},
-						/*
-							SetIdentifier: aws.String("ResourceRecordSetIdentifier"),
-
-						*/
-						TTL: aws.Int64(ttl),
-						/*
-							TrafficPolicyInstanceId: aws.String("TrafficPolicyInstanceId"),
-							Weight:                  aws.Int64(1),
-						*/
-					},
-				},
-				// More values...
-			},
-		},
-		HostedZoneId: aws.String(hostedZoneId), // Required
-	}
-	return input
-}
-
-func (rrsets ResourceRecordSets) New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) dnsprovider.ResourceRecordSet {
+func (r ResourceRecordSets) New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) dnsprovider.ResourceRecordSet {
 	rrstypeStr := string(rrstype)
+	rrs := &route53.ResourceRecordSet{
+		Name: &name,
+		Type: &rrstypeStr,
+		TTL:  &ttl,
+	}
+	for _, rrdata := range rrdatas {
+		rrs.ResourceRecords = append(rrs.ResourceRecords, &route53.ResourceRecord{
+			Value: aws.String(rrdata),
+		})
+	}
+
 	return ResourceRecordSet{
-		&route53.ResourceRecordSet{
-			Name: &name,
-			Type: &rrstypeStr,
-			TTL:  &ttl,
-			ResourceRecords: []*route53.ResourceRecord{
-				{
-					Value: &rrdatas[0],
-				},
-			},
-		}, // TODO: Add remaining rrdatas
-		&rrsets,
+		rrs,
+		&r,
 	}
 }

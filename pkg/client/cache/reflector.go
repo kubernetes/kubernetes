@@ -43,18 +43,9 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
-type ListerWatcher interface {
-	// List should return a list type object; the Items field will be extracted, and the
-	// ResourceVersion field will be used to start the watch in the right place.
-	List(options api.ListOptions) (runtime.Object, error)
-	// Watch should begin a watch at the specified version.
-	Watch(options api.ListOptions) (watch.Interface, error)
-}
-
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
-	// name identifies this reflector.  By default it will be a file:line if possible.
+	// name identifies this reflector. By default it will be a file:line if possible.
 	name string
 
 	// The type of object we expect to place in the store.
@@ -69,8 +60,6 @@ type Reflector struct {
 	resyncPeriod time.Duration
 	// now() returns current time - exposed for testing purposes
 	now func() time.Time
-	// nextResync is approximate time of next resync (0 if not scheduled)
-	nextResync time.Time
 	// lastSyncResourceVersion is the resource version token last
 	// observed when doing a sync with the underlying store
 	// it is thread safe, but not synchronized with the underlying store
@@ -85,12 +74,6 @@ var (
 	// However, it can be modified to avoid periodic resync to break the
 	// TCP connection.
 	minWatchTimeout = 5 * time.Minute
-	// If we are within 'forceResyncThreshold' from the next planned resync
-	// and are just before issuing Watch(), resync will be forced now.
-	forceResyncThreshold = 3 * time.Second
-	// We try to set timeouts for Watch() so that we will finish about
-	// than 'timeoutThreshold' from next planned periodic resync.
-	timeoutThreshold = 1 * time.Second
 )
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
@@ -125,9 +108,9 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 	return r
 }
 
-// internalPackages are packages that ignored when creating a default reflector name.  These packages are in the common
+// internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
 // call chains to NewReflector, so they'd be low entropy names for reflectors
-var internalPackages = []string{"kubernetes/pkg/client/cache/", "kubernetes/pkg/controller/framework/", "/runtime/asm_"}
+var internalPackages = []string{"kubernetes/pkg/client/cache/", "/runtime/asm_"}
 
 // getDefaultReflectorName walks back through the call stack until we find a caller from outside of the ignoredPackages
 // it returns back a shortpath/filename:line to aid in identification of this reflector when it starts logging
@@ -164,7 +147,7 @@ func hasPackage(file string, ignoredPackages []string) bool {
 	return false
 }
 
-// trimPackagePrefix reduces dulpicate values off the front of a package name.
+// trimPackagePrefix reduces duplicate values off the front of a package name.
 func trimPackagePrefix(file string) string {
 	if l := strings.LastIndex(file, "k8s.io/kubernetes/pkg/"); l >= 0 {
 		return file[l+len("k8s.io/kubernetes/"):]
@@ -234,14 +217,12 @@ var (
 // required, and a cleanup function.
 func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	if r.resyncPeriod == 0 {
-		r.nextResync = time.Time{}
 		return neverExitWatch, func() bool { return false }
 	}
 	// The cleanup function is required: imagine the scenario where watches
 	// always fail so we end up listing frequently. Then, if we don't
 	// manually stop the timer, we could end up with many timers active
 	// concurrently.
-	r.nextResync = r.now().Add(r.resyncPeriod)
 	t := time.NewTimer(r.resyncPeriod)
 	return t.C, t.Stop
 }
@@ -285,7 +266,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			case <-stopCh:
 				return
 			}
-			glog.V(4).Infof("%s: next resync planned for %#v, forcing now", r.name, r.nextResync)
+			glog.V(4).Infof("%s: forcing resync", r.name)
 			if err := r.store.Resync(); err != nil {
 				resyncerrc <- err
 				return

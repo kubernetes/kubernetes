@@ -20,7 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 )
 
@@ -28,10 +29,11 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	// Arrange
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	resyncPeriod := 5 * time.Minute
-	podInformer := informers.CreateSharedPodIndexInformer(fakeKubeClient, resyncPeriod)
-	nodeInformer := informers.CreateSharedNodeIndexInformer(fakeKubeClient, resyncPeriod)
-	pvcInformer := informers.CreateSharedPVCIndexInformer(fakeKubeClient, resyncPeriod)
-	pvInformer := informers.CreateSharedPVIndexInformer(fakeKubeClient, resyncPeriod)
+	podInformer := informers.NewPodInformer(fakeKubeClient, resyncPeriod)
+	nodeInformer := informers.NewNodeInformer(fakeKubeClient, resyncPeriod)
+	pvcInformer := informers.NewPVCInformer(fakeKubeClient, resyncPeriod)
+	pvInformer := informers.NewPVInformer(fakeKubeClient, resyncPeriod)
+	fakeRecorder := &record.FakeRecorder{}
 
 	// Act
 	_, err := NewAttachDetachController(
@@ -41,7 +43,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		pvcInformer,
 		pvInformer,
 		nil, /* cloud */
-		nil /* plugins */)
+		nil, /* plugins */
+		fakeRecorder)
 
 	// Assert
 	if err != nil {

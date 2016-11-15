@@ -1,6 +1,7 @@
 package testhelper
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -224,6 +225,21 @@ func CheckEquals(t *testing.T, expected, actual interface{}) {
 	}
 }
 
+// AssertErr is a convenience function for checking that an error occurred
+func AssertErr(t *testing.T, e error) {
+	if e == nil {
+		logFatal(t, fmt.Sprintf("expected an error but none occurred"))
+	}
+}
+
+// CheckErr is a convenience function for checking that an error occurred,
+// except with a non-fatal error
+func CheckErr(t *testing.T, e error) {
+	if e == nil {
+		logError(t, fmt.Sprintf("expected an error but none occurred"))
+	}
+}
+
 // AssertDeepEquals - like Equals - performs a comparison - but on more complex
 // structures that requires deeper inspection
 func AssertDeepEquals(t *testing.T, expected, actual interface{}) {
@@ -254,6 +270,24 @@ func CheckDeepEquals(t *testing.T, expected, actual interface{}) {
 			green(expected),
 			yellow(actual))
 	})
+}
+
+func isByteArrayEquals(t *testing.T, expectedBytes []byte, actualBytes []byte) bool {
+	return bytes.Equal(expectedBytes, actualBytes)
+}
+
+// AssertByteArrayEquals a convenience function for checking whether two byte arrays are equal
+func AssertByteArrayEquals(t *testing.T, expectedBytes []byte, actualBytes []byte) {
+	if !isByteArrayEquals(t, expectedBytes, actualBytes) {
+		logFatal(t, "The bytes differed.")
+	}
+}
+
+// CheckByteArrayEquals a convenience function for silent checking whether two byte arrays are equal
+func CheckByteArrayEquals(t *testing.T, expectedBytes []byte, actualBytes []byte) {
+	if !isByteArrayEquals(t, expectedBytes, actualBytes) {
+		logError(t, "The bytes differed.")
+	}
 }
 
 // isJSONEquals is a utility function that implements JSON comparison for AssertJSONEquals and
@@ -318,6 +352,13 @@ func CheckJSONEquals(t *testing.T, expectedJSON string, actual interface{}) {
 func AssertNoErr(t *testing.T, e error) {
 	if e != nil {
 		logFatal(t, fmt.Sprintf("unexpected error %s", yellow(e.Error())))
+	}
+}
+
+// AssertNotNil is a convenience function for checking whether given value is not nil
+func AssertNotNil(t *testing.T, actual interface{}) {
+	if actual == nil || !reflect.ValueOf(actual).Elem().IsValid() {
+		logFatal(t, fmt.Sprintf("Not nil expexted, but was %v", actual))
 	}
 }
 

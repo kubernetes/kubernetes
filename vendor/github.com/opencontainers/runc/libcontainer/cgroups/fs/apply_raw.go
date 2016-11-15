@@ -9,11 +9,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 )
 
 var (
@@ -30,8 +30,8 @@ var (
 		&NetPrioGroup{},
 		&PerfEventGroup{},
 		&FreezerGroup{},
+		&NameGroup{GroupName: "name=systemd", Join: true},
 	}
-	CgroupProcesses  = "cgroup.procs"
 	HugePageSizes, _ = cgroups.GetHugePageSize()
 )
 
@@ -94,17 +94,18 @@ func getCgroupRoot() (string, error) {
 }
 
 type cgroupData struct {
-	root   string
-	parent string
-	name   string
-	config *configs.Cgroup
-	pid    int
+	root      string
+	innerPath string
+	config    *configs.Cgroup
+	pid       int
 }
 
 func (m *Manager) Apply(pid int) (err error) {
 	if m.Cgroups == nil {
 		return nil
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	var c = m.Cgroups
 
@@ -130,11 +131,6 @@ func (m *Manager) Apply(pid int) (err error) {
 	}
 
 	paths := make(map[string]string)
-	defer func() {
-		if err != nil {
-			cgroups.RemovePaths(paths)
-		}
-	}()
 	for _, sys := range subsystems {
 		if err := sys.Apply(d); err != nil {
 			return err
@@ -144,7 +140,9 @@ func (m *Manager) Apply(pid int) (err error) {
 		// created then join consists of writing the process pids to cgroup.procs
 		p, err := d.path(sys.Name())
 		if err != nil {
-			if cgroups.IsNotFound(err) {
+			// The non-presence of the devices subsystem is
+			// considered fatal for security reasons.
+			if cgroups.IsNotFound(err) && sys.Name() != "devices" {
 				continue
 			}
 			return err
@@ -192,18 +190,15 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
-	for _, sys := range subsystems {
-		// Generate fake cgroup data.
-		d, err := getCgroupData(container.Cgroups, -1)
-		if err != nil {
-			return err
-		}
-		// Get the path, but don't error out if the cgroup wasn't found.
-		path, err := d.path(sys.Name())
-		if err != nil && !cgroups.IsNotFound(err) {
-			return err
-		}
+	// If Paths are set, then we are just joining cgroups paths
+	// and there is no need to set any values.
+	if m.Cgroups.Paths != nil {
+		return nil
+	}
 
+	paths := m.GetPaths()
+	for _, sys := range subsystems {
+		path := paths[sys.Name()]
 		if err := sys.Set(path, container.Cgroups); err != nil {
 			return err
 		}
@@ -220,14 +215,8 @@ func (m *Manager) Set(container *configs.Config) error {
 // Freeze toggles the container's freezer cgroup depending on the state
 // provided
 func (m *Manager) Freeze(state configs.FreezerState) error {
-	d, err := getCgroupData(m.Cgroups, 0)
-	if err != nil {
-		return err
-	}
-	dir, err := d.path("freezer")
-	if err != nil {
-		return err
-	}
+	paths := m.GetPaths()
+	dir := paths["freezer"]
 	prevState := m.Cgroups.Resources.Freezer
 	m.Cgroups.Resources.Freezer = state
 	freezer, err := subsystems.Get("freezer")
@@ -243,52 +232,13 @@ func (m *Manager) Freeze(state configs.FreezerState) error {
 }
 
 func (m *Manager) GetPids() ([]int, error) {
-	dir, err := getCgroupPath(m.Cgroups)
-	if err != nil {
-		return nil, err
-	}
-	return cgroups.GetPids(dir)
+	paths := m.GetPaths()
+	return cgroups.GetPids(paths["devices"])
 }
 
 func (m *Manager) GetAllPids() ([]int, error) {
-	dir, err := getCgroupPath(m.Cgroups)
-	if err != nil {
-		return nil, err
-	}
-	return cgroups.GetAllPids(dir)
-}
-
-func getCgroupPath(c *configs.Cgroup) (string, error) {
-	d, err := getCgroupData(c, 0)
-	if err != nil {
-		return "", err
-	}
-
-	return d.path("devices")
-}
-
-// pathClean makes a path safe for use with filepath.Join. This is done by not
-// only cleaning the path, but also (if the path is relative) adding a leading
-// '/' and cleaning it (then removing the leading '/'). This ensures that a
-// path resulting from prepending another path will always resolve to lexically
-// be a subdirectory of the prefixed path. This is all done lexically, so paths
-// that include symlinks won't be safe as a result of using pathClean.
-func pathClean(path string) string {
-	// Ensure that all paths are cleaned (especially problematic ones like
-	// "/../../../../../" which can cause lots of issues).
-	path = filepath.Clean(path)
-
-	// If the path isn't absolute, we need to do more processing to fix paths
-	// such as "../../../../<etc>/some/path". We also shouldn't convert absolute
-	// paths to relative ones.
-	if !filepath.IsAbs(path) {
-		path = filepath.Clean(string(os.PathSeparator) + path)
-		// This can't fail, as (by definition) all paths are relative to root.
-		path, _ = filepath.Rel(string(os.PathSeparator), path)
-	}
-
-	// Clean the path again for good measure.
-	return filepath.Clean(path)
+	paths := m.GetPaths()
+	return cgroups.GetAllPids(paths["devices"])
 }
 
 func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
@@ -297,15 +247,25 @@ func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
 		return nil, err
 	}
 
-	// Clean the parent slice path.
-	c.Parent = pathClean(c.Parent)
+	if (c.Name != "" || c.Parent != "") && c.Path != "" {
+		return nil, fmt.Errorf("cgroup: either Path or Name and Parent should be used")
+	}
+
+	// XXX: Do not remove this code. Path safety is important! -- cyphar
+	cgPath := libcontainerUtils.CleanPath(c.Path)
+	cgParent := libcontainerUtils.CleanPath(c.Parent)
+	cgName := libcontainerUtils.CleanPath(c.Name)
+
+	innerPath := cgPath
+	if innerPath == "" {
+		innerPath = filepath.Join(cgParent, cgName)
+	}
 
 	return &cgroupData{
-		root:   root,
-		parent: c.Parent,
-		name:   c.Name,
-		config: c,
-		pid:    pid,
+		root:      root,
+		innerPath: innerPath,
+		config:    c,
+		pid:       pid,
 	}, nil
 }
 
@@ -333,11 +293,10 @@ func (raw *cgroupData) path(subsystem string) (string, error) {
 		return "", err
 	}
 
-	cgPath := filepath.Join(raw.parent, raw.name)
 	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
-	if filepath.IsAbs(cgPath) {
+	if filepath.IsAbs(raw.innerPath) {
 		// Sometimes subsystems can be mounted togethger as 'cpu,cpuacct'.
-		return filepath.Join(raw.root, filepath.Base(mnt), cgPath), nil
+		return filepath.Join(raw.root, filepath.Base(mnt), raw.innerPath), nil
 	}
 
 	parentPath, err := raw.parentPath(subsystem, mnt, root)
@@ -345,7 +304,7 @@ func (raw *cgroupData) path(subsystem string) (string, error) {
 		return "", err
 	}
 
-	return filepath.Join(parentPath, cgPath), nil
+	return filepath.Join(parentPath, raw.innerPath), nil
 }
 
 func (raw *cgroupData) join(subsystem string) (string, error) {
@@ -356,7 +315,7 @@ func (raw *cgroupData) join(subsystem string) (string, error) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", err
 	}
-	if err := writeFile(path, CgroupProcesses, strconv.Itoa(raw.pid)); err != nil {
+	if err := cgroups.WriteCgroupProc(path, raw.pid); err != nil {
 		return "", err
 	}
 	return path, nil
@@ -366,9 +325,12 @@ func writeFile(dir, file, data string) error {
 	// Normally dir should not be empty, one case is that cgroup subsystem
 	// is not mounted, we will get empty dir, and we want it fail here.
 	if dir == "" {
-		return fmt.Errorf("no such directory for %s.", file)
+		return fmt.Errorf("no such directory for %s", file)
 	}
-	return ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700)
+	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700); err != nil {
+		return fmt.Errorf("failed to write %v to %v: %v", data, file, err)
+	}
+	return nil
 }
 
 func readFile(dir, file string) (string, error) {

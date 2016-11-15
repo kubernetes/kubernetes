@@ -32,6 +32,11 @@ gcloud compute instances delete "${MASTER_NAME}" \
 gcloud compute disks delete "${MASTER_NAME}-pd" \
     ${GCLOUD_COMMON_ARGS} || true
 
+gcloud compute addresses delete "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" \
+    --region "${REGION}" \
+    --quiet || true
+
 gcloud compute firewall-rules delete "${INSTANCE_PREFIX}-kubemark-master-https" \
 	--project "${PROJECT}" \
 	--quiet || true
@@ -44,7 +49,7 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
     	${GCLOUD_COMMON_ARGS} || true
 fi
 
-rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.loc" &> /dev/null || true
+rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.kubemark" &> /dev/null || true
 rm "${RESOURCE_DIRECTORY}/ca.crt" \
 	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
 	"${RESOURCE_DIRECTORY}/kubecfg.key" \

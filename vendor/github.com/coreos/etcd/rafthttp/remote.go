@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,13 +25,23 @@ type remote struct {
 	pipeline *pipeline
 }
 
-func startRemote(tr *Transport, urls types.URLs, local, to, cid types.ID, r Raft, errorc chan error) *remote {
+func startRemote(tr *Transport, urls types.URLs, id types.ID) *remote {
 	picker := newURLPicker(urls)
-	status := newPeerStatus(to)
+	status := newPeerStatus(id)
+	pipeline := &pipeline{
+		peerID: id,
+		tr:     tr,
+		picker: picker,
+		status: status,
+		raft:   tr.Raft,
+		errorc: tr.ErrorC,
+	}
+	pipeline.start()
+
 	return &remote{
-		id:       to,
+		id:       id,
 		status:   status,
-		pipeline: newPipeline(tr, picker, local, to, cid, status, nil, r, errorc),
+		pipeline: pipeline,
 	}
 }
 

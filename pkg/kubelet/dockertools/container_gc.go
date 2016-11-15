@@ -111,15 +111,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	for i := numToKeep; i < len(containers); i++ {
-		err := cgc.client.RemoveContainer(containers[i].id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
-		if err != nil {
-			glog.Warningf("Failed to remove dead container %q: %v", containers[i].name, err)
-		}
-		symlinkPath := LogSymlink(cgc.containerLogsDir, containers[i].podNameWithNamespace, containers[i].containerName, containers[i].id)
-		err = os.Remove(symlinkPath)
-		if err != nil && !os.IsNotExist(err) {
-			glog.Warningf("Failed to remove container %q log symlink %q: %v", containers[i].name, symlinkPath, err)
-		}
+		cgc.removeContainer(containers[i].id, containers[i].podNameWithNamespace, containers[i].containerName)
 	}
 
 	// Assume we removed the containers so that we're not too aggressive.
@@ -147,7 +139,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			continue
 		}
 
-		created, err := parseDockerTimestamp(data.Created)
+		created, err := ParseDockerTimestamp(data.Created)
 		if err != nil {
 			glog.Errorf("Failed to parse Created timestamp %q for container %q", data.Created, container.ID)
 		}
@@ -250,6 +242,38 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy,
 		}
 	}
 
+	return nil
+}
+
+func (cgc *containerGC) removeContainer(id string, podNameWithNamespace string, containerName string) {
+	glog.V(4).Infof("Removing container %q name %q", id, containerName)
+	err := cgc.client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	if err != nil {
+		glog.Warningf("Failed to remove container %q: %v", id, err)
+	}
+	symlinkPath := LogSymlink(cgc.containerLogsDir, podNameWithNamespace, containerName, id)
+	err = os.Remove(symlinkPath)
+	if err != nil && !os.IsNotExist(err) {
+		glog.Warningf("Failed to remove container %q log symlink %q: %v", id, symlinkPath, err)
+	}
+}
+
+func (cgc *containerGC) deleteContainer(id string) error {
+	containerInfo, err := cgc.client.InspectContainer(id)
+	if err != nil {
+		glog.Warningf("Failed to inspect container %q: %v", id, err)
+		return err
+	}
+	if containerInfo.State.Running {
+		return fmt.Errorf("container %q is still running", id)
+	}
+
+	containerName, _, err := ParseDockerName(containerInfo.Name)
+	if err != nil {
+		return err
+	}
+
+	cgc.removeContainer(id, containerName.PodFullName, containerName.ContainerName)
 	return nil
 }
 

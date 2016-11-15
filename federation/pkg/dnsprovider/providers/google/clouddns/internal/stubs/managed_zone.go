@@ -24,11 +24,16 @@ var _ interfaces.ManagedZone = ManagedZone{}
 type ManagedZone struct {
 	Service *ManagedZonesService
 	Name_   string
+	Id_     uint64
 	Rrsets  []ResourceRecordSet
 }
 
 func (m ManagedZone) Name() string {
 	return m.Name_
+}
+
+func (m ManagedZone) Id() uint64 {
+	return m.Id_
 }
 
 func (m ManagedZone) DnsName() string {

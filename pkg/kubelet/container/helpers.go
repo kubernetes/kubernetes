@@ -17,19 +17,24 @@ limitations under the License.
 package container
 
 import (
+	"bytes"
+	"fmt"
 	"hash/adler32"
 	"strings"
+	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
-	"k8s.io/kubernetes/third_party/golang/expansion"
-
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
 // HandlerRunner runs a lifecycle handler for a container.
@@ -44,6 +49,10 @@ type RuntimeHelper interface {
 	GetClusterDNS(pod *api.Pod) (dnsServers []string, dnsSearches []string, err error)
 	GetPodDir(podUID types.UID) string
 	GeneratePodHostNameAndDomain(pod *api.Pod) (hostname string, hostDomain string, err error)
+	// GetExtraSupplementalGroupsForPod returns a list of the extra
+	// supplemental groups for the Pod. These extra supplemental groups come
+	// from annotations on persistent volumes that the pod depends on.
+	GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -77,29 +86,6 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 		}
 	}
 	return true
-}
-
-// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
-func ConvertPodStatusToRunningPod(podStatus *PodStatus) Pod {
-	runningPod := Pod{
-		ID:        podStatus.ID,
-		Name:      podStatus.Name,
-		Namespace: podStatus.Namespace,
-	}
-	for _, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.State != ContainerStateRunning {
-			continue
-		}
-		container := &Container{
-			ID:    containerStatus.ID,
-			Name:  containerStatus.Name,
-			Image: containerStatus.Image,
-			Hash:  containerStatus.Hash,
-			State: containerStatus.State,
-		}
-		runningPod.Containers = append(runningPod.Containers, container)
-	}
-	return runningPod
 }
 
 // HashContainer returns the hash of the container. It is used to compare
@@ -184,4 +170,79 @@ func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp
 // Pod must not be nil.
 func IsHostNetworkPod(pod *api.Pod) bool {
 	return pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork
+}
+
+// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
+func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod {
+	runningPod := Pod{
+		ID:        podStatus.ID,
+		Name:      podStatus.Name,
+		Namespace: podStatus.Namespace,
+	}
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.State != ContainerStateRunning {
+			continue
+		}
+		container := &Container{
+			ID:      containerStatus.ID,
+			Name:    containerStatus.Name,
+			Image:   containerStatus.Image,
+			ImageID: containerStatus.ImageID,
+			Hash:    containerStatus.Hash,
+			State:   containerStatus.State,
+		}
+		runningPod.Containers = append(runningPod.Containers, container)
+	}
+
+	// Populate sandboxes in kubecontainer.Pod
+	for _, sandbox := range podStatus.SandboxStatuses {
+		runningPod.Sandboxes = append(runningPod.Sandboxes, &Container{
+			ID:    ContainerID{Type: runtimeName, ID: *sandbox.Id},
+			State: SandboxToContainerState(*sandbox.State),
+		})
+	}
+	return runningPod
+}
+
+// sandboxToContainerState converts runtimeApi.PodSandboxState to
+// kubecontainer.ContainerState.
+// This is only needed because we need to return sandboxes as if they were
+// kubecontainer.Containers to avoid substantial changes to PLEG.
+// TODO: Remove this once it becomes obsolete.
+func SandboxToContainerState(state runtimeApi.PodSandboxState) ContainerState {
+	switch state {
+	case runtimeApi.PodSandboxState_SANDBOX_READY:
+		return ContainerStateRunning
+	case runtimeApi.PodSandboxState_SANDBOX_NOTREADY:
+		return ContainerStateExited
+	}
+	return ContainerStateUnknown
+}
+
+// FormatPod returns a string representing a pod in a human readable format,
+// with pod UID as part of the string.
+func FormatPod(pod *Pod) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.ID)
+}
+
+type containerCommandRunnerWrapper struct {
+	DirectStreamingRuntime
+}
+
+var _ ContainerCommandRunner = &containerCommandRunnerWrapper{}
+
+func DirectStreamingRunner(runtime DirectStreamingRuntime) ContainerCommandRunner {
+	return &containerCommandRunnerWrapper{runtime}
+}
+
+func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+	var buffer bytes.Buffer
+	output := ioutils.WriteCloserWrapper(&buffer)
+	err := r.ExecInContainer(id, cmd, nil, output, output, false, nil, timeout)
+	// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
+	// the command returned a nonzero exit code). Therefore, always return the output along with the
+	// error.
+	return buffer.Bytes(), err
 }

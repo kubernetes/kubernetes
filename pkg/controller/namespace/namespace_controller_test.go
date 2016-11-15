@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -113,7 +114,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	groupVersionResources := testGroupVersionResources()
 	for _, groupVersionResource := range groupVersionResources {
 		urlPath := path.Join([]string{
-			dynamic.LegacyAPIPathResolverFunc(groupVersionResource.GroupVersion()),
+			dynamic.LegacyAPIPathResolverFunc(unversioned.GroupVersionKind{Group: groupVersionResource.Group, Version: groupVersionResource.Version}),
 			groupVersionResource.Group,
 			groupVersionResource.Version,
 			"namespaces",
@@ -155,9 +156,9 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		defer srv.Close()
 
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
-		clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
+		clientPool := dynamic.NewClientPool(clientConfig, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 
-		err := syncNamespace(mockClient, clientPool, operationNotSupportedCache{}, groupVersionResources, testInput.testNamespace, api.FinalizerKubernetes)
+		err := syncNamespace(mockClient, clientPool, &operationNotSupportedCache{m: make(map[operationKey]bool)}, groupVersionResources, testInput.testNamespace, api.FinalizerKubernetes)
 		if err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
@@ -226,7 +227,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
-	err := syncNamespace(mockClient, nil, operationNotSupportedCache{}, testGroupVersionResources(), testNamespace, api.FinalizerKubernetes)
+	err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, testGroupVersionResources(), testNamespace, api.FinalizerKubernetes)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
@@ -272,7 +273,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
 	response.Header().Set("Content-Type", runtime.ContentTypeJSON)
 	response.WriteHeader(f.statusCode)
-	response.Write([]byte("{\"kind\": \"List\"}"))
+	response.Write([]byte("{\"kind\": \"List\",\"items\":null}"))
 }
 
 // testGroupVersionResources returns a mocked up set of resources across different api groups for testing namespace controller.

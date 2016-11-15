@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/proposals/apiserver-watch.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 ## Abstract
 
 In the current system, most watch requests sent to apiserver are redirected to
@@ -99,13 +65,13 @@ to implement the proposal.
 1. Since we want the watch in apiserver to be optional for different resource
 types, this needs to be self-contained and hidden behind a well defined API.
 This should be a layer very close to etcd - in particular all registries:
-"pkg/registry/generic/etcd" should be built on top of it.
+"pkg/registry/generic/registry" should be built on top of it.
 We will solve it by turning tools.EtcdHelper by extracting its interface
 and treating this interface as this API - the whole watch mechanisms in
 apiserver will be hidden behind that interface.
 Thanks to it we will get an initial implementation for free and we will just
 need to reimplement few relevant functions (probably just Watch and List).
-Mover, this will not require any changes in other parts of the code.
+Moreover, this will not require any changes in other parts of the code.
 This step is about extracting the interface of tools.EtcdHelper.
 
 2. Create a FIFO cache with a given capacity. In its "rolling history window"

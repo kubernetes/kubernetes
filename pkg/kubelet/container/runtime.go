@@ -19,14 +19,17 @@ package container
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -67,8 +70,9 @@ type Runtime interface {
 	// This may be different from the runtime engine's version.
 	// TODO(random-liu): We should fold this into Version()
 	APIVersion() (Version, error)
-	// Status returns error if the runtime is unhealthy; nil otherwise.
-	Status() error
+	// Status returns the status of the runtime. An error is returned if the Status
+	// function itself fails, nil otherwise.
+	Status() (*RuntimeStatus, error)
 	// GetPods returns a list of containers grouped by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
@@ -91,6 +95,56 @@ type Runtime interface {
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
+	// Returns the filesystem path of the pod's network namespace; if the
+	// runtime does not handle namespace creation itself, or cannot return
+	// the network namespace path, it should return an error.
+	// TODO: Change ContainerID to a Pod ID since the namespace is shared
+	// by all containers in the pod.
+	GetNetNS(containerID ContainerID) (string, error)
+	// Returns the container ID that represents the Pod, as passed to network
+	// plugins. For example, if the runtime uses an infra container, returns
+	// the infra container's ContainerID.
+	// TODO: Change ContainerID to a Pod ID, see GetNetNS()
+	GetPodContainerID(*Pod) (ContainerID, error)
+	// TODO(vmarmol): Unify pod and containerID args.
+	// GetContainerLogs returns logs of a specific container. By
+	// default, it returns a snapshot of the container log. Set 'follow' to true to
+	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
+	// "100" or "all") to tail the log.
+	GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
+	// Delete a container. If the container is still running, an error is returned.
+	DeleteContainer(containerID ContainerID) error
+	// ImageService provides methods to image-related methods.
+	ImageService
+	// UpdatePodCIDR sends a new podCIDR to the runtime.
+	// This method just proxies a new runtimeConfig with the updated
+	// CIDR value down to the runtime shim.
+	UpdatePodCIDR(podCIDR string) error
+}
+
+// DirectStreamingRuntime is the interface implemented by runtimes for which the streaming calls
+// (exec/attach/port-forward) should be served directly by the Kubelet.
+type DirectStreamingRuntime interface {
+	// Runs the command in the container of the specified pod using nsenter.
+	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
+	// tty.
+	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
+	// Forward the specified port from the specified pod to the stream.
+	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
+	// ContainerAttach encapsulates the attaching to containers for testability
+	ContainerAttacher
+}
+
+// IndirectStreamingRuntime is the interface implemented by runtimes that handle the serving of the
+// streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
+// the runtime server.
+type IndirectStreamingRuntime interface {
+	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
+	GetAttach(id ContainerID, stdin, stdout, stderr bool) (*url.URL, error)
+	GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error)
+}
+
+type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error
@@ -102,48 +156,16 @@ type Runtime interface {
 	RemoveImage(image ImageSpec) error
 	// Returns Image statistics.
 	ImageStats() (*ImageStats, error)
-	// Returns the filesystem path of the pod's network namespace; if the
-	// runtime does not handle namespace creation itself, or cannot return
-	// the network namespace path, it should return an error.
-	// TODO: Change ContainerID to a Pod ID since the namespace is shared
-	// by all containers in the pod.
-	GetNetNS(containerID ContainerID) (string, error)
-	// Returns the container ID that represents the Pod, as passed to network
-	// plugins. For example if the runtime uses an infra container, returns
-	// the infra container's ContainerID.
-	// TODO: Change ContainerID to a Pod ID, see GetNetNS()
-	GetPodContainerID(*Pod) (ContainerID, error)
-	// TODO(vmarmol): Unify pod and containerID args.
-	// GetContainerLogs returns logs of a specific container. By
-	// default, it returns a snapshot of the container log. Set 'follow' to true to
-	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
-	// "100" or "all") to tail the log.
-	GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
-	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
-	ContainerCommandRunner
-	// ContainerAttach encapsulates the attaching to containers for testability
-	ContainerAttacher
 }
 
 type ContainerAttacher interface {
-	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
+	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error)
 }
 
-// CommandRunner encapsulates the command runner interfaces for testability.
 type ContainerCommandRunner interface {
-	// Runs the command in the container of the specified pod using nsenter.
-	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
-	// tty.
-	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
-	// Forward the specified port from the specified pod to the stream.
-	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
-}
-
-// ImagePuller wraps Runtime.PullImage() to pull a container image.
-// It will check the presence of the image, and report the 'image pulling',
-// 'image pulled' events correspondingly.
-type ImagePuller interface {
-	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
+	// RunInContainer synchronously executes the command in the container, and returns the output.
+	// If the command completes with a non-0 exit code, a pkg/util/exec.ExitError will be returned.
+	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
 }
 
 // Pod is a group of containers.
@@ -157,6 +179,11 @@ type Pod struct {
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
+	// List of sandboxes associated with this pod. The sandboxes are converted
+	// to Container temporariliy to avoid substantial changes to other
+	// components. This is only populated by kuberuntime.
+	// TODO: use the runtimeApi.PodSandbox type directly.
+	Sandboxes []*Container
 }
 
 // PodPair contains both runtime#Pod and api#Pod
@@ -229,12 +256,11 @@ func (id DockerID) ContainerID() ContainerID {
 type ContainerState string
 
 const (
+	ContainerStateCreated ContainerState = "created"
 	ContainerStateRunning ContainerState = "running"
 	ContainerStateExited  ContainerState = "exited"
 	// This unknown encompasses all the states that we currently don't care.
 	ContainerStateUnknown ContainerState = "unknown"
-	// Not in use yet.
-	ContainerStateCreated ContainerState = "created"
 )
 
 // Container provides the runtime information for a container, such as ID, hash,
@@ -249,6 +275,8 @@ type Container struct {
 	// The image name of the container, this also includes the tag of the image,
 	// the expected form is "NAME:TAG".
 	Image string
+	// The id of the image used by the container.
+	ImageID string
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64
@@ -269,6 +297,9 @@ type PodStatus struct {
 	IP string
 	// Status of containers in the pod.
 	ContainerStatuses []*ContainerStatus
+	// Status of the pod sandbox.
+	// Only for kuberuntime now, other runtime may keep it nil.
+	SandboxStatuses []*runtimeApi.PodSandboxStatus
 }
 
 // ContainerStatus represents the status of a container.
@@ -344,6 +375,8 @@ type EnvVar struct {
 
 type Mount struct {
 	// Name of the volume mount.
+	// TODO(yifan): Remove this field, as this is not representing the unique name of the mount,
+	// but the volume name only.
 	Name string
 	// Path of the mount within the container.
 	ContainerPath string
@@ -368,6 +401,15 @@ type PortMapping struct {
 	HostIP string
 }
 
+type DeviceInfo struct {
+	// Path on host for mapping
+	PathOnHost string
+	// Path in Container to map
+	PathInContainer string
+	// Cgroup permissions
+	Permissions string
+}
+
 // RunContainerOptions specify the options which are necessary for running containers
 type RunContainerOptions struct {
 	// The environment variables list.
@@ -375,7 +417,7 @@ type RunContainerOptions struct {
 	// The mounts for the containers.
 	Mounts []Mount
 	// The host devices mapped into the containers.
-	Devices []string
+	Devices []DeviceInfo
 	// The port mappings for the containers.
 	PortMappings []PortMapping
 	// If the container has specified the TerminationMessagePath, then
@@ -392,6 +434,12 @@ type RunContainerOptions struct {
 	ReadOnly bool
 	// hostname for pod containers
 	Hostname string
+	// EnableHostUserNamespace sets userns=host when users request host namespaces (pid, ipc, net),
+	// are using non-namespaced capabilities (mknod, sys_time, sys_module), the pod contains a privileged container,
+	// or using host path volumes.
+	// This should only be enabled when the container runtime is performing user remapping AND if the
+	// experimental behavior is desired.
+	EnableHostUserNamespace bool
 }
 
 // VolumeInfo contains information about the volume.
@@ -404,6 +452,59 @@ type VolumeInfo struct {
 }
 
 type VolumeMap map[string]VolumeInfo
+
+// RuntimeConditionType is the types of required runtime conditions.
+type RuntimeConditionType string
+
+const (
+	// RuntimeReady means the runtime is up and ready to accept basic containers.
+	RuntimeReady RuntimeConditionType = "RuntimeReady"
+	// NetworkReady means the runtime network is up and ready to accept containers which require network.
+	NetworkReady RuntimeConditionType = "NetworkReady"
+)
+
+// RuntimeStatus contains the status of the runtime.
+type RuntimeStatus struct {
+	// Conditions is an array of current observed runtime conditions.
+	Conditions []RuntimeCondition
+}
+
+// GetRuntimeCondition gets a specified runtime condition from the runtime status.
+func (r *RuntimeStatus) GetRuntimeCondition(t RuntimeConditionType) *RuntimeCondition {
+	for i := range r.Conditions {
+		c := &r.Conditions[i]
+		if c.Type == t {
+			return c
+		}
+	}
+	return nil
+}
+
+// String formats the runtime status into human readable string.
+func (s *RuntimeStatus) String() string {
+	var ss []string
+	for _, c := range s.Conditions {
+		ss = append(ss, c.String())
+	}
+	return fmt.Sprintf("Runtime Conditions: %s", strings.Join(ss, ", "))
+}
+
+// RuntimeCondition contains condition information for the runtime.
+type RuntimeCondition struct {
+	// Type of runtime condition.
+	Type RuntimeConditionType
+	// Status of the condition, one of true/false.
+	Status bool
+	// Reason is brief reason for the condition's last transition.
+	Reason string
+	// Message is human readable message indicating details about last transition.
+	Message string
+}
+
+// String formats the runtime condition into human readable string.
+func (c *RuntimeCondition) String() string {
+	return fmt.Sprintf("%s=%t reason:%s message:%s", c.Type, c.Status, c.Reason, c.Message)
+}
 
 type Pods []*Pod
 
@@ -453,6 +554,15 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 
 func (p *Pod) FindContainerByID(id ContainerID) *Container {
 	for _, c := range p.Containers {
+		if c.ID == id {
+			return c
+		}
+	}
+	return nil
+}
+
+func (p *Pod) FindSandboxByID(id ContainerID) *Container {
+	for _, c := range p.Sandboxes {
 		if c.ID == id {
 			return c
 		}

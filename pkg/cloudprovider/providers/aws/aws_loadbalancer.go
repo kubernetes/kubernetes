@@ -18,6 +18,7 @@ package aws
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -30,7 +31,7 @@ import (
 
 const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
 
-func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB, proxyProtocol bool) (*elb.LoadBalancerDescription, error) {
+func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB, proxyProtocol bool, loadBalancerAttributes *elb.LoadBalancerAttributes) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return nil, err
@@ -59,7 +60,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			{Key: aws.String(TagNameKubernetesService), Value: aws.String(namespacedName.String())},
 		}
 
-		glog.Infof("Creating load balancer for %v with name: ", namespacedName, loadBalancerName)
+		glog.Infof("Creating load balancer for %v with name: %s", namespacedName, loadBalancerName)
 		_, err := c.elb.CreateLoadBalancer(createRequest)
 		if err != nil {
 			return nil, err
@@ -217,7 +218,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 				// NOTE The documentation for the AWS API indicates we could get an HTTP 400
 				// back if a policy of the same name already exists. However, the aws-sdk does not
-				// seem to return an error to us in these cases. Therefore this will issue an API
+				// seem to return an error to us in these cases. Therefore, this will issue an API
 				// request every time.
 				err := c.createProxyProtocolPolicy(loadBalancerName)
 				if err != nil {
@@ -240,7 +241,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 				if currentState, ok := proxyProtocolBackends[instancePort]; !ok {
 					// This is a new ELB backend so we only need to worry about
-					// potentientally adding a policy and not removing an
+					// potentially adding a policy and not removing an
 					// existing one
 					setPolicy = proxyProtocol
 				} else {
@@ -273,6 +274,35 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					dirty = true
 				}
 			}
+		}
+	}
+
+	// Whether the ELB was new or existing, sync attributes regardless. This accounts for things
+	// that cannot be specified at the time of creation and can only be modified after the fact,
+	// e.g. idle connection timeout.
+	{
+		describeAttributesRequest := &elb.DescribeLoadBalancerAttributesInput{}
+		describeAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
+		describeAttributesOutput, err := c.elb.DescribeLoadBalancerAttributes(describeAttributesRequest)
+		if err != nil {
+			glog.Warning("Unable to retrieve load balancer attributes during attribute sync")
+			return nil, err
+		}
+
+		foundAttributes := &describeAttributesOutput.LoadBalancerAttributes
+
+		// Update attributes if they're dirty
+		if !reflect.DeepEqual(loadBalancerAttributes, foundAttributes) {
+			glog.V(2).Info("Updating load-balancer attributes for %q", loadBalancerName)
+
+			modifyAttributesRequest := &elb.ModifyLoadBalancerAttributesInput{}
+			modifyAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
+			modifyAttributesRequest.LoadBalancerAttributes = loadBalancerAttributes
+			_, err = c.elb.ModifyLoadBalancerAttributes(modifyAttributesRequest)
+			if err != nil {
+				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %v", err)
+			}
+			dirty = true
 		}
 	}
 

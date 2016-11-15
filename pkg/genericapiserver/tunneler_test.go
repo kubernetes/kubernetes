@@ -18,12 +18,13 @@ package genericapiserver
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -37,32 +38,32 @@ func TestSecondsSinceSync(t *testing.T) {
 	tunneler.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
 
 	// Nano Second. No difference.
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC))
 	assert.Equal(int64(0), tunneler.SecondsSinceSync())
 
 	// Second
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC))
 	assert.Equal(int64(1), tunneler.SecondsSinceSync())
 
 	// Minute
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC))
 	assert.Equal(int64(60), tunneler.SecondsSinceSync())
 
 	// Hour
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC))
 	assert.Equal(int64(3600), tunneler.SecondsSinceSync())
 
 	// Day
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(86400), tunneler.SecondsSinceSync())
 
 	// Month
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(2678400), tunneler.SecondsSinceSync())
 
 	// Future Month. Should be -Month.
 	tunneler.lastSync = time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC).Unix()
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(-2678400), tunneler.SecondsSinceSync())
 }
 
@@ -103,4 +104,32 @@ func TestGenerateSSHKey(t *testing.T) {
 	os.Remove(publicKey)
 
 	// TODO: testing error cases where the file can not be removed?
+}
+
+type FakeTunneler struct {
+	SecondsSinceSyncValue       int64
+	SecondsSinceSSHKeySyncValue int64
+}
+
+func (t *FakeTunneler) Run(AddressFunc)                         {}
+func (t *FakeTunneler) Stop()                                   {}
+func (t *FakeTunneler) Dial(net, addr string) (net.Conn, error) { return nil, nil }
+func (t *FakeTunneler) SecondsSinceSync() int64                 { return t.SecondsSinceSyncValue }
+func (t *FakeTunneler) SecondsSinceSSHKeySync() int64           { return t.SecondsSinceSSHKeySyncValue }
+
+// TestIsTunnelSyncHealthy verifies that the 600 second lag test
+// is honored.
+func TestIsTunnelSyncHealthy(t *testing.T) {
+	tunneler := &FakeTunneler{}
+
+	// Pass case: 540 second lag
+	tunneler.SecondsSinceSyncValue = 540
+	healthFn := TunnelSyncHealthChecker(tunneler)
+	err := healthFn(nil)
+	assert.NoError(t, err, "IsTunnelSyncHealthy() should not have returned an error.")
+
+	// Fail case: 720 second lag
+	tunneler.SecondsSinceSyncValue = 720
+	err = healthFn(nil)
+	assert.Error(t, err, "IsTunnelSyncHealthy() should have returned an error.")
 }

@@ -78,7 +78,7 @@ function download-or-bust {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 80 --retry 6 --retry-delay 10 "${url}"; then
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -98,8 +98,24 @@ function split-commas {
   echo $1 | tr "," "\n"
 }
 
+function install-gci-mounter-tools {
+    local -r rkt_version="v1.18.0"
+    local -r gci_mounter_version="v2"
+    local -r rkt_binary_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
+    local -r rkt_stage1_fly_sha1="474df5a1f934960ba669b360ab713d0a54283091"
+    local -r gci_mounter_sha1="851e841d8640d6a05e64e22c493f5ac3c4cba561"
+    download-or-bust "${rkt_binary_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/rkt"
+    download-or-bust "${rkt_stage1_fly_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/stage1-fly.aci"
+    download-or-bust "${gci_mounter_sha1}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-${gci_mounter_version}.aci"
+    local -r rkt_dst="${KUBE_HOME}/bin/"
+    mv "${KUBE_HOME}/rkt" "${rkt_dst}/rkt"
+    mv "${KUBE_HOME}/stage1-fly.aci" "${rkt_dst}/stage1-fly.aci"
+    mv "${KUBE_HOME}/gci-mounter-${gci_mounter_version}.aci" "${rkt_dst}/gci-mounter-${gci_mounter_version}.aci"
+    chmod a+x "${rkt_dst}/rkt"
+}
+
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
-# and places them into suitable directories. Files are placed in /home/kubernetes. 
+# and places them into suitable directories. Files are placed in /home/kubernetes.
 function install-kube-binary-config {
   cd "${KUBE_HOME}"
   local -r server_binary_tar_urls=( $(split-commas "${SERVER_BINARY_TAR_URL}") )
@@ -128,39 +144,25 @@ function install-kube-binary-config {
     cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
   fi
   local -r kube_bin="${KUBE_HOME}/bin"
-  # If the built-in binary version is different from the expected version, we use
-  # the downloaded binary. The simplest implementation is to always use the downloaded
-  # binary without checking the version. But we have another version guardian in GKE.
-  # So, we compare the versions to ensure this run-time binary replacement is only
-  # applied for OSS kubernetes.
-  cp "${src_dir}/kubelet" "${kube_bin}"
-  local -r builtin_version="$(/usr/bin/kubelet --version=true | cut -f2 -d " ")"
-  local -r required_version="$(/home/kubernetes/bin/kubelet --version=true | cut -f2 -d " ")"
-  if [[ "${TEST_CLUSTER:-}" == "true" ]] || \
-     [[ "${builtin_version}" != "${required_version}" ]]; then
-    cp "${src_dir}/kubectl" "${kube_bin}"
-    chmod 755 "${kube_bin}/kubelet"
-    chmod 755 "${kube_bin}/kubectl"
-    mount --bind "${kube_bin}/kubelet" /usr/bin/kubelet
-    mount --bind "${kube_bin}/kubectl" /usr/bin/kubectl
-  else
-    rm -f "${kube_bin}/kubelet"
-  fi
+  mv "${src_dir}/kubelet" "${kube_bin}"
+  mv "${src_dir}/kubectl" "${kube_bin}"
+
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
-    local -r cni_tar="cni-26b61728ac940c3faf827927782326e921be17b0.tar.gz"
-    download-or-bust "" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
-    tar xzf "${KUBE_HOME}/${cni_tar}" -C "${kube_bin}" --overwrite
-    mv "${kube_bin}/bin"/* "${kube_bin}"
-    rmdir "${kube_bin}/bin"
+    local -r cni_tar="cni-07a8a28637e97b22eb8dfe710eeae1344f69d16e.tar.gz"
+    local -r cni_sha1="19d49f7b2b99cd2493d5ae0ace896c64e289ccbb"
+    download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
+    local -r cni_dir="${KUBE_HOME}/cni"
+    mkdir -p "${cni_dir}"
+    tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}" --overwrite
+    mv "${cni_dir}/bin"/* "${kube_bin}"
+    rmdir "${cni_dir}/bin"
     rm -f "${KUBE_HOME}/${cni_tar}"
   fi
 
-  cp "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
-  cp "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
-  chmod a+r "${KUBE_HOME}/kubernetes/LICENSES"
-  chmod a+r "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz"
+  mv "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
+  mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   dst_dir="${KUBE_HOME}/kube-manifests"
@@ -185,10 +187,13 @@ function install-kube-binary-config {
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
+  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${KUBE_HOME}/bin/mounter"
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
-  chmod 544 "${KUBE_HOME}/bin/configure-helper.sh"
-  chmod 544 "${KUBE_HOME}/bin/health-monitor.sh"
+  chmod -R 755 "${kube_bin}"
 
+  # Install gci mounter related artifacts to allow mounting storage volumes in GCI
+  install-gci-mounter-tools
+  
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
   rm -f "${KUBE_HOME}/${server_binary_tar}"

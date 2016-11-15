@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/proposals/kubelet-eviction.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Kubelet - Eviction Policy
 
 **Authors**: Derek Carr (@derekwaynecarr), Vishnu Kannan (@vishh)
@@ -75,9 +41,12 @@ The `kubelet` will support the ability to trigger eviction decisions on the foll
 |------------------|---------------------------------------------------------------------------------|
 | memory.available | memory.available := node.status.capacity[memory] - node.stats.memory.workingSet |
 | nodefs.available   | nodefs.available := node.stats.fs.available |
-| nodefs.inodesFree | nodefs.inodesFree := node.fs.inodesFree |
+| nodefs.inodesFree | nodefs.inodesFree := node.stats.fs.inodesFree |
 | imagefs.available | imagefs.available := node.stats.runtime.imagefs.available |
-| imagefs.inodesFree | imagefs.inodesFree := node.runtime.imageFs.inodesFree |
+| imagefs.inodesFree | imagefs.inodesFree := node.stats.runtime.imagefs.inodesFree |
+
+Each of the above signals support either a literal or percentage based value.  The percentage based value
+is calculated relative to the total capacity associated with each signal.
 
 `kubelet` supports only two filesystem partitions.
 
@@ -93,16 +62,24 @@ The `kubelet` will support the ability to specify eviction thresholds.
 
 An eviction threshold is of the following form:
 
-`<eviction-signal><operator><quantity>`
+`<eviction-signal><operator><quantity | int%>`
 
 * valid `eviction-signal` tokens as defined above.
 * valid `operator` tokens are `<`
 * valid `quantity` tokens must match the quantity representation used by Kubernetes
+* an eviction threshold can be expressed as a percentage if ends with `%` token.
 
-If threhold criteria are met, the `kubelet` will take pro-active action to attempt
+If threshold criteria are met, the `kubelet` will take pro-active action to attempt
 to reclaim the starved compute resource associated with the eviction signal.
 
 The `kubelet` will support soft and hard eviction thresholds.
+
+For example, if a node has `10Gi` of memory, and the desire is to induce eviction
+if available memory falls below `1Gi`, an eviction signal can be specified as either
+of the following (but not both).
+
+* `memory.available<10%`
+* `memory.available<1Gi`
 
 ### Soft Eviction Thresholds
 
@@ -168,7 +145,7 @@ The following node conditions are defined that correspond to the specified evict
 | Node Condition | Eviction Signal  | Description                                                      |
 |----------------|------------------|------------------------------------------------------------------|
 | MemoryPressure | memory.available | Available memory on the node has satisfied an eviction threshold |
-| DiskPressure | nodefs.available, nodefs.inodesFree, imagefs.available, or imagefs.inodesFree | Available disk space and inodes on either the node's root filesytem or image filesystem has satisfied an eviction threshold |
+| DiskPressure | nodefs.available, nodefs.inodesFree, imagefs.available, or imagefs.inodesFree | Available disk space and inodes on either the node's root filesystem or image filesystem has satisfied an eviction threshold |
 
 The `kubelet` will continue to report node status updates at the frequency specified by
 `--node-status-update-frequency` which defaults to `10s`.
@@ -323,7 +300,7 @@ In the future, if we store logs of dead containers outside of the container itse
 Once the lifetime of containers and logs are split, kubelet can support more user friendly policies
 around log evictions. `kubelet` can delete logs of the oldest containers first.
 Since logs from the first and the most recent incarnation of a container is the most important for most applications,
-kubelet can try to preserve these logs and aggresively delete logs from other container incarnations.
+kubelet can try to preserve these logs and aggressively delete logs from other container incarnations.
 
 Until logs are split from container's lifetime, `kubelet` can delete dead containers to free up disk space.
 
@@ -359,20 +336,20 @@ If `nodefs` is triggering evictions, `kubelet` will sort pods based on the usage
 
 If `imagefs` is triggering evictions, `kubelet` will sort pods based on the writable layer usage of all its containers.
 
-## Minimum eviction thresholds
+## Minimum eviction reclaim
 
 In certain scenarios, eviction of pods could result in reclamation of small amount of resources. This can result in
 `kubelet` hitting eviction thresholds in repeated successions. In addition to that, eviction of resources like `disk`,
  is time consuming.
 
-To mitigate these issues, `kubelet` will have a per-resource `minimum-threshold`. Whenever `kubelet` observes
-resource pressure, `kubelet` will attempt to reclaim at least `minimum-threshold` amount of resource.
+To mitigate these issues, `kubelet` will have a per-resource `minimum-reclaim`. Whenever `kubelet` observes
+resource pressure, `kubelet` will attempt to reclaim at least `minimum-reclaim` amount of resource.
 
-Following are the flags through which `minimum-thresholds` can be configured for each evictable resource:
+Following are the flags through which `minimum-reclaim` can be configured for each evictable resource:
 
-`--minimum-eviction-thresholds="memory.available=0Mi,nodefs.available=500Mi,imagefs.available=2Gi"`
+`--eviction-minimum-reclaim="memory.available=0Mi,nodefs.available=500Mi,imagefs.available=2Gi"`
 
-The default `minimum-eviction-threshold` is `0` for all resources.
+The default `eviction-minimum-reclaim` is `0` for all resources.
 
 ## Deprecation of existing features
 
@@ -382,7 +359,7 @@ some of the existing features/flags around disk space retrieval will be deprecat
 | Existing Flag | New Flag | Rationale |
 | ------------- | -------- | --------- |
 | `--image-gc-high-threshold` | `--eviction-hard` or `eviction-soft` | existing eviction signals can capture image garbage collection |
-| `--image-gc-low-threshold` | `--minimum-eviction-thresholds` | eviction thresholds achieve the same behavior |
+| `--image-gc-low-threshold` | `--eviction-minimum-reclaim` | eviction reclaims achieve the same behavior |
 | `--maximum-dead-containers` | | deprecated once old logs are stored outside of container's context |
 | `--maximum-dead-containers-per-container` | | deprecated once old logs are stored outside of container's context |
 | `--minimum-container-ttl-duration` | | deprecated once old logs are stored outside of container's context |
@@ -422,8 +399,8 @@ The `kubelet` will reject all pods if any of the disk eviction thresholds have b
 Let's assume the operator started the `kubelet` with the following:
 
 ```
---eviction-soft="disk.available<1500Mi"
---eviction-soft-grace-period="disk.available=30s"
+--eviction-soft="nodefs.available<1500Mi"
+--eviction-soft-grace-period="nodefs.available=30s"
 ```
 
 If the `kubelet` sees that it has less than `1500Mi` of disk available
@@ -464,6 +441,21 @@ candidate set of pods provided to the eviction strategy.
 In general, it should be strongly recommended that `DaemonSet` not
 create `BestEffort` pods to avoid being identified as a candidate pod
 for eviction. Instead `DaemonSet` should ideally include Guaranteed pods only.
+
+## Known issues
+
+### kubelet may evict more pods than needed
+
+The pod eviction may evict more pods than needed due to stats collection timing gap. This can be mitigated by adding
+the ability to get root container stats on an on-demand basis (https://github.com/google/cadvisor/issues/1247) in the future.
+
+### How kubelet ranks pods for eviction in response to inode exhaustion
+
+At this time, it is not possible to know how many inodes were consumed by a particular container.  If the `kubelet` observes
+inode exhaustion, it will evict pods by ranking them by quality of service.  The following issue has been opened in cadvisor
+to track per container inode consumption (https://github.com/google/cadvisor/issues/1422) which would allow us to rank pods
+by inode consumption.  For example, this would let us identify a container that created large numbers of 0 byte files, and evict
+that pod over others.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/kubelet-eviction.md?pixel)]()

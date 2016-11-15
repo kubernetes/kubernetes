@@ -17,23 +17,55 @@
 import os
 
 from shlex import split
-from shutil import copy2
+from subprocess import call
 from subprocess import check_call
+from subprocess import check_output
 
 from charms.docker.compose import Compose
 from charms.reactive import hook
 from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import when
+from charms.reactive import when_any
 from charms.reactive import when_not
 
 from charmhelpers.core import hookenv
 from charmhelpers.core.hookenv import is_leader
-from charmhelpers.core.hookenv import status_set
+from charmhelpers.core.hookenv import leader_set
+from charmhelpers.core.hookenv import leader_get
 from charmhelpers.core.templating import render
 from charmhelpers.core import unitdata
 from charmhelpers.core.host import chdir
-from contextlib import contextmanager
+
+import tlslib
+
+
+@when('leadership.is_leader')
+def i_am_leader():
+    '''The leader is the Kubernetes master node. '''
+    leader_set({'master-address': hookenv.unit_private_ip()})
+
+
+@when_not('tls.client.authorization.required')
+def configure_easrsa():
+    '''Require the tls layer to generate certificates with "clientAuth". '''
+    # By default easyrsa generates the server certificates without clientAuth
+    # Setting this state before easyrsa is configured ensures the tls layer is
+    # configured to generate certificates with client authentication.
+    set_state('tls.client.authorization.required')
+    domain = hookenv.config().get('dns_domain')
+    cidr = hookenv.config().get('cidr')
+    sdn_ip = get_sdn_ip(cidr)
+    # Create extra sans that the tls layer will add to the server cert.
+    extra_sans = [
+        sdn_ip,
+        'kubernetes',
+        'kubernetes.{0}'.format(domain),
+        'kubernetes.default',
+        'kubernetes.default.svc',
+        'kubernetes.default.svc.{0}'.format(domain)
+    ]
+    unitdata.kv().set('extra_sans', extra_sans)
 
 
 @hook('config-changed')
@@ -41,38 +73,50 @@ def config_changed():
     '''If the configuration values change, remove the available states.'''
     config = hookenv.config()
     if any(config.changed(key) for key in config.keys()):
-        hookenv.log('Configuration options have changed.')
+        hookenv.log('The configuration options have changed.')
         # Use the Compose class that encapsulates the docker-compose commands.
         compose = Compose('files/kubernetes')
-        hookenv.log('Removing kubelet container and kubelet.available state.')
-        # Stop and remove the Kubernetes kubelet container..
-        compose.kill('kubelet')
-        compose.rm('kubelet')
-        # Remove the state so the code can react to restarting kubelet.
-        remove_state('kubelet.available')
-        hookenv.log('Removing proxy container and proxy.available state.')
-        # Stop and remove the Kubernetes proxy container.
-        compose.kill('proxy')
-        compose.rm('proxy')
-        # Remove the state so the code can react to restarting proxy.
-        remove_state('proxy.available')
+        if is_leader():
+            hookenv.log('Removing master container and kubelet.available state.')  # noqa
+            # Stop and remove the Kubernetes kubelet container.
+            compose.kill('master')
+            compose.rm('master')
+            compose.kill('proxy')
+            compose.rm('proxy')
+            # Remove the state so the code can react to restarting kubelet.
+            remove_state('kubelet.available')
+        else:
+            hookenv.log('Removing kubelet container and kubelet.available state.')  # noqa
+            # Stop and remove the Kubernetes kubelet container.
+            compose.kill('kubelet')
+            compose.rm('kubelet')
+            # Remove the state so the code can react to restarting kubelet.
+            remove_state('kubelet.available')
+            hookenv.log('Removing proxy container and proxy.available state.')
+            # Stop and remove the Kubernetes proxy container.
+            compose.kill('proxy')
+            compose.rm('proxy')
+            # Remove the state so the code can react to restarting proxy.
+            remove_state('proxy.available')
 
     if config.changed('version'):
-        hookenv.log('Removing kubectl.downloaded state so the new version'
-                    ' of kubectl will be downloaded.')
+        hookenv.log('The version changed removing the states so the new '
+                    'version of kubectl will be downloaded.')
         remove_state('kubectl.downloaded')
+        remove_state('kubeconfig.created')
 
 
 @when('tls.server.certificate available')
 @when_not('k8s.server.certificate available')
 def server_cert():
-    '''When the server certificate is available, get the server certificate from
-    the charm unit data and write it to the proper directory. '''
-    destination_directory = '/srv/kubernetes'
-    # Save the server certificate from unitdata to /srv/kubernetes/server.crt
-    save_certificate(destination_directory, 'server')
-    # Copy the unitname.key to /srv/kubernetes/server.key
-    copy_key(destination_directory, 'server')
+    '''When the server certificate is available, get the server certificate
+    from the charm unitdata and write it to the kubernetes directory. '''
+    server_cert = '/srv/kubernetes/server.crt'
+    server_key = '/srv/kubernetes/server.key'
+    # Save the server certificate from unit data to the destination.
+    tlslib.server_cert(None, server_cert, user='ubuntu', group='ubuntu')
+    # Copy the server key from the default location to the destination.
+    tlslib.server_key(None, server_key, user='ubuntu', group='ubuntu')
     set_state('k8s.server.certificate available')
 
 
@@ -80,71 +124,69 @@ def server_cert():
 @when_not('k8s.client.certficate available')
 def client_cert():
     '''When the client certificate is available, get the client certificate
-    from the charm unitdata and write it to the proper directory. '''
-    destination_directory = '/srv/kubernetes'
-    if not os.path.isdir(destination_directory):
-        os.makedirs(destination_directory)
-        os.chmod(destination_directory, 0o770)
-    # The client certificate is also available on charm unitdata.
-    client_cert_path = 'easy-rsa/easyrsa3/pki/issued/client.crt'
-    kube_cert_path = os.path.join(destination_directory, 'client.crt')
-    if os.path.isfile(client_cert_path):
-        # Copy the client.crt to /srv/kubernetes/client.crt
-        copy2(client_cert_path, kube_cert_path)
-    # The client key is only available on the leader.
-    client_key_path = 'easy-rsa/easyrsa3/pki/private/client.key'
-    kube_key_path = os.path.join(destination_directory, 'client.key')
-    if os.path.isfile(client_key_path):
-        # Copy the client.key to /srv/kubernetes/client.key
-        copy2(client_key_path, kube_key_path)
+    from the charm unitdata and write it to the kubernetes directory. '''
+    client_cert = '/srv/kubernetes/client.crt'
+    client_key = '/srv/kubernetes/client.key'
+    # Save the client certificate from the default location to the destination.
+    tlslib.client_cert(None, client_cert, user='ubuntu', group='ubuntu')
+    # Copy the client key from the default location to the destination.
+    tlslib.client_key(None, client_key, user='ubuntu', group='ubuntu')
+    set_state('k8s.client.certficate available')
 
 
 @when('tls.certificate.authority available')
 @when_not('k8s.certificate.authority available')
 def ca():
     '''When the Certificate Authority is available, copy the CA from the
-    /usr/local/share/ca-certificates/k8s.crt to the proper directory. '''
-    # Ensure the /srv/kubernetes directory exists.
-    directory = '/srv/kubernetes'
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
-        os.chmod(directory, 0o770)
-    # Normally the CA is just on the leader, but the tls layer installs the
-    # CA on all systems in the /usr/local/share/ca-certificates directory.
-    ca_path = '/usr/local/share/ca-certificates/{0}.crt'.format(
-              hookenv.service_name())
-    # The CA should be copied to the destination directory and named 'ca.crt'.
-    destination_ca_path = os.path.join(directory, 'ca.crt')
-    if os.path.isfile(ca_path):
-        copy2(ca_path, destination_ca_path)
-        set_state('k8s.certificate.authority available')
+    default location to the /srv/kubernetes directory. '''
+    ca_crt = '/srv/kubernetes/ca.crt'
+    # Copy the Certificate Authority to the destination directory.
+    tlslib.ca(None, ca_crt, user='ubuntu', group='ubuntu')
+    set_state('k8s.certificate.authority available')
 
 
-@when('kubelet.available', 'proxy.available', 'cadvisor.available')
-def final_messaging():
-    '''Lower layers emit messages, and if we do not clear the status messaging
-    queue, we are left with whatever the last method call sets status to. '''
-    # It's good UX to have consistent messaging that the cluster is online
-    if is_leader():
-        status_set('active', 'Kubernetes leader running')
-    else:
-        status_set('active', 'Kubernetes follower running')
-
-
-@when('kubelet.available', 'proxy.available', 'cadvisor.available')
-@when_not('skydns.available')
-def launch_skydns():
-    '''Create a kubernetes service and resource controller for the skydns
-    service. '''
+@when('kubelet.available', 'leadership.is_leader')
+@when_not('kubedns.available', 'skydns.available')
+def launch_dns():
+    '''Create the "kube-system" namespace, the kubedns resource controller,
+    and the kubedns service. '''
+    hookenv.log('Creating kubernetes kubedns on the master node.')
     # Only launch and track this state on the leader.
-    # Launching duplicate SkyDNS rc will raise an error
-    if not is_leader():
+    # Launching duplicate kubeDNS rc will raise an error
+    # Run a command to check if the apiserver is responding.
+    return_code = call(split('kubectl cluster-info'))
+    if return_code != 0:
+        hookenv.log('kubectl command failed, waiting for apiserver to start.')
+        remove_state('kubedns.available')
+        # Return without setting kubedns.available so this method will retry.
         return
-    cmd = "kubectl create -f files/manifests/skydns-rc.yml"
-    check_call(split(cmd))
-    cmd = "kubectl create -f files/manifests/skydns-svc.yml"
-    check_call(split(cmd))
-    set_state('skydns.available')
+    # Check for the "kube-system" namespace.
+    return_code = call(split('kubectl get namespace kube-system'))
+    if return_code != 0:
+        # Create the kube-system namespace that is used by the kubedns files.
+        check_call(split('kubectl create namespace kube-system'))
+    # Check for the kubedns replication controller.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-rc.yaml'))
+    if return_code != 0:
+        # Create the kubedns replication controller from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-rc.yaml'))
+    # Check for the kubedns service.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-svc.yaml'))
+    if return_code != 0:
+        # Create the kubedns service from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-svc.yaml'))
+    set_state('kubedns.available')
+
+
+@when('skydns.available', 'leadership.is_leader')
+def convert_to_kubedns():
+    '''Delete the skydns containers to make way for the kubedns containers.'''
+    hookenv.log('Deleteing the old skydns deployment.')
+    # Delete the skydns replication controller.
+    return_code = call(split('kubectl delete rc kube-dns-v11'))
+    # Delete the skydns service.
+    return_code = call(split('kubectl delete svc kube-dns'))
+    remove_state('skydns.available')
 
 
 @when('docker.available')
@@ -155,86 +197,101 @@ def relation_message():
     status_set('waiting', 'Waiting for relation to ETCD')
 
 
-@when('etcd.available', 'tls.server.certificate available')
+@when('kubeconfig.created')
+@when('etcd.available')
 @when_not('kubelet.available', 'proxy.available')
-def master(etcd):
-    '''Install and run the hyperkube container that starts kubernetes-master.
-    This actually runs the kubelet, which in turn runs a pod that contains the
-    other master components. '''
+def start_kubelet(etcd):
+    '''Run the hyperkube container that starts the kubernetes services.
+    When the leader, run the master services (apiserver, controller, scheduler,
+    proxy)
+    using the master.json from the rendered manifest directory.
+    When a follower, start the node services (kubelet, and proxy). '''
     render_files(etcd)
     # Use the Compose class that encapsulates the docker-compose commands.
     compose = Compose('files/kubernetes')
-    status_set('maintenance', 'Starting the Kubernetes kubelet container.')
-    # Start the Kubernetes kubelet container using docker-compose.
-    compose.up('kubelet')
-    set_state('kubelet.available')
-    # Open the secure port for api-server.
-    hookenv.open_port(6443)
-    status_set('maintenance', 'Starting the Kubernetes proxy container')
-    # Start the Kubernetes proxy container using docker-compose.
-    compose.up('proxy')
-    set_state('proxy.available')
-    status_set('active', 'Kubernetes started')
+    status_set('maintenance', 'Starting the Kubernetes services.')
+    if is_leader():
+        compose.up('master')
+        compose.up('proxy')
+        set_state('kubelet.available')
+        # Open the secure port for api-server.
+        hookenv.open_port(6443)
+    else:
+        # Start the Kubernetes kubelet container using docker-compose.
+        compose.up('kubelet')
+        set_state('kubelet.available')
+        # Start the Kubernetes proxy container using docker-compose.
+        compose.up('proxy')
+        set_state('proxy.available')
+    status_set('active', 'Kubernetes services started')
 
 
-@when('proxy.available')
+@when('docker.available')
 @when_not('kubectl.downloaded')
 def download_kubectl():
     '''Download the kubectl binary to test and interact with the cluster.'''
     status_set('maintenance', 'Downloading the kubectl binary')
     version = hookenv.config()['version']
-    cmd = 'wget -nv -O /usr/local/bin/kubectl https://storage.googleapis.com/' \
-          'kubernetes-release/release/{0}/bin/linux/amd64/kubectl'
-    cmd = cmd.format(version)
+    cmd = 'wget -nv -O /usr/local/bin/kubectl https://storage.googleapis.com' \
+          '/kubernetes-release/release/{0}/bin/linux/{1}/kubectl'
+    cmd = cmd.format(version, arch())
     hookenv.log('Downloading kubelet: {0}'.format(cmd))
     check_call(split(cmd))
     cmd = 'chmod +x /usr/local/bin/kubectl'
     check_call(split(cmd))
     set_state('kubectl.downloaded')
-    status_set('active', 'Kubernetes installed')
 
 
-@when('kubectl.downloaded')
-@when_not('kubectl.package.created')
-def package_kubectl():
-    '''Package the kubectl binary and configuration to a tar file for users
-    to consume and interact directly with Kubernetes.'''
-    if not is_leader():
-        return
-    context = 'default-context'
-    cluster_name = 'kubernetes'
-    public_address = hookenv.unit_public_ip()
+@when('kubectl.downloaded', 'leadership.is_leader', 'k8s.certificate.authority available', 'k8s.client.certficate available')  # noqa
+@when_not('kubeconfig.created')
+def master_kubeconfig():
+    '''Create the kubernetes configuration for the master unit. The master
+    should create a package with the client credentials so the user can
+    interact securely with the apiserver.'''
+    hookenv.log('Creating Kubernetes configuration for master node.')
     directory = '/srv/kubernetes'
-    key = 'client.key'
-    ca = 'ca.crt'
-    cert = 'client.crt'
-    user = 'ubuntu'
-    port = '6443'
+    ca = '/srv/kubernetes/ca.crt'
+    key = '/srv/kubernetes/client.key'
+    cert = '/srv/kubernetes/client.crt'
+    # Get the public address of the apiserver so users can access the master.
+    server = 'https://{0}:{1}'.format(hookenv.unit_public_ip(), '6443')
+    # Create the client kubeconfig so users can access the master node.
+    create_kubeconfig(directory, server, ca, key, cert)
+    # Copy the kubectl binary to this directory.
+    cmd = 'cp -v /usr/local/bin/kubectl {0}'.format(directory)
+    check_call(split(cmd))
+    # Use a context manager to run the tar command in a specific directory.
     with chdir(directory):
-        # Create the config file with the external address for this server.
-        cmd = 'kubectl config set-cluster --kubeconfig={0}/config {1} ' \
-              '--server=https://{2}:{3} --certificate-authority={4}'
-        check_call(split(cmd.format(directory, cluster_name, public_address,
-                                    port, ca)))
-        # Create the credentials.
-        cmd = 'kubectl config set-credentials --kubeconfig={0}/config {1} ' \
-              '--client-key={2} --client-certificate={3}'
-        check_call(split(cmd.format(directory, user, key, cert)))
-        # Create a default context with the cluster.
-        cmd = 'kubectl config set-context --kubeconfig={0}/config {1}' \
-              ' --cluster={2} --user={3}'
-        check_call(split(cmd.format(directory, context, cluster_name, user)))
-        # Now make the config use this new context.
-        cmd = 'kubectl config use-context --kubeconfig={0}/config {1}'
-        check_call(split(cmd.format(directory, context)))
-        # Copy the kubectl binary to this directory
-        cmd = 'cp -v /usr/local/bin/kubectl {0}'.format(directory)
+        # Create a package with kubectl and the files to use it externally.
+        cmd = 'tar -cvzf /home/ubuntu/kubectl_package.tar.gz ca.crt ' \
+              'client.key client.crt kubectl kubeconfig'
         check_call(split(cmd))
 
-        # Create an archive with all the necessary files.
-        cmd = 'tar -cvzf /home/ubuntu/kubectl_package.tar.gz ca.crt client.crt client.key config kubectl'  # noqa
-        check_call(split(cmd))
-        set_state('kubectl.package.created')
+    # This sets up the client workspace consistently on the leader and nodes.
+    node_kubeconfig()
+    set_state('kubeconfig.created')
+
+
+@when('kubectl.downloaded', 'k8s.certificate.authority available', 'k8s.server.certificate available')  # noqa
+@when_not('kubeconfig.created', 'leadership.is_leader')
+def node_kubeconfig():
+    '''Create the kubernetes configuration (kubeconfig) for this unit.
+    The the nodes will create a kubeconfig with the server credentials so
+    the services can interact securely with the apiserver.'''
+    hookenv.log('Creating Kubernetes configuration for worker node.')
+    directory = '/var/lib/kubelet'
+    ca = '/srv/kubernetes/ca.crt'
+    cert = '/srv/kubernetes/server.crt'
+    key = '/srv/kubernetes/server.key'
+    # Get the private address of the apiserver for communication between units.
+    server = 'https://{0}:{1}'.format(leader_get('master-address'), '6443')
+    # Create the kubeconfig for the other services.
+    kubeconfig = create_kubeconfig(directory, server, ca, key, cert)
+    # Install the kubeconfig in the root user's home directory.
+    install_kubeconfig(kubeconfig, '/root/.kube', 'root')
+    # Install the kubeconfig in the ubunut user's home directory.
+    install_kubeconfig(kubeconfig, '/home/ubuntu/.kube', 'ubuntu')
+    set_state('kubeconfig.created')
 
 
 @when('proxy.available')
@@ -244,54 +301,131 @@ def start_cadvisor():
     application containers on this system. '''
     compose = Compose('files/kubernetes')
     compose.up('cadvisor')
-    set_state('cadvisor.available')
-    status_set('active', 'cadvisor running on port 8088')
     hookenv.open_port(8088)
+    status_set('active', 'cadvisor running on port 8088')
+    set_state('cadvisor.available')
 
 
-@when('sdn.available')
+@when('kubelet.available', 'kubeconfig.created')
+@when_any('proxy.available', 'cadvisor.available', 'kubedns.available')
+def final_message():
+    '''Issue some final messages when the services are started. '''
+    # TODO: Run a simple/quick health checks before issuing this message.
+    status_set('active', 'Kubernetes running.')
+
+
 def gather_sdn_data():
     '''Get the Software Defined Network (SDN) information and return it as a
-    dictionary.'''
+    dictionary. '''
+    sdn_data = {}
+    # The dictionary named 'pillar' is a construct of the k8s template files.
+    pillar = {}
     # SDN Providers pass data via the unitdata.kv module
     db = unitdata.kv()
-    # Generate an IP address for the DNS provider
+    # Ideally the DNS address should come from the sdn cidr.
     subnet = db.get('sdn_subnet')
     if subnet:
-        ip = subnet.split('/')[0]
-        dns_server = '.'.join(ip.split('.')[0:-1]) + '.10'
-        addedcontext = {}
-        addedcontext['dns_server'] = dns_server
-        return addedcontext
-    return {}
+        # Generate the DNS ip address on the SDN cidr (this is desired).
+        pillar['dns_server'] = get_dns_ip(subnet)
+    else:
+        # There is no SDN cider fall back to the kubernetes config cidr option.
+        pillar['dns_server'] = get_dns_ip(hookenv.config().get('cidr'))
+    # The pillar['dns_domain'] value is used in the kubedns-rc.yaml
+    pillar['dns_domain'] = hookenv.config().get('dns_domain')
+    # Use a 'pillar' dictionary so we can reuse the upstream kubedns templates.
+    sdn_data['pillar'] = pillar
+    return sdn_data
 
 
-def copy_key(directory, prefix):
-    '''Copy the key from the easy-rsa/easyrsa3/pki/private directory to the
-    specified directory. '''
+def install_kubeconfig(kubeconfig, directory, user):
+    '''Copy the a file from the target to a new directory creating directories
+    if necessary. '''
+    # The file and directory must be owned by the correct user.
+    chown = 'chown {0}:{0} {1}'
     if not os.path.isdir(directory):
         os.makedirs(directory)
-        os.chmod(directory, 0o770)
-    # Must remove the path characters from the local unit name.
-    path_name = hookenv.local_unit().replace('/', '_')
-    # The key is not in unitdata it is in the local easy-rsa directory.
-    local_key_path = 'easy-rsa/easyrsa3/pki/private/{0}.key'.format(path_name)
-    key_name = '{0}.key'.format(prefix)
-    # The key should be copied to this directory.
-    destination_key_path = os.path.join(directory, key_name)
-    # Copy the key file from the local directory to the destination.
-    copy2(local_key_path, destination_key_path)
+        # Change the ownership of the config file to the right user.
+        check_call(split(chown.format(user, directory)))
+    # kubectl looks for a file named "config" in the ~/.kube directory.
+    config = os.path.join(directory, 'config')
+    # Copy the kubeconfig file to the directory renaming it to "config".
+    cmd = 'cp -v {0} {1}'.format(kubeconfig, config)
+    check_call(split(cmd))
+    # Change the ownership of the config file to the right user.
+    check_call(split(chown.format(user, config)))
+
+
+def create_kubeconfig(directory, server, ca, key, cert, user='ubuntu'):
+    '''Create a configuration for kubernetes in a specific directory using
+    the supplied arguments, return the path to the file.'''
+    context = 'default-context'
+    cluster_name = 'kubernetes'
+    # Ensure the destination directory exists.
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+    # The configuration file should be in this directory named kubeconfig.
+    kubeconfig = os.path.join(directory, 'kubeconfig')
+    # Create the config file with the address of the master server.
+    cmd = 'kubectl config set-cluster --kubeconfig={0} {1} ' \
+          '--server={2} --certificate-authority={3}'
+    check_call(split(cmd.format(kubeconfig, cluster_name, server, ca)))
+    # Create the credentials using the client flags.
+    cmd = 'kubectl config set-credentials --kubeconfig={0} {1} ' \
+          '--client-key={2} --client-certificate={3}'
+    check_call(split(cmd.format(kubeconfig, user, key, cert)))
+    # Create a default context with the cluster.
+    cmd = 'kubectl config set-context --kubeconfig={0} {1} ' \
+          '--cluster={2} --user={3}'
+    check_call(split(cmd.format(kubeconfig, context, cluster_name, user)))
+    # Make the config use this new context.
+    cmd = 'kubectl config use-context --kubeconfig={0} {1}'
+    check_call(split(cmd.format(kubeconfig, context)))
+
+    hookenv.log('kubectl configuration created at {0}.'.format(kubeconfig))
+    return kubeconfig
+
+
+def get_dns_ip(cidr):
+    '''Get an IP address for the DNS server on the provided cidr.'''
+    # Remove the range from the cidr.
+    ip = cidr.split('/')[0]
+    # Take the last octet off the IP address and replace it with 10.
+    return '.'.join(ip.split('.')[0:-1]) + '.10'
+
+
+def get_sdn_ip(cidr):
+    '''Get the IP address for the SDN gateway based on the provided cidr.'''
+    # Remove the range from the cidr.
+    ip = cidr.split('/')[0]
+    # Remove the last octet and replace it with 1.
+    return '.'.join(ip.split('.')[0:-1]) + '.1'
 
 
 def render_files(reldata=None):
     '''Use jinja templating to render the docker-compose.yml and master.json
     file to contain the dynamic data for the configuration files.'''
     context = {}
-    # Load the context manager with sdn and config data.
+    # Load the context data with SDN data.
     context.update(gather_sdn_data())
+    # Add the charm configuration data to the context.
     context.update(hookenv.config())
     if reldata:
-        context.update({'connection_string': reldata.connection_string()})
+        connection_string = reldata.get_connection_string()
+        # Define where the etcd tls files will be kept.
+        etcd_dir = '/etc/ssl/etcd'
+        # Create paths to the etcd client ca, key, and cert file locations.
+        ca = os.path.join(etcd_dir, 'client-ca.pem')
+        key = os.path.join(etcd_dir, 'client-key.pem')
+        cert = os.path.join(etcd_dir, 'client-cert.pem')
+        # Save the client credentials (in relation data) to the paths provided.
+        reldata.save_client_credentials(key, cert, ca)
+        # Update the context so the template has the etcd information.
+        context.update({'etcd_dir': etcd_dir,
+                        'connection_string': connection_string,
+                        'etcd_ca': ca,
+                        'etcd_key': key,
+                        'etcd_cert': cert})
+
     charm_dir = hookenv.charm_dir()
     rendered_kube_dir = os.path.join(charm_dir, 'files/kubernetes')
     if not os.path.exists(rendered_kube_dir):
@@ -299,39 +433,53 @@ def render_files(reldata=None):
     rendered_manifest_dir = os.path.join(charm_dir, 'files/manifests')
     if not os.path.exists(rendered_manifest_dir):
         os.makedirs(rendered_manifest_dir)
-    # Add the manifest directory so the docker-compose file can have.
-    context.update({'manifest_directory': rendered_manifest_dir,
+
+    # Update the context with extra values, arch, manifest dir, and private IP.
+    context.update({'arch': arch(),
+                    'master_address': leader_get('master-address'),
+                    'manifest_directory': rendered_manifest_dir,
+                    'public_address': hookenv.unit_get('public-address'),
                     'private_address': hookenv.unit_get('private-address')})
 
+    # Adapted from: http://kubernetes.io/docs/getting-started-guides/docker/
+    target = os.path.join(rendered_kube_dir, 'docker-compose.yml')
     # Render the files/kubernetes/docker-compose.yml file that contains the
     # definition for kubelet and proxy.
-    target = os.path.join(rendered_kube_dir, 'docker-compose.yml')
     render('docker-compose.yml', target, context)
-    # Render the files/manifests/master.json that contains parameters for the
-    # apiserver, controller, and controller-manager
-    target = os.path.join(rendered_manifest_dir, 'master.json')
-    render('master.json', target, context)
-    # Render files/kubernetes/skydns-svc.yaml for SkyDNS service
-    target = os.path.join(rendered_manifest_dir, 'skydns-svc.yml')
-    render('skydns-svc.yml', target, context)
-    # Render files/kubernetes/skydns-rc.yaml for SkyDNS pods
-    target = os.path.join(rendered_manifest_dir, 'skydns-rc.yml')
-    render('skydns-rc.yml', target, context)
+
+    if is_leader():
+        # Source: https://github.com/kubernetes/...master/cluster/images/hyperkube  # noqa
+        target = os.path.join(rendered_manifest_dir, 'master.json')
+        # Render the files/manifests/master.json that contains parameters for
+        # the apiserver, controller, and controller-manager
+        render('master.json', target, context)
+        # Source: ...cluster/addons/dns/skydns-svc.yaml.in
+        target = os.path.join(rendered_manifest_dir, 'kubedns-svc.yaml')
+        # Render files/kubernetes/kubedns-svc.yaml for the DNS service.
+        render('kubedns-svc.yaml', target, context)
+        # Source: ...cluster/addons/dns/skydns-rc.yaml.in
+        target = os.path.join(rendered_manifest_dir, 'kubedns-rc.yaml')
+        # Render files/kubernetes/kubedns-rc.yaml for the DNS pod.
+        render('kubedns-rc.yaml', target, context)
 
 
-def save_certificate(directory, prefix):
-    '''Get the certificate from the charm unitdata, and write it to the proper
-    directory. The parameters are: destination directory, and prefix to use
-    for the key and certificate name.'''
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
-        os.chmod(directory, 0o770)
-    # Grab the unitdata key value store.
-    store = unitdata.kv()
-    certificate_data = store.get('tls.{0}.certificate'.format(prefix))
-    certificate_name = '{0}.crt'.format(prefix)
-    # The certificate should be saved to this directory.
-    certificate_path = os.path.join(directory, certificate_name)
-    # write the server certificate out to the correct location
-    with open(certificate_path, 'w') as fp:
-        fp.write(certificate_data)
+def status_set(level, message):
+    '''Output status message with leadership information.'''
+    if is_leader():
+        message = '{0} (master) '.format(message)
+    hookenv.status_set(level, message)
+
+
+def arch():
+    '''Return the package architecture as a string. Raise an exception if the
+    architecture is not supported by kubernetes.'''
+    # Get the package architecture for this system.
+    architecture = check_output(['dpkg', '--print-architecture']).rstrip()
+    # Convert the binary result into a string.
+    architecture = architecture.decode('utf-8')
+    # Validate the architecture is supported by kubernetes.
+    if architecture not in ['amd64', 'arm', 'arm64', 'ppc64le']:
+        message = 'Unsupported machine architecture: {0}'.format(architecture)
+        status_set('blocked', message)
+        raise Exception(message)
+    return architecture

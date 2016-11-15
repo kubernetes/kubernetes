@@ -146,6 +146,7 @@ func TestConnectionCloseIsImmediateThroughAProxy(t *testing.T) {
 	}
 
 	expired := time.NewTimer(15 * time.Second)
+	defer expired.Stop()
 	i := 0
 	for {
 		select {

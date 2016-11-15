@@ -98,7 +98,7 @@ func pagesAssetsHtmlContainersHtml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "pages/assets/html/containers.html", size: 9533, mode: os.FileMode(416), modTime: time.Unix(1462817463, 0)}
+	info := bindataFileInfo{name: "pages/assets/html/containers.html", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

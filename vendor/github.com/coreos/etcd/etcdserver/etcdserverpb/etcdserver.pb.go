@@ -13,8 +13,10 @@
 	It has these top-level messages:
 		Request
 		Metadata
+		RequestHeader
 		InternalRaftRequest
 		EmptyResponse
+		InternalAuthenticateRequest
 		ResponseHeader
 		RangeRequest
 		RangeResponse
@@ -22,8 +24,8 @@
 		PutResponse
 		DeleteRangeRequest
 		DeleteRangeResponse
-		RequestUnion
-		ResponseUnion
+		RequestOp
+		ResponseOp
 		Compare
 		TxnRequest
 		TxnResponse
@@ -31,6 +33,8 @@
 		CompactionResponse
 		HashRequest
 		HashResponse
+		SnapshotRequest
+		SnapshotResponse
 		WatchRequest
 		WatchCreateRequest
 		WatchCancelRequest
@@ -64,13 +68,15 @@
 		AuthUserGetRequest
 		AuthUserDeleteRequest
 		AuthUserChangePasswordRequest
-		AuthUserGrantRequest
-		AuthUserRevokeRequest
+		AuthUserGrantRoleRequest
+		AuthUserRevokeRoleRequest
 		AuthRoleAddRequest
 		AuthRoleGetRequest
+		AuthUserListRequest
+		AuthRoleListRequest
 		AuthRoleDeleteRequest
-		AuthRoleGrantRequest
-		AuthRoleRevokeRequest
+		AuthRoleGrantPermissionRequest
+		AuthRoleRevokePermissionRequest
 		AuthEnableResponse
 		AuthDisableResponse
 		AuthenticateResponse
@@ -78,65 +84,73 @@
 		AuthUserGetResponse
 		AuthUserDeleteResponse
 		AuthUserChangePasswordResponse
-		AuthUserGrantResponse
-		AuthUserRevokeResponse
+		AuthUserGrantRoleResponse
+		AuthUserRevokeRoleResponse
 		AuthRoleAddResponse
 		AuthRoleGetResponse
+		AuthRoleListResponse
+		AuthUserListResponse
 		AuthRoleDeleteResponse
-		AuthRoleGrantResponse
-		AuthRoleRevokeResponse
+		AuthRoleGrantPermissionResponse
+		AuthRoleRevokePermissionResponse
 */
 package etcdserverpb
 
 import (
 	"fmt"
 
-	proto "github.com/gogo/protobuf/proto"
+	proto "github.com/golang/protobuf/proto"
 
 	math "math"
-)
 
-import io "io"
+	io "io"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+const _ = proto.ProtoPackageIsVersion1
+
 type Request struct {
-	ID               uint64 `protobuf:"varint,1,opt,name=ID" json:"ID"`
-	Method           string `protobuf:"bytes,2,opt,name=Method" json:"Method"`
-	Path             string `protobuf:"bytes,3,opt,name=Path" json:"Path"`
-	Val              string `protobuf:"bytes,4,opt,name=Val" json:"Val"`
-	Dir              bool   `protobuf:"varint,5,opt,name=Dir" json:"Dir"`
-	PrevValue        string `protobuf:"bytes,6,opt,name=PrevValue" json:"PrevValue"`
-	PrevIndex        uint64 `protobuf:"varint,7,opt,name=PrevIndex" json:"PrevIndex"`
-	PrevExist        *bool  `protobuf:"varint,8,opt,name=PrevExist" json:"PrevExist,omitempty"`
-	Expiration       int64  `protobuf:"varint,9,opt,name=Expiration" json:"Expiration"`
-	Wait             bool   `protobuf:"varint,10,opt,name=Wait" json:"Wait"`
-	Since            uint64 `protobuf:"varint,11,opt,name=Since" json:"Since"`
-	Recursive        bool   `protobuf:"varint,12,opt,name=Recursive" json:"Recursive"`
-	Sorted           bool   `protobuf:"varint,13,opt,name=Sorted" json:"Sorted"`
-	Quorum           bool   `protobuf:"varint,14,opt,name=Quorum" json:"Quorum"`
-	Time             int64  `protobuf:"varint,15,opt,name=Time" json:"Time"`
-	Stream           bool   `protobuf:"varint,16,opt,name=Stream" json:"Stream"`
-	Refresh          *bool  `protobuf:"varint,17,opt,name=Refresh" json:"Refresh,omitempty"`
+	ID               uint64 `protobuf:"varint,1,opt,name=ID,json=iD" json:"ID"`
+	Method           string `protobuf:"bytes,2,opt,name=Method,json=method" json:"Method"`
+	Path             string `protobuf:"bytes,3,opt,name=Path,json=path" json:"Path"`
+	Val              string `protobuf:"bytes,4,opt,name=Val,json=val" json:"Val"`
+	Dir              bool   `protobuf:"varint,5,opt,name=Dir,json=dir" json:"Dir"`
+	PrevValue        string `protobuf:"bytes,6,opt,name=PrevValue,json=prevValue" json:"PrevValue"`
+	PrevIndex        uint64 `protobuf:"varint,7,opt,name=PrevIndex,json=prevIndex" json:"PrevIndex"`
+	PrevExist        *bool  `protobuf:"varint,8,opt,name=PrevExist,json=prevExist" json:"PrevExist,omitempty"`
+	Expiration       int64  `protobuf:"varint,9,opt,name=Expiration,json=expiration" json:"Expiration"`
+	Wait             bool   `protobuf:"varint,10,opt,name=Wait,json=wait" json:"Wait"`
+	Since            uint64 `protobuf:"varint,11,opt,name=Since,json=since" json:"Since"`
+	Recursive        bool   `protobuf:"varint,12,opt,name=Recursive,json=recursive" json:"Recursive"`
+	Sorted           bool   `protobuf:"varint,13,opt,name=Sorted,json=sorted" json:"Sorted"`
+	Quorum           bool   `protobuf:"varint,14,opt,name=Quorum,json=quorum" json:"Quorum"`
+	Time             int64  `protobuf:"varint,15,opt,name=Time,json=time" json:"Time"`
+	Stream           bool   `protobuf:"varint,16,opt,name=Stream,json=stream" json:"Stream"`
+	Refresh          *bool  `protobuf:"varint,17,opt,name=Refresh,json=refresh" json:"Refresh,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *Request) Reset()         { *m = Request{} }
-func (m *Request) String() string { return proto.CompactTextString(m) }
-func (*Request) ProtoMessage()    {}
+func (m *Request) Reset()                    { *m = Request{} }
+func (m *Request) String() string            { return proto.CompactTextString(m) }
+func (*Request) ProtoMessage()               {}
+func (*Request) Descriptor() ([]byte, []int) { return fileDescriptorEtcdserver, []int{0} }
 
 type Metadata struct {
-	NodeID           uint64 `protobuf:"varint,1,opt,name=NodeID" json:"NodeID"`
-	ClusterID        uint64 `protobuf:"varint,2,opt,name=ClusterID" json:"ClusterID"`
+	NodeID           uint64 `protobuf:"varint,1,opt,name=NodeID,json=nodeID" json:"NodeID"`
+	ClusterID        uint64 `protobuf:"varint,2,opt,name=ClusterID,json=clusterID" json:"ClusterID"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *Metadata) Reset()         { *m = Metadata{} }
-func (m *Metadata) String() string { return proto.CompactTextString(m) }
-func (*Metadata) ProtoMessage()    {}
+func (m *Metadata) Reset()                    { *m = Metadata{} }
+func (m *Metadata) String() string            { return proto.CompactTextString(m) }
+func (*Metadata) ProtoMessage()               {}
+func (*Metadata) Descriptor() ([]byte, []int) { return fileDescriptorEtcdserver, []int{1} }
 
 func init() {
 	proto.RegisterType((*Request)(nil), "etcdserverpb.Request")
@@ -995,3 +1009,33 @@ var (
 	ErrInvalidLengthEtcdserver = fmt.Errorf("proto: negative length found during unmarshaling")
 	ErrIntOverflowEtcdserver   = fmt.Errorf("proto: integer overflow")
 )
+
+var fileDescriptorEtcdserver = []byte{
+	// 404 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x5c, 0x92, 0x41, 0x6e, 0x13, 0x31,
+	0x14, 0x86, 0xe3, 0xc4, 0x99, 0x64, 0x4c, 0x81, 0x62, 0x45, 0xe8, 0xa9, 0x42, 0x43, 0x14, 0xb1,
+	0xc8, 0x0a, 0xee, 0x50, 0xd2, 0x45, 0x24, 0x8a, 0x4a, 0x8a, 0xca, 0xda, 0x64, 0x1e, 0x8d, 0xa5,
+	0xcc, 0x78, 0x6a, 0xbf, 0x19, 0x72, 0x03, 0xae, 0xc0, 0x91, 0xb2, 0xe4, 0x04, 0x08, 0xc2, 0x45,
+	0x90, 0x3d, 0x9d, 0x60, 0xba, 0xb3, 0xbe, 0xff, 0xf7, 0xef, 0xdf, 0xf6, 0x13, 0xa7, 0x48, 0xeb,
+	0xdc, 0xa1, 0x6d, 0xd0, 0xbe, 0xae, 0xac, 0x21, 0x23, 0x4f, 0xfe, 0x91, 0xea, 0xf3, 0xd9, 0xe4,
+	0xd6, 0xdc, 0x9a, 0x20, 0xbc, 0xf1, 0xab, 0xd6, 0x33, 0xfb, 0xc6, 0xc5, 0x68, 0x85, 0x77, 0x35,
+	0x3a, 0x92, 0x13, 0xd1, 0x5f, 0x2e, 0x80, 0x4d, 0xd9, 0x9c, 0x9f, 0xf3, 0xfd, 0xcf, 0x97, 0xbd,
+	0x55, 0x5f, 0x2f, 0xe4, 0x0b, 0x91, 0x5c, 0x22, 0x6d, 0x4c, 0x0e, 0xfd, 0x29, 0x9b, 0xa7, 0xf7,
+	0x4a, 0x52, 0x04, 0x26, 0x41, 0xf0, 0x2b, 0x45, 0x1b, 0x18, 0x44, 0x1a, 0xaf, 0x14, 0x6d, 0xe4,
+	0x73, 0x31, 0xb8, 0x51, 0x5b, 0xe0, 0x91, 0x30, 0x68, 0xd4, 0xd6, 0xf3, 0x85, 0xb6, 0x30, 0x9c,
+	0xb2, 0xf9, 0xb8, 0xe3, 0xb9, 0xb6, 0x72, 0x26, 0xd2, 0x2b, 0x8b, 0xcd, 0x8d, 0xda, 0xd6, 0x08,
+	0x49, 0xb4, 0x2b, 0xad, 0x3a, 0xdc, 0x79, 0x96, 0x65, 0x8e, 0x3b, 0x18, 0x45, 0x45, 0x83, 0x27,
+	0xe0, 0xce, 0x73, 0xb1, 0xd3, 0x8e, 0x60, 0x7c, 0x3c, 0x85, 0xb5, 0x9e, 0x80, 0xe5, 0x2b, 0x21,
+	0x2e, 0x76, 0x95, 0xb6, 0x8a, 0xb4, 0x29, 0x21, 0x9d, 0xb2, 0xf9, 0xe0, 0x3e, 0x48, 0xe0, 0x91,
+	0xfb, 0xbb, 0x7d, 0x52, 0x9a, 0x40, 0x44, 0x55, 0xf9, 0x57, 0xa5, 0x49, 0x9e, 0x89, 0xe1, 0xb5,
+	0x2e, 0xd7, 0x08, 0x8f, 0xa2, 0x0e, 0x43, 0xe7, 0x91, 0x3f, 0x7f, 0x85, 0xeb, 0xda, 0x3a, 0xdd,
+	0x20, 0x9c, 0x44, 0x5b, 0x53, 0xdb, 0x61, 0xff, 0xa6, 0xd7, 0xc6, 0x12, 0xe6, 0xf0, 0x38, 0x32,
+	0x24, 0x2e, 0x30, 0xaf, 0x7e, 0xa8, 0x8d, 0xad, 0x0b, 0x78, 0x12, 0xab, 0x77, 0x81, 0xf9, 0x56,
+	0x1f, 0x75, 0x81, 0xf0, 0x34, 0x6a, 0xcd, 0x49, 0x17, 0x6d, 0x2a, 0x59, 0x54, 0x05, 0x9c, 0xfe,
+	0x97, 0x1a, 0x98, 0xcc, 0xfc, 0x47, 0x7f, 0xb1, 0xe8, 0x36, 0xf0, 0x2c, 0x7a, 0x95, 0x91, 0x6d,
+	0xe1, 0xec, 0x9d, 0x18, 0x5f, 0x22, 0xa9, 0x5c, 0x91, 0xf2, 0x49, 0xef, 0x4d, 0x8e, 0x0f, 0xa6,
+	0x21, 0x29, 0x03, 0xf3, 0x37, 0x7c, 0xbb, 0xad, 0x1d, 0xa1, 0x5d, 0x2e, 0xc2, 0x50, 0x1c, 0x7f,
+	0x61, 0xdd, 0xe1, 0xf3, 0xc9, 0xfe, 0x77, 0xd6, 0xdb, 0x1f, 0x32, 0xf6, 0xe3, 0x90, 0xb1, 0x5f,
+	0x87, 0x8c, 0x7d, 0xff, 0x93, 0xf5, 0xfe, 0x06, 0x00, 0x00, 0xff, 0xff, 0x80, 0x62, 0xfc, 0x40,
+	0xa4, 0x02, 0x00, 0x00,
+}

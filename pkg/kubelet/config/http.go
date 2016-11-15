@@ -29,19 +29,20 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 type sourceURL struct {
 	url         string
 	header      http.Header
-	nodeName    string
+	nodeName    types.NodeName
 	updates     chan<- interface{}
 	data        []byte
 	failureLogs int
 	client      *http.Client
 }
 
-func NewSourceURL(url string, header http.Header, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
 		header:   header,
@@ -49,7 +50,7 @@ func NewSourceURL(url string, header http.Header, nodeName string, period time.D
 		updates:  updates,
 		data:     nil,
 		// Timing out requests leads to retries. This client is only used to
-		// read the the manifest URL passed to kubelet.
+		// read the manifest URL passed to kubelet.
 		client: &http.Client{Timeout: 10 * time.Second},
 	}
 	glog.V(1).Infof("Watching URL %s", url)

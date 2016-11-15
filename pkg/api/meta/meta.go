@@ -29,104 +29,66 @@ import (
 	"github.com/golang/glog"
 )
 
+// errNotList is returned when an object implements the Object style interfaces but not the List style
+// interfaces.
+var errNotList = fmt.Errorf("object does not implement the List interfaces")
+
+// ListAccessor returns a List interface for the provided object or an error if the object does
+// not provide List.
+// IMPORTANT: Objects are a superset of lists, so all Objects return List metadata. Do not use this
+// check to determine whether an object *is* a List.
+// TODO: return bool instead of error
 func ListAccessor(obj interface{}) (List, error) {
-	if listMetaAccessor, ok := obj.(ListMetaAccessor); ok {
-		if om := listMetaAccessor.GetListMeta(); om != nil {
-			return om, nil
+	switch t := obj.(type) {
+	case List:
+		return t, nil
+	case unversioned.List:
+		return t, nil
+	case ListMetaAccessor:
+		if m := t.GetListMeta(); m != nil {
+			return m, nil
 		}
-	}
-	if listMetaAccessor, ok := obj.(unversioned.ListMetaAccessor); ok {
-		if om := listMetaAccessor.GetListMeta(); om != nil {
-			return om, nil
+		return nil, errNotList
+	case unversioned.ListMetaAccessor:
+		if m := t.GetListMeta(); m != nil {
+			return m, nil
 		}
-	}
-	// we may get passed an object that is directly portable to List
-	if list, ok := obj.(List); ok {
-		return list, nil
-	}
-	glog.V(4).Infof("Calling ListAccessor on non-internal object: %v", reflect.TypeOf(obj))
-	// legacy path for objects that do not implement List and ListMetaAccessor via
-	// reflection - very slow code path.
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	t := v.Type()
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), t, v.Interface())
-	}
-	a := &genericAccessor{}
-	listMeta := v.FieldByName("ListMeta")
-	if listMeta.IsValid() {
-		// look for the ListMeta fields
-		if err := extractFromListMeta(listMeta, a); err != nil {
-			return nil, fmt.Errorf("unable to find list fields on %#v: %v", listMeta, err)
+		return nil, errNotList
+	case Object:
+		return t, nil
+	case ObjectMetaAccessor:
+		if m := t.GetObjectMeta(); m != nil {
+			return m, nil
 		}
-	} else {
-		return nil, fmt.Errorf("unable to find listMeta on %#v", v)
+		return nil, errNotList
+	default:
+		return nil, errNotList
 	}
-	return a, nil
 }
+
+// errNotObject is returned when an object implements the List style interfaces but not the Object style
+// interfaces.
+var errNotObject = fmt.Errorf("object does not implement the Object interfaces")
 
 // Accessor takes an arbitrary object pointer and returns meta.Interface.
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
+// TODO: return bool instead of error
 func Accessor(obj interface{}) (Object, error) {
-	if objectMetaAccessor, ok := obj.(ObjectMetaAccessor); ok {
-		if om := objectMetaAccessor.GetObjectMeta(); om != nil {
-			return om, nil
+	switch t := obj.(type) {
+	case Object:
+		return t, nil
+	case ObjectMetaAccessor:
+		if m := t.GetObjectMeta(); m != nil {
+			return m, nil
 		}
+		return nil, errNotObject
+	case List, unversioned.List, ListMetaAccessor, unversioned.ListMetaAccessor:
+		return nil, errNotObject
+	default:
+		return nil, errNotObject
 	}
-	// we may get passed an object that is directly portable to Object
-	if object, ok := obj.(Object); ok {
-		return object, nil
-	}
-
-	glog.V(4).Infof("Calling Accessor on non-internal object: %v", reflect.TypeOf(obj))
-	// legacy path for objects that do not implement Object and ObjectMetaAccessor via
-	// reflection - very slow code path.
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	t := v.Type()
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), t, v.Interface())
-	}
-
-	typeMeta := v.FieldByName("TypeMeta")
-	if !typeMeta.IsValid() {
-		return nil, fmt.Errorf("struct %v lacks embedded TypeMeta type", t)
-	}
-
-	a := &genericAccessor{}
-	if err := extractFromTypeMeta(typeMeta, a); err != nil {
-		return nil, fmt.Errorf("unable to find type fields on %#v: %v", typeMeta, err)
-	}
-
-	objectMeta := v.FieldByName("ObjectMeta")
-	if objectMeta.IsValid() {
-		// look for the ObjectMeta fields
-		if err := extractFromObjectMeta(objectMeta, a); err != nil {
-			return nil, fmt.Errorf("unable to find object fields on %#v: %v", objectMeta, err)
-		}
-	} else {
-		listMeta := v.FieldByName("ListMeta")
-		if listMeta.IsValid() {
-			// look for the ListMeta fields
-			if err := extractFromListMeta(listMeta, a); err != nil {
-				return nil, fmt.Errorf("unable to find list fields on %#v: %v", listMeta, err)
-			}
-		} else {
-			// look for the older TypeMeta with all metadata
-			if err := extractFromObjectMeta(typeMeta, a); err != nil {
-				return nil, fmt.Errorf("unable to find object fields on %#v: %v", typeMeta, err)
-			}
-		}
-	}
-
-	return a, nil
 }
 
 // TypeAccessor returns an interface that allows retrieving and modifying the APIVersion
@@ -283,7 +245,7 @@ func (resourceAccessor) SetUID(obj runtime.Object, uid types.UID) error {
 }
 
 func (resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
-	accessor, err := Accessor(obj)
+	accessor, err := ListAccessor(obj)
 	if err != nil {
 		return "", err
 	}
@@ -291,7 +253,7 @@ func (resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
 }
 
 func (resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
-	accessor, err := Accessor(obj)
+	accessor, err := ListAccessor(obj)
 	if err != nil {
 		return err
 	}
@@ -334,7 +296,7 @@ func (resourceAccessor) SetAnnotations(obj runtime.Object, annotations map[strin
 }
 
 func (resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
-	accessor, err := Accessor(obj)
+	accessor, err := ListAccessor(obj)
 	if err != nil {
 		return "", err
 	}
@@ -342,7 +304,7 @@ func (resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
 }
 
 func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) error {
-	accessor, err := Accessor(obj)
+	accessor, err := ListAccessor(obj)
 	if err != nil {
 		return err
 	}
@@ -599,57 +561,6 @@ func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "Kind", &a.kind); err != nil {
-		return err
-	}
-	return nil
-}
-
-// extractFromObjectMeta extracts pointers to metadata fields from an object
-func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
-	if err := runtime.FieldPtr(v, "Namespace", &a.namespace); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "Name", &a.name); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "GenerateName", &a.generateName); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "UID", &a.uid); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "SelfLink", &a.selfLink); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "Labels", &a.labels); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "Annotations", &a.annotations); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "Finalizers", &a.finalizers); err != nil {
-		return err
-	}
-	ownerReferences := v.FieldByName("OwnerReferences")
-	if !ownerReferences.IsValid() {
-		return fmt.Errorf("struct %#v lacks OwnerReferences type", v)
-	}
-	if ownerReferences.Kind() != reflect.Slice {
-		return fmt.Errorf("expect %v to be a slice", ownerReferences.Kind())
-	}
-	a.ownerReferences = ownerReferences.Addr()
-	return nil
-}
-
-// extractFromObjectMeta extracts pointers to metadata fields from a list object
-func extractFromListMeta(v reflect.Value, a *genericAccessor) error {
-	if err := runtime.FieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "SelfLink", &a.selfLink); err != nil {
 		return err
 	}
 	return nil

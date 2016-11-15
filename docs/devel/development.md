@@ -1,62 +1,30 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/development.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Development Guide
 
 This document is intended to be the canonical source of truth for things like
 supported toolchain versions for building Kubernetes. If you find a
-requirement that this doc does not capture, please file a bug. If you find
-other docs with references to requirements that are not simply links to this
-doc, please file a bug.
+requirement that this doc does not capture, please
+[submit an issue](https://github.com/kubernetes/kubernetes/issues) on github. If
+you find other docs with references to requirements that are not simply links to
+this doc, please [submit an issue](https://github.com/kubernetes/kubernetes/issues).
 
 This document is intended to be relative to the branch in which it is found.
 It is guaranteed that requirements will change over time for the development
 branch, but release branches of Kubernetes should not change.
 
-## Building Kubernetes
+## Building Kubernetes with Docker
 
 Official releases are built using Docker containers. To build Kubernetes using
-Docker please follow [these
-instructions](http://releases.k8s.io/HEAD/build/README.md).
+Docker please follow [these instructions]
+(http://releases.k8s.io/HEAD/build-tools/README.md).
 
-### Local OS/shell environment
+## Building Kubernetes on a local OS/shell environment
 
-Many of the Kubernetes development helper scripts rely on a fairly up-to-date GNU tools
-environment, so most recent Linux distros should work just fine
-out-of-the-box.  Note that Mac OS X ships with somewhat outdated
-BSD-based tools, some of which may be incompatible in subtle ways, so we recommend
-[replacing those with modern GNU tools](https://www.topbug.net/blog/2013/04/14/install-and-use-gnu-command-line-tools-in-mac-os-x/).
+Many of the Kubernetes development helper scripts rely on a fairly up-to-date
+GNU tools environment, so most recent Linux distros should work just fine
+out-of-the-box. Note that Mac OS X ships with somewhat outdated BSD-based tools,
+some of which may be incompatible in subtle ways, so we recommend
+[replacing those with modern GNU tools]
+(https://www.topbug.net/blog/2013/04/14/install-and-use-gnu-command-line-tools-in-mac-os-x/).
 
 ### Go development environment
 
@@ -65,17 +33,85 @@ To build Kubernetes without using Docker containers, you'll need a Go
 development environment. Builds for Kubernetes 1.0 - 1.2 require Go version
 1.4.2. Builds for Kubernetes 1.3 and higher require Go version 1.6.0. If you
 haven't set up a Go development environment, please follow [these
-instructions](http://golang.org/doc/code.html) to install the go tools and set
-up a GOPATH.
+instructions](http://golang.org/doc/code.html) to install the go tools.
+
+Set up your GOPATH and add a path entry for go binaries to your PATH. Typically
+added to your ~/.profile:
+
+```sh
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+```
+
+### Godep dependency management
+
+Kubernetes build and test scripts use [godep](https://github.com/tools/godep) to
+manage dependencies.
+
+#### Install godep
+
+Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is
+installed on your system. (some of godep's dependencies use the mercurial
+source control system). Use `apt-get install mercurial` or `yum install
+mercurial` on Linux, or [brew.sh](http://brew.sh) on OS X, or download directly
+from mercurial.
+
+Install godep and go-bindata (may require sudo):
+
+```sh
+go get -u github.com/tools/godep
+go get -u github.com/jteeuwen/go-bindata/go-bindata
+```
+
+Note:
+At this time, godep version >= v63 is known to work in the Kubernetes project.
+
+To check your version of godep:
+
+```sh
+$ godep version
+godep v74 (linux/amd64/go1.6.2)
+```
+
+Developers planning to managing dependencies in the `vendor/` tree may want to
+explore alternative environment setups. See
+[using godep to manage dependencies](godep.md).
+
+### Local build using make
 
 To build Kubernetes using your local Go development environment (generate linux
 binaries):
 
-        hack/build-go.sh
-You may pass build options and packages to the script as necessary. To build
-binaries for all platforms:
+```sh
+        make
+```
 
-        hack/build-cross.sh
+You may pass build options and packages to the script as necessary. For example,
+to build with optimizations disabled for enabling use of source debug tools:
+
+```sh
+        make GOGCFLAGS="-N -l"
+```
+
+To build binaries for all platforms:
+
+```sh
+        make cross
+```
+
+### How to update the Go version used to test & build k8s
+
+The kubernetes project tries to stay on the latest version of Go so it can
+benefit from the improvements to the language over time and can easily
+bump to a minor release version for security updates.
+
+Since kubernetes is mostly built and tested in containers, there are a few
+unique places you need to update the go version.
+
+- The image for cross compiling in [build-tools/build-image/cross/](../../build-tools/build-image/cross/). The `VERSION` file and `Dockerfile`.
+- Update [dockerized-e2e-runner.sh](https://github.com/kubernetes/test-infra/blob/master/jenkins/dockerized-e2e-runner.sh) to run a kubekins-e2e with the desired go version, which requires pushing [e2e-image](https://github.com/kubernetes/test-infra/tree/master/jenkins/e2e-image) and [test-image](https://github.com/kubernetes/test-infra/tree/master/jenkins/test-image) images that are `FROM` the desired go version.
+- The docker image being run in [hack/jenkins/gotest-dockerized.sh](../../hack/jenkins/gotest-dockerized.sh).
+- The cross tag `KUBE_BUILD_IMAGE_CROSS_TAG` in [build-tools/common.sh](../../build-tools/common.sh)
 
 ## Workflow
 
@@ -110,7 +146,7 @@ git remote add upstream 'https://github.com/kubernetes/kubernetes.git'
 ### Create a branch and make changes
 
 ```sh
-git checkout -b myfeature
+git checkout -b my-feature
 # Make your code changes
 ```
 
@@ -147,14 +183,16 @@ Then you can commit your changes and push them to your fork:
 
 ```sh
 git commit
-git push -f origin myfeature
+git push -f origin my-feature
 ```
 
 ### Creating a pull request
 
 1. Visit https://github.com/$YOUR_GITHUB_USERNAME/kubernetes
-2. Click the "Compare and pull request" button next to your "myfeature" branch.
+2. Click the "Compare & pull request" button next to your "my-feature" branch.
 3. Check out the pull request [process](pull-requests.md) for more details
+
+**Note:** If you have write access, please refrain from using the GitHub UI for creating PRs, because GitHub will create the PR branch inside the main repository rather than inside your fork.
 
 ### When to retain commits and when to squash
 
@@ -170,143 +208,6 @@ reviews much easier.
 
 See [Faster Reviews](faster_reviews.md) for more details.
 
-## godep and dependency management
-
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies.
-It is not strictly required for building Kubernetes but it is required when
-managing dependencies under the vendor/ tree, and is required by a number of the
-build and test scripts. Please make sure that `godep` is installed and in your
-`$PATH`, and that `godep version` says it is at least v63.
-
-### Installing godep
-
-There are many ways to build and host Go binaries. Here is an easy way to get
-utilities like `godep` installed:
-
-1) Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is
-installed on your system. (some of godep's dependencies use the mercurial
-source control system). Use `apt-get install mercurial` or `yum install
-mercurial` on Linux, or [brew.sh](http://brew.sh) on OS X, or download directly
-from mercurial.
-
-2) Create a new GOPATH for your tools and install godep:
-
-```sh
-export GOPATH=$HOME/go-tools
-mkdir -p $GOPATH
-go get -u github.com/tools/godep
-```
-
-3) Add this $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
-
-```sh
-export GOPATH=$HOME/go-tools
-export PATH=$PATH:$GOPATH/bin
-```
-
-Note:
-At this time, godep version >= v63 is known to work in the Kubernetes project
-
-To check your version of godep:
-
-```sh
-$ godep version
-godep v66 (linux/amd64/go1.6.2)
-```
-
-If it is not a valid version try, make sure you have updated the godep repo
-with `go get -u github.com/tools/godep`.
-
-### Using godep
-
-Here's a quick walkthrough of one way to use godeps to add or update a
-Kubernetes dependency into `vendor/`. For more details, please see the
-instructions in [godep's documentation](https://github.com/tools/godep).
-
-1) Devote a directory to this endeavor:
-
-_Devoting a separate directory is not strictly required, but it is helpful to
-separate dependency updates from other changes._
-
-```sh
-export KPATH=$HOME/code/kubernetes
-mkdir -p $KPATH/src/k8s.io/kubernetes
-cd $KPATH/src/k8s.io/kubernetes
-git clone https://path/to/your/fork .
-# Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
-```
-
-2) Set up your GOPATH.
-
-```sh
-# This will *not* let your local builds see packages that exist elsewhere on your system.
-export GOPATH=$KPATH
-```
-
-3) Populate your new GOPATH.
-
-```sh
-cd $KPATH/src/k8s.io/kubernetes
-godep restore
-```
-
-4) Next, you can either add a new dependency or update an existing one.
-
-To add a new dependency is simple (if a bit slow):
-
-```sh
-cd $KPATH/src/k8s.io/kubernetes
-DEP=example.com/path/to/dependency
-godep get $DEP/...
-# Now change code in Kubernetes to use the dependency.
-./hack/godep-save.sh
-```
-
-To update an existing dependency is a bit more complicated.  Godep has an
-`update` command, but none of us can figure out how to actually make it work.
-Instead, this procedure seems to work reliably:
-
-```sh
-cd $KPATH/src/k8s.io/kubernetes
-DEP=example.com/path/to/dependency
-# NB: For the next step, $DEP is assumed be the repo root.  If it is actually a
-# subdir of the repo, use the repo root here.  This is required to keep godep
-# from getting angry because `godep restore` left the tree in a "detached head"
-# state.
-rm -rf $KPATH/src/$DEP # repo root
-godep get $DEP/...
-# Change code in Kubernetes, if necessary.
-rm -rf Godeps
-rm -rf vendor
-./hack/godep-save.sh
-git co -- $(git st -s | grep "^ D" | awk '{print $2}' | grep ^Godeps)
-```
-
-_If `go get -u path/to/dependency` fails with compilation errors, instead try
-`go get -d -u path/to/dependency` to fetch the dependencies without compiling
-them. This is unusual, but has been observed._
-
-After all of this is done, `git status` should show you what files have been
-modified and added/removed.  Make sure to `git add` and `git rm` them.  It is
-commonly advised to make one `git commit` which includes just the dependency
-update and Godeps files, and another `git commit` that includes changes to
-Kubernetes code to use the new/updated dependency.  These commits can go into a
-single pull request.
-
-5) Before sending your PR, it's a good idea to sanity check that your
-Godeps.json file and the contents of `vendor/ `are ok by running `hack/verify-godeps.sh`
-
-_If `hack/verify-godeps.sh` fails after a `godep update`, it is possible that a
-transitive dependency was added or removed but not updated by godeps. It then
-may be necessary to perform a `hack/godep-save.sh` to pick up the transitive
-dependency changes._
-
-It is sometimes expedient to manually fix the /Godeps/Godeps.json file to
-minimize the changes. However without great care this can lead to failures
-with `hack/verify-godeps.sh`. This must pass for every PR.
-
-6) If you updated the Godeps, please also update `Godeps/LICENSES` by running
-`hack/update-godep-licenses.sh`.
 
 ## Testing
 
@@ -314,18 +215,21 @@ Three basic commands let you run unit, integration and/or e2e tests:
 
 ```sh
 cd kubernetes
-hack/test-go.sh  # Run unit tests
-hack/test-integration.sh  # Run integration tests, requires etcd
-go run hack/e2e.go -v --build --up --test --down  # Run e2e tests
+make test # Run every unit test
+make test WHAT=pkg/util/cache GOFLAGS=-v # Run tests of a package verbosely
+make test-integration # Run integration tests, requires etcd
+make test-e2e # Run e2e tests
 ```
 
-See the [testing guide](testing.md) for additional information and scenarios.
+See the [testing guide](testing.md) and [end-to-end tests](e2e-tests.md) for additional information and scenarios.
 
 ## Regenerating the CLI documentation
 
 ```sh
 hack/update-generated-docs.sh
 ```
+
+
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

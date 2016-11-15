@@ -98,9 +98,9 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		metric, err := v.GetMetrics()
 		if err != nil {
 			// Expected for Volumes that don't support Metrics
-			// TODO: Disambiguate unsupported from errors
-			// See issue #20676
-			glog.V(4).Infof("Failed to calculate volume metrics for pod %s volume %s: %+v", format.Pod(s.pod), name, err)
+			if !volume.IsNotSupported(err) {
+				glog.V(4).Infof("Failed to calculate volume metrics for pod %s volume %s: %+v", format.Pod(s.pod), name, err)
+			}
 			continue
 		}
 		stats = append(stats, s.parsePodVolumeStats(name, metric))
@@ -114,9 +114,13 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 func (s *volumeStatCalculator) parsePodVolumeStats(podName string, metric *volume.Metrics) stats.VolumeStats {
 	available := uint64(metric.Available.Value())
 	capacity := uint64(metric.Capacity.Value())
-	used := uint64((metric.Used.Value()))
+	used := uint64(metric.Used.Value())
+	inodes := uint64(metric.Inodes.Value())
+	inodesFree := uint64(metric.InodesFree.Value())
+	inodesUsed := uint64(metric.InodesUsed.Value())
 	return stats.VolumeStats{
-		Name:    podName,
-		FsStats: stats.FsStats{AvailableBytes: &available, CapacityBytes: &capacity, UsedBytes: &used},
+		Name: podName,
+		FsStats: stats.FsStats{AvailableBytes: &available, CapacityBytes: &capacity, UsedBytes: &used,
+			Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
 }

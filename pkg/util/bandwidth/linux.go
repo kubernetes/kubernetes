@@ -255,7 +255,7 @@ func (t *tcShaper) ReconcileInterface() error {
 		return t.initializeInterface()
 	}
 	fields := strings.Split(output, " ")
-	if len(fields) != 12 || fields[1] != "htb" || fields[2] != "1:" {
+	if len(fields) < 12 || fields[1] != "htb" || fields[2] != "1:" {
 		if err := t.deleteInterface(fields[2]); err != nil {
 			return err
 		}
