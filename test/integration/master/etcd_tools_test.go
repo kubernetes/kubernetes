@@ -148,8 +148,8 @@ func TestWatch(t *testing.T) {
 	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
-		key = etcdtest.AddPrefix(key)
-		resp, err := keysAPI.Set(ctx, key, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), nil)
+		fullKey := etcdtest.AddPrefix(key)
+		resp, err := keysAPI.Set(ctx, fullKey, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -183,7 +183,7 @@ func TestWatch(t *testing.T) {
 		}
 
 		// should return the previously deleted item in the watch, but with the latest index
-		resp, err = keysAPI.Delete(ctx, key, nil)
+		resp, err = keysAPI.Delete(ctx, fullKey, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
