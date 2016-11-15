@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -32,20 +33,20 @@ import (
 // ListResourceUsingInformerFunc returns a listing function based on the shared informer factory for the specified resource.
 func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, groupResource unversioned.GroupResource) ListFuncByNamespace {
 	return func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+		labelSelector, err := labels.Parse(options.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
 		informer, err := f.ForResource(groupResource)
 		if err != nil {
 			return nil, err
 		}
-parsed, err := labels.Parse(options.LabelSelector)
-if err != nil {
-    return nil, err
-}
-		return informer.Lister().ByNamespace(namespace).List(parsed)
+		return informer.Lister().ByNamespace(namespace).List(labelSelector)
 	}
 }
 
 // ConstraintsFunc takes a list of required resources that must match on the input item
-type ConstraintsFunc func(required []v1.ResourceName, item runtime.Object) error
+type ConstraintsFunc func(required []api.ResourceName, item runtime.Object) error
 
 // GetFuncByNamespace knows how to get a resource with specified namespace and name
 type GetFuncByNamespace func(namespace, name string) (runtime.Object, error)
@@ -54,20 +55,20 @@ type GetFuncByNamespace func(namespace, name string) (runtime.Object, error)
 type ListFuncByNamespace func(namespace string, options v1.ListOptions) ([]runtime.Object, error)
 
 // MatchesScopeFunc knows how to evaluate if an object matches a scope
-type MatchesScopeFunc func(scope v1.ResourceQuotaScope, object runtime.Object) bool
+type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) bool
 
 // UsageFunc knows how to measure usage associated with an object
-type UsageFunc func(object runtime.Object) v1.ResourceList
+type UsageFunc func(object runtime.Object) api.ResourceList
 
 // MatchesNoScopeFunc returns false on all match checks
-func MatchesNoScopeFunc(scope v1.ResourceQuotaScope, object runtime.Object) bool {
+func MatchesNoScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bool {
 	return false
 }
 
 // ObjectCountConstraintsFunc returns ConstraintsFunc that returns nil if the
 // specified resource name is in the required set of resource names
-func ObjectCountConstraintsFunc(resourceName v1.ResourceName) ConstraintsFunc {
-	return func(required []v1.ResourceName, item runtime.Object) error {
+func ObjectCountConstraintsFunc(resourceName api.ResourceName) ConstraintsFunc {
+	return func(required []api.ResourceName, item runtime.Object) error {
 		if !quota.Contains(required, resourceName) {
 			return fmt.Errorf("missing %s", resourceName)
 		}
@@ -77,9 +78,9 @@ func ObjectCountConstraintsFunc(resourceName v1.ResourceName) ConstraintsFunc {
 
 // ObjectCountUsageFunc is useful if you are only counting your object
 // It always returns 1 as the usage for the named resource
-func ObjectCountUsageFunc(resourceName v1.ResourceName) UsageFunc {
-	return func(object runtime.Object) v1.ResourceList {
-		return v1.ResourceList{
+func ObjectCountUsageFunc(resourceName api.ResourceName) UsageFunc {
+	return func(object runtime.Object) api.ResourceList {
+		return api.ResourceList{
 			resourceName: resource.MustParse("1"),
 		}
 	}
@@ -92,9 +93,9 @@ type GenericEvaluator struct {
 	// The GroupKind that this evaluator tracks
 	InternalGroupKind unversioned.GroupKind
 	// The set of resources that are pertinent to the mapped operation
-	InternalOperationResources map[admission.Operation][]v1.ResourceName
+	InternalOperationResources map[admission.Operation][]api.ResourceName
 	// The set of resource names this evaluator matches
-	MatchedResourceNames []v1.ResourceName
+	MatchedResourceNames []api.ResourceName
 	// A function that knows how to evaluate a matches scope request
 	MatchesScopeFunc MatchesScopeFunc
 	// A function that knows how to return usage for an object
@@ -112,7 +113,7 @@ type GenericEvaluator struct {
 var _ quota.Evaluator = &GenericEvaluator{}
 
 // Constraints checks required constraints are satisfied on the input object
-func (g *GenericEvaluator) Constraints(required []v1.ResourceName, item runtime.Object) error {
+func (g *GenericEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
 	return g.ConstraintsFunc(required, item)
 }
 
@@ -124,7 +125,7 @@ func (g *GenericEvaluator) Get(namespace, name string) (runtime.Object, error) {
 // OperationResources returns the set of resources that could be updated for the
 // specified operation for this kind.  If empty, admission control will ignore
 // quota processing for the operation.
-func (g *GenericEvaluator) OperationResources(operation admission.Operation) []v1.ResourceName {
+func (g *GenericEvaluator) OperationResources(operation admission.Operation) []api.ResourceName {
 	return g.InternalOperationResources[operation]
 }
 
@@ -134,12 +135,12 @@ func (g *GenericEvaluator) GroupKind() unversioned.GroupKind {
 }
 
 // MatchesResources is the list of resources that this evaluator matches
-func (g *GenericEvaluator) MatchesResources() []v1.ResourceName {
+func (g *GenericEvaluator) MatchesResources() []api.ResourceName {
 	return g.MatchedResourceNames
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
-func (g *GenericEvaluator) Matches(resourceQuota *v1.ResourceQuota, item runtime.Object) bool {
+func (g *GenericEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) bool {
 	if resourceQuota == nil {
 		return false
 	}
@@ -161,7 +162,7 @@ func (g *GenericEvaluator) Matches(resourceQuota *v1.ResourceQuota, item runtime
 }
 
 // MatchesResource returns true if this evaluator can match on the specified resource
-func (g *GenericEvaluator) MatchesResource(resourceName v1.ResourceName) bool {
+func (g *GenericEvaluator) MatchesResource(resourceName api.ResourceName) bool {
 	for _, matchedResourceName := range g.MatchedResourceNames {
 		if resourceName == matchedResourceName {
 			return true
@@ -171,19 +172,19 @@ func (g *GenericEvaluator) MatchesResource(resourceName v1.ResourceName) bool {
 }
 
 // MatchesScope returns true if the input object matches the specified scope
-func (g *GenericEvaluator) MatchesScope(scope v1.ResourceQuotaScope, object runtime.Object) bool {
+func (g *GenericEvaluator) MatchesScope(scope api.ResourceQuotaScope, object runtime.Object) bool {
 	return g.MatchesScopeFunc(scope, object)
 }
 
 // Usage returns the resource usage for the specified object
-func (g *GenericEvaluator) Usage(object runtime.Object) v1.ResourceList {
+func (g *GenericEvaluator) Usage(object runtime.Object) api.ResourceList {
 	return g.UsageFunc(object)
 }
 
 // UsageStats calculates latest observed usage stats for all objects
 func (g *GenericEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
 	// default each tracked resource to zero
-	result := quota.UsageStats{Used: v1.ResourceList{}}
+	result := quota.UsageStats{Used: api.ResourceList{}}
 	for _, resourceName := range g.MatchedResourceNames {
 		result.Used[resourceName] = resource.MustParse("0")
 	}

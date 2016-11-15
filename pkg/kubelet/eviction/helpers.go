@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
@@ -533,12 +534,12 @@ func memory(stats statsFunc) cmpFunc {
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Memory := p1Usage[v1.ResourceMemory]
 		p1Spec := core.PodUsageFunc(p1)
-		p1Request := p1Spec[v1.ResourceRequestsMemory]
+		p1Request := p1Spec[api.ResourceRequestsMemory]
 		p1Memory.Sub(p1Request)
 
 		p2Memory := p2Usage[v1.ResourceMemory]
 		p2Spec := core.PodUsageFunc(p2)
-		p2Request := p2Spec[v1.ResourceRequestsMemory]
+		p2Request := p2Spec[api.ResourceRequestsMemory]
 		p2Memory.Sub(p2Request)
 
 		// if p2 is using more than p1, we want p2 first

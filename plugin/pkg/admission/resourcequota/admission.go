@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/quotainternal"
-	"k8s.io/kubernetes/pkg/quotainternal/install"
+	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/quota/install"
 )
 
 func init() {
@@ -33,7 +33,7 @@ func init() {
 		func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 			// NOTE: we do not provide informers to the registry because admission level decisions
 			// does not require us to open watches for all items tracked by quota.
-			registry := install.NewRegistry(client, nil)
+			registry := install.NewRegistry(nil, nil)
 			return NewResourceQuota(client, registry, 5, make(chan struct{}))
 		})
 }

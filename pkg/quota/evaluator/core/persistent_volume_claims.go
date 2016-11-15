@@ -33,11 +33,11 @@ import (
 
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
 func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []v1.ResourceName{v1.ResourcePersistentVolumeClaims, v1.ResourceRequestsStorage}
+	allResources := []api.ResourceName{api.ResourcePersistentVolumeClaims, api.ResourceRequestsStorage}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.PersistentVolumeClaim",
 		InternalGroupKind: api.Kind("PersistentVolumeClaim"),
-		InternalOperationResources: map[admission.Operation][]v1.ResourceName{
+		InternalOperationResources: map[admission.Operation][]api.ResourceName{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
@@ -59,23 +59,31 @@ func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Eva
 }
 
 // PersistentVolumeClaimUsageFunc knows how to measure usage associated with persistent volume claims
-func PersistentVolumeClaimUsageFunc(object runtime.Object) v1.ResourceList {
-	pvc, ok := object.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return v1.ResourceList{}
+func PersistentVolumeClaimUsageFunc(object runtime.Object) api.ResourceList {
+	internalPVC, isInternalPVC := object.(*api.PersistentVolumeClaim)
+	externalPVC, isExternalPVC := object.(*v1.PersistentVolumeClaim)
+	if !isInternalPVC && !isExternalPVC {
+		return api.ResourceList{}
 	}
-	result := v1.ResourceList{}
-	result[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
-	if request, found := pvc.Spec.Resources.Requests[v1.ResourceStorage]; found {
-		result[v1.ResourceRequestsStorage] = request
+	result := api.ResourceList{}
+	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+	if isInternalPVC {
+		if request, found := internalPVC.Spec.Resources.Requests[api.ResourceStorage]; found {
+			result[api.ResourceRequestsStorage] = request
+		}
+	}
+	if isExternalPVC {
+		if request, found := externalPVC.Spec.Resources.Requests[v1.ResourceStorage]; found {
+			result[api.ResourceRequestsStorage] = request
+		}
 	}
 	return result
 }
 
 // PersistentVolumeClaimConstraintsFunc verifies that all required resources are present on the claim
 // In addition, it validates that the resources are valid (i.e. requests < limits)
-func PersistentVolumeClaimConstraintsFunc(required []v1.ResourceName, object runtime.Object) error {
-	pvc, ok := object.(*v1.PersistentVolumeClaim)
+func PersistentVolumeClaimConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
+	pvc, ok := object.(*api.PersistentVolumeClaim)
 	if !ok {
 		return fmt.Errorf("unexpected input object %v", object)
 	}

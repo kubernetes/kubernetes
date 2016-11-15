@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/validation"
+	"k8s.io/kubernetes/pkg/api/validation"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -57,15 +57,15 @@ func listPodsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.
 // NewPodEvaluator returns an evaluator that can evaluate pods
 // if the specified shared informer factory is not nil, evaluator may use it to support listing functions.
 func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
-	computeResources := []v1.ResourceName{
-		v1.ResourceCPU,
-		v1.ResourceMemory,
-		v1.ResourceRequestsCPU,
-		v1.ResourceRequestsMemory,
-		v1.ResourceLimitsCPU,
-		v1.ResourceLimitsMemory,
+	computeResources := []api.ResourceName{
+		api.ResourceCPU,
+		api.ResourceMemory,
+		api.ResourceRequestsCPU,
+		api.ResourceRequestsMemory,
+		api.ResourceLimitsCPU,
+		api.ResourceLimitsMemory,
 	}
-	allResources := append(computeResources, v1.ResourcePods)
+	allResources := append(computeResources, api.ResourcePods)
 	listFuncByNamespace := listPodsByNamespaceFuncUsingClient(kubeClient)
 	if f != nil {
 		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, unversioned.GroupResource{Resource: "pods"})
@@ -73,7 +73,7 @@ func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerF
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Pod",
 		InternalGroupKind: api.Kind("Pod"),
-		InternalOperationResources: map[admission.Operation][]v1.ResourceName{
+		InternalOperationResources: map[admission.Operation][]api.ResourceName{
 			admission.Create: allResources,
 			// TODO: the quota system can only charge for deltas on compute resources when pods support updates.
 			// admission.Update: computeResources,
@@ -91,8 +91,8 @@ func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerF
 
 // PodConstraintsFunc verifies that all required resources are present on the pod
 // In addition, it validates that the resources are valid (i.e. requests < limits)
-func PodConstraintsFunc(required []v1.ResourceName, object runtime.Object) error {
-	pod, ok := object.(*v1.Pod)
+func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
+	pod, ok := object.(*api.Pod)
 	if !ok {
 		return fmt.Errorf("Unexpected input object %v", object)
 	}
@@ -132,7 +132,7 @@ func PodConstraintsFunc(required []v1.ResourceName, object runtime.Object) error
 
 // enforcePodContainerConstraints checks for required resources that are not set on this container and
 // adds them to missingSet.
-func enforcePodContainerConstraints(container *v1.Container, requiredSet, missingSet sets.String) {
+func enforcePodContainerConstraints(container *api.Container, requiredSet, missingSet sets.String) {
 	requests := container.Resources.Requests
 	limits := container.Resources.Limits
 	containerUsage := podUsageHelper(requests, limits)
@@ -144,92 +144,137 @@ func enforcePodContainerConstraints(container *v1.Container, requiredSet, missin
 }
 
 // podUsageHelper can summarize the pod quota usage based on requests and limits
-func podUsageHelper(requests v1.ResourceList, limits v1.ResourceList) v1.ResourceList {
-	result := v1.ResourceList{}
-	result[v1.ResourcePods] = resource.MustParse("1")
-	if request, found := requests[v1.ResourceCPU]; found {
-		result[v1.ResourceCPU] = request
-		result[v1.ResourceRequestsCPU] = request
+func podUsageHelper(requests api.ResourceList, limits api.ResourceList) api.ResourceList {
+	result := api.ResourceList{}
+	result[api.ResourcePods] = resource.MustParse("1")
+	if request, found := requests[api.ResourceCPU]; found {
+		result[api.ResourceCPU] = request
+		result[api.ResourceRequestsCPU] = request
 	}
-	if limit, found := limits[v1.ResourceCPU]; found {
-		result[v1.ResourceLimitsCPU] = limit
+	if limit, found := limits[api.ResourceCPU]; found {
+		result[api.ResourceLimitsCPU] = limit
 	}
-	if request, found := requests[v1.ResourceMemory]; found {
-		result[v1.ResourceMemory] = request
-		result[v1.ResourceRequestsMemory] = request
+	if request, found := requests[api.ResourceMemory]; found {
+		result[api.ResourceMemory] = request
+		result[api.ResourceRequestsMemory] = request
 	}
-	if limit, found := limits[v1.ResourceMemory]; found {
-		result[v1.ResourceLimitsMemory] = limit
+	if limit, found := limits[api.ResourceMemory]; found {
+		result[api.ResourceLimitsMemory] = limit
 	}
 	return result
 }
 
 // PodUsageFunc knows how to measure usage associated with pods
-func PodUsageFunc(object runtime.Object) v1.ResourceList {
-	pod, ok := object.(*v1.Pod)
-	if !ok {
-		return v1.ResourceList{}
-	}
-
+func PodUsageFunc(obj runtime.Object) api.ResourceList {
 	// by convention, we do not quota pods that have reached an end-of-life state
-	if !QuotaPod(pod) {
-		return v1.ResourceList{}
+	if !QuotaPod(obj) {
+		return api.ResourceList{}
 	}
+	requests := api.ResourceList{}
+	limits := api.ResourceList{}
+	switch pod := obj.(type) {
+	case *api.Pod:
+		// TODO: fix this when we have pod level cgroups
+		// when we have pod level cgroups, we can just read pod level requests/limits
+		for i := range pod.Spec.Containers {
+			requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
+			limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
+		}
+		// InitContainers are run sequentially before other containers start, so the highest
+		// init container resource is compared against the sum of app containers to determine
+		// the effective usage for both requests and limits.
+		for i := range pod.Spec.InitContainers {
+			requests = quota.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
+			limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
+		}
+	case *v1.Pod:
+		// TODO: fix this when we have pod level cgroups
+		// when we have pod level cgroups, we can just read pod level requests/limits
+		for i := range pod.Spec.Containers {
+			internalRequests := api.ResourceList{}
+			v1.Convert_v1_ResourceList_To_api_ResourceList(&pod.Spec.Containers[i].Resources.Requests, &internalRequests, nil)
+			requests = quota.Add(requests, internalRequests)
+			internalLimits := api.ResourceList{}
+			v1.Convert_v1_ResourceList_To_api_ResourceList(&pod.Spec.Containers[i].Resources.Limits, &internalLimits, nil)
+			limits = quota.Add(limits, internalLimits)
+		}
+		// InitContainers are run sequentially before other containers start, so the highest
+		// init container resource is compared against the sum of app containers to determine
+		// the effective usage for both requests and limits.
+		for i := range pod.Spec.InitContainers {
+			internalRequests := api.ResourceList{}
+			v1.Convert_v1_ResourceList_To_api_ResourceList(&pod.Spec.InitContainers[i].Resources.Requests, &internalRequests, nil)
+			requests = quota.Max(requests, internalRequests)
+			internalLimits := api.ResourceList{}
+			v1.Convert_v1_ResourceList_To_api_ResourceList(&pod.Spec.InitContainers[i].Resources.Limits, &internalLimits, nil)
+			limits = quota.Max(limits, internalLimits)
+		}
 
-	// TODO: fix this when we have pod level cgroups
-	// when we have pod level cgroups, we can just read pod level requests/limits
-	requests := v1.ResourceList{}
-	limits := v1.ResourceList{}
-
-	for i := range pod.Spec.Containers {
-		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
-		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
-	}
-	// InitContainers are run sequentially before other containers start, so the highest
-	// init container resource is compared against the sum of app containers to determine
-	// the effective usage for both requests and limits.
-	for i := range pod.Spec.InitContainers {
-		requests = quota.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
-		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
+	default:
+		return api.ResourceList{}
 	}
 
 	return podUsageHelper(requests, limits)
 }
 
 // PodMatchesScopeFunc is a function that knows how to evaluate if a pod matches a scope
-func PodMatchesScopeFunc(scope v1.ResourceQuotaScope, object runtime.Object) bool {
-	pod, ok := object.(*v1.Pod)
-	if !ok {
+func PodMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bool {
+	_, ok1 := object.(*api.Pod)
+	_, ok2 := object.(*v1.Pod)
+	if !ok1 && !ok2 {
 		return false
 	}
 	switch scope {
-	case v1.ResourceQuotaScopeTerminating:
-		return isTerminating(pod)
-	case v1.ResourceQuotaScopeNotTerminating:
-		return !isTerminating(pod)
-	case v1.ResourceQuotaScopeBestEffort:
-		return isBestEffort(pod)
-	case v1.ResourceQuotaScopeNotBestEffort:
-		return !isBestEffort(pod)
+	case api.ResourceQuotaScopeTerminating:
+		return isTerminating(object)
+	case api.ResourceQuotaScopeNotTerminating:
+		return !isTerminating(object)
+	case api.ResourceQuotaScopeBestEffort:
+		return isBestEffort(object)
+	case api.ResourceQuotaScopeNotBestEffort:
+		return !isBestEffort(object)
 	}
 	return false
 }
 
-func isBestEffort(pod *v1.Pod) bool {
-	return qos.GetPodQOS(pod) == qos.BestEffort
+func isBestEffort(obj runtime.Object) bool {
+	if pod, ok := obj.(*api.Pod); ok {
+		return qos.InternalGetPodQOS(pod) == qos.BestEffort
+	}
+	if pod, ok := obj.(*v1.Pod); ok {
+		return qos.GetPodQOS(pod) == qos.BestEffort
+	}
+	return false
 }
 
-func isTerminating(pod *v1.Pod) bool {
-	if pod.Spec.ActiveDeadlineSeconds != nil && *pod.Spec.ActiveDeadlineSeconds >= int64(0) {
-		return true
+func isTerminating(obj runtime.Object) bool {
+	if pod, ok := obj.(*api.Pod); ok {
+		if pod.Spec.ActiveDeadlineSeconds != nil && *pod.Spec.ActiveDeadlineSeconds >= int64(0) {
+			return true
+		}
+		return false
+	}
+	if pod, ok := obj.(*v1.Pod); ok {
+		if pod.Spec.ActiveDeadlineSeconds != nil && *pod.Spec.ActiveDeadlineSeconds >= int64(0) {
+			return true
+		}
+		return false
 	}
 	return false
 }
 
 // QuotaPod returns true if the pod is eligible to track against a quota
 // if it's not in a terminal state according to its phase.
-func QuotaPod(pod *v1.Pod) bool {
-	// see GetPhase in kubelet.go for details on how it covers all restart policy conditions
-	// https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet.go#L3001
-	return !(v1.PodFailed == pod.Status.Phase || v1.PodSucceeded == pod.Status.Phase)
+func QuotaPod(obj runtime.Object) bool {
+	if pod, ok := obj.(*api.Pod); ok {
+		// see GetPhase in kubelet.go for details on how it covers all restart policy conditions
+		// https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet.go#L3001
+		return !(api.PodFailed == pod.Status.Phase || api.PodSucceeded == pod.Status.Phase)
+	}
+	if pod, ok := obj.(*v1.Pod); ok {
+		// see GetPhase in kubelet.go for details on how it covers all restart policy conditions
+		// https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet.go#L3001
+		return !(v1.PodFailed == pod.Status.Phase || v1.PodSucceeded == pod.Status.Phase)
+	}
+	return false
 }

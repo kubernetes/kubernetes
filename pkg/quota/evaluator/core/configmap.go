@@ -28,17 +28,17 @@ import (
 
 // NewConfigMapEvaluator returns an evaluator that can evaluate configMaps
 func NewConfigMapEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []v1.ResourceName{v1.ResourceConfigMaps}
+	allResources := []api.ResourceName{api.ResourceConfigMaps}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.ConfigMap",
 		InternalGroupKind: api.Kind("ConfigMap"),
-		InternalOperationResources: map[admission.Operation][]v1.ResourceName{
+		InternalOperationResources: map[admission.Operation][]api.ResourceName{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(v1.ResourceConfigMaps),
-		UsageFunc:            generic.ObjectCountUsageFunc(v1.ResourceConfigMaps),
+		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceConfigMaps),
+		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceConfigMaps),
 		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ConfigMaps(namespace).List(options)
 			if err != nil {

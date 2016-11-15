@@ -19,22 +19,22 @@ package core
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
-func testVolumeClaim(name string, namespace string, spec v1.PersistentVolumeClaimSpec) *v1.PersistentVolumeClaim {
-	return &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{Name: name, Namespace: namespace},
+func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
 		Spec:       spec,
 	}
 }
 
 func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
-	validClaim := testVolumeClaim("foo", "ns", v1.PersistentVolumeClaimSpec{
+	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 		Selector: &unversioned.LabelSelector{
 			MatchExpressions: []unversioned.LabelSelectorRequirement{
 				{
@@ -43,17 +43,17 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 				},
 			},
 		},
-		AccessModes: []v1.PersistentVolumeAccessMode{
-			v1.ReadWriteOnce,
-			v1.ReadOnlyMany,
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
 		},
-		Resources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
 	})
-	missingStorage := testVolumeClaim("foo", "ns", v1.PersistentVolumeClaimSpec{
+	missingStorage := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 		Selector: &unversioned.LabelSelector{
 			MatchExpressions: []unversioned.LabelSelectorRequirement{
 				{
@@ -62,36 +62,36 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 				},
 			},
 		},
-		AccessModes: []v1.PersistentVolumeAccessMode{
-			v1.ReadWriteOnce,
-			v1.ReadOnlyMany,
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
 		},
-		Resources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{},
 		},
 	})
 
 	testCases := map[string]struct {
-		pvc      *v1.PersistentVolumeClaim
-		required []v1.ResourceName
+		pvc      *api.PersistentVolumeClaim
+		required []api.ResourceName
 		err      string
 	}{
 		"missing storage": {
 			pvc:      missingStorage,
-			required: []v1.ResourceName{v1.ResourceRequestsStorage},
+			required: []api.ResourceName{api.ResourceRequestsStorage},
 			err:      `must specify requests.storage`,
 		},
 		"valid-claim-quota-storage": {
 			pvc:      validClaim,
-			required: []v1.ResourceName{v1.ResourceRequestsStorage},
+			required: []api.ResourceName{api.ResourceRequestsStorage},
 		},
 		"valid-claim-quota-pvc": {
 			pvc:      validClaim,
-			required: []v1.ResourceName{v1.ResourcePersistentVolumeClaims},
+			required: []api.ResourceName{api.ResourcePersistentVolumeClaims},
 		},
 		"valid-claim-quota-storage-and-pvc": {
 			pvc:      validClaim,
-			required: []v1.ResourceName{v1.ResourceRequestsStorage, v1.ResourcePersistentVolumeClaims},
+			required: []api.ResourceName{api.ResourceRequestsStorage, api.ResourcePersistentVolumeClaims},
 		},
 	}
 	for testName, test := range testCases {
@@ -106,7 +106,7 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
-	validClaim := testVolumeClaim("foo", "ns", v1.PersistentVolumeClaimSpec{
+	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 		Selector: &unversioned.LabelSelector{
 			MatchExpressions: []unversioned.LabelSelectorRequirement{
 				{
@@ -115,13 +115,13 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				},
 			},
 		},
-		AccessModes: []v1.PersistentVolumeAccessMode{
-			v1.ReadWriteOnce,
-			v1.ReadOnlyMany,
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
 		},
-		Resources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10Gi"),
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
 			},
 		},
 	})
@@ -129,14 +129,14 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	evaluator := NewPersistentVolumeClaimEvaluator(kubeClient)
 	testCases := map[string]struct {
-		pvc   *v1.PersistentVolumeClaim
-		usage v1.ResourceList
+		pvc   *api.PersistentVolumeClaim
+		usage api.ResourceList
 	}{
 		"pvc-usage": {
 			pvc: validClaim,
-			usage: v1.ResourceList{
-				v1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
-				v1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+			usage: api.ResourceList{
+				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
 			},
 		},
 	}

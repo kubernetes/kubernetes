@@ -19,25 +19,25 @@ package core
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
 func TestPodConstraintsFunc(t *testing.T) {
 	testCases := map[string]struct {
-		pod      *v1.Pod
-		required []v1.ResourceName
+		pod      *api.Pod
+		required []api.ResourceName
 		err      string
 	}{
 		"init container resource invalid": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{{
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")},
-							Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m")},
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 						},
 					}},
 				},
@@ -45,12 +45,12 @@ func TestPodConstraintsFunc(t *testing.T) {
 			err: `spec.initContainers[0].resources.limits: Invalid value: "1m": must be greater than or equal to cpu request`,
 		},
 		"container resource invalid": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")},
-							Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m")},
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 						},
 					}},
 				},
@@ -58,31 +58,31 @@ func TestPodConstraintsFunc(t *testing.T) {
 			err: `spec.containers[0].resources.limits: Invalid value: "1m": must be greater than or equal to cpu request`,
 		},
 		"init container resource missing": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{{
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m")},
-							Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")},
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
 						},
 					}},
 				},
 			},
-			required: []v1.ResourceName{v1.ResourceMemory},
+			required: []api.ResourceName{api.ResourceMemory},
 			err:      `must specify memory`,
 		},
 		"container resource missing": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m")},
-							Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")},
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
 						},
 					}},
 				},
 			},
-			required: []v1.ResourceName{v1.ResourceMemory},
+			required: []api.ResourceName{api.ResourceMemory},
 			err:      `must specify memory`,
 		},
 	}
@@ -101,146 +101,146 @@ func TestPodEvaluatorUsage(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	evaluator := NewPodEvaluator(kubeClient, nil)
 	testCases := map[string]struct {
-		pod   *v1.Pod
-		usage v1.ResourceList
+		pod   *api.Pod
+		usage api.ResourceList
 	}{
 		"init container CPU": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{{
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m")},
-							Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")},
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
 						},
 					}},
 				},
 			},
-			usage: v1.ResourceList{
-				v1.ResourceRequestsCPU: resource.MustParse("1m"),
-				v1.ResourceLimitsCPU:   resource.MustParse("2m"),
-				v1.ResourcePods:        resource.MustParse("1"),
-				v1.ResourceCPU:         resource.MustParse("1m"),
+			usage: api.ResourceList{
+				api.ResourceRequestsCPU: resource.MustParse("1m"),
+				api.ResourceLimitsCPU:   resource.MustParse("2m"),
+				api.ResourcePods:        resource.MustParse("1"),
+				api.ResourceCPU:         resource.MustParse("1m"),
 			},
 		},
 		"init container MEM": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{{
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1m")},
-							Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2m")},
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceMemory: resource.MustParse("2m")},
 						},
 					}},
 				},
 			},
-			usage: v1.ResourceList{
-				v1.ResourceRequestsMemory: resource.MustParse("1m"),
-				v1.ResourceLimitsMemory:   resource.MustParse("2m"),
-				v1.ResourcePods:           resource.MustParse("1"),
-				v1.ResourceMemory:         resource.MustParse("1m"),
+			usage: api.ResourceList{
+				api.ResourceRequestsMemory: resource.MustParse("1m"),
+				api.ResourceLimitsMemory:   resource.MustParse("2m"),
+				api.ResourcePods:           resource.MustParse("1"),
+				api.ResourceMemory:         resource.MustParse("1m"),
 			},
 		},
 		"container CPU": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m")},
-							Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")},
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
 						},
 					}},
 				},
 			},
-			usage: v1.ResourceList{
-				v1.ResourceRequestsCPU: resource.MustParse("1m"),
-				v1.ResourceLimitsCPU:   resource.MustParse("2m"),
-				v1.ResourcePods:        resource.MustParse("1"),
-				v1.ResourceCPU:         resource.MustParse("1m"),
+			usage: api.ResourceList{
+				api.ResourceRequestsCPU: resource.MustParse("1m"),
+				api.ResourceLimitsCPU:   resource.MustParse("2m"),
+				api.ResourcePods:        resource.MustParse("1"),
+				api.ResourceCPU:         resource.MustParse("1m"),
 			},
 		},
 		"container MEM": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1m")},
-							Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2m")},
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceMemory: resource.MustParse("2m")},
 						},
 					}},
 				},
 			},
-			usage: v1.ResourceList{
-				v1.ResourceRequestsMemory: resource.MustParse("1m"),
-				v1.ResourceLimitsMemory:   resource.MustParse("2m"),
-				v1.ResourcePods:           resource.MustParse("1"),
-				v1.ResourceMemory:         resource.MustParse("1m"),
+			usage: api.ResourceList{
+				api.ResourceRequestsMemory: resource.MustParse("1m"),
+				api.ResourceLimitsMemory:   resource.MustParse("2m"),
+				api.ResourcePods:           resource.MustParse("1"),
+				api.ResourceMemory:         resource.MustParse("1m"),
 			},
 		},
 		"init container maximums override sum of containers": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
 						{
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("4"),
-									v1.ResourceMemory: resource.MustParse("100M"),
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("4"),
+									api.ResourceMemory: resource.MustParse("100M"),
 								},
-								Limits: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("8"),
-									v1.ResourceMemory: resource.MustParse("200M"),
+								Limits: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("8"),
+									api.ResourceMemory: resource.MustParse("200M"),
 								},
 							},
 						},
 						{
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("1"),
-									v1.ResourceMemory: resource.MustParse("50M"),
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceMemory: resource.MustParse("50M"),
 								},
-								Limits: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("2"),
-									v1.ResourceMemory: resource.MustParse("100M"),
+								Limits: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("2"),
+									api.ResourceMemory: resource.MustParse("100M"),
 								},
 							},
 						},
 					},
-					Containers: []v1.Container{
+					Containers: []api.Container{
 						{
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("1"),
-									v1.ResourceMemory: resource.MustParse("50M"),
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceMemory: resource.MustParse("50M"),
 								},
-								Limits: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("2"),
-									v1.ResourceMemory: resource.MustParse("100M"),
+								Limits: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("2"),
+									api.ResourceMemory: resource.MustParse("100M"),
 								},
 							},
 						},
 						{
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("2"),
-									v1.ResourceMemory: resource.MustParse("25M"),
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("2"),
+									api.ResourceMemory: resource.MustParse("25M"),
 								},
-								Limits: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("5"),
-									v1.ResourceMemory: resource.MustParse("50M"),
+								Limits: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("5"),
+									api.ResourceMemory: resource.MustParse("50M"),
 								},
 							},
 						},
 					},
 				},
 			},
-			usage: v1.ResourceList{
-				v1.ResourceRequestsCPU:    resource.MustParse("4"),
-				v1.ResourceRequestsMemory: resource.MustParse("100M"),
-				v1.ResourceLimitsCPU:      resource.MustParse("8"),
-				v1.ResourceLimitsMemory:   resource.MustParse("200M"),
-				v1.ResourcePods:           resource.MustParse("1"),
-				v1.ResourceCPU:            resource.MustParse("4"),
-				v1.ResourceMemory:         resource.MustParse("100M"),
+			usage: api.ResourceList{
+				api.ResourceRequestsCPU:    resource.MustParse("4"),
+				api.ResourceRequestsMemory: resource.MustParse("100M"),
+				api.ResourceLimitsCPU:      resource.MustParse("8"),
+				api.ResourceLimitsMemory:   resource.MustParse("200M"),
+				api.ResourcePods:           resource.MustParse("1"),
+				api.ResourceCPU:            resource.MustParse("4"),
+				api.ResourceMemory:         resource.MustParse("100M"),
 			},
 		},
 	}

@@ -28,17 +28,17 @@ import (
 
 // NewSecretEvaluator returns an evaluator that can evaluate secrets
 func NewSecretEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []v1.ResourceName{v1.ResourceSecrets}
+	allResources := []api.ResourceName{api.ResourceSecrets}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Secret",
 		InternalGroupKind: api.Kind("Secret"),
-		InternalOperationResources: map[admission.Operation][]v1.ResourceName{
+		InternalOperationResources: map[admission.Operation][]api.ResourceName{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(v1.ResourceSecrets),
-		UsageFunc:            generic.ObjectCountUsageFunc(v1.ResourceSecrets),
+		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceSecrets),
+		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceSecrets),
 		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().Secrets(namespace).List(options)
 			if err != nil {

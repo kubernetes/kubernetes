@@ -28,17 +28,17 @@ import (
 
 // NewResourceQuotaEvaluator returns an evaluator that can evaluate resource quotas
 func NewResourceQuotaEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []v1.ResourceName{v1.ResourceQuotas}
+	allResources := []api.ResourceName{api.ResourceQuotas}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.ResourceQuota",
 		InternalGroupKind: api.Kind("ResourceQuota"),
-		InternalOperationResources: map[admission.Operation][]v1.ResourceName{
+		InternalOperationResources: map[admission.Operation][]api.ResourceName{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(v1.ResourceQuotas),
-		UsageFunc:            generic.ObjectCountUsageFunc(v1.ResourceQuotas),
+		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceQuotas),
+		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceQuotas),
 		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ResourceQuotas(namespace).List(options)
 			if err != nil {
