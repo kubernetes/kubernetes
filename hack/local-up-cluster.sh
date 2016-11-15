@@ -400,6 +400,7 @@ EOF
     create_client_certkey kube-proxy
     create_client_certkey controller
     create_client_certkey scheduler
+    create_client_certkey admin
 
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
@@ -657,7 +658,7 @@ To start using your cluster, open up another terminal/tab and run:
   export KUBERNETES_PROVIDER=local
 
   cluster/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-  cluster/kubectl.sh config set-credentials myself --username=admin --password=admin
+  cluster/kubectl.sh config set-credentials myself --client-key \"${CERT_DIR}/client-admin.key\" --client-certificate=\"${CERT_DIR}/client-admin.crt\"
   cluster/kubectl.sh config set-context local --cluster=local --user=myself
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
