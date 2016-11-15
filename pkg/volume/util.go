@@ -83,7 +83,13 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.P
 			return fmt.Errorf("unexpected error creating recycler pod:  %+v\n", err)
 		}
 	}
-	defer recyclerClient.DeletePod(pod.Name, pod.Namespace)
+	defer func(pod *api.Pod) {
+		if err := recyclerClient.DeletePod(pod.Name, pod.Namespace); err != nil {
+			glog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		} else {
+			glog.V(4).Infof("deleted recycler pod %s/%s", pod.Namespace, pod.Name)
+		}
+	}(pod)
 
 	// Now only the old pod or the new pod run. Watch it until it finishes
 	// and send all events on the pod to the PV
