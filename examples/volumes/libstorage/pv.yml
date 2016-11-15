@@ -1,0 +1,13 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: pv-0001
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  libStorage:
+    host: http://127.0.0.1:7979
+    service: virtualbox
+    volumeName: vol-0001

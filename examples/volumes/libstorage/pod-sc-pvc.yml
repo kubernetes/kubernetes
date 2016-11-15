@@ -1,0 +1,15 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: podscpvc-0001
+spec:
+  containers:
+    - name: pod0003-container
+      image: gcr.io/google_containers/test-webserver
+      volumeMounts:
+      - mountPath: /test
+        name: test-data
+  volumes:
+    - name: test-data
+      persistentVolumeClaim:
+        claimName: pvc-0002
