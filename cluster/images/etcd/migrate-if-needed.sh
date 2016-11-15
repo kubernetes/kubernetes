@@ -117,7 +117,8 @@ start_etcd() {
   else
     ETCDCTL_CMD="${ETCDCTL_CMD} --endpoints=http://127.0.0.1:${ETCD_PORT} put"
   fi
-  ${ETCD_CMD} --data-dir=${DATA_DIRECTORY} \
+  ${ETCD_CMD} --name="etcd-$(hostname)" \
+    --data-dir=${DATA_DIRECTORY} \
     --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
     --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
     --listen-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
