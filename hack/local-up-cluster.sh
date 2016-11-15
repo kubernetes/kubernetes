@@ -411,7 +411,7 @@ EOF
     # Create client certs signed with client-ca, given id, given CN and a number of groups
     # NOTE: system:masters will be removed in the future
     create_client_certkey client-ca kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
-    create_client_certkey client-ca kube-proxy system:proxy system:nodes
+    create_client_certkey client-ca kube-proxy system:kube-proxy system:nodes
     create_client_certkey client-ca controller system:controller system:masters
     create_client_certkey client-ca scheduler system:scheduler system:masters
     create_client_certkey client-ca admin system:admin system:cluster-admins
