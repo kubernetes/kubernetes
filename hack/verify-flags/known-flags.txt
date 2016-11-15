@@ -59,7 +59,6 @@ cert-dir
 certificate-authority
 cgroup-driver
 cgroup-root
-cgroups-per-qos
 chaos-chance
 clean-start
 cleanup
@@ -189,6 +188,7 @@ executor-suicide-timeout
 exit-on-lock-contention
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
+experimental-cgroups-per-qos
 experimental-keystone-url
 experimental-keystone-ca-file
 experimental-mounter-path
