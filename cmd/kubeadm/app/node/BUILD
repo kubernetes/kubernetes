@@ -30,5 +30,6 @@ go_library(
         "//pkg/types:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//pkg/util/wait:go_default_library",
+        "//vendor:github.com/square/go-jose",
     ],
 )

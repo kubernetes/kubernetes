@@ -25,6 +25,7 @@ go_library(
         "//pkg/labels:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/heapster/metrics/api/v1/types",
+        "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
 )
 
@@ -46,5 +47,6 @@ go_test(
         "//pkg/runtime:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/heapster/metrics/api/v1/types",
+        "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
 )
