@@ -55,6 +55,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 const (
@@ -76,7 +77,7 @@ type Config struct {
 	// Note that this is ignored if EnableSwaggerSupport is false
 	EnableSwaggerUI bool
 	// Allows api group versions or specific resources to be conditionally enabled/disabled.
-	APIResourceConfigSource APIResourceConfigSource
+	APIResourceConfigSource config.APIResourceConfigSource
 	// allow downstream consumers to disable the index route
 	EnableIndex             bool
 	EnableProfiling         bool

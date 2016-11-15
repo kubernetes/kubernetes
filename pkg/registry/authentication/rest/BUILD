@@ -21,5 +21,6 @@ go_library(
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/authentication/tokenreview:go_default_library",
+        "//pkg/util/config:go_default_library",
     ],
 )

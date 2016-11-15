@@ -50,6 +50,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 const (
@@ -155,6 +161,18 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
+	resourceConfig := defaultAPIResourceConfigSource()
+	err = resourceConfig.MergeResourceConfigs(s.RuntimeConfig)
+	if err != nil {
+		return err
+	}
+
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(restClientCfg)
+	serverResources, err := discoveryClient.ServerResources()
+	if err != nil {
+		return err
+	}
+
 	glog.Infof("Loading client config for namespace controller %q", "namespace-controller")
 	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
 	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
@@ -182,7 +200,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	// TODO: rename s.ConcurentReplicaSetSyncs
 	go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 
-	if s.EnableIngressController {
+	if resourceEnabled(resourceConfig, serverResources, extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses")){
 		glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
 		ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
 		ingressController := ingresscontroller.NewIngressController(ingClientset)
@@ -210,4 +228,39 @@ func restClientConfigFromSecret(master string) (*restclient.Config, error) {
 		return nil, fmt.Errorf("failed to find the Federation API server kubeconfig, tried the --kubeconfig flag and the deprecated secret %s: %v", DeprecatedKubeconfigSecretName, err)
 	}
 	return restClientCfg, nil
+}
+
+func defaultAPIResourceConfigSource() *config.ResourceConfig {
+	ret := config.NewResourceConfig()
+	ret.EnableVersions(
+		apiv1.SchemeGroupVersion,
+		extensionsapiv1beta1.SchemeGroupVersion,
+	)
+
+	// all extensions resources except these are disabled by default
+	ret.EnableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+	)
+
+	return ret
+}
+
+
+func resourceEnabled(resourceConfig *config.ResourceConfig, serverResources map[string]*unversioned.APIResourceList, resource unversioned.GroupVersionResource) bool {
+	if !resourceConfig.ResourceEnabled(resource) {
+		return false
+	}
+	groupResources := serverResources[resource.GroupVersion().String()]
+	if groupResources == nil {
+		return false
+	}
+	for _, apiResource := range groupResources.APIResources {
+		if apiResource.Name == resource.Resource {
+			return true
+		}
+	}
+	return false
 }

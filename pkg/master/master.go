@@ -65,6 +65,7 @@ import (
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 const (
@@ -292,7 +293,7 @@ func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient 
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter, restStorageProviders ...genericapiserver.RESTStorageProvider) {
+func (m *Master) InstallAPIs(apiResourceConfigSource config.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter, restStorageProviders ...genericapiserver.RESTStorageProvider) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
@@ -375,8 +376,8 @@ func (n nodeAddressProvider) externalAddresses() (addresses []string, err error)
 	return addrs, nil
 }
 
-func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
-	ret := genericapiserver.NewResourceConfig()
+func DefaultAPIResourceConfigSource() *config.ResourceConfig {
+	ret := config.NewResourceConfig()
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,

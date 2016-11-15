@@ -58,6 +58,7 @@ go_library(
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/routes:go_default_library",
+        "//pkg/util/config:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/version:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",

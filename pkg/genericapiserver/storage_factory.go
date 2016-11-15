@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 // StorageFactory is the interface to locate the storage for a given GroupResource
@@ -71,7 +72,7 @@ type DefaultStorageFactory struct {
 	// APIResourceConfigSource indicates whether the *storage* is enabled, NOT the API
 	// This is discrete from resource enablement because those are separate concerns.  How this source is configured
 	// is left to the caller.
-	APIResourceConfigSource APIResourceConfigSource
+	APIResourceConfigSource config.APIResourceConfigSource
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
 	newStorageCodecFn func(storageMediaType string, ns runtime.StorageSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (codec runtime.Codec, err error)
@@ -112,7 +113,7 @@ var specialDefaultResourcePrefixes = map[unversioned.GroupResource]string{
 	unversioned.GroupResource{Group: "extensions", Resource: "ingresses"}:    "ingress",
 }
 
-func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
+func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig config.APIResourceConfigSource) *DefaultStorageFactory {
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}

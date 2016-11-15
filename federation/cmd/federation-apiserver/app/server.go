@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -78,7 +79,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	// TODO: register cluster federation resources here.
-	resourceConfig := genericapiserver.NewResourceConfig()
+	resourceConfig := config.NewResourceConfig()
 
 	if s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, set it to 50000

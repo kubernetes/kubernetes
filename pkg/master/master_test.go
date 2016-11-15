@@ -59,6 +59,7 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 	"github.com/stretchr/testify/assert"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -119,8 +120,8 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 }
 
 // limitedAPIResourceConfigSource only enables the core group, the extensions group, the batch group, and the autoscaling group.
-func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
-	ret := genericapiserver.NewResourceConfig()
+func limitedAPIResourceConfigSource() *utilconfig.ResourceConfig {
+	ret := utilconfig.NewResourceConfig()
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,

@@ -23,5 +23,6 @@ go_library(
         "//pkg/registry/authorization/localsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/selfsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/subjectaccessreview:go_default_library",
+        "//pkg/util/config:go_default_library",
     ],
 )

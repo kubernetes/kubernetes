@@ -19,11 +19,12 @@ package genericapiserver
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 type RESTOptionsGetter func(resource unversioned.GroupResource) generic.RESTOptions
 
 type RESTStorageProvider interface {
 	GroupName() string
-	NewRESTStorage(apiResourceConfigSource APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (APIGroupInfo, bool)
+	NewRESTStorage(apiResourceConfigSource config.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (APIGroupInfo, bool)
 }

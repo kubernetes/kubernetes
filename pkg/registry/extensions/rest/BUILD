@@ -36,6 +36,7 @@ go_library(
         "//pkg/registry/extensions/thirdpartyresource/etcd:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/util/config:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/wait:go_default_library",

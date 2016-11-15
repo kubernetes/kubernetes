@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
 
 func TestUpdateEtcdOverrides(t *testing.T) {
@@ -52,7 +53,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			Prefix:     options.DefaultEtcdPathPrefix,
 			ServerList: defaultEtcdLocation,
 		}
-		storageFactory := NewDefaultStorageFactory(defaultConfig, "", api.Codecs, NewDefaultResourceEncodingConfig(), NewResourceConfig())
+		storageFactory := NewDefaultStorageFactory(defaultConfig, "", api.Codecs, NewDefaultResourceEncodingConfig(), utilconfig.NewResourceConfig())
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
 		var err error

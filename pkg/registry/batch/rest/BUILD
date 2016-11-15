@@ -23,5 +23,6 @@ go_library(
         "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/batch/cronjob/etcd:go_default_library",
         "//pkg/registry/batch/job/etcd:go_default_library",
+        "//pkg/util/config:go_default_library",
     ],
 )

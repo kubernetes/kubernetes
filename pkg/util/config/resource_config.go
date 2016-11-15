@@ -14,11 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package config
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"fmt"
+	"strconv"
+	"strings"
 )
 
 // APIResourceConfigSource is the interface to determine which versions and resources are enabled
@@ -182,4 +186,119 @@ func (o *ResourceConfig) AnyResourcesForGroupEnabled(group string) bool {
 	}
 
 	return false
+}
+
+
+// Merges with the given resourceConfigOverrides.
+func (o *ResourceConfig) MergeResourceConfigs(resourceConfigOverrides ConfigurationMap) error {
+	overrides := resourceConfigOverrides
+
+	// "api/all=false" allows users to selectively enable specific api versions.
+	allAPIFlagValue, ok := overrides["api/all"]
+	if ok {
+		if allAPIFlagValue == "false" {
+			// Disable all group versions.
+			o.DisableVersions(registered.RegisteredGroupVersions()...)
+		} else if allAPIFlagValue == "true" {
+			o.EnableVersions(registered.RegisteredGroupVersions()...)
+		}
+	}
+
+	// "api/legacy=false" allows users to disable legacy api versions.
+	disableLegacyAPIs := false
+	legacyAPIFlagValue, ok := overrides["api/legacy"]
+	if ok && legacyAPIFlagValue == "false" {
+		disableLegacyAPIs = true
+	}
+	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
+
+	// "<resourceSpecifier>={true|false} allows users to enable/disable API.
+	// This takes preference over api/all and api/legacy, if specified.
+	// Iterate through all group/version overrides specified in runtimeConfig.
+	for key := range overrides {
+		if key == "api/all" || key == "api/legacy" {
+			// Have already handled them above. Can skip them here.
+			continue
+		}
+		tokens := strings.Split(key, "/")
+		if len(tokens) != 2 {
+			continue
+		}
+		groupVersionString := tokens[0] + "/" + tokens[1]
+		// HACK: Hack for "v1" legacy group version.
+		// Remove when we stop supporting the legacy group version.
+		if groupVersionString == "api/v1" {
+			groupVersionString = "v1"
+		}
+		groupVersion, err := unversioned.ParseGroupVersion(groupVersionString)
+		if err != nil {
+			return fmt.Errorf("invalid key %s", key)
+		}
+		// Verify that the groupVersion is registered.
+		if !registered.IsRegisteredVersion(groupVersion) {
+			return fmt.Errorf("group version %s that has not been registered", groupVersion.String())
+		}
+		enabled, err := getRuntimeConfigValue(overrides, key, false)
+		if err != nil {
+			return err
+		}
+		if enabled {
+			o.EnableVersions(groupVersion)
+		} else {
+			o.DisableVersions(groupVersion)
+		}
+	}
+
+	// Iterate through all group/version/resource overrides specified in runtimeConfig.
+	for key := range overrides {
+		tokens := strings.Split(key, "/")
+		if len(tokens) != 3 {
+			continue
+		}
+		groupVersionString := tokens[0] + "/" + tokens[1]
+		// HACK: Hack for "v1" legacy group version.
+		// Remove when we stop supporting the legacy group version.
+		if groupVersionString == "api/v1" {
+			groupVersionString = "v1"
+		}
+		groupVersion, err := unversioned.ParseGroupVersion(groupVersionString)
+		if err != nil {
+			return fmt.Errorf("invalid key %s", key)
+		}
+		resource := tokens[2]
+		// Verify that the groupVersion is registered.
+		if !registered.IsRegisteredVersion(groupVersion) {
+			return fmt.Errorf("group version %s that has not been registered", groupVersion.String())
+		}
+
+		if !o.AnyResourcesForVersionEnabled(groupVersion) {
+			return fmt.Errorf("%v is disabled, you cannot configure its resources individually", groupVersion)
+		}
+
+		enabled, err := getRuntimeConfigValue(overrides, key, false)
+		if err != nil {
+			return err
+		}
+		if enabled {
+			o.EnableResources(groupVersion.WithResource(resource))
+		} else {
+			o.DisableResources(groupVersion.WithResource(resource))
+		}
+	}
+	return nil
+}
+
+func getRuntimeConfigValue(overrides ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
+	flagValue, ok := overrides[apiKey]
+	if ok {
+		if flagValue == "" {
+			return true, nil
+		}
+		boolValue, err := strconv.ParseBool(flagValue)
+		if err != nil {
+			return false, fmt.Errorf("invalid value of %s: %s, err: %v", apiKey, flagValue, err)
+		}
+		return boolValue, nil
+	}
+	return defaultValue, nil
 }
