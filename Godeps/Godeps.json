@@ -1579,6 +1579,26 @@
 			"Rev": "cca7078d478f8520f85629ad7c68962d31ed7682"
 		},
 		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n",
+			"Comment": "v1.5.0",
+			"Rev": "e6c90c3ceece7f43060f843b495c3c9c031f5575"
+		},
+		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n/bundle",
+			"Comment": "v1.5.0",
+			"Rev": "e6c90c3ceece7f43060f843b495c3c9c031f5575"
+		},
+		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n/language",
+			"Comment": "v1.5.0",
+			"Rev": "e6c90c3ceece7f43060f843b495c3c9c031f5575"
+		},
+		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n/translation",
+			"Comment": "v1.5.0",
+			"Rev": "e6c90c3ceece7f43060f843b495c3c9c031f5575"
+		},
+		{
 			"ImportPath": "github.com/onsi/ginkgo",
 			"Comment": "v1.2.0-66-g74c678d",
 			"Rev": "74c678d97c305753605c338c6c78c49ec104b5e7"
