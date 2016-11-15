@@ -276,7 +276,7 @@ func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(vsphereVolumePluginName), "mounts", devName)
+	return path.Join(host.GetPluginDir(vsphereVolumePluginName), mount.MountsInGlobalPDPath, devName)
 }
 
 func (vv *vsphereVolume) GetPath() string {
