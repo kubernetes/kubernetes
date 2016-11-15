@@ -30,7 +30,8 @@ import (
 
 const (
 	// Default mount command if mounter path is not specified
-	defaultMountCommand = "mount"
+	defaultMountCommand  = "mount"
+	MountsInGlobalPDPath = "mounts"
 )
 
 type Interface interface {
@@ -189,9 +190,29 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 		glog.V(4).Infof("Directory %s is not mounted", mountPath)
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
+	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
 	for _, ref := range refs {
-		if strings.HasPrefix(ref, pluginDir) {
-			return path.Base(ref), nil
+		if strings.HasPrefix(ref, basemountPath) {
+			volumeID, err := filepath.Rel(basemountPath, ref)
+			if err != nil {
+				glog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				return "", err
+			}
+			// This is a workaround to fix the issue in converting aws volume id from globalPDPath
+			// There are three aws volume id formats and their globalPDPaths are:
+			// aws:///vol-1234 (../aws-ebs/mounts/aws/vol-1234)
+			// aws://us-east-1/vol-1234 (../aws-ebs/mounts/aws/us-east-1/vol-1234)
+			// vol-1234 (../aws-ebs/mounts/vol-1234)
+			// This code is for dealing with the first two cases.
+			if strings.HasPrefix(volumeID, "aws/") {
+				if len(strings.Split(volumeID, "/")) > 2 {
+					volumeID = strings.Replace(volumeID, "aws/", "aws://", 1)
+				} else {
+					volumeID = strings.Replace(volumeID, "aws/", "aws:///", 1)
+				}
+			}
+			glog.V(4).Info("Mapping from mount dir ", mountPath, " to volumeID ", volumeID)
+			return volumeID, nil
 		}
 	}
 

@@ -324,12 +324,12 @@ func makeGlobalPDPath(host volume.VolumeHost, volumeID aws.KubernetesVolumeID) s
 	// Clean up the URI to be more fs-friendly
 	name := string(volumeID)
 	name = strings.Replace(name, "://", "/", -1)
-	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts", name)
+	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath, name)
 }
 
 // Reverses the mapping done in makeGlobalPDPath
 func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
-	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts")
+	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath)
 	rel, err := filepath.Rel(basePath, globalPath)
 	if err != nil {
 		glog.Errorf("Failed to get volume id from global mount %s - %v", globalPath, err)
