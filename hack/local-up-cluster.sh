@@ -317,7 +317,8 @@ function set_service_accounts {
 }
 
 function create_client_certkey {
-    echo '{"CN":"$1","hosts":[""],"key":{"algo":"rsa","size":2048}}' | docker run -i  --entrypoint /bin/bash -v "${CERT_DIR}:/certs" -w /certs cfssl/cfssl:latest -ec "cfssl gencert -ca=client-ca.crt -ca-key=client-ca.key -config=client-ca-config.json - | cfssljson -bare client-$1"
+    local CN=${2:-$1}
+    echo "{\"CN\":\"${CN}\",\"hosts\":[\"\"],\"key\":{\"algo\":\"rsa\",\"size\":2048}}" | docker run -i  --entrypoint /bin/bash -v "${CERT_DIR}:/certs" -w /certs cfssl/cfssl:latest -ec "cfssl gencert -ca=client-ca.crt -ca-key=client-ca.key -config=client-ca-config.json - | cfssljson -bare client-$1"
     sudo /bin/bash -e <<EOF
     mv "${CERT_DIR}/client-$1-key.pem" "${CERT_DIR}/client-$1.key"
     mv "${CERT_DIR}/client-$1.pem" "${CERT_DIR}/client-$1.crt"
@@ -396,10 +397,10 @@ function start_apiserver {
     openssl req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/client-ca.key" -out "${CERT_DIR}/client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "${CERT_DIR}/client-ca-config.json"
 EOF
-    create_client_certkey kubelet
-    create_client_certkey kube-proxy
-    create_client_certkey controller
-    create_client_certkey scheduler
+    create_client_certkey kubelet system:node:${HOSTNAME_OVERRIDE}
+    create_client_certkey kube-proxy system:kube-proxy:${HOSTNAME_OVERRIDE}
+    create_client_certkey controller system:controller
+    create_client_certkey scheduler system:scheduler
     create_client_certkey admin
 
     APISERVER_LOG=/tmp/kube-apiserver.log
