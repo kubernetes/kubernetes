@@ -42,11 +42,11 @@ const (
 )
 
 type HostportHandler interface {
-	OpenPodHostportsAndSync(newPod *RunningPod, natInterfaceName string, runningPods []*RunningPod) error
-	SyncHostports(natInterfaceName string, runningPods []*RunningPod) error
+	OpenPodHostportsAndSync(newPod *ActivePod, natInterfaceName string, activePods []*ActivePod) error
+	SyncHostports(natInterfaceName string, activePods []*ActivePod) error
 }
 
-type RunningPod struct {
+type ActivePod struct {
 	Pod *api.Pod
 	IP  net.IP
 }
@@ -131,9 +131,9 @@ func (h *handler) openHostports(pod *api.Pod) error {
 // gatherAllHostports returns all hostports that should be presented on node,
 // given the list of pods running on that node and ignoring host network
 // pods (which don't need hostport <-> container port mapping).
-func gatherAllHostports(runningPods []*RunningPod) (map[api.ContainerPort]targetPod, error) {
+func gatherAllHostports(activePods []*ActivePod) (map[api.ContainerPort]targetPod, error) {
 	podHostportMap := make(map[api.ContainerPort]targetPod)
-	for _, r := range runningPods {
+	for _, r := range activePods {
 		if r.IP.To4() == nil {
 			return nil, fmt.Errorf("Invalid or missing pod %s IP", kubecontainer.GetPodFullName(r.Pod))
 		}
@@ -162,7 +162,7 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 //hostportChainName takes containerPort for a pod and returns associated iptables chain.
 // This is computed by hashing (sha256)
 // then encoding to base32 and truncating with the prefix "KUBE-SVC-".  We do
-// this because Iptables Chain Names must be <= 28 chars long, and the longer
+// this because IPTables Chain Names must be <= 28 chars long, and the longer
 // they are the harder they are to read.
 func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Chain {
 	hash := sha256.Sum256([]byte(string(cp.HostPort) + string(cp.Protocol) + podFullName))
@@ -171,36 +171,37 @@ func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Ch
 }
 
 // OpenPodHostportsAndSync opens hostports for a new pod, gathers all hostports on
-// node, sets up iptables rules enable them. And finally clean up stale hostports
-func (h *handler) OpenPodHostportsAndSync(newPod *RunningPod, natInterfaceName string, runningPods []*RunningPod) error {
+// node, sets up iptables rules enable them. And finally clean up stale hostports.
+// 'newPod' must also be present in 'activePods'.
+func (h *handler) OpenPodHostportsAndSync(newPod *ActivePod, natInterfaceName string, activePods []*ActivePod) error {
 	// try to open pod host port if specified
 	if err := h.openHostports(newPod.Pod); err != nil {
 		return err
 	}
 
-	// Add the new pod to running pods if it's not running already (e.g. in rkt's case).
+	// Add the new pod to active pods if it's not present.
 	var found bool
-	for _, p := range runningPods {
+	for _, p := range activePods {
 		if p.Pod.UID == newPod.Pod.UID {
 			found = true
 			break
 		}
 	}
 	if !found {
-		runningPods = append(runningPods, newPod)
+		activePods = append(activePods, newPod)
 	}
 
-	return h.SyncHostports(natInterfaceName, runningPods)
+	return h.SyncHostports(natInterfaceName, activePods)
 }
 
 // SyncHostports gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
-func (h *handler) SyncHostports(natInterfaceName string, runningPods []*RunningPod) error {
+func (h *handler) SyncHostports(natInterfaceName string, activePods []*ActivePod) error {
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
 	}()
 
-	containerPortMap, err := gatherAllHostports(runningPods)
+	containerPortMap, err := gatherAllHostports(activePods)
 	if err != nil {
 		return err
 	}
@@ -251,14 +252,6 @@ func (h *handler) SyncHostports(natInterfaceName string, runningPods []*RunningP
 	} else {
 		writeLine(natChains, utiliptables.MakeChainLine(kubeHostportsChain))
 	}
-	// Assuming the node is running kube-proxy in iptables mode
-	// Reusing kube-proxy's KubeMarkMasqChain for SNAT
-	// TODO: let kubelet manage KubeMarkMasqChain. Other components should just be able to use it
-	if chain, ok := existingNATChains[iptablesproxy.KubeMarkMasqChain]; ok {
-		writeLine(natChains, chain)
-	} else {
-		writeLine(natChains, utiliptables.MakeChainLine(iptablesproxy.KubeMarkMasqChain))
-	}
 
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
@@ -284,6 +277,7 @@ func (h *handler) SyncHostports(natInterfaceName string, runningPods []*RunningP
 		}
 		writeLine(natRules, args...)
 
+		// Assuming kubelet is syncing iptables KUBE-MARK-MASQ chain
 		// If the request comes from the pod that is serving the hostport, then SNAT
 		args = []string{
 			"-A", string(hostportChain),
@@ -293,7 +287,7 @@ func (h *handler) SyncHostports(natInterfaceName string, runningPods []*RunningP
 		writeLine(natRules, args...)
 
 		// Create hostport chain to DNAT traffic to final destination
-		// Iptables will maintained the stats for this chain
+		// IPTables will maintained the stats for this chain
 		args = []string{
 			"-A", string(hostportChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, containerPort.HostPort),

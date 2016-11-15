@@ -18,6 +18,10 @@
 
 source "$HOME/kube/${KUBE_CONFIG_FILE##*/}"
 
+if [[ -n "$DEBUG" ]] && [[ "$DEBUG" != false ]] && [[ "$DEBUG" != FALSE ]]; then
+	set -x
+fi
+
 if [[ "$(id -u)" != "0" ]]; then
   echo >&2 "Please run as root"
   exit 1
@@ -36,7 +40,7 @@ function config_etcd {
         exit 2
       fi
 
-      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\", \"Backend\": {\"Type\": \"vxlan\"}${FLANNEL_OTHER_NET_CONFIG}}"
+      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\", \"Backend\": ${FLANNEL_BACKEND:-"{\"Type\": \"vxlan\"}"}${FLANNEL_OTHER_NET_CONFIG}}"
       attempt=$((attempt+1))
       sleep 3
     fi
@@ -59,7 +63,7 @@ function restart_docker {
 
   source /run/flannel/subnet.env
   source /etc/default/docker
-  echo DOCKER_OPTS=\"${DOCKER_OPTS} -H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock \
+  echo DOCKER_OPTS=\" -H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock \
        --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}\" > /etc/default/docker
   sudo service docker restart
 }

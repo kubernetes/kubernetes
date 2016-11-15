@@ -17,8 +17,8 @@ limitations under the License.
 package prober
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,9 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -100,12 +100,12 @@ func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus,
 		if err != nil {
 			glog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
 			if hasRef {
-				pb.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+				pb.recorder.Eventf(ref, api.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
 			}
 		} else { // result != probe.Success
 			glog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
 			if hasRef {
-				pb.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+				pb.recorder.Eventf(ref, api.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 			}
 		}
 		return results.Failure, err
@@ -130,7 +130,7 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 }
 
 // buildHeaderMap takes a list of HTTPHeader <name, value> string
-// pairs and returns a a populated string->[]string http.Header map.
+// pairs and returns a populated string->[]string http.Header map.
 func buildHeader(headerList []api.HTTPHeader) http.Header {
 	headers := make(http.Header)
 	for _, header := range headerList {
@@ -143,7 +143,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
-		return pb.exec.Probe(pb.newExecInContainer(container, containerID, p.Exec.Command))
+		return pb.exec.Probe(pb.newExecInContainer(container, containerID, p.Exec.Command, timeout))
 	}
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
@@ -221,19 +221,14 @@ func formatURL(scheme string, host string, port int, path string) *url.URL {
 }
 
 type execInContainer struct {
+	// run executes a command in a container. Combined stdout and stderr output is always returned. An
+	// error is returned if one occurred.
 	run func() ([]byte, error)
 }
 
-func (p *prober) newExecInContainer(container api.Container, containerID kubecontainer.ContainerID, cmd []string) exec.Cmd {
+func (pb *prober) newExecInContainer(container api.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
-		var buffer bytes.Buffer
-		output := ioutils.WriteCloserWrapper(&buffer)
-		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false)
-		if err != nil {
-			return nil, err
-		}
-
-		return buffer.Bytes(), nil
+		return pb.runner.RunInContainer(containerID, cmd, timeout)
 	}}
 }
 
@@ -246,5 +241,13 @@ func (eic execInContainer) Output() ([]byte, error) {
 }
 
 func (eic execInContainer) SetDir(dir string) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStdin(in io.Reader) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStdout(out io.Writer) {
 	//unimplemented
 }

@@ -21,14 +21,15 @@ import (
 	"reflect"
 	"strings"
 
+	"testing"
+
 	"k8s.io/kubernetes/pkg/api"
 	api_pod "k8s.io/kubernetes/pkg/api/pod"
-	"testing"
 )
 
 func TestPetIDName(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		petName := fmt.Sprintf("%v-%d", ps.Name, i)
 		pcb, err := newPCB(fmt.Sprintf("%d", i), ps)
@@ -44,7 +45,7 @@ func TestPetIDName(t *testing.T) {
 
 func TestPetIDDNS(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		petName := fmt.Sprintf("%v-%d", ps.Name, i)
 		petSubdomain := ps.Spec.ServiceName
@@ -54,17 +55,17 @@ func TestPetIDDNS(t *testing.T) {
 			t.Fatalf("Failed to generate pet %v", err)
 		}
 		if hostname, ok := pod.Annotations[api_pod.PodHostnameAnnotation]; !ok || hostname != petName {
-			t.Errorf("Wrong hostname: %v", petName)
+			t.Errorf("Wrong hostname: %v", hostname)
 		}
 		// TODO: Check this against the governing service.
 		if subdomain, ok := pod.Annotations[api_pod.PodSubdomainAnnotation]; !ok || subdomain != petSubdomain {
-			t.Errorf("Wrong subdomain: %v", petName)
+			t.Errorf("Wrong subdomain: %v", subdomain)
 		}
 	}
 }
 func TestPetIDVolume(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		pcb, err := newPCB(fmt.Sprintf("%d", i), ps)
 		if err != nil {
@@ -98,7 +99,7 @@ func TestPetIDVolume(t *testing.T) {
 
 func TestPetIDVolumeClaims(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		pcb, err := newPCB(fmt.Sprintf("%v", i), ps)
 		if err != nil {
@@ -115,7 +116,7 @@ func TestPetIDVolumeClaims(t *testing.T) {
 
 func TestPetIDCrossAssignment(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 
 	nameMapper := &NameIdentityMapper{ps}
 	volumeMapper := &VolumeIdentityMapper{ps}
@@ -143,7 +144,7 @@ func TestPetIDCrossAssignment(t *testing.T) {
 
 func TestPetIDReset(t *testing.T) {
 	replicas := 2
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	firstPCB, err := newPCB("1", ps)
 	secondPCB, err := newPCB("2", ps)
 	if identityHash(ps, firstPCB.pod) == identityHash(ps, secondPCB.pod) {

@@ -22,11 +22,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -49,7 +50,7 @@ type resourceTest struct {
 	memLimits   framework.ResourceUsagePerContainer
 }
 
-func logPodsOnNodes(c *client.Client, nodeNames []string) {
+func logPodsOnNodes(c clientset.Interface, nodeNames []string) {
 	for _, n := range nodeNames {
 		podList, err := framework.GetKubeletRunningPods(c, n)
 		if err != nil {
@@ -65,14 +66,14 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	numNodes := nodeNames.Len()
 	totalPods := podsPerNode * numNodes
 	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
-	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID()))
+	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(uuid.NewUUID()))
 
 	// TODO: Use a more realistic workload
-	Expect(framework.RunRC(framework.RCConfig{
-		Client:    f.Client,
+	Expect(framework.RunRC(testutils.RCConfig{
+		Client:    f.ClientSet,
 		Name:      rcName,
 		Namespace: f.Namespace.Name,
-		Image:     framework.GetPauseImageName(f.Client),
+		Image:     framework.GetPauseImageName(f.ClientSet),
 		Replicas:  totalPods,
 	})).NotTo(HaveOccurred())
 
@@ -95,18 +96,18 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 		} else {
 			time.Sleep(reportingPeriod)
 		}
-		logPodsOnNodes(f.Client, nodeNames.List())
+		logPodsOnNodes(f.ClientSet, nodeNames.List())
 	}
 
 	By("Reporting overall resource usage")
-	logPodsOnNodes(f.Client, nodeNames.List())
+	logPodsOnNodes(f.ClientSet, nodeNames.List())
 	usageSummary, err := rm.GetLatest()
 	Expect(err).NotTo(HaveOccurred())
 	// TODO(random-liu): Remove the original log when we migrate to new perfdash
 	framework.Logf("%s", rm.FormatResourceUsage(usageSummary))
 	// Log perf result
 	framework.PrintPerfData(framework.ResourceUsageToPerfData(rm.GetMasterNodeLatest(usageSummary)))
-	verifyMemoryLimits(f.Client, expectedMemory, usageSummary)
+	verifyMemoryLimits(f.ClientSet, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	framework.Logf("%s", rm.FormatCPUSummary(cpuSummary))
@@ -115,10 +116,10 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	By("Deleting the RC")
-	framework.DeleteRC(f.Client, f.Namespace.Name, rcName)
+	framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, rcName)
 }
 
-func verifyMemoryLimits(c *client.Client, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
+func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
 	if expected == nil {
 		return
 	}
@@ -199,16 +200,16 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		// Wait until image prepull pod has completed so that they wouldn't
 		// affect the runtime cpu usage. Fail the test if prepulling cannot
 		// finish in time.
-		if err := framework.WaitForPodsSuccess(f.Client, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
+		if err := framework.WaitForPodsSuccess(f.ClientSet, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
 			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adultrated", imagePrePullingLongTimeout)
 		}
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
-		om = framework.NewRuntimeOperationMonitor(f.Client)
-		rm = framework.NewResourceMonitor(f.Client, framework.TargetContainers(), containerStatsPollingPeriod)
+		om = framework.NewRuntimeOperationMonitor(f.ClientSet)
+		rm = framework.NewResourceMonitor(f.ClientSet, framework.TargetContainers(), containerStatsPollingPeriod)
 		rm.Start()
 	})
 
@@ -226,43 +227,35 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		// initialization. This *noise* is obvious when N is small. We
 		// deliberately set higher resource usage limits to account for the
 		// noise.
+		//
+		// We set all resource limits generously because this test is mainly
+		// used to catch resource leaks in the soak cluster. For tracking
+		// kubelet/runtime resource usage, please see the node e2e benchmark
+		// dashboard. http://node-perf-dash.k8s.io/
+		//
+		// TODO(#36621): Deprecate this test once we have a node e2e soak
+		// cluster.
 		rTests := []resourceTest{
 			{
 				podsPerNode: 0,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.06, 0.95: 0.08},
-					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.06},
+					stats.SystemContainerKubelet: {0.50: 0.10, 0.95: 0.20},
+					stats.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.20},
 				},
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
-				},
-			},
-			{
-				podsPerNode: 35,
-				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.12, 0.95: 0.14},
-					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.07},
-				},
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
-				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 150 * 1024 * 1024},
+					// The detail can be found at https://github.com/kubernetes/kubernetes/issues/28384#issuecomment-244158892
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 125 * 1024 * 1024},
 				},
 			},
 			{
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.17, 0.95: 0.22},
-					stats.SystemContainerRuntime: {0.50: 0.06, 0.95: 0.09},
+					stats.SystemContainerKubelet: {0.50: 0.35, 0.95: 0.50},
+					stats.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.50},
 				},
 				podsPerNode: 100,
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 80 * 1024 * 1024},
+					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
 					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
 				},
 			},

@@ -1,38 +1,4 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/control-plane-resilience.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
-# Kubernetes/Ubernetes Control Plane Resilience
+# Kubernetes and Cluster Federation Control Plane Resilience
 
 ## Long Term Design and Current Status
 
@@ -44,7 +10,7 @@ Documentation for other releases can be found at
 
 Some amount of confusion exists around how we currently, and in future
 want to ensure resilience of the Kubernetes (and by implication
-Ubernetes) control plane.  This document is an attempt to capture that
+Kubernetes Cluster Federation) control plane.  This document is an attempt to capture that
 definitively. It covers areas including self-healing, high
 availability, bootstrapping and recovery.  Most of the information in
 this document already exists in the form of github comments,
@@ -179,7 +145,7 @@ well-bounded time period.
 Multiple stateless, self-hosted, self-healing API servers behind a HA
 load balancer, built out by the default "kube-up" automation on GCE,
 AWS and basic bare metal (BBM). Note that the single-host approach of
-hving etcd listen only on localhost to ensure that onyl API server can
+having etcd listen only on localhost to ensure that only API server can
 connect to it will no longer work, so alternative security will be
 needed in the regard (either using firewall rules, SSL certs, or
 something else). All necessary flags are currently supported to enable

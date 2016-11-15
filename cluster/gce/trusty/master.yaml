@@ -65,6 +65,8 @@ script
 	create_master_auth
 	echo "Creating master instance kubelet auth file"
 	create_master_kubelet_auth
+	echo "Creating auth files for etcd"
+	create-master-etcd-auth
 	echo "Assemble kubelet command line"
 	# Kubelet command flags will be written in /etc/default/kubelet
 	assemble_kubelet_flags
@@ -192,6 +194,7 @@ script
 	start_kube_scheduler
 	start_kube_addons
 	start_cluster_autoscaler
+	start_rescheduler
 	reset_motd
 } 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
@@ -204,7 +207,7 @@ Content-Disposition: attachment; filename="kube-master-health-monitoring.conf"
 
 #upstart-job
 
-description "Kubenetes master health monitoring"
+description "Kubernetes master health monitoring"
 
 start on stopped kube-docker
 

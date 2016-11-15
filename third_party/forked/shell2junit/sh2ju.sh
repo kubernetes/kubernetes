@@ -43,7 +43,7 @@ function eVal() {
 # Method to clean old tests
 function juLogClean() {
   echo "+++ Removing old junit reports from: $juDIR "
-  rm -f "$juDIR"/TEST-*
+  rm -f "$juDIR"/junit-*
 }
 
 # Execute a command and record its results
@@ -113,7 +113,7 @@ function juLog() {
       H=`echo "$out" | egrep $icase "$ereg"`
       [ -n "$H" ] && err=1
   fi
-  echo "+++ error: $err"         | tee -a $outf
+  [ $err != 0 ] && echo "+++ error: $err"         | tee -a $outf
   rm -f $outf
 
   errMsg=`cat $errf`
@@ -151,23 +151,23 @@ $errMsg
   "
   ## testsuite block
 
-  if [[ -e "$juDIR/TEST-$suite.xml" ]]; then
+  if [[ -e "$juDIR/junit-$suite.xml" ]]; then
     # file exists. first update the failures count
-    failCount=`sed -n "s/.*testsuite.*failures=\"\([0-9]*\)\".*/\1/p" "$juDIR/TEST-$suite.xml"`
+    failCount=`sed -n "s/.*testsuite.*failures=\"\([0-9]*\)\".*/\1/p" "$juDIR/junit-$suite.xml"`
     errors=$(($failCount+$errors))
-    sed -i "0,/failures=\"$failCount\"/ s/failures=\"$failCount\"/failures=\"$errors\"/" "$juDIR/TEST-$suite.xml"
-    sed -i "0,/errors=\"$failCount\"/ s/errors=\"$failCount\"/errors=\"$errors\"/" "$juDIR/TEST-$suite.xml"
+    sed -i "0,/failures=\"$failCount\"/ s/failures=\"$failCount\"/failures=\"$errors\"/" "$juDIR/junit-$suite.xml"
+    sed -i "0,/errors=\"$failCount\"/ s/errors=\"$failCount\"/errors=\"$errors\"/" "$juDIR/junit-$suite.xml"
 
     # file exists. Need to append to it. If we remove the testsuite end tag, we can just add it in after.
-    sed -i "s^</testsuite>^^g" $juDIR/TEST-$suite.xml ## remove testSuite so we can add it later
-    cat <<EOF >> "$juDIR/TEST-$suite.xml"
+    sed -i "s^</testsuite>^^g" $juDIR/junit-$suite.xml ## remove testSuite so we can add it later
+    cat <<EOF >> "$juDIR/junit-$suite.xml"
      $content
     </testsuite>
 EOF
 
   else
     # no file exists. Adding a new file
-    cat <<EOF > "$juDIR/TEST-$suite.xml"
+    cat <<EOF > "$juDIR/junit-$suite.xml"
     <testsuite failures="$errors" assertions="$assertions" name="$suite" tests="1" errors="$errors" time="$total">
     $content
     </testsuite>

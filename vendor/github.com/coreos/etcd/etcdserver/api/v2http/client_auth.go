@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,18 +26,56 @@ import (
 )
 
 type authHandler struct {
-	sec     auth.Store
-	cluster api.Cluster
+	sec                   auth.Store
+	cluster               api.Cluster
+	clientCertAuthEnabled bool
 }
 
-func hasWriteRootAccess(sec auth.Store, r *http.Request) bool {
+func hasWriteRootAccess(sec auth.Store, r *http.Request, clientCertAuthEnabled bool) bool {
 	if r.Method == "GET" || r.Method == "HEAD" {
 		return true
 	}
-	return hasRootAccess(sec, r)
+	return hasRootAccess(sec, r, clientCertAuthEnabled)
 }
 
-func hasRootAccess(sec auth.Store, r *http.Request) bool {
+func userFromBasicAuth(sec auth.Store, r *http.Request) *auth.User {
+	username, password, ok := r.BasicAuth()
+	if !ok {
+		plog.Warningf("auth: malformed basic auth encoding")
+		return nil
+	}
+	user, err := sec.GetUser(username)
+	if err != nil {
+		return nil
+	}
+
+	ok = sec.CheckPassword(user, password)
+	if !ok {
+		plog.Warningf("auth: incorrect password for user: %s", username)
+		return nil
+	}
+	return &user
+}
+
+func userFromClientCertificate(sec auth.Store, r *http.Request) *auth.User {
+	if r.TLS == nil {
+		return nil
+	}
+
+	for _, chains := range r.TLS.VerifiedChains {
+		for _, chain := range chains {
+			plog.Debugf("auth: found common name %s.\n", chain.Subject.CommonName)
+			user, err := sec.GetUser(chain.Subject.CommonName)
+			if err == nil {
+				plog.Debugf("auth: authenticated user %s by cert common name.", user.User)
+				return &user
+			}
+		}
+	}
+	return nil
+}
+
+func hasRootAccess(sec auth.Store, r *http.Request, clientCertAuthEnabled bool) bool {
 	if sec == nil {
 		// No store means no auth available, eg, tests.
 		return true
@@ -45,30 +83,30 @@ func hasRootAccess(sec auth.Store, r *http.Request) bool {
 	if !sec.AuthEnabled() {
 		return true
 	}
-	username, password, ok := r.BasicAuth()
-	if !ok {
-		return false
-	}
-	rootUser, err := sec.GetUser(username)
-	if err != nil {
-		return false
+
+	var rootUser *auth.User
+	if r.Header.Get("Authorization") == "" && clientCertAuthEnabled {
+		rootUser = userFromClientCertificate(sec, r)
+		if rootUser == nil {
+			return false
+		}
+	} else {
+		rootUser = userFromBasicAuth(sec, r)
+		if rootUser == nil {
+			return false
+		}
 	}
 
-	ok = sec.CheckPassword(rootUser, password)
-	if !ok {
-		plog.Warningf("auth: wrong password for user %s", username)
-		return false
-	}
 	for _, role := range rootUser.Roles {
 		if role == auth.RootRoleName {
 			return true
 		}
 	}
-	plog.Warningf("auth: user %s does not have the %s role for resource %s.", username, auth.RootRoleName, r.URL.Path)
+	plog.Warningf("auth: user %s does not have the %s role for resource %s.", rootUser.User, auth.RootRoleName, r.URL.Path)
 	return false
 }
 
-func hasKeyPrefixAccess(sec auth.Store, r *http.Request, key string, recursive bool) bool {
+func hasKeyPrefixAccess(sec auth.Store, r *http.Request, key string, recursive, clientCertAuthEnabled bool) bool {
 	if sec == nil {
 		// No store means no auth available, eg, tests.
 		return true
@@ -76,25 +114,22 @@ func hasKeyPrefixAccess(sec auth.Store, r *http.Request, key string, recursive b
 	if !sec.AuthEnabled() {
 		return true
 	}
+
+	var user *auth.User
 	if r.Header.Get("Authorization") == "" {
-		plog.Warningf("auth: no authorization provided, checking guest access")
-		return hasGuestAccess(sec, r, key)
+		if clientCertAuthEnabled {
+			user = userFromClientCertificate(sec, r)
+		}
+		if user == nil {
+			return hasGuestAccess(sec, r, key)
+		}
+	} else {
+		user = userFromBasicAuth(sec, r)
+		if user == nil {
+			return false
+		}
 	}
-	username, password, ok := r.BasicAuth()
-	if !ok {
-		plog.Warningf("auth: malformed basic auth encoding")
-		return false
-	}
-	user, err := sec.GetUser(username)
-	if err != nil {
-		plog.Warningf("auth: no such user: %s.", username)
-		return false
-	}
-	authAsUser := sec.CheckPassword(user, password)
-	if !authAsUser {
-		plog.Warningf("auth: incorrect password for user: %s.", username)
-		return false
-	}
+
 	writeAccess := r.Method != "GET" && r.Method != "HEAD"
 	for _, roleName := range user.Roles {
 		role, err := sec.GetRole(roleName)
@@ -109,7 +144,7 @@ func hasKeyPrefixAccess(sec auth.Store, r *http.Request, key string, recursive b
 			return true
 		}
 	}
-	plog.Warningf("auth: invalid access for user %s on key %s.", username, key)
+	plog.Warningf("auth: invalid access for user %s on key %s.", user.User, key)
 	return false
 }
 
@@ -134,18 +169,18 @@ func writeNoAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleAuth(mux *http.ServeMux, sh *authHandler) {
-	mux.HandleFunc(authPrefix+"/roles", capabilityHandler(authCapability, sh.baseRoles))
-	mux.HandleFunc(authPrefix+"/roles/", capabilityHandler(authCapability, sh.handleRoles))
-	mux.HandleFunc(authPrefix+"/users", capabilityHandler(authCapability, sh.baseUsers))
-	mux.HandleFunc(authPrefix+"/users/", capabilityHandler(authCapability, sh.handleUsers))
-	mux.HandleFunc(authPrefix+"/enable", capabilityHandler(authCapability, sh.enableDisable))
+	mux.HandleFunc(authPrefix+"/roles", capabilityHandler(api.AuthCapability, sh.baseRoles))
+	mux.HandleFunc(authPrefix+"/roles/", capabilityHandler(api.AuthCapability, sh.handleRoles))
+	mux.HandleFunc(authPrefix+"/users", capabilityHandler(api.AuthCapability, sh.baseUsers))
+	mux.HandleFunc(authPrefix+"/users/", capabilityHandler(api.AuthCapability, sh.handleUsers))
+	mux.HandleFunc(authPrefix+"/enable", capabilityHandler(api.AuthCapability, sh.enableDisable))
 }
 
 func (sh *authHandler) baseRoles(w http.ResponseWriter, r *http.Request) {
 	if !allowMethod(w, r.Method, "GET") {
 		return
 	}
-	if !hasRootAccess(sh.sec, r) {
+	if !hasRootAccess(sh.sec, r, sh.clientCertAuthEnabled) {
 		writeNoAuth(w, r)
 		return
 	}
@@ -209,7 +244,7 @@ func (sh *authHandler) forRole(w http.ResponseWriter, r *http.Request, role stri
 	if !allowMethod(w, r.Method, "GET", "PUT", "DELETE") {
 		return
 	}
-	if !hasRootAccess(sh.sec, r) {
+	if !hasRootAccess(sh.sec, r, sh.clientCertAuthEnabled) {
 		writeNoAuth(w, r)
 		return
 	}
@@ -285,11 +320,15 @@ type userWithRoles struct {
 	Roles []auth.Role `json:"roles,omitempty"`
 }
 
+type usersCollections struct {
+	Users []userWithRoles `json:"users"`
+}
+
 func (sh *authHandler) baseUsers(w http.ResponseWriter, r *http.Request) {
 	if !allowMethod(w, r.Method, "GET") {
 		return
 	}
-	if !hasRootAccess(sh.sec, r) {
+	if !hasRootAccess(sh.sec, r, sh.clientCertAuthEnabled) {
 		writeNoAuth(w, r)
 		return
 	}
@@ -311,9 +350,7 @@ func (sh *authHandler) baseUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var usersCollections struct {
-		Users []userWithRoles `json:"users"`
-	}
+	ucs := usersCollections{}
 	for _, userName := range users {
 		var user auth.User
 		user, err = sh.sec.GetUser(userName)
@@ -327,15 +364,14 @@ func (sh *authHandler) baseUsers(w http.ResponseWriter, r *http.Request) {
 			var role auth.Role
 			role, err = sh.sec.GetRole(roleName)
 			if err != nil {
-				writeError(w, r, err)
-				return
+				continue
 			}
 			uwr.Roles = append(uwr.Roles, role)
 		}
 
-		usersCollections.Users = append(usersCollections.Users, uwr)
+		ucs.Users = append(ucs.Users, uwr)
 	}
-	err = json.NewEncoder(w).Encode(usersCollections)
+	err = json.NewEncoder(w).Encode(ucs)
 
 	if err != nil {
 		plog.Warningf("baseUsers error encoding on %s", r.URL)
@@ -364,7 +400,7 @@ func (sh *authHandler) forUser(w http.ResponseWriter, r *http.Request, user stri
 	if !allowMethod(w, r.Method, "GET", "PUT", "DELETE") {
 		return
 	}
-	if !hasRootAccess(sh.sec, r) {
+	if !hasRootAccess(sh.sec, r, sh.clientCertAuthEnabled) {
 		writeNoAuth(w, r)
 		return
 	}
@@ -477,7 +513,7 @@ func (sh *authHandler) enableDisable(w http.ResponseWriter, r *http.Request) {
 	if !allowMethod(w, r.Method, "GET", "PUT", "DELETE") {
 		return
 	}
-	if !hasWriteRootAccess(sh.sec, r) {
+	if !hasWriteRootAccess(sh.sec, r, sh.clientCertAuthEnabled) {
 		writeNoAuth(w, r)
 		return
 	}

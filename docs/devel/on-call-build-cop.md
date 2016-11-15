@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/on-call-build-cop.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 ## Kubernetes "Github and Build-cop" Rotation
 
 ### Preqrequisites
@@ -139,7 +105,7 @@ or [flaky test builds](https://goto.google.com/k8s-test/view/Flaky/) are not
 your responsibility to monitor. The `Test owner:` in the job description will be
 automatically emailed if the job is failing.
 
-* If you are a weekday oncall, ensure that PRs confirming to the following
+* If you are oncall, ensure that PRs confirming to the following
 pre-requisites are being merged at a reasonable rate:
 
   * [Have been LGTMd](https://github.com/kubernetes/kubernetes/labels/lgtm)
@@ -147,10 +113,9 @@ pre-requisites are being merged at a reasonable rate:
   * Author has signed CLA if applicable.
 
 
-* If you are a weekend oncall, [never merge PRs manually](collab.md), instead
-add the label "lgtm" to the PRs once they have been LGTMd and passed Travis;
-this will cause merge-bot to merge them automatically (or make them easy to find
-by the next oncall, who will merge them).
+* Although the shift schedule shows you as being scheduled Monday to Monday,
+  working on the weekend is neither expected nor encouraged.  Enjoy your time
+  off.
 
 * When the build is broken, roll back the PRs responsible ASAP
 

@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/kubernetes/pkg/util/maps"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -67,7 +68,7 @@ func NewSimpleProvider(psp *extensions.PodSecurityPolicy, namespace string, stra
 //
 // NOTE: this method works on a copy of the PodSecurityContext.  It is up to the caller to
 // apply the PSC if validation passes.
-func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, error) {
+func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error) {
 	var sc *api.PodSecurityContext = nil
 	if pod.Spec.SecurityContext != nil {
 		// work with a copy
@@ -76,11 +77,12 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	} else {
 		sc = &api.PodSecurityContext{}
 	}
+	annotations := maps.CopySS(pod.Annotations)
 
 	if len(sc.SupplementalGroups) == 0 {
 		supGroups, err := s.strategies.SupplementalGroupStrategy.Generate(pod)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.SupplementalGroups = supGroups
 	}
@@ -88,7 +90,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.FSGroup == nil {
 		fsGroup, err := s.strategies.FSGroupStrategy.GenerateSingle(pod)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.FSGroup = fsGroup
 	}
@@ -96,12 +98,24 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.SELinuxOptions == nil {
 		seLinux, err := s.strategies.SELinuxStrategy.Generate(pod, nil)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.SELinuxOptions = seLinux
 	}
 
-	return sc, nil
+	// This is only generated on the pod level.  Containers inherit the pod's profile.  If the
+	// container has a specific profile set then it will be caught in the validation step.
+	seccompProfile, err := s.strategies.SeccompStrategy.Generate(annotations, pod)
+	if err != nil {
+		return nil, nil, err
+	}
+	if seccompProfile != "" {
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[api.SeccompPodAnnotationKey] = seccompProfile
+	}
+	return sc, annotations, nil
 }
 
 // Create a SecurityContext based on the given constraints.  If a setting is already set on the
@@ -110,7 +124,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 //
 // NOTE: this method works on a copy of the SC of the container.  It is up to the caller to apply
 // the SC if validation passes.
-func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, error) {
+func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, map[string]string, error) {
 	var sc *api.SecurityContext = nil
 	if container.SecurityContext != nil {
 		// work with a copy of the original
@@ -119,10 +133,12 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	} else {
 		sc = &api.SecurityContext{}
 	}
+	annotations := maps.CopySS(pod.Annotations)
+
 	if sc.RunAsUser == nil {
 		uid, err := s.strategies.RunAsUserStrategy.Generate(pod, container)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.RunAsUser = uid
 	}
@@ -130,9 +146,14 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	if sc.SELinuxOptions == nil {
 		seLinux, err := s.strategies.SELinuxStrategy.Generate(pod, container)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.SELinuxOptions = seLinux
+	}
+
+	annotations, err := s.strategies.AppArmorStrategy.Generate(annotations, container)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	if sc.Privileged == nil {
@@ -150,7 +171,7 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 
 	caps, err := s.strategies.CapabilitiesStrategy.Generate(pod, container)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sc.Capabilities = caps
 
@@ -161,7 +182,7 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 		sc.ReadOnlyRootFilesystem = &readOnlyRootFS
 	}
 
-	return sc, nil
+	return sc, annotations, nil
 }
 
 // Ensure a pod's SecurityContext is in compliance with the given constraints.
@@ -179,6 +200,7 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 	}
 	allErrs = append(allErrs, s.strategies.FSGroupStrategy.Validate(pod, fsGroups)...)
 	allErrs = append(allErrs, s.strategies.SupplementalGroupStrategy.Validate(pod, pod.Spec.SecurityContext.SupplementalGroups)...)
+	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidatePod(pod)...)
 
 	// make a dummy container context to reuse the selinux strategies
 	container := &api.Container{
@@ -201,6 +223,27 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostIPC"), pod.Spec.SecurityContext.HostIPC, "Host IPC is not allowed to be used"))
 	}
 
+	allErrs = append(allErrs, s.strategies.SysctlsStrategy.Validate(pod)...)
+
+	// TODO(timstclair): ValidatePodSecurityContext should be renamed to ValidatePod since its scope
+	// is not limited to the PodSecurityContext.
+	if len(pod.Spec.Volumes) > 0 && !psputil.PSPAllowsAllVolumes(s.psp) {
+		allowedVolumes := psputil.FSTypeToStringSet(s.psp.Spec.Volumes)
+		for i, v := range pod.Spec.Volumes {
+			fsType, err := psputil.GetVolumeFSType(v)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "volumes").Index(i), string(fsType), err.Error()))
+				continue
+			}
+
+			if !allowedVolumes.Has(string(fsType)) {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "volumes").Index(i), string(fsType),
+					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
+			}
+		}
+	}
+
 	return allErrs
 }
 
@@ -216,6 +259,8 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	sc := container.SecurityContext
 	allErrs = append(allErrs, s.strategies.RunAsUserStrategy.Validate(pod, container)...)
 	allErrs = append(allErrs, s.strategies.SELinuxStrategy.Validate(pod, container)...)
+	allErrs = append(allErrs, s.strategies.AppArmorStrategy.Validate(pod, container)...)
+	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidateContainer(pod, container)...)
 
 	if !s.psp.Spec.Privileged && *sc.Privileged {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("privileged"), *sc.Privileged, "Privileged containers are not allowed"))
@@ -223,29 +268,18 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 
 	allErrs = append(allErrs, s.strategies.CapabilitiesStrategy.Validate(pod, container)...)
 
-	if len(pod.Spec.Volumes) > 0 && !psputil.PSPAllowsAllVolumes(s.psp) {
-		allowedVolumes := psputil.FSTypeToStringSet(s.psp.Spec.Volumes)
-		for i, v := range pod.Spec.Volumes {
-			fsType, err := psputil.GetVolumeFSType(v)
-			if err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("volumes").Index(i), string(fsType), err.Error()))
-				continue
-			}
-
-			if !allowedVolumes.Has(string(fsType)) {
-				allErrs = append(allErrs, field.Invalid(
-					fldPath.Child("volumes").Index(i), string(fsType),
-					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
-			}
-		}
-	}
-
 	if !s.psp.Spec.HostNetwork && pod.Spec.SecurityContext.HostNetwork {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostNetwork"), pod.Spec.SecurityContext.HostNetwork, "Host network is not allowed to be used"))
 	}
 
 	containersPath := fldPath.Child("containers")
 	for idx, c := range pod.Spec.Containers {
+		idxPath := containersPath.Index(idx)
+		allErrs = append(allErrs, s.hasInvalidHostPort(&c, idxPath)...)
+	}
+
+	containersPath = fldPath.Child("initContainers")
+	for idx, c := range pod.Spec.InitContainers {
 		idxPath := containersPath.Index(idx)
 		allErrs = append(allErrs, s.hasInvalidHostPort(&c, idxPath)...)
 	}

@@ -23,13 +23,19 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
 func FillObjectMetaSystemFields(ctx Context, meta *ObjectMeta) {
 	meta.CreationTimestamp = unversioned.Now()
-	meta.UID = util.NewUUID()
+	// allows admission controllers to assign a UID earlier in the request processing
+	// to support tracking resources pending creation.
+	uid, found := UIDFrom(ctx)
+	if !found {
+		uid = uuid.NewUUID()
+	}
+	meta.UID = uid
 	meta.SelfLink = ""
 }
 
@@ -66,8 +72,6 @@ func ListMetaFor(obj runtime.Object) (*unversioned.ListMeta, error) {
 }
 
 func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }
-
-func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind { return obj }
 
 // Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
 // fast, direct access to metadata fields for API objects.
@@ -126,4 +130,11 @@ func (meta *ObjectMeta) SetOwnerReferences(references []metatypes.OwnerReference
 		}
 	}
 	meta.OwnerReferences = newReferences
+}
+
+func (meta *ObjectMeta) GetClusterName() string {
+	return meta.ClusterName
+}
+func (meta *ObjectMeta) SetClusterName(clusterName string) {
+	meta.ClusterName = clusterName
 }

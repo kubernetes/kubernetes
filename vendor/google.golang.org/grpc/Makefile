@@ -1,15 +1,3 @@
-.PHONY: \
-	all \
-	deps \
-	updatedeps \
-	testdeps \
-	updatetestdeps \
-	build \
-	proto \
-	test \
-	testrace \
-	clean \
-
 all: test testrace
 
 deps:
@@ -32,9 +20,10 @@ proto:
 		echo "error: protoc not installed" >&2; \
 		exit 1; \
 	fi
-	go get -v github.com/golang/protobuf/protoc-gen-go
-	for file in $$(git ls-files '*.proto'); do \
-		protoc -I $$(dirname $$file) --go_out=plugins=grpc:$$(dirname $$file) $$file; \
+	go get -u -v github.com/golang/protobuf/protoc-gen-go
+	# use $$dir as the root for all proto files in the same directory
+	for dir in $$(git ls-files '*.proto' | xargs -n1 dirname | uniq); do \
+		protoc -I $$dir --go_out=plugins=grpc:$$dir $$dir/*.proto; \
 	done
 
 test: testdeps
@@ -44,7 +33,20 @@ testrace: testdeps
 	go test -v -race -cpu 1,4 google.golang.org/grpc/...
 
 clean:
-	go clean google.golang.org/grpc/...
+	go clean -i google.golang.org/grpc/...
 
 coverage: testdeps
 	./coverage.sh --coveralls
+
+.PHONY: \
+	all \
+	deps \
+	updatedeps \
+	testdeps \
+	updatetestdeps \
+	build \
+	proto \
+	test \
+	testrace \
+	clean \
+	coverage

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 //
-// diskManager interface and diskSetup/TearDown functions abtract commonly used procedures to setup a block volume
+// diskManager interface and diskSetup/TearDown functions abstract commonly used procedures to setup a block volume
 // rbd volume implements diskManager, calls diskSetup when creating a volume, and calls diskTearDown inside volume unmounter.
 // TODO: consolidate, refactor, and share diskManager among iSCSI, GCE PD, and RBD
 //
@@ -26,6 +26,7 @@ import (
 	"os"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -37,6 +38,10 @@ type diskManager interface {
 	AttachDisk(disk rbdMounter) error
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(disk rbdUnmounter, mntPath string) error
+	// Creates a rbd image
+	CreateImage(provisioner *rbdVolumeProvisioner) (r *api.RBDVolumeSource, volumeSizeGB int, err error)
+	// Deletes a rbd image
+	DeleteImage(deleter *rbdVolumeDeleter) error
 }
 
 // utility to mount a disk based filesystem

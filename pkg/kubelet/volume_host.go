@@ -125,11 +125,10 @@ func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
 	return kvh.kubelet.GetHostIP()
 }
 
-func (kvh *kubeletVolumeHost) GetRootContext() string {
-	rootContext, err := kvh.kubelet.getRootDirContext()
+func (kvh *kubeletVolumeHost) GetNodeAllocatable() (api.ResourceList, error) {
+	node, err := kvh.kubelet.getNodeAnyWay()
 	if err != nil {
-		return ""
+		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
-
-	return rootContext
+	return node.Status.Allocatable, nil
 }

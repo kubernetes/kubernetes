@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,8 +28,6 @@ import (
 // None is a placeholder node ID used when there is no leader.
 const None uint64 = 0
 const noLimit = math.MaxUint64
-
-var ErrSnapshotTemporarilyUnavailable = errors.New("snapshot is temporarily unavailable")
 
 // Possible values for StateType.
 const (
@@ -156,7 +154,9 @@ type raft struct {
 
 	// the leader id
 	lead uint64
-
+	// leadTransferee is id of the leader transfer target when its value is not zero.
+	// Follow the procedure defined in raft thesis 3.10.
+	leadTransferee uint64
 	// New configuration is ignored if there exists unapplied configuration.
 	pendingConf bool
 
@@ -229,7 +229,7 @@ func newRaft(c *Config) *raft {
 	}
 	r.becomeFollower(r.Term, None)
 
-	nodesStrs := make([]string, 0)
+	var nodesStrs []string
 	for _, n := range r.nodes() {
 		nodesStrs = append(nodesStrs, fmt.Sprintf("%x", n))
 	}
@@ -397,6 +397,8 @@ func (r *raft) reset(term uint64) {
 	r.heartbeatElapsed = 0
 	r.resetRandomizedElectionTimeout()
 
+	r.abortLeaderTransfer()
+
 	r.votes = make(map[uint64]bool)
 	for id := range r.prs {
 		r.prs[id] = &Progress{Next: r.raftLog.lastIndex() + 1, ins: newInflights(r.maxInflight)}
@@ -421,12 +423,9 @@ func (r *raft) appendEntry(es ...pb.Entry) {
 
 // tickElection is run by followers and candidates after r.electionTimeout.
 func (r *raft) tickElection() {
-	if !r.promotable() {
-		r.electionElapsed = 0
-		return
-	}
 	r.electionElapsed++
-	if r.pastElectionTimeout() {
+
+	if r.promotable() && r.pastElectionTimeout() {
 		r.electionElapsed = 0
 		r.Step(pb.Message{From: r.id, Type: pb.MsgHup})
 	}
@@ -441,6 +440,10 @@ func (r *raft) tickHeartbeat() {
 		r.electionElapsed = 0
 		if r.checkQuorum {
 			r.Step(pb.Message{From: r.id, Type: pb.MsgCheckQuorum})
+		}
+		// If current leader cannot transfer leadership in electionTimeout, it becomes leader again.
+		if r.state == StateLeader && r.leadTransferee != None {
+			r.abortLeaderTransfer()
 		}
 	}
 
@@ -547,6 +550,11 @@ func (r *raft) Step(m pb.Message) error {
 		}
 		return nil
 	}
+	if m.Type == pb.MsgTransferLeader {
+		if r.state != StateLeader {
+			r.logger.Debugf("%x [term %d state %v] ignoring MsgTransferLeader to %x", r.id, r.Term, r.state, m.From)
+		}
+	}
 
 	switch {
 	case m.Term == 0:
@@ -554,15 +562,35 @@ func (r *raft) Step(m pb.Message) error {
 	case m.Term > r.Term:
 		lead := m.From
 		if m.Type == pb.MsgVote {
+			if r.checkQuorum && r.state != StateCandidate && r.electionElapsed < r.electionTimeout {
+				// If a server receives a RequestVote request within the minimum election timeout
+				// of hearing from a current leader, it does not update its term or grant its vote
+				r.logger.Infof("%x [logterm: %d, index: %d, vote: %x] ignored vote from %x [logterm: %d, index: %d] at term %d: lease is not expired (remaining ticks: %d)",
+					r.id, r.raftLog.lastTerm(), r.raftLog.lastIndex(), r.Vote, m.From, m.LogTerm, m.Index, r.Term, r.electionTimeout-r.electionElapsed)
+				return nil
+			}
 			lead = None
 		}
 		r.logger.Infof("%x [term: %d] received a %s message with higher term from %x [term: %d]",
 			r.id, r.Term, m.Type, m.From, m.Term)
 		r.becomeFollower(m.Term, lead)
 	case m.Term < r.Term:
-		// ignore
-		r.logger.Infof("%x [term: %d] ignored a %s message with lower term from %x [term: %d]",
-			r.id, r.Term, m.Type, m.From, m.Term)
+		if r.checkQuorum && (m.Type == pb.MsgHeartbeat || m.Type == pb.MsgApp) {
+			// We have received messages from a leader at a lower term. It is possible that these messages were
+			// simply delayed in the network, but this could also mean that this node has advanced its term number
+			// during a network partition, and it is now unable to either win an election or to rejoin the majority
+			// on the old term. If checkQuorum is false, this will be handled by incrementing term numbers in response
+			// to MsgVote with a higher term, but if checkQuorum is true we may not advance the term on MsgVote and
+			// must generate other messages to advance the term. The net result of these two features is to minimize
+			// the disruption caused by nodes that have been removed from the cluster's configuration: a removed node
+			// will send MsgVotes which will be ignored, but it will not receive MsgApp or MsgHeartbeat, so it will not
+			// create disruptive term increases
+			r.send(pb.Message{To: m.From, Type: pb.MsgAppResp})
+		} else {
+			// ignore other cases
+			r.logger.Infof("%x [term: %d] ignored a %s message with lower term from %x [term: %d]",
+				r.id, r.Term, m.Type, m.From, m.Term)
+		}
 		return nil
 	}
 	r.step(r, m)
@@ -572,7 +600,6 @@ func (r *raft) Step(m pb.Message) error {
 type stepFunc func(r *raft, m pb.Message)
 
 func stepLeader(r *raft, m pb.Message) {
-
 	// These message types do not require any progress for m.From.
 	switch m.Type {
 	case pb.MsgBeat:
@@ -594,6 +621,11 @@ func stepLeader(r *raft, m pb.Message) {
 			// drop any new proposals.
 			return
 		}
+		if r.leadTransferee != None {
+			r.logger.Debugf("%x [term %d] transfer leadership to %x is in progress; dropping proposal", r.id, r.Term, r.leadTransferee)
+			return
+		}
+
 		for i, e := range m.Entries {
 			if e.Type == pb.EntryConfChange {
 				if r.pendingConf {
@@ -615,7 +647,7 @@ func stepLeader(r *raft, m pb.Message) {
 	// All other message types require a progress for m.From (pr).
 	pr, prOk := r.prs[m.From]
 	if !prOk {
-		r.logger.Debugf("no progress available for %x", m.From)
+		r.logger.Debugf("%x no progress available for %x", r.id, m.From)
 		return
 	}
 	switch m.Type {
@@ -638,7 +670,7 @@ func stepLeader(r *raft, m pb.Message) {
 				switch {
 				case pr.State == ProgressStateProbe:
 					pr.becomeReplicate()
-				case pr.State == ProgressStateSnapshot && pr.maybeSnapshotAbort():
+				case pr.State == ProgressStateSnapshot && pr.needSnapshotAbort():
 					r.logger.Debugf("%x snapshot aborted, resumed sending replication messages to %x [%s]", r.id, m.From, pr)
 					pr.becomeProbe()
 				case pr.State == ProgressStateReplicate:
@@ -651,6 +683,11 @@ func stepLeader(r *raft, m pb.Message) {
 					// update() reset the wait state on this node. If we had delayed sending
 					// an update before, send it now.
 					r.sendAppend(m.From)
+				}
+				// Transfer leadership is in progress.
+				if m.From == r.leadTransferee && pr.Match == r.raftLog.lastIndex() {
+					r.logger.Infof("%x sent MsgTimeoutNow to %x after received MsgAppResp", r.id, m.From)
+					r.sendTimeoutNow(m.From)
 				}
 			}
 		}
@@ -687,6 +724,33 @@ func stepLeader(r *raft, m pb.Message) {
 			pr.becomeProbe()
 		}
 		r.logger.Debugf("%x failed to send message to %x because it is unreachable [%s]", r.id, m.From, pr)
+	case pb.MsgTransferLeader:
+		leadTransferee := m.From
+		lastLeadTransferee := r.leadTransferee
+		if lastLeadTransferee != None {
+			if lastLeadTransferee == leadTransferee {
+				r.logger.Infof("%x [term %d] transfer leadership to %x is in progress, ignores request to same node %x",
+					r.id, r.Term, leadTransferee, leadTransferee)
+				return
+			}
+			r.abortLeaderTransfer()
+			r.logger.Infof("%x [term %d] abort previous transferring leadership to %x", r.id, r.Term, lastLeadTransferee)
+		}
+		if leadTransferee == r.id {
+			r.logger.Debugf("%x is already leader. Ignored transferring leadership to self", r.id)
+			return
+		}
+		// Transfer leadership to third party.
+		r.logger.Infof("%x [term %d] starts to transfer leadership to %x", r.id, r.Term, leadTransferee)
+		// Transfer leadership should be finished in one electionTimeout, so reset r.electionElapsed.
+		r.electionElapsed = 0
+		r.leadTransferee = leadTransferee
+		if pr.Match == r.raftLog.lastIndex() {
+			r.sendTimeoutNow(leadTransferee)
+			r.logger.Infof("%x sends MsgTimeoutNow to %x immediately as %x already has up-to-date log", r.id, leadTransferee, leadTransferee)
+		} else {
+			r.sendAppend(leadTransferee)
+		}
 	}
 }
 
@@ -718,6 +782,8 @@ func stepCandidate(r *raft, m pb.Message) {
 		case len(r.votes) - gr:
 			r.becomeFollower(r.Term, None)
 		}
+	case pb.MsgTimeoutNow:
+		r.logger.Debugf("%x [term %d state %v] ignored MsgTimeoutNow from %x", r.id, r.Term, r.state, m.From)
 	}
 }
 
@@ -753,6 +819,9 @@ func stepFollower(r *raft, m pb.Message) {
 				r.id, r.raftLog.lastTerm(), r.raftLog.lastIndex(), r.Vote, m.From, m.LogTerm, m.Index, r.Term)
 			r.send(pb.Message{To: m.From, Type: pb.MsgVoteResp, Reject: true})
 		}
+	case pb.MsgTimeoutNow:
+		r.logger.Infof("%x [term %d] received MsgTimeoutNow from %x and starts an election to get leadership.", r.id, r.Term, m.From)
+		r.campaign()
 	}
 }
 
@@ -841,10 +910,20 @@ func (r *raft) addNode(id uint64) {
 func (r *raft) removeNode(id uint64) {
 	r.delProgress(id)
 	r.pendingConf = false
+
+	// do not try to commit or abort transferring if there is no nodes in the cluster.
+	if len(r.prs) == 0 {
+		return
+	}
+
 	// The quorum size is now smaller, so see if any pending entries can
 	// be committed.
 	if r.maybeCommit() {
 		r.bcastAppend()
+	}
+	// If the removed node is the leadTransferee, then abort the leadership transferring.
+	if r.state == StateLeader && r.leadTransferee == id {
+		r.abortLeaderTransfer()
 	}
 }
 
@@ -899,4 +978,12 @@ func (r *raft) checkQuorumActive() bool {
 	}
 
 	return act >= r.quorum()
+}
+
+func (r *raft) sendTimeoutNow(to uint64) {
+	r.send(pb.Message{To: to, Type: pb.MsgTimeoutNow})
+}
+
+func (r *raft) abortLeaderTransfer() {
+	r.leadTransferee = None
 }

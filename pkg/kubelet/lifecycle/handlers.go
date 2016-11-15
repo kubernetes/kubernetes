@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -29,7 +28,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -55,21 +54,18 @@ func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontain
 func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) (string, error) {
 	switch {
 	case handler.Exec != nil:
-		var (
-			buffer bytes.Buffer
-			msg    string
-		)
-		output := ioutils.WriteCloserWrapper(&buffer)
-		err := hr.commandRunner.ExecInContainer(containerID, handler.Exec.Command, nil, output, output, false)
+		var msg string
+		// TODO(timstclair): Pass a proper timeout value.
+		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
 		if err != nil {
-			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - %q", handler.Exec.Command, container.Name, format.Pod(pod), buffer.String())
+			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
 			glog.V(1).Infof(msg)
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
-			msg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), msg)
+			msg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
 			glog.V(1).Infof(msg)
 		}
 		return msg, err
@@ -81,7 +77,7 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod
 	}
 }
 
-// resolvePort attempts to turn a IntOrString port reference into a concrete port number.
+// resolvePort attempts to turn an IntOrString port reference into a concrete port number.
 // If portReference has an int value, it is treated as a literal, and simply returns that value.
 // If portReference is a string, an attempt is first made to parse it as an integer.  If that fails,
 // an attempt is made to find a port with the same name in the container spec.
@@ -141,4 +137,31 @@ func getHttpRespBody(resp *http.Response) string {
 		return string(bytes)
 	}
 	return ""
+}
+
+func NewAppArmorAdmitHandler(validator apparmor.Validator) PodAdmitHandler {
+	return &appArmorAdmitHandler{
+		Validator: validator,
+	}
+}
+
+type appArmorAdmitHandler struct {
+	apparmor.Validator
+}
+
+func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	// If the pod is already running or terminated, no need to recheck AppArmor.
+	if attrs.Pod.Status.Phase != api.PodPending {
+		return PodAdmitResult{Admit: true}
+	}
+
+	err := a.Validate(attrs.Pod)
+	if err == nil {
+		return PodAdmitResult{Admit: true}
+	}
+	return PodAdmitResult{
+		Admit:   false,
+		Reason:  "AppArmor",
+		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+	}
 }

@@ -50,14 +50,17 @@ type PolicyRule struct {
 	AttributeRestrictions runtime.Object
 	// APIGroups is the name of the APIGroup that contains the resources.
 	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.
+
 	APIGroups []string
 	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
 	Resources []string
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
 	ResourceNames []string
+
 	// NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
 	// If an action is not a resource API request, then the URL is split on '/' and is checked against the NonResourceURLs to look for a match.
 	// Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+	// Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
 	NonResourceURLs []string
 }
 
@@ -68,13 +71,23 @@ type Subject struct {
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string
 	// APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-	// expected to be API version of this API group. For example "rbac/v1alpha1".
+	// expected to be API version of this API group. For example, "rbac/v1alpha1".
 	APIVersion string
 	// Name of the object being referenced.
 	Name string
 	// Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
 	// the Authorizer should report an error.
 	Namespace string
+}
+
+// RoleRef contains information that points to the role being used
+type RoleRef struct {
+	// APIGroup is the group for the resource being referenced
+	APIGroup string
+	// Kind is the type of resource being referenced
+	Kind string
+	// Name is the name of resource being referenced
+	Name string
 }
 
 // +genclient=true
@@ -103,7 +116,7 @@ type RoleBinding struct {
 
 	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
-	RoleRef api.ObjectReference
+	RoleRef RoleRef
 }
 
 // RoleBindingList is a collection of RoleBindings
@@ -126,7 +139,8 @@ type RoleList struct {
 	Items []Role
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 type ClusterRole struct {
@@ -138,7 +152,8 @@ type ClusterRole struct {
 	Rules []PolicyRule
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
 // and adds who information via Subject.
@@ -152,7 +167,7 @@ type ClusterRoleBinding struct {
 
 	// RoleRef can only reference a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
-	RoleRef api.ObjectReference
+	RoleRef RoleRef
 }
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings

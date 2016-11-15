@@ -26,10 +26,12 @@ import (
 	"time"
 
 	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -43,6 +45,26 @@ type TestParam struct {
 	expStatus             *unversioned.Status
 	testBody              bool
 	testBodyErrorIsNotNil bool
+}
+
+// TestSerializer makes sure that you're always able to decode an unversioned API object
+func TestSerializer(t *testing.T) {
+	contentConfig := ContentConfig{
+		ContentType:          "application/json",
+		GroupVersion:         &unversioned.GroupVersion{Group: "other", Version: runtime.APIVersionInternal},
+		NegotiatedSerializer: api.Codecs,
+	}
+
+	serializer, err := createSerializers(contentConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// bytes based on actual return from API server when encoding an "unversioned" object
+	obj, err := runtime.Decode(serializer.Decoder, []byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success"}`))
+	t.Log(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDoRequestSuccess(t *testing.T) {
@@ -81,9 +103,48 @@ func TestDoRequestFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	err = c.Get().Do().Error()
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	ss, ok := err.(errors.APIStatus)
+	if !ok {
+		t.Errorf("unexpected error type %v", err)
+	}
+	actual := ss.Status()
+	if !reflect.DeepEqual(status, &actual) {
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
+	}
+}
+
+func TestDoRawRequestFailed(t *testing.T) {
+	status := &unversioned.Status{
+		Code:    http.StatusNotFound,
+		Status:  unversioned.StatusFailure,
+		Reason:  unversioned.StatusReasonNotFound,
+		Message: "the server could not find the requested resource",
+		Details: &unversioned.StatusDetails{
+			Causes: []unversioned.StatusCause{
+				{Type: unversioned.CauseTypeUnexpectedServerResponse, Message: "unknown"},
+			},
+		},
+	}
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   404,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+
+	c, err := restClient(testServer)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	body, err := c.Get().Do().Raw()
 
-	if err == nil || body != nil {
+	if err == nil || body == nil {
 		t.Errorf("unexpected non-error: %#v", body)
 	}
 	ss, ok := err.(errors.APIStatus)
@@ -91,12 +152,8 @@ func TestDoRequestFailed(t *testing.T) {
 		t.Errorf("unexpected error type %v", err)
 	}
 	actual := ss.Status()
-	expected := *status
-	// The decoder will apply the default Version and Kind to the Status.
-	expected.APIVersion = "v1"
-	expected.Kind = "Status"
-	if !reflect.DeepEqual(&expected, &actual) {
-		t.Errorf("Unexpected mis-match: %s", diff.ObjectDiff(status, &actual))
+	if !reflect.DeepEqual(status, &actual) {
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
 	}
 }
 
@@ -160,10 +217,11 @@ func TestBadRequest(t *testing.T) {
 }
 
 func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utiltesting.FakeHandler) {
-	if testParam.expectingError {
-		if testParam.actualError == nil {
-			t.Errorf("Expected error")
-		}
+	switch {
+	case testParam.expectingError && testParam.actualError == nil:
+		t.Errorf("Expected error")
+	case !testParam.expectingError && testParam.actualError != nil:
+		t.Error(testParam.actualError)
 	}
 	if !testParam.expCreated {
 		if testParam.actualCreated {
@@ -184,7 +242,7 @@ func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utilt
 			t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", testParam.expStatus, statusOut)
 		}
 	}
-	fakeHandler.ValidateRequest(t, "/"+testapi.Default.GroupVersion().String()+"/test", "GET", nil)
+	fakeHandler.ValidateRequest(t, "/"+registered.GroupOrDie(api.GroupName).GroupVersion.String()+"/test", "GET", nil)
 
 }
 
@@ -271,7 +329,7 @@ func restClient(testServer *httptest.Server) (*RESTClient, error) {
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
-			GroupVersion:         testapi.Default.GroupVersion(),
+			GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		},
 		Username: "user",

@@ -28,6 +28,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/tests"
 )
 
 func newTestInterface() (dnsprovider.Interface, error) {
@@ -133,17 +134,27 @@ func getInvalidRrs(zone dnsprovider.Zone) dnsprovider.ResourceRecordSet {
 	return rrsets.New("www12."+zone.Name(), []string{"rubbish", "rubbish"}, 180, rrstype.A)
 }
 
-func addRrsetOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordSet {
-	result, err := rrsets.Add(rrset)
+func addRrsetOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, rrset dnsprovider.ResourceRecordSet) {
+	err := rrsets.StartChangeset().Add(rrset).Apply()
 	if err != nil {
 		t.Fatalf("Failed to add recordsets: %v", err)
 	}
-	return result
 }
 
-/* TestResourceRecordSetsList verifies that listing of zones succeeds */
+/* TestZonesList verifies that listing of zones succeeds */
 func TestZonesList(t *testing.T) {
 	firstZone(t)
+}
+
+/* TestZonesID verifies that the id of the zone is returned with the prefix removed */
+func TestZonesID(t *testing.T) {
+	zone := firstZone(t)
+
+	// Check /hostedzone/ prefix is removed
+	zoneID := zone.ID()
+	if zoneID != zone.Name() {
+		t.Fatalf("Unexpected zone id: %q", zoneID)
+	}
 }
 
 /* TestZoneAddSuccess verifies that addition of a valid managed DNS zone succeeds */
@@ -177,8 +188,9 @@ func TestResourceRecordSetsList(t *testing.T) {
 func TestResourceRecordSetsAddSuccess(t *testing.T) {
 	zone := firstZone(t)
 	sets := rrs(t, zone)
-	set := addRrsetOrFail(t, sets, getExampleRrs(zone))
-	defer sets.Remove(set)
+	set := getExampleRrs(zone)
+	addRrsetOrFail(t, sets, set)
+	defer sets.StartChangeset().Remove(set).Apply()
 	t.Logf("Successfully added resource record set: %v", set)
 }
 
@@ -187,9 +199,9 @@ func TestResourceRecordSetsAdditionVisible(t *testing.T) {
 	zone := firstZone(t)
 	sets := rrs(t, zone)
 	rrset := getExampleRrs(zone)
-	set := addRrsetOrFail(t, sets, rrset)
-	defer sets.Remove(set)
-	t.Logf("Successfully added resource record set: %v", set)
+	addRrsetOrFail(t, sets, rrset)
+	defer sets.StartChangeset().Remove(rrset).Apply()
+	t.Logf("Successfully added resource record set: %v", rrset)
 	found := false
 	for _, record := range listRrsOrFail(t, sets) {
 		if record.Name() == rrset.Name() {
@@ -207,16 +219,16 @@ func TestResourceRecordSetsAddDuplicateFail(t *testing.T) {
 	zone := firstZone(t)
 	sets := rrs(t, zone)
 	rrset := getExampleRrs(zone)
-	set := addRrsetOrFail(t, sets, rrset)
-	defer sets.Remove(set)
-	t.Logf("Successfully added resource record set: %v", set)
+	addRrsetOrFail(t, sets, rrset)
+	defer sets.StartChangeset().Remove(rrset).Apply()
+	t.Logf("Successfully added resource record set: %v", rrset)
 	// Try to add it again, and verify that the call fails.
-	rrs, err := sets.Add(rrset)
+	err := sets.StartChangeset().Add(rrset).Apply()
 	if err == nil {
-		defer sets.Remove(rrs)
-		t.Errorf("Should have failed to add duplicate resource record %v, but succeeded instead.", set)
+		defer sets.StartChangeset().Remove(rrset).Apply()
+		t.Errorf("Should have failed to add duplicate resource record %v, but succeeded instead.", rrset)
 	} else {
-		t.Logf("Correctly failed to add duplicate resource record %v: %v", set, err)
+		t.Logf("Correctly failed to add duplicate resource record %v: %v", rrset, err)
 	}
 }
 
@@ -225,14 +237,14 @@ func TestResourceRecordSetsRemove(t *testing.T) {
 	zone := firstZone(t)
 	sets := rrs(t, zone)
 	rrset := getExampleRrs(zone)
-	set := addRrsetOrFail(t, sets, rrset)
-	err := sets.Remove(set)
+	addRrsetOrFail(t, sets, rrset)
+	err := sets.StartChangeset().Remove(rrset).Apply()
 	if err != nil {
 		// Try again to clean up.
-		defer sets.Remove(rrset)
+		defer sets.StartChangeset().Remove(rrset).Apply()
 		t.Errorf("Failed to remove resource record set %v after adding", rrset)
 	} else {
-		t.Logf("Successfully removed resource set %v after adding", set)
+		t.Logf("Successfully removed resource set %v after adding", rrset)
 	}
 }
 
@@ -241,14 +253,14 @@ func TestResourceRecordSetsRemoveGone(t *testing.T) {
 	zone := firstZone(t)
 	sets := rrs(t, zone)
 	rrset := getExampleRrs(zone)
-	set := addRrsetOrFail(t, sets, rrset)
-	err := sets.Remove(set)
+	addRrsetOrFail(t, sets, rrset)
+	err := sets.StartChangeset().Remove(rrset).Apply()
 	if err != nil {
 		// Try again to clean up.
-		defer sets.Remove(rrset)
+		defer sets.StartChangeset().Remove(rrset).Apply()
 		t.Errorf("Failed to remove resource record set %v after adding", rrset)
 	} else {
-		t.Logf("Successfully removed resource set %v after adding", set)
+		t.Logf("Successfully removed resource set %v after adding", rrset)
 	}
 	// Check that it's gone
 	list := listRrsOrFail(t, sets)
@@ -262,4 +274,22 @@ func TestResourceRecordSetsRemoveGone(t *testing.T) {
 	if found {
 		t.Errorf("Deleted resource record set %v is still present", rrset)
 	}
+}
+
+/* TestResourceRecordSetsReplace verifies that replacing an RRS works */
+func TestResourceRecordSetsReplace(t *testing.T) {
+	zone := firstZone(t)
+	tests.CommonTestResourceRecordSetsReplace(t, zone)
+}
+
+/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name*/
+func TestResourceRecordSetsReplaceAll(t *testing.T) {
+	zone := firstZone(t)
+	tests.CommonTestResourceRecordSetsReplaceAll(t, zone)
+}
+
+/* TestResourceRecordSetsHonorsType verifies that we can add records of the same name but different types */
+func TestResourceRecordSetsDifferentTypes(t *testing.T) {
+	zone := firstZone(t)
+	tests.CommonTestResourceRecordSetsDifferentTypes(t, zone)
 }

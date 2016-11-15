@@ -26,6 +26,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
@@ -77,6 +78,7 @@ type testcase struct {
 func TestAttachDetach(t *testing.T) {
 	diskName := "disk"
 	instanceID := "instance"
+	nodeName := types.NodeName(instanceID)
 	readOnly := false
 	spec := createVolSpec(diskName, readOnly)
 	attachError := errors.New("Fake attach error")
@@ -93,7 +95,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				return attacher.Attach(spec, nodeName)
 			},
 			expectedDevice: "/dev/sda",
 		},
@@ -106,7 +108,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				return attacher.Attach(spec, nodeName)
 			},
 			expectedDevice: "/dev/sda",
 		},
@@ -120,7 +122,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				return attacher.Attach(spec, nodeName)
 			},
 			expectedDevice: "/dev/sda",
 		},
@@ -133,7 +135,7 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, instanceID, "/dev/sda", attachError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				return attacher.Attach(spec, nodeName)
 			},
 			expectedError: attachError,
 		},
@@ -147,7 +149,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:       diskPathCall{diskName, instanceID, "", diskPathError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				return attacher.Attach(spec, nodeName)
 			},
 			expectedError: diskPathError,
 		},
@@ -160,7 +162,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, instanceID)
+				return "", detacher.Detach(diskName, nodeName)
 			},
 		},
 
@@ -171,7 +173,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, instanceID)
+				return "", detacher.Detach(diskName, nodeName)
 			},
 		},
 
@@ -183,7 +185,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, instanceID)
+				return "", detacher.Detach(diskName, nodeName)
 			},
 		},
 
@@ -195,7 +197,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, instanceID)
+				return "", detacher.Detach(diskName, nodeName)
 			},
 			expectedError: detachError,
 		},
@@ -217,7 +219,7 @@ func TestAttachDetach(t *testing.T) {
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
 func newPlugin() *cinderPlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil, "")
+	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
@@ -391,7 +393,11 @@ func (testcase *testcase) GetAttachmentDiskPath(instanceID string, diskName stri
 	return expected.retPath, expected.ret
 }
 
-func (testcase *testcase) CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error) {
+func (testcase *testcase) ShouldTrustDevicePath() bool {
+	return true
+}
+
+func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
 	return "", errors.New("Not implemented")
 }
 
@@ -415,35 +421,39 @@ func (testcase *testcase) Instances() (cloudprovider.Instances, bool) {
 	return &instances{testcase.instanceID}, true
 }
 
+func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error) {
+	return nil, errors.New("Not implemented")
+}
+
 // Implementation of fake cloudprovider.Instances
 type instances struct {
 	instanceID string
 }
 
-func (instances *instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
+func (instances *instances) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 	return []api.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) ExternalID(name string) (string, error) {
+func (instances *instances) ExternalID(name types.NodeName) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceID(name string) (string, error) {
+func (instances *instances) InstanceID(name types.NodeName) (string, error) {
 	return instances.instanceID, nil
 }
 
-func (instances *instances) InstanceType(name string) (string, error) {
+func (instances *instances) InstanceType(name types.NodeName) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) List(filter string) ([]string, error) {
-	return []string{}, errors.New("Not implemented")
+func (instances *instances) List(filter string) ([]types.NodeName, error) {
+	return []types.NodeName{}, errors.New("Not implemented")
 }
 
 func (instances *instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("Not implemented")
 }
 
-func (instances *instances) CurrentNodeName(hostname string) (string, error) {
+func (instances *instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return "", errors.New("Not implemented")
 }

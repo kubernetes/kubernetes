@@ -40,9 +40,11 @@ if err != nil {
 // use the response
 ```
 
-etcd uses go's `vendor` directory to manage external dependencies. If `clientv3` is imported
-outside of etcd, simply copy `clientv3` to the `vendor` directory or use tools like godep to
-manage your own dependency, as in [vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories).
+etcd uses `cmd/vendor` directory to store external dependencies, which are
+to be compiled into etcd release binaries. `client` can be imported without
+vendoring. For full compatibility, it is recommended to vendor builds using
+etcd's vendored packages, using tools like godep, as in
+[vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories).
 For more detail, please read [Go vendor design](https://golang.org/s/go15vendor).
 
 ## Error Handling
@@ -50,21 +52,22 @@ For more detail, please read [Go vendor design](https://golang.org/s/go15vendor)
 etcd client returns 2 types of errors:
 
 1. context error: canceled or deadline exceeded.
-2. gRPC error: see [v3rpc/error](https://github.com/coreos/etcd/blob/master/etcdserver/api/v3rpc/error.go).
+2. gRPC error: see [api/v3rpc/rpctypes](https://godoc.org/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes).
 
 Here is the example code to handle client errors:
 
 ```go
 resp, err := kvc.Put(ctx, "", "")
 if err != nil {
-	if err == context.Canceled {
-		// ctx is canceled by another routine
-	} else if err == context.DeadlineExceeded {
-		// ctx is attached with a deadline and it exceeded
-	} else if verr, ok := err.(*v3rpc.ErrEmptyKey); ok {
-		// process (verr.Errors)
-	} else {
-		// bad cluster endpoints, which are not etcd servers
+	switch err {
+	case context.Canceled:
+		log.Fatalf("ctx is canceled by another routine: %v", err)
+	case context.DeadlineExceeded:
+		log.Fatalf("ctx is attached with a deadline is exceeded: %v", err)
+	case rpctypes.ErrEmptyKey:
+		log.Fatalf("client-side error: %v", err)
+	default:
+		log.Fatalf("bad cluster endpoints, which are not etcd servers: %v", err)
 	}
 }
 ```

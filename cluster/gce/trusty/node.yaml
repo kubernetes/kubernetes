@@ -258,7 +258,7 @@ Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Content-Disposition: attachment; filename="kube-node-health-monitoring.conf"
 
-description "Kubenetes node health monitoring"
+description "Kubernetes node health monitoring"
 
 start on stopped kube-docker
 

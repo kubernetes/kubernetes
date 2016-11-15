@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/podaffinity.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Inter-pod topological affinity and anti-affinity
 
 ## Introduction
@@ -347,7 +313,7 @@ scheduler to not put more than one pod from S in the same zone, and thus by
 definition it will not put more than one pod from S on the same node, assuming
 each node is in one zone. This rule is more useful as PreferredDuringScheduling
 anti-affinity, e.g. one might expect it to be common in
-[Ubernetes](../../docs/proposals/federation.md) clusters.)
+[Cluster Federation](../../docs/proposals/federation.md) clusters.)
 
 * **Don't co-locate pods of this service with pods from service "evilService"**:
 `{LabelSelector: selector that matches evilService's pods, TopologyKey: "node"}`

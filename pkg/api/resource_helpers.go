@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
@@ -74,6 +76,24 @@ func GetExistingContainerStatus(statuses []ContainerStatus, name string) Contain
 	return ContainerStatus{}
 }
 
+// IsPodAvailable returns true if a pod is available; false otherwise.
+// Precondition for an available pod is that it must be ready. On top
+// of that, there are two cases when a pod can be considered available:
+// 1. minReadySeconds == 0, or
+// 2. LastTransitionTime (is set) + minReadySeconds < current time
+func IsPodAvailable(pod *Pod, minReadySeconds int32, now unversioned.Time) bool {
+	if !IsPodReady(pod) {
+		return false
+	}
+
+	c := GetPodReadyCondition(pod.Status)
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time) {
+		return true
+	}
+	return false
+}
+
 // IsPodReady returns true if a pod is ready; false otherwise.
 func IsPodReady(pod *Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)
@@ -93,7 +113,7 @@ func GetPodReadyCondition(status PodStatus) *PodCondition {
 }
 
 // GetPodCondition extracts the provided condition from the given status and returns that.
-// Returns nil and -1 if the condition is not present, and the the index of the located condition.
+// Returns nil and -1 if the condition is not present, and the index of the located condition.
 func GetPodCondition(status *PodStatus, conditionType PodConditionType) (int, *PodCondition) {
 	if status == nil {
 		return -1, nil
@@ -107,7 +127,7 @@ func GetPodCondition(status *PodStatus, conditionType PodConditionType) (int, *P
 }
 
 // GetNodeCondition extracts the provided condition from the given status and returns that.
-// Returns nil and -1 if the condition is not present, and the the index of the located condition.
+// Returns nil and -1 if the condition is not present, and the index of the located condition.
 func GetNodeCondition(status *NodeStatus, conditionType NodeConditionType) (int, *NodeCondition) {
 	if status == nil {
 		return -1, nil

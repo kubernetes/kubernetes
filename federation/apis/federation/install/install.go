@@ -81,7 +81,6 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 	if err := registered.RegisterGroup(groupMeta); err != nil {
 		return err
 	}
-	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	return nil
 }
 
@@ -114,7 +113,10 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 
 func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 	// add the internal version to Scheme
-	federation.AddToScheme(api.Scheme)
+	if err := federation.AddToScheme(api.Scheme); err != nil {
+		// Programmer error, detect immediately
+		panic(err)
+	}
 	// add the enabled external versions to Scheme
 	for _, v := range externalVersions {
 		if !registered.IsEnabledVersion(v) {
@@ -123,7 +125,10 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 		}
 		switch v {
 		case v1beta1.SchemeGroupVersion:
-			v1beta1.AddToScheme(api.Scheme)
+			if err := v1beta1.AddToScheme(api.Scheme); err != nil {
+				// Programmer error, detect immediately
+				panic(err)
+			}
 		}
 	}
 }

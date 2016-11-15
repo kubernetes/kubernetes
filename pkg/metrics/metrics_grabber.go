@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/system"
@@ -41,7 +41,7 @@ type MetricsCollection struct {
 }
 
 type MetricsGrabber struct {
-	client                    *client.Client
+	client                    clientset.Interface
 	grabFromApiServer         bool
 	grabFromControllerManager bool
 	grabFromKubelets          bool
@@ -50,10 +50,10 @@ type MetricsGrabber struct {
 	registeredMaster          bool
 }
 
-func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controllers bool, apiServer bool) (*MetricsGrabber, error) {
+func NewMetricsGrabber(c clientset.Interface, kubelets bool, scheduler bool, controllers bool, apiServer bool) (*MetricsGrabber, error) {
 	registeredMaster := false
 	masterName := ""
-	nodeList, err := c.Nodes().List(api.ListOptions{})
+	nodeList, err := c.Core().Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controll
 }
 
 func (g *MetricsGrabber) GrabFromKubelet(nodeName string) (KubeletMetrics, error) {
-	nodes, err := g.client.Nodes().List(api.ListOptions{FieldSelector: fields.Set{api.ObjectNameField: nodeName}.AsSelector()})
+	nodes, err := g.client.Core().Nodes().List(api.ListOptions{FieldSelector: fields.Set{api.ObjectNameField: nodeName}.AsSelector()})
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -166,7 +166,7 @@ func (g *MetricsGrabber) Grab() (MetricsCollection, error) {
 	}
 	if g.grabFromKubelets {
 		result.KubeletMetrics = make(map[string]KubeletMetrics)
-		nodes, err := g.client.Nodes().List(api.ListOptions{})
+		nodes, err := g.client.Core().Nodes().List(api.ListOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		} else {

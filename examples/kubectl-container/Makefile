@@ -23,10 +23,11 @@ GOARCH?=$(shell go env GOARCH)
 GOOS?=$(shell go env GOOS)
 
 kubectl:
-	KUBE_STATIC_OVERRIDES="kubectl" ../../hack/build-go.sh cmd/kubectl; cp ../../_output/local/bin/$(GOOS)/$(GOARCH)/kubectl .
+	make -C ../../ WHAT=cmd/kubectl KUBE_STATIC_OVERRIDES="kubectl"; \
+	cp ../../_output/local/bin/$(GOOS)/$(GOARCH)/kubectl .
 
 .tag: kubectl
-	./kubectl version -c | grep -o 'GitVersion:"[^"]*"' | cut -f 2 -d '"' > .tag
+	./kubectl version --client | grep -o 'GitVersion:"[^"]*"' | sed 's/[^"]*"\([^"+]*\).*/\1/' > .tag
 
 tag: .tag
 	@echo "Suggest using TAG=$(shell cat .tag)"
@@ -40,7 +41,7 @@ container:
 
 push: container
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' to see a suggestion))
-	gcloud docker push gcr.io/google_containers/kubectl:$(TAG)
+	gcloud docker -- push gcr.io/google_containers/kubectl:$(TAG)
 
 clean:
 	rm -f kubectl

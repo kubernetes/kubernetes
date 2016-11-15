@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/federation-phase-1.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Ubernetes Design Spec (phase one)
 
 **Huawei PaaS Team**
@@ -320,8 +286,8 @@ Below is the state transition diagram.
 
 ## Replication Controller
 
-A global workload submitted to control plane is represented as an
-Ubernetes replication controller. When a replication controller
+A global workload submitted to control plane is represented as a
+ replication controller in the Cluster Federation control plane. When a replication controller
 is submitted to control plane, clients need a way to express its
 requirements or preferences on clusters. Depending on different use
 cases it may be complex. For example:
@@ -377,11 +343,11 @@ some implicit scheduling restrictions. For example it defines
 “nodeSelector” which can only be satisfied on some particular
 clusters. How to handle this will be addressed after phase one.
 
-## Ubernetes Services
+## Federated Services
 
-The Service API object exposed by Ubernetes is similar to service
+The Service API object exposed by the Cluster Federation is similar to service
 objects on Kubernetes. It defines the access to a group of pods. The
-Ubernetes service controller will create corresponding Kubernetes
+federation service controller will create corresponding Kubernetes
 service objects on underlying clusters. These are detailed in a
 separate design document: [Federated Services](federated-services.md).
 
@@ -389,13 +355,13 @@ separate design document: [Federated Services](federated-services.md).
 
 In phase one we only support scheduling replication controllers. Pod
 scheduling will be supported in later phase. This is primarily in
-order to keep the Ubernetes API compatible with the Kubernetes API.
+order to keep the Cluster Federation API compatible with the Kubernetes API.
 
 ## ACTIVITY FLOWS
 
 ## Scheduling
 
-The below diagram shows how workloads are scheduled on the Ubernetes control\
+The below diagram shows how workloads are scheduled on the Cluster Federation control\
 plane:
 
 1. A replication controller is created by the client.
@@ -419,20 +385,20 @@ distribution policies. The scheduling rule is basically:
 There is a potential race condition here. Say at time _T1_ the control
 plane learns there are _m_ available resources in a K8S cluster. As
 the cluster is working independently it still accepts workload
-requests from other K8S clients or even another Ubernetes control
-plane. The Ubernetes scheduling decision is based on this data of
+requests from other K8S clients or even another Cluster Federation control
+plane. The Cluster Federation scheduling decision is based on this data of
 available resources. However when the actual RC creation happens to
 the cluster at time _T2_, the cluster may don’t have enough resources
 at that time. We will address this problem in later phases with some
 proposed solutions like resource reservation mechanisms.
 
-![Ubernetes Scheduling](ubernetes-scheduling.png)
+![Federated Scheduling](ubernetes-scheduling.png)
 
 ## Service Discovery
 
 This part has been included in the section “Federated Service” of
 document
-“[Ubernetes Cross-cluster Load Balancing and Service Discovery Requirements and System Design](federated-services.md))”.
+“[Federated Cross-cluster Load Balancing and Service Discovery Requirements and System Design](federated-services.md))”.
 Please refer to that document for details.
 
 

@@ -1,36 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
 API Conventions
 ===============
 
@@ -63,7 +30,7 @@ resources](../user-guide/working-with-resources.md).*
     - [List Operations](#list-operations)
     - [Map Operations](#map-operations)
   - [Idempotency](#idempotency)
-  - [Optional vs Required](#optional-vs-required)
+  - [Optional vs. Required](#optional-vs-required)
   - [Defaulting](#defaulting)
   - [Late Initialization](#late-initialization)
   - [Concurrency Control and Consistency](#concurrency-control-and-consistency)
@@ -134,8 +101,9 @@ specific actions that create, update, delete, or get.
 2. **Lists** are collections of **resources** of one (usually) or more
 (occasionally) kinds.
 
-   Lists have a limited set of common metadata. All lists use the "items" field
-to contain the array of objects they return.
+   The name of a list kind must end with "List". Lists have a limited set of
+common metadata. All lists use the required "items" field to contain the array
+of objects they return. Any kind that has the "items" field must be a list kind.
 
    Most objects defined in the system should have an endpoint that returns the
 full set of resources, as well as zero or more endpoints that return subsets of
@@ -657,7 +625,7 @@ exists - instead, it will either return 201 Created or 504 with Reason
 allotted, and the client should retry (optionally after the time indicated in
 the Retry-After header).
 
-## Optional vs Required
+## Optional vs. Required
 
 Fields must be either optional or required.
 
@@ -1181,7 +1149,7 @@ than capitalization of the initial letter, the two should almost always match.
 No underscores nor dashes in either.
 * Field and resource names should be declarative, not imperative (DoSomething,
 SomethingDoer, DoneBy, DoneAt).
-* `Minion` has been deprecated in favor of `Node`. Use `Node` where referring to
+* Use `Node` where referring to
 the node resource in the context of the cluster. Use `Host` where referring to
 properties of the individual physical/virtual system, such as `hostname`,
 `hostPath`, `hostNetwork`, etc.
@@ -1344,7 +1312,7 @@ encodes the stream before returning it to the client.
 
 Clients should use the SPDY protocols if their clients have native support, or
 WebSockets as a fallback. Note that WebSockets is susceptible to Head-of-Line
-blocking and so clients must read and process each message sequentionally. In
+blocking and so clients must read and process each message sequentially. In
 the future, an HTTP/2 implementation will be exposed that deprecates SPDY.
 
 

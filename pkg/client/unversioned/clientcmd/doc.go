@@ -34,4 +34,4 @@ Sample usage from merged .kubeconfig files (local directory, home directory)
 	client, err := unversioned.New(config)
 	// ...
 */
-package clientcmd
+package clientcmd // import "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"

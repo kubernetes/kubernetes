@@ -66,15 +66,21 @@ type manager struct {
 	apiStatusVersions map[types.UID]uint64
 }
 
-// status.Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
-// the latest api.PodStatus. It also syncs updates back to the API server.
-type Manager interface {
-	// Start the API server status sync loop.
-	Start()
-
+// PodStatusProvider knows how to provide status for a pod.  It's intended to be used by other components
+// that need to introspect status.
+type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
 	// was a cache hit.
 	GetPodStatus(uid types.UID) (api.PodStatus, bool)
+}
+
+// Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
+// the latest api.PodStatus. It also syncs updates back to the API server.
+type Manager interface {
+	PodStatusProvider
+
+	// Start the API server status sync loop.
+	Start()
 
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
 	SetPodStatus(pod *api.Pod, status api.PodStatus)
@@ -214,27 +220,20 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 
 func findContainerStatus(status *api.PodStatus, containerID string) (containerStatus *api.ContainerStatus, init bool, ok bool) {
 	// Find the container to update.
-	containerIndex := -1
 	for i, c := range status.ContainerStatuses {
 		if c.ContainerID == containerID {
-			containerIndex = i
-			break
+			return &status.ContainerStatuses[i], false, true
 		}
-	}
-	if containerIndex != -1 {
-		return &status.ContainerStatuses[containerIndex], false, true
 	}
 
 	for i, c := range status.InitContainerStatuses {
 		if c.ContainerID == containerID {
-			containerIndex = i
-			break
+			return &status.InitContainerStatuses[i], true, true
 		}
 	}
-	if containerIndex != -1 {
-		return &status.InitContainerStatuses[containerIndex], true, true
-	}
+
 	return nil, false, false
+
 }
 
 func (m *manager) TerminatePod(pod *api.Pod) {
@@ -373,6 +372,10 @@ func (m *manager) syncBatch() {
 		for uid, status := range m.podStatuses {
 			syncedUID := uid
 			if mirrorUID, ok := podToMirror[uid]; ok {
+				if mirrorUID == "" {
+					glog.V(5).Infof("Static pod %q (%s/%s) does not have a corresponding mirror pod; skipping", uid, status.podName, status.podNamespace)
+					continue
+				}
 				syncedUID = mirrorUID
 			}
 			if m.needsUpdate(syncedUID, status) {
@@ -411,7 +414,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	if err == nil {
 		translatedUID := m.podManager.TranslatePodUID(pod.UID)
 		if len(translatedUID) > 0 && translatedUID != uid {
-			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", format.Pod(pod))
+			glog.V(2).Infof("Pod %q was deleted and then recreated, skipping status update; old UID %q, new UID %q", format.Pod(pod), uid, translatedUID)
 			m.deletePodStatus(uid)
 			return
 		}
@@ -435,7 +438,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			deleteOptions := api.NewDeleteOptions(0)
 			// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
 			deleteOptions.Preconditions = api.NewUIDPreconditions(string(pod.UID))
-			if err := m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err == nil {
+			if err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
 				m.deletePodStatus(uid)
 				return
@@ -498,10 +501,10 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 }
 
 // We add this function, because apiserver only supports *RFC3339* now, which means that the timestamp returned by
-// apiserver has no nanosecond infromation. However, the timestamp returned by unversioned.Now() contains nanosecond,
+// apiserver has no nanosecond information. However, the timestamp returned by unversioned.Now() contains nanosecond,
 // so when we do comparison between status from apiserver and cached status, isStatusEqual() will always return false.
 // There is related issue #15262 and PR #15263 about this.
-// In fact, the best way to solve this is to do it on api side. However for now, we normalize the status locally in
+// In fact, the best way to solve this is to do it on api side. However, for now, we normalize the status locally in
 // kubelet temporarily.
 // TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
 func normalizeStatus(pod *api.Pod, status *api.PodStatus) *api.PodStatus {

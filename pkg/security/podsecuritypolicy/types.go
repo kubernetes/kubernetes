@@ -19,9 +19,12 @@ package podsecuritypolicy
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/user"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -29,10 +32,12 @@ import (
 // Provider provides the implementation to generate a new security
 // context based on constraints or validate an existing security context against constraints.
 type Provider interface {
-	// Create a PodSecurityContext based on the given constraints.
-	CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, error)
-	// Create a container SecurityContext based on the given constraints
-	CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, error)
+	// Create a PodSecurityContext based on the given constraints. Also returns an updated set
+	// of Pod annotations for alpha feature support.
+	CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error)
+	// Create a container SecurityContext based on the given constraints. Also returns an updated set
+	// of Pod annotations for alpha feature support.
+	CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, map[string]string, error)
 	// Ensure a pod's SecurityContext is in compliance with the given constraints.
 	ValidatePodSecurityContext(pod *api.Pod, fldPath *field.Path) field.ErrorList
 	// Ensure a container's SecurityContext is in compliance with the given constraints
@@ -56,7 +61,10 @@ type StrategyFactory interface {
 type ProviderStrategies struct {
 	RunAsUserStrategy         user.RunAsUserStrategy
 	SELinuxStrategy           selinux.SELinuxStrategy
+	AppArmorStrategy          apparmor.Strategy
 	FSGroupStrategy           group.GroupStrategy
 	SupplementalGroupStrategy group.GroupStrategy
-	CapabilitiesStrategy      capabilities.CapabilitiesStrategy
+	CapabilitiesStrategy      capabilities.Strategy
+	SysctlsStrategy           sysctl.SysctlsStrategy
+	SeccompStrategy           seccomp.Strategy
 }

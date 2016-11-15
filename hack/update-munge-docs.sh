@@ -21,17 +21,22 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+git_upstream=$(kube::util::git_upstream_remote_name)
+: ${git_upstream:="upstream"}
+
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" \
-    cmd/mungedocs
+make -C "${KUBE_ROOT}" WHAT=cmd/mungedocs
 
 kube::util::ensure-temp-dir
 
 kube::util::gen-analytics "${KUBE_ROOT}"
 
 mungedocs=$(kube::util::find-binary "mungedocs")
-"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" "--root-dir=${KUBE_ROOT}/docs/" && ret=0 || ret=$?
+
+"${mungedocs}" "--upstream=${git_upstream}" "--root-dir=${KUBE_ROOT}/docs/" \
+ && ret=0 || ret=$?
+
 if [[ $ret -eq 1 ]]; then
   echo "${KUBE_ROOT}/docs/ requires manual changes.  See preceding errors."
   exit 1
@@ -40,7 +45,9 @@ elif [[ $ret -gt 1 ]]; then
   exit 1
 fi
 
-"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" "--root-dir=${KUBE_ROOT}/examples/" && ret=0 || ret=$?
+"${mungedocs}" "--upstream=${git_upstream}" \
+               "--root-dir=${KUBE_ROOT}/examples/" && ret=0 || ret=$?
+
 if [[ $ret -eq 1 ]]; then
   echo "${KUBE_ROOT}/examples/ requires manual changes.  See preceding errors."
   exit 1
@@ -49,8 +56,8 @@ elif [[ $ret -gt 1 ]]; then
   exit 1
 fi
 
-"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" \
-               "--skip-munges=unversioned-warning,analytics" \
+"${mungedocs}" "--upstream=${git_upstream}" \
+               "--skip-munges=analytics" \
                "--norecurse" \
                "--root-dir=${KUBE_ROOT}/" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then

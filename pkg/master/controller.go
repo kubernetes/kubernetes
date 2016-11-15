@@ -26,12 +26,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/registry/endpoint"
-	"k8s.io/kubernetes/pkg/registry/namespace"
-	"k8s.io/kubernetes/pkg/registry/service"
-	servicecontroller "k8s.io/kubernetes/pkg/registry/service/ipallocator/controller"
-	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/service/portallocator/controller"
-	"k8s.io/kubernetes/pkg/util"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/registry/core/namespace"
+	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
+	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	"k8s.io/kubernetes/pkg/registry/core/service"
+	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
+	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
+	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -42,14 +45,15 @@ import (
 // loops, which manage creating the "kubernetes" service, the "default" and "kube-system"
 // namespace, and provide the IP repair check on service IPs
 type Controller struct {
+	ServiceClient     coreclient.ServicesGetter
 	NamespaceRegistry namespace.Registry
 	ServiceRegistry   service.Registry
 
-	ServiceClusterIPRegistry service.RangeRegistry
+	ServiceClusterIPRegistry rangeallocation.RangeRegistry
 	ServiceClusterIPInterval time.Duration
-	ServiceClusterIPRange    *net.IPNet
+	ServiceClusterIPRange    net.IPNet
 
-	ServiceNodePortRegistry service.RangeRegistry
+	ServiceNodePortRegistry rangeallocation.RangeRegistry
 	ServiceNodePortInterval time.Duration
 	ServiceNodePortRange    utilnet.PortRange
 
@@ -68,7 +72,44 @@ type Controller struct {
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
-	runner *util.Runner
+	runner *async.Runner
+}
+
+// NewBootstrapController returns a controller for watching the core capabilities of the master
+func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter) *Controller {
+	return &Controller{
+		ServiceClient:     serviceClient,
+		NamespaceRegistry: legacyRESTStorage.NamespaceRegistry,
+		ServiceRegistry:   legacyRESTStorage.ServiceRegistry,
+
+		EndpointReconciler: c.EndpointReconcilerConfig.Reconciler,
+		EndpointInterval:   c.EndpointReconcilerConfig.Interval,
+
+		SystemNamespaces:         []string{api.NamespaceSystem},
+		SystemNamespacesInterval: 1 * time.Minute,
+
+		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
+		ServiceClusterIPRange:    c.ServiceIPRange,
+		ServiceClusterIPInterval: 3 * time.Minute,
+
+		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
+		ServiceNodePortRange:    c.ServiceNodePortRange,
+		ServiceNodePortInterval: 3 * time.Minute,
+
+		PublicIP: c.GenericConfig.PublicAddress,
+
+		ServiceIP:                 c.APIServerServiceIP,
+		ServicePort:               c.APIServerServicePort,
+		ExtraServicePorts:         c.ExtraServicePorts,
+		ExtraEndpointPorts:        c.ExtraEndpointPorts,
+		PublicServicePort:         c.GenericConfig.ReadWritePort,
+		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
+	}
+}
+
+func (c *Controller) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
+	c.Start()
+	return nil
 }
 
 // Start begins the core controller loops that must exist for bootstrapping
@@ -78,7 +119,7 @@ func (c *Controller) Start() {
 		return
 	}
 
-	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceRegistry, c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
+	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceRegistry, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.
@@ -95,7 +136,7 @@ func (c *Controller) Start() {
 		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
 	}
 
-	c.runner = util.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
+	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
 	c.runner.Start()
 }
 
@@ -201,12 +242,12 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 // doesn't already exist.
 func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType, reconcile bool) error {
 	ctx := api.NewDefaultContext()
-	if s, err := c.ServiceRegistry.GetService(ctx, serviceName); err == nil {
+	if s, err := c.ServiceClient.Services(api.NamespaceDefault).Get(serviceName); err == nil {
 		// The service already exists.
 		if reconcile {
 			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
 				glog.Warningf("Resetting master service %q to %#v", serviceName, svc)
-				_, err := c.ServiceRegistry.UpdateService(ctx, svc)
+				_, err := c.ServiceClient.Services(api.NamespaceDefault).Update(svc)
 				return err
 			}
 		}
@@ -231,7 +272,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		return err
 	}
 
-	_, err := c.ServiceRegistry.CreateService(ctx, svc)
+	_, err := c.ServiceClient.Services(api.NamespaceDefault).Create(svc)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}
@@ -256,18 +297,18 @@ type EndpointReconciler interface {
 // masterCountEndpointReconciler reconciles endpoints based on a specified expected number of
 // masters. masterCountEndpointReconciler implements EndpointReconciler.
 type masterCountEndpointReconciler struct {
-	masterCount      int
-	endpointRegistry endpoint.Registry
+	masterCount    int
+	endpointClient coreclient.EndpointsGetter
 }
 
 var _ EndpointReconciler = &masterCountEndpointReconciler{}
 
 // NewMasterCountEndpointReconciler creates a new EndpointReconciler that reconciles based on a
 // specified expected number of masters.
-func NewMasterCountEndpointReconciler(masterCount int, endpointRegistry endpoint.Registry) *masterCountEndpointReconciler {
+func NewMasterCountEndpointReconciler(masterCount int, endpointClient coreclient.EndpointsGetter) *masterCountEndpointReconciler {
 	return &masterCountEndpointReconciler{
-		masterCount:      masterCount,
-		endpointRegistry: endpointRegistry,
+		masterCount:    masterCount,
+		endpointClient: endpointClient,
 	}
 }
 
@@ -284,8 +325,7 @@ func NewMasterCountEndpointReconciler(masterCount int, endpointRegistry endpoint
 //      to be running (c.masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
 func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	ctx := api.NewDefaultContext()
-	e, err := r.endpointRegistry.GetEndpoints(ctx, serviceName)
+	e, err := r.endpointClient.Endpoints(api.NamespaceDefault).Get(serviceName)
 	if err != nil {
 		e = &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
@@ -293,6 +333,15 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 				Namespace: api.NamespaceDefault,
 			},
 		}
+	}
+	if errors.IsNotFound(err) {
+		// Simply create non-existing endpoints for the service.
+		e.Subsets = []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: ip.String()}},
+			Ports:     endpointPorts,
+		}}
+		_, err = r.endpointClient.Endpoints(api.NamespaceDefault).Create(e)
+		return err
 	}
 
 	// First, determine if the endpoint is in the format we expect (one
@@ -304,8 +353,9 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []api.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-		return r.endpointRegistry.UpdateEndpoints(ctx, e)
+		glog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
+		_, err = r.endpointClient.Endpoints(api.NamespaceDefault).Update(e)
+		return err
 	}
 	if ipCorrect && portsCorrect {
 		return nil
@@ -340,7 +390,8 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		e.Subsets[0].Ports = endpointPorts
 	}
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-	return r.endpointRegistry.UpdateEndpoints(ctx, e)
+	_, err = r.endpointClient.Endpoints(api.NamespaceDefault).Update(e)
+	return err
 }
 
 // Determine if the endpoint is in the format ReconcileEndpoints expects.

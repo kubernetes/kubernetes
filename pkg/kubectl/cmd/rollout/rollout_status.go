@@ -20,55 +20,63 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/spf13/cobra"
 )
 
-// StatusOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type StatusOptions struct {
-	Filenames []string
-	Recursive bool
-}
-
 var (
-	status_long = dedent.Dedent(`
-		Watch the status of current rollout, until it's done.`)
-	status_example = dedent.Dedent(`
+	status_long = templates.LongDesc(`
+		Show the status of the rollout.
+
+		By default 'rollout status' will watch the status of the latest rollout
+		until it's done. If you don't want to wait for the rollout to finish then
+		you can use --watch=false. Note that if a new rollout starts in-between, then
+		'rollout status' will continue watching the latest revision. If you want to
+		pin to a specific revision and abort if it is rolled over by another revision,
+		use --revision=N where N is the revision you need to watch for.`)
+
+	status_example = templates.Examples(`
 		# Watch the rollout status of a deployment
 		kubectl rollout status deployment/nginx`)
 )
 
-func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &StatusOptions{}
+func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &resource.FilenameOptions{}
+
+	validArgs := []string{"deployment"}
+	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use:     "status (TYPE NAME | TYPE/NAME) [flags]",
-		Short:   "Watch rollout status until it's done",
+		Short:   "Show the status of the rollout",
 		Long:    status_long,
 		Example: status_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(RunStatus(f, cmd, out, args, options))
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	usage := "identifying the resource to get from a server."
+	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmd.Flags().BoolP("watch", "w", true, "Watch the status of the rollout until it's done.")
+	cmd.Flags().Int64("revision", 0, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
 	return cmd
 }
 
-func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *StatusOptions) error {
-	if len(args) == 0 && len(options.Filenames) == 0 {
+func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *resource.FilenameOptions) error {
+	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
-	mapper, typer := f.Object(false)
+	mapper, typer := f.Object()
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -77,7 +85,7 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().
@@ -111,13 +119,23 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 		return err
 	}
 
+	revision := cmdutil.GetFlagInt64(cmd, "revision")
+	if revision < 0 {
+		return fmt.Errorf("revision must be a positive integer: %v", revision)
+	}
+
 	// check if deployment's has finished the rollout
-	status, done, err := statusViewer.Status(cmdNamespace, info.Name)
+	status, done, err := statusViewer.Status(cmdNamespace, info.Name, revision)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "%s", status)
 	if done {
+		return nil
+	}
+
+	shouldWatch := cmdutil.GetFlagBool(cmd, "watch")
+	if !shouldWatch {
 		return nil
 	}
 
@@ -128,18 +146,21 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 	}
 
 	// if the rollout isn't done yet, keep watching deployment status
-	kubectl.WatchLoop(w, func(e watch.Event) error {
-		// print deployment's status
-		status, done, err := statusViewer.Status(cmdNamespace, info.Name)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "%s", status)
-		// Quit waiting if the rollout is done
-		if done {
-			w.Stop()
-		}
-		return nil
+	intr := interrupt.New(nil, w.Stop)
+	return intr.Run(func() error {
+		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
+			// print deployment's status
+			status, done, err := statusViewer.Status(cmdNamespace, info.Name, revision)
+			if err != nil {
+				return false, err
+			}
+			fmt.Fprintf(out, "%s", status)
+			// Quit waiting if the rollout is done
+			if done {
+				return true, nil
+			}
+			return false, nil
+		})
+		return err
 	})
-	return nil
 }

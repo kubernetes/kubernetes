@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"syscall"
 
@@ -22,41 +22,19 @@ import (
 )
 
 const (
-	stateFilename = "state.json"
+	stateFilename    = "state.json"
+	execFifoFilename = "exec.fifo"
 )
 
 var (
-	idRegex  = regexp.MustCompile(`^[\w_-]+$`)
+	idRegex  = regexp.MustCompile(`^[\w+-\.]+$`)
 	maxIdLen = 1024
 )
 
 // InitArgs returns an options func to configure a LinuxFactory with the
-// provided init arguments.
+// provided init binary path and arguments.
 func InitArgs(args ...string) func(*LinuxFactory) error {
 	return func(l *LinuxFactory) error {
-		name := args[0]
-		if filepath.Base(name) == name {
-			if lp, err := exec.LookPath(name); err == nil {
-				name = lp
-			}
-		} else {
-			abs, err := filepath.Abs(name)
-			if err != nil {
-				return err
-			}
-			name = abs
-		}
-		l.InitPath = "/proc/self/exe"
-		l.InitArgs = append([]string{name}, args[1:]...)
-		return nil
-	}
-}
-
-// InitPath returns an options func to configure a LinuxFactory with the
-// provided absolute path to the init binary and arguements.
-func InitPath(path string, args ...string) func(*LinuxFactory) error {
-	return func(l *LinuxFactory) error {
-		l.InitPath = path
 		l.InitArgs = args
 		return nil
 	}
@@ -101,6 +79,15 @@ func TmpfsRoot(l *LinuxFactory) error {
 	return nil
 }
 
+// CriuPath returns an option func to configure a LinuxFactory with the
+// provided criupath
+func CriuPath(criupath string) func(*LinuxFactory) error {
+	return func(l *LinuxFactory) error {
+		l.CriuPath = criupath
+		return nil
+	}
+}
+
 // New returns a linux based container factory based in the root directory and
 // configures the factory with the provided option funcs.
 func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
@@ -111,10 +98,10 @@ func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
 	}
 	l := &LinuxFactory{
 		Root:      root,
+		InitArgs:  []string{"/proc/self/exe", "init"},
 		Validator: validate.New(),
 		CriuPath:  "criu",
 	}
-	InitArgs(os.Args[0], "init")(l)
 	Cgroupfs(l)
 	for _, opt := range options {
 		if err := opt(l); err != nil {
@@ -128,9 +115,6 @@ func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
 type LinuxFactory struct {
 	// Root directory for the factory to store state.
 	Root string
-
-	// InitPath is the absolute path to the init binary.
-	InitPath string
 
 	// InitArgs are arguments for calling the init responsibilities for spawning
 	// a container.
@@ -157,20 +141,40 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 	if err := l.Validator.Validate(config); err != nil {
 		return nil, newGenericError(err, ConfigInvalid)
 	}
+	uid, err := config.HostUID()
+	if err != nil {
+		return nil, newGenericError(err, SystemError)
+	}
+	gid, err := config.HostGID()
+	if err != nil {
+		return nil, newGenericError(err, SystemError)
+	}
 	containerRoot := filepath.Join(l.Root, id)
 	if _, err := os.Stat(containerRoot); err == nil {
 		return nil, newGenericError(fmt.Errorf("container with id exists: %v", id), IdInUse)
 	} else if !os.IsNotExist(err) {
 		return nil, newGenericError(err, SystemError)
 	}
-	if err := os.MkdirAll(containerRoot, 0700); err != nil {
+	if err := os.MkdirAll(containerRoot, 0711); err != nil {
+		return nil, newGenericError(err, SystemError)
+	}
+	if err := os.Chown(containerRoot, uid, gid); err != nil {
+		return nil, newGenericError(err, SystemError)
+	}
+	fifoName := filepath.Join(containerRoot, execFifoFilename)
+	oldMask := syscall.Umask(0000)
+	if err := syscall.Mkfifo(fifoName, 0622); err != nil {
+		syscall.Umask(oldMask)
+		return nil, newGenericError(err, SystemError)
+	}
+	syscall.Umask(oldMask)
+	if err := os.Chown(fifoName, uid, gid); err != nil {
 		return nil, newGenericError(err, SystemError)
 	}
 	c := &linuxContainer{
 		id:            id,
 		root:          containerRoot,
 		config:        config,
-		initPath:      l.InitPath,
 		initArgs:      l.InitArgs,
 		criuPath:      l.CriuPath,
 		cgroupManager: l.NewCgroupsManager(config.Cgroups, nil),
@@ -184,7 +188,7 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 		return nil, newGenericError(fmt.Errorf("invalid root"), ConfigInvalid)
 	}
 	containerRoot := filepath.Join(l.Root, id)
-	state, err := l.loadState(containerRoot)
+	state, err := l.loadState(containerRoot, id)
 	if err != nil {
 		return nil, err
 	}
@@ -194,16 +198,17 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 		fds:              state.ExternalDescriptors,
 	}
 	c := &linuxContainer{
-		initProcess:   r,
-		id:            id,
-		config:        &state.Config,
-		initPath:      l.InitPath,
-		initArgs:      l.InitArgs,
-		criuPath:      l.CriuPath,
-		cgroupManager: l.NewCgroupsManager(state.Config.Cgroups, state.CgroupPaths),
-		root:          containerRoot,
+		initProcess:          r,
+		initProcessStartTime: state.InitProcessStartTime,
+		id:                   id,
+		config:               &state.Config,
+		initArgs:             l.InitArgs,
+		criuPath:             l.CriuPath,
+		cgroupManager:        l.NewCgroupsManager(state.Config.Cgroups, state.CgroupPaths),
+		root:                 containerRoot,
+		created:              state.Created,
 	}
-	c.state = &createdState{c: c, s: Created}
+	c.state = &loadedState{c: c}
 	if err := c.refreshState(); err != nil {
 		return nil, err
 	}
@@ -217,10 +222,22 @@ func (l *LinuxFactory) Type() string {
 // StartInitialization loads a container by opening the pipe fd from the parent to read the configuration and state
 // This is a low level implementation detail of the reexec and should not be consumed externally
 func (l *LinuxFactory) StartInitialization() (err error) {
-	fdStr := os.Getenv("_LIBCONTAINER_INITPIPE")
-	pipefd, err := strconv.Atoi(fdStr)
-	if err != nil {
-		return fmt.Errorf("error converting env var _LIBCONTAINER_INITPIPE(%q) to an int: %s", fdStr, err)
+	var pipefd, rootfd int
+	for _, pair := range []struct {
+		k string
+		v *int
+	}{
+		{"_LIBCONTAINER_INITPIPE", &pipefd},
+		{"_LIBCONTAINER_STATEDIR", &rootfd},
+	} {
+
+		s := os.Getenv(pair.k)
+
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("unable to convert %s=%s to int", pair.k, s)
+		}
+		*pair.v = i
 	}
 	var (
 		pipe = os.NewFile(uintptr(pipefd), "pipe")
@@ -229,40 +246,42 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 	// clear the current process's environment to clean any libcontainer
 	// specific env vars.
 	os.Clearenv()
+
 	var i initer
 	defer func() {
-		// if we have an error during the initialization of the container's init then send it back to the
-		// parent process in the form of an initError.
-		if err != nil {
-			if _, ok := i.(*linuxStandardInit); ok {
-				//  Synchronisation only necessary for standard init.
-				if err := utils.WriteJSON(pipe, syncT{procError}); err != nil {
-					panic(err)
-				}
-			}
-			if err := utils.WriteJSON(pipe, newSystemError(err)); err != nil {
+		// We have an error during the initialization of the container's init,
+		// send it back to the parent process in the form of an initError.
+		// If container's init successed, syscall.Exec will not return, hence
+		// this defer function will never be called.
+		if _, ok := i.(*linuxStandardInit); ok {
+			//  Synchronisation only necessary for standard init.
+			if werr := utils.WriteJSON(pipe, syncT{procError}); werr != nil {
 				panic(err)
 			}
-		} else {
-			if err := utils.WriteJSON(pipe, syncT{procStart}); err != nil {
-				panic(err)
-			}
+		}
+		if werr := utils.WriteJSON(pipe, newSystemError(err)); werr != nil {
+			panic(err)
 		}
 		// ensure that this pipe is always closed
 		pipe.Close()
 	}()
-	i, err = newContainerInit(it, pipe)
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("panic from initialization: %v, %v", e, string(debug.Stack()))
+		}
+	}()
+	i, err = newContainerInit(it, pipe, rootfd)
 	if err != nil {
 		return err
 	}
 	return i.Init()
 }
 
-func (l *LinuxFactory) loadState(root string) (*State, error) {
+func (l *LinuxFactory) loadState(root, id string) (*State, error) {
 	f, err := os.Open(filepath.Join(root, stateFilename))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, newGenericError(err, ContainerNotExists)
+			return nil, newGenericError(fmt.Errorf("container %q does not exist", id), ContainerNotExists)
 		}
 		return nil, newGenericError(err, SystemError)
 	}

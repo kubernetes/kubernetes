@@ -20,17 +20,18 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
+
+	"k8s.io/gengo/generator"
+	"k8s.io/gengo/types"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
-	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
-func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
-	outputPackagePath := filepath.Join(packageBasePath, gv.Group, gv.Version, "fake")
+func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
+	outputPackagePath := strings.ToLower(filepath.Join(packageBasePath, gv.Group.NonEmpty(), gv.Version.NonEmpty(), "fake"))
 	// TODO: should make this a function, called by here and in client-generator.go
-	realClientPath := filepath.Join(packageBasePath, gv.Group, gv.Version)
+	realClientPath := filepath.Join(packageBasePath, gv.Group.NonEmpty(), gv.Version.NonEmpty())
 	return &generator.DefaultPackage{
 		PackageName: "fake",
 		PackagePath: outputPackagePath,
@@ -54,9 +55,9 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 						OptionalName: "fake_" + strings.ToLower(c.Namers["private"].Name(t)),
 					},
 					outputPackage: outputPackagePath,
-					group:         normalization.BeforeFirstDot(gv.Group),
+					group:         gv.Group.NonEmpty(),
+					version:       gv.Version.String(),
 					inputPackage:  inputPath,
-					version:       gv.Version,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})
@@ -64,20 +65,29 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 
 			generators = append(generators, &genFakeForGroup{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: "fake_" + normalization.BeforeFirstDot(gv.Group) + "_client",
+					OptionalName: "fake_" + gv.Group.NonEmpty() + "_client",
 				},
 				outputPackage:  outputPackagePath,
 				realClientPath: realClientPath,
-				group:          normalization.BeforeFirstDot(gv.Group),
+				group:          gv.Group.NonEmpty(),
+				version:        gv.Version.String(),
 				types:          typeList,
 				imports:        generator.NewImportTracker(),
 			})
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			return types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] == "true"
+			return extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == true
 		},
 	}
+}
+
+func extractBoolTagOrDie(key string, lines []string) bool {
+	val, err := types.ExtractSingleBoolCommentTag("+", key, false, lines)
+	if err != nil {
+		glog.Fatalf(err.Error())
+	}
+	return val
 }
 
 func PackageForClientset(customArgs clientgenargs.Args, typedClientBasePath string, boilerplate []byte, generatedBy string) generator.Package {
@@ -102,7 +112,7 @@ func PackageForClientset(customArgs clientgenargs.Args, typedClientBasePath stri
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "clientset_generated",
 					},
-					groupVersions:   customArgs.GroupVersions,
+					groups:          customArgs.Groups,
 					typedClientPath: typedClientBasePath,
 					outputPackage:   "fake",
 					imports:         generator.NewImportTracker(),

@@ -18,10 +18,14 @@ package serviceaccount
 
 import (
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -128,6 +132,7 @@ func TestServiceAccountCreation(t *testing.T) {
 			ExpectCreatedServiceAccounts: []string{},
 		},
 		"deleted serviceaccount with active namespace": {
+			ExistingServiceAccounts:      []*api.ServiceAccount{managedServiceAccount},
 			ExistingNamespace:            activeNS,
 			DeletedServiceAccount:        defaultServiceAccount,
 			ExpectCreatedServiceAccounts: []string{defaultName},
@@ -138,6 +143,7 @@ func TestServiceAccountCreation(t *testing.T) {
 			ExpectCreatedServiceAccounts: []string{},
 		},
 		"deleted unmanaged serviceaccount with active namespace": {
+			ExistingServiceAccounts:      []*api.ServiceAccount{defaultServiceAccount, managedServiceAccount},
 			ExistingNamespace:            activeNS,
 			DeletedServiceAccount:        unmanagedServiceAccount,
 			ExpectCreatedServiceAccounts: []string{},
@@ -151,30 +157,56 @@ func TestServiceAccountCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		client := fake.NewSimpleClientset(defaultServiceAccount, managedServiceAccount)
+		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 		options := DefaultServiceAccountsControllerOptions()
 		options.ServiceAccounts = []api.ServiceAccount{
 			{ObjectMeta: api.ObjectMeta{Name: defaultName}},
 			{ObjectMeta: api.ObjectMeta{Name: managedName}},
 		}
-		controller := NewServiceAccountsController(client, options)
+		controller := NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), client, options)
+		controller.saLister = &cache.StoreToServiceAccountLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+		controller.nsLister = &cache.IndexerToNamespaceLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+		controller.saSynced = alwaysReady
+		controller.nsSynced = alwaysReady
+
+		syncCalls := make(chan struct{})
+		controller.syncHandler = func(key string) error {
+			err := controller.syncNamespace(key)
+			if err != nil {
+				t.Logf("%s: %v", k, err)
+			}
+
+			syncCalls <- struct{}{}
+			return err
+		}
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		go controller.Run(1, stopCh)
 
 		if tc.ExistingNamespace != nil {
-			controller.namespaces.Add(tc.ExistingNamespace)
+			controller.nsLister.Add(tc.ExistingNamespace)
 		}
 		for _, s := range tc.ExistingServiceAccounts {
-			controller.serviceAccounts.Add(s)
+			controller.saLister.Indexer.Add(s)
 		}
 
 		if tc.AddedNamespace != nil {
-			controller.namespaces.Add(tc.AddedNamespace)
+			controller.nsLister.Add(tc.AddedNamespace)
 			controller.namespaceAdded(tc.AddedNamespace)
 		}
 		if tc.UpdatedNamespace != nil {
-			controller.namespaces.Add(tc.UpdatedNamespace)
+			controller.nsLister.Add(tc.UpdatedNamespace)
 			controller.namespaceUpdated(nil, tc.UpdatedNamespace)
 		}
 		if tc.DeletedServiceAccount != nil {
 			controller.serviceAccountDeleted(tc.DeletedServiceAccount)
+		}
+
+		// wait to be called
+		select {
+		case <-syncCalls:
+		case <-time.After(10 * time.Second):
+			t.Errorf("%s: took too long", k)
 		}
 
 		actions := client.Actions()
@@ -195,3 +227,5 @@ func TestServiceAccountCreation(t *testing.T) {
 		}
 	}
 }
+
+var alwaysReady = func() bool { return true }

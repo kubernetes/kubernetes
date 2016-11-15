@@ -21,17 +21,20 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
-var Scheme = runtime.NewScheme()
-
 // SchemeGroupVersion is group version used to register these objects
 // TODO this should be in the "kubeconfig" group
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 
-func init() {
-	Scheme.AddKnownTypes(SchemeGroupVersion,
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Config{},
 	)
+	return nil
 }
 
 func (obj *Config) GetObjectKind() unversioned.ObjectKind { return obj }

@@ -18,6 +18,8 @@ package storage
 
 import (
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
@@ -51,13 +53,25 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
-// FilterFunc is a predicate which takes an API object and returns true
-// if and only if the object should remain in the set.
+// MatchValue defines a pair (<index name>, <value for that index>).
+type MatchValue struct {
+	IndexName string
+	Value     string
+}
+
+// TriggerPublisherFunc is a function that takes an object, and returns a list of pairs
+// (<index name>, <index value for the given object>) for all indexes known
+// to that function.
+type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
+
+// FilterFunc takes an API object and returns true if the object satisfies some requirements.
+// TODO: We will remove this type and use SelectionPredicate everywhere.
 type FilterFunc func(obj runtime.Object) bool
 
-// Everything is a FilterFunc which accepts all objects.
-func Everything(runtime.Object) bool {
-	return true
+// Everything accepts all objects.
+var Everything = SelectionPredicate{
+	Label: labels.Everything(),
+	Field: fields.Everything(),
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
@@ -68,6 +82,7 @@ type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Obj
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type Preconditions struct {
 	// Specifies the target UID.
+	// +optional
 	UID *types.UID `json:"uid,omitempty"`
 }
 
@@ -77,14 +92,9 @@ func NewUIDPreconditions(uid string) *Preconditions {
 	return &Preconditions{UID: &u}
 }
 
-// Interface offers a common interface for object marshaling/unmarshling operations and
+// Interface offers a common interface for object marshaling/unmarshaling operations and
 // hides all the storage-related operations behind it.
 type Interface interface {
-	// Returns list of servers addresses of the underyling database.
-	// TODO: This method is used only in a single place. Consider refactoring and getting rid
-	// of this method from the interface.
-	Backends(ctx context.Context) []string
-
 	// Returns Versioner associated with this interface.
 	Versioner() Versioner
 
@@ -98,18 +108,18 @@ type Interface interface {
 	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
-	// and any items passing 'filter' are sent down to returned watch.Interface.
+	// and any items selected by 'p' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	Watch(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
+	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
-	// objects and any item passing 'filter' are sent down to returned watch.Interface.
+	// objects and any item selected by 'p' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	WatchList(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
@@ -118,13 +128,15 @@ type Interface interface {
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// be have at least 'resourceVersion'.
+	GetToList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// be have at least 'resourceVersion'.
-	List(ctx context.Context, key string, resourceVersion string, filter FilterFunc, listObj runtime.Object) error
+	List(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
@@ -135,6 +147,9 @@ type Interface interface {
 	// or zero value in 'ptrToType' parameter otherwise.
 	// If the object to update has the same value as previous, it won't do any update
 	// but will return the object in 'ptrToType' parameter.
+	// If 'suggestion' can contain zero or one element - in such case this can be used as
+	// a suggestion about the current version of the object to avoid read operation from
+	// storage to get it.
 	//
 	// Example:
 	//
@@ -154,18 +169,7 @@ type Interface interface {
 	//       return cur, nil, nil
 	//    }
 	// })
-	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, precondtions *Preconditions, tryUpdate UpdateFunc) error
-
-	// Codec provides access to the underlying codec being used by the implementation.
-	Codec() runtime.Codec
-}
-
-// Config interface allows storage tiers to generate the proper storage.interface
-// and reduce the dependencies to encapsulate storage.
-type Config interface {
-	// Creates the Interface base on ConfigObject
-	NewStorage() (Interface, error)
-
-	// This function is used to enforce membership, and return the underlying type
-	GetType() string
+	GuaranteedUpdate(
+		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
 }

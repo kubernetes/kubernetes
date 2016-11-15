@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/nodeaffinity.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Node affinity and NodeSelector
 
 ## Introduction
@@ -62,14 +28,14 @@ scheduling requirements.
 rather than replacing `map[string]string`, due to backward compatibility
 requirements.)
 
-The affiniy specifications described above allow a pod to request various
+The affinity specifications described above allow a pod to request various
 properties that are inherent to nodes, for example "run this pod on a node with
 an Intel CPU" or, in a multi-zone cluster, "run this pod on a node in zone Z."
 ([This issue](https://github.com/kubernetes/kubernetes/issues/9044) describes
 some of the properties that a node might publish as labels, which affinity
 expressions can match against.) They do *not* allow a pod to request to schedule
 (or not schedule) on a node based on what other pods are running on the node.
-That feature is called "inter-pod topological affinity/anti-afinity" and is
+That feature is called "inter-pod topological affinity/anti-affinity" and is
 described [here](https://github.com/kubernetes/kubernetes/pull/18265).
 
 ## API

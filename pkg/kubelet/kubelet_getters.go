@@ -18,14 +18,17 @@ package kubelet
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"path"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -40,7 +43,7 @@ func (kl *Kubelet) getRootDir() string {
 // getPodsDir returns the full path to the directory under which pod
 // directories are created.
 func (kl *Kubelet) getPodsDir() string {
-	return path.Join(kl.getRootDir(), "pods")
+	return path.Join(kl.getRootDir(), options.DefaultKubeletPodsDirName)
 }
 
 // getPluginsDir returns the full path to the directory under which plugin
@@ -48,7 +51,7 @@ func (kl *Kubelet) getPodsDir() string {
 // they need to persist.  Plugins should create subdirectories under this named
 // after their own names.
 func (kl *Kubelet) getPluginsDir() string {
-	return path.Join(kl.getRootDir(), "plugins")
+	return path.Join(kl.getRootDir(), options.DefaultKubeletPluginsDirName)
 }
 
 // getPluginDir returns a data directory name for a given plugin name.
@@ -90,7 +93,7 @@ func (kl *Kubelet) getPodDir(podUID types.UID) string {
 // which volumes are created for the specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumesDir(podUID types.UID) string {
-	return path.Join(kl.getPodDir(podUID), "volumes")
+	return path.Join(kl.getPodDir(podUID), options.DefaultKubeletVolumesDirName)
 }
 
 // getPodVolumeDir returns the full path to the directory which represents the
@@ -104,7 +107,7 @@ func (kl *Kubelet) getPodVolumeDir(podUID types.UID, pluginName string, volumeNa
 // which plugins may store data for the specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodPluginsDir(podUID types.UID) string {
-	return path.Join(kl.getPodDir(podUID), "plugins")
+	return path.Join(kl.getPodDir(podUID), options.DefaultKubeletPluginsDirName)
 }
 
 // getPodPluginDir returns a data directory name for a given plugin name for a
@@ -126,7 +129,7 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	//     old && new   = use new (but warn)
 	oldPath := path.Join(kl.getPodDir(podUID), ctrName)
 	oldExists := dirExists(oldPath)
-	newPath := path.Join(kl.getPodDir(podUID), "containers", ctrName)
+	newPath := path.Join(kl.getPodDir(podUID), options.DefaultKubeletContainersDirName, ctrName)
 	newExists := dirExists(newPath)
 	if oldExists && !newExists {
 		return oldPath
@@ -186,9 +189,9 @@ func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 // GetNode returns the node info for the configured node name of this Kubelet.
 func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
-		return kl.initialNodeStatus()
+		return kl.initialNode()
 	}
-	return kl.nodeInfo.GetNodeInfo(kl.nodeName)
+	return kl.nodeInfo.GetNodeInfo(string(kl.nodeName))
 }
 
 // getNodeAnyWay() must return a *api.Node which is required by RunGeneralPredicates().
@@ -198,11 +201,11 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*api.Node, error) {
 	if !kl.standaloneMode {
-		if n, err := kl.nodeInfo.GetNodeInfo(kl.nodeName); err == nil {
+		if n, err := kl.nodeInfo.GetNodeInfo(string(kl.nodeName)); err == nil {
 			return n, nil
 		}
 	}
-	return kl.initialNodeStatus()
+	return kl.initialNode()
 }
 
 // GetNodeConfig returns the container manager node config.
@@ -219,11 +222,43 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	return nodeutil.GetNodeHostIP(node)
 }
 
-// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or the initialNodeStatus
+// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or
+// the initialNode.
 func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		return nil, err
 	}
 	return nodeutil.GetNodeHostIP(node)
+}
+
+// GetExtraSupplementalGroupsForPod returns a list of the extra
+// supplemental groups for the Pod. These extra supplemental groups come
+// from annotations on persistent volumes that the pod depends on.
+func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+	return kl.volumeManager.GetExtraSupplementalGroupsForPod(pod)
+}
+
+// getPodVolumePathListFromDisk returns a list of the volume paths by reading the
+// volume directories for the given pod from the disk.
+func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, error) {
+	volumes := []string{}
+	podVolDir := kl.getPodVolumesDir(podUID)
+	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
+	if err != nil {
+		glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+		return volumes, err
+	}
+	for _, volumePluginDir := range volumePluginDirs {
+		volumePluginName := volumePluginDir.Name()
+		volumePluginPath := path.Join(podVolDir, volumePluginName)
+		volumeDirs, err := util.ReadDirNoStat(volumePluginPath)
+		if err != nil {
+			return volumes, fmt.Errorf("Could not read directory %s: %v", volumePluginPath, err)
+		}
+		for _, volumeDir := range volumeDirs {
+			volumes = append(volumes, path.Join(volumePluginPath, volumeDir))
+		}
+	}
+	return volumes, nil
 }

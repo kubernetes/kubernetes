@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/proposals/service-discovery.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Service Discovery Proposal
 
 ## Goal of this document
@@ -50,7 +16,7 @@ however for the purpose of service discovery we can simplify this to the followi
 
 If a user and/or password is required then this information can be passed using Kubernetes Secrets. Kubernetes contains the host and port of each service but it lacks the scheme and path.
 
-`Service Path` - Every Service has one (or more) endpoint. As a rule the endpoint should be located at the root "/" of the localtion URL, i.e. `http://172.100.1.52/`. There are cases where this is not possible and the actual service endpoint could be located at `http://172.100.1.52/cxfcdi`. The Kubernetes metadata for a service does not capture the path part, making it hard to consume this service.
+`Service Path` - Every Service has one (or more) endpoint. As a rule the endpoint should be located at the root "/" of the location URL, i.e. `http://172.100.1.52/`. There are cases where this is not possible and the actual service endpoint could be located at `http://172.100.1.52/cxfcdi`. The Kubernetes metadata for a service does not capture the path part, making it hard to consume this service.
 
 `Service Scheme` - Services can be deployed using different schemes. Some popular schemes include `http`,`https`,`file`,`ftp` and `jdbc`.
 
@@ -62,7 +28,7 @@ The API of a service is the point of interaction with a service consumer. The de
 
 `Service Description Path` - To facilitate the consumption of the service by client, the location this document would be greatly helpful to the service consumer. In some cases the client side code can be generated from such a document. It is assumed that the service description document is published somewhere on the service endpoint itself.
 
-`Service Description Language` - A number of Definition Languages (DL) have been developed to describe the service. Some of examples are `WSDL`, `WADL` and `Swagger`. In order to consume a decription document it is good to know the type of DL used.
+`Service Description Language` - A number of Definition Languages (DL) have been developed to describe the service. Some of examples are `WSDL`, `WADL` and `Swagger`. In order to consume a description document it is good to know the type of DL used.
 
 ## Standard Service Annotations
 
@@ -92,7 +58,7 @@ The fragment below is taken from the service section of the kubernetes.json were
 
 ## Conclusion
 
-Five service annotations are proposed as a standard way to desribe a service endpoint. These five annotation are promoted as a Kubernetes standard, so that services can be discovered and a service catalog can be build to facilitate service consumers.
+Five service annotations are proposed as a standard way to describe a service endpoint. These five annotation are promoted as a Kubernetes standard, so that services can be discovered and a service catalog can be build to facilitate service consumers.
 
 
 

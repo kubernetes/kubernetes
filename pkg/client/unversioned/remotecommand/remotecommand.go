@@ -29,7 +29,20 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
+	"k8s.io/kubernetes/pkg/util/term"
 )
+
+// StreamOptions holds information pertaining to the current streaming session: supported stream
+// protocols, input/output streams, if the client is requesting a TTY, and a terminal size queue to
+// support terminal resizing.
+type StreamOptions struct {
+	SupportedProtocols []string
+	Stdin              io.Reader
+	Stdout             io.Writer
+	Stderr             io.Writer
+	Tty                bool
+	TerminalSizeQueue  term.TerminalSizeQueue
+}
 
 // Executor is an interface for transporting shell-style streams.
 type Executor interface {
@@ -37,7 +50,7 @@ type Executor interface {
 	// non-nil stream to a remote system, and return an error if a problem occurs. If tty
 	// is set, the stderr stream is not used (raw TTY manages stdout and stderr over the
 	// stdout stream).
-	Stream(supportedProtocols []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Stream(options StreamOptions) error
 }
 
 // StreamExecutor supports the ability to dial an httpstream connection and the ability to
@@ -85,7 +98,7 @@ func NewExecutor(config *restclient.Config, method string, url *url.URL) (Stream
 // to wrap the round tripper. This method may be used by clients that are lower level than
 // Kubernetes clients or need to provide their own upgrade round tripper.
 func NewStreamExecutor(upgrader httpstream.UpgradeRoundTripper, fn func(http.RoundTripper) http.RoundTripper, method string, url *url.URL) (StreamExecutor, error) {
-	var rt http.RoundTripper = upgrader
+	rt := http.RoundTripper(upgrader)
 	if fn != nil {
 		rt = fn(rt)
 	}
@@ -129,14 +142,18 @@ func (e *streamExecutor) Dial(protocols ...string) (httpstream.Connection, strin
 	return conn, resp.Header.Get(httpstream.HeaderProtocolVersion), nil
 }
 
+type streamCreator interface {
+	CreateStream(headers http.Header) (httpstream.Stream, error)
+}
+
 type streamProtocolHandler interface {
-	stream(httpstream.Connection) error
+	stream(conn streamCreator) error
 }
 
 // Stream opens a protocol streamer to the server and streams until a client closes
 // the connection or the server disconnects.
-func (e *streamExecutor) Stream(supportedProtocols []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	conn, protocol, err := e.Dial(supportedProtocols...)
+func (e *streamExecutor) Stream(options StreamOptions) error {
+	conn, protocol, err := e.Dial(options.SupportedProtocols...)
 	if err != nil {
 		return err
 	}
@@ -145,23 +162,17 @@ func (e *streamExecutor) Stream(supportedProtocols []string, stdin io.Reader, st
 	var streamer streamProtocolHandler
 
 	switch protocol {
+	case remotecommand.StreamProtocolV4Name:
+		streamer = newStreamProtocolV4(options)
+	case remotecommand.StreamProtocolV3Name:
+		streamer = newStreamProtocolV3(options)
 	case remotecommand.StreamProtocolV2Name:
-		streamer = &streamProtocolV2{
-			stdin:  stdin,
-			stdout: stdout,
-			stderr: stderr,
-			tty:    tty,
-		}
+		streamer = newStreamProtocolV2(options)
 	case "":
 		glog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
 		fallthrough
 	case remotecommand.StreamProtocolV1Name:
-		streamer = &streamProtocolV1{
-			stdin:  stdin,
-			stdout: stdout,
-			stderr: stderr,
-			tty:    tty,
-		}
+		streamer = newStreamProtocolV1(options)
 	}
 
 	return streamer.stream(conn)

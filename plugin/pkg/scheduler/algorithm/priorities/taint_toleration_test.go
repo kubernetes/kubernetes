@@ -22,14 +22,13 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-func nodeWithTaints(nodeName string, taints []api.Taint) api.Node {
+func nodeWithTaints(nodeName string, taints []api.Taint) *api.Node {
 	taintsData, _ := json.Marshal(taints)
-	return api.Node{
+	return &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name: nodeName,
 			Annotations: map[string]string{
@@ -57,7 +56,7 @@ func podWithTolerations(tolerations []api.Toleration) *api.Pod {
 func TestTaintAndToleration(t *testing.T) {
 	tests := []struct {
 		pod          *api.Pod
-		nodes        []api.Node
+		nodes        []*api.Node
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
@@ -70,7 +69,7 @@ func TestTaintAndToleration(t *testing.T) {
 				Value:    "bar",
 				Effect:   api.TaintEffectPreferNoSchedule,
 			}}),
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				nodeWithTaints("nodeA", []api.Taint{{
 					Key:    "foo",
 					Value:  "bar",
@@ -103,7 +102,7 @@ func TestTaintAndToleration(t *testing.T) {
 					Effect:   api.TaintEffectPreferNoSchedule,
 				},
 			}),
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				nodeWithTaints("nodeA", []api.Taint{}),
 				nodeWithTaints("nodeB", []api.Taint{
 					{
@@ -139,7 +138,7 @@ func TestTaintAndToleration(t *testing.T) {
 				Value:    "bar",
 				Effect:   api.TaintEffectPreferNoSchedule,
 			}}),
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				nodeWithTaints("nodeA", []api.Taint{}),
 				nodeWithTaints("nodeB", []api.Taint{
 					{
@@ -182,7 +181,7 @@ func TestTaintAndToleration(t *testing.T) {
 					Effect:   api.TaintEffectNoSchedule,
 				},
 			}),
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				nodeWithTaints("nodeA", []api.Taint{}),
 				nodeWithTaints("nodeB", []api.Taint{
 					{
@@ -211,12 +210,9 @@ func TestTaintAndToleration(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap([]*api.Pod{{}})
-		taintToleration := TaintToleration{nodeLister: algorithm.FakeNodeLister(api.NodeList{Items: test.nodes})}
-		list, err := taintToleration.ComputeTaintTolerationPriority(
-			test.pod,
-			nodeNameToInfo,
-			algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
+		ttp := priorityFunction(ComputeTaintTolerationPriorityMap, ComputeTaintTolerationPriorityReduce)
+		list, err := ttp(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("%s, unexpected error: %v", test.test, err)
 		}

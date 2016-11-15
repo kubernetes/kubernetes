@@ -51,7 +51,8 @@ func NewInterPodAntiAffinity(client clientset.Interface) admission.Interface {
 // Admit will deny any pod that defines AntiAffinity topology key other than unversioned.LabelHostname i.e. "kubernetes.io/hostname"
 // in  requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution.
 func (p *plugin) Admit(attributes admission.Attributes) (err error) {
-	if attributes.GetResource().GroupResource() != api.Resource("pods") {
+	// Ignore all calls to subresources or resources other than pods.
+	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 	pod, ok := attributes.GetObject().(*api.Pod)
@@ -63,7 +64,7 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		glog.V(5).Infof("Invalid Affinity detected, but we will leave handling of this to validation phase")
 		return nil
 	}
-	if affinity.PodAntiAffinity != nil {
+	if affinity != nil && affinity.PodAntiAffinity != nil {
 		var podAntiAffinityTerms []api.PodAffinityTerm
 		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			podAntiAffinityTerms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution

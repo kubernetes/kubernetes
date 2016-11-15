@@ -61,6 +61,17 @@ func TestValidateCluster(t *testing.T) {
 				},
 			},
 		},
+		"invalid cluster name (is a subdomain)": {
+			ObjectMeta: api.ObjectMeta{Name: "mycluster.mycompany"},
+			Spec: federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "0.0.0.0/0",
+						ServerAddress: "localhost:8888",
+					},
+				},
+			},
+		},
 	}
 	for testName, errorCase := range errorCases {
 		errs := ValidateCluster(&errorCase)

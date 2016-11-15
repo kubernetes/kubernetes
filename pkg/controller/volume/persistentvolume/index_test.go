@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 )
 
 func TestMatchVolume(t *testing.T) {
@@ -164,7 +165,52 @@ func TestMatchVolume(t *testing.T) {
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("10000G"),
+							api.ResourceName(api.ResourceStorage): resource.MustParse("20000G"),
+						},
+					},
+				},
+			},
+		},
+		"successful-match-with-class": {
+			expectedMatch: "gce-pd-silver1",
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claim01",
+					Namespace: "myns",
+					Annotations: map[string]string{
+						storageutil.StorageClassAnnotation: "silver",
+					},
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Selector: &unversioned.LabelSelector{
+						MatchLabels: map[string]string{
+							"should-exist": "true",
+						},
+					},
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+						},
+					},
+				},
+			},
+		},
+		"successful-match-with-class-and-labels": {
+			expectedMatch: "gce-pd-silver2",
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claim01",
+					Namespace: "myns",
+					Annotations: map[string]string{
+						storageutil.StorageClassAnnotation: "silver",
+					},
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
 						},
 					},
 				},
@@ -563,7 +609,70 @@ func createTestVolumes() []*api.PersistentVolume {
 			},
 			Spec: api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("20000G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:  "gce-pd-silver1",
+				Name: "gce0023",
+				Labels: map[string]string{
+					"should-exist": "true",
+				},
+				Annotations: map[string]string{
+					storageutil.StorageClassAnnotation: "silver",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10000G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:  "gce-pd-silver2",
+				Name: "gce0024",
+				Annotations: map[string]string{
+					storageutil.StorageClassAnnotation: "silver",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("100G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:  "gce-pd-gold",
+				Name: "gce0025",
+				Annotations: map[string]string{
+					storageutil.StorageClassAnnotation: "gold",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("50G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -610,11 +719,16 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	pv1 := testVolume("pv1", "1Gi")
 	pv5 := testVolume("pv5", "5Gi")
 	pv8 := testVolume("pv8", "8Gi")
+	pvBadSize := testVolume("pvBadSize", "1Mi")
+	pvBadMode := testVolume("pvBadMode", "1Gi")
+	pvBadMode.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadOnlyMany}
 
 	index := newPersistentVolumeOrderedIndex()
 	index.store.Add(pv1)
 	index.store.Add(pv5)
 	index.store.Add(pv8)
+	index.store.Add(pvBadSize)
+	index.store.Add(pvBadMode)
 
 	// expected exact match on size
 	volume, _ := index.findBestMatchForClaim(claim)
@@ -635,6 +749,22 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != pv8.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
+	}
+
+	// pretend the volume with too small a size is pre-bound to the claim. should get the exact match.
+	pv8.Spec.ClaimRef = nil
+	pvBadSize.Spec.ClaimRef = claimRef
+	volume, _ = index.findBestMatchForClaim(claim)
+	if volume.Name != pv1.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
+	}
+
+	// pretend the volume without the right access mode is pre-bound to the claim. should get the exact match.
+	pvBadSize.Spec.ClaimRef = nil
+	pvBadMode.Spec.ClaimRef = claimRef
+	volume, _ = index.findBestMatchForClaim(claim)
+	if volume.Name != pv1.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
 	}
 }
 

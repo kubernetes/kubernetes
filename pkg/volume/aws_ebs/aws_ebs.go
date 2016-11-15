@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -102,7 +103,7 @@ func (plugin *awsElasticBlockStorePlugin) newMounterInternal(spec *volume.Spec, 
 		return nil, err
 	}
 
-	volumeID := ebs.VolumeID
+	volumeID := aws.KubernetesVolumeID(ebs.VolumeID)
 	fsType := ebs.FSType
 	partition := ""
 	if ebs.Partition != 0 {
@@ -147,21 +148,19 @@ func (plugin *awsElasticBlockStorePlugin) NewDeleter(spec *volume.Spec) (volume.
 
 func (plugin *awsElasticBlockStorePlugin) newDeleterInternal(spec *volume.Spec, manager ebsManager) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AWSElasticBlockStore == nil {
+		glog.Errorf("spec.PersistentVolumeSource.AWSElasticBlockStore is nil")
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.AWSElasticBlockStore is nil")
 	}
 	return &awsElasticBlockStoreDeleter{
 		awsElasticBlockStore: &awsElasticBlockStore{
 			volName:  spec.Name(),
-			volumeID: spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID,
+			volumeID: aws.KubernetesVolumeID(spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID),
 			manager:  manager,
 			plugin:   plugin,
 		}}, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &AWSDiskUtil{})
 }
 
@@ -187,9 +186,27 @@ func getVolumeSource(
 	return nil, false, fmt.Errorf("Spec does not reference an AWS EBS volume type")
 }
 
+func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	awsVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+				VolumeID: sourceName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(awsVolume), nil
+}
+
 // Abstract interface to PD operations.
 type ebsManager interface {
-	CreateVolume(provisioner *awsElasticBlockStoreProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
+	CreateVolume(provisioner *awsElasticBlockStoreProvisioner) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *awsElasticBlockStoreDeleter) error
 }
@@ -200,7 +217,7 @@ type awsElasticBlockStore struct {
 	volName string
 	podUID  types.UID
 	// Unique id of the PD, used to find the disk resource in the provider.
-	volumeID string
+	volumeID aws.KubernetesVolumeID
 	// Specifies the partition to mount
 	partition string
 	// Utility interface that provides API calls to the provider to attach/detach disks.
@@ -231,6 +248,13 @@ func (b *awsElasticBlockStoreMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *awsElasticBlockStoreMounter) CanMount() error {
+	return nil
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *awsElasticBlockStoreMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
@@ -242,6 +266,7 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, fsGroup *int64) error 
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notMnt {
@@ -263,17 +288,17 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, fsGroup *int64) error 
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			glog.Errorf("IsLikelyNotMountPoint check failed for %s: %v", dir, mntErr)
 			return err
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				glog.Errorf("failed to unmount %s: %v", dir, mntErr)
 				return err
 			}
 			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				glog.Errorf("IsLikelyNotMountPoint check failed for %s: %v", dir, mntErr)
 				return err
 			}
 			if !notMnt {
@@ -283,6 +308,7 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, fsGroup *int64) error 
 			}
 		}
 		os.Remove(dir)
+		glog.Errorf("Mount of disk %s failed: %v", dir, err)
 		return err
 	}
 
@@ -290,12 +316,13 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, fsGroup *int64) error 
 		volume.SetVolumeOwnership(b, fsGroup)
 	}
 
+	glog.V(4).Infof("Successfully mounted %s", dir)
 	return nil
 }
 
-func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {
+func makeGlobalPDPath(host volume.VolumeHost, volumeID aws.KubernetesVolumeID) string {
 	// Clean up the URI to be more fs-friendly
-	name := volumeID
+	name := string(volumeID)
 	name = strings.Replace(name, "://", "/", -1)
 	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts", name)
 }
@@ -305,10 +332,12 @@ func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (stri
 	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts")
 	rel, err := filepath.Rel(basePath, globalPath)
 	if err != nil {
+		glog.Errorf("Failed to get volume id from global mount %s - %v", globalPath, err)
 		return "", err
 	}
 	if strings.Contains(rel, "../") {
-		return "", fmt.Errorf("Unexpected mount path: " + globalPath)
+		glog.Errorf("Unexpected mount path: %s", globalPath)
+		return "", fmt.Errorf("unexpected mount path: " + globalPath)
 	}
 	// Reverse the :// replacement done in makeGlobalPDPath
 	volumeID := rel
@@ -391,6 +420,7 @@ var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
 func (c *awsElasticBlockStoreProvisioner) Provision() (*api.PersistentVolume, error) {
 	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
+		glog.Errorf("Provision failed: %v", err)
 		return nil, err
 	}
 
@@ -404,19 +434,23 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*api.PersistentVolume, er
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
+			AccessModes:                   c.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
-					VolumeID:  volumeID,
+					VolumeID:  string(volumeID),
 					FSType:    "ext4",
 					Partition: 0,
 					ReadOnly:  false,
 				},
 			},
 		},
+	}
+
+	if len(c.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
 	if len(labels) != 0 {

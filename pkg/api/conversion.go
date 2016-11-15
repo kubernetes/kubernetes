@@ -17,41 +17,102 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	utillabels "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-func init() {
-	Scheme.AddDefaultingFuncs(
-		func(obj *ListOptions) {
-			if obj.LabelSelector == nil {
-				obj.LabelSelector = labels.Everything()
-			}
-			if obj.FieldSelector == nil {
-				obj.FieldSelector = fields.Everything()
-			}
-		},
-	)
-	Scheme.AddConversionFuncs(
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddConversionFuncs(
 		Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
+
 		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
+
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
+
 		Convert_unversioned_Time_To_unversioned_Time,
+
 		Convert_Slice_string_To_unversioned_Time,
+
+		Convert_resource_Quantity_To_resource_Quantity,
+
 		Convert_string_To_labels_Selector,
+		Convert_labels_Selector_To_string,
+
 		Convert_string_To_fields_Selector,
+		Convert_fields_Selector_To_string,
+
 		Convert_Pointer_bool_To_bool,
 		Convert_bool_To_Pointer_bool,
+
 		Convert_Pointer_string_To_string,
 		Convert_string_To_Pointer_string,
-		Convert_labels_Selector_To_string,
-		Convert_fields_Selector_To_string,
-		Convert_resource_Quantity_To_resource_Quantity,
+
+		Convert_Pointer_int64_To_int,
+		Convert_int_To_Pointer_int64,
+
+		Convert_Pointer_int32_To_int32,
+		Convert_int32_To_Pointer_int32,
+
+		Convert_Pointer_float64_To_float64,
+		Convert_float64_To_Pointer_float64,
+
+		Convert_map_to_unversioned_LabelSelector,
+		Convert_unversioned_LabelSelector_to_map,
 	)
+}
+
+func Convert_Pointer_float64_To_float64(in **float64, out *float64, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = float64(**in)
+	return nil
+}
+
+func Convert_float64_To_Pointer_float64(in *float64, out **float64, s conversion.Scope) error {
+	temp := float64(*in)
+	*out = &temp
+	return nil
+}
+
+func Convert_Pointer_int32_To_int32(in **int32, out *int32, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = int32(**in)
+	return nil
+}
+
+func Convert_int32_To_Pointer_int32(in *int32, out **int32, s conversion.Scope) error {
+	temp := int32(*in)
+	*out = &temp
+	return nil
+}
+
+func Convert_Pointer_int64_To_int(in **int64, out *int, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = int(**in)
+	return nil
+}
+
+func Convert_int_To_Pointer_int64(in *int, out **int64, s conversion.Scope) error {
+	temp := int64(*in)
+	*out = &temp
+	return nil
 }
 
 func Convert_Pointer_string_To_string(in **string, out *string, s conversion.Scope) error {
@@ -92,6 +153,7 @@ func Convert_bool_To_Pointer_bool(in *bool, out **bool, s conversion.Scope) erro
 	return nil
 }
 
+// +k8s:conversion-fn=drop
 func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.TypeMeta, s conversion.Scope) error {
 	// These values are explicitly not copied
 	//out.APIVersion = in.APIVersion
@@ -99,19 +161,19 @@ func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.T
 	return nil
 }
 
+// +k8s:conversion-fn=copy-only
 func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *unversioned.ListMeta, s conversion.Scope) error {
-	out.ResourceVersion = in.ResourceVersion
-	out.SelfLink = in.SelfLink
+	*out = *in
 	return nil
 }
 
+// +k8s:conversion-fn=copy-only
 func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
-	out.Type = in.Type
-	out.IntVal = in.IntVal
-	out.StrVal = in.StrVal
+	*out = *in
 	return nil
 }
 
+// +k8s:conversion-fn=copy-only
 func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
 	// Cannot deep copy these, because time.Time has unexported fields.
 	*out = *in
@@ -135,6 +197,7 @@ func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conve
 	*out = selector
 	return nil
 }
+
 func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conversion.Scope) error {
 	selector, err := fields.ParseSelector(*in)
 	if err != nil {
@@ -143,6 +206,7 @@ func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conve
 	*out = selector
 	return nil
 }
+
 func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {
 	if *in == nil {
 		return nil
@@ -150,6 +214,7 @@ func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conve
 	*out = (*in).String()
 	return nil
 }
+
 func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conversion.Scope) error {
 	if *in == nil {
 		return nil
@@ -157,7 +222,29 @@ func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conve
 	*out = (*in).String()
 	return nil
 }
+
+// +k8s:conversion-fn=copy-only
 func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
 	*out = *in
 	return nil
+}
+
+func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *unversioned.LabelSelector, s conversion.Scope) error {
+	if in == nil {
+		return nil
+	}
+	out = new(unversioned.LabelSelector)
+	for labelKey, labelValue := range *in {
+		utillabels.AddLabelToSelector(out, labelKey, labelValue)
+	}
+	return nil
+}
+
+func Convert_unversioned_LabelSelector_to_map(in *unversioned.LabelSelector, out *map[string]string, s conversion.Scope) error {
+	var err error
+	*out, err = unversioned.LabelSelectorAsMap(in)
+	if err != nil {
+		err = field.Invalid(field.NewPath("labelSelector"), *in, fmt.Sprintf("cannot convert to old selector: %v", err))
+	}
+	return err
 }

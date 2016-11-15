@@ -41,3 +41,15 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 func (*NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
+
+func (*NsenterMounter) DeviceOpened(pathname string) (bool, error) {
+	return false, nil
+}
+
+func (*NsenterMounter) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
+func (*NsenterMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
+}

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
@@ -133,13 +134,13 @@ func (p *testNamer) SetSelfLink(obj runtime.Object, url string) error {
 }
 
 // GenerateLink creates a path and query for a given runtime object that represents the canonical path.
-func (p *testNamer) GenerateLink(req *restful.Request, obj runtime.Object) (path, query string, err error) {
-	return "", "", errors.New("not implemented")
+func (p *testNamer) GenerateLink(req *restful.Request, obj runtime.Object) (uri string, err error) {
+	return "", errors.New("not implemented")
 }
 
 // GenerateLink creates a path and query for a list that represents the canonical path.
-func (p *testNamer) GenerateListLink(req *restful.Request) (path, query string, err error) {
-	return "", "", errors.New("not implemented")
+func (p *testNamer) GenerateListLink(req *restful.Request) (uri string, err error) {
+	return "", errors.New("not implemented")
 }
 
 type patchTestCase struct {
@@ -186,12 +187,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	namer := &testNamer{namespace, name}
 	copier := runtime.ObjectCopier(api.Scheme)
 	resource := unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-
-	versionedObj, err := api.Scheme.ConvertToVersion(&api.Pod{}, unversioned.GroupVersion{Version: "v1"})
-	if err != nil {
-		t.Errorf("%s: unexpected error: %v", tc.name, err)
-		return
-	}
+	versionedObj := &v1.Pod{}
 
 	for _, patchType := range []api.PatchType{api.JSONPatchType, api.MergePatchType, api.StrategicMergePatchType} {
 		// TODO SUPPORT THIS!
@@ -217,7 +213,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			continue
 
 		case api.StrategicMergePatchType:
-			patch, err = strategicpatch.CreateStrategicMergePatch(originalObjJS, changedJS, versionedObj)
+			patch, err = strategicpatch.CreateStrategicMergePatch(originalObjJS, changedJS, versionedObj, strategicpatch.SMPatchVersionLatest)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				return

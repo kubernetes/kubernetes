@@ -19,10 +19,13 @@ package predicates
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"k8s.io/gengo/parser"
+	"k8s.io/gengo/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/util/codeinspector"
@@ -71,37 +74,38 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*api.P
 	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
 }
 
-func makeResources(milliCPU int64, memory int64, nvidiaGPUs int64, pods int64) api.NodeResources {
+var (
+	opaqueResourceA = api.OpaqueIntResourceName("AAA")
+	opaqueResourceB = api.OpaqueIntResourceName("BBB")
+)
+
+func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA int64) api.NodeResources {
 	return api.NodeResources{
 		Capacity: api.ResourceList{
 			api.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 			api.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
 			api.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
 			api.ResourceNvidiaGPU: *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
+			opaqueResourceA:       *resource.NewQuantity(opaqueA, resource.DecimalSI),
 		},
 	}
 }
 
-func makeAllocatableResources(milliCPU int64, memory int64, nvidiaGPUs int64, pods int64) api.ResourceList {
+func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA int64) api.ResourceList {
 	return api.ResourceList{
 		api.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 		api.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
 		api.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
 		api.ResourceNvidiaGPU: *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
+		opaqueResourceA:       *resource.NewQuantity(opaqueA, resource.DecimalSI),
 	}
 }
 
-func newResourcePod(usage ...resourceRequest) *api.Pod {
+func newResourcePod(usage ...schedulercache.Resource) *api.Pod {
 	containers := []api.Container{}
 	for _, req := range usage {
 		containers = append(containers, api.Container{
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceCPU:       *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
-					api.ResourceMemory:    *resource.NewQuantity(req.memory, resource.BinarySI),
-					api.ResourceNvidiaGPU: *resource.NewQuantity(req.nvidiaGPU, resource.DecimalSI),
-				},
-			},
+			Resources: api.ResourceRequirements{Requests: req.ResourceList()},
 		})
 	}
 	return &api.Pod{
@@ -111,9 +115,14 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 	}
 }
 
-func newResourceInitPod(pod *api.Pod, usage ...resourceRequest) *api.Pod {
+func newResourceInitPod(pod *api.Pod, usage ...schedulercache.Resource) *api.Pod {
 	pod.Spec.InitContainers = newResourcePod(usage...).Spec.Containers
 	return pod
+}
+
+func PredicateMetadata(p *api.Pod, nodeInfo map[string]*schedulercache.NodeInfo) interface{} {
+	pm := PredicateMetadataFactory{algorithm.FakePodLister{p}}
+	return pm.GetMetadata(p, nodeInfo)
 }
 
 func TestPodFitsResources(t *testing.T) {
@@ -122,113 +131,215 @@ func TestPodFitsResources(t *testing.T) {
 		nodeInfo *schedulercache.NodeInfo
 		fits     bool
 		test     string
-		wErr     error
+		reasons  []algorithm.PredicateFailureReason
 	}{
 		{
 			pod: &api.Pod{},
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 20})),
 			fits: true,
 			test: "no resources requested always fits",
-			wErr: nil,
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 20})),
 			fits: false,
 			test: "too many resources fails",
-			wErr: newInsufficientResourceError(cpuResourceName, 1, 10, 10),
+			reasons: []algorithm.PredicateFailureReason{
+				NewInsufficientResourceError(api.ResourceCPU, 1, 10, 10),
+				NewInsufficientResourceError(api.ResourceMemory, 1, 20, 20),
+			},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 3, memory: 1}),
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 3, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 8, memory: 19})),
-			fits: false,
-			test: "too many resources fails due to init container cpu",
-			wErr: newInsufficientResourceError(cpuResourceName, 3, 8, 10),
+				newResourcePod(schedulercache.Resource{MilliCPU: 8, Memory: 19})),
+			fits:    false,
+			test:    "too many resources fails due to init container cpu",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceCPU, 3, 8, 10)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 3, memory: 1}, resourceRequest{milliCPU: 2, memory: 1}),
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 3, Memory: 1}, schedulercache.Resource{MilliCPU: 2, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 8, memory: 19})),
-			fits: false,
-			test: "too many resources fails due to highest init container cpu",
-			wErr: newInsufficientResourceError(cpuResourceName, 3, 8, 10),
+				newResourcePod(schedulercache.Resource{MilliCPU: 8, Memory: 19})),
+			fits:    false,
+			test:    "too many resources fails due to highest init container cpu",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceCPU, 3, 8, 10)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 1, memory: 3}),
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 3}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
-			fits: false,
-			test: "too many resources fails due to init container memory",
-			wErr: newInsufficientResourceError(memoryResourceName, 3, 19, 20),
+				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
+			fits:    false,
+			test:    "too many resources fails due to init container memory",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceMemory, 3, 19, 20)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 1, memory: 3}, resourceRequest{milliCPU: 1, memory: 2}),
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 3}, schedulercache.Resource{MilliCPU: 1, Memory: 2}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
-			fits: false,
-			test: "too many resources fails due to highest init container memory",
-			wErr: newInsufficientResourceError(memoryResourceName, 3, 19, 20),
+				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
+			fits:    false,
+			test:    "too many resources fails due to highest init container memory",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceMemory, 3, 19, 20)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 1, memory: 1}),
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			fits: true,
 			test: "init container fits because it's the max, not sum, of containers and init containers",
-			wErr: nil,
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 1, memory: 1}, resourceRequest{milliCPU: 1, memory: 1}),
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 1}, schedulercache.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			fits: true,
 			test: "multiple init containers fit because it's the max, not sum, of containers and init containers",
-			wErr: nil,
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 5})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 5})),
 			fits: true,
 			test: "both resources fit",
-			wErr: nil,
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
-			fits: false,
-			test: "one resources fits",
-			wErr: newInsufficientResourceError(memoryResourceName, 2, 19, 20),
+				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 5})),
+			fits:    false,
+			test:    "one resource memory fits",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceCPU, 2, 9, 10)},
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 2}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			fits:    false,
+			test:    "one resource cpu fits",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceMemory, 2, 19, 20)},
+		},
+		{
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			fits: true,
 			test: "equal edge case",
-			wErr: nil,
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 4, memory: 1}), resourceRequest{milliCPU: 5, memory: 1}),
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 4, Memory: 1}), schedulercache.Resource{MilliCPU: 5, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			fits: true,
 			test: "equal edge case for init container",
-			wErr: nil,
+		},
+		{
+			pod:      newResourcePod(schedulercache.Resource{OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 1}}),
+			nodeInfo: schedulercache.NewNodeInfo(newResourcePod(schedulercache.Resource{})),
+			fits:     true,
+			test:     "opaque resource fits",
+		},
+		{
+			pod:      newResourceInitPod(newResourcePod(schedulercache.Resource{}), schedulercache.Resource{OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 1}}),
+			nodeInfo: schedulercache.NewNodeInfo(newResourcePod(schedulercache.Resource{})),
+			fits:     true,
+			test:     "opaque resource fits for init container",
+		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 0}})),
+			fits:    false,
+			test:    "opaque resource capacity enforced",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 10, 0, 5)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 0}})),
+			fits:    false,
+			test:    "opaque resource capacity enforced for init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 10, 0, 5)},
+		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 1}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 5}})),
+			fits:    false,
+			test:    "opaque resource allocatable enforced",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 1, 5, 5)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 1}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 5}})),
+			fits:    false,
+			test:    "opaque resource allocatable enforced for init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 1, 5, 5)},
+		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 2}})),
+			fits:    false,
+			test:    "opaque resource allocatable enforced for multiple containers",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 6, 2, 5)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 2}})),
+			fits: true,
+			test: "opaque resource allocatable admits multiple init containers",
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 6}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 2}})),
+			fits:    false,
+			test:    "opaque resource allocatable enforced for multiple init containers",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 6, 2, 5)},
+		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceB: 1}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits:    false,
+			test:    "opaque resource allocatable enforced for unknown resource",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceB, 1, 0, 0)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceB: 1}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits:    false,
+			test:    "opaque resource allocatable enforced for unknown resource for init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceB, 1, 0, 0)},
 		},
 	}
 
 	for _, test := range enoughPodsTests {
-		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)}}
+		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5)}}
 		test.nodeInfo.SetNode(&node)
-
-		fits, err := PodFitsResources(test.pod, test.nodeInfo)
-		if !reflect.DeepEqual(err, test.wErr) {
-			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
+		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, test.reasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
@@ -240,48 +351,50 @@ func TestPodFitsResources(t *testing.T) {
 		nodeInfo *schedulercache.NodeInfo
 		fits     bool
 		test     string
-		wErr     error
+		reasons  []algorithm.PredicateFailureReason
 	}{
 		{
 			pod: &api.Pod{},
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 10, memory: 20})),
-			fits: false,
-			test: "even without specified resources predicate fails when there's no space for additional pod",
-			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
+				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 20})),
+			fits:    false,
+			test:    "even without specified resources predicate fails when there's no space for additional pod",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourcePods, 1, 1, 1)},
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 5})),
-			fits: false,
-			test: "even if both resources fit predicate fails when there's no space for additional pod",
-			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 5})),
+			fits:    false,
+			test:    "even if both resources fit predicate fails when there's no space for additional pod",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourcePods, 1, 1, 1)},
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
-			fits: false,
-			test: "even for equal edge case predicate fails when there's no space for additional pod",
-			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			fits:    false,
+			test:    "even for equal edge case predicate fails when there's no space for additional pod",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourcePods, 1, 1, 1)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 5, memory: 1}), resourceRequest{milliCPU: 5, memory: 1}),
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}), schedulercache.Resource{MilliCPU: 5, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
-			fits: false,
-			test: "even for equal edge case predicate fails when there's no space for additional pod due to init container",
-			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			fits:    false,
+			test:    "even for equal edge case predicate fails when there's no space for additional pod due to init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourcePods, 1, 1, 1)},
 		},
 	}
 	for _, test := range notEnoughPodsTests {
-		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1)}}
+		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1, 0)}}
 		test.nodeInfo.SetNode(&node)
-
-		fits, err := PodFitsResources(test.pod, test.nodeInfo)
-		if !reflect.DeepEqual(err, test.wErr) {
-			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
+		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, test.reasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
@@ -331,19 +444,20 @@ func TestPodFitsHost(t *testing.T) {
 			test: "host doesn't match",
 		},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodNotMatchHostName}
 
 	for _, test := range tests {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
-		result, err := PodFitsHost(test.pod, nodeInfo)
-		if !reflect.DeepEqual(err, ErrPodNotMatchHostName) && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		fits, reasons, err := PodFitsHost(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-		if result == false && !reflect.DeepEqual(err, ErrPodNotMatchHostName) {
-			t.Errorf("unexpected error: %v", err)
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
-		if result != test.fits {
-			t.Errorf("unexpected difference for %s: expected: %v got %v", test.test, test.fits, result)
+		if fits != test.fits {
+			t.Errorf("%s: unexpected difference: expected: %v got %v", test.test, test.fits, fits)
 		}
 	}
 }
@@ -407,13 +521,15 @@ func TestPodFitsHostPorts(t *testing.T) {
 			test: "second port",
 		},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}
+
 	for _, test := range tests {
-		fits, err := PodFitsHostPorts(test.pod, test.nodeInfo)
-		if !reflect.DeepEqual(err, ErrPodNotFitsHostPorts) && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		fits, reasons, err := PodFitsHostPorts(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-		if fits == false && !reflect.DeepEqual(err, ErrPodNotFitsHostPorts) {
-			t.Errorf("unexpected error: %v", err)
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
 		if test.fits != fits {
 			t.Errorf("%s: expected %v, saw %v", test.test, test.fits, fits)
@@ -450,9 +566,9 @@ func TestGetUsedPorts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ports := getUsedPorts(test.pods...)
+		ports := GetUsedPorts(test.pods...)
 		if !reflect.DeepEqual(test.ports, ports) {
-			t.Errorf("expect %v, got %v", test.ports, ports)
+			t.Errorf("%s: expected %v, got %v", "test get used ports", test.ports, ports)
 		}
 	}
 }
@@ -491,20 +607,21 @@ func TestDiskConflicts(t *testing.T) {
 		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
 		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
-		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-		if ok == false && !reflect.DeepEqual(err, ErrDiskConflict) {
-			t.Errorf("unexpected error: %v", err)
+		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
+			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
+			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -543,20 +660,21 @@ func TestAWSDiskConflicts(t *testing.T) {
 		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
 		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
-		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-		if ok == false && !reflect.DeepEqual(err, ErrDiskConflict) {
-			t.Errorf("unexpected error: %v", err)
+		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
+			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
+			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -601,20 +719,21 @@ func TestRBDDiskConflicts(t *testing.T) {
 		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
 		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
-		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-		if ok == false && !reflect.DeepEqual(err, ErrDiskConflict) {
-			t.Errorf("unexpected error: %v", err)
+		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
 		if test.isOk && !ok {
-			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
+			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
 		}
 		if !test.isOk && ok {
-			t.Errorf("expected no ok, got one.  %v %s %s", test.pod, test.nodeInfo, test.test)
+			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
 		}
 	}
 }
@@ -719,7 +838,7 @@ func TestPodFitsSelector(t *testing.T) {
 								"matchExpressions": [{
 									"key": "kernel-version",
 									"operator": "Gt",
-									"values": ["2.4"]
+									"values": ["0204"]
 								}]
 							}]
 						}}}`,
@@ -727,7 +846,8 @@ func TestPodFitsSelector(t *testing.T) {
 				},
 			},
 			labels: map[string]string{
-				"kernel-version": "2.6",
+				// We use two digit to denote major version and two digit for minor version.
+				"kernel-version": "0206",
 			},
 			fits: true,
 			test: "Pod with matchExpressions using Gt operator that matches the existing node",
@@ -1075,18 +1195,19 @@ func TestPodFitsSelector(t *testing.T) {
 				"is not satisfied, won't schedule onto the node",
 		},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
 
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
-		fits, err := PodSelectorMatches(test.pod, nodeInfo)
-		if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		fits, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-		if fits == false && !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) {
-			t.Errorf("unexpected error: %v", err)
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
@@ -1140,18 +1261,20 @@ func TestNodeLabelPresence(t *testing.T) {
 			test:     "all labels match, presence false",
 		},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeLabelPresenceViolated}
+
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: label}}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
 		labelChecker := NodeLabelChecker{test.labels, test.presence}
-		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, nodeInfo)
-		if !reflect.DeepEqual(err, ErrNodeLabelPresenceViolated) && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-		if fits == false && !reflect.DeepEqual(err, ErrNodeLabelPresenceViolated) {
-			t.Errorf("unexpected error: %v", err)
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
@@ -1185,7 +1308,7 @@ func TestServiceAffinity(t *testing.T) {
 	tests := []struct {
 		pod      *api.Pod
 		pods     []*api.Pod
-		services []api.Service
+		services []*api.Service
 		node     *api.Node
 		labels   []string
 		fits     bool
@@ -1216,7 +1339,7 @@ func TestServiceAffinity(t *testing.T) {
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     &node1,
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region"},
 			test:     "service pod on same node",
@@ -1225,7 +1348,7 @@ func TestServiceAffinity(t *testing.T) {
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     &node1,
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region"},
 			test:     "service pod on different node, region match",
@@ -1234,7 +1357,7 @@ func TestServiceAffinity(t *testing.T) {
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     &node1,
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
 			labels:   []string{"region"},
 			test:     "service pod on different node, region mismatch",
@@ -1243,7 +1366,7 @@ func TestServiceAffinity(t *testing.T) {
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
 			node:     &node1,
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns2"}}},
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns2"}}},
 			fits:     true,
 			labels:   []string{"region"},
 			test:     "service in different namespace, region mismatch",
@@ -1252,7 +1375,7 @@ func TestServiceAffinity(t *testing.T) {
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
 			node:     &node1,
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			fits:     true,
 			labels:   []string{"region"},
 			test:     "pod in different namespace, region mismatch",
@@ -1261,7 +1384,7 @@ func TestServiceAffinity(t *testing.T) {
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
 			node:     &node1,
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			fits:     false,
 			labels:   []string{"region"},
 			test:     "service and pod in same namespace, region mismatch",
@@ -1270,7 +1393,7 @@ func TestServiceAffinity(t *testing.T) {
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     &node1,
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
 			labels:   []string{"region", "zone"},
 			test:     "service pod on different node, multiple labels, not all match",
@@ -1279,28 +1402,45 @@ func TestServiceAffinity(t *testing.T) {
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     &node4,
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region", "zone"},
 			test:     "service pod on different node, multiple labels, all match",
 		},
 	}
-
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrServiceAffinityViolated}
 	for _, test := range tests {
-		nodes := []api.Node{node1, node2, node3, node4, node5}
-		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
-		nodeInfo := schedulercache.NewNodeInfo()
-		nodeInfo.SetNode(test.node)
-		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, nodeInfo)
-		if !reflect.DeepEqual(err, ErrServiceAffinityViolated) && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		testIt := func(skipPrecompute bool) {
+			nodes := []api.Node{node1, node2, node3, node4, node5}
+			nodeInfo := schedulercache.NewNodeInfo()
+			nodeInfo.SetNode(test.node)
+			nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
+			// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
+			predicate, precompute := NewServiceAffinityPredicate(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
+			// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
+			RegisterPredicatePrecomputation("checkServiceAffinity-unitTestPredicate", func(pm *predicateMetadata) {
+				if !skipPrecompute {
+					precompute(pm)
+				}
+			})
+			if pmeta, ok := (PredicateMetadata(test.pod, nodeInfoMap)).(*predicateMetadata); ok {
+				fits, reasons, err := predicate(test.pod, pmeta, nodeInfo)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", test.test, err)
+				}
+				if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+					t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+				}
+				if fits != test.fits {
+					t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+				}
+			} else {
+				t.Errorf("Error casting.")
+			}
 		}
-		if fits == false && !reflect.DeepEqual(err, ErrServiceAffinityViolated) {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
+
+		testIt(false) // Confirm that the predicate works without precomputed data (resilience)
+		testIt(true)  // Confirm that the predicate works with the precomputed data (better performance)
 	}
 }
 
@@ -1561,7 +1701,6 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			}
 			return "", false
 		},
-
 		FilterPersistentVolume: func(pv *api.PersistentVolume) (string, bool) {
 			if pv.Spec.AWSElasticBlockStore != nil {
 				return pv.Spec.AWSElasticBlockStore.VolumeID, true
@@ -1569,22 +1708,43 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			return "", false
 		},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	for _, test := range tests {
 		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
-		fits, err := pred(test.newPod, schedulercache.NewNodeInfo(test.existingPods...))
-		if err != nil && !reflect.DeepEqual(err, ErrMaxVolumeCountExceeded) {
-			t.Errorf("unexpected error: %v", err)
+		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		}
 		if fits != test.fits {
 			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
 		}
 	}
 }
 
+func getPredicateSignature() (*types.Signature, error) {
+	filePath := "./../types.go"
+	pkgName := filepath.Dir(filePath)
+	builder := parser.New()
+	if err := builder.AddDir(pkgName); err != nil {
+		return nil, err
+	}
+	universe, err := builder.FindTypes()
+	if err != nil {
+		return nil, err
+	}
+	result, ok := universe[pkgName].Types["FitPredicate"]
+	if !ok {
+		return nil, fmt.Errorf("FitPredicate type not defined")
+	}
+	return result.Signature, nil
+}
+
 func TestPredicatesRegistered(t *testing.T) {
-	var functionNames []string
+	var functions []*types.Type
 
 	// Files and directories which predicates may be referenced
 	targetFiles := []string{
@@ -1602,27 +1762,42 @@ func TestPredicatesRegistered(t *testing.T) {
 
 	// Get all public predicates in files.
 	for _, filePath := range files {
-		functions, err := codeinspector.GetPublicFunctions(filePath)
+		fileFunctions, err := codeinspector.GetPublicFunctions("k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates", filePath)
 		if err == nil {
-			functionNames = append(functionNames, functions...)
+			functions = append(functions, fileFunctions...)
 		} else {
-			t.Errorf("unexpected error when parsing %s", filePath)
+			t.Errorf("unexpected error %s when parsing %s", err, filePath)
 		}
 	}
 
+	predSignature, err := getPredicateSignature()
+	if err != nil {
+		t.Fatalf("Couldn't get predicates signature")
+	}
+
 	// Check if all public predicates are referenced in target files.
-	for _, functionName := range functionNames {
-		args := []string{"-rl", functionName}
+	for _, function := range functions {
+		// Ignore functions that don't match FitPredicate signature.
+		signature := function.Underlying.Signature
+		if len(predSignature.Parameters) != len(signature.Parameters) {
+			continue
+		}
+		if len(predSignature.Results) != len(signature.Results) {
+			continue
+		}
+		// TODO: Check exact types of parameters and results.
+
+		args := []string{"-rl", function.Name.Name}
 		args = append(args, targetFiles...)
 
 		err := exec.Command("grep", args...).Run()
 		if err != nil {
 			switch err.Error() {
 			case "exit status 2":
-				t.Errorf("unexpected error when checking %s", functionName)
+				t.Errorf("unexpected error when checking %s", function.Name)
 			case "exit status 1":
 				t.Errorf("predicate %s is implemented as public but seems not registered or used in any other place",
-					functionName)
+					function.Name)
 			}
 		}
 	}
@@ -1652,54 +1827,60 @@ func TestRunGeneralPredicates(t *testing.T) {
 		fits     bool
 		test     string
 		wErr     error
+		reasons  []algorithm.PredicateFailureReason
 	}{
 		{
 			pod: &api.Pod{},
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			node: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "machine1"},
-				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
 			},
 			fits: true,
 			wErr: nil,
 			test: "no resources/port/host requested always fits",
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 8, memory: 10}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 8, Memory: 10}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			node: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "machine1"},
-				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
 			},
 			fits: false,
-			wErr: newInsufficientResourceError("CPU", 8, 5, 10),
-			test: "not enough cpu resource",
+			wErr: nil,
+			reasons: []algorithm.PredicateFailureReason{
+				NewInsufficientResourceError(api.ResourceCPU, 8, 5, 10),
+				NewInsufficientResourceError(api.ResourceMemory, 10, 19, 20),
+			},
+			test: "not enough cpu and memory resource",
 		},
 		{
 			pod: &api.Pod{},
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
-			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32)}},
+				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
+			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0)}},
 			fits: true,
 			wErr: nil,
 			test: "no resources/port/host requested always fits on GPU machine",
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 3, memory: 1, nvidiaGPU: 1}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 10, nvidiaGPU: 1})),
-			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32)}},
-			fits: false,
-			wErr: newInsufficientResourceError("NvidiaGpu", 1, 1, 1),
-			test: "not enough GPU resource",
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 1})),
+			node:    &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0)}},
+			fits:    false,
+			wErr:    nil,
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceNvidiaGPU, 1, 1, 1)},
+			test:    "not enough GPU resource",
 		},
 		{
-			pod: newResourcePod(resourceRequest{milliCPU: 3, memory: 1, nvidiaGPU: 1}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(resourceRequest{milliCPU: 5, memory: 10, nvidiaGPU: 0})),
-			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32)}},
+				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 0})),
+			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0)}},
 			fits: true,
 			wErr: nil,
 			test: "enough GPU resource",
@@ -1713,29 +1894,34 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(),
 			node: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "machine1"},
-				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
 			},
-			fits: false,
-			wErr: ErrPodNotMatchHostName,
-			test: "host not match",
+			fits:    false,
+			wErr:    nil,
+			reasons: []algorithm.PredicateFailureReason{ErrPodNotMatchHostName},
+			test:    "host not match",
 		},
 		{
 			pod:      newPodWithPort(123),
 			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
 			node: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "machine1"},
-				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
 			},
-			fits: false,
-			wErr: ErrPodNotFitsHostPorts,
-			test: "hostport conflict",
+			fits:    false,
+			wErr:    nil,
+			reasons: []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts},
+			test:    "hostport conflict",
 		},
 	}
 	for _, test := range resourceTests {
 		test.nodeInfo.SetNode(test.node)
-		fits, err := GeneralPredicates(test.pod, test.nodeInfo)
-		if !reflect.DeepEqual(err, test.wErr) {
-			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
+		fits, reasons, err := GeneralPredicates(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, test.reasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
@@ -1795,8 +1981,7 @@ func TestInterPodAffinity(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabel2,
 					Annotations: map[string]string{
-						api.AffinityAnnotationKey: `
-						{"podAffinity": {
+						api.AffinityAnnotationKey: `{"podAffinity": {
 							"requiredDuringSchedulingIgnoredDuringExecution": [{
 								"labelSelector": {
 									"matchExpressions": [{
@@ -1951,7 +2136,7 @@ func TestInterPodAffinity(t *testing.T) {
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: false,
-			test: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node becasue one of the matchExpression item don't match.",
+			test: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression item don't match.",
 		},
 		{
 			pod: &api.Pod{
@@ -2209,7 +2394,65 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: false,
 			test: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
 		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Labels: podLabel,
+				},
+			},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"},
+				ObjectMeta: api.ObjectMeta{Labels: podLabel,
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"PodAntiAffinity": {
+							"requiredDuringSchedulingIgnoredDuringExecution": [{
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "service",
+										"operator": "In",
+										"values": ["securityscan", "value2"]
+									}]
+								},
+								"topologyKey": "zone"
+							}]
+						}}`,
+					}},
+			}},
+			node: &node1,
+			fits: false,
+			test: "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. doesn't satisfy PodAntiAffinity symmetry with the existing pod",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Labels: podLabel,
+				},
+			},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"},
+				ObjectMeta: api.ObjectMeta{Labels: podLabel,
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+                        {"PodAntiAffinity": {
+                            "requiredDuringSchedulingIgnoredDuringExecution": [{
+                                "labelSelector": {
+                                    "matchExpressions": [{
+                                        "key": "service",
+                                        "operator": "NotIn",
+                                        "values": ["securityscan", "value2"]
+                                    }]
+                                },
+                                "topologyKey": "zone"
+                            }]
+                        }}`,
+					}},
+			}},
+			node: &node1,
+			fits: true,
+			test: "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. satisfy PodAntiAffinity symmetry with the existing pod",
+		},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}
+
 	for _, test := range tests {
 		node := test.node
 		var podsOnNode []*api.Pod
@@ -2226,9 +2469,13 @@ func TestInterPodAffinity(t *testing.T) {
 		}
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
-		fits, err := fit.InterPodAffinityMatches(test.pod, nodeInfo)
-		if !reflect.DeepEqual(err, ErrPodAffinityNotMatch) && err != nil {
+		nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
+		fits, reasons, err := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+		if err != nil {
 			t.Errorf("%s: unexpected error %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected %v got %v", test.test, test.fits, fits)
@@ -2374,7 +2621,82 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			test: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
 				"should not be blocked from being scheduled onto any node, even there's no existing pod that match the rule anywhere.",
 		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{
+							"podAntiAffinity": {
+								"requiredDuringSchedulingIgnoredDuringExecution": [{
+									"labelSelector": {
+										"matchExpressions": [{
+											"key": "foo",
+											"operator": "In",
+											"values": ["abc"]
+										}]
+									},
+									"topologyKey": "region"
+								}]
+							}
+						}`,
+					},
+				},
+			},
+			pods: []*api.Pod{
+				{Spec: api.PodSpec{NodeName: "nodeA"}, ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
+			},
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
+				{ObjectMeta: api.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+			},
+			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{
+							"podAntiAffinity": {
+								"requiredDuringSchedulingIgnoredDuringExecution": [{
+									"labelSelector": {
+										"matchExpressions": [{
+											"key": "foo",
+											"operator": "In",
+											"values": ["abc"]
+										}]
+									},
+									"topologyKey": "region"
+								}]
+							}
+						}`,
+					},
+				},
+			},
+			pods: []*api.Pod{
+				{Spec: api.PodSpec{NodeName: "nodeA"}, ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
+			},
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
+				{ObjectMeta: api.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: api.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+				"nodeC": true,
+			},
+			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be schedulerd onto nodeC",
+		},
 	}
+	affinityExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}
+	selectorExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
+
 	for _, test := range tests {
 		nodeListInfo := FakeNodeListInfo(test.nodes)
 		for _, node := range test.nodes {
@@ -2392,20 +2714,28 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			}
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)
-			fits, err := testFit.InterPodAffinityMatches(test.pod, nodeInfo)
-			if !reflect.DeepEqual(err, ErrPodAffinityNotMatch) && err != nil {
+			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
+			fits, reasons, err := testFit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+			if err != nil {
 				t.Errorf("%s: unexpected error %v", test.test, err)
+			}
+			if !fits && !reflect.DeepEqual(reasons, affinityExpectedFailureReasons) {
+				t.Errorf("%s: unexpected failure reasons: %v", test.test, reasons)
 			}
 			affinity, err := api.GetAffinityFromPodAnnotations(test.pod.ObjectMeta.Annotations)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("%s: unexpected error: %v", test.test, err)
 			}
-			if affinity.NodeAffinity != nil {
+			if affinity != nil && affinity.NodeAffinity != nil {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)
-				fits2, err := PodSelectorMatches(test.pod, nodeInfo)
-				if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
-					t.Errorf("unexpected error: %v", err)
+				nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
+				fits2, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", test.test, err)
+				}
+				if !fits2 && !reflect.DeepEqual(reasons, selectorExpectedFailureReasons) {
+					t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, selectorExpectedFailureReasons)
 				}
 				fits = fits && fits2
 			}
@@ -2475,7 +2805,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			test: "a pod which can be scheduled on a dedicated node assgined to user1 with effect NoSchedule",
+			test: "a pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
 		},
 		{
 			pod: &api.Pod{
@@ -2508,7 +2838,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
-			test: "a pod which can't be scheduled on a dedicated node assgined to user2 with effect NoSchedule",
+			test: "a pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
 		},
 		{
 			pod: &api.Pod{
@@ -2682,17 +3012,20 @@ func TestPodToleratesTaints(t *testing.T) {
 			},
 			fits: true,
 			test: "The pod has a toleration that key and value don't match the taint on the node, " +
-				"but the effect of taint on node is PreferNochedule. Pod can be shceduled onto the node",
+				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
 		},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}
 
 	for _, test := range podTolerateTaintsTests {
-		tolerationMatch := TolerationMatch{FakeNodeInfo(test.node)}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&test.node)
-		fits, err := tolerationMatch.PodToleratesNodeTaints(test.pod, nodeInfo)
-		if fits == false && !reflect.DeepEqual(err, ErrTaintsTolerationsNotMatch) {
+		fits, reasons, err := PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		if err != nil {
 			t.Errorf("%s, unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s, unexpected failure reason: %v, want: %v", test.test, reasons, expectedFailureReasons)
 		}
 		if fits != test.fits {
 			t.Errorf("%s, expected: %v got %v", test.test, test.fits, fits)
@@ -2732,7 +3065,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 					ImagePullPolicy: "Always",
 					// at least one requirement -> burstable pod
 					Resources: api.ResourceRequirements{
-						Requests: makeAllocatableResources(100, 100, 100, 100),
+						Requests: makeAllocatableResources(100, 100, 100, 100, 0),
 					},
 				},
 			},
@@ -2794,16 +3127,90 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 			name:     "non best-effort pod schedulable on node without memory pressure condition on",
 		},
 	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}
 
 	for _, test := range tests {
-		fits, err := CheckNodeMemoryPressurePredicate(test.pod, test.nodeInfo)
+		fits, reasons, err := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
+		}
 		if fits != test.fits {
 			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
 		}
+	}
+}
 
-		if err != nil && err != ErrNodeUnderMemoryPressure {
+func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:            "container",
+					Image:           "image",
+					ImagePullPolicy: "Always",
+				},
+			},
+		},
+	}
+
+	// specify a node with no disk pressure condition on
+	noPressureNode := &api.Node{
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{
+					Type:   "Ready",
+					Status: "True",
+				},
+			},
+		},
+	}
+
+	// specify a node with pressure condition on
+	pressureNode := &api.Node{
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{
+					Type:   "DiskPressure",
+					Status: "True",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		name     string
+	}{
+		{
+			pod:      pod,
+			nodeInfo: makeEmptyNodeInfo(noPressureNode),
+			fits:     true,
+			name:     "pod schedulable on node without pressure condition on",
+		},
+		{
+			pod:      pod,
+			nodeInfo: makeEmptyNodeInfo(pressureNode),
+			fits:     false,
+			name:     "pod not schedulable on node with pressure condition on",
+		},
+	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}
+
+	for _, test := range tests {
+		fits, reasons, err := CheckNodeDiskPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
-			continue
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
 		}
 	}
 }

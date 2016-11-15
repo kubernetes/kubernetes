@@ -44,6 +44,8 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/version"
 
+	"net/http"
+
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
@@ -99,6 +101,9 @@ type Manager interface {
 	// Get version information about different components we depend on.
 	GetVersionInfo() (*info.VersionInfo, error)
 
+	// Get filesystem information for the filesystem that contains the given directory
+	GetDirFsInfo(dir string) (v2.FsInfo, error)
+
 	// Get filesystem information for a given label.
 	// Returns information for all global filesystems if label is empty.
 	GetFsInfo(label string) ([]v2.FsInfo, error)
@@ -125,7 +130,7 @@ type Manager interface {
 }
 
 // New takes a memory storage and returns a new manager.
-func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool, ignoreMetricsSet container.MetricSet) (Manager, error) {
+func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool, ignoreMetricsSet container.MetricSet, collectorHttpClient *http.Client) (Manager, error) {
 	if memoryCache == nil {
 		return nil, fmt.Errorf("manager requires memory storage")
 	}
@@ -182,6 +187,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		ignoreMetrics:            ignoreMetricsSet,
 		containerWatchers:        []watcher.ContainerWatcher{},
 		eventsChannel:            eventsChannel,
+		collectorHttpClient:      collectorHttpClient,
 	}
 
 	machineInfo, err := machine.Info(sysfs, fsInfo, inHostNamespace)
@@ -226,6 +232,7 @@ type manager struct {
 	ignoreMetrics            container.MetricSet
 	containerWatchers        []watcher.ContainerWatcher
 	eventsChannel            chan watcher.ContainerEvent
+	collectorHttpClient      *http.Client
 }
 
 // Start the container manager.
@@ -653,6 +660,27 @@ func (self *manager) getRequestedContainers(containerName string, options v2.Req
 	return containersMap, nil
 }
 
+func (self *manager) GetDirFsInfo(dir string) (v2.FsInfo, error) {
+	dirDevice, err := self.fsInfo.GetDirFsDevice(dir)
+	if err != nil {
+		return v2.FsInfo{}, fmt.Errorf("error trying to get filesystem Device for dir %v: err: %v", dir, err)
+	}
+	dirMountpoint, err := self.fsInfo.GetMountpointForDevice(dirDevice.Device)
+	if err != nil {
+		return v2.FsInfo{}, fmt.Errorf("error trying to get MountPoint for Root Device: %v, err: %v", dirDevice, err)
+	}
+	infos, err := self.GetFsInfo("")
+	if err != nil {
+		return v2.FsInfo{}, err
+	}
+	for _, info := range infos {
+		if info.Mountpoint == dirMountpoint {
+			return info, nil
+		}
+	}
+	return v2.FsInfo{}, fmt.Errorf("did not find fs info for dir: %v", dir)
+}
+
 func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 	var empty time.Time
 	// Get latest data from filesystems hanging off root container.
@@ -668,7 +696,8 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 		}
 	}
 	fsInfo := []v2.FsInfo{}
-	for _, fs := range stats[0].Filesystem {
+	for i := range stats[0].Filesystem {
+		fs := stats[0].Filesystem[i]
 		if len(label) != 0 && fs.Device != dev {
 			continue
 		}
@@ -680,6 +709,7 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		fi := v2.FsInfo{
 			Device:     fs.Device,
 			Mountpoint: mountpoint,
@@ -687,7 +717,10 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 			Usage:      fs.Usage,
 			Available:  fs.Available,
 			Labels:     labels,
-			InodesFree: fs.InodesFree,
+		}
+		if fs.HasInodes {
+			fi.Inodes = &fs.Inodes
+			fi.InodesFree = &fs.InodesFree
 		}
 		fsInfo = append(fsInfo, fi)
 	}
@@ -752,7 +785,7 @@ func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *c
 		glog.V(3).Infof("Got config from %q: %q", v, configFile)
 
 		if strings.HasPrefix(k, "prometheus") || strings.HasPrefix(k, "Prometheus") {
-			newCollector, err := collector.NewPrometheusCollector(k, configFile, *applicationMetricsCountLimit)
+			newCollector, err := collector.NewPrometheusCollector(k, configFile, *applicationMetricsCountLimit, cont.handler, m.collectorHttpClient)
 			if err != nil {
 				glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
 				return err
@@ -763,7 +796,7 @@ func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *c
 				return err
 			}
 		} else {
-			newCollector, err := collector.NewCollector(k, configFile, *applicationMetricsCountLimit)
+			newCollector, err := collector.NewCollector(k, configFile, *applicationMetricsCountLimit, cont.handler, m.collectorHttpClient)
 			if err != nil {
 				glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
 				return err

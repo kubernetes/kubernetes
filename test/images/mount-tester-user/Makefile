@@ -21,6 +21,6 @@ image:
 	sudo docker build -t $(PREFIX)/mounttest-user:$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/mounttest-user:$(TAG)
+	gcloud docker -- push $(PREFIX)/mounttest-user:$(TAG)
 
 clean:

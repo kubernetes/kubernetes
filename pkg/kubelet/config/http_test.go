@@ -27,8 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -67,7 +69,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid volume name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "_INVALID_"}},
 				},
@@ -76,7 +78,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -85,7 +87,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: ""}},
 				},
@@ -94,7 +96,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
@@ -121,7 +123,7 @@ func TestExtractInvalidPods(t *testing.T) {
 }
 
 func TestExtractPodsFromHTTP(t *testing.T) {
-	hostname := "different-value"
+	nodeName := "different-value"
 
 	grace := int64(30)
 	var testCases = []struct {
@@ -142,7 +144,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					Namespace: "mynamespace",
 				},
 				Spec: api.PodSpec{
-					NodeName:        hostname,
+					NodeName:        string(nodeName),
 					Containers:      []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 					SecurityContext: &api.PodSecurityContext{},
 				},
@@ -155,13 +157,13 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:         "111",
-						Name:        "foo" + "-" + hostname,
+						Name:        "foo" + "-" + nodeName,
 						Namespace:   "mynamespace",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
-						SelfLink:    getSelfLink("foo-"+hostname, "mynamespace"),
+						SelfLink:    getSelfLink("foo-"+nodeName, "mynamespace"),
 					},
 					Spec: api.PodSpec{
-						NodeName:                      hostname,
+						NodeName:                      nodeName,
 						RestartPolicy:                 api.RestartPolicyAlways,
 						DNSPolicy:                     api.DNSClusterFirst,
 						SecurityContext:               &api.PodSecurityContext{},
@@ -193,7 +195,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							UID:  "111",
 						},
 						Spec: api.PodSpec{
-							NodeName:        hostname,
+							NodeName:        nodeName,
 							Containers:      []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 							SecurityContext: &api.PodSecurityContext{},
 						},
@@ -207,7 +209,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							UID:  "222",
 						},
 						Spec: api.PodSpec{
-							NodeName:        hostname,
+							NodeName:        nodeName,
 							Containers:      []api.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
 							SecurityContext: &api.PodSecurityContext{},
 						},
@@ -222,13 +224,13 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:         "111",
-						Name:        "foo" + "-" + hostname,
+						Name:        "foo" + "-" + nodeName,
 						Namespace:   "default",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
-						SelfLink:    getSelfLink("foo-"+hostname, kubetypes.NamespaceDefault),
+						SelfLink:    getSelfLink("foo-"+nodeName, kubetypes.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						NodeName:                      hostname,
+						NodeName:                      nodeName,
 						RestartPolicy:                 api.RestartPolicyAlways,
 						DNSPolicy:                     api.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
@@ -248,13 +250,13 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:         "222",
-						Name:        "bar" + "-" + hostname,
+						Name:        "bar" + "-" + nodeName,
 						Namespace:   "default",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "222"},
-						SelfLink:    getSelfLink("bar-"+hostname, kubetypes.NamespaceDefault),
+						SelfLink:    getSelfLink("bar-"+nodeName, kubetypes.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						NodeName:                      hostname,
+						NodeName:                      nodeName,
 						RestartPolicy:                 api.RestartPolicyAlways,
 						DNSPolicy:                     api.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
@@ -276,7 +278,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 	for _, testCase := range testCases {
 		var versionedPods runtime.Object
-		err := testapi.Default.Converter().Convert(&testCase.pods, &versionedPods)
+		err := testapi.Default.Converter().Convert(&testCase.pods, &versionedPods, nil)
 		if err != nil {
 			t.Fatalf("%s: error in versioning the pods: %s", testCase.desc, err)
 		}
@@ -291,7 +293,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, http.Header{}, hostname, ch, nil, 0, http.DefaultClient}
+		c := sourceURL{testServer.URL, http.Header{}, types.NodeName(nodeName), ch, nil, 0, http.DefaultClient}
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
@@ -312,7 +314,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 func TestURLWithHeader(t *testing.T) {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: testapi.Default.GroupVersion().String(),
+			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 			Kind:       "Pod",
 		},
 		ObjectMeta: api.ObjectMeta{

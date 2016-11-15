@@ -16,7 +16,11 @@ limitations under the License.
 
 package dnsprovider
 
-import "k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+import (
+	"reflect"
+
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+)
 
 // Interface is an abstract, pluggable interface for DNS providers.
 type Interface interface {
@@ -39,6 +43,8 @@ type Zones interface {
 type Zone interface {
 	// Name returns the name of the zone, e.g. "example.com"
 	Name() string
+	// ID returns the unique provider identifier for the zone
+	ID() string
 	// ResourceRecordsets returns the provider's ResourceRecordSets interface, or false if not supported.
 	ResourceRecordSets() (ResourceRecordSets, bool)
 }
@@ -46,14 +52,22 @@ type Zone interface {
 type ResourceRecordSets interface {
 	// List returns the ResourceRecordSets of the Zone, or an error if the list operation failed.
 	List() ([]ResourceRecordSet, error)
-	// Add adds and returns a ResourceRecordSet of the Zone, or an error if the add operation failed.
-	Add(ResourceRecordSet) (ResourceRecordSet, error)
-	// Remove removes a ResourceRecordSet from the Zone, or an error if the remove operation failed.
-	// The supplied ResourceRecordSet must match one of the existing zones (obtained via List()) exactly.
-	Remove(ResourceRecordSet) error
-	// New allocates a new ResourceRecordSet, which can then be passed to Add() or Remove()
+	// New allocates a new ResourceRecordSet, which can then be passed to ResourceRecordChangeset Add() or Remove()
 	// Arguments are as per the ResourceRecordSet interface below.
 	New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) ResourceRecordSet
+	// StartChangeset begins a new batch operation of changes against the Zone
+	StartChangeset() ResourceRecordChangeset
+}
+
+// ResourceRecordChangeset accumulates a set of changes, that can then be applied with Apply
+type ResourceRecordChangeset interface {
+	// Add adds the creation of a ResourceRecordSet in the Zone to the changeset
+	Add(ResourceRecordSet) ResourceRecordChangeset
+	// Remove adds the removal of a ResourceRecordSet in the Zone to the changeset
+	// The supplied ResourceRecordSet must match one of the existing recordsets (obtained via List()) exactly.
+	Remove(ResourceRecordSet) ResourceRecordChangeset
+	// Apply applies the accumulated operations to the Zone.
+	Apply() error
 }
 
 type ResourceRecordSet interface {
@@ -65,4 +79,20 @@ type ResourceRecordSet interface {
 	Ttl() int64
 	// Type returns the type of the record set (A, CNAME, SRV, etc)
 	Type() rrstype.RrsType
+}
+
+/* ResourceRecordSetsEquivalent compares two ResourceRecordSets for semantic equivalence.
+   Go's equality operator doesn't work the way we want it to in this case,
+   hence the need for this function.
+   More specifically (from the Go spec):
+   "Two struct values are equal if their corresponding non-blank fields are equal."
+   In our case, there may be some private internal member variables that may not be not equal,
+   but we want the two structs to be considered equivalent anyway, if the fields exposed
+   via their interfaces are equal.
+*/
+func ResourceRecordSetsEquivalent(r1, r2 ResourceRecordSet) bool {
+	if r1.Name() == r2.Name() && reflect.DeepEqual(r1.Rrdatas(), r2.Rrdatas()) && r1.Ttl() == r2.Ttl() && r1.Type() == r2.Type() {
+		return true
+	}
+	return false
 }

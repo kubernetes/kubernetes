@@ -20,9 +20,11 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"golang.org/x/net/websocket"
+
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -37,23 +39,46 @@ const binaryWebSocketProtocol = "binary.k8s.io"
 // possible.
 const base64BinaryWebSocketProtocol = "base64.binary.k8s.io"
 
+// ReaderProtocolConfig describes a websocket subprotocol with one stream.
+type ReaderProtocolConfig struct {
+	Binary bool
+}
+
+// NewDefaultReaderProtocols returns a stream protocol map with the
+// subprotocols "", "channel.k8s.io", "base64.channel.k8s.io".
+func NewDefaultReaderProtocols() map[string]ReaderProtocolConfig {
+	return map[string]ReaderProtocolConfig{
+		"": {Binary: true},
+		binaryWebSocketProtocol:       {Binary: true},
+		base64BinaryWebSocketProtocol: {Binary: false},
+	}
+}
+
 // Reader supports returning an arbitrary byte stream over a websocket channel.
-// Supports the "binary.k8s.io" and "base64.binary.k8s.io" subprotocols.
 type Reader struct {
-	err     chan error
-	r       io.Reader
-	ping    bool
-	timeout time.Duration
+	err              chan error
+	r                io.Reader
+	ping             bool
+	timeout          time.Duration
+	protocols        map[string]ReaderProtocolConfig
+	selectedProtocol string
+
+	handleCrash func() // overridable for testing
 }
 
 // NewReader creates a WebSocket pipe that will copy the contents of r to a provided
 // WebSocket connection. If ping is true, a zero length message will be sent to the client
 // before the stream begins reading.
-func NewReader(r io.Reader, ping bool) *Reader {
+//
+// The protocols parameter maps subprotocol names to StreamProtocols. The empty string
+// subprotocol name is used if websocket.Config.Protocol is empty.
+func NewReader(r io.Reader, ping bool, protocols map[string]ReaderProtocolConfig) *Reader {
 	return &Reader{
-		r:    r,
-		err:  make(chan error),
-		ping: ping,
+		r:           r,
+		err:         make(chan error),
+		ping:        ping,
+		protocols:   protocols,
+		handleCrash: func() { runtime.HandleCrash() },
 	}
 }
 
@@ -64,14 +89,18 @@ func (r *Reader) SetIdleTimeout(duration time.Duration) {
 }
 
 func (r *Reader) handshake(config *websocket.Config, req *http.Request) error {
-	return handshake(config, req, []string{binaryWebSocketProtocol, base64BinaryWebSocketProtocol})
+	supportedProtocols := make([]string, 0, len(r.protocols))
+	for p := range r.protocols {
+		supportedProtocols = append(supportedProtocols, p)
+	}
+	return handshake(config, req, supportedProtocols)
 }
 
 // Copy the reader to the response. The created WebSocket is closed after this
 // method completes.
 func (r *Reader) Copy(w http.ResponseWriter, req *http.Request) error {
 	go func() {
-		defer runtime.HandleCrash()
+		defer r.handleCrash()
 		websocket.Server{Handshake: r.handshake, Handler: r.handle}.ServeHTTP(w, req)
 	}()
 	return <-r.err
@@ -79,11 +108,29 @@ func (r *Reader) Copy(w http.ResponseWriter, req *http.Request) error {
 
 // handle implements a WebSocket handler.
 func (r *Reader) handle(ws *websocket.Conn) {
-	encode := len(ws.Config().Protocol) > 0 && ws.Config().Protocol[0] == base64BinaryWebSocketProtocol
+	// Close the connection when the client requests it, or when we finish streaming, whichever happens first
+	closeConnOnce := &sync.Once{}
+	closeConn := func() {
+		closeConnOnce.Do(func() {
+			ws.Close()
+		})
+	}
+
+	negotiated := ws.Config().Protocol
+	r.selectedProtocol = negotiated[0]
 	defer close(r.err)
-	defer ws.Close()
-	go IgnoreReceives(ws, r.timeout)
-	r.err <- messageCopy(ws, r.r, encode, r.ping, r.timeout)
+	defer closeConn()
+
+	go func() {
+		defer runtime.HandleCrash()
+		// This blocks until the connection is closed.
+		// Client should not send anything.
+		IgnoreReceives(ws, r.timeout)
+		// Once the client closes, we should also close
+		closeConn()
+	}()
+
+	r.err <- messageCopy(ws, r.r, !r.protocols[r.selectedProtocol].Binary, r.ping, r.timeout)
 }
 
 func resetTimeout(ws *websocket.Conn, timeout time.Duration) {
@@ -96,8 +143,14 @@ func messageCopy(ws *websocket.Conn, r io.Reader, base64Encode, ping bool, timeo
 	buf := make([]byte, 2048)
 	if ping {
 		resetTimeout(ws, timeout)
-		if err := websocket.Message.Send(ws, []byte{}); err != nil {
-			return err
+		if base64Encode {
+			if err := websocket.Message.Send(ws, ""); err != nil {
+				return err
+			}
+		} else {
+			if err := websocket.Message.Send(ws, []byte{}); err != nil {
+				return err
+			}
 		}
 	}
 	for {

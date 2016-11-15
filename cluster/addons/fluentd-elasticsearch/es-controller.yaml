@@ -20,12 +20,12 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/elasticsearch:1.9
-        name: elasticsearch-logging         
+      - image: gcr.io/google_containers/elasticsearch:v2.4.1
+        name: elasticsearch-logging
         resources:
-          # keep request = limit to keep this container in guaranteed class
+          # need more cpu upon initialization, therefore burstable class
           limits:
-            cpu: 100m
+            cpu: 1000m
           requests:
             cpu: 100m
         ports:

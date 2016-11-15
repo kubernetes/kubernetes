@@ -22,11 +22,11 @@ import (
 	"strings"
 
 	"github.com/evanphx/json-patch"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -40,22 +40,22 @@ var patchTypes = map[string]api.PatchType{"json": api.JSONPatchType, "merge": ap
 // PatchOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type PatchOptions struct {
-	Filenames []string
-	Recursive bool
-	Local     bool
+	resource.FilenameOptions
+
+	Local bool
 
 	OutputFormat string
 }
 
 var (
-	patch_long = dedent.Dedent(`
+	patch_long = templates.LongDesc(`
 		Update field(s) of a resource using strategic merge patch
 
 		JSON and YAML formats are accepted.
 
 		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`)
-	patch_example = dedent.Dedent(`
 
+	patch_example = templates.Examples(`
 		# Partially update a node using strategic merge patch
 		kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 
@@ -69,12 +69,14 @@ var (
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`)
 )
 
-func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &PatchOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
+	p, err := f.Printer(nil, kubectl.PrintOptions{
+		ColumnLabels: []string{},
+	})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -83,7 +85,7 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "patch (-f FILENAME | TYPE NAME) -p PATCH",
-		Short:   "Update field(s) of a resource using strategic merge patch.",
+		Short:   "Update field(s) of a resource using strategic merge patch",
 		Long:    patch_long,
 		Example: patch_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -101,16 +103,15 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
-	usage := "Filename, directory, or URL to a file identifying the resource to update"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	usage := "identifying the resource to update"
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, patch will operate on the content of the file, not the server-side resource.")
 
 	return cmd
 }
 
-func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *PatchOptions) error {
+func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *PatchOptions) error {
 	switch {
 	case options.Local && len(args) != 0:
 		return fmt.Errorf("cannot specify --local and server resources")
@@ -140,17 +141,25 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return fmt.Errorf("unable to parse %q: %v", patch, err)
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
 	err = r.Err()
 	if err != nil {
 		return err
+	}
+
+	smPatchVersion := strategicpatch.SMPatchVersionLatest
+	if !options.Local {
+		smPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
+		if err != nil {
+			return err
+		}
 	}
 
 	count := 0
@@ -176,7 +185,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 				// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
 				// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
 				// record hint is likely to be invalid anyway, so avoid the bad hint
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
+				patch, err := cmdutil.ChangeResourcePatch(info, f.Command(), smPatchVersion)
 				if err == nil {
 					helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 				}
@@ -184,7 +193,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			count++
 
 			if options.OutputFormat == "name" || len(options.OutputFormat) == 0 {
-				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, "", name, "patched")
+				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, "", name, false, "patched")
 			}
 			return nil
 		}
@@ -195,7 +204,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if err != nil {
 			return err
 		}
-		originalObjJS, err := runtime.Encode(api.Codecs.LegacyCodec(), info.VersionedObject.(runtime.Object))
+		originalObjJS, err := runtime.Encode(api.Codecs.LegacyCodec(mapping.GroupVersionKind.GroupVersion()), info.VersionedObject.(runtime.Object))
 		if err != nil {
 			return err
 		}

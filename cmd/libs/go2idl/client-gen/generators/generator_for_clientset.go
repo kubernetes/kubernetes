@@ -20,18 +20,18 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
-	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
-	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/gengo/generator"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
+	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
 // genClientset generates a package for a clientset.
 type genClientset struct {
 	generator.DefaultGen
-	groupVersions      []unversioned.GroupVersion
+	groups             []clientgentypes.GroupVersions
 	typedClientPath    string
 	outputPackage      string
 	imports            namer.ImportTracker
@@ -55,15 +55,16 @@ func (g *genClientset) Filter(c *generator.Context, t *types.Type) bool {
 
 func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
-	for _, gv := range g.groupVersions {
-		group := normalization.Group(gv.Group)
-		version := normalization.Version(gv.Version)
-		typedClientPath := filepath.Join(g.typedClientPath, group, version)
-		group = normalization.BeforeFirstDot(group)
-		imports = append(imports, fmt.Sprintf("%s%s \"%s\"", version, group, typedClientPath))
+	for _, group := range g.groups {
+		for _, version := range group.Versions {
+			typedClientPath := filepath.Join(g.typedClientPath, group.Group.NonEmpty(), version.NonEmpty())
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), typedClientPath)))
+		}
 	}
 	imports = append(imports, "github.com/golang/glog")
 	imports = append(imports, "k8s.io/kubernetes/pkg/util/flowcontrol")
+	// import solely to initialize client auth plugins.
+	imports = append(imports, "_ \"k8s.io/kubernetes/plugin/pkg/client/auth\"")
 	return
 }
 
@@ -74,33 +75,27 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	const pkgDiscovery = "k8s.io/kubernetes/pkg/client/typed/discovery"
 	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
 
-	type arg struct {
-		Group       string
-		PackageName string
-	}
-
-	allGroups := []arg{}
-	for _, gv := range g.groupVersions {
-		group := normalization.BeforeFirstDot(normalization.Group(gv.Group))
-		version := normalization.Version(gv.Version)
-		allGroups = append(allGroups, arg{namer.IC(group), version + group})
-	}
+	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
 
 	m := map[string]interface{}{
 		"allGroups":                        allGroups,
 		"Config":                           c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
 		"DefaultKubernetesUserAgent":       c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClient":                       c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
+		"RESTClientInterface":              c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
 		"DiscoveryInterface":               c.Universe.Type(types.Name{Package: pkgDiscovery, Name: "DiscoveryInterface"}),
 		"DiscoveryClient":                  c.Universe.Type(types.Name{Package: pkgDiscovery, Name: "DiscoveryClient"}),
 		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfig"}),
 		"NewDiscoveryClientForConfigOrDie": c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfigOrDie"}),
 		"NewDiscoveryClient":               c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClient"}),
 	}
-	sw.Do(clientsetInterfaceTemplate, m)
+	sw.Do(clientsetInterface, m)
 	sw.Do(clientsetTemplate, m)
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
+		// don't generated the default method if generating internalversion clientset
+		if g.IsDefaultVersion && g.Version != "" {
+			sw.Do(clientsetInterfaceDefaultVersionImpl, g)
+		}
 	}
 	sw.Do(getDiscoveryTemplate, m)
 	sw.Do(newClientsetForConfigTemplate, m)
@@ -110,10 +105,12 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	return sw.Error()
 }
 
-var clientsetInterfaceTemplate = `
+var clientsetInterface = `
 type Interface interface {
 	Discovery() $.DiscoveryInterface|raw$
-    $range .allGroups$$.Group$() $.PackageName$.$.Group$Interface
+    $range .allGroups$$.GroupVersion$() $.PackageName$.$.GroupVersion$Interface
+	$if .IsDefaultVersion$// Deprecated: please explicitly pick a version if possible.
+	$.Group$() $.PackageName$.$.GroupVersion$Interface$end$
     $end$
 }
 `
@@ -123,20 +120,32 @@ var clientsetTemplate = `
 // version included in a Clientset.
 type Clientset struct {
 	*$.DiscoveryClient|raw$
-    $range .allGroups$*$.PackageName$.$.Group$Client
+    $range .allGroups$*$.PackageName$.$.GroupVersion$Client
     $end$
 }
 `
 
 var clientsetInterfaceImplTemplate = `
-// $.Group$ retrieves the $.Group$Client
-func (c *Clientset) $.Group$() $.PackageName$.$.Group$Interface {
+// $.GroupVersion$ retrieves the $.GroupVersion$Client
+func (c *Clientset) $.GroupVersion$() $.PackageName$.$.GroupVersion$Interface {
 	if c == nil {
 		return nil
 	}
-	return c.$.Group$Client
+	return c.$.GroupVersion$Client
 }
 `
+
+var clientsetInterfaceDefaultVersionImpl = `
+// Deprecated: $.Group$ retrieves the default version of $.Group$Client.
+// Please explicitly pick a version.
+func (c *Clientset) $.Group$() $.PackageName$.$.GroupVersion$Interface {
+	if c == nil {
+		return nil
+	}
+	return c.$.GroupVersion$Client
+}
+`
+
 var getDiscoveryTemplate = `
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
@@ -153,7 +162,7 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-$range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig(&configShallowCopy)
+$range .allGroups$    clientset.$.GroupVersion$Client, err =$.PackageName$.NewForConfig(&configShallowCopy)
 	if err!=nil {
 		return nil, err
 	}
@@ -172,7 +181,7 @@ var newClientsetForConfigOrDieTemplate = `
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *$.Config|raw$) *Clientset {
 	var clientset Clientset
-$range .allGroups$    clientset.$.Group$Client =$.PackageName$.NewForConfigOrDie(c)
+$range .allGroups$    clientset.$.GroupVersion$Client =$.PackageName$.NewForConfigOrDie(c)
 $end$
 	clientset.DiscoveryClient = $.NewDiscoveryClientForConfigOrDie|raw$(c)
 	return &clientset
@@ -181,9 +190,9 @@ $end$
 
 var newClientsetForRESTClientTemplate = `
 // New creates a new Clientset for the given RESTClient.
-func New(c *$.RESTClient|raw$) *Clientset {
+func New(c $.RESTClientInterface|raw$) *Clientset {
 	var clientset Clientset
-$range .allGroups$    clientset.$.Group$Client =$.PackageName$.New(c)
+$range .allGroups$    clientset.$.GroupVersion$Client =$.PackageName$.New(c)
 $end$
 	clientset.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &clientset

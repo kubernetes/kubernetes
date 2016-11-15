@@ -117,12 +117,11 @@ enable_node_logging: "${ENABLE_NODE_LOGGING:false}"
 logging_destination: $LOGGING_DESTINATION
 elasticsearch_replicas: $ELASTICSEARCH_LOGGING_REPLICAS
 enable_cluster_dns: "${ENABLE_CLUSTER_DNS:-false}"
-dns_replicas: ${DNS_REPLICAS:-1}
 dns_server: $DNS_SERVER_IP
 dns_domain: $DNS_DOMAIN
 federations_domain_map: ''
 e2e_storage_test_environment: "${E2E_STORAGE_TEST_ENVIRONMENT:-false}"
 cluster_cidr: "$NODE_IP_RANGES"
 allocate_node_cidrs: "${ALLOCATE_NODE_CIDRS:-true}"
-admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,ResourceQuota
 EOF

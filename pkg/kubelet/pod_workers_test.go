@@ -29,7 +29,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
@@ -99,7 +99,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 			return nil
 		},
 		fakeRecorder,
-		queue.NewBasicWorkQueue(&util.RealClock{}),
+		queue.NewBasicWorkQueue(&clock.RealClock{}),
 		time.Second,
 		time.Second,
 		fakeCache,
@@ -279,7 +279,7 @@ func TestFakePodWorkers(t *testing.T) {
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(&util.RealClock{}), time.Second, time.Second, fakeCache)
+	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache)
 	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeCache, t}
 
 	tests := []struct {
@@ -331,8 +331,9 @@ func TestFakePodWorkers(t *testing.T) {
 
 // TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
 func TestKillPodNowFunc(t *testing.T) {
+	fakeRecorder := &record.FakeRecorder{}
 	podWorkers, processed := createPodWorkers()
-	killPodFunc := killPodNow(podWorkers)
+	killPodFunc := killPodNow(podWorkers, fakeRecorder)
 	pod := newPod("test", "test")
 	gracePeriodOverride := int64(0)
 	err := killPodFunc(pod, api.PodStatus{Phase: api.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)

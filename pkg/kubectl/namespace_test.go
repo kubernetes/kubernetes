@@ -80,7 +80,7 @@ func TestNamespaceGenerate(t *testing.T) {
 			t.Errorf("%v: expected error and didn't get one", index)
 			continue // loop, no expected output object
 		case !test.expectErr && err != nil:
-			t.Errorf("%v: expected error and didn't get one", index)
+			t.Errorf("%v: unexpected error %v", index, err)
 			continue // loop, no output object
 		case !test.expectErr && err == nil:
 			// do nothing and drop through

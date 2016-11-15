@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/proposals/security-context-constraints.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 ## Abstract
 
 PodSecurityPolicy allows cluster administrators to control the creation and validation of a security
@@ -160,36 +126,36 @@ type HostPortRange struct {
 // VolumeSecurityPolicy allows and disallows the use of different types of volume plugins.
 type VolumeSecurityPolicy struct {
 	// HostPath allows or disallows the use of the HostPath volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath
+	// More info: http://kubernetes.io/docs/user-guide/volumes#hostpath
 	HostPath bool `json:"hostPath,omitempty"`
 	// EmptyDir allows or disallows the use of the EmptyDir volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir
+	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	EmptyDir bool `json:"emptyDir,omitempty"`
 	// GCEPersistentDisk allows or disallows the use of the GCEPersistentDisk volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk
 	GCEPersistentDisk bool `json:"gcePersistentDisk,omitempty"`
 	// AWSElasticBlockStore allows or disallows the use of the AWSElasticBlockStore volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
 	AWSElasticBlockStore bool `json:"awsElasticBlockStore,omitempty"`
 	// GitRepo allows or disallows the use of the GitRepo volume plugin.
 	GitRepo bool `json:"gitRepo,omitempty"`
 	// Secret allows or disallows the use of the Secret volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets
+	// More info: http://kubernetes.io/docs/user-guide/volumes#secrets
 	Secret bool `json:"secret,omitempty"`
 	// NFS allows or disallows the use of the NFS volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
+	// More info: http://kubernetes.io/docs/user-guide/volumes#nfs
 	NFS bool `json:"nfs,omitempty"`
 	// ISCSI allows or disallows the use of the ISCSI volume plugin.
-	// More info: http://releases.k8s.io/HEAD/examples/iscsi/README.md
+	// More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md
 	ISCSI bool `json:"iscsi,omitempty"`
 	// Glusterfs allows or disallows the use of the Glusterfs volume plugin.
-	// More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md
+	// More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
 	Glusterfs bool `json:"glusterfs,omitempty"`
 	// PersistentVolumeClaim allows or disallows the use of the PersistentVolumeClaim volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
 	PersistentVolumeClaim bool `json:"persistentVolumeClaim,omitempty"`
 	// RBD allows or disallows the use of the RBD volume plugin.
-	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md
+	// More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
 	RBD bool `json:"rbd,omitempty"`
 	// Cinder allows or disallows the use of the Cinder volume plugin.
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md

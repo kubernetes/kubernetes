@@ -33,7 +33,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	kubeletserver "k8s.io/kubernetes/pkg/kubelet/server"
+	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
@@ -88,7 +88,8 @@ func TestParsePortsAndNew(t *testing.T) {
 
 		dialer := &fakeDialer{}
 		expectedStopChan := make(chan struct{})
-		pf, err := New(dialer, test.input, expectedStopChan, os.Stdout, os.Stderr)
+		readyChan := make(chan struct{})
+		pf, err := New(dialer, test.input, expectedStopChan, readyChan, os.Stdout, os.Stderr)
 		haveError = err != nil
 		if e, a := test.expectNewError, haveError; e != a {
 			t.Fatalf("%d: New: error expected=%t, got %t: %s", i, e, a, err)
@@ -205,7 +206,7 @@ func TestGetListener(t *testing.T) {
 }
 
 // fakePortForwarder simulates port forwarding for testing. It implements
-// kubeletserver.PortForwarder.
+// portforward.PortForwarder.
 type fakePortForwarder struct {
 	lock sync.Mutex
 	// stores data expected from the stream per port
@@ -216,7 +217,7 @@ type fakePortForwarder struct {
 	send map[uint16]string
 }
 
-var _ kubeletserver.PortForwarder = &fakePortForwarder{}
+var _ portforward.PortForwarder = &fakePortForwarder{}
 
 func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
 	defer stream.Close()
@@ -251,7 +252,7 @@ func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedF
 			received: make(map[uint16]string),
 			send:     serverSends,
 		}
-		kubeletserver.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
+		portforward.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
 
 		for port, expected := range expectedFromClient {
 			actual, ok := pf.received[port]
@@ -305,8 +306,9 @@ func TestForwardPorts(t *testing.T) {
 		}
 
 		stopChan := make(chan struct{}, 1)
+		readyChan := make(chan struct{})
 
-		pf, err := New(exec, test.ports, stopChan, os.Stdout, os.Stderr)
+		pf, err := New(exec, test.ports, stopChan, readyChan, os.Stdout, os.Stderr)
 		if err != nil {
 			t.Fatalf("%s: unexpected error calling New: %v", testName, err)
 		}
@@ -375,8 +377,9 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 
 	stopChan1 := make(chan struct{}, 1)
 	defer close(stopChan1)
+	readyChan1 := make(chan struct{})
 
-	pf1, err := New(exec, []string{"5555"}, stopChan1, os.Stdout, os.Stderr)
+	pf1, err := New(exec, []string{"5555"}, stopChan1, readyChan1, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf1: %v", err)
 	}
@@ -384,7 +387,8 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	<-pf1.Ready
 
 	stopChan2 := make(chan struct{}, 1)
-	pf2, err := New(exec, []string{"5555"}, stopChan2, os.Stdout, os.Stderr)
+	readyChan2 := make(chan struct{})
+	pf2, err := New(exec, []string{"5555"}, stopChan2, readyChan2, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf2: %v", err)
 	}

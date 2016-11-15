@@ -58,7 +58,8 @@ type FooList struct {
 	Items []Foo `json:"items"`
 }
 
-var _ = Describe("ThirdParty resources", func() {
+// This test is marked flaky pending namespace controller observing dynamic creation of new third party types.
+var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("thirdparty")
 
@@ -74,16 +75,16 @@ var _ = Describe("ThirdParty resources", func() {
 	Context("Simple Third Party", func() {
 		It("creating/deleting thirdparty objects works [Conformance]", func() {
 			defer func() {
-				if err := f.Client.ThirdPartyResources().Delete(rsrc.Name); err != nil {
+				if err := f.ClientSet.Extensions().ThirdPartyResources().Delete(rsrc.Name, nil); err != nil {
 					framework.Failf("failed to delete third party resource: %v", err)
 				}
 			}()
-			if _, err := f.Client.ThirdPartyResources().Create(rsrc); err != nil {
+			if _, err := f.ClientSet.Extensions().ThirdPartyResources().Create(rsrc); err != nil {
 				framework.Failf("failed to create third party resource: %v", err)
 			}
 
 			wait.Poll(time.Second*30, time.Minute*5, func() (bool, error) {
-				data, err := f.Client.RESTClient.Get().AbsPath("/apis/company.com/v1/foos").DoRaw()
+				data, err := f.ClientSet.Extensions().RESTClient().Get().AbsPath("/apis/company.com/v1/foos").DoRaw()
 				if err != nil {
 					return false, err
 				}
@@ -104,7 +105,7 @@ var _ = Describe("ThirdParty resources", func() {
 				return false, nil
 			})
 
-			data, err := f.Client.RESTClient.Get().AbsPath("/apis/company.com/v1/foos").DoRaw()
+			data, err := f.ClientSet.Extensions().RESTClient().Get().AbsPath("/apis/company.com/v1/foos").DoRaw()
 			if err != nil {
 				framework.Failf("failed to list with no objects: %v", err)
 			}
@@ -129,11 +130,11 @@ var _ = Describe("ThirdParty resources", func() {
 			if err != nil {
 				framework.Failf("failed to marshal: %v", err)
 			}
-			if _, err := f.Client.RESTClient.Post().AbsPath("/apis/company.com/v1/namespaces/default/foos").Body(bodyData).DoRaw(); err != nil {
+			if _, err := f.ClientSet.Extensions().RESTClient().Post().AbsPath("/apis/company.com/v1/namespaces/default/foos").Body(bodyData).DoRaw(); err != nil {
 				framework.Failf("failed to create: %v", err)
 			}
 
-			data, err = f.Client.RESTClient.Get().AbsPath("/apis/company.com/v1/namespaces/default/foos/foo").DoRaw()
+			data, err = f.ClientSet.Extensions().RESTClient().Get().AbsPath("/apis/company.com/v1/namespaces/default/foos/foo").DoRaw()
 			if err != nil {
 				framework.Failf("failed to get object: %v", err)
 			}
@@ -145,7 +146,7 @@ var _ = Describe("ThirdParty resources", func() {
 				framework.Failf("expected:\n%#v\nsaw:\n%#v\n%s\n", foo, &out, string(data))
 			}
 
-			data, err = f.Client.RESTClient.Get().AbsPath("/apis/company.com/v1/foos").DoRaw()
+			data, err = f.ClientSet.Extensions().RESTClient().Get().AbsPath("/apis/company.com/v1/foos").DoRaw()
 			if err != nil {
 				framework.Failf("failed to list with no objects: %v", err)
 			}
@@ -159,11 +160,11 @@ var _ = Describe("ThirdParty resources", func() {
 				framework.Failf("expected: %#v, saw in list: %#v", foo, list.Items[0])
 			}
 
-			if _, err := f.Client.RESTClient.Delete().AbsPath("/apis/company.com/v1/namespaces/default/foos/foo").DoRaw(); err != nil {
+			if _, err := f.ClientSet.Extensions().RESTClient().Delete().AbsPath("/apis/company.com/v1/namespaces/default/foos/foo").DoRaw(); err != nil {
 				framework.Failf("failed to delete: %v", err)
 			}
 
-			data, err = f.Client.RESTClient.Get().AbsPath("/apis/company.com/v1/foos").DoRaw()
+			data, err = f.ClientSet.Extensions().RESTClient().Get().AbsPath("/apis/company.com/v1/foos").DoRaw()
 			if err != nil {
 				framework.Failf("failed to list with no objects: %v", err)
 			}

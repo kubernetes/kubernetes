@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux,!windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -42,6 +42,23 @@ func (mi *fakeMountInterface) List() ([]mount.MountPoint, error) {
 
 func (mi *fakeMountInterface) IsLikelyNotMountPoint(file string) (bool, error) {
 	return false, fmt.Errorf("unsupported")
+}
+
+func (mi *fakeMountInterface) DeviceOpened(pathname string) (bool, error) {
+	for _, mp := range mi.mountPoints {
+		if mp.Device == pathname {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (mi *fakeMountInterface) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
+func (mi *fakeMountInterface) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
 }
 
 func fakeContainerMgrMountInt() mount.Interface {

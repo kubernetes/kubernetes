@@ -1,58 +1,24 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/proposals/federation-lite.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Kubernetes Multi-AZ Clusters
 
-## (a.k.a. "Ubernetes-Lite")
+## (previously nicknamed "Ubernetes-Lite")
 
 ## Introduction
 
-Full Ubernetes will offer sophisticated federation between multiple kuberentes
+Full Cluster Federation will offer sophisticated federation between multiple kubernetes
 clusters, offering true high-availability, multiple provider support &
 cloud-bursting, multiple region support etc.  However, many users have
 expressed a desire for a "reasonably" high-available cluster, that runs in
 multiple zones on GCE or availability zones in AWS, and can tolerate the failure
 of a single zone without the complexity of running multiple clusters.
 
-Ubernetes-Lite aims to deliver exactly that functionality: to run a single
+Multi-AZ Clusters aim to deliver exactly that functionality: to run a single
 Kubernetes cluster in multiple zones.  It will attempt to make reasonable
 scheduling decisions, in particular so that a replication controller's pods are
 spread across zones, and it will try to be aware of constraints - for example
 that a volume cannot be mounted on a node in a different zone.
 
-Ubernetes-Lite is deliberately limited in scope; for many advanced functions
-the answer will be "use Ubernetes (full)".  For example, multiple-region
+Multi-AZ Clusters are deliberately limited in scope; for many advanced functions
+the answer will be "use full Cluster Federation".  For example, multiple-region
 support is not in scope.  Routing affinity (e.g. so that a webserver will
 prefer to talk to a backend service in the same zone) is similarly not in
 scope.
@@ -73,7 +39,7 @@ advanced/experimental functionality, so the interface is not initially going to
 be particularly user-friendly.  As we design the evolution of kube-up, we will
 make multiple zones better supported.
 
-For the initial implemenation, kube-up must be run multiple times, once for
+For the initial implementation, kube-up must be run multiple times, once for
 each zone.  The first kube-up will take place as normal, but then for each
 additional zone the user must run kube-up again, specifying
 `KUBE_USE_EXISTING_MASTER=true` and `KUBE_SUBNET_CIDR=172.20.x.0/24`.  This will then
@@ -122,7 +88,7 @@ zones (in the same region).  For both clouds, the behaviour of the native cloud
 load-balancer is reasonable in the face of failures (indeed, this is why clouds
 provide load-balancing as a primitve).
 
-For Ubernetes-Lite we will therefore simply rely on the native cloud provider
+For multi-AZ clusters we will therefore simply rely on the native cloud provider
 load balancer behaviour, and we do not anticipate substantial code changes.
 
 One notable shortcoming here is that load-balanced traffic still goes through
@@ -130,8 +96,8 @@ kube-proxy controlled routing, and kube-proxy does not (currently) favor
 targeting a pod running on the same instance or even the same zone.  This will
 likely produce a lot of unnecessary cross-zone traffic (which is likely slower
 and more expensive).  This might be sufficiently low-hanging fruit that we
-choose to address it in kube-proxy / Ubernetes-Lite, but this can be addressed
-after the initial Ubernetes-Lite implementation.
+choose to address it in kube-proxy / multi-AZ clusters, but this can be addressed
+after the initial implementation.
 
 
 ## Implementation
@@ -182,8 +148,8 @@ region-wide, meaning that a single call will find instances and volumes in all
 zones.  In addition, instance ids and volume ids are unique per-region (and
 hence also per-zone).  I believe they are actually globally unique, but I do
 not know if this is guaranteed; in any case we only need global uniqueness if
-we are to span regions, which will not be supported by Ubernetes-Lite (to do
-that correctly requires an Ubernetes-Full type approach).
+we are to span regions, which will not be supported by multi-AZ clusters (to do
+that correctly requires a full Cluster Federation type approach).
 
 ## GCE Specific Considerations
 
@@ -197,20 +163,20 @@ combine results from calls in all relevant zones.
 A further complexity is that GCE volume names are scoped per-zone, not
 per-region.  Thus it is permitted to have two volumes both named `myvolume` in
 two different GCE zones. (Instance names are currently unique per-region, and
-thus are not a problem for Ubernetes-Lite).
+thus are not a problem for multi-AZ clusters).
 
-The volume scoping leads to a (small) behavioural change for Ubernetes-Lite on
+The volume scoping leads to a (small) behavioural change for multi-AZ clusters on
 GCE.  If you had two volumes both named `myvolume` in two different GCE zones,
 this would not be ambiguous when Kubernetes is operating only in a single zone.
-But, if Ubernetes-Lite is operating in multiple zones, `myvolume` is no longer
+But, when operating a cluster across multiple zones, `myvolume` is no longer
 sufficient to specify a volume uniquely.  Worse, the fact that a volume happens
 to be unambigious at a particular time is no guarantee that it will continue to
 be unambigious in future, because a volume with the same name could
 subsequently be created in a second zone.  While perhaps unlikely in practice,
-we cannot automatically enable Ubernetes-Lite for GCE users if this then causes
+we cannot automatically enable multi-AZ clusters for GCE users if this then causes
 volume mounts to stop working.
 
-This suggests that (at least on GCE), Ubernetes-Lite must be optional (i.e.
+This suggests that (at least on GCE), multi-AZ clusters must be optional (i.e.
 there must be a feature-flag).  It may be that we can make this feature
 semi-automatic in future, by detecting whether nodes are running in multiple
 zones, but it seems likely that kube-up could instead simply set this flag.
@@ -218,15 +184,15 @@ zones, but it seems likely that kube-up could instead simply set this flag.
 For the initial implementation, creating volumes with identical names will
 yield undefined results.  Later, we may add some way to specify the zone for a
 volume (and possibly require that volumes have their zone specified when
-running with Ubernetes-Lite).  We could add a new `zone` field to the
+running in multi-AZ cluster mode).  We could add a new `zone` field to the
 PersistentVolume type for GCE PD volumes, or we could use a DNS-style dotted
 name for the volume name (<name>.<zone>)
 
 Initially therefore, the GCE changes will be to:
 
 1. change kube-up to support creation of a cluster in multiple zones
-1. pass a flag enabling Ubernetes-Lite with kube-up
-1. change the kuberentes cloud provider to iterate through relevant zones when resolving items
+1. pass a flag enabling multi-AZ clusters with kube-up
+1. change the kubernetes cloud provider to iterate through relevant zones when resolving items
 1. tag GCE PD volumes with the appropriate zone information
 
 

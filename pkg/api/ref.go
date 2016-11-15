@@ -45,10 +45,6 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 		// Don't make a reference to a reference.
 		return ref, nil
 	}
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
 
 	gvk := obj.GetObjectKind().GroupVersionKind()
 
@@ -64,10 +60,22 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 		kind = gvks[0].Kind
 	}
 
+	// An object that implements only List has enough metadata to build a reference
+	var listMeta meta.List
+	objectMeta, err := meta.Accessor(obj)
+	if err != nil {
+		listMeta, err = meta.ListAccessor(obj)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		listMeta = objectMeta
+	}
+
 	// if the object referenced is actually persisted, we can also get version from meta
 	version := gvk.GroupVersion().String()
 	if len(version) == 0 {
-		selfLink := meta.GetSelfLink()
+		selfLink := listMeta.GetSelfLink()
 		if len(selfLink) == 0 {
 			return nil, ErrNoSelfLink
 		}
@@ -83,13 +91,22 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 		version = parts[2]
 	}
 
+	// only has list metadata
+	if objectMeta == nil {
+		return &ObjectReference{
+			Kind:            kind,
+			APIVersion:      version,
+			ResourceVersion: listMeta.GetResourceVersion(),
+		}, nil
+	}
+
 	return &ObjectReference{
 		Kind:            kind,
 		APIVersion:      version,
-		Name:            meta.GetName(),
-		Namespace:       meta.GetNamespace(),
-		UID:             meta.GetUID(),
-		ResourceVersion: meta.GetResourceVersion(),
+		Name:            objectMeta.GetName(),
+		Namespace:       objectMeta.GetNamespace(),
+		UID:             objectMeta.GetUID(),
+		ResourceVersion: objectMeta.GetResourceVersion(),
 	}, nil
 }
 
@@ -111,3 +128,5 @@ func (obj *ObjectReference) SetGroupVersionKind(gvk unversioned.GroupVersionKind
 func (obj *ObjectReference) GroupVersionKind() unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
+
+func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind { return obj }

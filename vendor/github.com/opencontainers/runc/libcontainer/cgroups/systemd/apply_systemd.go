@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -67,13 +66,16 @@ var subsystems = subsystemSet{
 
 const (
 	testScopeWait = 4
+	testSliceWait = 4
 )
 
 var (
 	connLock                        sync.Mutex
 	theConn                         *systemdDbus.Conn
 	hasStartTransientUnit           bool
+	hasStartTransientSliceUnit      bool
 	hasTransientDefaultDependencies bool
+	hasDelegate                     bool
 )
 
 func newProp(name string, units interface{}) systemdDbus.Property {
@@ -146,18 +148,50 @@ func UseSystemd() bool {
 
 		// Not critical because of the stop unit logic above.
 		theConn.StopUnit(scope, "replace", nil)
+
+		// Assume StartTransientUnit on a scope allows Delegate
+		hasDelegate = true
+		dl := newProp("Delegate", true)
+		if _, err := theConn.StartTransientUnit(scope, "replace", []systemdDbus.Property{dl}, nil); err != nil {
+			if dbusError, ok := err.(dbus.Error); ok {
+				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") {
+					hasDelegate = false
+				}
+			}
+		}
+
+		// Assume we have the ability to start a transient unit as a slice
+		// This was broken until systemd v229, but has been back-ported on RHEL environments >= 219
+		// For details, see: https://bugzilla.redhat.com/show_bug.cgi?id=1370299
+		hasStartTransientSliceUnit = true
+
+		// To ensure simple clean-up, we create a slice off the root with no hierarchy
+		slice := fmt.Sprintf("libcontainer_%d_systemd_test_default.slice", os.Getpid())
+		if _, err := theConn.StartTransientUnit(slice, "replace", nil, nil); err != nil {
+			if _, ok := err.(dbus.Error); ok {
+				hasStartTransientSliceUnit = false
+			}
+		}
+
+		for i := 0; i <= testSliceWait; i++ {
+			if _, err := theConn.StopUnit(slice, "replace", nil); err != nil {
+				if dbusError, ok := err.(dbus.Error); ok {
+					if strings.Contains(dbusError.Name, "org.freedesktop.systemd1.NoSuchUnit") {
+						hasStartTransientSliceUnit = false
+						break
+					}
+				}
+			} else {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+
+		// Not critical because of the stop unit logic above.
+		theConn.StopUnit(scope, "replace", nil)
+		theConn.StopUnit(slice, "replace", nil)
 	}
 	return hasStartTransientUnit
-}
-
-func getIfaceForUnit(unitName string) string {
-	if strings.HasSuffix(unitName, ".scope") {
-		return "Scope"
-	}
-	if strings.HasSuffix(unitName, ".service") {
-		return "Service"
-	}
-	return "Unit"
 }
 
 func (m *Manager) Apply(pid int) error {
@@ -189,11 +223,29 @@ func (m *Manager) Apply(pid int) error {
 		slice = c.Parent
 	}
 
-	properties = append(properties,
-		systemdDbus.PropSlice(slice),
-		systemdDbus.PropDescription("docker container "+c.Name),
-		newProp("PIDs", []uint32{uint32(pid)}),
-	)
+	properties = append(properties, systemdDbus.PropDescription("libcontainer container "+c.Name))
+
+	// if we create a slice, the parent is defined via a Wants=
+	if strings.HasSuffix(unitName, ".slice") {
+		// This was broken until systemd v229, but has been back-ported on RHEL environments >= 219
+		if !hasStartTransientSliceUnit {
+			return fmt.Errorf("systemd version does not support ability to start a slice as transient unit")
+		}
+		properties = append(properties, systemdDbus.PropWants(slice))
+	} else {
+		// otherwise, we use Slice=
+		properties = append(properties, systemdDbus.PropSlice(slice))
+	}
+
+	// only add pid if its valid, -1 is used w/ general slice creation.
+	if pid != -1 {
+		properties = append(properties, newProp("PIDs", []uint32{uint32(pid)}))
+	}
+
+	if hasDelegate {
+		// This is only supported on systemd versions 218 and above.
+		properties = append(properties, newProp("Delegate", true))
+	}
 
 	// Always enable accounting, this gets us the same behaviour as the fs implementation,
 	// plus the kernel has some problems with joining the memory cgroup at a later time.
@@ -222,11 +274,9 @@ func (m *Manager) Apply(pid int) error {
 			newProp("BlockIOWeight", uint64(c.Resources.BlkioWeight)))
 	}
 
-	// We need to set kernel memory before processes join cgroup because
-	// kmem.limit_in_bytes can only be set when the cgroup is empty.
-	// And swap memory limit needs to be set after memory limit, only
-	// memory limit is handled by systemd, so it's kind of ugly here.
-	if c.Resources.KernelMemory > 0 {
+	// We have to set kernel memory here, as we can't change it once
+	// processes have been attached to the cgroup.
+	if c.Resources.KernelMemory != 0 {
 		if err := setKernelMemory(c); err != nil {
 			return err
 		}
@@ -236,53 +286,7 @@ func (m *Manager) Apply(pid int) error {
 		return err
 	}
 
-	if err := joinDevices(c, pid); err != nil {
-		return err
-	}
-
-	// TODO: CpuQuota and CpuPeriod not available in systemd
-	// we need to manually join the cpu.cfs_quota_us and cpu.cfs_period_us
-	if err := joinCpu(c, pid); err != nil {
-		return err
-	}
-
-	// TODO: MemoryReservation and MemorySwap not available in systemd
-	if err := joinMemory(c, pid); err != nil {
-		return err
-	}
-
-	// we need to manually join the freezer, net_cls, net_prio, pids and cpuset cgroup in systemd
-	// because it does not currently support it via the dbus api.
-	if err := joinFreezer(c, pid); err != nil {
-		return err
-	}
-
-	if err := joinNetPrio(c, pid); err != nil {
-		return err
-	}
-	if err := joinNetCls(c, pid); err != nil {
-		return err
-	}
-
-	if err := joinPids(c, pid); err != nil {
-		return err
-	}
-
-	if err := joinCpuset(c, pid); err != nil {
-		return err
-	}
-
-	if err := joinHugetlb(c, pid); err != nil {
-		return err
-	}
-
-	if err := joinPerfEvent(c, pid); err != nil {
-		return err
-	}
-	// FIXME: Systemd does have `BlockIODeviceWeight` property, but we got problem
-	// using that (at least on systemd 208, see https://github.com/opencontainers/runc/libcontainer/pull/354),
-	// so use fs work around for now.
-	if err := joinBlkio(c, pid); err != nil {
+	if err := joinCgroups(c, pid); err != nil {
 		return err
 	}
 
@@ -327,7 +331,7 @@ func writeFile(dir, file, data string) error {
 	// Normally dir should not be empty, one case is that cgroup subsystem
 	// is not mounted, we will get empty dir, and we want it fail here.
 	if dir == "" {
-		return fmt.Errorf("no such directory for %s.", file)
+		return fmt.Errorf("no such directory for %s", file)
 	}
 	return ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700)
 }
@@ -340,61 +344,71 @@ func join(c *configs.Cgroup, subsystem string, pid int) (string, error) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", err
 	}
-	if err := writeFile(path, "cgroup.procs", strconv.Itoa(pid)); err != nil {
+	if err := cgroups.WriteCgroupProc(path, pid); err != nil {
 		return "", err
 	}
-
 	return path, nil
 }
 
-func joinCpu(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "cpu", pid)
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
+func joinCgroups(c *configs.Cgroup, pid int) error {
+	for _, sys := range subsystems {
+		name := sys.Name()
+		switch name {
+		case "name=systemd":
+			// let systemd handle this
+			break
+		case "cpuset":
+			path, err := getSubsystemPath(c, name)
+			if err != nil && !cgroups.IsNotFound(err) {
+				return err
+			}
+			s := &fs.CpusetGroup{}
+			if err := s.ApplyDir(path, c, pid); err != nil {
+				return err
+			}
+			break
+		default:
+			_, err := join(c, name, pid)
+			if err != nil {
+				// Even if it's `not found` error, we'll return err
+				// because devices cgroup is hard requirement for
+				// container security.
+				if name == "devices" {
+					return err
+				}
+				// For other subsystems, omit the `not found` error
+				// because they are optional.
+				if !cgroups.IsNotFound(err) {
+					return err
+				}
+			}
+		}
 	}
-	return nil
-}
 
-func joinFreezer(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "freezer", pid)
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
-}
-
-func joinNetPrio(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "net_prio", pid)
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
-}
-
-func joinNetCls(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "net_cls", pid)
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
-}
-
-func joinPids(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "pids", pid)
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
 	return nil
 }
 
 // systemd represents slice heirarchy using `-`, so we need to follow suit when
 // generating the path of slice. Essentially, test-a-b.slice becomes
 // test.slice/test-a.slice/test-a-b.slice.
-func expandSlice(slice string) (string, error) {
+func ExpandSlice(slice string) (string, error) {
 	suffix := ".slice"
-	sliceName := strings.TrimSuffix(slice, suffix)
+	// Name has to end with ".slice", but can't be just ".slice".
+	if len(slice) < len(suffix) || !strings.HasSuffix(slice, suffix) {
+		return "", fmt.Errorf("invalid slice name: %s", slice)
+	}
+
+	// Path-separators are not allowed.
+	if strings.Contains(slice, "/") {
+		return "", fmt.Errorf("invalid slice name: %s", slice)
+	}
 
 	var path, prefix string
+	sliceName := strings.TrimSuffix(slice, suffix)
+	// if input was -.slice, we should just return root now
+	if sliceName == "-" {
+		return "/", nil
+	}
 	for _, component := range strings.Split(sliceName, "-") {
 		// test--a.slice isn't permitted, nor is -test.slice.
 		if component == "" {
@@ -419,13 +433,15 @@ func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// if pid 1 is systemd 226 or later, it will be in init.scope, not the root
+	initPath = strings.TrimSuffix(filepath.Clean(initPath), "init.scope")
 
 	slice := "system.slice"
 	if c.Parent != "" {
 		slice = c.Parent
 	}
 
-	slice, err = expandSlice(slice)
+	slice, err = ExpandSlice(slice)
 	if err != nil {
 		return "", err
 	}
@@ -486,6 +502,11 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
+	// If Paths are set, then we are just joining cgroups paths
+	// and there is no need to set any values.
+	if m.Cgroups.Paths != nil {
+		return nil
+	}
 	for _, sys := range subsystems {
 		// Get the subsystem path, but don't error out for not found cgroups.
 		path, err := getSubsystemPath(container.Cgroups, sys.Name())
@@ -507,28 +528,11 @@ func (m *Manager) Set(container *configs.Config) error {
 }
 
 func getUnitName(c *configs.Cgroup) string {
-	return fmt.Sprintf("%s-%s.scope", c.ScopePrefix, c.Name)
-}
-
-// Atm we can't use the systemd device support because of two missing things:
-// * Support for wildcards to allow mknod on any device
-// * Support for wildcards to allow /dev/pts support
-//
-// The second is available in more recent systemd as "char-pts", but not in e.g. v208 which is
-// in wide use. When both these are available we will be able to switch, but need to keep the old
-// implementation for backwards compat.
-//
-// Note: we can't use systemd to set up the initial limits, and then change the cgroup
-// because systemd will re-write the device settings if it needs to re-apply the cgroup context.
-// This happens at least for v208 when any sibling unit is started.
-func joinDevices(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "devices", pid)
-	// Even if it's `not found` error, we'll return err because devices cgroup
-	// is hard requirement for container security.
-	if err != nil {
-		return err
+	// by default, we create a scope unless the user explicitly asks for a slice.
+	if !strings.HasSuffix(c.Name, ".slice") {
+		return fmt.Sprintf("%s-%s.scope", c.ScopePrefix, c.Name)
 	}
-	return nil
+	return c.Name
 }
 
 func setKernelMemory(c *configs.Cgroup) error {
@@ -540,57 +544,5 @@ func setKernelMemory(c *configs.Cgroup) error {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return err
 	}
-
-	// This doesn't get called by manager.Set, so we need to do it here.
-	s := &fs.MemoryGroup{}
-	return s.SetKernelMemory(path, c)
-}
-
-func joinMemory(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "memory", pid)
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
-}
-
-// systemd does not atm set up the cpuset controller, so we must manually
-// join it. Additionally that is a very finicky controller where each
-// level must have a full setup as the default for a new directory is "no cpus"
-func joinCpuset(c *configs.Cgroup, pid int) error {
-	path, err := getSubsystemPath(c, "cpuset")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-
-	s := &fs.CpusetGroup{}
-
-	return s.ApplyDir(path, c, pid)
-}
-
-// `BlockIODeviceWeight` property of systemd does not work properly, and systemd
-// expects device path instead of major minor numbers, which is also confusing
-// for users. So we use fs work around for now.
-func joinBlkio(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "blkio", pid)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func joinHugetlb(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "hugetlb", pid)
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
-}
-
-func joinPerfEvent(c *configs.Cgroup, pid int) error {
-	_, err := join(c, "perf_event", pid)
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
+	return fs.EnableKernelMemoryAccounting(path)
 }

@@ -350,6 +350,7 @@ func (t *tracker) Delete(gvk unversioned.GroupVersionKind, ns, name string) erro
 		if objMeta.GetNamespace() == ns && objMeta.GetName() == name {
 			t.objects[gvk] = append(t.objects[gvk][:i], t.objects[gvk][i+1:]...)
 			found = true
+			break
 		}
 	}
 

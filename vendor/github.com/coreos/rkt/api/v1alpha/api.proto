@@ -74,6 +74,9 @@ message Image {
 
         // Annotations on this image.
         repeated KeyValue annotations = 8;
+
+        // Labels of this image.
+        repeated KeyValue labels = 9;
 }
 
 // Network describes the network information of a pod.

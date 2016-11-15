@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/types"
@@ -29,7 +30,7 @@ import (
 const region = "us-central"
 
 func newService(name string, uid types.UID, serviceType api.ServiceType) *api.Service {
-	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{Type: serviceType}}
+	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: api.ServiceSpec{Type: serviceType}}
 }
 
 func TestCreateExternalLoadBalancer(t *testing.T) {
@@ -56,6 +57,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name:      "udp-service",
 					Namespace: "default",
+					SelfLink:  testapi.Default.SelfLink("services", "udp-service"),
 				},
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{{
@@ -73,6 +75,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
+					SelfLink:  testapi.Default.SelfLink("services", "basic-service1"),
 				},
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{{
@@ -91,11 +94,11 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		cloud := &fakecloud.FakeCloud{}
 		cloud.Region = region
 		client := &fake.Clientset{}
-		controller := New(cloud, client, "test-cluster")
+		controller, _ := New(cloud, client, "test-cluster")
 		controller.init()
 		cloud.Calls = nil     // ignore any cloud calls made in init()
 		client.ClearActions() // ignore any client calls made in init()
-		err, _ := controller.createLoadBalancerIfNeeded(types.NamespacedName{Namespace: "foo", Name: "bar"}, item.service, nil)
+		err, _ := controller.createLoadBalancerIfNeeded("foo/bar", item.service)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if item.expectErr && err == nil {
@@ -211,13 +214,13 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 
 		cloud.Region = region
 		client := &fake.Clientset{}
-		controller := New(cloud, client, "test-cluster2")
+		controller, _ := New(cloud, client, "test-cluster2")
 		controller.init()
 		cloud.Calls = nil // ignore any cloud calls made in init()
 
-		var services []*cachedService
+		var services []*api.Service
 		for _, service := range item.services {
-			services = append(services, &cachedService{lastState: service, appliedState: service})
+			services = append(services, service)
 		}
 		if err := controller.updateLoadBalancerHosts(services, hosts); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -319,7 +322,7 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 	}
 	pred := getNodeConditionPredicate()
 	for _, test := range tests {
-		accept := pred(test.node)
+		accept := pred(&test.node)
 		if accept != test.expectAccept {
 			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
 		}

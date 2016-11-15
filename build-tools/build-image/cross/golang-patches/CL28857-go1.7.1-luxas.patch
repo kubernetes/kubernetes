@@ -1,0 +1,390 @@
+From cc1015ff9bb020ea92c1854026e9ae395a8504b2 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Lucas=20K=C3=A4ldstr=C3=B6m?=
+ <lucas.kaldstrom@hotmail.co.uk>
+Date: Mon, 12 Sep 2016 22:55:42 +0300
+Subject: [PATCH] Ported cherrymui's CL 28857 to the go1.7.1 branch
+
+---
+ src/cmd/compile/internal/arm/ssa.go  | 16 ++++++
+ src/cmd/compile/internal/gc/cgen.go  |  5 ++
+ src/cmd/compile/internal/gc/main.go  | 11 ++--
+ src/cmd/compile/internal/gc/plive.go |  5 ++
+ src/cmd/internal/obj/arm/asm5.go     | 32 ++++++++++++
+ src/cmd/internal/obj/arm/obj5.go     |  3 ++
+ src/cmd/internal/obj/link.go         | 98 +++++++++++++++++++-----------------
+ src/cmd/link/internal/arm/asm.go     | 18 ++++++-
+ src/cmd/link/internal/ld/lib.go      |  4 +-
+ src/runtime/asm_arm.s                |  2 +-
+ 10 files changed, 138 insertions(+), 56 deletions(-)
+
+diff --git a/src/cmd/compile/internal/arm/ssa.go b/src/cmd/compile/internal/arm/ssa.go
+index 8f466e3..a066e02 100644
+--- a/src/cmd/compile/internal/arm/ssa.go
++++ b/src/cmd/compile/internal/arm/ssa.go
+@@ -111,6 +111,22 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
+ 		gc.AddAux(&p.To, v)
+ 	case ssa.OpARMCALLstatic:
+ 		// TODO: deferreturn
++		if v.Aux.(*gc.Sym) == gc.Deferreturn.Sym {
++			// Deferred calls will appear to be returning to
++			// the CALL deferreturn(SB) that we are about to emit.
++			// However, the stack trace code will show the line
++			// of the instruction byte before the return PC.
++			// To avoid that being an unrelated instruction,
++			// insert an actual hardware NOP that will have the right line number.
++			// This is different from obj.ANOP, which is a virtual no-op
++			// that doesn't make it into the instruction stream.
++			ginsnop()
++			if !gc.Ctxt.Flag_largemodel {
++				// We always back up two instructions.
++				// For non-large build, insert another NOP.
++				ginsnop()
++			}
++		}
+ 		p := gc.Prog(obj.ACALL)
+ 		p.To.Type = obj.TYPE_MEM
+ 		p.To.Name = obj.NAME_EXTERN
+diff --git a/src/cmd/compile/internal/gc/cgen.go b/src/cmd/compile/internal/gc/cgen.go
+index 74fe463..7507d5f 100644
+--- a/src/cmd/compile/internal/gc/cgen.go
++++ b/src/cmd/compile/internal/gc/cgen.go
+@@ -2373,6 +2373,11 @@ func Ginscall(f *Node, proc int) {
+ 						Thearch.Ginsnop()
+ 					}
+ 				}
++				if Ctxt.Arch.Family == sys.ARM && !Ctxt.Flag_largemodel {
++					// On ARM we always back up two instructions.
++					// For non-large build, insert another NOP.
++					Thearch.Ginsnop()
++				}
+ 			}
+ 
+ 			p := Thearch.Gins(obj.ACALL, nil, f)
+diff --git a/src/cmd/compile/internal/gc/main.go b/src/cmd/compile/internal/gc/main.go
+index b4df7ed..c0a8aa1 100644
+--- a/src/cmd/compile/internal/gc/main.go
++++ b/src/cmd/compile/internal/gc/main.go
+@@ -148,9 +148,9 @@ func Main() {
+ 	goos = obj.Getgoos()
+ 
+ 	Nacl = goos == "nacl"
+-	if Nacl {
+-		flag_largemodel = true
+-	}
++	//if Nacl {
++	//	flag_largemodel = true
++	//}
+ 
+ 	flag.BoolVar(&compiling_runtime, "+", false, "compiling runtime")
+ 	obj.Flagcount("%", "debug non-static initializers", &Debug['%'])
+@@ -204,9 +204,7 @@ func Main() {
+ 		flag.BoolVar(&flag_shared, "shared", false, "generate code that can be linked into a shared library")
+ 		flag.BoolVar(&flag_dynlink, "dynlink", false, "support references to Go symbols defined in other shared libraries")
+ 	}
+-	if Thearch.LinkArch.Family == sys.AMD64 {
+-		flag.BoolVar(&flag_largemodel, "largemodel", false, "generate code that assumes a large memory model")
+-	}
++	flag.BoolVar(&flag_largemodel, "largemodel", false, "generate code that assumes a large memory model")
+ 	flag.StringVar(&cpuprofile, "cpuprofile", "", "write cpu profile to `file`")
+ 	flag.StringVar(&memprofile, "memprofile", "", "write memory profile to `file`")
+ 	flag.Int64Var(&memprofilerate, "memprofilerate", 0, "set runtime.MemProfileRate to `rate`")
+@@ -216,6 +214,7 @@ func Main() {
+ 	Ctxt.Flag_shared = flag_dynlink || flag_shared
+ 	Ctxt.Flag_dynlink = flag_dynlink
+ 	Ctxt.Flag_optimize = Debug['N'] == 0
++	Ctxt.Flag_largemodel = flag_largemodel
+ 
+ 	Ctxt.Debugasm = int32(Debug['S'])
+ 	Ctxt.Debugvlog = int32(Debug['v'])
+diff --git a/src/cmd/compile/internal/gc/plive.go b/src/cmd/compile/internal/gc/plive.go
+index ca0421d..ad26d24 100644
+--- a/src/cmd/compile/internal/gc/plive.go
++++ b/src/cmd/compile/internal/gc/plive.go
+@@ -1400,6 +1400,11 @@ func livenessepilogue(lv *Liveness) {
+ 							// the call.
+ 							prev = prev.Opt.(*obj.Prog)
+ 						}
++						if Ctxt.Arch.Family == sys.ARM && !Ctxt.Flag_largemodel {
++							// On ARM we always back up two instructions.
++							// For non-large build, there is another NOP.
++							prev = prev.Opt.(*obj.Prog)
++						}
+ 						splicebefore(lv, bb, newpcdataprog(prev, pos), prev)
+ 					} else {
+ 						splicebefore(lv, bb, newpcdataprog(p, pos), p)
+diff --git a/src/cmd/internal/obj/arm/asm5.go b/src/cmd/internal/obj/arm/asm5.go
+index d37091f..8136492 100644
+--- a/src/cmd/internal/obj/arm/asm5.go
++++ b/src/cmd/internal/obj/arm/asm5.go
+@@ -585,6 +585,30 @@ func span5(ctxt *obj.Link, cursym *obj.LSym) {
+ 			break
+ 		}
+ 
++		if ctxt.Flag_largemodel && (p.As == AB || p.As == ABL || p.As == obj.ADUFFZERO || p.As == obj.ADUFFCOPY) && p.To.Name == obj.NAME_EXTERN {
++			// in large mode, emit indirect call
++			//	MOVW	$target, Rtmp
++			//	BL	(Rtmp)
++			// use REGLINK as Rtmp, as soft div calls expects REGTMP to pass argument
++			tmp := int16(REGLINK)
++			q := obj.Appendp(ctxt, p)
++			q.As = ABL
++			if p.As == AB {
++				q.As = AB
++				tmp = REGTMP // should not clobber REGLINK in this case
++			}
++			q.To.Type = obj.TYPE_MEM
++			q.To.Reg = tmp
++			q.To.Sym = p.To.Sym // tell asmout to emits R_CALLARMLARGE reloc
++
++			p.As = AMOVW
++			p.From = p.To // jump target
++			p.From.Type = obj.TYPE_ADDR
++			p.To = obj.Addr{}
++			p.To.Type = obj.TYPE_REG
++			p.To.Reg = tmp
++		}
++
+ 		ctxt.Curp = p
+ 		p.Pc = int64(c)
+ 		o = oplook(ctxt, p)
+@@ -1583,6 +1607,14 @@ func asmout(ctxt *obj.Link, p *obj.Prog, o *Optab, out []uint32) {
+ 		}
+ 		o1 = oprrr(ctxt, ABL, int(p.Scond))
+ 		o1 |= (uint32(p.To.Reg) & 15) << 0
++		if p.To.Sym != nil {
++			rel := obj.Addrel(ctxt.Cursym)
++			rel.Off = int32(ctxt.Pc)
++			rel.Siz = 4
++			rel.Sym = p.To.Sym
++			rel.Type = obj.R_CALLARMLARGE
++			break
++		}
+ 		rel := obj.Addrel(ctxt.Cursym)
+ 		rel.Off = int32(ctxt.Pc)
+ 		rel.Siz = 0
+diff --git a/src/cmd/internal/obj/arm/obj5.go b/src/cmd/internal/obj/arm/obj5.go
+index 9cf2f29..13bf952 100644
+--- a/src/cmd/internal/obj/arm/obj5.go
++++ b/src/cmd/internal/obj/arm/obj5.go
+@@ -584,6 +584,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym) {
+ 			p.As = ABL
+ 			p.Lineno = q1.Lineno
+ 			p.To.Type = obj.TYPE_BRANCH
++			p.To.Name = obj.NAME_EXTERN
+ 			switch o {
+ 			case ADIV:
+ 				p.To.Sym = ctxt.Sym_div
+@@ -687,6 +688,7 @@ func softfloat(ctxt *obj.Link, cursym *obj.LSym) {
+ 			p.Link = next
+ 			p.As = ABL
+ 			p.To.Type = obj.TYPE_BRANCH
++			p.To.Name = obj.NAME_EXTERN
+ 			p.To.Sym = symsfloat
+ 			p.Lineno = next.Lineno
+ 
+@@ -820,6 +822,7 @@ func stacksplit(ctxt *obj.Link, p *obj.Prog, framesize int32) *obj.Prog {
+ 	call := obj.Appendp(ctxt, movw)
+ 	call.As = obj.ACALL
+ 	call.To.Type = obj.TYPE_BRANCH
++	call.To.Name = obj.NAME_EXTERN
+ 	morestack := "runtime.morestack"
+ 	switch {
+ 	case ctxt.Cursym.Cfunc:
+diff --git a/src/cmd/internal/obj/link.go b/src/cmd/internal/obj/link.go
+index b6861f4..51e9fd3 100644
+--- a/src/cmd/internal/obj/link.go
++++ b/src/cmd/internal/obj/link.go
+@@ -588,6 +588,11 @@ const (
+ 	// R_ADDRMIPSTLS (only used on mips64) resolves to the low 16 bits of a TLS
+ 	// address (offset from thread pointer), by encoding it into the instruction.
+ 	R_ADDRMIPSTLS
++
++	// R_CALLARMLARGE applies on an indirect CALL with known target used on large mode.
++	// Currently it does nothing but tell the linker the target for stack split check.
++	// In the future linker may optimize this to a NOP and a direct CALL if it is safe.
++	R_CALLARMLARGE
+ )
+ 
+ type Auto struct {
+@@ -617,52 +622,53 @@ const (
+ // Link holds the context for writing object code from a compiler
+ // to be linker input or for reading that input into the linker.
+ type Link struct {
+-	Goarm         int32
+-	Headtype      int
+-	Arch          *LinkArch
+-	Debugasm      int32
+-	Debugvlog     int32
+-	Debugdivmod   int32
+-	Debugpcln     int32
+-	Flag_shared   bool
+-	Flag_dynlink  bool
+-	Flag_optimize bool
+-	Bso           *bufio.Writer
+-	Pathname      string
+-	Goroot        string
+-	Goroot_final  string
+-	Hash          map[SymVer]*LSym
+-	LineHist      LineHist
+-	Imports       []string
+-	Plist         *Plist
+-	Plast         *Plist
+-	Sym_div       *LSym
+-	Sym_divu      *LSym
+-	Sym_mod       *LSym
+-	Sym_modu      *LSym
+-	Plan9privates *LSym
+-	Curp          *Prog
+-	Printp        *Prog
+-	Blitrl        *Prog
+-	Elitrl        *Prog
+-	Rexflag       int
+-	Vexflag       int
+-	Rep           int
+-	Repn          int
+-	Lock          int
+-	Asmode        int
+-	AsmBuf        AsmBuf // instruction buffer for x86
+-	Instoffset    int64
+-	Autosize      int32
+-	Armsize       int32
+-	Pc            int64
+-	DiagFunc      func(string, ...interface{})
+-	Mode          int
+-	Cursym        *LSym
+-	Version       int
+-	Textp         *LSym
+-	Etextp        *LSym
+-	Errors        int
++	Goarm           int32
++	Headtype        int
++	Arch            *LinkArch
++	Debugasm        int32
++	Debugvlog       int32
++	Debugdivmod     int32
++	Debugpcln       int32
++	Flag_shared     bool
++	Flag_dynlink    bool
++	Flag_optimize   bool
++	Flag_largemodel bool // generate code that assumes a large memory model
++	Bso             *bufio.Writer
++	Pathname        string
++	Goroot          string
++	Goroot_final    string
++	Hash            map[SymVer]*LSym
++	LineHist        LineHist
++	Imports         []string
++	Plist           *Plist
++	Plast           *Plist
++	Sym_div         *LSym
++	Sym_divu        *LSym
++	Sym_mod         *LSym
++	Sym_modu        *LSym
++	Plan9privates   *LSym
++	Curp            *Prog
++	Printp          *Prog
++	Blitrl          *Prog
++	Elitrl          *Prog
++	Rexflag         int
++	Vexflag         int
++	Rep             int
++	Repn            int
++	Lock            int
++	Asmode          int
++	AsmBuf          AsmBuf // instruction buffer for x86
++	Instoffset      int64
++	Autosize        int32
++	Armsize         int32
++	Pc              int64
++	DiagFunc        func(string, ...interface{})
++	Mode            int
++	Cursym          *LSym
++	Version         int
++	Textp           *LSym
++	Etextp          *LSym
++	Errors          int
+ 
+ 	Framepointer_enabled bool
+ 
+diff --git a/src/cmd/link/internal/arm/asm.go b/src/cmd/link/internal/arm/asm.go
+index 0c3e957..0cf61bb 100644
+--- a/src/cmd/link/internal/arm/asm.go
++++ b/src/cmd/link/internal/arm/asm.go
+@@ -410,6 +410,11 @@ func machoreloc1(r *ld.Reloc, sectoff int64) int {
+ 	return 0
+ }
+ 
++// sign extend a 24-bit integer
++func signext24(x int64) int32 {
++	return (int32(x) << 8) >> 8
++}
++
+ func archreloc(r *ld.Reloc, s *ld.LSym, val *int64) int {
+ 	if ld.Linkmode == ld.LinkExternal {
+ 		switch r.Type {
+@@ -445,6 +450,9 @@ func archreloc(r *ld.Reloc, s *ld.LSym, val *int64) int {
+ 
+ 			*val = int64(braddoff(int32(0xff000000&uint32(r.Add)), int32(0xffffff&uint32(r.Xadd/4))))
+ 			return 0
++
++		case obj.R_CALLARMLARGE:
++			return 0
+ 		}
+ 
+ 		return -1
+@@ -479,8 +487,16 @@ func archreloc(r *ld.Reloc, s *ld.LSym, val *int64) int {
+ 		return 0
+ 
+ 	case obj.R_CALLARM: // bl XXXXXX or b YYYYYY
+-		*val = int64(braddoff(int32(0xff000000&uint32(r.Add)), int32(0xffffff&uint32((ld.Symaddr(r.Sym)+int64((uint32(r.Add))*4)-(s.Value+int64(r.Off)))/4))))
++		// low 24-bit encodes the target address
++		t := (ld.Symaddr(r.Sym) + int64(signext24(r.Add&0xffffff)*4) - (s.Value + int64(r.Off))) / 4
++		if t > 0x7fffff || t < -0x800000 {
++			ld.Diag("direct call too far %d, should build with -gcflags -largemodel", t)
++		}
++		*val = int64(braddoff(int32(0xff000000&uint32(r.Add)), int32(0xffffff&t)))
++
++		return 0
+ 
++	case obj.R_CALLARMLARGE:
+ 		return 0
+ 	}
+ 
+diff --git a/src/cmd/link/internal/ld/lib.go b/src/cmd/link/internal/ld/lib.go
+index 14f4fa9..cc3b50e 100644
+--- a/src/cmd/link/internal/ld/lib.go
++++ b/src/cmd/link/internal/ld/lib.go
+@@ -1826,7 +1826,7 @@ func stkcheck(up *Chain, depth int) int {
+ 			r = &s.R[ri]
+ 			switch r.Type {
+ 			// Direct call.
+-			case obj.R_CALL, obj.R_CALLARM, obj.R_CALLARM64, obj.R_CALLPOWER, obj.R_CALLMIPS:
++			case obj.R_CALL, obj.R_CALLARM, obj.R_CALLARM64, obj.R_CALLPOWER, obj.R_CALLMIPS, obj.R_CALLARMLARGE:
+ 				ch.limit = int(int32(limit) - pcsp.value - int32(callsize()))
+ 				ch.sym = r.Sym
+ 				if stkcheck(&ch, depth+1) < 0 {
+@@ -2164,7 +2164,7 @@ func callgraph() {
+ 			if r.Sym == nil {
+ 				continue
+ 			}
+-			if (r.Type == obj.R_CALL || r.Type == obj.R_CALLARM || r.Type == obj.R_CALLPOWER || r.Type == obj.R_CALLMIPS) && r.Sym.Type == obj.STEXT {
++			if (r.Type == obj.R_CALL || r.Type == obj.R_CALLARM || r.Type == obj.R_CALLPOWER || r.Type == obj.R_CALLMIPS || r.Type == obj.R_CALLARMLARGE) && r.Sym.Type == obj.STEXT {
+ 				fmt.Fprintf(Bso, "%s calls %s\n", s.Name, r.Sym.Name)
+ 			}
+ 		}
+diff --git a/src/runtime/asm_arm.s b/src/runtime/asm_arm.s
+index f02297e..0930585 100644
+--- a/src/runtime/asm_arm.s
++++ b/src/runtime/asm_arm.s
+@@ -465,7 +465,7 @@ CALLFN(·call1073741824, 1073741824)
+ // (And double-check that pop is atomic in that way.)
+ TEXT runtime·jmpdefer(SB),NOSPLIT,$0-8
+ 	MOVW	0(R13), LR
+-	MOVW	$-4(LR), LR	// BL deferreturn
++	MOVW	$-8(LR), LR	// BL deferreturn
+ 	MOVW	fv+0(FP), R7
+ 	MOVW	argp+4(FP), R13
+ 	MOVW	$-4(R13), R13	// SP is 4 below argp, due to saved LR
+-- 
+2.5.0
+

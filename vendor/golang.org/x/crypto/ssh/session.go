@@ -339,7 +339,7 @@ func (s *Session) Shell() error {
 
 	ok, err := s.ch.SendRequest("shell", true, nil)
 	if err == nil && !ok {
-		return fmt.Errorf("ssh: cound not start shell")
+		return errors.New("ssh: could not start shell")
 	}
 	if err != nil {
 		return err

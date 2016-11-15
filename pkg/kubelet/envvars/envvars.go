@@ -27,10 +27,10 @@ import (
 // FromServices builds environment variables that a container is started with,
 // which tell the container where to find the services it may need, which are
 // provided as an argument.
-func FromServices(services *api.ServiceList) []api.EnvVar {
+func FromServices(services []*api.Service) []api.EnvVar {
 	var result []api.EnvVar
-	for i := range services.Items {
-		service := &services.Items[i]
+	for i := range services {
+		service := services[i]
 
 		// ignore services where ClusterIP is "None" or empty
 		// the services passed to this method should be pre-filtered

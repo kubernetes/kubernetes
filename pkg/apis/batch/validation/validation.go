@@ -49,14 +49,8 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
 	}
 
-	// If somehow uid was unset then we would get "controller-uid=" as the selector
-	// which is bad.
-	if obj.ObjectMeta.UID == "" {
-		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
-	}
-
 	// If selector generation was requested, then expected labels must be
-	// present on pod template, and much match job's uid and name.  The
+	// present on pod template, and must match job's uid and name.  The
 	// generated (not-manual) selectors/labels ensure no overlap with other
 	// controllers.  The manual mode allows orphaning, adoption,
 	// backward-compatibility, and experimentation with new
@@ -164,14 +158,14 @@ func ValidateJobStatusUpdate(status, oldStatus batch.JobStatus) field.ErrorList 
 	return allErrs
 }
 
-func ValidateScheduledJob(scheduledJob *batch.ScheduledJob) field.ErrorList {
-	// ScheduledJobs and rcs have the same name validation
+func ValidateCronJob(scheduledJob *batch.CronJob) field.ErrorList {
+	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&scheduledJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateScheduledJobSpec(&scheduledJob.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateCronJobSpec(&scheduledJob.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func ValidateScheduledJobSpec(spec *batch.ScheduledJobSpec, fldPath *field.Path) field.ErrorList {
+func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
@@ -205,8 +199,7 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 
 func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	_, err := cron.Parse(schedule)
-	if err != nil {
+	if _, err := cron.ParseStandard(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
 

@@ -24,11 +24,43 @@ import (
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
-type FitPredicate func(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error)
+// TODO: Change interface{} to a specific type.
+type FitPredicate func(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error)
 
-type PriorityFunction func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister NodeLister) (schedulerapi.HostPriorityList, error)
+// PriorityMapFunction is a function that computes per-node results for a given node.
+// TODO: Figure out the exact API of this method.
+// TODO: Change interface{} to a specific type.
+type PriorityMapFunction func(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error)
+
+// PriorityReduceFunction is a function that aggregated per-node results and computes
+// final scores for all nodes.
+// TODO: Figure out the exact API of this method.
+// TODO: Change interface{} to a specific type.
+type PriorityReduceFunction func(pod *api.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error
+
+// MetdataProducer is a function that computes metadata for a given pod.
+type MetadataProducer func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{}
+
+// DEPRECATED
+// Use Map-Reduce pattern for priority functions.
+type PriorityFunction func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error)
 
 type PriorityConfig struct {
+	Map    PriorityMapFunction
+	Reduce PriorityReduceFunction
+	// TODO: Remove it after migrating all functions to
+	// Map-Reduce pattern.
 	Function PriorityFunction
 	Weight   int
 }
+
+// EmptyMetadataProducer returns a no-op MetadataProducer type.
+func EmptyMetadataProducer(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
+	return nil
+}
+
+type PredicateFailureReason interface {
+	GetReason() string
+}
+
+type GetEquivalencePodFunc func(pod *api.Pod) interface{}

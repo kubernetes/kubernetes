@@ -14,8 +14,9 @@ type syncType uint8
 const (
 	procReady syncType = iota
 	procError
-	procStart
 	procRun
+	procHooks
+	procResume
 )
 
 type syncT struct {
@@ -51,14 +52,27 @@ func newGenericError(err error, c ErrorCode) Error {
 }
 
 func newSystemError(err error) Error {
-	if le, ok := err.(Error); ok {
-		return le
-	}
+	return createSystemError(err, "")
+}
+
+func newSystemErrorWithCausef(err error, cause string, v ...interface{}) Error {
+	return createSystemError(err, fmt.Sprintf(cause, v...))
+}
+
+func newSystemErrorWithCause(err error, cause string) Error {
+	return createSystemError(err, cause)
+}
+
+// createSystemError creates the specified error with the correct number of
+// stack frames skipped. This is only to be called by the other functions for
+// formatting the error.
+func createSystemError(err error, cause string) Error {
 	gerr := &genericError{
 		Timestamp: time.Now(),
 		Err:       err,
 		ECode:     SystemError,
-		Stack:     stacktrace.Capture(1),
+		Cause:     cause,
+		Stack:     stacktrace.Capture(2),
 	}
 	if err != nil {
 		gerr.Message = err.Error()
@@ -70,12 +84,17 @@ type genericError struct {
 	Timestamp time.Time
 	ECode     ErrorCode
 	Err       error `json:"-"`
+	Cause     string
 	Message   string
 	Stack     stacktrace.Stacktrace
 }
 
 func (e *genericError) Error() string {
-	return fmt.Sprintf("[%d] %s: %s", e.ECode, e.ECode, e.Message)
+	if e.Cause == "" {
+		return e.Message
+	}
+	frame := e.Stack.Frames[0]
+	return fmt.Sprintf("%s:%d: %s caused %q", frame.File, frame.Line, e.Cause, e.Message)
 }
 
 func (e *genericError) Code() ErrorCode {

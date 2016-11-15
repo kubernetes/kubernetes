@@ -514,7 +514,7 @@ function kube-down {
 #}
 
 # -----------------------------------------------------------------------------
-# Cluster specific test helpers used from hack/e2e-test.sh
+# Cluster specific test helpers
 
 # Execute prior to running tests to build a release if required for env.
 #
@@ -522,7 +522,7 @@ function kube-down {
 #   KUBE_ROOT
 function test-build-release {
     # Make a release
-    "${KUBE_ROOT}/build/release.sh"
+    "${KUBE_ROOT}/build-tools/release.sh"
 }
 
 # SSH to a node by name ($1) and run a command ($2).

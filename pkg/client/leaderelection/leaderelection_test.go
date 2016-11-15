@@ -29,8 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -39,11 +41,11 @@ func TestTryAcquireOrRenew(t *testing.T) {
 	past := time.Now().Add(-1000 * time.Hour)
 
 	tests := []struct {
-		observedRecord LeaderElectionRecord
+		observedRecord rl.LeaderElectionRecord
 		observedTime   time.Time
 		reactors       []struct {
 			verb     string
-			reaction testclient.ReactionFunc
+			reaction core.ReactionFunc
 		}
 
 		expectSuccess    bool
@@ -54,18 +56,18 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		{
 			reactors: []struct {
 				verb     string
-				reaction testclient.ReactionFunc
+				reaction core.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(api.Resource(action.(testclient.GetAction).GetResource()), action.(testclient.GetAction).GetName())
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(core.GetAction).GetResource().GroupResource(), action.(core.GetAction).GetName())
 					},
 				},
 				{
 					verb: "create",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(testclient.CreateAction).GetObject().(*api.Endpoints), nil
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(core.CreateAction).GetObject().(*api.Endpoints), nil
 					},
 				},
 			},
@@ -76,23 +78,23 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		{
 			reactors: []struct {
 				verb     string
-				reaction testclient.ReactionFunc
+				reaction core.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &api.Endpoints{
 							ObjectMeta: api.ObjectMeta{
 								Namespace: action.GetNamespace(),
-								Name:      action.(testclient.GetAction).GetName(),
+								Name:      action.(core.GetAction).GetName(),
 							},
 						}, nil
 					},
 				},
 				{
 					verb: "update",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(testclient.CreateAction).GetObject().(*api.Endpoints), nil
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(core.CreateAction).GetObject().(*api.Endpoints), nil
 					},
 				},
 			},
@@ -105,17 +107,17 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		{
 			reactors: []struct {
 				verb     string
-				reaction testclient.ReactionFunc
+				reaction core.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &api.Endpoints{
 							ObjectMeta: api.ObjectMeta{
 								Namespace: action.GetNamespace(),
-								Name:      action.(testclient.GetAction).GetName(),
+								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
-									LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
+									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
 								},
 							},
 						}, nil
@@ -123,12 +125,12 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				},
 				{
 					verb: "update",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(testclient.CreateAction).GetObject().(*api.Endpoints), nil
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(core.CreateAction).GetObject().(*api.Endpoints), nil
 					},
 				},
 			},
-			observedRecord: LeaderElectionRecord{HolderIdentity: "bing"},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing"},
 			observedTime:   past,
 
 			expectSuccess:    true,
@@ -139,17 +141,17 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		{
 			reactors: []struct {
 				verb     string
-				reaction testclient.ReactionFunc
+				reaction core.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &api.Endpoints{
 							ObjectMeta: api.ObjectMeta{
 								Namespace: action.GetNamespace(),
-								Name:      action.(testclient.GetAction).GetName(),
+								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
-									LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
+									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
 								},
 							},
 						}, nil
@@ -165,17 +167,17 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		{
 			reactors: []struct {
 				verb     string
-				reaction testclient.ReactionFunc
+				reaction core.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &api.Endpoints{
 							ObjectMeta: api.ObjectMeta{
 								Namespace: action.GetNamespace(),
-								Name:      action.(testclient.GetAction).GetName(),
+								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
-									LeaderElectionRecordAnnotationKey: `{"holderIdentity":"baz"}`,
+									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"baz"}`,
 								},
 							},
 						}, nil
@@ -183,13 +185,13 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				},
 				{
 					verb: "update",
-					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(testclient.CreateAction).GetObject().(*api.Endpoints), nil
+					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(core.CreateAction).GetObject().(*api.Endpoints), nil
 					},
 				},
 			},
 			observedTime:   future,
-			observedRecord: LeaderElectionRecord{HolderIdentity: "baz"},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz"},
 
 			expectSuccess: true,
 			outHolder:     "baz",
@@ -202,10 +204,16 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		wg.Add(1)
 		var reportedLeader string
 
-		lec := LeaderElectionConfig{
+		lock := rl.EndpointsLock{
 			EndpointsMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"},
-			Identity:      "baz",
-			EventRecorder: &record.FakeRecorder{},
+			LockConfig: rl.ResourceLockConfig{
+				Identity:      "baz",
+				EventRecorder: &record.FakeRecorder{},
+			},
+		}
+
+		lec := LeaderElectionConfig{
+			Lock:          &lock,
 			LeaseDuration: 10 * time.Second,
 			Callbacks: LeaderCallbacks{
 				OnNewLeader: func(l string) {
@@ -214,11 +222,11 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				},
 			},
 		}
-		c := &testclient.Fake{}
+		c := &fakeclientset.Clientset{Fake: core.Fake{}}
 		for _, reactor := range test.reactors {
 			c.AddReactor(reactor.verb, "endpoints", reactor.reaction)
 		}
-		c.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
+		c.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 			t.Errorf("[%v] unreachable action. testclient called too many times: %+v", i, action)
 			return true, nil, fmt.Errorf("uncreachable action")
 		})
@@ -228,7 +236,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			observedRecord: test.observedRecord,
 			observedTime:   test.observedTime,
 		}
-		le.config.Client = c
+		lock.Client = c
 
 		if test.expectSuccess != le.tryAcquireOrRenew() {
 			t.Errorf("[%v]unexpected result of tryAcquireOrRenew: [succeded=%v]", i, !test.expectSuccess)

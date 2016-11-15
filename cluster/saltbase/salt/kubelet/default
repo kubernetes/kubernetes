@@ -26,7 +26,6 @@
 
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
 
-{% set reconcile_cidr_args = "" -%}
 {% if grains['roles'][0] == 'kubernetes-master' -%}
   {% if grains.cloud in ['aws', 'gce', 'vagrant', 'vsphere', 'photon-controller', 'openstack', 'azure-legacy'] -%}
 
@@ -35,7 +34,6 @@
     {% if grains.kubelet_api_servers is defined -%}
       {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
       {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false" -%}
-      {% set reconcile_cidr_args =  "--reconcile-cidr=false" -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
     {% endif -%}
@@ -48,12 +46,12 @@
 {% endif -%}
 
 {% set cloud_provider = "" -%}
-{% if grains.cloud is defined and grains.cloud not in ['vagrant', 'vsphere', 'photon-controller', 'azure-legacy'] -%}
+{% if grains.cloud is defined and grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
   {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 {% endif -%}
 
 {% set cloud_config = "" -%}
-{% if grains.cloud in [ 'openstack' ] and grains.cloud_config is defined -%}
+{% if grains.cloud in [ 'openstack', 'vsphere' ] and grains.cloud_config is defined -%}
   {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
 {% endif -%}
 
@@ -87,24 +85,9 @@
   {% set kubelet_root = " --root-dir=" + grains.kubelet_root -%}
 {% endif -%}
 
-{% set configure_cbr0 = "" -%}
-{% if pillar['allocate_node_cidrs'] is defined -%}
-  {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
-{% endif -%}
-
 {% set non_masquerade_cidr = "" -%}
 {% if pillar.get('non_masquerade_cidr','') -%}
   {% set non_masquerade_cidr = "--non-masquerade-cidr=" + pillar.non_masquerade_cidr -%}
-{% endif -%}
-
-# The master kubelet cannot wait for the flannel daemon because it is responsible
-# for starting up the flannel server in a static pod. So even though the flannel
-# daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
-# on the master run with host networking, so the master flannel doesn't care
-# even if the network changes. We only need it for the master proxy.
-{% set experimental_flannel_overlay = "" -%}
-{% if pillar.get('network_provider', '').lower() == 'flannel' and grains['roles'][0] != 'kubernetes-master' %}
-  {% set experimental_flannel_overlay = "--experimental-flannel-overlay=true" %}
 {% endif -%}
 
 # Setup cgroups hierarchies.
@@ -141,6 +124,11 @@
  {% set cpu_cfs_quota = "--cpu-cfs-quota=" + pillar['enable_cpu_cfs_quota'] -%}
 {% endif -%}
 
+{% set feature_gates = "" -%}
+{% if grains['feature_gates'] is defined -%}
+  {% set feature_gates = "--feature-gates=" + grains['feature_gates'] -%}
+{% endif %}
+
 {% set test_args = "" -%}
 {% if pillar['kubelet_test_args'] is defined -%}
   {% set test_args=pillar['kubelet_test_args'] %}
@@ -155,9 +143,6 @@
   {% set network_plugin = "--network-plugin=cni --network-plugin-dir=/etc/cni/net.d/" %}
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
   {% set network_plugin = "--network-plugin=kubenet" -%}
-  {% if reconcile_cidr_args == '' -%}
-    {% set reconcile_cidr_args =  "--reconcile-cidr=true" -%}
-  {% endif -%}
 {% endif -%}
 
 # Don't pipe the --hairpin-mode flag by default. This allows the kubelet to pick
@@ -204,4 +189,4 @@
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{ reconcile_cidr_args }} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{feature_gates}} {{test_args}}"

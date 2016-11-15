@@ -383,6 +383,85 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h2 id="_definitions">Definitions</h2>
 <div class="sectionbody">
 <div class="sect2">
+<h3 id="_v1_photonpersistentdiskvolumesource">v1.PhotonPersistentDiskVolumeSource</h3>
+<div class="paragraph">
+<p>Represents a Photon Controller persistent disk resource.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pdID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ID that identifies Photon Controller persistent disk</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_versioned_event">versioned.Event</h3>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">type</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_preconditions">v1.Preconditions</h3>
 <div class="paragraph">
 <p>Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.</p>
@@ -592,65 +671,24 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">server</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Server is the hostname or IP address of the NFS server. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Server is the hostname or IP address of the NFS server. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#nfs">http://kubernetes.io/docs/user-guide/volumes#nfs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Path that is exported by the NFS server. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Path that is exported by the NFS server. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#nfs">http://kubernetes.io/docs/user-guide/volumes#nfs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#nfs">http://kubernetes.io/docs/user-guide/volumes#nfs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
-<h3 id="_v1_labelselector">v1.LabelSelector</h3>
-<div class="paragraph">
-<p>A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">matchLabels</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">matchExpressions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">matchExpressions is a list of label selector requirements. The requirements are ANDed.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselectorrequirement">v1.LabelSelectorRequirement</a> array</p></td>
-<td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
 </table>
@@ -681,7 +719,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">monitors</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Required: Monitors is a collection of Ceph monitors More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Required: Monitors is a collection of Ceph monitors More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -695,28 +733,28 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: User is the rados user name, default is admin More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: User is the rados user name, default is admin More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretFile</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -791,7 +829,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">targetWWNs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Required: FC target world wide names (WWNs)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Required: FC target worldwide names (WWNs)</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -849,6 +887,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">Items is a list of downward API volume file</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_downwardapivolumefile">v1.DownwardAPIVolumeFile</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">defaultMode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -935,28 +980,28 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">pdName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk">http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk">http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">partition</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as "1". Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty). More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as "1". Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty). More info: <a href="http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk">http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk">http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -1027,7 +1072,7 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#names">http://kubernetes.io/docs/user-guide/identifiers#names</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1039,12 +1084,15 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_keytopath">v1.KeyToPath</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">defaultMode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
-
-</div>
-<div class="sect2">
-<h3 id="__versioned_event">*versioned.Event</h3>
 
 </div>
 <div class="sect2">
@@ -1285,7 +1333,7 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#names">http://kubernetes.io/docs/user-guide/identifiers#names</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1326,21 +1374,21 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">image</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Docker image name. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/images.md">http://releases.k8s.io/HEAD/docs/user-guide/images.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Docker image name. More info: <a href="http://kubernetes.io/docs/user-guide/images">http://kubernetes.io/docs/user-guide/images</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">command</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Entrypoint array. Not executed within a shell. The docker image&#8217;s ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Entrypoint array. Not executed within a shell. The docker image&#8217;s ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/containers#containers-and-commands">http://kubernetes.io/docs/user-guide/containers#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">args</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Arguments to the entrypoint. The docker image&#8217;s CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Arguments to the entrypoint. The docker image&#8217;s CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/containers#containers-and-commands">http://kubernetes.io/docs/user-guide/containers#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1368,7 +1416,7 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">resources</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Compute Resources required by this container. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Compute Resources required by this container. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/persistent-volumes#resources">http://kubernetes.io/docs/user-guide/persistent-volumes#resources</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_resourcerequirements">v1.ResourceRequirements</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1382,14 +1430,14 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">livenessProbe</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/pod-states#container-probes">http://kubernetes.io/docs/user-guide/pod-states#container-probes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_probe">v1.Probe</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readinessProbe</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/pod-states#container-probes">http://kubernetes.io/docs/user-guide/pod-states#container-probes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_probe">v1.Probe</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1410,7 +1458,7 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">imagePullPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/images.md#updating-images">http://releases.k8s.io/HEAD/docs/user-guide/images.md#updating-images</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/images#updating-images">http://kubernetes.io/docs/user-guide/images#updating-images</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1570,7 +1618,7 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">conditions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Conditions represent the latest available observations of an object&#8217;s current state. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/jobs.md">http://releases.k8s.io/HEAD/docs/user-guide/jobs.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Conditions represent the latest available observations of an object&#8217;s current state. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_jobcondition">v1.JobCondition</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1579,14 +1627,14 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">startTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">completionTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1639,7 +1687,7 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#names">http://kubernetes.io/docs/user-guide/identifiers#names</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1659,7 +1707,7 @@ Applied only if Name is not specified. More info: <a href="http://releases.k8s.i
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Namespace defines the space within each name must be unique. An empty namespace is equivalent to the "default" namespace, but "default" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.<br>
 <br>
-Must be a DNS_LABEL. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md">http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md</a></p></td>
+Must be a DNS_LABEL. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/namespaces">http://kubernetes.io/docs/user-guide/namespaces</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1675,7 +1723,7 @@ Must be a DNS_LABEL. Cannot be updated. More info: <a href="http://releases.k8s.
 <td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.<br>
 <br>
-Populated by the system. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids</a></p></td>
+Populated by the system. Read-only. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#uids">http://kubernetes.io/docs/user-guide/identifiers#uids</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1702,16 +1750,16 @@ Populated by the system. Read-only. Value must be treated as opaque by clients a
 <br>
 Populated by the system. Read-only. Null for lists. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">deletionTimestamp</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.<br>
+<td class="tableblock halign-left valign-top"><p class="tableblock">DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.<br>
 <br>
 Populated by the system when a graceful deletion is requested. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1723,14 +1771,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">labels</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/labels.md">http://releases.k8s.io/HEAD/docs/user-guide/labels.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: <a href="http://kubernetes.io/docs/user-guide/labels">http://kubernetes.io/docs/user-guide/labels</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">annotations</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/annotations.md">http://releases.k8s.io/HEAD/docs/user-guide/annotations.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: <a href="http://kubernetes.io/docs/user-guide/annotations">http://kubernetes.io/docs/user-guide/annotations</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1747,6 +1795,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">clusterName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -1792,14 +1847,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#names">http://kubernetes.io/docs/user-guide/identifiers#names</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">UID of the referent. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UID of the referent. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#uids">http://kubernetes.io/docs/user-guide/identifiers#uids</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1844,7 +1899,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Path of the directory on the host. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Path of the directory on the host. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#hostpath">http://kubernetes.io/docs/user-guide/volumes#hostpath</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1954,7 +2009,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#iscsi">http://kubernetes.io/docs/user-guide/volumes#iscsi</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1995,7 +2050,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">medium</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">What type of storage medium should back this directory. The default is "" which means to use the node&#8217;s default medium. Must be an empty string (default) or Memory. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">What type of storage medium should back this directory. The default is "" which means to use the node&#8217;s default medium. Must be an empty string (default) or Memory. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#emptydir">http://kubernetes.io/docs/user-guide/volumes#emptydir</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2152,7 +2207,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">claimName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: <a href="http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims">http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2196,14 +2251,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">volumeID</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: <a href="http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore">http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore">http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2217,7 +2272,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Specify "true" to force and set the ReadOnly property in VolumeMounts to "true". If omitted, the default is "false". More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specify "true" to force and set the ReadOnly property in VolumeMounts to "true". If omitted, the default is "false". More info: <a href="http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore">http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -2229,7 +2284,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_flockervolumesource">v1.FlockerVolumeSource</h3>
 <div class="paragraph">
-<p>Represents a Flocker volume mounted by the Flocker agent. Flocker volumes do not support ownership management or SELinux relabeling.</p>
+<p>Represents a Flocker volume mounted by the Flocker agent. One and only one of datasetName and datasetUUID should be set. Flocker volumes do not support ownership management or SELinux relabeling.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2251,8 +2306,15 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">datasetName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Required: the volume name. This is going to be store on metadata &#8594; name on the payload for Flocker</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the dataset stored as metadata &#8594; name on the dataset for Flocker should be considered as deprecated</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">datasetUUID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UUID of the dataset. This is unique identifier of a Flocker dataset</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -2293,6 +2355,68 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">String that identifies the server&#8217;s internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_quobytevolumesource">v1.QuobyteVolumeSource</h3>
+<div class="paragraph">
+<p>Represents a Quobyte mount that lasts the lifetime of a pod. Quobyte volumes do not support ownership management or SELinux relabeling.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">registry</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">volume</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Volume is a string that references an already created Quobyte volume by name.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">User to map volume access to Defaults to serivceaccount user</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">group</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Group to map volume access to Default is no group</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2364,6 +2488,47 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
+<h3 id="_unversioned_labelselector">unversioned.LabelSelector</h3>
+<div class="paragraph">
+<p>A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchLabels</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchExpressions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchExpressions is a list of label selector requirements. The requirements are ANDed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_labelselectorrequirement">unversioned.LabelSelectorRequirement</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_jobcondition">v1.JobCondition</h3>
 <div class="paragraph">
 <p>JobCondition describes current state of a job.</p>
@@ -2404,14 +2569,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastProbeTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Last time the condition was checked.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastTransitionTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Last time the condition transit from one status to another.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -2515,7 +2680,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the secret in the pod&#8217;s namespace to use. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the secret in the pod&#8217;s namespace to use. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#secrets">http://kubernetes.io/docs/user-guide/volumes#secrets</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2527,52 +2692,11 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_keytopath">v1.KeyToPath</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
-<h3 id="_v1_labelselectorrequirement">v1.LabelSelectorRequirement</h3>
-<div class="paragraph">
-<p>A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
 <tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">key</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">key is the label key that the selector applies to.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">operator</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">operator represents a key&#8217;s relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">values</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">defaultMode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -2652,14 +2776,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">limits</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Limits describes the maximum amount of compute resources allowed. More info: <a href="http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications">http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Limits describes the maximum amount of compute resources allowed. More info: <a href="http://kubernetes.io/docs/user-guide/compute-resources/">http://kubernetes.io/docs/user-guide/compute-resources/</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">requests</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: <a href="http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications">http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: <a href="http://kubernetes.io/docs/user-guide/compute-resources/">http://kubernetes.io/docs/user-guide/compute-resources/</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2671,7 +2795,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_flexvolumesource">v1.FlexVolumeSource</h3>
 <div class="paragraph">
-<p>FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.</p>
+<p>FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2755,7 +2879,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">fieldRef</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Selects a field of the pod; only name and namespace are supported.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectfieldselector">v1.ObjectFieldSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2863,6 +2987,75 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_azurediskvolumesource">v1.AzureDiskVolumeSource</h3>
+<div class="paragraph">
+<p>AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">diskName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The Name of the data disk in the blob storage</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">diskURI</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The URI the data disk in the blob storage</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">cachingMode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Host Caching mode: None, Read Only, Read Write.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_azuredatadiskcachingmode">v1.AzureDataDiskCachingMode</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
 </tbody>
 </table>
 
@@ -2933,14 +3126,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">parallelism</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) &lt; .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/jobs.md">http://releases.k8s.io/HEAD/docs/user-guide/jobs.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) &lt; .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">completions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/jobs.md">http://releases.k8s.io/HEAD/docs/user-guide/jobs.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2954,9 +3147,9 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">selector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors">http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: <a href="http://kubernetes.io/docs/user-guide/labels#label-selectors">http://kubernetes.io/docs/user-guide/labels#label-selectors</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselector">v1.LabelSelector</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_labelselector">unversioned.LabelSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -2968,7 +3161,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">template</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Template is the object that describes the pod that will be created when executing a job. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/jobs.md">http://releases.k8s.io/HEAD/docs/user-guide/jobs.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Template is the object that describes the pod that will be created when executing a job. More info: <a href="http://kubernetes.io/docs/user-guide/jobs">http://kubernetes.io/docs/user-guide/jobs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_podtemplatespec">v1.PodTemplateSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3064,35 +3257,35 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Volume&#8217;s name. Must be a DNS_LABEL and unique within the pod. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Volume&#8217;s name. Must be a DNS_LABEL and unique within the pod. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#names">http://kubernetes.io/docs/user-guide/identifiers#names</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">hostPath</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#hostpath">http://kubernetes.io/docs/user-guide/volumes#hostpath</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_hostpathvolumesource">v1.HostPathVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">emptyDir</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">EmptyDir represents a temporary directory that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">EmptyDir represents a temporary directory that shares a pod&#8217;s lifetime. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#emptydir">http://kubernetes.io/docs/user-guide/volumes#emptydir</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_emptydirvolumesource">v1.EmptyDirVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">gcePersistentDisk</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk">http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_gcepersistentdiskvolumesource">v1.GCEPersistentDiskVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">awsElasticBlockStore</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore">http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_awselasticblockstorevolumesource">v1.AWSElasticBlockStoreVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3106,49 +3299,49 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secret</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Secret represents a secret that should populate this volume. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secret represents a secret that should populate this volume. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#secrets">http://kubernetes.io/docs/user-guide/volumes#secrets</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_secretvolumesource">v1.SecretVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">nfs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">NFS represents an NFS mount on the host that shares a pod&#8217;s lifetime More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NFS represents an NFS mount on the host that shares a pod&#8217;s lifetime More info: <a href="http://kubernetes.io/docs/user-guide/volumes#nfs">http://kubernetes.io/docs/user-guide/volumes#nfs</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_nfsvolumesource">v1.NFSVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">iscsi</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ISCSI represents an ISCSI Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="http://releases.k8s.io/HEAD/examples/iscsi/README.md">http://releases.k8s.io/HEAD/examples/iscsi/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ISCSI represents an ISCSI Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md">http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_iscsivolumesource">v1.ISCSIVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">glusterfs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs represents a Glusterfs mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/glusterfs/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs represents a Glusterfs mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_glusterfsvolumesource">v1.GlusterfsVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">persistentVolumeClaim</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: <a href="http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims">http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumeclaimvolumesource">v1.PersistentVolumeClaimVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rbd</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">RBD represents a Rados Block Device mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md">http://releases.k8s.io/HEAD/examples/rbd/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RBD represents a Rados Block Device mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_rbdvolumesource">v1.RBDVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">flexVolume</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_flexvolumesource">v1.FlexVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3207,6 +3400,27 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_vspherevirtualdiskvolumesource">v1.VsphereVirtualDiskVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">quobyte</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Quobyte represents a Quobyte mount on the host that shares a pod&#8217;s lifetime</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_quobytevolumesource">v1.QuobyteVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">azureDisk</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_azurediskvolumesource">v1.AzureDiskVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">photonPersistentDisk</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_photonpersistentdiskvolumesource">v1.PhotonPersistentDiskVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -3307,14 +3521,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">initialDelaySeconds</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after the container has started before liveness probes are initiated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after the container has started before liveness probes are initiated. More info: <a href="http://kubernetes.io/docs/user-guide/pod-states#container-probes">http://kubernetes.io/docs/user-guide/pod-states#container-probes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: <a href="http://kubernetes.io/docs/user-guide/pod-states#container-probes">http://kubernetes.io/docs/user-guide/pod-states#container-probes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3338,6 +3552,54 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_unversioned_labelselectorrequirement">unversioned.LabelSelectorRequirement</h3>
+<div class="paragraph">
+<p>A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">key</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">key is the label key that the selector applies to.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">operator</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">operator represents a key&#8217;s relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">values</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -3424,7 +3686,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#names">http://kubernetes.io/docs/user-guide/identifiers#names</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3619,6 +3881,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_resourcefieldselector">v1.ResourceFieldSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -3648,21 +3917,21 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">volumes</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">List of volumes that can be mounted by containers belonging to the pod. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of volumes that can be mounted by containers belonging to the pod. More info: <a href="http://kubernetes.io/docs/user-guide/volumes">http://kubernetes.io/docs/user-guide/volumes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_volume">v1.Volume</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">containers</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/containers.md">http://releases.k8s.io/HEAD/docs/user-guide/containers.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: <a href="http://kubernetes.io/docs/user-guide/containers">http://kubernetes.io/docs/user-guide/containers</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_container">v1.Container</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">restartPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#restartpolicy">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#restartpolicy</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: <a href="http://kubernetes.io/docs/user-guide/pod-states#restartpolicy">http://kubernetes.io/docs/user-guide/pod-states#restartpolicy</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3690,7 +3959,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">nodeSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node&#8217;s labels for the pod to be scheduled on that node. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md">http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node&#8217;s labels for the pod to be scheduled on that node. More info: <a href="http://kubernetes.io/docs/user-guide/node-selection/README">http://kubernetes.io/docs/user-guide/node-selection/README</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3746,7 +4015,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">imagePullSecrets</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod">http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: <a href="http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod">http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3856,14 +4125,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">postStart</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details">http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: <a href="http://kubernetes.io/docs/user-guide/container-environment#hook-details">http://kubernetes.io/docs/user-guide/container-environment#hook-details</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_handler">v1.Handler</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">preStop</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details">http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: <a href="http://kubernetes.io/docs/user-guide/container-environment#hook-details">http://kubernetes.io/docs/user-guide/container-environment#hook-details</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_handler">v1.Handler</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3897,7 +4166,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names">http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent. More info: <a href="http://kubernetes.io/docs/user-guide/identifiers#names">http://kubernetes.io/docs/user-guide/identifiers#names</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3986,27 +4255,31 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">endpoints</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">EndpointsName is the endpoint name that details Glusterfs topology. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">EndpointsName is the endpoint name that details Glusterfs topology. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Path is the Glusterfs volume path. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Path is the Glusterfs volume path. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 </tbody>
 </table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_azuredatadiskcachingmode">v1.AzureDataDiskCachingMode</h3>
 
 </div>
 <div class="sect2">
@@ -4034,56 +4307,56 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">monitors</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A collection of Ceph monitors. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A collection of Ceph monitors. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">image</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The rados image name. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The rados image name. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#rbd">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#rbd</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: <a href="http://kubernetes.io/docs/user-guide/volumes#rbd">http://kubernetes.io/docs/user-guide/volumes#rbd</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">pool</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The rados pool name. Default is rbd. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The rados pool name. Default is rbd. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a>.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The rados user name. Default is admin. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The rados user name. Default is admin. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">keyring</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -4103,7 +4376,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-06-06 17:05:30 UTC
+Last updated 2016-11-05 07:45:07 UTC
 </div>
 </div>
 </body>

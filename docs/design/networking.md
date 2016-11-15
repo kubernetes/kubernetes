@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/networking.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Networking
 
 There are 4 distinct networking problems to solve:
@@ -207,10 +173,13 @@ External IP assignment would also simplify DNS support (see below).
 
 ### IPv6
 
-IPv6 would be a nice option, also, but we can't depend on it yet. Docker support
-is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974),
-[Docker issue #6923](https://github.com/dotcloud/docker/issues/6923),
-[Docker issue #6975](https://github.com/dotcloud/docker/issues/6975).
+IPv6 support would be nice but requires significant internal changes in a few
+areas. First pods should be able to report multiple IP addresses
+[Kubernetes issue #27398](https://github.com/kubernetes/kubernetes/issues/27398)
+and the network plugin architecture Kubernetes uses needs to allow returning
+IPv6 addresses too [CNI issue #245](https://github.com/containernetworking/cni/issues/245).
+Kubernetes code that deals with IP addresses must then be audited and fixed to
+support both IPv4 and IPv6 addresses and not assume IPv4.
 Additionally, direct ipv6 assignment to instances doesn't appear to be supported
 by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull
 requests from people running Kubernetes on bare metal, though. :-)

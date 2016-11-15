@@ -26,15 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/federation/api"
+const importPrefix = "k8s.io/kubernetes/pkg/api"
 
 var accessor = meta.NewAccessor()
 
@@ -83,7 +81,6 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 	if err := registered.RegisterGroup(groupMeta); err != nil {
 		return err
 	}
-	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	return nil
 }
 
@@ -93,7 +90,9 @@ var userResources = []string{"svc"}
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString()
+	rootScoped := sets.NewString(
+		"Namespace",
+	)
 
 	// these kinds should be excluded from the list of resources
 	ignoredKinds := sets.NewString(
@@ -101,7 +100,7 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 		"DeleteOptions",
 		"Status")
 
-	mapper := api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	mapper := api.NewDefaultRESTMapperFromScheme(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped, core.Scheme)
 	// setup aliases for groups of resources
 	mapper.AddResourceAlias("all", userResources...)
 
@@ -125,7 +124,10 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 
 func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 	// add the internal version to Scheme
-	core.AddToScheme(core.Scheme)
+	if err := core.AddToScheme(core.Scheme); err != nil {
+		// Programmer error, detect immediately
+		panic(err)
+	}
 	// add the enabled external versions to Scheme
 	for _, v := range externalVersions {
 		if !registered.IsEnabledVersion(v) {
@@ -134,27 +136,10 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 		}
 		switch v {
 		case core_v1.SchemeGroupVersion:
-			core_v1.AddToScheme(core.Scheme)
+			if err := core_v1.AddToScheme(core.Scheme); err != nil {
+				// Programmer error, detect immediately
+				panic(err)
+			}
 		}
 	}
-
-	// This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
-	// converted the most in the cluster.
-	// TODO: generate one of these for every external API group - this is to prove the impact
-	core.Scheme.AddGenericConversionFunc(func(objA, objB interface{}, s conversion.Scope) (bool, error) {
-		switch a := objA.(type) {
-		case *v1.Service:
-			switch b := objB.(type) {
-			case *api.Service:
-				return true, v1.Convert_v1_Service_To_api_Service(a, b, s)
-			}
-		case *api.Service:
-			switch b := objB.(type) {
-			case *v1.Service:
-				return true, v1.Convert_api_Service_To_v1_Service(a, b, s)
-			}
-
-		}
-		return false, nil
-	})
 }

@@ -17,8 +17,8 @@ limitations under the License.
 package protobuf
 
 import (
-	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 )
 
 type ImportTracker struct {

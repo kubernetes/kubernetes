@@ -24,9 +24,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type cinderDiskAttacher struct {
@@ -53,7 +55,12 @@ func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
-func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
+func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	mounter := plugin.host.GetMounter()
+	return mount.GetMountRefs(mounter, deviceMountPath)
+}
+
+func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -65,7 +72,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (
 	if !res {
 		return "", fmt.Errorf("failed to list openstack instances")
 	}
-	instanceid, err := instances.InstanceID(hostName)
+	instanceid, err := instances.InstanceID(nodeName)
 	if err != nil {
 		return "", err
 	}
@@ -102,7 +109,42 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (
 	return devicePath, err
 }
 
+func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	volumeSpecMap := make(map[string]*volume.Spec)
+	volumeIDList := []string{}
+	for _, spec := range specs {
+		volumeSource, _, err := getVolumeSource(spec)
+		if err != nil {
+			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+			continue
+		}
+
+		volumeIDList = append(volumeIDList, volumeSource.VolumeID)
+		volumesAttachedCheck[spec] = true
+		volumeSpecMap[volumeSource.VolumeID] = spec
+	}
+	attachedResult, err := attacher.cinderProvider.DisksAreAttached(volumeIDList, string(nodeName))
+	if err != nil {
+		// Log error and continue with attach
+		glog.Errorf(
+			"Error checking if Volumes (%v) are already attached to current node (%q). Will continue and try attach anyway. err=%v",
+			volumeIDList, nodeName, err)
+		return volumesAttachedCheck, err
+	}
+
+	for volumeID, attached := range attachedResult {
+		if !attached {
+			spec := volumeSpecMap[volumeID]
+			volumesAttachedCheck[spec] = false
+			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumeID, spec.Name())
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
+	// NOTE: devicePath is is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -125,13 +167,17 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 		case <-ticker.C:
 			glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
 			probeAttachedVolume()
-			exists, err := pathExists(devicePath)
+			if !attacher.cinderProvider.ShouldTrustDevicePath() {
+				// Using the Cinder volume ID, find the real device path (See Issue #33128)
+				devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
+			}
+			exists, err := volumeutil.PathExists(devicePath)
 			if exists && err == nil {
-				glog.Infof("Successfully found attached Cinder disk %q.", volumeID)
+				glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil
 			} else {
-				//Log error, if any, and continue checking periodically
-				glog.Errorf("Error Stat Cinder disk (%q) is attached: %v", volumeID, err)
+				// Log an error, and continue checking periodically
+				glog.Errorf("Error: could not find attached Cinder disk %q: %v", volumeID, err)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
@@ -202,13 +248,13 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName string) error {
+func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
 	volumeID := path.Base(deviceMountPath)
 	instances, res := detacher.cinderProvider.Instances()
 	if !res {
 		return fmt.Errorf("failed to list openstack instances")
 	}
-	instanceid, err := instances.InstanceID(hostName)
+	instanceid, err := instances.InstanceID(nodeName)
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
@@ -218,12 +264,12 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 		// Log error and continue with detach
 		glog.Errorf(
 			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
-			volumeID, hostName, err)
+			volumeID, nodeName, err)
 	}
 
 	if err == nil && !attached {
 		// Volume is already detached from node.
-		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, hostName)
+		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, nodeName)
 		return nil
 	}
 
@@ -235,51 +281,6 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 	return nil
 }
 
-func (detacher *cinderDiskDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
-	ticker := time.NewTicker(checkSleepDuration)
-	defer ticker.Stop()
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			glog.V(5).Infof("Checking device %q is detached.", devicePath)
-			if pathExists, err := pathExists(devicePath); err != nil {
-				return fmt.Errorf("Error checking if device path exists: %v", err)
-			} else if !pathExists {
-				return nil
-			}
-		case <-timer.C:
-			return fmt.Errorf("Timeout reached; PD Device %v is still attached", devicePath)
-		}
-	}
-}
-
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	volume := path.Base(deviceMountPath)
-	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, detacher.mounter); err != nil {
-		glog.Errorf("Error unmounting %q: %v", volume, err)
-	}
-
-	return nil
-}
-
-// Checks if the specified path exists
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else {
-		return false, err
-	}
-}
-
-// Unmount the global mount path, which should be the only one, and delete it.
-func unmountPDAndRemoveGlobalPath(globalMountPath string, mounter mount.Interface) error {
-	err := mounter.Unmount(globalMountPath)
-	os.Remove(globalMountPath)
-	return err
+	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }

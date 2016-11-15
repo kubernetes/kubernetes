@@ -33,6 +33,17 @@ type NodeMetrics struct {
 	Usage v1.ResourceList `json:"usage"`
 }
 
+// NodeMetricsList is a list of NodeMetrics.
+type NodeMetricsList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// List of node metrics.
+	Items []NodeMetrics `json:"items"`
+}
+
 // resource usage metrics of a pod.
 type PodMetrics struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -45,6 +56,17 @@ type PodMetrics struct {
 
 	// Metrics for all containers are collected within the same time window.
 	Containers []ContainerMetrics `json:"containers"`
+}
+
+// PodMetricsList is a list of PodMetrics.
+type PodMetricsList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// List of pod metrics.
+	Items []PodMetrics `json:"items"`
 }
 
 // resource usage metrics of a container.

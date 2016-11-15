@@ -24,8 +24,10 @@ import (
 type Simple struct {
 	unversioned.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata"`
-	Other                string            `json:"other,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
+	// +optional
+	Other string `json:"other,omitempty"`
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 func (obj *Simple) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
@@ -33,8 +35,10 @@ func (obj *Simple) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta
 type SimpleRoot struct {
 	unversioned.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata"`
-	Other                string            `json:"other,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
+	// +optional
+	Other string `json:"other,omitempty"`
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 func (obj *SimpleRoot) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
@@ -58,7 +62,8 @@ func (obj *SimpleGetOptions) GetObjectKind() unversioned.ObjectKind { return &ob
 type SimpleList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,inline"`
-	Items                []Simple `json:"items,omitempty"`
+	// +optional
+	Items []Simple `json:"items,omitempty"`
 }
 
 func (obj *SimpleList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

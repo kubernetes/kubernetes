@@ -18,62 +18,72 @@ limitations under the License.
 package rbac
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/registry/clusterrole"
-	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
-	"k8s.io/kubernetes/pkg/registry/role"
-	"k8s.io/kubernetes/pkg/registry/rolebinding"
 )
+
+type RequestToRuleMapper interface {
+	// RulesFor returns all known PolicyRules and any errors that happened while locating those rules.
+	// Any rule returned is still valid, since rules are deny by default.  If you can pass with the rules
+	// supplied, you do not have to fail the request.  If you cannot, you should indicate the error along
+	// with your denial.
+	RulesFor(subject user.Info, namespace string) ([]rbac.PolicyRule, error)
+}
 
 type RBACAuthorizer struct {
 	superUser string
 
-	authorizationRuleResolver validation.AuthorizationRuleResolver
+	authorizationRuleResolver RequestToRuleMapper
 }
 
-func (r *RBACAuthorizer) Authorize(attr authorizer.Attributes) error {
-	if r.superUser != "" && attr.GetUserName() == r.superUser {
-		return nil
+func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (bool, string, error) {
+	if r.superUser != "" && requestAttributes.GetUser() != nil && requestAttributes.GetUser().GetName() == r.superUser {
+		return true, "", nil
 	}
 
-	userInfo := &user.DefaultInfo{
-		Name:   attr.GetUserName(),
-		Groups: attr.GetGroups(),
+	rules, ruleResolutionError := r.authorizationRuleResolver.RulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace())
+	if RulesAllow(requestAttributes, rules...) {
+		return true, "", nil
 	}
 
-	ctx := api.WithNamespace(api.WithUser(api.NewContext(), userInfo), attr.GetNamespace())
-
-	// Frame the authorization request as a privilege escalation check.
-	var requestedRule rbac.PolicyRule
-	if attr.IsResourceRequest() {
-		requestedRule = rbac.PolicyRule{
-			Verbs:         []string{attr.GetVerb()},
-			APIGroups:     []string{attr.GetAPIGroup()}, // TODO(ericchiang): add api version here too?
-			Resources:     []string{attr.GetResource()},
-			ResourceNames: []string{attr.GetName()},
-		}
-	} else {
-		requestedRule = rbac.PolicyRule{
-			NonResourceURLs: []string{attr.GetPath()},
-		}
-	}
-
-	return validation.ConfirmNoEscalation(ctx, r.authorizationRuleResolver, []rbac.PolicyRule{requestedRule})
+	return false, "", ruleResolutionError
 }
 
-func New(roleRegistry role.Registry, roleBindingRegistry rolebinding.Registry, clusterRoleRegistry clusterrole.Registry, clusterRoleBindingRegistry clusterrolebinding.Registry, superUser string) *RBACAuthorizer {
+func New(roles validation.RoleGetter, roleBindings validation.RoleBindingLister, clusterRoles validation.ClusterRoleGetter, clusterRoleBindings validation.ClusterRoleBindingLister, superUser string) *RBACAuthorizer {
 	authorizer := &RBACAuthorizer{
 		superUser: superUser,
 		authorizationRuleResolver: validation.NewDefaultRuleResolver(
-			roleRegistry,
-			roleBindingRegistry,
-			clusterRoleRegistry,
-			clusterRoleBindingRegistry,
+			roles, roleBindings, clusterRoles, clusterRoleBindings,
 		),
 	}
 	return authorizer
+}
+
+func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbac.PolicyRule) bool {
+	for _, rule := range rules {
+		if RuleAllows(requestAttributes, rule) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func RuleAllows(requestAttributes authorizer.Attributes, rule rbac.PolicyRule) bool {
+	if requestAttributes.IsResourceRequest() {
+		resource := requestAttributes.GetResource()
+		if len(requestAttributes.GetSubresource()) > 0 {
+			resource = requestAttributes.GetResource() + "/" + requestAttributes.GetSubresource()
+		}
+
+		return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
+			rbac.APIGroupMatches(rule, requestAttributes.GetAPIGroup()) &&
+			rbac.ResourceMatches(rule, resource) &&
+			rbac.ResourceNameMatches(rule, requestAttributes.GetName())
+	}
+
+	return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
+		rbac.NonResourceURLMatches(rule, requestAttributes.GetPath())
 }

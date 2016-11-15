@@ -21,8 +21,11 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	v1.RegisterDefaults(scheme)
+	return scheme.AddDefaultingFuncs(
+		v1.SetDefaults_Secret,
 		v1.SetDefaults_ServiceSpec,
+		v1.SetDefaults_NamespaceStatus,
 	)
 }

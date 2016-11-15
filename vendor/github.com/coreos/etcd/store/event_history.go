@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,24 +78,26 @@ func (eh *EventHistory) scan(key string, recursive bool, index uint64) (*Event, 
 	for {
 		e := eh.Queue.Events[i]
 
-		ok := (e.Node.Key == key)
+		if !e.Refresh {
+			ok := (e.Node.Key == key)
 
-		if recursive {
-			// add tailing slash
-			key = path.Clean(key)
-			if key[len(key)-1] != '/' {
-				key = key + "/"
+			if recursive {
+				// add tailing slash
+				key = path.Clean(key)
+				if key[len(key)-1] != '/' {
+					key = key + "/"
+				}
+
+				ok = ok || strings.HasPrefix(e.Node.Key, key)
 			}
 
-			ok = ok || strings.HasPrefix(e.Node.Key, key)
-		}
+			if (e.Action == Delete || e.Action == Expire) && e.PrevNode != nil && e.PrevNode.Dir {
+				ok = ok || strings.HasPrefix(key, e.PrevNode.Key)
+			}
 
-		if (e.Action == Delete || e.Action == Expire) && e.PrevNode != nil && e.PrevNode.Dir {
-			ok = ok || strings.HasPrefix(key, e.PrevNode.Key)
-		}
-
-		if ok {
-			return e, nil
+			if ok {
+				return e, nil
+			}
 		}
 
 		i = (i + 1) % eh.Queue.Capacity
@@ -117,10 +119,7 @@ func (eh *EventHistory) clone() *EventHistory {
 		Back:     eh.Queue.Back,
 	}
 
-	for i, e := range eh.Queue.Events {
-		clonedQueue.Events[i] = e
-	}
-
+	copy(clonedQueue.Events, eh.Queue.Events)
 	return &EventHistory{
 		StartIndex: eh.StartIndex,
 		Queue:      clonedQueue,

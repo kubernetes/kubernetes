@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,6 +39,18 @@ const (
 	envBackoffDuration = "KUBE_CLIENT_BACKOFF_DURATION"
 )
 
+// Interface captures the set of operations for generically interacting with Kubernetes REST apis.
+type Interface interface {
+	GetRateLimiter() flowcontrol.RateLimiter
+	Verb(verb string) *Request
+	Post() *Request
+	Put() *Request
+	Patch(pt api.PatchType) *Request
+	Get() *Request
+	Delete() *Request
+	APIVersion() unversioned.GroupVersion
+}
+
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
 // The baseURL is expected to point to an HTTP or HTTPS path that is the parent
 // of one or more resources.  The server should return a decodable API resource
@@ -54,7 +67,7 @@ type RESTClient struct {
 	// contentConfig is the information used to communicate with the server.
 	contentConfig ContentConfig
 
-	// serializers contain all serializers for undelying content type.
+	// serializers contain all serializers for underlying content type.
 	serializers Serializers
 
 	// creates BackoffManager that is passed to requests.
@@ -141,34 +154,55 @@ func readExpBackoffConfig() BackoffManager {
 }
 
 // createSerializers creates all necessary serializers for given contentType.
+// TODO: the negotiated serializer passed to this method should probably return
+//   serializers that control decoding and versioning without this package
+//   being aware of the types. Depends on whether RESTClient must deal with
+//   generic infrastructure.
 func createSerializers(config ContentConfig) (*Serializers, error) {
-	negotiated := config.NegotiatedSerializer
+	mediaTypes := config.NegotiatedSerializer.SupportedMediaTypes()
 	contentType := config.ContentType
-	info, ok := negotiated.SerializerForMediaType(contentType, nil)
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return nil, fmt.Errorf("the content type specified in the client configuration is not recognized: %v", err)
+	}
+	info, ok := runtime.SerializerInfoForMediaType(mediaTypes, mediaType)
 	if !ok {
-		return nil, fmt.Errorf("serializer for %s not registered", contentType)
+		if len(contentType) != 0 || len(mediaTypes) == 0 {
+			return nil, fmt.Errorf("no serializers registered for %s", contentType)
+		}
+		info = mediaTypes[0]
 	}
-	streamInfo, ok := negotiated.StreamingSerializerForMediaType(contentType, nil)
-	if !ok {
-		return nil, fmt.Errorf("streaming serializer for %s not registered", contentType)
+
+	internalGV := unversioned.GroupVersions{
+		{
+			Group:   config.GroupVersion.Group,
+			Version: runtime.APIVersionInternal,
+		},
+		// always include the legacy group as a decoding target to handle non-error `Status` return types
+		{
+			Group:   "",
+			Version: runtime.APIVersionInternal,
+		},
 	}
-	internalGV := unversioned.GroupVersion{
-		Group:   config.GroupVersion.Group,
-		Version: runtime.APIVersionInternal,
-	}
-	return &Serializers{
-		Encoder:             negotiated.EncoderForVersion(info.Serializer, *config.GroupVersion),
-		Decoder:             negotiated.DecoderToVersion(info.Serializer, internalGV),
-		StreamingSerializer: streamInfo.Serializer,
-		Framer:              streamInfo.Framer,
+
+	s := &Serializers{
+		Encoder: config.NegotiatedSerializer.EncoderForVersion(info.Serializer, *config.GroupVersion),
+		Decoder: config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV),
+
 		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
-			renegotiated, ok := negotiated.SerializerForMediaType(contentType, params)
+			info, ok := runtime.SerializerInfoForMediaType(mediaTypes, contentType)
 			if !ok {
 				return nil, fmt.Errorf("serializer for %s not registered", contentType)
 			}
-			return negotiated.DecoderToVersion(renegotiated.Serializer, internalGV), nil
+			return config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV), nil
 		},
-	}, nil
+	}
+	if info.StreamSerializer != nil {
+		s.StreamingSerializer = info.StreamSerializer.Serializer
+		s.Framer = info.StreamSerializer.Framer
+	}
+
+	return s, nil
 }
 
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
@@ -221,8 +255,4 @@ func (c *RESTClient) Delete() *Request {
 // APIVersion returns the APIVersion this RESTClient is expected to use.
 func (c *RESTClient) APIVersion() unversioned.GroupVersion {
 	return *c.contentConfig.GroupVersion
-}
-
-func (c *RESTClient) Codec() runtime.Codec {
-	return c.contentConfig.Codec
 }

@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -40,21 +39,22 @@ type VolumeOptions struct {
 	// TODO: refactor all of this out of volumes when an admin can configure
 	// many kinds of provisioners.
 
-	// Capacity is the size of a volume.
-	Capacity resource.Quantity
-	// AccessModes of a volume
-	AccessModes []api.PersistentVolumeAccessMode
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy api.PersistentVolumeReclaimPolicy
 	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
 	// volume name.
 	PVName string
-	// PVC.Name of the PersistentVolumeClaim; only set during dynamic provisioning.
-	PVCName string
+	// PVC is reference to the claim that lead to provisioning of a new PV.
+	// Provisioners *must* create a PV that would be matched by this PVC,
+	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
+	// so on.
+	PVC *api.PersistentVolumeClaim
 	// Unique name of Kubernetes cluster.
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
+	// Volume provisioning parameters from StorageClass
+	Parameters map[string]string
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
@@ -98,6 +98,12 @@ type VolumePlugin interface {
 	// - name: The volume name, as per the api.Volume spec.
 	// - podUID: The UID of the enclosing pod
 	NewUnmounter(name string, podUID types.UID) (Unmounter, error)
+
+	// ConstructVolumeSpec constructs a volume spec based on the given volume name
+	// and mountPath. The spec may have incomplete information due to limited
+	// information from input. This function is used by volume manager to reconstruct
+	// volume spec by reading the volume directories from disk
+	ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used
@@ -113,9 +119,12 @@ type PersistentVolumePlugin interface {
 // again to new claims
 type RecyclableVolumePlugin interface {
 	VolumePlugin
-	// NewRecycler creates a new volume.Recycler which knows how to reclaim
-	// this resource after the volume's release from a PersistentVolumeClaim
-	NewRecycler(pvName string, spec *Spec) (Recycler, error)
+	// NewRecycler creates a new volume.Recycler which knows how to reclaim this
+	// resource after the volume's release from a PersistentVolumeClaim. The
+	// recycler will use the provided recorder to write any events that might be
+	// interesting to user. It's expected that caller will pass these events to
+	// the PV being recycled.
+	NewRecycler(pvName string, spec *Spec, eventRecorder RecycleEventRecorder) (Recycler, error)
 }
 
 // DeletableVolumePlugin is an extended interface of VolumePlugin and is used
@@ -151,6 +160,7 @@ type AttachableVolumePlugin interface {
 	VolumePlugin
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
+	GetDeviceMountRefs(deviceMountPath string) ([]string, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
@@ -202,11 +212,8 @@ type VolumeHost interface {
 	// Returns host IP or nil in the case of error.
 	GetHostIP() (net.IP, error)
 
-	// Returns the rootcontext to use when performing mounts for a volume.
-	// This is a temporary measure in order to set the rootContext of tmpfs
-	// mounts correctly. It will be replaced and expanded on by future
-	// SecurityContext work.
-	GetRootContext() string
+	// Returns node allocatable
+	GetNodeAllocatable() (api.ResourceList, error)
 }
 
 // VolumePluginMgr tracks registered plugins.
@@ -283,6 +290,10 @@ type VolumeConfig struct {
 	// the system and only understood by the binary hosting the plugin and the
 	// plugin itself.
 	OtherAttributes map[string]string
+
+	// ProvisioningEnabled configures whether provisioning of this plugin is
+	// enabled or not. Currently used only in host_path plugin.
+	ProvisioningEnabled bool
 }
 
 // NewSpecFromVolume creates an Spec from an api.Volume
@@ -385,7 +396,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find volume plugin for spec: %+v", spec)
+		return nil, fmt.Errorf("Could not find volume plugin for spec: %#v", spec)
 	}
 	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
 		return persistentVolumePlugin, nil
@@ -419,10 +430,36 @@ func (pm *VolumePluginMgr) FindRecyclablePluginBySpec(spec *Spec) (RecyclableVol
 	return nil, fmt.Errorf("no recyclable volume plugin matched")
 }
 
-// FindDeletablePluginByName fetches a persistent volume plugin by name.  If
+// FindProvisionablePluginByName fetches  a persistent volume plugin by name.  If
+// no plugin is found, returns error.
+func (pm *VolumePluginMgr) FindProvisionablePluginByName(name string) (ProvisionableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if provisionableVolumePlugin, ok := volumePlugin.(ProvisionableVolumePlugin); ok {
+		return provisionableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no provisionable volume plugin matched")
+}
+
+// FindDeletablePluginBySppec fetches a persistent volume plugin by spec.  If
 // no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if deletableVolumePlugin, ok := volumePlugin.(DeletableVolumePlugin); ok {
+		return deletableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no deletable volume plugin matched")
+}
+
+// FindDeletablePluginByName fetches a persistent volume plugin by name.  If
+// no plugin is found, returns error.
+func (pm *VolumePluginMgr) FindDeletablePluginByName(name string) (DeletableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
 	if err != nil {
 		return nil, err
 	}

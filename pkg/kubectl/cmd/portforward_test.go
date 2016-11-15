@@ -20,15 +20,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 type fakePortForwarder struct {
@@ -37,30 +37,29 @@ type fakePortForwarder struct {
 	pfErr  error
 }
 
-func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
+func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
 	f.method = method
 	f.url = url
 	return f.pfErr
 }
 
-func TestPortForward(t *testing.T) {
-	version := testapi.Default.GroupVersion().Version
+func testPortForward(t *testing.T, flags map[string]string, args []string) {
+	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
 
 	tests := []struct {
-		name, version, podPath, pfPath, container string
-		pod                                       *api.Pod
-		pfErr                                     bool
+		name                       string
+		podPath, pfPath, container string
+		pod                        *api.Pod
+		pfErr                      bool
 	}{
 		{
 			name:    "pod portforward",
-			version: version,
 			podPath: "/api/" + version + "/namespaces/test/pods/foo",
 			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
 			pod:     execPod(),
 		},
 		{
 			name:    "pod portforward error",
-			version: version,
 			podPath: "/api/" + version + "/namespaces/test/pods/foo",
 			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
 			pod:     execPod(),
@@ -68,9 +67,10 @@ func TestPortForward(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		var err error
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
@@ -84,17 +84,32 @@ func TestPortForward(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = defaultClientConfig()
 		ff := &fakePortForwarder{}
 		if test.pfErr {
 			ff.pfErr = fmt.Errorf("pf error")
 		}
-		cmd := &cobra.Command{}
-		cmd.Flags().StringP("pod", "p", "", "Pod name")
-		err := RunPortForward(f, cmd, []string{"foo", ":5000", ":1000"}, ff)
+
+		opts := &PortForwardOptions{}
+		cmd := NewCmdPortForward(f, os.Stdout, os.Stderr)
+		cmd.Run = func(cmd *cobra.Command, args []string) {
+			if err = opts.Complete(f, cmd, args, os.Stdout, os.Stderr); err != nil {
+				return
+			}
+			opts.PortForwarder = ff
+			if err = opts.Validate(); err != nil {
+				return
+			}
+			err = opts.RunPortForward()
+		}
+
+		for name, value := range flags {
+			cmd.Flags().Set(name, value)
+		}
+		cmd.Run(cmd, args)
 
 		if test.pfErr && err != ff.pfErr {
-			t.Errorf("%s: Unexpected exec error: %v", test.name, err)
+			t.Errorf("%s: Unexpected port-forward error: %v", test.name, err)
 		}
 		if !test.pfErr && err != nil {
 			t.Errorf("%s: Unexpected error: %v", test.name, err)
@@ -109,68 +124,13 @@ func TestPortForward(t *testing.T) {
 		if ff.method != "POST" {
 			t.Errorf("%s: Did not get method for attach request: %s", test.name, ff.method)
 		}
-
 	}
 }
 
-func TestPortForwardWithPFlag(t *testing.T) {
-	version := testapi.Default.GroupVersion().Version
+func TestPortForward(t *testing.T) {
+	testPortForward(t, nil, []string{"foo", ":5000", ":1000"})
+}
 
-	tests := []struct {
-		name, version, podPath, pfPath, container string
-		pod                                       *api.Pod
-		pfErr                                     bool
-	}{
-		{
-			name:    "pod portforward",
-			version: version,
-			podPath: "/api/" + version + "/namespaces/test/pods/foo",
-			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
-			pod:     execPod(),
-		},
-		{
-			name:    "pod portforward error",
-			version: version,
-			podPath: "/api/" + version + "/namespaces/test/pods/foo",
-			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
-			pod:     execPod(),
-			pfErr:   true,
-		},
-	}
-	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
-			Codec: codec,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				default:
-					// Ensures no GET is performed when deleting by name
-					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
-		ff := &fakePortForwarder{}
-		if test.pfErr {
-			ff.pfErr = fmt.Errorf("pf error")
-		}
-		cmd := &cobra.Command{}
-		podPtr := cmd.Flags().StringP("pod", "p", "", "Pod name")
-		*podPtr = "foo"
-		err := RunPortForward(f, cmd, []string{":5000", ":1000"}, ff)
-		if test.pfErr && err != ff.pfErr {
-			t.Errorf("%s: Unexpected exec error: %v", test.name, err)
-		}
-		if !test.pfErr && ff.url.Path != test.pfPath {
-			t.Errorf("%s: Did not get expected path for portforward request", test.name)
-		}
-		if !test.pfErr && err != nil {
-			t.Errorf("%s: Unexpected error: %v", test.name, err)
-		}
-	}
+func TestPortForwardWithPFlag(t *testing.T) {
+	testPortForward(t, map[string]string{"pod": "foo"}, []string{":5000", ":1000"})
 }

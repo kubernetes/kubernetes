@@ -48,9 +48,9 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 	}
 
 	// If the container logs directory does not exist, create it.
-	if _, err := os.Stat(containerLogsDir); err != nil {
-		if err := kl.os.MkdirAll(containerLogsDir, 0755); err != nil {
-			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
+	if _, err := os.Stat(ContainerLogsDir); err != nil {
+		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
+			glog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
 		}
 	}
 
@@ -71,20 +71,22 @@ func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results [
 	admitted := []*api.Pod{}
 	for _, pod := range pods {
 		// Check if we can admit the pod.
-		if ok, reason, message := kl.canAdmitPod(append(admitted, pod), pod); !ok {
+		if ok, reason, message := kl.canAdmitPod(admitted, pod); !ok {
 			kl.rejectPod(pod, reason, message)
-		} else {
-			admitted = append(admitted, pod)
+			results = append(results, RunPodResult{pod, nil})
+			continue
 		}
+
+		admitted = append(admitted, pod)
 		go func(pod *api.Pod) {
 			err := kl.runPod(pod, retryDelay)
 			ch <- RunPodResult{pod, err}
 		}(pod)
 	}
 
-	glog.Infof("waiting for %d pods", len(pods))
+	glog.Infof("Waiting for %d pods", len(admitted))
 	failedPods := []string{}
-	for i := 0; i < len(pods); i++ {
+	for i := 0; i < len(admitted); i++ {
 		res := <-ch
 		results = append(results, res)
 		if res.Err != nil {

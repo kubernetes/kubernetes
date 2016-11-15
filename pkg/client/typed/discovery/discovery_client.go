@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -31,17 +32,26 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/version"
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
 type DiscoveryInterface interface {
+	RESTClient() restclient.Interface
 	ServerGroupsInterface
 	ServerResourcesInterface
 	ServerVersionInterface
 	SwaggerSchemaInterface
+}
+
+// CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
+type CachedDiscoveryInterface interface {
+	DiscoveryInterface
+	// Fresh returns true if no cached data was used that had been retrieved before the instantiation.
+	Fresh() bool
+	// Invalidate enforces that no cached data is used in the future that is older than the current time.
+	Invalidate()
 }
 
 // ServerGroupsInterface has methods for obtaining supported groups on the API server
@@ -80,7 +90,7 @@ type SwaggerSchemaInterface interface {
 // DiscoveryClient implements the functions that discover server-supported API groups,
 // versions and resources.
 type DiscoveryClient struct {
-	*restclient.RESTClient
+	restClient restclient.Interface
 
 	LegacyPrefix string
 }
@@ -107,7 +117,7 @@ func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unver
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
 	v := &unversioned.APIVersions{}
-	err = d.Get().AbsPath(d.LegacyPrefix).Do().Into(v)
+	err = d.restClient.Get().AbsPath(d.LegacyPrefix).Do().Into(v)
 	apiGroup := unversioned.APIGroup{}
 	if err == nil {
 		apiGroup = apiVersionsToAPIGroup(v)
@@ -118,7 +128,7 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 
 	// Get the groupVersions exposed at /apis
 	apiGroupList = &unversioned.APIGroupList{}
-	err = d.Get().AbsPath("/apis").Do().Into(apiGroupList)
+	err = d.restClient.Get().AbsPath("/apis").Do().Into(apiGroupList)
 	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
 		return nil, err
 	}
@@ -144,14 +154,13 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 		url.Path = "/apis/" + groupVersion
 	}
 	resources = &unversioned.APIResourceList{}
-	err = d.Get().AbsPath(url.String()).Do().Into(resources)
+	err = d.restClient.Get().AbsPath(url.String()).Do().Into(resources)
 	if err != nil {
 		// ignore 403 or 404 error to be compatible with an v1.0 server.
 		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
 			return resources, nil
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return resources, nil
 }
@@ -174,36 +183,72 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 	return result, nil
 }
 
+// ErrGroupDiscoveryFailed is returned if one or more API groups fail to load.
+type ErrGroupDiscoveryFailed struct {
+	// Groups is a list of the groups that failed to load and the error cause
+	Groups map[unversioned.GroupVersion]error
+}
+
+// Error implements the error interface
+func (e *ErrGroupDiscoveryFailed) Error() string {
+	var groups []string
+	for k, v := range e.Groups {
+		groups = append(groups, fmt.Sprintf("%s: %v", k, v))
+	}
+	sort.Strings(groups)
+	return fmt.Sprintf("unable to retrieve the complete list of server APIs: %s", strings.Join(groups, ", "))
+}
+
+// IsGroupDiscoveryFailedError returns true if the provided error indicates the server was unable to discover
+// a complete list of APIs for the client to use.
+func IsGroupDiscoveryFailedError(err error) bool {
+	_, ok := err.(*ErrGroupDiscoveryFailed)
+	return err != nil && ok
+}
+
 // serverPreferredResources returns the supported resources with the version preferred by the
 // server. If namespaced is true, only namespaced resources will be returned.
 func (d *DiscoveryClient) serverPreferredResources(namespaced bool) ([]unversioned.GroupVersionResource, error) {
-	results := []unversioned.GroupVersionResource{}
-	serverGroupList, err := d.ServerGroups()
-	if err != nil {
-		return results, err
-	}
-
-	allErrs := []error{}
-	for _, apiGroup := range serverGroupList.Groups {
-		preferredVersion := apiGroup.PreferredVersion
-		apiResourceList, err := d.ServerResourcesForGroupVersion(preferredVersion.GroupVersion)
+	// retry in case the groups supported by the server change after ServerGroup() returns.
+	const maxRetries = 2
+	var failedGroups map[unversioned.GroupVersion]error
+	var results []unversioned.GroupVersionResource
+RetrieveGroups:
+	for i := 0; i < maxRetries; i++ {
+		results = []unversioned.GroupVersionResource{}
+		failedGroups = make(map[unversioned.GroupVersion]error)
+		serverGroupList, err := d.ServerGroups()
 		if err != nil {
-			allErrs = append(allErrs, err)
-			continue
+			return results, err
 		}
-		groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
-		for _, apiResource := range apiResourceList.APIResources {
-			// ignore the root scoped resources if "namespaced" is true.
-			if namespaced && !apiResource.Namespaced {
+
+		for _, apiGroup := range serverGroupList.Groups {
+			preferredVersion := apiGroup.PreferredVersion
+			groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
+			apiResourceList, err := d.ServerResourcesForGroupVersion(preferredVersion.GroupVersion)
+			if err != nil {
+				if i < maxRetries-1 {
+					continue RetrieveGroups
+				}
+				failedGroups[groupVersion] = err
 				continue
 			}
-			if strings.Contains(apiResource.Name, "/") {
-				continue
+			for _, apiResource := range apiResourceList.APIResources {
+				// ignore the root scoped resources if "namespaced" is true.
+				if namespaced && !apiResource.Namespaced {
+					continue
+				}
+				if strings.Contains(apiResource.Name, "/") {
+					continue
+				}
+				results = append(results, groupVersion.WithResource(apiResource.Name))
 			}
-			results = append(results, groupVersion.WithResource(apiResource.Name))
+		}
+		if len(failedGroups) == 0 {
+			return results, nil
 		}
 	}
-	return results, utilerrors.NewAggregate(allErrs)
+	return results, &ErrGroupDiscoveryFailed{Groups: failedGroups}
 }
 
 // ServerPreferredResources returns the supported resources with the version preferred by the
@@ -220,7 +265,7 @@ func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.Gr
 
 // ServerVersion retrieves and parses the server's version (git version).
 func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
-	body, err := d.Get().AbsPath("/version").Do().Raw()
+	body, err := d.restClient.Get().AbsPath("/version").Do().Raw()
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +279,7 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 
 // SwaggerSchema retrieves and parses the swagger API schema the server supports.
 func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
-	if version.IsEmpty() {
+	if version.Empty() {
 		return nil, fmt.Errorf("groupVersion cannot be empty")
 	}
 
@@ -254,7 +299,7 @@ func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swag
 		path = "/swaggerapi/apis/" + version.Group + "/" + version.Version
 	}
 
-	body, err := d.Get().AbsPath(path).Do().Raw()
+	body, err := d.restClient.Get().AbsPath(path).Do().Raw()
 	if err != nil {
 		return nil, err
 	}
@@ -270,10 +315,7 @@ func setDiscoveryDefaults(config *restclient.Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil
 	codec := runtime.NoopEncoder{Decoder: api.Codecs.UniversalDecoder()}
-	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(
-		runtime.SerializerInfo{Serializer: codec},
-		runtime.StreamSerializerInfo{},
-	)
+	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
@@ -288,7 +330,7 @@ func NewDiscoveryClientForConfig(c *restclient.Config) (*DiscoveryClient, error)
 		return nil, err
 	}
 	client, err := restclient.UnversionedRESTClientFor(&config)
-	return &DiscoveryClient{RESTClient: client, LegacyPrefix: "/api"}, err
+	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api"}, err
 }
 
 // NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. If
@@ -303,8 +345,8 @@ func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 }
 
 // New creates a new DiscoveryClient for the given RESTClient.
-func NewDiscoveryClient(c *restclient.RESTClient) *DiscoveryClient {
-	return &DiscoveryClient{RESTClient: c, LegacyPrefix: "/api"}
+func NewDiscoveryClient(c restclient.Interface) *DiscoveryClient {
+	return &DiscoveryClient{restClient: c, LegacyPrefix: "/api"}
 }
 
 func stringDoesntExistIn(str string, slice []string) bool {
@@ -314,4 +356,13 @@ func stringDoesntExistIn(str string, slice []string) bool {
 		}
 	}
 	return true
+}
+
+// RESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *DiscoveryClient) RESTClient() restclient.Interface {
+	if c == nil {
+		return nil
+	}
+	return c.restClient
 }

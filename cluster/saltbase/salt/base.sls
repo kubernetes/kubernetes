@@ -2,6 +2,7 @@ pkg-core:
   pkg.installed:
     - names:
       - curl
+      - ebtables
 {% if grains['os_family'] == 'RedHat' %}
       - python
       - git

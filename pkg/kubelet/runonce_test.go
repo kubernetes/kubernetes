@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -79,10 +79,11 @@ func TestRunOnce(t *testing.T) {
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,
 		reasonCache:         NewReasonCache(),
-		clock:               util.RealClock{},
+		clock:               clock.RealClock{},
 		kubeClient:          &fake.Clientset{},
 		hostname:            testKubeletHostname,
 		nodeName:            testKubeletHostname,
+		runtimeState:        newRuntimeState(time.Second),
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
@@ -94,31 +95,35 @@ func TestRunOnce(t *testing.T) {
 	}
 	kb.volumeManager, err = volumemanager.NewVolumeManager(
 		true,
-		kb.hostname,
+		kb.nodeName,
 		kb.podManager,
 		kb.kubeClient,
 		kb.volumePluginMgr,
-		fakeRuntime)
+		fakeRuntime,
+		kb.mounter,
+		kb.getPodsDir(),
+		kb.recorder,
+		false /* experimentalCheckNodeCapabilitiesBeforeMount*/)
 
-	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kb.nonMasqueradeCIDR)
+	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kb.nonMasqueradeCIDR, network.UseDefaultMTU)
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.containerRuntime)
 	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
-		Name:      kb.nodeName,
+		Name:      string(kb.nodeName),
 		UID:       types.UID(kb.nodeName),
 		Namespace: "",
 	}
 	fakeKillPodFunc := func(pod *api.Pod, podStatus api.PodStatus, gracePeriodOverride *int64) error {
 		return nil
 	}
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, kb.recorder, nodeRef, kb.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, kb.recorder, nodeRef, kb.clock)
 	if err != nil {
 		t.Fatalf("failed to initialize eviction manager: %v", err)
 	}
 	kb.evictionManager = evictionManager
-	kb.AddPodAdmitHandler(evictionAdmitHandler)
+	kb.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}
@@ -139,7 +144,7 @@ func TestRunOnce(t *testing.T) {
 	}
 	podManager.SetPods(pods)
 	// The original test here is totally meaningless, because fakeruntime will always return an empty podStatus. While
-	// the originial logic of isPodRunning happens to return true when podstatus is empty, so the test can always pass.
+	// the original logic of isPodRunning happens to return true when podstatus is empty, so the test can always pass.
 	// Now the logic in isPodRunning is changed, to let the test pass, we set the podstatus directly in fake runtime.
 	// This is also a meaningless test, because the isPodRunning will also always return true after setting this. However,
 	// because runonce is never used in kubernetes now, we should deprioritize the cleanup work.

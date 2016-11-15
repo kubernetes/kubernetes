@@ -20,7 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // Compile time check for interface adeherence
@@ -31,24 +31,24 @@ type Zones struct {
 }
 
 func (zones Zones) List() ([]dnsprovider.Zone, error) {
+	var zoneList []dnsprovider.Zone
+
 	input := route53.ListHostedZonesInput{}
-	response, err := zones.interface_.service.ListHostedZones(&input)
+	err := zones.interface_.service.ListHostedZonesPages(&input, func(page *route53.ListHostedZonesOutput, lastPage bool) bool {
+		for _, zone := range page.HostedZones {
+			zoneList = append(zoneList, &Zone{zone, &zones})
+		}
+		return true
+	})
 	if err != nil {
 		return []dnsprovider.Zone{}, err
-	}
-	hostedZones := response.HostedZones
-	// TODO: Handle result truncation
-	// https://docs.aws.amazon.com/sdk-for-go/api/service/route53/Route53.html#ListHostedZones-instance_method
-	zoneList := make([]dnsprovider.Zone, len(hostedZones))
-	for i, zone := range hostedZones {
-		zoneList[i] = &Zone{zone, &zones}
 	}
 	return zoneList, nil
 }
 
 func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {
 	dnsName := zone.Name()
-	callerReference := string(util.NewUUID())
+	callerReference := string(uuid.NewUUID())
 	input := route53.CreateHostedZoneInput{Name: &dnsName, CallerReference: &callerReference}
 	output, err := zones.interface_.service.CreateHostedZone(&input)
 	if err != nil {
@@ -67,7 +67,7 @@ func (zones Zones) Remove(zone dnsprovider.Zone) error {
 	return nil
 }
 func (zones Zones) New(name string) (dnsprovider.Zone, error) {
-	id := string(util.NewUUID())
+	id := string(uuid.NewUUID())
 	managedZone := route53.HostedZone{Id: &id, Name: &name}
 	return &Zone{&managedZone, &zones}, nil
 }

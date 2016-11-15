@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/adding-an-APIGroup.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 Adding an API Group
 ===============
 
@@ -49,19 +15,19 @@ We plan on improving the way the types are factored in the future; see
 [#16062](https://github.com/kubernetes/kubernetes/pull/16062) for the directions
 in which this might evolve.
 
-1. Create a folder in pkg/apis to hold you group. Create types.go in
+1. Create a folder in pkg/apis to hold your group. Create types.go in
 pkg/apis/`<group>`/ and pkg/apis/`<group>`/`<version>`/ to define API objects
 in your group;
 
 2. Create pkg/apis/`<group>`/{register.go, `<version>`/register.go} to register
 this group's API objects to the encoding/decoding scheme (e.g.,
-[pkg/apis/extensions/register.go](../../pkg/apis/extensions/register.go) and
-[pkg/apis/extensions/v1beta1/register.go](../../pkg/apis/extensions/v1beta1/register.go);
+[pkg/apis/authentication/register.go](../../pkg/apis/authentication/register.go) and
+[pkg/apis/authentication/v1beta1/register.go](../../pkg/apis/authentication/v1beta1/register.go);
 
 3. Add a pkg/apis/`<group>`/install/install.go, which is responsible for adding
 the group to the `latest` package, so that other packages can access the group's
 meta through `latest.Group`. You probably only need to change the name of group
-and version in the [example](../../pkg/apis/extensions/install/install.go)). You
+and version in the [example](../../pkg/apis/authentication/install/install.go)). You
 need to import this `install` package in {pkg/master,
 pkg/client/unversioned}/import_known_versions.go, if you want to make your group
 accessible to other packages in the kube-apiserver binary, binaries that uses
@@ -75,12 +41,18 @@ cmd/libs/go2idl/ tool.
 1. Generate conversions and deep-copies:
 
     1. Add your "group/" or "group/version" into
-       cmd/libs/go2idl/{conversion-gen, deep-copy-gen}/main.go;
+       cmd/libs/go2idl/conversion-gen/main.go;
     2. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file
-       with the comment `// +genconversion=true`, to catch the attention of our
-       gen-conversion script.
-    3. Run hack/update-all.sh.
-
+       with the comment `// +k8s:deepcopy-gen=package,register`, to catch the
+       attention of our generation tools.
+    3. Make sure your `pkg/apis/<group>/<version>` directory has a doc.go file
+       with the comment `// +k8s:conversion-gen=<internal-pkg>`, to catch the
+       attention of our generation tools.  For most APIs the only target you
+       need is `k8s.io/kubernetes/pkg/apis/<group>` (your internal API).
+    3. Make sure your `pkg/apis/<group>` and `pkg/apis/<group>/<version>` directories
+       have a doc.go file with the comment `+groupName=<group>.k8s.io`, to correctly
+       generate the DNS-suffixed group name.
+    5. Run hack/update-all.sh.
 
 2. Generate files for Ugorji codec:
 
@@ -116,8 +88,8 @@ pkg/kubectl/cmd/util/factory.go.
 1. Add your group in pkg/api/testapi/testapi.go, then you can access the group
 in tests through testapi.`<group>`;
 
-2. Add your "group/version" to `KUBE_API_VERSIONS` and `KUBE_TEST_API_VERSIONS`
-in hack/test-go.sh.
+2. Add your "group/version" to `KUBE_TEST_API_VERSIONS` in
+   hack/make-rules/test.sh and hack/make-rules/test-integration.sh
 
 TODO: Add a troubleshooting section.
 

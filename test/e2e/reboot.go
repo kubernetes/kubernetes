@@ -22,11 +22,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -63,7 +64,7 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			// events for the kube-system namespace on failures
 			namespaceName := api.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.Client.Events(namespaceName).List(api.ListOptions{})
+			events, err := f.ClientSet.Core().Events(namespaceName).List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
@@ -88,32 +89,32 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &")
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &")
 	})
 
 	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
 	})
 
 	It("each node by triggering kernel panic and ensure they function upon restart", func() {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
 	})
 
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo ifdown eth0 && sleep 120 && sudo ifup eth0' >/dev/null 2>&1 &")
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && (sudo ifdown eth0 || sudo ip link set eth0 down) && sleep 120 && (sudo ifup eth0 || sudo ip link set eth0 up)' >/dev/null 2>&1 &")
 	})
 
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I INPUT 2 -j DROP && "+
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I INPUT 2 -j DROP && "+
 			" sleep 120 && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 
@@ -121,12 +122,12 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I OUTPUT 2 -j DROP && "+
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I OUTPUT 2 -j DROP && "+
 			" sleep 120 && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 })
 
-func testReboot(c *client.Client, rebootCmd string) {
+func testReboot(c clientset.Interface, rebootCmd string) {
 	// Get all nodes, and kick off the test on each.
 	nodelist := framework.GetReadySchedulableNodesOrDie(c)
 	result := make([]bool, len(nodelist.Items))
@@ -159,7 +160,7 @@ func testReboot(c *client.Client, rebootCmd string) {
 	}
 }
 
-func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []string, pods []*api.Pod) {
+func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podNames []string, pods []*api.Pod) {
 	printFn := func(id, log string, err error, previous bool) {
 		prefix := "Retrieving log for container"
 		if previous {
@@ -179,7 +180,7 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 		if !podNameSet.Has(p.Name) {
 			continue
 		}
-		if ok, _ := framework.PodRunningReady(p); ok {
+		if ok, _ := testutils.PodRunningReady(p); ok {
 			continue
 		}
 		framework.Logf("Status for not ready pod %s/%s: %+v", p.Namespace, p.Name, p.Status)
@@ -206,15 +207,15 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.
-func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
+func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := api.NamespaceSystem
-	ps := framework.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	ps := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	defer ps.Stop()
 
 	// Get the node initially.
 	framework.Logf("Getting %s", name)
-	node, err := c.Nodes().Get(name)
+	node, err := c.Core().Nodes().Get(name)
 	if err != nil {
 		framework.Logf("Couldn't get node %s", name)
 		return false

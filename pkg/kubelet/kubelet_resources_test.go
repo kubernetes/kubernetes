@@ -25,6 +25,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestPodResourceLimitsDefaulting(t *testing.T) {
@@ -38,25 +39,37 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	}, nil)
 	tk.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	tk.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	tk.kubelet.reservation = kubetypes.Reservation{
+		Kubernetes: api.ResourceList{
+			api.ResourceCPU:    resource.MustParse("3"),
+			api.ResourceMemory: resource.MustParse("4Gi"),
+		},
+		System: api.ResourceList{
+			api.ResourceCPU:    resource.MustParse("1"),
+			api.ResourceMemory: resource.MustParse("2Gi"),
+		},
+	}
+
 	cases := []struct {
 		pod      *api.Pod
 		expected *api.Pod
 	}{
 		{
 			pod:      getPod("0", "0"),
-			expected: getPod("10", "10Gi"),
+			expected: getPod("6", "4Gi"),
 		},
 		{
 			pod:      getPod("1", "0"),
-			expected: getPod("1", "10Gi"),
+			expected: getPod("1", "4Gi"),
 		},
 		{
 			pod:      getPod("", ""),
-			expected: getPod("10", "10Gi"),
+			expected: getPod("6", "4Gi"),
 		},
 		{
 			pod:      getPod("0", "1Mi"),
-			expected: getPod("10", "1Mi"),
+			expected: getPod("6", "1Mi"),
 		},
 	}
 	as := assert.New(t)

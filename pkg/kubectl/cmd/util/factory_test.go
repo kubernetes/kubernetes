@@ -32,16 +32,20 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	manualfake "k8s.io/kubernetes/pkg/client/restclient/fake"
+	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flag"
@@ -51,7 +55,7 @@ import (
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
 	factory := NewFactory(nil)
 
-	if !factory.flags.HasFlags() {
+	if !factory.FlagSet().HasFlags() {
 		t.Errorf("Expected flags, but didn't get any")
 	}
 }
@@ -60,8 +64,8 @@ func TestNewFactoryNoFlagBindings(t *testing.T) {
 	clientConfig := clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})
 	factory := NewFactory(clientConfig)
 
-	if factory.flags.HasFlags() {
-		t.Errorf("Expected zero flags, but got %v", factory.flags)
+	if factory.FlagSet().HasFlags() {
+		t.Errorf("Expected zero flags, but got %v", factory.FlagSet())
 	}
 }
 
@@ -225,17 +229,17 @@ func TestCanBeExposed(t *testing.T) {
 func TestFlagUnderscoreRenaming(t *testing.T) {
 	factory := NewFactory(nil)
 
-	factory.flags.SetNormalizeFunc(flag.WordSepNormalizeFunc)
-	factory.flags.Bool("valid_flag", false, "bool value")
+	factory.FlagSet().SetNormalizeFunc(flag.WordSepNormalizeFunc)
+	factory.FlagSet().Bool("valid_flag", false, "bool value")
 
 	// In case of failure of this test check this PR: spf13/pflag#23
-	if factory.flags.Lookup("valid_flag").Name != "valid-flag" {
-		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.flags.Lookup("valid_flag").Name)
+	if factory.FlagSet().Lookup("valid_flag").Name != "valid-flag" {
+		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.FlagSet().Lookup("valid_flag").Name)
 	}
 }
 
 func loadSchemaForTest() (validation.Schema, error) {
-	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
+	pathToSwaggerSpec := "../../../../api/swagger-spec/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version + ".json"
 	data, err := ioutil.ReadFile(pathToSwaggerSpec)
 	if err != nil {
 		return nil, err
@@ -262,9 +266,9 @@ func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 	}
 	requests := map[string]int{}
 
-	c := &fake.RESTClient{
-		Codec: testapi.Default.Codec(),
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+	c := &manualfake.RESTClient{
+		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1
@@ -319,9 +323,9 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 	requests := map[string]int{}
 
-	c := &fake.RESTClient{
-		Codec: testapi.Default.Codec(),
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+	c := &manualfake.RESTClient{
+		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1
@@ -587,10 +591,7 @@ func TestGetFirstPod(t *testing.T) {
 
 	for i := range tests {
 		test := tests[i]
-		client := &testclient.Fake{}
-		client.PrependReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-			return true, test.podList, nil
-		})
+		fake := fake.NewSimpleClientset(test.podList)
 		if len(test.watching) > 0 {
 			watcher := watch.NewFake()
 			for _, event := range test.watching {
@@ -601,11 +602,11 @@ func TestGetFirstPod(t *testing.T) {
 					go watcher.Modify(event.Object)
 				}
 			}
-			client.PrependWatchReactor("pods", testclient.DefaultWatchReactor(watcher, nil))
+			fake.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
 		}
 		selector := labels.Set(labelSet).AsSelector()
 
-		pod, numPods, err := GetFirstPod(client, api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
+		pod, numPods, err := GetFirstPod(fake.Core(), api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
@@ -711,6 +712,46 @@ func TestMakePortsString(t *testing.T) {
 		output := makePortsString(test.ports, test.useNodePort)
 		if output != test.expectedOutput {
 			t.Errorf("expected: %s, saw: %s.", test.expectedOutput, output)
+		}
+	}
+}
+
+func fakeClient() resource.ClientMapper {
+	return resource.ClientMapperFunc(func(*meta.RESTMapping) (resource.RESTClient, error) {
+		return &manualfake.RESTClient{}, nil
+	})
+}
+
+func TestDiscoveryReplaceAliases(t *testing.T) {
+	tests := []struct {
+		name     string
+		arg      string
+		expected string
+	}{
+		{
+			name:     "no-replacement",
+			arg:      "service",
+			expected: "service",
+		},
+		{
+			name:     "all-replacement",
+			arg:      "all",
+			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets",
+		},
+		{
+			name:     "alias-in-comma-separated-arg",
+			arg:      "all,secrets",
+			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
+		},
+	}
+
+	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), nil)
+	b := resource.NewBuilder(mapper, api.Scheme, fakeClient(), testapi.Default.Codec())
+
+	for _, test := range tests {
+		replaced := b.ReplaceAliases(test.arg)
+		if replaced != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }

@@ -57,7 +57,11 @@ BASH_TARGETS="
 	generated-docs
 	generated-swagger-docs
 	swagger-spec
-	api-reference-docs"
+	openapi-spec
+	api-reference-docs
+	bazel"
+# TODO: (caesarxuchao) uncomment after 1.5 code freeze.
+#	staging-client-go"
 
 
 for t in $BASH_TARGETS

@@ -43,8 +43,8 @@ import (
 	"syscall"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -235,7 +235,7 @@ func contactOthers(state *State) {
 		log.Fatalf("Unable to create config; error: %v\n", err)
 	}
 	config.ContentType = "application/vnd.kubernetes.protobuf"
-	client, err := client.New(config)
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		log.Fatalf("Unable to create client; error: %v\n", err)
 	}
@@ -267,8 +267,8 @@ func contactOthers(state *State) {
 }
 
 //getWebserverEndpoints returns the webserver endpoints as a set of String, each in the format like "http://{ip}:{port}"
-func getWebserverEndpoints(client *client.Client) sets.String {
-	endpoints, err := client.Endpoints(*namespace).Get(*service)
+func getWebserverEndpoints(client clientset.Interface) sets.String {
+	endpoints, err := client.Core().Endpoints(*namespace).Get(*service)
 	eps := sets.String{}
 	if err != nil {
 		state.Logf("Unable to read the endpoints for %v/%v: %v.", *namespace, *service, err)

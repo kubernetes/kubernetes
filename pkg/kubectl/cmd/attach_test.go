@@ -28,10 +28,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 type fakeRemoteAttach struct {
@@ -40,7 +42,7 @@ type fakeRemoteAttach struct {
 	err    error
 }
 
-func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error {
 	f.method = method
 	f.url = url
 	return f.err
@@ -73,21 +75,21 @@ func TestPodAndContainerAttach(t *testing.T) {
 			name:        "no container, no flags",
 		},
 		{
-			p:                 &AttachOptions{ContainerName: "bar"},
+			p:                 &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
 			args:              []string{"foo"},
 			expectedPod:       "foo",
 			expectedContainer: "bar",
 			name:              "container in flag",
 		},
 		{
-			p:                 &AttachOptions{ContainerName: "initfoo"},
+			p:                 &AttachOptions{StreamOptions: StreamOptions{ContainerName: "initfoo"}},
 			args:              []string{"foo"},
 			expectedPod:       "foo",
 			expectedContainer: "initfoo",
 			name:              "init container in flag",
 		},
 		{
-			p:           &AttachOptions{ContainerName: "bar"},
+			p:           &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
 			args:        []string{"foo", "-c", "wrong"},
 			expectError: true,
 			name:        "non-existing container in flag",
@@ -95,13 +97,13 @@ func TestPodAndContainerAttach(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec:  codec,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
+			NegotiatedSerializer: ns,
+			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{}
+		tf.ClientConfig = defaultClientConfig()
 
 		cmd := &cobra.Command{}
 		options := test.p
@@ -125,7 +127,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 }
 
 func TestAttach(t *testing.T) {
-	version := testapi.Default.GroupVersion().Version
+	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, version, podPath, attachPath, container string
 		pod                                           *api.Pod
@@ -161,9 +163,9 @@ func TestAttach(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
@@ -177,7 +179,7 @@ func TestAttach(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
@@ -186,11 +188,13 @@ func TestAttach(t *testing.T) {
 			remoteAttach.err = fmt.Errorf("attach error")
 		}
 		params := &AttachOptions{
-			ContainerName: test.container,
-			In:            bufIn,
-			Out:           bufOut,
-			Err:           bufErr,
-			Attach:        remoteAttach,
+			StreamOptions: StreamOptions{
+				ContainerName: test.container,
+				In:            bufIn,
+				Out:           bufOut,
+				Err:           bufErr,
+			},
+			Attach: remoteAttach,
 		}
 		cmd := &cobra.Command{}
 		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {
@@ -209,7 +213,7 @@ func TestAttach(t *testing.T) {
 			continue
 		}
 		if remoteAttach.url.Path != test.attachPath {
-			t.Errorf("%s: Did not get expected path for exec request", test.name)
+			t.Errorf("%s: Did not get expected path for exec request: %q %q", test.name, test.attachPath, remoteAttach.url.Path)
 			continue
 		}
 		if remoteAttach.method != "POST" {
@@ -222,7 +226,7 @@ func TestAttach(t *testing.T) {
 }
 
 func TestAttachWarnings(t *testing.T) {
-	version := testapi.Default.GroupVersion().Version
+	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, container, version, podPath, expectedErr, expectedOut string
 		pod                                                         *api.Pod
@@ -239,9 +243,9 @@ func TestAttachWarnings(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
@@ -254,19 +258,21 @@ func TestAttachWarnings(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
 		ex := &fakeRemoteAttach{}
 		params := &AttachOptions{
-			ContainerName: test.container,
-			In:            bufIn,
-			Out:           bufOut,
-			Err:           bufErr,
-			Stdin:         test.stdin,
-			TTY:           test.tty,
-			Attach:        ex,
+			StreamOptions: StreamOptions{
+				ContainerName: test.container,
+				In:            bufIn,
+				Out:           bufOut,
+				Err:           bufErr,
+				Stdin:         test.stdin,
+				TTY:           test.tty,
+			},
+			Attach: ex,
 		}
 		cmd := &cobra.Command{}
 		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {

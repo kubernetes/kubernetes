@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // Rolling back to a revision; no-op if the toRevision is deployment's current revision
@@ -35,7 +35,7 @@ func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRe
 	allRSs := append(allOldRSs, newRS)
 	// If rollback revision is 0, rollback to the last revision
 	if *toRevision == 0 {
-		if *toRevision = lastRevision(allRSs); *toRevision == 0 {
+		if *toRevision = deploymentutil.LastRevision(allRSs); *toRevision == 0 {
 			// If we still can't find the last revision, gives up rollback
 			dc.emitRollbackWarningEvent(deployment, deploymentutil.RollbackRevisionNotFound, "Unable to find last revision.")
 			// Gives up rollback
@@ -50,7 +50,8 @@ func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRe
 		}
 		if v == *toRevision {
 			glog.V(4).Infof("Found replica set %q with desired revision %d", rs.Name, v)
-			// rollback by copying podTemplate.Spec from the replica set, and increment revision number by 1
+			// rollback by copying podTemplate.Spec from the replica set
+			// revision number will be incremented during the next getAllReplicaSetsAndSyncRevision call
 			// no-op if the the spec matches current deployment's podTemplate.Spec
 			deployment, performedRollback, err := dc.rollbackToTemplate(deployment, rs)
 			if performedRollback && err == nil {
@@ -79,7 +80,7 @@ func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deploy
 		//
 		// If we don't copy the annotations back from RS to deployment on rollback, the Deployment will stay as {change-cause:edit},
 		// and new RS1 becomes {change-cause:edit} (copied from deployment after rollback), old RS2 {change-cause:edit}, which is not correct.
-		setDeploymentAnnotationsTo(deployment, rs)
+		deploymentutil.SetDeploymentAnnotationsTo(deployment, rs)
 		performedRollback = true
 	} else {
 		glog.V(4).Infof("Rolling back to a revision that contains the same template as current deployment %s, skipping rollback...", deployment.Name)

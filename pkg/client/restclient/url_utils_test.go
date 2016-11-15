@@ -20,7 +20,8 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestValidatesHostParameter(t *testing.T) {
@@ -31,17 +32,17 @@ func TestValidatesHostParameter(t *testing.T) {
 		URL string
 		Err bool
 	}{
-		{"127.0.0.1", "", "http://127.0.0.1/" + testapi.Default.GroupVersion().Version, false},
-		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + testapi.Default.GroupVersion().Version, false},
-		{"foo.bar.com", "", "http://foo.bar.com/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host/prefix", "", "http://host/prefix/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "", "http://host/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "/", "http://host/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "/other", "http://host/other/" + testapi.Default.GroupVersion().Version, false},
+		{"127.0.0.1", "", "http://127.0.0.1/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{"foo.bar.com", "", "http://foo.bar.com/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{"http://host/prefix", "", "http://host/prefix/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{"http://host", "", "http://host/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{"http://host", "/", "http://host/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{"http://host", "/other", "http://host/other/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
 		{"host/server", "", "", true},
 	}
 	for i, testCase := range testCases {
-		u, versionedAPIPath, err := DefaultServerURL(testCase.Host, testCase.APIPath, *testapi.Default.GroupVersion(), false)
+		u, versionedAPIPath, err := DefaultServerURL(testCase.Host, testCase.APIPath, registered.GroupOrDie(api.GroupName).GroupVersion, false)
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")

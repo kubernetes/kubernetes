@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,15 +32,13 @@ func Repair(dirpath string) bool {
 	}
 	defer f.Close()
 
-	n := 0
 	rec := &walpb.Record{}
-
 	decoder := newDecoder(f)
 	for {
+		lastOffset := decoder.lastOffset()
 		err := decoder.decode(rec)
 		switch err {
 		case nil:
-			n += 8 + rec.Size()
 			// update crc of the decoder when necessary
 			switch rec.Type {
 			case crcType:
@@ -74,11 +72,11 @@ func Repair(dirpath string) bool {
 				return false
 			}
 
-			if err = f.Truncate(int64(n)); err != nil {
+			if err = f.Truncate(int64(lastOffset)); err != nil {
 				plog.Errorf("could not repair %v, failed to truncate file", f.Name())
 				return false
 			}
-			if err = f.Sync(); err != nil {
+			if err = fileutil.Fsync(f.File); err != nil {
 				plog.Errorf("could not repair %v, failed to sync file", f.Name())
 				return false
 			}
@@ -91,15 +89,11 @@ func Repair(dirpath string) bool {
 }
 
 // openLast opens the last wal file for read and write.
-func openLast(dirpath string) (*os.File, error) {
-	names, err := fileutil.ReadDir(dirpath)
+func openLast(dirpath string) (*fileutil.LockedFile, error) {
+	names, err := readWalNames(dirpath)
 	if err != nil {
 		return nil, err
 	}
-	names = checkWalNames(names)
-	if len(names) == 0 {
-		return nil, ErrFileNotFound
-	}
 	last := path.Join(dirpath, names[len(names)-1])
-	return os.OpenFile(last, os.O_RDWR, 0)
+	return fileutil.LockFile(last, os.O_RDWR, fileutil.PrivateFileMode)
 }

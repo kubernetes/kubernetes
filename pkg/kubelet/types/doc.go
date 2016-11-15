@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Common types in the Kubelet.
-package types
+package types // import "k8s.io/kubernetes/pkg/kubelet/types"

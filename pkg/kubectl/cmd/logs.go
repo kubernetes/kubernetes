@@ -23,20 +23,20 @@ import (
 	"os"
 	"time"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (
-	logs_example = dedent.Dedent(`
+	logs_example = templates.Examples(`
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
@@ -51,6 +51,10 @@ var (
 
 		# Show all logs from pod nginx written in the last hour
 		kubectl logs --since=1h nginx`)
+)
+
+const (
+	logsUsageStr = "expected 'logs POD_NAME [CONTAINER_NAME]'.\nPOD_NAME is a required argument for the logs command"
 )
 
 type LogsOptions struct {
@@ -70,11 +74,11 @@ type LogsOptions struct {
 }
 
 // NewCmdLog creates a new pod logs command
-func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
 		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
-		Short:   "Print the logs for a container in a pod.",
+		Short:   "Print the logs for a container in a pod",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: logs_example,
 		PreRun: func(cmd *cobra.Command, args []string) {
@@ -107,21 +111,21 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	switch len(args) {
 	case 0:
-		return cmdutil.UsageError(cmd, "POD is required for logs")
+		return cmdutil.UsageError(cmd, logsUsageStr)
 	case 1:
 		o.ResourceArg = args[0]
 	case 2:
 		if cmd.Flag("container").Changed {
-			return cmdutil.UsageError(cmd, "only one of -c, [CONTAINER] arg is allowed")
+			return cmdutil.UsageError(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
 		}
 		o.ResourceArg = args[0]
 		containerName = args[1]
 	default:
-		return cmdutil.UsageError(cmd, "logs POD [-c CONTAINER]")
+		return cmdutil.UsageError(cmd, logsUsageStr)
 	}
 	var err error
 	o.Namespace, _, err = f.DefaultNamespace()
@@ -158,7 +162,7 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.Out = out
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	decoder := f.Decoder(true)
 	if o.Object == nil {
 		infos, err := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).

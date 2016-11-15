@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package secret contains the internal representation of secret volumes.
-package secret
+package secret // import "k8s.io/kubernetes/pkg/volume/secret"

@@ -180,12 +180,17 @@ function kube-up-vm {
     -debug \
     -disk="${DISK}" \
     -g="${GUEST_ID}" \
+    -on=false \
     -link=true \
     "$@" \
     "${vm_name}"
 
+  govc vm.change -e="disk.enableUUID=${ENABLE_UUID}" -vm="${vm_name}"
+
+  govc vm.power -on=true "${vm_name}"
+
   # Retrieve IP first, to confirm the guest operations agent is running.
-  govc vm.ip "${vm_name}" > /dev/null
+  CURRENT_NODE_IP=$(govc vm.ip "${vm_name}")
 
   govc guest.mkdir \
     -l "kube:kube" \
@@ -220,7 +225,7 @@ function kube-run {
 
 #
 # run the command remotely and check if the specific kube artifact is running or not.
-# keep checking till the you hit the timeout. default timeout 300s
+# keep checking till the you hit the timeout. Default timeout 300s
 #
 # Usage:
 #   kube_check 10.0.0.1 cmd timeout
@@ -263,7 +268,7 @@ function kube-check {
 }
 
 #
-# verify if salt master is up. check 30 times and then echo out bad output and return 0
+# verify if salt master is up. Check 30 times and then echo out bad output and return 0
 #
 # Usage:
 #   remote-pgrep 10.0.0.1 salt-master
@@ -317,26 +322,55 @@ function setup-pod-routes {
   done
 
 
-  # identify the subnet assigned to the node by the kubernertes controller manager.
+  # identify the subnet assigned to the node by the kubernetes controller manager.
   KUBE_NODE_BRIDGE_NETWORK=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-     printf " finding network of cbr0 bridge on node  ${NODE_NAMES[$i]}\n"
-     network=$(kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} 'sudo ip route show | grep -E "dev cbr0" | cut -d     " " -f1')
-     KUBE_NODE_BRIDGE_NETWORK+=("${network}")
-  done
+    printf " finding network of cbr0 bridge on node  ${NODE_NAMES[$i]}\n"
 
+    network=""
+    top2_octets_final=$(echo $NODE_IP_RANGES | awk -F "." '{ print $1 "." $2 }') # Assume that a 24 bit mask per node
+
+    attempt=0
+    max_attempt=60
+    while true ; do
+      attempt=$(($attempt+1))
+
+      network=$(kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} 'sudo ip route show | grep -E "dev cbr0" | cut -d     " " -f1')
+      top2_octets_read=$(echo $network | awk -F "." '{ print $1 "." $2 }')
+
+      if [[ "$top2_octets_read" == "$top2_octets_final" ]]; then
+        break
+      fi
+
+      if (( $attempt == $max_attempt )); then
+        echo
+        echo "(Failed) Waiting for cbr0 bridge to come up @ ${NODE_NAMES[$i]}"
+        echo
+        exit 1
+      fi
+
+      printf "."
+      sleep 5
+    done
+
+    printf "\n"
+    KUBE_NODE_BRIDGE_NETWORK+=("${network}")
+  done
 
   # Make the pods visible to each other and to the master.
   # The master needs have routes to the pods for the UI to work.
   local j
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-     printf "setting up routes for ${NODE_NAMES[$i]}"
-     kube-ssh "${KUBE_MASTER_IP}" "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[${i}]} gw ${KUBE_NODE_IP_ADDRESSES[${i}]}"
-     for (( j=0; j<${#NODE_NAMES[@]}; j++)); do
-        if [[ $i != $j ]]; then
-           kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[$j]} gw ${KUBE_NODE_IP_ADDRESSES[$j]}"
-        fi
-      done
+    printf "setting up routes for ${NODE_NAMES[$i]}\n"
+    printf " adding route to ${MASTER_NAME} for network ${KUBE_NODE_BRIDGE_NETWORK[${i}]} via ${KUBE_NODE_IP_ADDRESSES[${i}]}\n"
+    kube-ssh "${KUBE_MASTER_IP}" "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[${i}]} gw ${KUBE_NODE_IP_ADDRESSES[${i}]}"
+    for (( j=0; j<${#NODE_NAMES[@]}; j++)); do
+      if [[ $i != $j ]]; then
+        printf " adding route to ${NODE_NAMES[$j]} for network ${KUBE_NODE_BRIDGE_NETWORK[${i}]} via ${KUBE_NODE_IP_ADDRESSES[${i}]}\n" 
+        kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[$j]} gw ${KUBE_NODE_IP_ADDRESSES[$j]}"
+      fi
+    done
+    printf "\n"
   done
 }
 
@@ -368,6 +402,9 @@ function kube-up {
   ((octets[3]+=1))
   service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   MASTER_EXTRA_SANS="IP:${service_ip},DNS:${MASTER_NAME},${MASTER_EXTRA_SANS}"
+  TMP_DIR=/tmp
+  HOSTS=hosts
+  ETC_HOSTS=/etc/${HOSTS}
 
   echo "Starting master VM (this can take a minute)..."
 
@@ -395,6 +432,13 @@ function kube-up {
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
     echo "readonly MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
+    echo "readonly GOVC_USERNAME='${GOVC_USERNAME}'"
+    echo "readonly GOVC_PASSWORD='${GOVC_PASSWORD}'"
+    echo "readonly GOVC_URL='${GOVC_URL}'"
+    echo "readonly GOVC_PORT='${GOVC_PORT}'"
+    echo "readonly GOVC_INSECURE='${GOVC_INSECURE}'"
+    echo "readonly GOVC_DATACENTER='${GOVC_DATACENTER}'"
+    echo "readonly GOVC_DATASTORE='${GOVC_DATASTORE}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/install-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-master.sh"
@@ -416,11 +460,24 @@ function kube-up {
       echo "KUBE_MASTER=${KUBE_MASTER}"
       echo "KUBE_MASTER_IP=${KUBE_MASTER_IP}"
       echo "NODE_IP_RANGE=$NODE_IP_RANGES"
+      echo "readonly GOVC_USERNAME='${GOVC_USERNAME}'"
+      echo "readonly GOVC_PASSWORD='${GOVC_PASSWORD}'"
+      echo "readonly GOVC_URL='${GOVC_URL}'"
+      echo "readonly GOVC_PORT='${GOVC_PORT}'"
+      echo "readonly GOVC_INSECURE='${GOVC_INSECURE}'"
+      echo "readonly GOVC_DATACENTER='${GOVC_DATACENTER}'"
+      echo "readonly GOVC_DATASTORE='${GOVC_DATASTORE}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/node-start-${i}.sh"
 
     (
       kube-up-vm "${NODE_NAMES[$i]}" -c ${NODE_CPU-1} -m ${NODE_MEMORY_MB-1024}
+      add_to_hosts="${CURRENT_NODE_IP}    ${NODE_NAMES[$i]}"
+      node_ip_file=${NODE_NAMES[$i]}-ip
+      echo "sudo bash -c \"echo $add_to_hosts >> /etc/hosts\"" > ${KUBE_TEMP}/${node_ip_file}
+      echo $add_to_hosts >> ${KUBE_TEMP}/${HOSTS}
+      kube-scp ${KUBE_MASTER_IP} ${KUBE_TEMP}/${node_ip_file} /${TMP_DIR}/
+      kube-ssh ${KUBE_MASTER_IP} "bash /tmp/${node_ip_file}"
       kube-run "${NODE_NAMES[$i]}" "${KUBE_TEMP}/node-start-${i}.sh"
     ) &
   done
@@ -437,6 +494,12 @@ function kube-up {
 
   # Print node IPs, so user can log in for debugging.
   detect-nodes
+
+  # Setup node to node vm-name resolution
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+      kube-scp ${KUBE_NODE_IP_ADDRESSES[$i]} ${KUBE_TEMP}/${HOSTS} ${TMP_DIR}
+      kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} "sudo bash -c \"cat ${TMP_DIR}/${HOSTS} >> ${ETC_HOSTS}\""
+  done
 
   printf "Waiting for salt-master to be up on ${KUBE_MASTER} ...\n"
   remote-pgrep ${KUBE_MASTER_IP} "salt-master"

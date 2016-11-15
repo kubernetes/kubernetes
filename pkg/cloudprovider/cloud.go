@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.
@@ -63,7 +64,7 @@ func GetLoadBalancerName(service *api.Service) string {
 	return ret
 }
 
-func GetInstanceProviderID(cloud Interface, nodeName string) (string, error) {
+func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return "", fmt.Errorf("failed to get instances from cloud provider")
@@ -81,13 +82,16 @@ type LoadBalancer interface {
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	GetLoadBalancer(service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	GetLoadBalancer(clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	EnsureLoadBalancer(service *api.Service, hosts []string) (*api.LoadBalancerStatus, error)
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	EnsureLoadBalancer(clusterName string, service *api.Service, nodeNames []string) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	UpdateLoadBalancer(service *api.Service, hosts []string) error
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	UpdateLoadBalancer(clusterName string, service *api.Service, nodeNames []string) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
@@ -95,7 +99,8 @@ type LoadBalancer interface {
 	// have multiple underlying components, meaning a Get could say that the LB
 	// doesn't exist even if some part of it is still laying around.
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	EnsureLoadBalancerDeleted(service *api.Service) error
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
@@ -104,23 +109,22 @@ type Instances interface {
 	// TODO(roberthbailey): This currently is only used in such a way that it
 	// returns the address of the calling instance. We should do a rename to
 	// make this clearer.
-	NodeAddresses(name string) ([]api.NodeAddress, error)
-	// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-	ExternalID(name string) (string, error)
-	// InstanceID returns the cloud provider ID of the specified instance.
+	NodeAddresses(name types.NodeName) ([]api.NodeAddress, error)
+	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	InstanceID(name string) (string, error)
+	ExternalID(nodeName types.NodeName) (string, error)
+	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
+	InstanceID(nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	InstanceType(name string) (string, error)
+	InstanceType(name types.NodeName) (string, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-	List(filter string) ([]string, error)
+	List(filter string) ([]types.NodeName, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
-	CurrentNodeName(hostname string) (string, error)
+	CurrentNodeName(hostname string) (types.NodeName, error)
 }
 
 // Route is a representation of an advanced routing rule.
@@ -128,9 +132,8 @@ type Route struct {
 	// Name is the name of the routing rule in the cloud-provider.
 	// It will be ignored in a Create (although nameHint may influence it)
 	Name string
-	// TargetInstance is the name of the instance as specified in routing rules
-	// for the cloud-provider (in gce: the Instance Name).
-	TargetInstance string
+	// TargetNode is the NodeName of the target instance.
+	TargetNode types.NodeName
 	// DestinationCIDR is the CIDR format IP range that this routing rule
 	// applies to.
 	DestinationCIDR string

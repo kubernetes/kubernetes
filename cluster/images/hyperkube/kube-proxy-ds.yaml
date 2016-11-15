@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: Move out kube-proxy to a DaemonSet again
-# This is disabled for the v1.3 release, due to bootstrapping complexities
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: k8s-proxy
+  name: k8s-proxy-v1
   namespace: kube-system
   labels:
     k8s-app: k8s-proxy
@@ -38,8 +36,16 @@ spec:
         command:
         - /hyperkube
         - proxy
-        - --master=http://127.0.0.1:8080
+        - --kubeconfig=/var/lib/kubelet/kubeconfig/kubeconfig.yaml
         - --v=2
         - --resource-container=""
         securityContext:
           privileged: true
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /var/lib/kubelet/kubeconfig
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        hostPath:
+          path: /var/lib/kubelet/kubeconfig

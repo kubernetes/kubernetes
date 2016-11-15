@@ -1,7 +1,8 @@
 language: go
 go:
   - 1.5
-  - tip
+  - 1.6.2
+  - stable
 
 install:
   - go get -v ./...

@@ -74,14 +74,20 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 	}
 }
 
-func (cache *schedulerCache) GetNodeNameToInfoMap() (map[string]*NodeInfo, error) {
-	nodeNameToInfo := make(map[string]*NodeInfo)
+func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*NodeInfo) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	for name, info := range cache.nodes {
-		nodeNameToInfo[name] = info.Clone()
+		if current, ok := nodeNameToInfo[name]; !ok || current.generation != info.generation {
+			nodeNameToInfo[name] = info.Clone()
+		}
 	}
-	return nodeNameToInfo, nil
+	for name := range nodeNameToInfo {
+		if _, ok := cache.nodes[name]; !ok {
+			delete(nodeNameToInfo, name)
+		}
+	}
+	return nil
 }
 
 func (cache *schedulerCache) List(selector labels.Selector) ([]*api.Pod, error) {
@@ -123,6 +129,31 @@ func (cache *schedulerCache) assumePod(pod *api.Pod, now time.Time) error {
 	}
 	cache.podStates[key] = ps
 	cache.assumedPods[key] = true
+	return nil
+}
+
+func (cache *schedulerCache) ForgetPod(pod *api.Pod) error {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	_, ok := cache.podStates[key]
+	switch {
+	// Only assumed pod can be forgotten.
+	case ok && cache.assumedPods[key]:
+		err := cache.removePod(pod)
+		if err != nil {
+			return err
+		}
+		delete(cache.assumedPods, key)
+		delete(cache.podStates, key)
+	default:
+		return fmt.Errorf("pod state wasn't assumed but get forgotten. Pod key: %v", key)
+	}
 	return nil
 }
 
@@ -213,12 +244,12 @@ func (cache *schedulerCache) RemovePod(pod *api.Pod) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	_, ok := cache.podStates[key]
+	cachedstate, ok := cache.podStates[key]
 	switch {
 	// An assumed pod won't have Delete/Remove event. It needs to have Add event
 	// before Remove event, in which case the state would change from Assumed to Added.
 	case ok && !cache.assumedPods[key]:
-		err := cache.removePod(pod)
+		err := cache.removePod(cachedstate.pod)
 		if err != nil {
 			return err
 		}

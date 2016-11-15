@@ -18,12 +18,14 @@ package kubenet
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"testing"
 
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
@@ -32,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"k8s.io/kubernetes/pkg/util/exec"
 	ipttest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	sysctltest "k8s.io/kubernetes/pkg/util/sysctl/testing"
 )
 
 // test it fulfills the NetworkPlugin interface
@@ -41,7 +44,7 @@ func newFakeKubenetPlugin(initMap map[kubecontainer.ContainerID]string, execer e
 	return &kubenetNetworkPlugin{
 		podIPs: initMap,
 		execer: execer,
-		MTU:    1460,
+		mtu:    1460,
 		host:   host,
 	}
 }
@@ -154,6 +157,111 @@ func TestTeardownCallsShaper(t *testing.T) {
 	}
 	assert.Equal(t, []string{"10.0.0.1/32"}, fshaper.ResetCIDRs, "shaper.Reset should have been called")
 
+	mockcni.AssertExpectations(t)
+}
+
+// TestInit tests that a `Init` call with an MTU sets the MTU
+func TestInit_MTU(t *testing.T) {
+	var fakeCmds []exec.FakeCommandAction
+	{
+		// modprobe br-netfilter
+		fCmd := exec.FakeCmd{
+			CombinedOutputScript: []exec.FakeCombinedOutputAction{
+				func() ([]byte, error) {
+					return make([]byte, 0), nil
+				},
+			},
+		}
+		fakeCmds = append(fakeCmds, func(cmd string, args ...string) exec.Cmd {
+			return exec.InitFakeCmd(&fCmd, cmd, args...)
+		})
+	}
+
+	fexec := &exec.FakeExec{
+		CommandScript: fakeCmds,
+		LookPathFunc: func(file string) (string, error) {
+			return fmt.Sprintf("/fake-bin/%s", file), nil
+		},
+	}
+
+	fhost := nettest.NewFakeHost(nil)
+	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]string{}, fexec, fhost)
+	kubenet.iptables = ipttest.NewFake()
+
+	sysctl := sysctltest.NewFake()
+	sysctl.Settings["net/bridge/bridge-nf-call-iptables"] = 0
+	kubenet.sysctl = sysctl
+
+	if err := kubenet.Init(nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8", 1234); err != nil {
+		t.Fatalf("Unexpected error in Init: %v", err)
+	}
+	assert.Equal(t, 1234, kubenet.mtu, "kubenet.mtu should have been set")
+	assert.Equal(t, 1, sysctl.Settings["net/bridge/bridge-nf-call-iptables"], "net/bridge/bridge-nf-call-iptables sysctl should have been set")
+}
+
+func TestGenerateMacAddress(t *testing.T) {
+	testCases := []struct {
+		ip          net.IP
+		expectedMAC string
+	}{
+		{
+			ip:          net.ParseIP("10.0.0.2"),
+			expectedMAC: privateMACPrefix + ":0a:00:00:02",
+		},
+		{
+			ip:          net.ParseIP("10.250.0.244"),
+			expectedMAC: privateMACPrefix + ":0a:fa:00:f4",
+		},
+		{
+			ip:          net.ParseIP("172.17.0.2"),
+			expectedMAC: privateMACPrefix + ":ac:11:00:02",
+		},
+	}
+
+	for _, tc := range testCases {
+		mac, err := generateHardwareAddr(tc.ip)
+		if err != nil {
+			t.Errorf("Did not expect error: %v", err)
+		}
+		if mac.String() != tc.expectedMAC {
+			t.Errorf("generated mac: %q, expecting: %q", mac.String(), tc.expectedMAC)
+		}
+	}
+}
+
+// TestInvocationWithoutRuntime invokes the plugin without a runtime.
+// This is how kubenet is invoked from the cri.
+func TestTearDownWithoutRuntime(t *testing.T) {
+	fhost := nettest.NewFakeHost(nil)
+	fhost.Legacy = false
+	fhost.Runtime = nil
+	mockcni := &mock_cni.MockCNI{}
+
+	fexec := &exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{},
+		LookPathFunc: func(file string) (string, error) {
+			return fmt.Sprintf("/fake-bin/%s", file), nil
+		},
+	}
+
+	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]string{}, fexec, fhost)
+	kubenet.cniConfig = mockcni
+	kubenet.iptables = ipttest.NewFake()
+
+	details := make(map[string]interface{})
+	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
+	kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+
+	existingContainerID := kubecontainer.BuildContainerID("docker", "123")
+	kubenet.podIPs[existingContainerID] = "10.0.0.1"
+
+	mockcni.On("DelNetwork", mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+
+	if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
+		t.Fatalf("Unexpected error in TearDownPod: %v", err)
+	}
+	// Assert that the CNI DelNetwork made it through and we didn't crash
+	// without a runtime.
 	mockcni.AssertExpectations(t)
 }
 

@@ -33,9 +33,10 @@ type jsonpathTest struct {
 	expect   string
 }
 
-func testJSONPath(tests []jsonpathTest, t *testing.T) {
+func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 	for _, test := range tests {
 		j := New(test.name)
+		j.AllowMissingKeys(allowMissingKeys)
 		err := j.Parse(test.template)
 		if err != nil {
 			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
@@ -166,10 +167,15 @@ func TestStructInput(t *testing.T) {
 		{"recurarray", "{..Book[2]}", storeData,
 			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
 	}
-	testJSONPath(storeTests, t)
+	testJSONPath(storeTests, false, t)
+
+	missingKeyTests := []jsonpathTest{
+		{"nonexistent field", "{.hello}", storeData, ""},
+	}
+	testJSONPath(missingKeyTests, true, t)
 
 	failStoreTests := []jsonpathTest{
-		{"invalid identfier", "{hello}", storeData, "unrecognized identifier hello"},
+		{"invalid identifier", "{hello}", storeData, "unrecognized identifier hello"},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
 		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice"},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
@@ -196,7 +202,7 @@ func TestJSONInput(t *testing.T) {
 		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5"},
 		{"bracket key", "{[0]['id']}", pointsData, "i1"},
 	}
-	testJSONPath(pointsTests, t)
+	testJSONPath(pointsTests, false, t)
 }
 
 // TestKubernetes tests some use cases from kubernetes
@@ -206,7 +212,12 @@ func TestKubernetes(t *testing.T) {
 	  "items":[
 		{
 		  "kind":"None",
-		  "metadata":{"name":"127.0.0.1"},
+		  "metadata":{
+		    "name":"127.0.0.1",
+			"labels":{
+			  "kubernetes.io/hostname":"127.0.0.1"
+			}
+		  },
 		  "status":{
 			"capacity":{"cpu":"4"},
 			"addresses":[{"type": "LegacyHostIP", "address":"127.0.0.1"}]
@@ -214,7 +225,12 @@ func TestKubernetes(t *testing.T) {
 		},
 		{
 		  "kind":"None",
-		  "metadata":{"name":"127.0.0.2"},
+		  "metadata":{
+			"name":"127.0.0.2",
+			"labels":{
+			  "kubernetes.io/hostname":"127.0.0.2"
+			}
+		  },
 		  "status":{
 			"capacity":{"cpu":"8"},
 			"addresses":[
@@ -254,8 +270,10 @@ func TestKubernetes(t *testing.T) {
 		{"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
 			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] "},
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
+		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1"},
+		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None"},
 	}
-	testJSONPath(nodesTests, t)
+	testJSONPath(nodesTests, false, t)
 
 	randomPrintOrderTests := []jsonpathTest{
 		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},

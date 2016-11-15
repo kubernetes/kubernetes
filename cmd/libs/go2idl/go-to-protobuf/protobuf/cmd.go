@@ -26,11 +26,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
-	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
-	"k8s.io/kubernetes/cmd/libs/go2idl/parser"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/gengo/args"
+	"k8s.io/gengo/generator"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/parser"
+	"k8s.io/gengo/types"
 
 	flag "github.com/spf13/pflag"
 )
@@ -66,15 +66,19 @@ func New() *Generator {
 			`+k8s.io/kubernetes/pkg/watch/versioned`,
 			`k8s.io/kubernetes/pkg/api/unversioned`,
 			`k8s.io/kubernetes/pkg/api/v1`,
-			`k8s.io/kubernetes/pkg/apis/policy/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/policy/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/extensions/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/autoscaling/v1`,
+			`k8s.io/kubernetes/pkg/apis/authorization/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/batch/v1`,
 			`k8s.io/kubernetes/pkg/apis/batch/v2alpha1`,
-			`k8s.io/kubernetes/pkg/apis/apps/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/apps/v1beta1`,
+			`k8s.io/kubernetes/pkg/apis/authentication/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/rbac/v1alpha1`,
 			`k8s.io/kubernetes/federation/apis/federation/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/certificates/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/storage/v1beta1`,
 		}, ","),
 		DropEmbeddedFields: "k8s.io/kubernetes/pkg/api/unversioned.TypeMeta",
 	}
@@ -125,9 +129,6 @@ func Run(g *Generator) {
 	protobufNames := NewProtobufNamer()
 	outputPackages := generator.Packages{}
 	for _, d := range strings.Split(g.Packages, ",") {
-		if strings.Contains(d, "-") {
-			log.Fatalf("Package names must be valid protobuf package identifiers, which allow only [a-z0-9_]: %s", d)
-		}
 		generateAllTypes, outputPackage := true, true
 		switch {
 		case strings.HasPrefix(d, "+"):
@@ -179,12 +180,12 @@ func Run(g *Generator) {
 		},
 		"public",
 	)
-	c.Verify = g.Common.VerifyOnly
-	c.FileTypes["protoidl"] = NewProtoFile()
-
 	if err != nil {
 		log.Fatalf("Failed making a context: %v", err)
 	}
+
+	c.Verify = g.Common.VerifyOnly
+	c.FileTypes["protoidl"] = NewProtoFile()
 
 	if err := protobufNames.AssignTypesToPackages(c); err != nil {
 		log.Fatalf("Failed to identify Common types: %v", err)

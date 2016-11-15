@@ -17,8 +17,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
-	"unicode/utf8"
 )
 
 const (
@@ -87,19 +87,6 @@ var LabelNameRE = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 // therewith.
 type LabelName string
 
-// IsValid is true iff the label name matches the pattern of LabelNameRE.
-func (ln LabelName) IsValid() bool {
-	if len(ln) == 0 {
-		return false
-	}
-	for i, b := range ln {
-		if !((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_' || (b >= '0' && b <= '9' && i > 0)) {
-			return false
-		}
-	}
-	return true
-}
-
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (ln *LabelName) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var s string
@@ -152,11 +139,6 @@ func (l LabelNames) String() string {
 // A LabelValue is an associated value for a LabelName.
 type LabelValue string
 
-// IsValid returns true iff the string is a valid UTF8.
-func (lv LabelValue) IsValid() bool {
-	return utf8.ValidString(string(lv))
-}
-
 // LabelValues is a sortable LabelValue slice. It implements sort.Interface.
 type LabelValues []LabelValue
 
@@ -165,7 +147,7 @@ func (l LabelValues) Len() int {
 }
 
 func (l LabelValues) Less(i, j int) bool {
-	return string(l[i]) < string(l[j])
+	return sort.StringsAreSorted([]string{string(l[i]), string(l[j])})
 }
 
 func (l LabelValues) Swap(i, j int) {

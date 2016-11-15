@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/taint-toleration-dedicated.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Taints, Tolerations, and Dedicated Nodes
 
 ## Introduction
@@ -201,7 +167,7 @@ to both `NodeSpec` and `NodeStatus`. The value in `NodeStatus` is the union
 of the taints specified by various sources. For now, the only source is
 the `NodeSpec` itself, but in the future one could imagine a node inheriting
 taints from pods (if we were to allow taints to be attached to pods), from
-the node's startup coniguration, etc. The scheduler should look at the `Taints`
+the node's startup configuration, etc. The scheduler should look at the `Taints`
 in `NodeStatus`, not in `NodeSpec`.
 
 Taints and tolerations are not scoped to namespace.
@@ -305,7 +271,7 @@ Users should not start using taints and tolerations until the full
 implementation has been in Kubelet and the master for enough binary versions
 that we feel comfortable that we will not need to roll back either Kubelet or
 master to a version that does not support them. Longer-term we will use a
-progamatic approach to enforcing this ([#4855](https://github.com/kubernetes/kubernetes/issues/4855)).
+programatic approach to enforcing this ([#4855](https://github.com/kubernetes/kubernetes/issues/4855)).
 
 ## Related issues
 

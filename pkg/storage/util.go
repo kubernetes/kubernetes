@@ -19,9 +19,13 @@ package storage
 import (
 	"fmt"
 	"strconv"
+	"strings"
+	"sync/atomic"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -34,6 +38,31 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 		out, err := fn(input)
 		return out, nil, err
 	}
+}
+
+// SimpleFilter converts a selection predicate into a FilterFunc.
+// It ignores any error from Matches().
+func SimpleFilter(p SelectionPredicate) FilterFunc {
+	return func(obj runtime.Object) bool {
+		matches, err := p.Matches(obj)
+		if err != nil {
+			glog.Errorf("invalid object for matching. Obj: %v. Err: %v", obj, err)
+			return false
+		}
+		return matches
+	}
+}
+
+func EverythingFunc(runtime.Object) bool {
+	return true
+}
+
+func NoTriggerFunc() []MatchValue {
+	return nil
+}
+
+func NoTriggerPublisher(runtime.Object) []MatchValue {
+	return nil
 }
 
 // ParseWatchResourceVersion takes a resource version argument and converts it to
@@ -71,7 +100,7 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", err
 	}
 	name := meta.GetName()
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
 	return prefix + "/" + meta.GetNamespace() + "/" + name, nil
@@ -83,8 +112,50 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", err
 	}
 	name := meta.GetName()
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
 	return prefix + "/" + name, nil
+}
+
+// hasPathPrefix returns true if the string matches pathPrefix exactly, or if is prefixed with pathPrefix at a path segment boundary
+func hasPathPrefix(s, pathPrefix string) bool {
+	// Short circuit if s doesn't contain the prefix at all
+	if !strings.HasPrefix(s, pathPrefix) {
+		return false
+	}
+
+	pathPrefixLength := len(pathPrefix)
+
+	if len(s) == pathPrefixLength {
+		// Exact match
+		return true
+	}
+	if strings.HasSuffix(pathPrefix, "/") {
+		// pathPrefix already ensured a path segment boundary
+		return true
+	}
+	if s[pathPrefixLength:pathPrefixLength+1] == "/" {
+		// The next character in s is a path segment boundary
+		// Check this instead of normalizing pathPrefix to avoid allocating on every call
+		return true
+	}
+	return false
+}
+
+// HighWaterMark is a thread-safe object for tracking the maximum value seen
+// for some quantity.
+type HighWaterMark int64
+
+// Update returns true if and only if 'current' is the highest value ever seen.
+func (hwm *HighWaterMark) Update(current int64) bool {
+	for {
+		old := atomic.LoadInt64((*int64)(hwm))
+		if current <= old {
+			return false
+		}
+		if atomic.CompareAndSwapInt64((*int64)(hwm), old, current) {
+			return true
+		}
+	}
 }

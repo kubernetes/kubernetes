@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,57 +14,41 @@
 
 package rafthttp
 
-import (
-	"time"
+import "github.com/prometheus/client_golang/prometheus"
 
-	"github.com/coreos/etcd/pkg/types"
-	"github.com/coreos/etcd/raft/raftpb"
-	"github.com/prometheus/client_golang/prometheus"
-)
-
+// TODO: record write/recv failures.
 var (
-	// TODO: create a separate histogram for recording
-	// snapshot sending metric. snapshot can be large and
-	// take a long time to send. So it needs a different
-	// time range than other type of messages.
-	msgSentDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Namespace: "etcd",
-			Subsystem: "rafthttp",
-			Name:      "message_sent_latency_seconds",
-			Help:      "message sent latency distributions.",
-			Buckets:   prometheus.ExponentialBuckets(0.0005, 2, 13),
-		},
-		[]string{"sendingType", "remoteID", "msgType"},
+	sentBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "etcd",
+		Subsystem: "network",
+		Name:      "peer_sent_bytes_total",
+		Help:      "The total number of bytes sent to peers.",
+	},
+		[]string{"To"},
 	)
 
-	msgSentFailed = prometheus.NewCounterVec(prometheus.CounterOpts{
+	receivedBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "etcd",
-		Subsystem: "rafthttp",
-		Name:      "message_sent_failed_total",
-		Help:      "The total number of failed messages sent.",
+		Subsystem: "network",
+		Name:      "peer_received_bytes_total",
+		Help:      "The total number of bytes received from peers.",
 	},
-		[]string{"sendingType", "remoteID", "msgType"},
+		[]string{"From"},
+	)
+
+	rtts = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "etcd",
+		Subsystem: "network",
+		Name:      "peer_round_trip_time_seconds",
+		Help:      "Round-Trip-Time histogram between peers.",
+		Buckets:   prometheus.ExponentialBuckets(0.0001, 2, 14),
+	},
+		[]string{"To"},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(msgSentDuration)
-	prometheus.MustRegister(msgSentFailed)
-}
-
-func reportSentDuration(sendingType string, m raftpb.Message, duration time.Duration) {
-	typ := m.Type.String()
-	if isLinkHeartbeatMessage(m) {
-		typ = "MsgLinkHeartbeat"
-	}
-	msgSentDuration.WithLabelValues(sendingType, types.ID(m.To).String(), typ).Observe(float64(duration) / float64(time.Second))
-}
-
-func reportSentFailure(sendingType string, m raftpb.Message) {
-	typ := m.Type.String()
-	if isLinkHeartbeatMessage(m) {
-		typ = "MsgLinkHeartbeat"
-	}
-	msgSentFailed.WithLabelValues(sendingType, types.ID(m.To).String(), typ).Inc()
+	prometheus.MustRegister(sentBytes)
+	prometheus.MustRegister(receivedBytes)
+	prometheus.MustRegister(rtts)
 }

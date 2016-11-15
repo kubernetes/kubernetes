@@ -151,7 +151,7 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 	returnKeySet := sets.String{}
 	for _, indexKey := range indexKeys {
 		set := index[indexKey]
-		for _, key := range set.List() {
+		for _, key := range set.UnsortedList() {
 			returnKeySet.Insert(key)
 		}
 	}

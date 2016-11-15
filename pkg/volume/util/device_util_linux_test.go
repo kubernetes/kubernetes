@@ -112,7 +112,7 @@ func TestFindMultipathDeviceForDevice(t *testing.T) {
 	}
 }
 
-func TestfindDeviceForPath(t *testing.T) {
+func TestFindDeviceForPath(t *testing.T) {
 	io := &mockOsIOHandler{}
 
 	disk, err := findDeviceForPath("/dev/sde", io)

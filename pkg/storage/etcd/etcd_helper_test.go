@@ -29,7 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/storage"
@@ -43,7 +46,7 @@ const validEtcdVersion = "etcd 2.0.9"
 func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
-	scheme.AddKnownTypes(*testapi.Default.GroupVersion(), &storagetesting.TestResource{})
+	scheme.AddKnownTypes(registered.GroupOrDie(api.GroupName).GroupVersion, &storagetesting.TestResource{})
 	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
 	if err := scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
@@ -57,7 +60,7 @@ func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	); err != nil {
 		panic(err)
 	}
-	codec := serializer.NewCodecFactory(scheme).LegacyCodec(*testapi.Default.GroupVersion())
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
 	return scheme, codec
 }
 
@@ -154,13 +157,17 @@ func TestListFiltered(t *testing.T) {
 	}
 
 	createPodList(t, helper, &list)
-	filter := func(obj runtime.Object) bool {
-		pod := obj.(*api.Pod)
-		return pod.Name == "bar"
+	// List only "bar" pod
+	p := storage.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.SelectorFromSet(fields.Set{"metadata.name": "bar"}),
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			pod := obj.(*api.Pod)
+			return labels.Set(pod.Labels), fields.Set{"metadata.name": pod.Name}, nil
+		},
 	}
-
 	var got api.PodList
-	err := helper.List(context.TODO(), key, "", filter, &got)
+	err := helper.List(context.TODO(), key, "", p, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -459,7 +466,7 @@ func TestGuaranteedUpdateUIDMismatch(t *testing.T) {
 	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", podPtr, true, storage.NewUIDPreconditions("B"), storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
-	if !storage.IsTestFailed(err) {
+	if !storage.IsInvalidObj(err) {
 		t.Fatalf("Expect a Test Failed (write conflict) error, got: %v", err)
 	}
 }
@@ -498,7 +505,7 @@ func TestDeleteUIDMismatch(t *testing.T) {
 		t.Fatalf("Unexpected error %#v", err)
 	}
 	err = helper.Delete(context.TODO(), "/some/key", obj, storage.NewUIDPreconditions("B"))
-	if !storage.IsTestFailed(err) {
+	if !storage.IsInvalidObj(err) {
 		t.Fatalf("Expect a Test Failed (write conflict) error, got: %v", err)
 	}
 }

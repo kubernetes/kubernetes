@@ -25,9 +25,11 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
-	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"github.com/golang/glog"
+
+	"k8s.io/gengo/generator"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 )
 
 // genProtoIDL produces a .proto IDL.
@@ -51,6 +53,8 @@ func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 	return []string{
 		"option (gogoproto.marshaler_all) = true;",
 		"option (gogoproto.sizer_all) = true;",
+		"option (gogoproto.goproto_stringer_all) = false;",
+		"option (gogoproto.stringer_all) = true;",
 		"option (gogoproto.unmarshaler_all) = true;",
 		"option (gogoproto.goproto_unrecognized_all) = false;",
 		"option (gogoproto.goproto_enum_prefix_all) = false;",
@@ -70,13 +74,20 @@ func (g *genProtoIDL) Namers(c *generator.Context) namer.NameSystems {
 
 // Filter ignores types that are identified as not exportable.
 func (g *genProtoIDL) Filter(c *generator.Context, t *types.Type) bool {
-	flags := types.ExtractCommentTags("+", t.CommentLines)
-	switch {
-	case flags["protobuf"] == "false":
-		return false
-	case flags["protobuf"] == "true":
-		return true
-	case !g.generateAll:
+	tagVals := types.ExtractCommentTags("+", t.CommentLines)["protobuf"]
+	if tagVals != nil {
+		if tagVals[0] == "false" {
+			// Type specified "false".
+			return false
+		}
+		if tagVals[0] == "true" {
+			// Type specified "true".
+			return true
+		}
+		glog.Fatalf(`Comment tag "protobuf" must be true or false, found: %q`, tagVals[0])
+	}
+	if !g.generateAll {
+		// We're not generating everything.
 		return false
 	}
 	seen := map[*types.Type]bool{}
@@ -125,7 +136,7 @@ func isOptionalAlias(t *types.Type) bool {
 	if t.Underlying == nil || (t.Underlying.Kind != types.Map && t.Underlying.Kind != types.Slice) {
 		return false
 	}
-	if types.ExtractCommentTags("+", t.CommentLines)["protobuf.nullable"] != "true" {
+	if extractBoolTagOrDie("protobuf.nullable", t.CommentLines) == false {
 		return false
 	}
 	return true
@@ -268,7 +279,7 @@ func (b bodyGen) doAlias(sw *generator.SnippetWriter) error {
 		Members: []types.Member{
 			{
 				Name:         "Items",
-				CommentLines: fmt.Sprintf("items, if empty, will result in an empty %s\n", kind),
+				CommentLines: []string{fmt.Sprintf("items, if empty, will result in an empty %s\n", kind)},
 				Type:         b.t.Underlying,
 			},
 		},
@@ -296,7 +307,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 			key := strings.TrimPrefix(k, "protobuf.options.")
 			switch key {
 			case "marshal":
-				if v == "false" {
+				if v[0] == "false" {
 					if !b.omitGogo {
 						options = append(options,
 							"(gogoproto.marshaler) = false",
@@ -307,14 +318,17 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 				}
 			default:
 				if !b.omitGogo || !strings.HasPrefix(key, "(gogoproto.") {
-					options = append(options, fmt.Sprintf("%s = %s", key, v))
+					if key == "(gogoproto.goproto_stringer)" && v[0] == "false" {
+						options = append(options, "(gogoproto.stringer) = false")
+					}
+					options = append(options, fmt.Sprintf("%s = %s", key, v[0]))
 				}
 			}
 		// protobuf.as allows a type to have the same message contents as another Go type
 		case k == "protobuf.as":
 			fields = nil
-			if alias = b.locator.GoTypeForName(types.Name{Name: v}); alias == nil {
-				return fmt.Errorf("type %v references alias %q which does not exist", b.t, v)
+			if alias = b.locator.GoTypeForName(types.Name{Name: v[0]}); alias == nil {
+				return fmt.Errorf("type %v references alias %q which does not exist", b.t, v[0])
 			}
 		// protobuf.embed instructs the generator to use the named type in this package
 		// as an embedded message.
@@ -322,10 +336,10 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 			fields = []protoField{
 				{
 					Tag:  1,
-					Name: v,
+					Name: v[0],
 					Type: &types.Type{
 						Name: types.Name{
-							Name:    v,
+							Name:    v[0],
 							Package: b.localPackage.Package,
 							Path:    b.localPackage.Path,
 						},
@@ -410,7 +424,7 @@ type protoField struct {
 	Nullable bool
 	Extras   map[string]string
 
-	CommentLines string
+	CommentLines []string
 }
 
 var (
@@ -580,6 +594,8 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			return fmt.Errorf("member %q of %q malformed 'protobuf' tag, tag %d should be key=value, got %q\n", m.Name, t.Name, i+4, extra)
 		}
 		switch parts[0] {
+		case "name":
+			protoExtra[parts[0]] = parts[1]
 		case "casttype", "castkey", "castvalue":
 			parts[0] = fmt.Sprintf("(gogoproto.%s)", parts[0])
 			protoExtra[parts[0]] = parts[1]
@@ -687,8 +703,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 	return fields, nil
 }
 
-func genComment(out io.Writer, comment, indent string) {
-	lines := strings.Split(comment, "\n")
+func genComment(out io.Writer, lines []string, indent string) {
 	for {
 		l := len(lines)
 		if l == 0 || len(lines[l-1]) != 0 {

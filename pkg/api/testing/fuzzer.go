@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"testing"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -169,6 +172,14 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				j.ManualSelector = nil
 			}
 		},
+		func(sj *batch.CronJobSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(sj)
+			suspend := c.RandBool()
+			sj.Suspend = &suspend
+			sds := int64(c.RandUint64())
+			sj.StartingDeadlineSeconds = &sds
+			sj.Schedule = c.RandString()
+		},
 		func(cp *batch.ConcurrencyPolicy, c fuzz.Continue) {
 			policies := []batch.ConcurrencyPolicy{batch.AllowConcurrent, batch.ForbidConcurrent, batch.ReplaceConcurrent}
 			*cp = policies[c.Rand.Intn(len(policies))]
@@ -243,15 +254,59 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			policies := []api.RestartPolicy{api.RestartPolicyAlways, api.RestartPolicyNever, api.RestartPolicyOnFailure}
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},
-		// Only api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
+		// api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
 		// defaulted to a version otherwise roundtrip will fail
-		// For the remaining volume plugins the default fuzzer is enough.
 		func(m *api.DownwardAPIVolumeFile, c fuzz.Continue) {
 			m.Path = c.RandString()
 			versions := []string{"v1"}
 			m.FieldRef = &api.ObjectFieldSelector{}
 			m.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
 			m.FieldRef.FieldPath = c.RandString()
+			c.Fuzz(m.Mode)
+			if m.Mode != nil {
+				*m.Mode &= 0777
+			}
+		},
+		func(s *api.SecretVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			s.DefaultMode = &mode
+		},
+		func(cm *api.ConfigMapVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(cm) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			cm.DefaultMode = &mode
+		},
+		func(d *api.DownwardAPIVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(d) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			d.DefaultMode = &mode
+		},
+		func(k *api.KeyToPath, c fuzz.Continue) {
+			c.FuzzNoCustom(k) // fuzz self without calling this function again
+			k.Key = c.RandString()
+			k.Path = c.RandString()
+
+			// Mode is not mandatory, but if it is set, it should be
+			// a value between 0 and 0777
+			if k.Mode != nil {
+				*k.Mode &= 0777
+			}
 		},
 		func(vs *api.VolumeSource, c fuzz.Continue) {
 			// Exactly one of the fields must be set.
@@ -364,6 +419,20 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			types := []api.PersistentVolumeClaimPhase{api.ClaimBound, api.ClaimPending, api.ClaimLost}
 			pvc.Status.Phase = types[c.Rand.Intn(len(types))]
 		},
+		func(obj *api.AzureDiskVolumeSource, c fuzz.Continue) {
+			if obj.CachingMode == nil {
+				obj.CachingMode = new(api.AzureDataDiskCachingMode)
+				*obj.CachingMode = api.AzureDataDiskCachingNone
+			}
+			if obj.FSType == nil {
+				obj.FSType = new(string)
+				*obj.FSType = "ext4"
+			}
+			if obj.ReadOnly == nil {
+				obj.ReadOnly = new(bool)
+				*obj.ReadOnly = false
+			}
+		},
 		func(s *api.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
 		},
@@ -432,6 +501,14 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				}
 			}
 		},
+		func(r *rbac.RoleRef, c fuzz.Continue) {
+			c.FuzzNoCustom(r) // fuzz self without calling this function again
+
+			// match defaulter
+			if len(r.APIGroup) == 0 {
+				r.APIGroup = rbac.GroupName
+			}
+		},
 		func(r *runtime.RawExtension, c fuzz.Continue) {
 			// Pick an arbitrary type and fuzz it
 			types := []runtime.Object{&api.Pod{}, &extensions.Deployment{}, &api.Service{}}
@@ -462,6 +539,23 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 
 			// Set the bytes field on the RawExtension
 			r.Raw = bytes
+		},
+		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			obj.KubernetesVersion = "v10"
+			obj.API.BindPort = 20
+			obj.Discovery.BindPort = 20
+			obj.Networking.ServiceSubnet = "foo"
+			obj.Networking.DNSDomain = "foo"
+		},
+		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			obj.APIPort = 20
+			obj.DiscoveryPort = 20
+		},
+		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			s.PodDisruptionsAllowed = int32(c.Rand.Intn(2))
 		},
 	)
 	return f

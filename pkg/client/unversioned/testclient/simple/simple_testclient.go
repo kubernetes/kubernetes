@@ -27,9 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -54,7 +54,6 @@ type Response struct {
 }
 
 type Client struct {
-	*client.Client
 	Clientset *clientset.Clientset
 	Request   Request
 	Response  Response
@@ -81,31 +80,7 @@ func (c *Client) Setup(t *testing.T) *Client {
 		c.handler.ResponseBody = *responseBody
 	}
 	c.server = httptest.NewServer(c.handler)
-	if c.Client == nil {
-		c.Client = client.NewOrDie(&restclient.Config{
-			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
-		})
-
-		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
-		// We will fix this by supporting multiple group versions in Config
-		c.AutoscalingClient = client.NewAutoscalingOrDie(&restclient.Config{
-			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Autoscaling.GroupVersion()},
-		})
-		c.BatchClient = client.NewBatchOrDie(&restclient.Config{
-			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Batch.GroupVersion()},
-		})
-		c.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{
-			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
-		})
-		c.RbacClient = client.NewRbacOrDie(&restclient.Config{
-			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Rbac.GroupVersion()},
-		})
-
+	if c.Clientset == nil {
 		c.Clientset = clientset.NewForConfigOrDie(&restclient.Config{Host: c.server.URL})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}
@@ -166,9 +141,9 @@ func (c *Client) ValidateCommon(t *testing.T, err error) {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			switch key {
-			case unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()):
+			case unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = ValidateLabels
-			case unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()):
+			case unversioned.FieldSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = validateFields
 			default:
 				validator = func(a, b string) bool { return a == b }

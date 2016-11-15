@@ -61,11 +61,11 @@ func InterpretCreateError(err error, qualifiedResource unversioned.GroupResource
 	}
 }
 
-// InterpretUpdateError converts a generic error on a update
+// InterpretUpdateError converts a generic error on an update
 // operation into the appropriate API error.
 func InterpretUpdateError(err error, qualifiedResource unversioned.GroupResource, name string) error {
 	switch {
-	case storage.IsTestFailed(err), storage.IsNodeExist(err):
+	case storage.IsTestFailed(err), storage.IsNodeExist(err), storage.IsInvalidObj(err):
 		return errors.NewConflict(qualifiedResource, name, err)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "update", 2) // TODO: make configurable or handled at a higher level
@@ -86,7 +86,7 @@ func InterpretDeleteError(err error, qualifiedResource unversioned.GroupResource
 		return errors.NewNotFound(qualifiedResource, name)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "delete", 2) // TODO: make configurable or handled at a higher level
-	case storage.IsTestFailed(err), storage.IsNodeExist(err):
+	case storage.IsTestFailed(err), storage.IsNodeExist(err), storage.IsInvalidObj(err):
 		return errors.NewConflict(qualifiedResource, name, err)
 	case storage.IsInternalError(err):
 		return errors.NewInternalError(err)

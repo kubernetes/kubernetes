@@ -54,7 +54,7 @@ VM_USER=kube
 # will be reused, and the ssh keys will be different. This prevents us from seeing error
 # due to this, and it will not save the SSH key to the known_hosts file, so users will
 # still have standard ssh security checks.
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 # Optional: Enable node logging.
 # Note: currently untested
@@ -77,7 +77,9 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.244.240.240"
 DNS_DOMAIN="cluster.local"
-DNS_REPLICAS=1
+
+# Optional: Enable DNS horizontal autoscaler
+ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}"
 
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI=true

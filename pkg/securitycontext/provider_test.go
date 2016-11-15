@@ -104,10 +104,10 @@ func TestModifyHostConfig(t *testing.T) {
 
 	setSELinuxHC := &dockercontainer.HostConfig{}
 	setSELinuxHC.SecurityOpt = []string{
-		fmt.Sprintf("%s:%s", dockerLabelUser, "user"),
-		fmt.Sprintf("%s:%s", dockerLabelRole, "role"),
-		fmt.Sprintf("%s:%s", dockerLabelType, "type"),
-		fmt.Sprintf("%s:%s", dockerLabelLevel, "level"),
+		fmt.Sprintf("%s:%s", DockerLabelUser, "user"),
+		fmt.Sprintf("%s:%s", DockerLabelRole, "role"),
+		fmt.Sprintf("%s:%s", DockerLabelType, "type"),
+		fmt.Sprintf("%s:%s", DockerLabelLevel, "level"),
 	}
 
 	// seLinuxLabelsSC := fullValidSecurityContext()
@@ -166,7 +166,7 @@ func TestModifyHostConfig(t *testing.T) {
 		dummyContainer.SecurityContext = tc.sc
 		dockerCfg := &dockercontainer.HostConfig{}
 
-		provider.ModifyHostConfig(pod, dummyContainer, dockerCfg)
+		provider.ModifyHostConfig(pod, dummyContainer, dockerCfg, nil)
 
 		if e, a := tc.expected, dockerCfg; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: unexpected modification of host config\nExpected:\n\n%#v\n\nGot:\n\n%#v", tc.name, e, a)
@@ -181,32 +181,50 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	supplementalGroupHC.GroupAdd = []string{"2222"}
 	fsGroupHC := fullValidHostConfig()
 	fsGroupHC.GroupAdd = []string{"1234"}
+	extraSupplementalGroupHC := fullValidHostConfig()
+	extraSupplementalGroupHC.GroupAdd = []string{"1234"}
 	bothHC := fullValidHostConfig()
 	bothHC.GroupAdd = []string{"2222", "1234"}
 	fsGroup := int64(1234)
+	extraSupplementalGroup := []int64{1234}
 
 	testCases := map[string]struct {
-		securityContext *api.PodSecurityContext
-		expected        *dockercontainer.HostConfig
+		securityContext         *api.PodSecurityContext
+		expected                *dockercontainer.HostConfig
+		extraSupplementalGroups []int64
 	}{
 		"nil": {
-			securityContext: nil,
-			expected:        fullValidHostConfig(),
+			securityContext:         nil,
+			expected:                fullValidHostConfig(),
+			extraSupplementalGroups: nil,
 		},
 		"SupplementalGroup": {
-			securityContext: supplementalGroupsSC,
-			expected:        supplementalGroupHC,
+			securityContext:         supplementalGroupsSC,
+			expected:                supplementalGroupHC,
+			extraSupplementalGroups: nil,
 		},
 		"FSGroup": {
-			securityContext: &api.PodSecurityContext{FSGroup: &fsGroup},
-			expected:        fsGroupHC,
+			securityContext:         &api.PodSecurityContext{FSGroup: &fsGroup},
+			expected:                fsGroupHC,
+			extraSupplementalGroups: nil,
 		},
 		"FSGroup + SupplementalGroups": {
 			securityContext: &api.PodSecurityContext{
 				SupplementalGroups: []int64{2222},
 				FSGroup:            &fsGroup,
 			},
-			expected: bothHC,
+			expected:                bothHC,
+			extraSupplementalGroups: nil,
+		},
+		"ExtraSupplementalGroup": {
+			securityContext:         nil,
+			expected:                extraSupplementalGroupHC,
+			extraSupplementalGroups: extraSupplementalGroup,
+		},
+		"ExtraSupplementalGroup + SupplementalGroups": {
+			securityContext:         supplementalGroupsSC,
+			expected:                bothHC,
+			extraSupplementalGroups: extraSupplementalGroup,
 		},
 	}
 
@@ -220,7 +238,7 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	for k, v := range testCases {
 		dummyPod.Spec.SecurityContext = v.securityContext
 		dockerCfg := &dockercontainer.HostConfig{}
-		provider.ModifyHostConfig(dummyPod, dummyContainer, dockerCfg)
+		provider.ModifyHostConfig(dummyPod, dummyContainer, dockerCfg, v.extraSupplementalGroups)
 		if !reflect.DeepEqual(v.expected, dockerCfg) {
 			t.Errorf("unexpected modification of host config for %s.  Expected: %#v Got: %#v", k, v.expected, dockerCfg)
 		}
@@ -307,10 +325,10 @@ func fullValidHostConfig() *dockercontainer.HostConfig {
 		CapAdd:     []string{"addCapA", "addCapB"},
 		CapDrop:    []string{"dropCapA", "dropCapB"},
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", dockerLabelUser, "user"),
-			fmt.Sprintf("%s:%s", dockerLabelRole, "role"),
-			fmt.Sprintf("%s:%s", dockerLabelType, "type"),
-			fmt.Sprintf("%s:%s", dockerLabelLevel, "level"),
+			fmt.Sprintf("%s:%s", DockerLabelUser, "user"),
+			fmt.Sprintf("%s:%s", DockerLabelRole, "role"),
+			fmt.Sprintf("%s:%s", DockerLabelType, "type"),
+			fmt.Sprintf("%s:%s", DockerLabelLevel, "level"),
 		},
 	}
 }

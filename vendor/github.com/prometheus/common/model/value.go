@@ -16,7 +16,6 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,14 +43,8 @@ func (v *SampleValue) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Equal returns true if the value of v and o is equal or if both are NaN. Note
-// that v==o is false if both are NaN. If you want the conventional float
-// behavior, use == to compare two SampleValues.
 func (v SampleValue) Equal(o SampleValue) bool {
-	if v == o {
-		return true
-	}
-	return math.IsNaN(float64(v)) && math.IsNaN(float64(o))
+	return v == o
 }
 
 func (v SampleValue) String() string {
@@ -84,9 +77,9 @@ func (s *SamplePair) UnmarshalJSON(b []byte) error {
 }
 
 // Equal returns true if this SamplePair and o have equal Values and equal
-// Timestamps. The sematics of Value equality is defined by SampleValue.Equal.
+// Timestamps.
 func (s *SamplePair) Equal(o *SamplePair) bool {
-	return s == o || (s.Value.Equal(o.Value) && s.Timestamp.Equal(o.Timestamp))
+	return s == o || (s.Value == o.Value && s.Timestamp.Equal(o.Timestamp))
 }
 
 func (s SamplePair) String() string {
@@ -100,8 +93,7 @@ type Sample struct {
 	Timestamp Time        `json:"timestamp"`
 }
 
-// Equal compares first the metrics, then the timestamp, then the value. The
-// sematics of value equality is defined by SampleValue.Equal.
+// Equal compares first the metrics, then the timestamp, then the value.
 func (s *Sample) Equal(o *Sample) bool {
 	if s == o {
 		return true
@@ -113,7 +105,7 @@ func (s *Sample) Equal(o *Sample) bool {
 	if !s.Timestamp.Equal(o.Timestamp) {
 		return false
 	}
-	if s.Value.Equal(o.Value) {
+	if s.Value != o.Value {
 		return false
 	}
 

@@ -1,0 +1,26 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "kubectl-in-pod"
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "busybox",
+        "image": "busybox",
+        "stdin": true,
+        "stdinOnce": true,
+        "tty": true,
+        "volumeMounts": [{
+          "mountPath": "/usr/bin/kubectl",
+          "name": "kubectl"
+        }]
+      }
+    ],
+    "volumes": [{
+      "name":"kubectl",
+      "hostPath":{"path": "/usr/bin/kubectl"}
+    }]
+  }
+}

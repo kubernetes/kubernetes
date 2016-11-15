@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/labels"
 	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -66,7 +66,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 
 	// Handle returned error from wait poll
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("timed out trying to update RS: %+v", oldRs)
+		err = fmt.Errorf("timed out trying to update RS: %#v", oldRs)
 	}
 	// Ignore the RS not found error, but the RS isn't updated.
 	if errors.IsNotFound(err) {
@@ -85,7 +85,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 }
 
 // GetPodTemplateSpecHash returns the pod template hash of a ReplicaSet's pod template space
-func GetPodTemplateSpecHash(rs extensions.ReplicaSet) string {
+func GetPodTemplateSpecHash(rs *extensions.ReplicaSet) string {
 	meta := rs.Spec.Template.ObjectMeta
 	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
 	return fmt.Sprintf("%d", podutil.GetPodTemplateSpecHash(api.PodTemplateSpec{

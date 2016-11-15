@@ -3,6 +3,10 @@
   "apiVersion": "extensions/v1beta1",
   "basePath": "https://10.10.10.10:6443",
   "resourcePath": "/apis/extensions/v1beta1",
+  "info": {
+   "title": "",
+   "description": ""
+  },
   "apis": [
    {
     "path": "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets",
@@ -81,7 +85,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -220,7 +226,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of DaemonSet",
       "nickname": "watchNamespacedDaemonSetList",
@@ -286,13 +292,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -503,6 +510,22 @@
         "allowMultiple": false
        },
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -542,7 +565,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind DaemonSet",
       "nickname": "watchNamespacedDaemonSet",
@@ -616,13 +639,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -639,7 +663,7 @@
       "type": "v1beta1.DaemonSetList",
       "method": "GET",
       "summary": "list or watch objects of kind DaemonSet",
-      "nickname": "listNamespacedDaemonSet",
+      "nickname": "listDaemonSetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -700,7 +724,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -713,10 +739,10 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of DaemonSet",
-      "nickname": "watchNamespacedDaemonSetList",
+      "nickname": "watchDaemonSetListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -771,13 +797,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -1028,7 +1055,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -1167,7 +1196,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Deployment",
       "nickname": "watchNamespacedDeploymentList",
@@ -1233,13 +1262,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -1450,6 +1480,22 @@
         "allowMultiple": false
        },
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -1489,7 +1535,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Deployment",
       "nickname": "watchNamespacedDeployment",
@@ -1563,13 +1609,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -1586,7 +1633,7 @@
       "type": "v1beta1.DeploymentList",
       "method": "GET",
       "summary": "list or watch objects of kind Deployment",
-      "nickname": "listNamespacedDeployment",
+      "nickname": "listDeploymentForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -1647,7 +1694,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -1660,10 +1709,10 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Deployment",
-      "nickname": "watchNamespacedDeploymentList",
+      "nickname": "watchDeploymentListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -1718,13 +1767,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2201,7 +2251,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -2340,7 +2392,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
       "nickname": "watchNamespacedHorizontalPodAutoscalerList",
@@ -2406,13 +2458,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2623,6 +2676,22 @@
         "allowMultiple": false
        },
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -2662,7 +2731,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind HorizontalPodAutoscaler",
       "nickname": "watchNamespacedHorizontalPodAutoscaler",
@@ -2736,13 +2805,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2759,7 +2829,7 @@
       "type": "v1beta1.HorizontalPodAutoscalerList",
       "method": "GET",
       "summary": "list or watch objects of kind HorizontalPodAutoscaler",
-      "nickname": "listNamespacedHorizontalPodAutoscaler",
+      "nickname": "listHorizontalPodAutoscalerForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2820,7 +2890,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -2833,10 +2905,10 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
-      "nickname": "watchNamespacedHorizontalPodAutoscalerList",
+      "nickname": "watchHorizontalPodAutoscalerListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2891,13 +2963,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -3148,7 +3221,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -3157,7 +3232,7 @@
      {
       "type": "v1beta1.Ingress",
       "method": "POST",
-      "summary": "create a Ingress",
+      "summary": "create an Ingress",
       "nickname": "createNamespacedIngress",
       "parameters": [
        {
@@ -3287,7 +3362,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Ingress",
       "nickname": "watchNamespacedIngressList",
@@ -3353,13 +3428,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -3550,7 +3626,7 @@
      {
       "type": "unversioned.Status",
       "method": "DELETE",
-      "summary": "delete a Ingress",
+      "summary": "delete an Ingress",
       "nickname": "deleteNamespacedIngress",
       "parameters": [
        {
@@ -3567,6 +3643,22 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -3609,7 +3701,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Ingress",
       "nickname": "watchNamespacedIngress",
@@ -3683,13 +3775,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -3706,7 +3799,7 @@
       "type": "v1beta1.IngressList",
       "method": "GET",
       "summary": "list or watch objects of kind Ingress",
-      "nickname": "listNamespacedIngress",
+      "nickname": "listIngressForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -3767,7 +3860,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -3780,10 +3875,10 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Ingress",
-      "nickname": "watchNamespacedIngressList",
+      "nickname": "watchIngressListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -3838,13 +3933,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -4095,7 +4191,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -4234,7 +4332,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
       "nickname": "watchNamespacedJobList",
@@ -4300,13 +4398,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -4517,6 +4616,22 @@
         "allowMultiple": false
        },
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -4556,7 +4671,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Job",
       "nickname": "watchNamespacedJob",
@@ -4630,13 +4745,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -4653,7 +4769,7 @@
       "type": "v1beta1.JobList",
       "method": "GET",
       "summary": "list or watch objects of kind Job",
-      "nickname": "listNamespacedJob",
+      "nickname": "listJobForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -4714,7 +4830,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -4727,10 +4845,10 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
-      "nickname": "watchNamespacedJobList",
+      "nickname": "watchJobListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -4785,13 +4903,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -4966,6 +5085,811 @@
     ]
    },
    {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/networkpolicies",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.NetworkPolicyList",
+      "method": "GET",
+      "summary": "list or watch objects of kind NetworkPolicy",
+      "nickname": "listNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicyList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.NetworkPolicy",
+      "method": "POST",
+      "summary": "create a NetworkPolicy",
+      "nickname": "createNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.NetworkPolicy",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete collection of NetworkPolicy",
+      "nickname": "deletecollectionNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/networkpolicies",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "versioned.Event",
+      "method": "GET",
+      "summary": "watch individual changes to a list of NetworkPolicy",
+      "nickname": "watchNamespacedNetworkPolicyList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "versioned.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/networkpolicies/{name}",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.NetworkPolicy",
+      "method": "GET",
+      "summary": "read the specified NetworkPolicy",
+      "nickname": "readNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the NetworkPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.NetworkPolicy",
+      "method": "PUT",
+      "summary": "replace the specified NetworkPolicy",
+      "nickname": "replaceNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.NetworkPolicy",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the NetworkPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.NetworkPolicy",
+      "method": "PATCH",
+      "summary": "partially update the specified NetworkPolicy",
+      "nickname": "patchNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "unversioned.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the NetworkPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete a NetworkPolicy",
+      "nickname": "deleteNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the NetworkPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/networkpolicies/{name}",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "versioned.Event",
+      "method": "GET",
+      "summary": "watch changes to an object of kind NetworkPolicy",
+      "nickname": "watchNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the NetworkPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "versioned.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/networkpolicies",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.NetworkPolicyList",
+      "method": "GET",
+      "summary": "list or watch objects of kind NetworkPolicy",
+      "nickname": "listNetworkPolicyForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicyList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/networkpolicies",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "versioned.Event",
+      "method": "GET",
+      "summary": "watch individual changes to a list of NetworkPolicy",
+      "nickname": "watchNetworkPolicyListForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "versioned.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/extensions/v1beta1/namespaces/{namespace}/replicasets",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
@@ -5042,7 +5966,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -5181,7 +6107,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicaSet",
       "nickname": "watchNamespacedReplicaSetList",
@@ -5247,13 +6173,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -5464,6 +6391,22 @@
         "allowMultiple": false
        },
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -5503,7 +6446,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ReplicaSet",
       "nickname": "watchNamespacedReplicaSet",
@@ -5577,13 +6520,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -5600,7 +6544,7 @@
       "type": "v1beta1.ReplicaSetList",
       "method": "GET",
       "summary": "list or watch objects of kind ReplicaSet",
-      "nickname": "listNamespacedReplicaSet",
+      "nickname": "listReplicaSetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -5661,7 +6605,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -5674,10 +6620,10 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicaSet",
-      "nickname": "watchNamespacedReplicaSetList",
+      "nickname": "watchReplicaSetListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -5732,13 +6678,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -6311,7 +7258,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -6434,7 +7383,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ThirdPartyResource",
       "nickname": "watchThirdPartyResourceList",
@@ -6492,13 +7441,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -6685,6 +7635,22 @@
         "allowMultiple": false
        },
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "name",
@@ -6716,7 +7682,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ThirdPartyResource",
       "nickname": "watchThirdPartyResource",
@@ -6782,13 +7748,14 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -6896,7 +7863,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "description": "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      },
      "generateName": {
       "type": "string",
@@ -6904,7 +7871,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "Namespace defines the space within each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
+      "description": "Namespace defines the space within each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/namespaces"
      },
      "selfLink": {
       "type": "string",
@@ -6912,7 +7879,7 @@
      },
      "uid": {
       "type": "string",
-      "description": "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
+      "description": "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
      },
      "resourceVersion": {
       "type": "string",
@@ -6925,11 +7892,13 @@
      },
      "creationTimestamp": {
       "type": "string",
+      "format": "date-time",
       "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionTimestamp": {
       "type": "string",
-      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "format": "date-time",
+      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionGracePeriodSeconds": {
       "type": "integer",
@@ -6938,11 +7907,11 @@
      },
      "labels": {
       "type": "object",
-      "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+      "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels"
      },
      "annotations": {
       "type": "object",
-      "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://releases.k8s.io/HEAD/docs/user-guide/annotations.md"
+      "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations"
      },
      "ownerReferences": {
       "type": "array",
@@ -6957,6 +7926,10 @@
        "type": "string"
       },
       "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed."
+     },
+     "clusterName": {
+      "type": "string",
+      "description": "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request."
      }
     }
    },
@@ -6980,11 +7953,11 @@
      },
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      },
      "uid": {
       "type": "string",
-      "description": "UID of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
      },
      "controller": {
       "type": "boolean",
@@ -7000,17 +7973,17 @@
     ],
     "properties": {
      "selector": {
-      "$ref": "v1beta1.LabelSelector",
-      "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
+      "$ref": "unversioned.LabelSelector",
+      "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template"
+      "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template"
      }
     }
    },
-   "v1beta1.LabelSelector": {
-    "id": "v1beta1.LabelSelector",
+   "unversioned.LabelSelector": {
+    "id": "unversioned.LabelSelector",
     "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
      "matchLabels": {
@@ -7020,14 +7993,14 @@
      "matchExpressions": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.LabelSelectorRequirement"
+       "$ref": "unversioned.LabelSelectorRequirement"
       },
       "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
      }
     }
    },
-   "v1beta1.LabelSelectorRequirement": {
-    "id": "v1beta1.LabelSelectorRequirement",
+   "unversioned.LabelSelectorRequirement": {
+    "id": "unversioned.LabelSelectorRequirement",
     "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
     "required": [
      "key",
@@ -7077,18 +8050,18 @@
       "items": {
        "$ref": "v1.Volume"
       },
-      "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md"
+      "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://kubernetes.io/docs/user-guide/volumes"
      },
      "containers": {
       "type": "array",
       "items": {
        "$ref": "v1.Container"
       },
-      "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md"
+      "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers"
      },
      "restartPolicy": {
       "type": "string",
-      "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#restartpolicy"
+      "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy"
      },
      "terminationGracePeriodSeconds": {
       "type": "integer",
@@ -7106,7 +8079,7 @@
      },
      "nodeSelector": {
       "type": "object",
-      "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md"
+      "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://kubernetes.io/docs/user-guide/node-selection/README"
      },
      "serviceAccountName": {
       "type": "string",
@@ -7141,7 +8114,7 @@
       "items": {
        "$ref": "v1.LocalObjectReference"
       },
-      "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod"
+      "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod"
      },
      "hostname": {
       "type": "string",
@@ -7162,23 +8135,23 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      },
      "hostPath": {
       "$ref": "v1.HostPathVolumeSource",
-      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
+      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath"
      },
      "emptyDir": {
       "$ref": "v1.EmptyDirVolumeSource",
-      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir"
+      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir"
      },
      "gcePersistentDisk": {
       "$ref": "v1.GCEPersistentDiskVolumeSource",
-      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
      },
      "awsElasticBlockStore": {
       "$ref": "v1.AWSElasticBlockStoreVolumeSource",
-      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
      },
      "gitRepo": {
       "$ref": "v1.GitRepoVolumeSource",
@@ -7186,31 +8159,31 @@
      },
      "secret": {
       "$ref": "v1.SecretVolumeSource",
-      "description": "Secret represents a secret that should populate this volume. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets"
+      "description": "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets"
      },
      "nfs": {
       "$ref": "v1.NFSVolumeSource",
-      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
+      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
      },
      "iscsi": {
       "$ref": "v1.ISCSIVolumeSource",
-      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/iscsi/README.md"
+      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md"
      },
      "glusterfs": {
       "$ref": "v1.GlusterfsVolumeSource",
-      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md"
+      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md"
      },
      "persistentVolumeClaim": {
       "$ref": "v1.PersistentVolumeClaimVolumeSource",
-      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
+      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims"
      },
      "rbd": {
       "$ref": "v1.RBDVolumeSource",
-      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md"
+      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md"
      },
      "flexVolume": {
       "$ref": "v1.FlexVolumeSource",
-      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future."
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future."
      },
      "cinder": {
       "$ref": "v1.CinderVolumeSource",
@@ -7243,6 +8216,18 @@
      "vsphereVolume": {
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
+     "quobyte": {
+      "$ref": "v1.QuobyteVolumeSource",
+      "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime"
+     },
+     "azureDisk": {
+      "$ref": "v1.AzureDiskVolumeSource",
+      "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
+     },
+     "photonPersistentDisk": {
+      "$ref": "v1.PhotonPersistentDiskVolumeSource",
+      "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
      }
     }
    },
@@ -7255,7 +8240,7 @@
     "properties": {
      "path": {
       "type": "string",
-      "description": "Path of the directory on the host. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
+      "description": "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath"
      }
     }
    },
@@ -7265,7 +8250,7 @@
     "properties": {
      "medium": {
       "type": "string",
-      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir"
+      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir"
      }
     }
    },
@@ -7278,20 +8263,20 @@
     "properties": {
      "pdName": {
       "type": "string",
-      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
      },
      "partition": {
       "type": "integer",
       "format": "int32",
-      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
      }
     }
    },
@@ -7304,11 +8289,11 @@
     "properties": {
      "volumeID": {
       "type": "string",
-      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
      },
      "partition": {
       "type": "integer",
@@ -7317,7 +8302,7 @@
      },
      "readOnly": {
       "type": "boolean",
-      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
      }
     }
    },
@@ -7348,7 +8333,7 @@
     "properties": {
      "secretName": {
       "type": "string",
-      "description": "Name of the secret in the pod's namespace to use. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets"
+      "description": "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets"
      },
      "items": {
       "type": "array",
@@ -7356,6 +8341,11 @@
        "$ref": "v1.KeyToPath"
       },
       "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'."
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
      }
     }
    },
@@ -7374,6 +8364,11 @@
      "path": {
       "type": "string",
       "description": "The relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'."
+     },
+     "mode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
      }
     }
    },
@@ -7387,15 +8382,15 @@
     "properties": {
      "server": {
       "type": "string",
-      "description": "Server is the hostname or IP address of the NFS server. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
+      "description": "Server is the hostname or IP address of the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
      },
      "path": {
       "type": "string",
-      "description": "Path that is exported by the NFS server. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
+      "description": "Path that is exported by the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
+      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
      }
     }
    },
@@ -7427,7 +8422,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi"
      },
      "readOnly": {
       "type": "boolean",
@@ -7445,15 +8440,15 @@
     "properties": {
      "endpoints": {
       "type": "string",
-      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod"
+      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
      },
      "path": {
       "type": "string",
-      "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod"
+      "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod"
+      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
      }
     }
    },
@@ -7466,7 +8461,7 @@
     "properties": {
      "claimName": {
       "type": "string",
-      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
+      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims"
      },
      "readOnly": {
       "type": "boolean",
@@ -7487,35 +8482,35 @@
       "items": {
        "type": "string"
       },
-      "description": "A collection of Ceph monitors. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it"
+      "description": "A collection of Ceph monitors. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "image": {
       "type": "string",
-      "description": "The rados image name. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it"
+      "description": "The rados image name. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#rbd"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd"
      },
      "pool": {
       "type": "string",
-      "description": "The rados pool name. Default is rbd. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it."
+      "description": "The rados pool name. Default is rbd. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it."
      },
      "user": {
       "type": "string",
-      "description": "The rados user name. Default is admin. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it"
+      "description": "The rados user name. Default is admin. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "keyring": {
       "type": "string",
-      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it"
+      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
-      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it"
+      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it"
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      }
     }
    },
@@ -7525,13 +8520,13 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      }
     }
    },
    "v1.FlexVolumeSource": {
     "id": "v1.FlexVolumeSource",
-    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
     "required": [
      "driver"
     ],
@@ -7591,7 +8586,7 @@
       "items": {
        "type": "string"
       },
-      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "path": {
       "type": "string",
@@ -7599,32 +8594,33 @@
      },
      "user": {
       "type": "string",
-      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "secretFile": {
       "type": "string",
-      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
-      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      }
     }
    },
    "v1.FlockerVolumeSource": {
     "id": "v1.FlockerVolumeSource",
-    "description": "Represents a Flocker volume mounted by the Flocker agent. Flocker volumes do not support ownership management or SELinux relabeling.",
-    "required": [
-     "datasetName"
-    ],
+    "description": "Represents a Flocker volume mounted by the Flocker agent. One and only one of datasetName and datasetUUID should be set. Flocker volumes do not support ownership management or SELinux relabeling.",
     "properties": {
      "datasetName": {
       "type": "string",
-      "description": "Required: the volume name. This is going to be store on metadata -\u003e name on the payload for Flocker"
+      "description": "Name of the dataset stored as metadata -\u003e name on the dataset for Flocker should be considered as deprecated"
+     },
+     "datasetUUID": {
+      "type": "string",
+      "description": "UUID of the dataset. This is unique identifier of a Flocker dataset"
      }
     }
    },
@@ -7638,6 +8634,11 @@
        "$ref": "v1.DownwardAPIVolumeFile"
       },
       "description": "Items is a list of downward API volume file"
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
      }
     }
    },
@@ -7659,6 +8660,11 @@
      "resourceFieldRef": {
       "$ref": "v1.ResourceFieldSelector",
       "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
+     },
+     "mode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
      }
     }
    },
@@ -7713,7 +8719,7 @@
       "items": {
        "type": "string"
       },
-      "description": "Required: FC target world wide names (WWNs)"
+      "description": "Required: FC target worldwide names (WWNs)"
      },
      "lun": {
       "type": "integer",
@@ -7758,7 +8764,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      },
      "items": {
       "type": "array",
@@ -7766,6 +8772,11 @@
        "$ref": "v1.KeyToPath"
       },
       "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'."
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
      }
     }
    },
@@ -7786,6 +8797,87 @@
      }
     }
    },
+   "v1.QuobyteVolumeSource": {
+    "id": "v1.QuobyteVolumeSource",
+    "description": "Represents a Quobyte mount that lasts the lifetime of a pod. Quobyte volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "registry",
+     "volume"
+    ],
+    "properties": {
+     "registry": {
+      "type": "string",
+      "description": "Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes"
+     },
+     "volume": {
+      "type": "string",
+      "description": "Volume is a string that references an already created Quobyte volume by name."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false."
+     },
+     "user": {
+      "type": "string",
+      "description": "User to map volume access to Defaults to serivceaccount user"
+     },
+     "group": {
+      "type": "string",
+      "description": "Group to map volume access to Default is no group"
+     }
+    }
+   },
+   "v1.AzureDiskVolumeSource": {
+    "id": "v1.AzureDiskVolumeSource",
+    "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+    "required": [
+     "diskName",
+     "diskURI"
+    ],
+    "properties": {
+     "diskName": {
+      "type": "string",
+      "description": "The Name of the data disk in the blob storage"
+     },
+     "diskURI": {
+      "type": "string",
+      "description": "The URI the data disk in the blob storage"
+     },
+     "cachingMode": {
+      "$ref": "v1.AzureDataDiskCachingMode",
+      "description": "Host Caching mode: None, Read Only, Read Write."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.AzureDataDiskCachingMode": {
+    "id": "v1.AzureDataDiskCachingMode",
+    "properties": {}
+   },
+   "v1.PhotonPersistentDiskVolumeSource": {
+    "id": "v1.PhotonPersistentDiskVolumeSource",
+    "description": "Represents a Photon Controller persistent disk resource.",
+    "required": [
+     "pdID"
+    ],
+    "properties": {
+     "pdID": {
+      "type": "string",
+      "description": "ID that identifies Photon Controller persistent disk"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
    "v1.Container": {
     "id": "v1.Container",
     "description": "A single application container that you want to run within a pod.",
@@ -7799,21 +8891,21 @@
      },
      "image": {
       "type": "string",
-      "description": "Docker image name. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md"
+      "description": "Docker image name. More info: http://kubernetes.io/docs/user-guide/images"
      },
      "command": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands"
+      "description": "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers#containers-and-commands"
      },
      "args": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands"
+      "description": "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers#containers-and-commands"
      },
      "workingDir": {
       "type": "string",
@@ -7835,7 +8927,7 @@
      },
      "resources": {
       "$ref": "v1.ResourceRequirements",
-      "description": "Compute Resources required by this container. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources"
+      "description": "Compute Resources required by this container. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources"
      },
      "volumeMounts": {
       "type": "array",
@@ -7846,11 +8938,11 @@
      },
      "livenessProbe": {
       "$ref": "v1.Probe",
-      "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+      "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes"
      },
      "readinessProbe": {
       "$ref": "v1.Probe",
-      "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+      "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes"
      },
      "lifecycle": {
       "$ref": "v1.Lifecycle",
@@ -7862,7 +8954,7 @@
      },
      "imagePullPolicy": {
       "type": "string",
-      "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#updating-images"
+      "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/images#updating-images"
      },
      "securityContext": {
       "$ref": "v1.SecurityContext",
@@ -7940,7 +9032,7 @@
     "properties": {
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
-      "description": "Selects a field of the pod; only name and namespace are supported."
+      "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP."
      },
      "resourceFieldRef": {
       "$ref": "v1.ResourceFieldSelector",
@@ -7965,7 +9057,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      },
      "key": {
       "type": "string",
@@ -7982,7 +9074,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      },
      "key": {
       "type": "string",
@@ -7996,11 +9088,11 @@
     "properties": {
      "limits": {
       "type": "object",
-      "description": "Limits describes the maximum amount of compute resources allowed. More info: http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications"
+      "description": "Limits describes the maximum amount of compute resources allowed. More info: http://kubernetes.io/docs/user-guide/compute-resources/"
      },
      "requests": {
       "type": "object",
-      "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications"
+      "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: http://kubernetes.io/docs/user-guide/compute-resources/"
      }
     }
    },
@@ -8049,12 +9141,12 @@
      "initialDelaySeconds": {
       "type": "integer",
       "format": "int32",
-      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes"
      },
      "timeoutSeconds": {
       "type": "integer",
       "format": "int32",
-      "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+      "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes"
      },
      "periodSeconds": {
       "type": "integer",
@@ -8155,11 +9247,11 @@
     "properties": {
      "postStart": {
       "$ref": "v1.Handler",
-      "description": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details"
+      "description": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details"
      },
      "preStop": {
       "$ref": "v1.Handler",
-      "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details"
+      "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details"
      }
     }
    },
@@ -8295,7 +9387,8 @@
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
-     "desiredNumberScheduled"
+     "desiredNumberScheduled",
+     "numberReady"
     ],
     "properties": {
      "currentNumberScheduled": {
@@ -8312,6 +9405,11 @@
       "type": "integer",
       "format": "int32",
       "description": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md"
+     },
+     "numberReady": {
+      "type": "integer",
+      "format": "int32",
+      "description": "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready."
      }
     }
    },
@@ -8402,9 +9500,20 @@
      }
     }
    },
-   "*versioned.Event": {
-    "id": "*versioned.Event",
-    "properties": {}
+   "versioned.Event": {
+    "id": "versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
    },
    "unversioned.Patch": {
     "id": "unversioned.Patch",
@@ -8519,7 +9628,7 @@
       "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1."
      },
      "selector": {
-      "$ref": "v1beta1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment."
      },
      "template": {
@@ -8547,6 +9656,11 @@
      "rollbackTo": {
       "$ref": "v1beta1.RollbackConfig",
       "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
+     },
+     "progressDeadlineSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. This is not set by default."
      }
     }
    },
@@ -8616,6 +9730,49 @@
       "type": "integer",
       "format": "int32",
       "description": "Total number of unavailable pods targeted by this deployment."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.DeploymentCondition"
+      },
+      "description": "Represents the latest available observations of a deployment's current state."
+     }
+    }
+   },
+   "v1beta1.DeploymentCondition": {
+    "id": "v1beta1.DeploymentCondition",
+    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of deployment condition."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
+     },
+     "lastUpdateTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The last time this condition was updated."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "The reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human readable message indicating details about the transition."
      }
     }
    },
@@ -8700,11 +9857,11 @@
      },
      "selector": {
       "type": "object",
-      "description": "label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
+      "description": "label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "targetSelector": {
       "type": "string",
-      "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
+      "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      }
     }
    },
@@ -8800,7 +9957,7 @@
      },
      "name": {
       "type": "string",
-      "description": "Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+      "description": "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      },
      "apiVersion": {
       "type": "string",
@@ -8840,6 +9997,7 @@
      },
      "lastScaleTime": {
       "type": "string",
+      "format": "date-time",
       "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
      },
      "currentReplicas": {
@@ -9010,7 +10168,7 @@
     "properties": {
      "path": {
       "type": "string",
-      "description": "Path is a extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend."
+      "description": "Path is an extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend."
      },
      "backend": {
       "$ref": "v1beta1.IngressBackend",
@@ -9057,7 +10215,7 @@
    },
    "v1beta1.JobList": {
     "id": "v1beta1.JobList",
-    "description": "JobList is a collection of jobs.",
+    "description": "JobList is a collection of jobs. DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.",
     "required": [
      "items"
     ],
@@ -9085,7 +10243,7 @@
    },
    "v1beta1.Job": {
     "id": "v1beta1.Job",
-    "description": "Job represents the configuration of a single job.",
+    "description": "Job represents the configuration of a single job. DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9119,12 +10277,12 @@
      "parallelism": {
       "type": "integer",
       "format": "int32",
-      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md"
+      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs"
      },
      "completions": {
       "type": "integer",
       "format": "int32",
-      "description": "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md"
+      "description": "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs"
      },
      "activeDeadlineSeconds": {
       "type": "integer",
@@ -9132,8 +10290,8 @@
       "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer"
      },
      "selector": {
-      "$ref": "v1beta1.LabelSelector",
-      "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
+      "$ref": "unversioned.LabelSelector",
+      "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "autoSelector": {
       "type": "boolean",
@@ -9141,7 +10299,7 @@
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md"
+      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs"
      }
     }
    },
@@ -9154,14 +10312,16 @@
       "items": {
        "$ref": "v1beta1.JobCondition"
       },
-      "description": "Conditions represent the latest available observations of an object's current state. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md"
+      "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs"
      },
      "startTime": {
       "type": "string",
+      "format": "date-time",
       "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
      },
      "completionTime": {
       "type": "string",
+      "format": "date-time",
       "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
      },
      "active": {
@@ -9199,10 +10359,12 @@
      },
      "lastProbeTime": {
       "type": "string",
+      "format": "date-time",
       "description": "Last time the condition was checked."
      },
      "lastTransitionTime": {
       "type": "string",
+      "format": "date-time",
       "description": "Last time the condition transit from one status to another."
      },
      "reason": {
@@ -9212,6 +10374,124 @@
      "message": {
       "type": "string",
       "description": "Human readable message indicating details about last transition."
+     }
+    }
+   },
+   "v1beta1.NetworkPolicyList": {
+    "id": "v1beta1.NetworkPolicyList",
+    "description": "Network Policy List is a list of NetworkPolicy objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "unversioned.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.NetworkPolicy"
+      },
+      "description": "Items is a list of schema objects."
+     }
+    }
+   },
+   "v1beta1.NetworkPolicy": {
+    "id": "v1beta1.NetworkPolicy",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1beta1.NetworkPolicySpec",
+      "description": "Specification of the desired behavior for this NetworkPolicy."
+     }
+    }
+   },
+   "v1beta1.NetworkPolicySpec": {
+    "id": "v1beta1.NetworkPolicySpec",
+    "required": [
+     "podSelector"
+    ],
+    "properties": {
+     "podSelector": {
+      "$ref": "unversioned.LabelSelector",
+      "description": "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace."
+     },
+     "ingress": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.NetworkPolicyIngressRule"
+      },
+      "description": "List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if namespace.networkPolicy.ingress.isolation is undefined and cluster policy allows it, OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not affect ingress isolation. If this field is present and contains at least one rule, this policy allows any traffic which matches at least one of the ingress rules in this list."
+     }
+    }
+   },
+   "v1beta1.NetworkPolicyIngressRule": {
+    "id": "v1beta1.NetworkPolicyIngressRule",
+    "description": "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
+    "properties": {
+     "ports": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.NetworkPolicyPort"
+      },
+      "description": "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is not provided, this rule matches all ports (traffic not restricted by port). If this field is empty, this rule matches no ports (no traffic matches). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list."
+     },
+     "from": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.NetworkPolicyPeer"
+      },
+      "description": "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is not provided, this rule matches all sources (traffic not restricted by source). If this field is empty, this rule matches no sources (no traffic matches). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list."
+     }
+    }
+   },
+   "v1beta1.NetworkPolicyPort": {
+    "id": "v1beta1.NetworkPolicyPort",
+    "properties": {
+     "protocol": {
+      "$ref": "v1.Protocol",
+      "description": "Optional.  The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP."
+     },
+     "port": {
+      "type": "string",
+      "description": "If specified, the port on the given protocol.  This can either be a numerical or named port on a pod.  If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched."
+     }
+    }
+   },
+   "v1.Protocol": {
+    "id": "v1.Protocol",
+    "properties": {}
+   },
+   "v1beta1.NetworkPolicyPeer": {
+    "id": "v1beta1.NetworkPolicyPeer",
+    "properties": {
+     "podSelector": {
+      "$ref": "unversioned.LabelSelector",
+      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace."
+     },
+     "namespaceSelector": {
+      "$ref": "unversioned.LabelSelector",
+      "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces."
      }
     }
    },
@@ -9239,7 +10519,7 @@
       "items": {
        "$ref": "v1beta1.ReplicaSet"
       },
-      "description": "List of ReplicaSets. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md"
+      "description": "List of ReplicaSets. More info: http://kubernetes.io/docs/user-guide/replication-controller"
      }
     }
    },
@@ -9276,15 +10556,20 @@
      "replicas": {
       "type": "integer",
       "format": "int32",
-      "description": "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
+      "description": "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller"
+     },
+     "minReadySeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
      },
      "selector": {
-      "$ref": "v1beta1.LabelSelector",
-      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
+      "$ref": "unversioned.LabelSelector",
+      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template"
+      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template"
      }
     }
    },
@@ -9298,17 +10583,65 @@
      "replicas": {
       "type": "integer",
       "format": "int32",
-      "description": "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
+      "description": "Replicas is the most recently oberved number of replicas. More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller"
      },
      "fullyLabeledReplicas": {
       "type": "integer",
       "format": "int32",
       "description": "The number of pods that have labels matching the labels of the pod template of the replicaset."
      },
+     "readyReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of ready replicas for this replica set."
+     },
+     "availableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of available replicas (ready for at least minReadySeconds) for this replica set."
+     },
      "observedGeneration": {
       "type": "integer",
       "format": "int64",
       "description": "ObservedGeneration reflects the generation of the most recently observed ReplicaSet."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ReplicaSetCondition"
+      },
+      "description": "Represents the latest available observations of a replica set's current state."
+     }
+    }
+   },
+   "v1beta1.ReplicaSetCondition": {
+    "id": "v1beta1.ReplicaSetCondition",
+    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of replica set condition."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "The reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human readable message indicating details about the transition."
      }
     }
    },

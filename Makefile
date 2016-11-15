@@ -12,21 +12,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+DBG_MAKEFILE ?=
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** starting Makefile for goal(s) "$(MAKECMDGOALS)")
+    $(warning ***** $(shell date))
+else
+    # If we're not debugging the Makefile, don't echo recipes.
+    MAKEFLAGS += -s
+endif
+
+
 # Old-skool build tools.
 #
-# Targets (see each target for more information):
+# Commonly used targets (see each target for more information):
 #   all: Build code.
-#   check: Run tests.
 #   test: Run tests.
 #   clean: Clean up.
 
-OUT_DIR = _output
+# It's necessary to set this because some environments don't link sh -> bash.
+SHELL := /bin/bash
 
-KUBE_GOFLAGS = $(GOFLAGS)
-export KUBE_GOFLAGS
+# We don't need make's built-in rules.
+MAKEFLAGS += --no-builtin-rules
+.SUFFIXES:
 
-KUBE_GOLDFLAGS = $(GOLDFLAGS)
-export KUBE_GOLDFLAGS
+# Constants used throughout.
+.EXPORT_ALL_VARIABLES:
+OUT_DIR ?= _output
+BIN_DIR := $(OUT_DIR)/bin
+PRJ_SRC_PATH := k8s.io/kubernetes
+GENERATED_FILE_PREFIX := zz_generated.
+
+# Metadata for driving the build lives here.
+META_DIR := .make
+
+# Our build flags.
+# TODO(thockin): it would be nice to just use the native flags.  Can we EOL
+#                these "wrapper" flags?
+KUBE_GOFLAGS := $(GOFLAGS)
+KUBE_GOLDFLAGS := $(GOLDFLAGS)
+KUBE_GOGCFLAGS = $(GOGCFLAGS)
+
+# This controls the verbosity of the build.  Higher numbers mean more output.
+KUBE_VERBOSE ?= 1
 
 # Build code.
 #
@@ -35,35 +63,49 @@ export KUBE_GOLDFLAGS
 #     package, the build will produce executable files under $(OUT_DIR)/go/bin.
 #     If not specified, "everything" will be built.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
-#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
+#   GOLDFLAGS: Extra linking flags passed to 'go' when building.
+#   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
 #
 # Example:
 #   make
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
-all:
-	hack/build-go.sh $(WHAT)
+#   make all GOGCFLAGS="-N -l"
+#     Note: Use the -N -l options to disable compiler optimizations an inlining.
+#           Using these build options allows you to subsequently use source
+#           debugging tools like delve.
 .PHONY: all
+all: generated_files
+	hack/make-rules/build.sh $(WHAT)
 
 # Build ginkgo
 #
 # Example:
 # make ginkgo
-ginkgo:
-	hack/build-go.sh vendor/github.com/onsi/ginkgo/ginkgo	
 .PHONY: ginkgo
+ginkgo:
+	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
 
 # Runs all the presubmission verifications.
 #
 # Args:
-#   BRANCH: Branch to be passed to hack/verify-godeps.sh script.
+#   BRANCH: Branch to be passed to verify-godeps.sh script.
 #
 # Example:
 #   make verify
 #   make verify BRANCH=branch_x
-verify:
-	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/verify-all.sh -v
 .PHONY: verify
+verify: verify_generated_files
+	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
+	hack/make-rules/vet.sh
+
+# Runs all the generated updates.
+#
+# Example:
+# make update
+.PHONY: update
+update:
+	hack/update-all.sh
 
 # Build and run tests.
 #
@@ -73,65 +115,115 @@ verify:
 #   TESTS: Same as WHAT.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
+#   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
 #
 # Example:
 #   make check
 #   make test
 #   make check WHAT=pkg/kubelet GOFLAGS=-v
-check test:
-	hack/test-go.sh $(WHAT) $(TESTS)
 .PHONY: check test
+check test: generated_files
+	hack/make-rules/test.sh $(WHAT) $(TESTS)
 
 # Build and run integration tests.
 #
+# Args:
+#   WHAT: Directory names to test.  All *_test.go files under these
+#     directories will be run.  If not specified, "everything" will be tested.
+#
 # Example:
-#   make test_integration
-test_integration:
-	hack/test-integration.sh
-.PHONY: test_integration test_integ
+#   make test-integration
+.PHONY: test-integration
+test-integration: generated_files
+	hack/make-rules/test-integration.sh $(WHAT)
 
 # Build and run end-to-end tests.
 #
 # Example:
-#   make test_e2e
-test_e2e:
+#   make test-e2e
+.PHONY: test-e2e
+test-e2e: ginkgo generated_files
 	go run hack/e2e.go -v --build --up --test --down
-.PHONY: test_e2e
 
 # Build and run node end-to-end tests.
 #
 # Args:
-#  FOCUS: regexp that matches the tests to be run.  Defaults to "".
-#  SKIP: regexp that matches the tests that needs to be skipped.  Defaults to "".
-#  RUN_UNTIL_FAILURE: Ff true, pass --untilItFails to ginkgo so tests are run repeatedly until they fail.  Defaults to false.
-#  REMOTE: If true, run the tests on a remote host instance on GCE.  Defaults to false.
-#  IMAGES: for REMOTE=true only.  Comma delimited list of images for creating remote hosts to run tests against.  Defaults to "e2e-node-containervm-v20160321-image".
-#  LIST_IMAGES: If true, don't run tests.  Just output the list of available images for testing.  Defaults to false.
-#  HOSTS: for REMOTE=true only.  Comma delimited list of running gce hosts to run tests against.  Defaults to "".
-#  DELETE_INSTANCES: for REMOTE=true only.  Delete any instances created as part of this test run.  Defaults to false.
-#  ARTIFACTS: for REMOTE=true only.  Local directory to scp test artifacts into from the remote hosts.  Defaults to ""/tmp/_artifacts".
-#  REPORT: for REMOTE=false only.  Local directory to write juntil xml results to.  Defaults to "/tmp/".
-#  CLEANUP: for REMOTE=true only.  If false, do not stop processes or delete test files on remote hosts.  Defaults to true.
-#  IMAGE_PROJECT: for REMOTE=true only.  Project containing images provided to IMAGES.  Defaults to "kubernetes-node-e2e-images".
-#  INSTANCE_PREFIX: for REMOTE=true only.  Instances created from images will have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test"/
+#  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
+#  SKIP: Regexp that matches the tests that needs to be skipped.  Defaults
+#    to "".
+#  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
+#    repeatedly until they fail.  Defaults to false.
+#  REMOTE: If true, run the tests on a remote host instance on GCE.  Defaults
+#    to false.
+#  IMAGES: For REMOTE=true only.  Comma delimited list of images for creating
+#    remote hosts to run tests against.  Defaults to a recent image.
+#  LIST_IMAGES: If true, don't run tests.  Just output the list of available
+#    images for testing.  Defaults to false.
+#  HOSTS: For REMOTE=true only.  Comma delimited list of running gce hosts to
+#    run tests against.  Defaults to "".
+#  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
+#    part of this test run.  Defaults to false.
+#  ARTIFACTS: For REMOTE=true only.  Local directory to scp test artifacts into
+#    from the remote hosts.  Defaults to "/tmp/_artifacts".
+#  REPORT: For REMOTE=false only.  Local directory to write juntil xml results
+#    to.  Defaults to "/tmp/".
+#  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
+#    test files on remote hosts.  Defaults to true.
+#  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
+#  IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
+#    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
+#  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
+#  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
+#	 Defaults to false.
+#  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
 #
 # Example:
-#   make test_e2e_node FOCUS=kubelet SKIP=container
-#   make test_e2e_node REMOTE=true DELETE_INSTANCES=true
+#   make test-e2e-node FOCUS=Kubelet SKIP=container
+#   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
+#   make test-e2e-node TEST_ARGS="--cgroups-per-qos=true"
 # Build and run tests.
-test_e2e_node: ginkgo
-	hack/e2e-node-test.sh
-.PHONY: test_e2e_node
+.PHONY: test-e2e-node
+test-e2e-node: ginkgo generated_files
+	hack/make-rules/test-e2e-node.sh
+
+# Build and run cmdline tests.
+#
+# Example:
+#   make test-cmd
+.PHONY: test-cmd
+test-cmd: generated_files
+	hack/make-rules/test-kubeadm-cmd.sh
+	hack/make-rules/test-cmd.sh
 
 # Remove all build artifacts.
 #
 # Example:
 #   make clean
-clean:
-	build/make-clean.sh
+#
+# TODO(thockin): call clean_generated when we stop committing generated code.
+.PHONY: clean
+clean: clean_meta
+	build-tools/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
-.PHONY: clean
+
+# Remove make-related metadata files.
+#
+# Example:
+#   make clean_meta
+.PHONY: clean_meta
+clean_meta:
+	rm -rf $(META_DIR)
+
+# Remove all auto-generated artifacts. Generated artifacts in staging folder should not be removed as they are not
+# generated using generated_files.
+#
+# Example:
+#   make clean_generated
+.PHONY: clean_generated
+clean_generated:
+	find . -type f -name $(GENERATED_FILE_PREFIX)\* | grep -v "[.]/staging/.*" | xargs rm -f
 
 # Run 'go vet'.
 #
@@ -139,30 +231,74 @@ clean:
 #   WHAT: Directory names to vet.  All *.go files under these
 #     directories will be vetted.  If not specified, "everything" will be
 #     vetted.
-#   TESTS: Same as WHAT.
-#   GOFLAGS: Extra flags to pass to 'go' when building.
-#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #
 # Example:
 #   make vet
 #   make vet WHAT=pkg/kubelet
-vet:
-	hack/verify-govet.sh $(WHAT) $(TESTS)
 .PHONY: vet
+vet:
+	hack/make-rules/vet.sh $(WHAT)
 
 # Build a release
 #
 # Example:
 #   make release
-release:
-	build/release.sh
 .PHONY: release
+release:
+	build-tools/release.sh
 
 # Build a release, but skip tests
 #
 # Example:
 #   make release-skip-tests
-release-skip-tests quick-release:
-	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 .PHONY: release-skip-tests quick-release
+release-skip-tests quick-release:
+	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build-tools/release.sh
 
+# Cross-compile for all platforms
+#
+# Example:
+#   make cross
+.PHONY: cross
+cross:
+	hack/make-rules/cross.sh
+
+# Add rules for all directories in cmd/
+#
+# Example:
+#   make kubectl kube-proxy
+.PHONY: $(notdir $(abspath $(wildcard cmd/*/)))
+$(notdir $(abspath $(wildcard cmd/*/))): generated_files
+	hack/make-rules/build.sh cmd/$@
+
+# Add rules for all directories in plugin/cmd/
+#
+# Example:
+#   make kube-scheduler
+.PHONY: $(notdir $(abspath $(wildcard plugin/cmd/*/)))
+$(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
+	hack/make-rules/build.sh plugin/cmd/$@
+
+# Add rules for all directories in federation/cmd/
+#
+# Example:
+#   make federation-apiserver federation-controller-manager
+.PHONY: $(notdir $(abspath $(wildcard federation/cmd/*/)))
+$(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
+	hack/make-rules/build.sh federation/cmd/$@
+
+# Produce auto-generated files needed for the build.
+#
+# Example:
+#   make generated_files
+.PHONY: generated_files
+generated_files:
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
+
+# Verify auto-generated files needed for the build.
+#
+# Example:
+#   make verify_generated_files
+.PHONY: verify_generated_files
+verify_generated_files:
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1

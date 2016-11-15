@@ -26,9 +26,10 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/set-gen/generators"
+	"k8s.io/gengo/args"
+	"k8s.io/gengo/examples/set-gen/generators"
 
 	"github.com/golang/glog"
 )
@@ -40,6 +41,7 @@ func main() {
 	// locations.
 	arguments.InputDirs = []string{"k8s.io/kubernetes/pkg/util/sets/types"}
 	arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/util/sets"
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 
 	if err := arguments.Execute(
 		generators.NameSystems(),
@@ -49,5 +51,5 @@ func main() {
 		glog.Errorf("Error: %v", err)
 		os.Exit(1)
 	}
-	glog.Info("Completed successfully.")
+	glog.V(2).Info("Completed successfully.")
 }

@@ -1,27 +1,24 @@
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
-  name: kibana-logging-v1
+  name: kibana-logging
   namespace: kube-system
   labels:
     k8s-app: kibana-logging
-    version: v1
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
-    k8s-app: kibana-logging
-    version: v1
+    matchLabels:
+      k8s-app: kibana-logging
   template:
     metadata:
       labels:
         k8s-app: kibana-logging
-        version: v1
-        kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: kibana-logging
-        image: gcr.io/google_containers/kibana:1.3
+        image: gcr.io/google_containers/kibana:v4.6.1
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
@@ -31,6 +28,8 @@ spec:
         env:
           - name: "ELASTICSEARCH_URL"
             value: "http://elasticsearch-logging:9200"
+          - name: "KIBANA_BASE_URL"
+            value: "/api/v1/proxy/namespaces/kube-system/services/kibana-logging"
         ports:
         - containerPort: 5601
           name: ui

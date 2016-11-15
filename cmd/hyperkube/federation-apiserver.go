@@ -18,13 +18,13 @@ package main
 
 import (
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 )
 
 // NewFederationAPIServer creates a new hyperkube Server object that includes the
 // description and flags.
 func NewFederationAPIServer() *Server {
-	s := genericoptions.NewServerRunOptions()
+	s := options.NewServerRunOptions()
 
 	hks := Server{
 		SimpleUsage: "federation-apiserver",

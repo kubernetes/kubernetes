@@ -16,68 +16,61 @@ limitations under the License.
 
 // deepcopy-gen is a tool for auto-generating DeepCopy functions.
 //
-// Structs in the input directories with the below line in their comments
-// will be ignored during generation.
-// // +gencopy=false
+// Given a list of input directories, it will generate functions that
+// efficiently perform a full deep-copy of each type.  For any type that
+// offers a `.DeepCopy()` method, it will simply call that.  Otherwise it will
+// use standard value assignment whenever possible.  If that is not possible it
+// will try to call its own generated copy function for the type, if the type is
+// within the allowed root packages.  Failing that, it will fall back on
+// `conversion.Cloner.DeepCopy(val)` to make the copy.  The resulting file will
+// be stored in the same directory as the processed source package.
+//
+// Generation is governed by comment tags in the source.  Any package may
+// request DeepCopy generation by including a comment in the file-comments of
+// one file, of the form:
+//   // +k8s:deepcopy-gen=package
+//
+// Packages can request that the generated DeepCopy functions be registered
+// with an `init()` function call to `Scheme.AddGeneratedDeepCopyFuncs()` by
+// changing the tag to:
+//   // +k8s:deepcopy-gen=package,register
+//
+// DeepCopy functions can be generated for individual types, rather than the
+// entire package by specifying a comment on the type definion of the form:
+//   // +k8s:deepcopy-gen=true
+//
+// When generating for a whole package, individual types may opt out of
+// DeepCopy generation by specifying a comment on the of the form:
+//   // +k8s:deepcopy-gen=false
+//
+// Note that registration is a whole-package option, and is not available for
+// individual types.
 package main
 
 import (
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/deepcopy-gen/generators"
+	"path/filepath"
+
+	"k8s.io/gengo/args"
+	"k8s.io/gengo/examples/deepcopy-gen/generators"
 
 	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 )
 
 func main() {
 	arguments := args.Default()
 
-	arguments.CustomArgs = generators.Constraints{
-		// Types outside of this package will be inlined.
-		PackageConstraints: []string{"k8s.io/kubernetes/"},
-	}
+	// Override defaults.
+	arguments.OutputFileBaseName = "deepcopy_generated"
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 
-	// Override defaults. These are Kubernetes specific input locations.
-	arguments.InputDirs = []string{
-		// generate all types, but do not register them
-		"+k8s.io/kubernetes/pkg/api/unversioned",
+	// Custom args.
+	customArgs := &generators.CustomArgs{}
+	pflag.CommandLine.StringSliceVar(&customArgs.BoundingDirs, "bounding-dirs", customArgs.BoundingDirs,
+		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
+	arguments.CustomArgs = customArgs
 
-		"-k8s.io/kubernetes/pkg/api/meta",
-		"-k8s.io/kubernetes/pkg/api/meta/metatypes",
-		"-k8s.io/kubernetes/pkg/api/resource",
-		"-k8s.io/kubernetes/pkg/conversion",
-		"-k8s.io/kubernetes/pkg/labels",
-		"-k8s.io/kubernetes/pkg/runtime",
-		"-k8s.io/kubernetes/pkg/runtime/serializer",
-		"-k8s.io/kubernetes/pkg/util/intstr",
-		"-k8s.io/kubernetes/pkg/util/sets",
-
-		"k8s.io/kubernetes/pkg/api",
-		"k8s.io/kubernetes/pkg/api/v1",
-		"k8s.io/kubernetes/pkg/apis/authentication.k8s.io",
-		"k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1",
-		"k8s.io/kubernetes/pkg/apis/authorization",
-		"k8s.io/kubernetes/pkg/apis/authorization/v1beta1",
-		"k8s.io/kubernetes/pkg/apis/autoscaling",
-		"k8s.io/kubernetes/pkg/apis/autoscaling/v1",
-		"k8s.io/kubernetes/pkg/apis/batch",
-		"k8s.io/kubernetes/pkg/apis/batch/v1",
-		"k8s.io/kubernetes/pkg/apis/batch/v2alpha1",
-		"k8s.io/kubernetes/pkg/apis/apps",
-		"k8s.io/kubernetes/pkg/apis/apps/v1alpha1",
-		"k8s.io/kubernetes/pkg/apis/certificates",
-		"k8s.io/kubernetes/pkg/apis/certificates/v1alpha1",
-		"k8s.io/kubernetes/pkg/apis/componentconfig",
-		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1",
-		"k8s.io/kubernetes/pkg/apis/policy",
-		"k8s.io/kubernetes/pkg/apis/policy/v1alpha1",
-		"k8s.io/kubernetes/pkg/apis/extensions",
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1",
-		"k8s.io/kubernetes/pkg/apis/rbac",
-		"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1",
-		"k8s.io/kubernetes/federation/apis/federation",
-		"k8s.io/kubernetes/federation/apis/federation/v1beta1",
-	}
-
+	// Run it.
 	if err := arguments.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
@@ -85,5 +78,5 @@ func main() {
 	); err != nil {
 		glog.Fatalf("Error: %v", err)
 	}
-	glog.Info("Completed successfully.")
+	glog.V(2).Info("Completed successfully.")
 }

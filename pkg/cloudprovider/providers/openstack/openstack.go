@@ -17,13 +17,11 @@ limitations under the License.
 package openstack
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -32,25 +30,18 @@ import (
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack"
-	"github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/flavors"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
+	"github.com/rackspace/gophercloud/openstack/identity/v3/extensions/trust"
+	token3 "github.com/rackspace/gophercloud/openstack/identity/v3/tokens"
 	"github.com/rackspace/gophercloud/pagination"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "openstack"
-
-// metadataUrl is URL to OpenStack metadata server. It's hadrcoded IPv4
-// link-local address as documented in "OpenStack Cloud Administrator Guide",
-// chapter Compute - Networking with nova-network.
-// http://docs.openstack.org/admin-guide-cloud/compute-networking-nova.html#metadata-service
-const metadataUrl = "http://169.254.169.254/openstack/2012-08-10/meta_data.json"
 
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
@@ -83,14 +74,20 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerOpts struct {
-	LBVersion         string     `gcfg:"lb-version"` // v1 or v2
-	SubnetId          string     `gcfg:"subnet-id"`  // required
-	FloatingNetworkId string     `gcfg:"floating-network-id"`
-	LBMethod          string     `gcfg:"lb-method"`
-	CreateMonitor     bool       `gcfg:"create-monitor"`
-	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
-	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
-	MonitorMaxRetries uint       `gcfg:"monitor-max-retries"`
+	LBVersion            string     `gcfg:"lb-version"` // overrides autodetection. v1 or v2
+	SubnetId             string     `gcfg:"subnet-id"`  // required
+	FloatingNetworkId    string     `gcfg:"floating-network-id"`
+	LBMethod             string     `gcfg:"lb-method"`
+	CreateMonitor        bool       `gcfg:"create-monitor"`
+	MonitorDelay         MyDuration `gcfg:"monitor-delay"`
+	MonitorTimeout       MyDuration `gcfg:"monitor-timeout"`
+	MonitorMaxRetries    uint       `gcfg:"monitor-max-retries"`
+	ManageSecurityGroups bool       `gcfg:"manage-security-groups"`
+	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
+}
+
+type BlockStorageOpts struct {
+	TrustDevicePath bool `gcfg:"trust-device-path"` // See Issue #33128
 }
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
@@ -98,6 +95,7 @@ type OpenStack struct {
 	provider *gophercloud.ProviderClient
 	region   string
 	lbOpts   LoadBalancerOpts
+	bsOpts   BlockStorageOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
 	localInstanceID string
 }
@@ -111,11 +109,13 @@ type Config struct {
 		ApiKey     string `gcfg:"api-key"`
 		TenantId   string `gcfg:"tenant-id"`
 		TenantName string `gcfg:"tenant-name"`
+		TrustId    string `gcfg:"trust-id"`
 		DomainId   string `gcfg:"domain-id"`
 		DomainName string `gcfg:"domain-name"`
 		Region     string
 	}
 	LoadBalancer LoadBalancerOpts
+	BlockStorage BlockStorageOpts
 }
 
 func init() {
@@ -152,29 +152,12 @@ func readConfig(config io.Reader) (Config, error) {
 	}
 
 	var cfg Config
+
+	// Set default values for config params
+	cfg.BlockStorage.TrustDevicePath = false
+
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
-}
-
-// parseMetadataUUID reads JSON from OpenStack metadata server and parses
-// instance ID out of it.
-func parseMetadataUUID(jsonData []byte) (string, error) {
-	// We should receive an object with { 'uuid': '<uuid>' } and couple of other
-	// properties (which we ignore).
-
-	obj := struct{ UUID string }{}
-	err := json.Unmarshal(jsonData, &obj)
-	if err != nil {
-		return "", err
-	}
-
-	uuid := obj.UUID
-	if uuid == "" {
-		err = fmt.Errorf("cannot parse OpenStack metadata, got empty uuid")
-		return "", err
-	}
-
-	return uuid, nil
 }
 
 func readInstanceID() (string, error) {
@@ -188,41 +171,32 @@ func readInstanceID() (string, error) {
 		if instanceID != "" {
 			return instanceID, nil
 		}
-		// Fall through with empty instanceID and try metadata server.
+		// Fall through to metadata server lookup
 	}
-	glog.V(5).Infof("Cannot read %s: '%v', trying metadata server", instanceIDFile, err)
 
-	// Try to get JSON from metdata server.
-	resp, err := http.Get(metadataUrl)
+	md, err := getMetadata()
 	if err != nil {
-		glog.V(3).Infof("Cannot read %s: %v", metadataUrl, err)
 		return "", err
 	}
 
-	if resp.StatusCode != 200 {
-		err = fmt.Errorf("got unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
-		glog.V(3).Infof("%v", err)
-		return "", err
-	}
-
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.V(3).Infof("Cannot get HTTP response body from %s: %v", metadataUrl, err)
-		return "", err
-	}
-	instanceID, err := parseMetadataUUID(bodyBytes)
-	if err != nil {
-		glog.V(3).Infof("Cannot parse instance ID from metadata from %s: %v", metadataUrl, err)
-		return "", err
-	}
-
-	glog.V(3).Infof("Got instance id from %s: %s", metadataUrl, instanceID)
-	return instanceID, nil
+	return md.Uuid, nil
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
-	provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
+	provider, err := openstack.NewClient(cfg.Global.AuthUrl)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Global.TrustId != "" {
+		authOptionsExt := trust.AuthOptionsExt{
+			TrustID:     cfg.Global.TrustId,
+			AuthOptions: token3.AuthOptions{AuthOptions: cfg.toAuthOptions()},
+		}
+		err = trust.AuthenticateV3Trust(provider, authOptionsExt)
+	} else {
+		err = openstack.Authenticate(provider, cfg.toAuthOptions())
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -236,95 +210,27 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		provider:        provider,
 		region:          cfg.Global.Region,
 		lbOpts:          cfg.LoadBalancer,
+		bsOpts:          cfg.BlockStorage,
 		localInstanceID: id,
 	}
 
 	return &os, nil
 }
 
-type Instances struct {
-	compute            *gophercloud.ServiceClient
-	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
+// mapNodeNameToServerName maps a k8s NodeName to an OpenStack Server Name
+// This is a simple string cast.
+func mapNodeNameToServerName(nodeName types.NodeName) string {
+	return string(nodeName)
 }
 
-// Instances returns an implementation of Instances for OpenStack.
-func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
-	glog.V(4).Info("openstack.Instances() called")
-
-	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil {
-		glog.Warningf("Failed to find compute endpoint: %v", err)
-		return nil, false
-	}
-
-	pager := flavors.ListDetail(compute, nil)
-
-	flavor_to_resource := make(map[string]*api.NodeResources)
-	err = pager.EachPage(func(page pagination.Page) (bool, error) {
-		flavorList, err := flavors.ExtractFlavors(page)
-		if err != nil {
-			return false, err
-		}
-		for _, flavor := range flavorList {
-			rsrc := api.NodeResources{
-				Capacity: api.ResourceList{
-					api.ResourceCPU:            *resource.NewQuantity(int64(flavor.VCPUs), resource.DecimalSI),
-					api.ResourceMemory:         *resource.NewQuantity(int64(flavor.RAM)*MiB, resource.BinarySI),
-					"openstack.org/disk":       *resource.NewQuantity(int64(flavor.Disk)*GB, resource.DecimalSI),
-					"openstack.org/rxTxFactor": *resource.NewMilliQuantity(int64(flavor.RxTxFactor)*1000, resource.DecimalSI),
-					"openstack.org/swap":       *resource.NewQuantity(int64(flavor.Swap)*MiB, resource.BinarySI),
-				},
-			}
-			flavor_to_resource[flavor.ID] = &rsrc
-		}
-		return true, nil
-	})
-	if err != nil {
-		glog.Warningf("Failed to find compute flavors: %v", err)
-		return nil, false
-	}
-
-	glog.V(3).Infof("Found %v compute flavors", len(flavor_to_resource))
-	glog.V(1).Info("Claiming to support Instances")
-
-	return &Instances{compute, flavor_to_resource}, true
+// mapServerToNodeName maps an OpenStack Server to a k8s NodeName
+func mapServerToNodeName(server *servers.Server) types.NodeName {
+	return types.NodeName(server.Name)
 }
 
-func (i *Instances) List(name_filter string) ([]string, error) {
-	glog.V(4).Infof("openstack List(%v) called", name_filter)
-
+func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
 	opts := servers.ListOpts{
-		Name:   name_filter,
-		Status: "ACTIVE",
-	}
-	pager := servers.List(i.compute, opts)
-
-	ret := make([]string, 0)
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		sList, err := servers.ExtractServers(page)
-		if err != nil {
-			return false, err
-		}
-		for _, server := range sList {
-			ret = append(ret, server.Name)
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	glog.V(3).Infof("Found %v instances matching %v: %v",
-		len(ret), name_filter, ret)
-
-	return ret, nil
-}
-
-func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.Server, error) {
-	opts := servers.ListOpts{
-		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
+		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
 		Status: "ACTIVE",
 	}
 	pager := servers.List(client, opts)
@@ -355,7 +261,7 @@ func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.S
 	return &serverList[0], nil
 }
 
-func getAddressesByName(client *gophercloud.ServiceClient, name string) ([]api.NodeAddress, error) {
+func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) ([]api.NodeAddress, error) {
 	srv, err := getServerByName(client, name)
 	if err != nil {
 		return nil, err
@@ -424,7 +330,7 @@ func getAddressesByName(client *gophercloud.ServiceClient, name string) ([]api.N
 	return addrs, nil
 }
 
-func getAddressByName(client *gophercloud.ServiceClient, name string) (string, error) {
+func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (string, error) {
 	addrs, err := getAddressesByName(client, name)
 	if err != nil {
 		return "", err
@@ -439,57 +345,6 @@ func getAddressByName(client *gophercloud.ServiceClient, name string) (string, e
 	}
 
 	return addrs[0].Address, nil
-}
-
-// Implementation of Instances.CurrentNodeName
-func (i *Instances) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
-}
-
-func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("unimplemented")
-}
-
-func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	glog.V(4).Infof("NodeAddresses(%v) called", name)
-
-	addrs, err := getAddressesByName(i.compute, name)
-	if err != nil {
-		return nil, err
-	}
-
-	glog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
-	return addrs, nil
-}
-
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (i *Instances) ExternalID(name string) (string, error) {
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return "", err
-	}
-	return srv.ID, nil
-}
-
-// InstanceID returns the kubelet's cloud provider ID.
-func (os *OpenStack) InstanceID() (string, error) {
-	return os.localInstanceID, nil
-}
-
-// InstanceID returns the cloud provider ID of the specified instance.
-func (i *Instances) InstanceID(name string) (string, error) {
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return "", err
-	}
-	// In the future it is possible to also return an endpoint as:
-	// <endpoint>/<instanceid>
-	return "/" + srv.ID, nil
-}
-
-// InstanceType returns the type of the specified instance.
-func (i *Instances) InstanceType(name string) (string, error) {
-	return "", nil
 }
 
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
@@ -526,13 +381,35 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 		return nil, false
 	}
 
+	lbversion := os.lbOpts.LBVersion
+	if lbversion == "" {
+		// No version specified, try newest supported by server
+		netExts, err := networkExtensions(network)
+		if err != nil {
+			glog.Warningf("Failed to list neutron extensions: %v", err)
+			return nil, false
+		}
+
+		if netExts["lbaasv2"] {
+			lbversion = "v2"
+		} else if netExts["lbaas"] {
+			lbversion = "v1"
+		} else {
+			glog.Warningf("Failed to find neutron LBaaS extension (v1 or v2)")
+			return nil, false
+		}
+		glog.V(3).Infof("Using LBaaS extension %v", lbversion)
+	}
+
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
-	if os.lbOpts.LBVersion == "v2" {
+	if lbversion == "v2" {
 		return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else {
-
+	} else if lbversion == "v1" {
 		return &LbaasV1{LoadBalancer{network, compute, os.lbOpts}}, true
+	} else {
+		glog.Warningf("Config error: unrecognised lb-version \"%v\"", lbversion)
+		return nil, false
 	}
 }
 
@@ -547,206 +424,20 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	return os, true
 }
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
-	glog.V(1).Infof("Current zone is %v", os.region)
+	md, err := getMetadata()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
 
-	return cloudprovider.Zone{Region: os.region}, nil
+	zone := cloudprovider.Zone{
+		FailureDomain: md.AvailabilityZone,
+		Region:        os.region,
+	}
+	glog.V(1).Infof("Current zone is %v", zone)
+
+	return zone, nil
 }
 
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
-}
-
-// Attaches given cinder volume to the compute running kubelet
-func (os *OpenStack) AttachDisk(instanceID string, diskName string) (string, error) {
-	disk, err := os.getVolume(diskName)
-	if err != nil {
-		return "", err
-	}
-	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil || cClient == nil {
-		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
-		return "", err
-	}
-
-	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil {
-		if instanceID == disk.Attachments[0]["server_id"] {
-			glog.V(4).Infof("Disk: %q is already attached to compute: %q", diskName, instanceID)
-			return disk.ID, nil
-		} else {
-			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", diskName, disk.Attachments[0]["server_id"])
-			glog.Errorf(errMsg)
-			return "", errors.New(errMsg)
-		}
-	}
-	// add read only flag here if possible spothanis
-	_, err = volumeattach.Create(cClient, instanceID, &volumeattach.CreateOpts{
-		VolumeID: disk.ID,
-	}).Extract()
-	if err != nil {
-		glog.Errorf("Failed to attach %s volume to %s compute", diskName, instanceID)
-		return "", err
-	}
-	glog.V(2).Infof("Successfully attached %s volume to %s compute", diskName, instanceID)
-	return disk.ID, nil
-}
-
-// Detaches given cinder volume from the compute running kubelet
-func (os *OpenStack) DetachDisk(instanceID string, partialDiskId string) error {
-	disk, err := os.getVolume(partialDiskId)
-	if err != nil {
-		return err
-	}
-	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil || cClient == nil {
-		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
-		return err
-	}
-	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && instanceID == disk.Attachments[0]["server_id"] {
-		// This is a blocking call and effects kubelet's performance directly.
-		// We should consider kicking it out into a separate routine, if it is bad.
-		err = volumeattach.Delete(cClient, instanceID, disk.ID).ExtractErr()
-		if err != nil {
-			glog.Errorf("Failed to delete volume %s from compute %s attached %v", disk.ID, instanceID, err)
-			return err
-		}
-		glog.V(2).Infof("Successfully detached volume: %s from compute: %s", disk.ID, instanceID)
-	} else {
-		errMsg := fmt.Sprintf("Disk: %s has no attachments or is not attached to compute: %s", disk.Name, instanceID)
-		glog.Errorf(errMsg)
-		return errors.New(errMsg)
-	}
-	return nil
-}
-
-// Takes a partial/full disk id or diskname
-func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
-	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-
-	var volume volumes.Volume
-	if err != nil || sClient == nil {
-		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
-		return volume, err
-	}
-
-	err = volumes.List(sClient, nil).EachPage(func(page pagination.Page) (bool, error) {
-		vols, err := volumes.ExtractVolumes(page)
-		if err != nil {
-			glog.Errorf("Failed to extract volumes: %v", err)
-			return false, err
-		} else {
-			for _, v := range vols {
-				glog.V(4).Infof("%s %s %v", v.ID, v.Name, v.Attachments)
-				if v.Name == diskName || strings.Contains(v.ID, diskName) {
-					volume = v
-					return true, nil
-				}
-			}
-		}
-		// if it reached here then no disk with the given name was found.
-		errmsg := fmt.Sprintf("Unable to find disk: %s in region %s", diskName, os.region)
-		return false, errors.New(errmsg)
-	})
-	if err != nil {
-		glog.Errorf("Error occured getting volume: %s", diskName)
-		return volume, err
-	}
-	return volume, err
-}
-
-// Create a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error) {
-
-	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-
-	if err != nil || sClient == nil {
-		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
-		return "", err
-	}
-
-	opts := volumes.CreateOpts{
-		Name: name,
-		Size: size,
-	}
-	if tags != nil {
-		opts.Metadata = *tags
-	}
-	vol, err := volumes.Create(sClient, opts).Extract()
-	if err != nil {
-		glog.Errorf("Failed to create a %d GB volume: %v", size, err)
-		return "", err
-	}
-	glog.Infof("Created volume %v", vol.ID)
-	return vol.ID, err
-}
-
-// GetDevicePath returns the path of an attached block storage volume, specified by its id.
-func (os *OpenStack) GetDevicePath(diskId string) string {
-	files, _ := ioutil.ReadDir("/dev/disk/by-id/")
-	for _, f := range files {
-		if strings.Contains(f.Name(), "virtio-") {
-			devid_prefix := f.Name()[len("virtio-"):len(f.Name())]
-			if strings.Contains(diskId, devid_prefix) {
-				glog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n", f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
-				return path.Join("/dev/disk/by-id/", f.Name())
-			}
-		}
-	}
-	glog.Warningf("Failed to find device for the diskid: %q\n", diskId)
-	return ""
-}
-
-func (os *OpenStack) DeleteVolume(volumeName string) error {
-	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-
-	if err != nil || sClient == nil {
-		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
-		return err
-	}
-	err = volumes.Delete(sClient, volumeName).ExtractErr()
-	if err != nil {
-		glog.Errorf("Cannot delete volume %s: %v", volumeName, err)
-	}
-	return err
-}
-
-// Get device path of attached volume to the compute running kubelet
-func (os *OpenStack) GetAttachmentDiskPath(instanceID string, diskName string) (string, error) {
-	disk, err := os.getVolume(diskName)
-	if err != nil {
-		return "", err
-	}
-	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil {
-		if instanceID == disk.Attachments[0]["server_id"] {
-			// Attachment[0]["device"] points to the device path
-			// see http://developer.openstack.org/api-ref-blockstorage-v1.html
-			return disk.Attachments[0]["device"].(string), nil
-		} else {
-			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", diskName, disk.Attachments[0]["server_id"])
-			glog.Errorf(errMsg)
-			return "", errors.New(errMsg)
-		}
-	}
-	return "", fmt.Errorf("volume %s is not attached to %s", diskName, instanceID)
-}
-
-// query if a volume is attached to a compute instance
-func (os *OpenStack) DiskIsAttached(diskName, instanceID string) (bool, error) {
-	disk, err := os.getVolume(diskName)
-	if err != nil {
-		return false, err
-	}
-	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && instanceID == disk.Attachments[0]["server_id"] {
-		return true, nil
-	}
-	return false, nil
 }

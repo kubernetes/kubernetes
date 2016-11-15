@@ -17,4 +17,4 @@ limitations under the License.
 // Package apimachinery contains the generic API machinery code that
 // is common to both server and clients.
 // This package should never import specific API objects.
-package apimachinery
+package apimachinery // import "k8s.io/kubernetes/pkg/apimachinery"

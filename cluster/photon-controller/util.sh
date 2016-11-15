@@ -284,7 +284,7 @@ function pc-create-vm {
 
    # Wait for the VM to be started and connected to the network
   have_network=0
-  for i in $(seq 120); do
+  for i in {1..120}; do
     # photon -n vm networks print several fields:
     # NETWORK MAC IP GATEWAY CONNECTED?
     # We wait until CONNECTED is True

@@ -17,14 +17,22 @@ spec:
       - name: apiserver
         image: {{.FEDERATION_APISERVER_IMAGE_REPO}}:{{.FEDERATION_APISERVER_IMAGE_TAG}}
         command:
-        - /usr/local/bin/federation-apiserver
+        - /usr/local/bin/hyperkube
+        - federation-apiserver
         - --bind-address=0.0.0.0
         - --etcd-servers=http://localhost:2379
         - --service-cluster-ip-range={{.FEDERATION_SERVICE_CIDR}}
         - --secure-port=443
+        {{if eq .IS_DNS_NAME "false"}}
         - --advertise-address={{.FEDERATION_API_HOST}}
-        # TODO: --admission-control values must be set when support is added for each type of control.
+        {{end}}
+        - --client-ca-file=/srv/kubernetes/ca.crt
+        - --basic-auth-file=/srv/kubernetes/basic-auth.csv
+        - --tls-cert-file=/srv/kubernetes/server.cert
+        - --tls-private-key-file=/srv/kubernetes/server.key
+        - --admission-control={{.FEDERATION_ADMISSION_CONTROL}}
         - --token-auth-file=/srv/kubernetes/known-tokens.csv
+        - --anonymous-auth=false
         ports:
         - containerPort: 443
           name: https

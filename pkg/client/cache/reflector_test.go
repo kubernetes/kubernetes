@@ -34,12 +34,12 @@ import (
 var nevererrc chan error
 
 type testLW struct {
-	ListFunc  func() (runtime.Object, error)
+	ListFunc  func(options api.ListOptions) (runtime.Object, error)
 	WatchFunc func(options api.ListOptions) (watch.Interface, error)
 }
 
 func (t *testLW) List(options api.ListOptions) (runtime.Object, error) {
-	return t.ListFunc()
+	return t.ListFunc(options)
 }
 func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options)
@@ -53,7 +53,7 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
@@ -79,7 +79,7 @@ func TestRunUntil(t *testing.T) {
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
@@ -227,7 +227,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 			go func() { createdFakes <- fw }()
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
@@ -286,14 +286,14 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 		{
 			list: mkList("1"),
 			events: []watch.Event{
-				{watch.Added, mkPod("foo", "2")},
-				{watch.Added, mkPod("bar", "3")},
+				{Type: watch.Added, Object: mkPod("foo", "2")},
+				{Type: watch.Added, Object: mkPod("bar", "3")},
 			},
 		}, {
 			list: mkList("3", mkPod("foo", "2"), mkPod("bar", "3")),
 			events: []watch.Event{
-				{watch.Deleted, mkPod("foo", "4")},
-				{watch.Added, mkPod("qux", "5")},
+				{Type: watch.Deleted, Object: mkPod("foo", "4")},
+				{Type: watch.Added, Object: mkPod("qux", "5")},
 			},
 		}, {
 			listErr: fmt.Errorf("a list error"),
@@ -303,7 +303,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 		}, {
 			list: mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
 			events: []watch.Event{
-				{watch.Added, mkPod("baz", "6")},
+				{Type: watch.Added, Object: mkPod("baz", "6")},
 			},
 		}, {
 			list: mkList("6", mkPod("bar", "3"), mkPod("qux", "5"), mkPod("baz", "6")),
@@ -345,7 +345,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 				}()
 				return fw, nil
 			},
-			ListFunc: func() (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return item.list, item.listErr
 			},
 		}
@@ -373,7 +373,7 @@ func TestReflectorResync(t *testing.T) {
 			fw := watch.NewFake()
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "0"}}, nil
 		},
 	}

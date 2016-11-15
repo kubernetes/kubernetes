@@ -18,8 +18,21 @@ source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
+# hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
+# what what is default in hack/lib/etcd.sh
+# To avoid it, if it is empty, we set it to 'avoid-overwrite' and
+# clean it after that.
+if [ -z "${ETCD_IMAGE}" ]; then
+  ETCD_IMAGE="avoid-overwrite"
+fi
+source "${KUBE_ROOT}/hack/lib/init.sh"
+if [ "${ETCD_IMAGE}" == "avoid-overwrite" ]; then
+  ETCD_IMAGE=""
+fi
+
 detect-project &> /dev/null
 export PROJECT
+find-release-tars
 
 MASTER_NAME="${INSTANCE_PREFIX}-kubemark-master"
 MASTER_TAG="kubemark-master"

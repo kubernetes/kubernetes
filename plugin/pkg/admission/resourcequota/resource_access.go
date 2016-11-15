@@ -138,7 +138,7 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]api.ResourceQuota, error)
 	// if there are no quotas, we don't need to do anything
 	items, err := e.indexer.Index("namespace", &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: ""}})
 	if err != nil {
-		return nil, fmt.Errorf("Error resolving quota.")
+		return nil, fmt.Errorf("error resolving quota.")
 	}
 
 	// if there are no items held in our indexer, check our live-lookup LRU, if that misses, do the live lookup to prime it.

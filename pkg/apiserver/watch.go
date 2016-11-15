@@ -68,24 +68,33 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Reques
 		scope.err(err, res.ResponseWriter, req.Request)
 		return
 	}
-	if serializer.Framer == nil {
+	framer := serializer.StreamSerializer.Framer
+	streamSerializer := serializer.StreamSerializer.Serializer
+	embedded := serializer.Serializer
+	if framer == nil {
 		scope.err(fmt.Errorf("no framer defined for %q available for embedded encoding", serializer.MediaType), res.ResponseWriter, req.Request)
 		return
 	}
-	encoder := scope.Serializer.EncoderForVersion(serializer.Serializer, scope.Kind.GroupVersion())
+	encoder := scope.Serializer.EncoderForVersion(streamSerializer, scope.Kind.GroupVersion())
 
 	useTextFraming := serializer.EncodesAsText
 
 	// find the embedded serializer matching the media type
-	embeddedEncoder := scope.Serializer.EncoderForVersion(serializer.Embedded.Serializer, scope.Kind.GroupVersion())
+	embeddedEncoder := scope.Serializer.EncoderForVersion(embedded, scope.Kind.GroupVersion())
+
+	// TODO: next step, get back mediaTypeOptions from negotiate and return the exact value here
+	mediaType := serializer.MediaType
+	if mediaType != runtime.ContentTypeJSON {
+		mediaType += ";stream=watch"
+	}
 
 	server := &WatchServer{
 		watching: watcher,
 		scope:    scope,
 
 		useTextFraming:  useTextFraming,
-		mediaType:       serializer.MediaType,
-		framer:          serializer.Framer,
+		mediaType:       mediaType,
+		framer:          framer,
 		encoder:         encoder,
 		embeddedEncoder: embeddedEncoder,
 		fixup: func(obj runtime.Object) {
@@ -120,7 +129,7 @@ type WatchServer struct {
 	t timeoutFactory
 }
 
-// Serve serves a series of encoded events via HTTP with Transfer-Encoding: chunked
+// ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
 // or over a websocket connection.
 func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w = httplog.Unlogged(w)
@@ -216,7 +225,15 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	defer ws.Close()
 	done := make(chan struct{})
-	go wsstream.IgnoreReceives(ws, 0)
+
+	go func() {
+		defer utilruntime.HandleCrash()
+		// This blocks until the connection is closed.
+		// Client should not send anything.
+		wsstream.IgnoreReceives(ws, 0)
+		// Once the client closes, we should also close
+		close(done)
+	}()
 
 	var unknown runtime.Unknown
 	internalEvent := &versioned.InternalEvent{}

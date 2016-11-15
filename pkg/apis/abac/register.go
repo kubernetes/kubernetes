@@ -23,18 +23,32 @@ import (
 )
 
 // Group is the API group for abac
-const Group = "abac.authorization.kubernetes.io"
+const GroupName = "abac.authorization.kubernetes.io"
+
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
 // Scheme is the default instance of runtime.Scheme to which types in the abac API group are registered.
+// TODO: remove this, abac should not have its own scheme.
 var Scheme = runtime.NewScheme()
 
 // Codecs provides access to encoding and decoding for the scheme
 var Codecs = serializer.NewCodecFactory(Scheme)
 
 func init() {
-	Scheme.AddKnownTypes(unversioned.GroupVersion{Group: Group, Version: runtime.APIVersionInternal},
+	// TODO: delete this, abac should not have its own scheme.
+	addKnownTypes(Scheme)
+}
+
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Policy{},
 	)
+	return nil
 }
 
 func (obj *Policy) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

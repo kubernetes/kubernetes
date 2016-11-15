@@ -18,7 +18,7 @@
 # must implement to use cluster/kube-*.sh scripts.
 set -e
 
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 MASTER=""
 MASTER_IP=""
@@ -28,7 +28,7 @@ NODE_IPS=""
 #   KUBE_ROOT
 function test-build-release() {
   # Make a release
-  "${KUBE_ROOT}/build/release.sh"
+  "${KUBE_ROOT}/build-tools/release.sh"
 }
 
 # From user input set the necessary k8s and etcd configuration information
@@ -58,7 +58,7 @@ function setClusterInfo() {
         NODE_IPS="$NODE_IPS,$nodeIP"
       fi
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
 
@@ -156,7 +156,7 @@ function verify-cluster() {
       verify-master
       verify-node "$i"
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
 
@@ -318,6 +318,7 @@ EOF
 
 # Create ~/kube/default/flanneld with proper contents.
 # $1: The one hostname or IP address at which the etcd leader listens.
+# $2: The IP address or network interface for the local Flannel daemon to use
 function create-flanneld-opts() {
   cat <<EOF > ~/kube/default/flanneld
 FLANNEL_OPTS="--etcd-endpoints=http://${1}:4001 \
@@ -478,10 +479,10 @@ function provision-master() {
       '${SERVICE_NODE_PORT_RANGE}' \
       '${MASTER_IP}' \
       '${ALLOW_PRIVILEGED}'
-    create-kube-controller-manager-opts '${NODE_IPS}'
+    create-kube-controller-manager-opts
     create-kube-scheduler-opts
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
-    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
+    FLANNEL_BACKEND='${FLANNEL_BACKEND}' FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
       ${BASH_DEBUG_FLAGS}
 
       cp ~/kube/default/* /etc/default/
@@ -493,7 +494,7 @@ function provision-master() {
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
-      if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh a; fi
+      if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" DEBUG=\"$DEBUG\" ~/kube/reconfDocker.sh a; fi
       '" || {
       echo "Deploying master on machine ${MASTER_IP} failed"
       exit 1
@@ -574,7 +575,7 @@ function provision-node() {
       mkdir -p /opt/bin/
       cp ~/kube/minion/* /opt/bin
       ${SERVICE_STARTS}
-      if ${NEED_RECONFIG_DOCKER}; then KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh i; fi
+      if ${NEED_RECONFIG_DOCKER}; then KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" DEBUG=\"$DEBUG\" ~/kube/reconfDocker.sh i; fi
       '" || {
       echo "Deploying node on machine ${1#*@} failed"
       exit 1
@@ -652,7 +653,7 @@ function provision-masterandnode() {
       '${SERVICE_NODE_PORT_RANGE}' \
       '${MASTER_IP}' \
       '${ALLOW_PRIVILEGED}'
-    create-kube-controller-manager-opts '${NODE_IPS}'
+    create-kube-controller-manager-opts
     create-kube-scheduler-opts
     create-kubelet-opts \
       '${MASTER_IP}' \
@@ -668,7 +669,7 @@ function provision-masterandnode() {
       '${KUBE_PROXY_EXTRA_OPTS}'
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
-    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
+    FLANNEL_BACKEND='${FLANNEL_BACKEND}' FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
       ${BASH_DEBUG_FLAGS}
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
@@ -681,7 +682,7 @@ function provision-masterandnode() {
       cp ~/kube/minion/* /opt/bin/
 
       service etcd start
-      if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh ai; fi
+      if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" DEBUG=\"$DEBUG\" ~/kube/reconfDocker.sh ai; fi
       '" || {
       echo "Deploying master and node on machine ${MASTER_IP} failed"
       exit 1
@@ -977,7 +978,7 @@ function kube-push() {
     elif [[ "${roles_array[${ii}]}" == "ai" ]]; then
       provision-masterandnode
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
     ((ii=ii+1))

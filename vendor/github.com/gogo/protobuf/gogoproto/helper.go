@@ -37,6 +37,17 @@ func IsNullable(field *google_protobuf.FieldDescriptorProto) bool {
 	return proto.GetBoolExtension(field.Options, E_Nullable, true)
 }
 
+func NeedsNilCheck(proto3 bool, field *google_protobuf.FieldDescriptorProto) bool {
+	nullable := IsNullable(field)
+	if field.IsMessage() || IsCustomType(field) {
+		return nullable
+	}
+	if proto3 {
+		return false
+	}
+	return nullable || *field.Type == google_protobuf.FieldDescriptorProto_TYPE_BYTES
+}
+
 func IsCustomType(field *google_protobuf.FieldDescriptorProto) bool {
 	typ := GetCustomType(field)
 	if len(typ) > 0 {
@@ -117,9 +128,45 @@ func IsCustomName(field *google_protobuf.FieldDescriptorProto) bool {
 	return false
 }
 
+func IsEnumCustomName(field *google_protobuf.EnumDescriptorProto) bool {
+	name := GetEnumCustomName(field)
+	if len(name) > 0 {
+		return true
+	}
+	return false
+}
+
+func IsEnumValueCustomName(field *google_protobuf.EnumValueDescriptorProto) bool {
+	name := GetEnumValueCustomName(field)
+	if len(name) > 0 {
+		return true
+	}
+	return false
+}
+
 func GetCustomName(field *google_protobuf.FieldDescriptorProto) string {
 	if field.Options != nil {
 		v, err := proto.GetExtension(field.Options, E_Customname)
+		if err == nil && v.(*string) != nil {
+			return *(v.(*string))
+		}
+	}
+	return ""
+}
+
+func GetEnumCustomName(field *google_protobuf.EnumDescriptorProto) string {
+	if field.Options != nil {
+		v, err := proto.GetExtension(field.Options, E_EnumCustomname)
+		if err == nil && v.(*string) != nil {
+			return *(v.(*string))
+		}
+	}
+	return ""
+}
+
+func GetEnumValueCustomName(field *google_protobuf.EnumValueDescriptorProto) string {
+	if field.Options != nil {
+		v, err := proto.GetExtension(field.Options, E_EnumvalueCustomname)
 		if err == nil && v.(*string) != nil {
 			return *(v.(*string))
 		}
@@ -209,6 +256,10 @@ func IsUnmarshaler(file *google_protobuf.FileDescriptorProto, message *google_pr
 	return proto.GetBoolExtension(message.Options, E_Unmarshaler, proto.GetBoolExtension(file.Options, E_UnmarshalerAll, false))
 }
 
+func IsStableMarshaler(file *google_protobuf.FileDescriptorProto, message *google_protobuf.DescriptorProto) bool {
+	return proto.GetBoolExtension(message.Options, E_StableMarshaler, proto.GetBoolExtension(file.Options, E_StableMarshalerAll, false))
+}
+
 func IsSizer(file *google_protobuf.FileDescriptorProto, message *google_protobuf.DescriptorProto) bool {
 	return proto.GetBoolExtension(message.Options, E_Sizer, proto.GetBoolExtension(file.Options, E_SizerAll, false))
 }
@@ -250,4 +301,8 @@ func IsProto3(file *google_protobuf.FileDescriptorProto) bool {
 
 func ImportsGoGoProto(file *google_protobuf.FileDescriptorProto) bool {
 	return proto.GetBoolExtension(file.Options, E_GogoprotoImport, true)
+}
+
+func HasCompare(file *google_protobuf.FileDescriptorProto, message *google_protobuf.DescriptorProto) bool {
+	return proto.GetBoolExtension(message.Options, E_Compare, proto.GetBoolExtension(file.Options, E_CompareAll, false))
 }

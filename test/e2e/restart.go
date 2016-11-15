@@ -22,24 +22,48 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
+func isRestartNeverMirrorPod(p *api.Pod) bool {
+	if !kubepod.IsMirrorPod(p) {
+		return false
+	}
+	return p.Spec.RestartPolicy == api.RestartPolicyNever
+}
+
+func filterIrrelevantPods(pods []*api.Pod) []*api.Pod {
+	var results []*api.Pod
+	for _, p := range pods {
+		if isRestartNeverMirrorPod(p) {
+			// Mirror pods with restart policy == Never will not get
+			// recreated if they are deleted after the pods have
+			// terminated. For now, we discount such pods.
+			// https://github.com/kubernetes/kubernetes/issues/34003
+			continue
+		}
+		results = append(results, p)
+	}
+	return results
+}
+
 var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart")
-	var ps *framework.PodStore
+	var ps *testutils.PodStore
 
 	BeforeEach(func() {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		ps = framework.NewPodStore(f.Client, api.NamespaceSystem, labels.Everything(), fields.Everything())
+		ps = testutils.NewPodStore(f.ClientSet, api.NamespaceSystem, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
@@ -52,27 +76,29 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		nn := framework.TestContext.CloudConfig.NumNodes
 
 		By("ensuring all nodes are ready")
-		nodeNamesBefore, err := framework.CheckNodesReady(f.Client, framework.NodeReadyInitialTimeout, nn)
+		nodeNamesBefore, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Got the following nodes before restart: %v", nodeNamesBefore)
 
 		By("ensuring all pods are running and ready")
-		pods := ps.List()
+		allPods := ps.List()
+		pods := filterIrrelevantPods(allPods)
+
 		podNamesBefore := make([]string, len(pods))
 		for i, p := range pods {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
 		ns := api.NamespaceSystem
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.Client, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 
 		By("restarting all of the nodes")
-		err = restartNodes(framework.TestContext.Provider, framework.RestartPerNodeTimeout)
+		err = restartNodes(f, nodeNamesBefore)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("ensuring all nodes are ready after the restart")
-		nodeNamesAfter, err := framework.CheckNodesReady(f.Client, framework.RestartNodeReadyAgainTimeout, nn)
+		nodeNamesAfter, err := framework.CheckNodesReady(f.ClientSet, framework.RestartNodeReadyAgainTimeout, nn)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Got the following nodes after restart: %v", nodeNamesAfter)
 
@@ -92,7 +118,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		podNamesAfter, err := waitForNPods(ps, len(podNamesBefore), framework.RestartPodReadyAgainTimeout)
 		Expect(err).NotTo(HaveOccurred())
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.Client, ns, podNamesAfter, remaining) {
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNamesAfter, remaining) {
 			framework.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
@@ -100,12 +126,13 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 
 // waitForNPods tries to list pods using c until it finds expect of them,
 // returning their names if it can do so before timeout.
-func waitForNPods(ps *framework.PodStore, expect int, timeout time.Duration) ([]string, error) {
+func waitForNPods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
 	// Loop until we find expect pods or timeout is passed.
 	var pods []*api.Pod
 	var errLast error
 	found := wait.Poll(framework.Poll, timeout, func() (bool, error) {
-		pods = ps.List()
+		allPods := ps.List()
+		pods := filterIrrelevantPods(allPods)
 		if len(pods) != expect {
 			errLast = fmt.Errorf("expected to find %d pods but found only %d", expect, len(pods))
 			framework.Logf("Error getting pods: %v", errLast)
@@ -125,42 +152,40 @@ func waitForNPods(ps *framework.PodStore, expect int, timeout time.Duration) ([]
 	return podNames, nil
 }
 
-// restartNodes uses provider to do a restart of all nodes in the cluster,
-// allowing up to nt per node.
-func restartNodes(provider string, nt time.Duration) error {
-	switch provider {
-	case "gce", "gke":
-		return migRollingUpdateSelf(nt)
-	default:
-		return fmt.Errorf("restartNodes(...) not implemented for %s", provider)
+func restartNodes(f *framework.Framework, nodeNames []string) error {
+	// List old boot IDs.
+	oldBootIDs := make(map[string]string)
+	for _, name := range nodeNames {
+		node, err := f.ClientSet.Core().Nodes().Get(name)
+		if err != nil {
+			return fmt.Errorf("error getting node info before reboot: %s", err)
+		}
+		oldBootIDs[name] = node.Status.NodeInfo.BootID
 	}
-}
-
-// TODO(marekbiskup): Switch this to MIG recreate-instances. This can be done
-// with the following bash, but needs to be written in Go:
-//
-//   # Step 1: Get instance names.
-//   list=$(gcloud compute instance-groups --project=${PROJECT} --zone=${ZONE} instances --group=${GROUP} list)
-//   i=""
-//   for l in $list; do
-// 	  i="${l##*/},${i}"
-//   done
-//
-//   # Step 2: Start the recreate.
-//   output=$(gcloud compute instance-groups managed --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
-//   op=${output##*:}
-//
-//   # Step 3: Wait until it's complete.
-//   status=""
-//   while [[ "${status}" != "DONE" ]]; do
-// 	  output=$(gcloud compute instance-groups managed --zone="${ZONE}" get-operation ${op} | grep status)
-// 	  status=${output##*:}
-//   done
-func migRollingUpdateSelf(nt time.Duration) error {
-	By("getting the name of the template for the managed instance group")
-	tmpl, err := framework.MigTemplate()
+	// Reboot the nodes.
+	args := []string{
+		"compute",
+		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
+		"instances",
+		"reset",
+	}
+	args = append(args, nodeNames...)
+	args = append(args, fmt.Sprintf("--zone=%s", framework.TestContext.CloudConfig.Zone))
+	stdout, stderr, err := framework.RunCmd("gcloud", args...)
 	if err != nil {
-		return fmt.Errorf("couldn't get MIG template name: %v", err)
+		return fmt.Errorf("error restarting nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
 	}
-	return framework.MigRollingUpdate(tmpl, nt)
+	// Wait for their boot IDs to change.
+	for _, name := range nodeNames {
+		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+			node, err := f.ClientSet.Core().Nodes().Get(name)
+			if err != nil {
+				return false, fmt.Errorf("error getting node info after reboot: %s", err)
+			}
+			return node.Status.NodeInfo.BootID != oldBootIDs[name], nil
+		}); err != nil {
+			return fmt.Errorf("error waiting for node %s boot ID to change: %s", name, err)
+		}
+	}
+	return nil
 }

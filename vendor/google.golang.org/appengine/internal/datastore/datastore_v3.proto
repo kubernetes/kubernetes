@@ -1,0 +1,541 @@
+syntax = "proto2";
+option go_package = "datastore";
+
+package appengine;
+
+message Action{}
+
+message PropertyValue {
+  optional int64 int64Value = 1;
+  optional bool booleanValue = 2;
+  optional string stringValue = 3;
+  optional double doubleValue = 4;
+
+  optional group PointValue = 5 {
+    required double x = 6;
+    required double y = 7;
+  }
+
+  optional group UserValue = 8 {
+    required string email = 9;
+    required string auth_domain = 10;
+    optional string nickname = 11;
+    optional string federated_identity = 21;
+    optional string federated_provider = 22;
+  }
+
+  optional group ReferenceValue = 12 {
+    required string app = 13;
+    optional string name_space = 20;
+    repeated group PathElement = 14 {
+      required string type = 15;
+      optional int64 id = 16;
+      optional string name = 17;
+    }
+  }
+}
+
+message Property {
+  enum Meaning {
+    NO_MEANING = 0;
+    BLOB = 14;
+    TEXT = 15;
+    BYTESTRING = 16;
+
+    ATOM_CATEGORY = 1;
+    ATOM_LINK = 2;
+    ATOM_TITLE = 3;
+    ATOM_CONTENT = 4;
+    ATOM_SUMMARY = 5;
+    ATOM_AUTHOR = 6;
+
+    GD_WHEN = 7;
+    GD_EMAIL = 8;
+    GEORSS_POINT = 9;
+    GD_IM = 10;
+
+    GD_PHONENUMBER = 11;
+    GD_POSTALADDRESS = 12;
+
+    GD_RATING = 13;
+
+    BLOBKEY = 17;
+    ENTITY_PROTO = 19;
+
+    INDEX_VALUE = 18;
+  };
+
+  optional Meaning meaning = 1 [default = NO_MEANING];
+  optional string meaning_uri = 2;
+
+  required string name = 3;
+
+  required PropertyValue value = 5;
+
+  required bool multiple = 4;
+
+  optional bool searchable = 6 [default=false];
+
+  enum FtsTokenizationOption {
+    HTML = 1;
+    ATOM = 2;
+  }
+
+  optional FtsTokenizationOption fts_tokenization_option = 8;
+
+  optional string locale = 9 [default = "en"];
+}
+
+message Path {
+  repeated group Element = 1 {
+    required string type = 2;
+    optional int64 id = 3;
+    optional string name = 4;
+  }
+}
+
+message Reference {
+  required string app = 13;
+  optional string name_space = 20;
+  required Path path = 14;
+}
+
+message User {
+  required string email = 1;
+  required string auth_domain = 2;
+  optional string nickname = 3;
+  optional string federated_identity = 6;
+  optional string federated_provider = 7;
+}
+
+message EntityProto {
+  required Reference key = 13;
+  required Path entity_group = 16;
+  optional User owner = 17;
+
+  enum Kind {
+    GD_CONTACT = 1;
+    GD_EVENT = 2;
+    GD_MESSAGE = 3;
+  }
+  optional Kind kind = 4;
+  optional string kind_uri = 5;
+
+  repeated Property property = 14;
+  repeated Property raw_property = 15;
+
+  optional int32 rank = 18;
+}
+
+message CompositeProperty {
+  required int64 index_id = 1;
+  repeated string value = 2;
+}
+
+message Index {
+  required string entity_type = 1;
+  required bool ancestor = 5;
+  repeated group Property = 2 {
+    required string name = 3;
+    enum Direction {
+      ASCENDING = 1;
+      DESCENDING = 2;
+    }
+    optional Direction direction = 4 [default = ASCENDING];
+  }
+}
+
+message CompositeIndex {
+  required string app_id = 1;
+  required int64 id = 2;
+  required Index definition = 3;
+
+  enum State {
+    WRITE_ONLY = 1;
+    READ_WRITE = 2;
+    DELETED = 3;
+    ERROR = 4;
+  }
+  required State state = 4;
+
+  optional bool only_use_if_required = 6 [default = false];
+}
+
+message IndexPostfix {
+  message IndexValue {
+    required string property_name = 1;
+    required PropertyValue value = 2;
+  }
+
+  repeated IndexValue index_value = 1;
+
+  optional Reference key = 2;
+
+  optional bool before = 3 [default=true];
+}
+
+message IndexPosition {
+  optional string key = 1;
+
+  optional bool before = 2 [default=true];
+}
+
+message Snapshot {
+  enum Status {
+    INACTIVE = 0;
+    ACTIVE = 1;
+  }
+
+  required int64 ts = 1;
+}
+
+message InternalHeader {
+  optional string qos = 1;
+}
+
+message Transaction {
+  optional InternalHeader header = 4;
+  required fixed64 handle = 1;
+  required string app = 2;
+  optional bool mark_changes = 3 [default = false];
+}
+
+message Query {
+  optional InternalHeader header = 39;
+
+  required string app = 1;
+  optional string name_space = 29;
+
+  optional string kind = 3;
+  optional Reference ancestor = 17;
+
+  repeated group Filter = 4 {
+    enum Operator {
+      LESS_THAN = 1;
+      LESS_THAN_OR_EQUAL = 2;
+      GREATER_THAN = 3;
+      GREATER_THAN_OR_EQUAL = 4;
+      EQUAL = 5;
+      IN = 6;
+      EXISTS = 7;
+    }
+
+    required Operator op = 6;
+    repeated Property property = 14;
+  }
+
+  optional string search_query = 8;
+
+  repeated group Order = 9 {
+    enum Direction {
+      ASCENDING = 1;
+      DESCENDING = 2;
+    }
+
+    required string property = 10;
+    optional Direction direction = 11 [default = ASCENDING];
+  }
+
+  enum Hint {
+    ORDER_FIRST = 1;
+    ANCESTOR_FIRST = 2;
+    FILTER_FIRST = 3;
+  }
+  optional Hint hint = 18;
+
+  optional int32 count = 23;
+
+  optional int32 offset = 12 [default = 0];
+
+  optional int32 limit = 16;
+
+  optional CompiledCursor compiled_cursor = 30;
+  optional CompiledCursor end_compiled_cursor = 31;
+
+  repeated CompositeIndex composite_index = 19;
+
+  optional bool require_perfect_plan = 20 [default = false];
+
+  optional bool keys_only = 21 [default = false];
+
+  optional Transaction transaction = 22;
+
+  optional bool compile = 25 [default = false];
+
+  optional int64 failover_ms = 26;
+
+  optional bool strong = 32;
+
+  repeated string property_name = 33;
+
+  repeated string group_by_property_name = 34;
+
+  optional bool distinct = 24;
+
+  optional int64 min_safe_time_seconds = 35;
+
+  repeated string safe_replica_name = 36;
+
+  optional bool persist_offset = 37 [default=false];
+}
+
+message CompiledQuery {
+  required group PrimaryScan = 1 {
+    optional string index_name = 2;
+
+    optional string start_key = 3;
+    optional bool start_inclusive = 4;
+    optional string end_key = 5;
+    optional bool end_inclusive = 6;
+
+    repeated string start_postfix_value = 22;
+    repeated string end_postfix_value = 23;
+
+    optional int64 end_unapplied_log_timestamp_us = 19;
+  }
+
+  repeated group MergeJoinScan = 7 {
+    required string index_name = 8;
+
+    repeated string prefix_value = 9;
+
+    optional bool value_prefix = 20 [default=false];
+  }
+
+  optional Index index_def = 21;
+
+  optional int32 offset = 10 [default = 0];
+
+  optional int32 limit = 11;
+
+  required bool keys_only = 12;
+
+  repeated string property_name = 24;
+
+  optional int32 distinct_infix_size = 25;
+
+  optional group EntityFilter = 13 {
+    optional bool distinct = 14 [default=false];
+
+    optional string kind = 17;
+    optional Reference ancestor = 18;
+  }
+}
+
+message CompiledCursor {
+  optional group Position = 2 {
+    optional string start_key = 27;
+
+    repeated group IndexValue = 29 {
+      optional string property = 30;
+      required PropertyValue value = 31;
+    }
+
+    optional Reference key = 32;
+
+    optional bool start_inclusive = 28 [default=true];
+  }
+}
+
+message Cursor {
+  required fixed64 cursor = 1;
+
+  optional string app = 2;
+}
+
+message Error {
+  enum ErrorCode {
+    BAD_REQUEST = 1;
+    CONCURRENT_TRANSACTION = 2;
+    INTERNAL_ERROR = 3;
+    NEED_INDEX = 4;
+    TIMEOUT = 5;
+    PERMISSION_DENIED = 6;
+    BIGTABLE_ERROR = 7;
+    COMMITTED_BUT_STILL_APPLYING = 8;
+    CAPABILITY_DISABLED = 9;
+    TRY_ALTERNATE_BACKEND = 10;
+    SAFE_TIME_TOO_OLD = 11;
+  }
+}
+
+message Cost {
+  optional int32 index_writes = 1;
+  optional int32 index_write_bytes = 2;
+  optional int32 entity_writes = 3;
+  optional int32 entity_write_bytes = 4;
+  optional group CommitCost = 5 {
+    optional int32 requested_entity_puts = 6;
+    optional int32 requested_entity_deletes = 7;
+  };
+  optional int32 approximate_storage_delta = 8;
+  optional int32 id_sequence_updates = 9;
+}
+
+message GetRequest {
+  optional InternalHeader header = 6;
+
+  repeated Reference key = 1;
+  optional Transaction transaction = 2;
+
+  optional int64 failover_ms = 3;
+
+  optional bool strong = 4;
+
+  optional bool allow_deferred = 5 [default=false];
+}
+
+message GetResponse {
+  repeated group Entity = 1 {
+    optional EntityProto entity = 2;
+    optional Reference key = 4;
+
+    optional int64 version = 3;
+  }
+
+  repeated Reference deferred = 5;
+
+  optional bool in_order = 6 [default=true];
+}
+
+message PutRequest {
+  optional InternalHeader header = 11;
+
+  repeated EntityProto entity = 1;
+  optional Transaction transaction = 2;
+  repeated CompositeIndex composite_index = 3;
+
+  optional bool trusted = 4 [default = false];
+
+  optional bool force = 7 [default = false];
+
+  optional bool mark_changes = 8 [default = false];
+  repeated Snapshot snapshot = 9;
+
+  enum AutoIdPolicy {
+    CURRENT = 0;
+    SEQUENTIAL = 1;
+  }
+  optional AutoIdPolicy auto_id_policy = 10 [default = CURRENT];
+}
+
+message PutResponse {
+  repeated Reference key = 1;
+  optional Cost cost = 2;
+  repeated int64 version = 3;
+}
+
+message TouchRequest {
+  optional InternalHeader header = 10;
+
+  repeated Reference key = 1;
+  repeated CompositeIndex composite_index = 2;
+  optional bool force = 3 [default = false];
+  repeated Snapshot snapshot = 9;
+}
+
+message TouchResponse {
+  optional Cost cost = 1;
+}
+
+message DeleteRequest {
+  optional InternalHeader header = 10;
+
+  repeated Reference key = 6;
+  optional Transaction transaction = 5;
+
+  optional bool trusted = 4 [default = false];
+
+  optional bool force = 7 [default = false];
+
+  optional bool mark_changes = 8 [default = false];
+  repeated Snapshot snapshot = 9;
+}
+
+message DeleteResponse {
+  optional Cost cost = 1;
+  repeated int64 version = 3;
+}
+
+message NextRequest {
+  optional InternalHeader header = 5;
+
+  required Cursor cursor = 1;
+  optional int32 count = 2;
+
+  optional int32 offset = 4 [default = 0];
+
+  optional bool compile = 3 [default = false];
+}
+
+message QueryResult {
+  optional Cursor cursor = 1;
+
+  repeated EntityProto result = 2;
+
+  optional int32 skipped_results = 7;
+
+  required bool more_results = 3;
+
+  optional bool keys_only = 4;
+
+  optional bool index_only = 9;
+
+  optional bool small_ops = 10;
+
+  optional CompiledQuery compiled_query = 5;
+
+  optional CompiledCursor compiled_cursor = 6;
+
+  repeated CompositeIndex index = 8;
+
+  repeated int64 version = 11;
+}
+
+message AllocateIdsRequest {
+  optional InternalHeader header = 4;
+
+  optional Reference model_key = 1;
+
+  optional int64 size = 2;
+
+  optional int64 max = 3;
+
+  repeated Reference reserve = 5;
+}
+
+message AllocateIdsResponse {
+  required int64 start = 1;
+  required int64 end = 2;
+  optional Cost cost = 3;
+}
+
+message CompositeIndices {
+  repeated CompositeIndex index = 1;
+}
+
+message AddActionsRequest {
+  optional InternalHeader header = 3;
+
+  required Transaction transaction = 1;
+  repeated Action action = 2;
+}
+
+message AddActionsResponse {
+}
+
+message BeginTransactionRequest {
+  optional InternalHeader header = 3;
+
+  required string app = 1;
+  optional bool allow_multiple_eg = 2 [default = false];
+}
+
+message CommitResponse {
+  optional Cost cost = 1;
+
+  repeated group Version = 3 {
+    required Reference root_entity_key = 4;
+    required int64 version = 5;
+  }
+}

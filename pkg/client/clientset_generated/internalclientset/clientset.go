@@ -18,57 +18,99 @@ package internalclientset
 
 import (
 	"github.com/golang/glog"
-	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned"
-	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
-	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
-	unversionedrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
+	internalversionapps "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	internalversionauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
+	internalversionauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
+	internalversionautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/internalversion"
+	internalversionbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
+	internalversioncertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
+	internalversioncore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	internalversionextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	internalversionpolicy "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
+	internalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
+	internalversionstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Core() unversionedcore.CoreInterface
-	Extensions() unversionedextensions.ExtensionsInterface
-	Autoscaling() unversionedautoscaling.AutoscalingInterface
-	Batch() unversionedbatch.BatchInterface
-	Rbac() unversionedrbac.RbacInterface
-	Certificates() unversionedcertificates.CertificatesInterface
+	Core() internalversioncore.CoreInterface
+
+	Apps() internalversionapps.AppsInterface
+
+	Authentication() internalversionauthentication.AuthenticationInterface
+
+	Authorization() internalversionauthorization.AuthorizationInterface
+
+	Autoscaling() internalversionautoscaling.AutoscalingInterface
+
+	Batch() internalversionbatch.BatchInterface
+
+	Certificates() internalversioncertificates.CertificatesInterface
+
+	Extensions() internalversionextensions.ExtensionsInterface
+
+	Policy() internalversionpolicy.PolicyInterface
+
+	Rbac() internalversionrbac.RbacInterface
+
+	Storage() internalversionstorage.StorageInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*unversionedcore.CoreClient
-	*unversionedextensions.ExtensionsClient
-	*unversionedautoscaling.AutoscalingClient
-	*unversionedbatch.BatchClient
-	*unversionedrbac.RbacClient
-	*unversionedcertificates.CertificatesClient
+	*internalversioncore.CoreClient
+	*internalversionapps.AppsClient
+	*internalversionauthentication.AuthenticationClient
+	*internalversionauthorization.AuthorizationClient
+	*internalversionautoscaling.AutoscalingClient
+	*internalversionbatch.BatchClient
+	*internalversioncertificates.CertificatesClient
+	*internalversionextensions.ExtensionsClient
+	*internalversionpolicy.PolicyClient
+	*internalversionrbac.RbacClient
+	*internalversionstorage.StorageClient
 }
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() unversionedcore.CoreInterface {
+func (c *Clientset) Core() internalversioncore.CoreInterface {
 	if c == nil {
 		return nil
 	}
 	return c.CoreClient
 }
 
-// Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
+// Apps retrieves the AppsClient
+func (c *Clientset) Apps() internalversionapps.AppsInterface {
 	if c == nil {
 		return nil
 	}
-	return c.ExtensionsClient
+	return c.AppsClient
+}
+
+// Authentication retrieves the AuthenticationClient
+func (c *Clientset) Authentication() internalversionauthentication.AuthenticationInterface {
+	if c == nil {
+		return nil
+	}
+	return c.AuthenticationClient
+}
+
+// Authorization retrieves the AuthorizationClient
+func (c *Clientset) Authorization() internalversionauthorization.AuthorizationInterface {
+	if c == nil {
+		return nil
+	}
+	return c.AuthorizationClient
 }
 
 // Autoscaling retrieves the AutoscalingClient
-func (c *Clientset) Autoscaling() unversionedautoscaling.AutoscalingInterface {
+func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterface {
 	if c == nil {
 		return nil
 	}
@@ -76,27 +118,51 @@ func (c *Clientset) Autoscaling() unversionedautoscaling.AutoscalingInterface {
 }
 
 // Batch retrieves the BatchClient
-func (c *Clientset) Batch() unversionedbatch.BatchInterface {
+func (c *Clientset) Batch() internalversionbatch.BatchInterface {
 	if c == nil {
 		return nil
 	}
 	return c.BatchClient
 }
 
+// Certificates retrieves the CertificatesClient
+func (c *Clientset) Certificates() internalversioncertificates.CertificatesInterface {
+	if c == nil {
+		return nil
+	}
+	return c.CertificatesClient
+}
+
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
+	if c == nil {
+		return nil
+	}
+	return c.ExtensionsClient
+}
+
+// Policy retrieves the PolicyClient
+func (c *Clientset) Policy() internalversionpolicy.PolicyInterface {
+	if c == nil {
+		return nil
+	}
+	return c.PolicyClient
+}
+
 // Rbac retrieves the RbacClient
-func (c *Clientset) Rbac() unversionedrbac.RbacInterface {
+func (c *Clientset) Rbac() internalversionrbac.RbacInterface {
 	if c == nil {
 		return nil
 	}
 	return c.RbacClient
 }
 
-// Certificates retrieves the CertificatesClient
-func (c *Clientset) Certificates() unversionedcertificates.CertificatesInterface {
+// Storage retrieves the StorageClient
+func (c *Clientset) Storage() internalversionstorage.StorageInterface {
 	if c == nil {
 		return nil
 	}
-	return c.CertificatesClient
+	return c.StorageClient
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -112,27 +178,47 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.CoreClient, err = unversionedcore.NewForConfig(&configShallowCopy)
+	clientset.CoreClient, err = internalversioncore.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsClient, err = unversionedextensions.NewForConfig(&configShallowCopy)
+	clientset.AppsClient, err = internalversionapps.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.AutoscalingClient, err = unversionedautoscaling.NewForConfig(&configShallowCopy)
+	clientset.AuthenticationClient, err = internalversionauthentication.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.BatchClient, err = unversionedbatch.NewForConfig(&configShallowCopy)
+	clientset.AuthorizationClient, err = internalversionauthorization.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.RbacClient, err = unversionedrbac.NewForConfig(&configShallowCopy)
+	clientset.AutoscalingClient, err = internalversionautoscaling.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.CertificatesClient, err = unversionedcertificates.NewForConfig(&configShallowCopy)
+	clientset.BatchClient, err = internalversionbatch.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	clientset.CertificatesClient, err = internalversioncertificates.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	clientset.ExtensionsClient, err = internalversionextensions.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	clientset.PolicyClient, err = internalversionpolicy.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	clientset.RbacClient, err = internalversionrbac.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	clientset.StorageClient, err = internalversionstorage.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -149,26 +235,36 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = unversionedcore.NewForConfigOrDie(c)
-	clientset.ExtensionsClient = unversionedextensions.NewForConfigOrDie(c)
-	clientset.AutoscalingClient = unversionedautoscaling.NewForConfigOrDie(c)
-	clientset.BatchClient = unversionedbatch.NewForConfigOrDie(c)
-	clientset.RbacClient = unversionedrbac.NewForConfigOrDie(c)
-	clientset.CertificatesClient = unversionedcertificates.NewForConfigOrDie(c)
+	clientset.CoreClient = internalversioncore.NewForConfigOrDie(c)
+	clientset.AppsClient = internalversionapps.NewForConfigOrDie(c)
+	clientset.AuthenticationClient = internalversionauthentication.NewForConfigOrDie(c)
+	clientset.AuthorizationClient = internalversionauthorization.NewForConfigOrDie(c)
+	clientset.AutoscalingClient = internalversionautoscaling.NewForConfigOrDie(c)
+	clientset.BatchClient = internalversionbatch.NewForConfigOrDie(c)
+	clientset.CertificatesClient = internalversioncertificates.NewForConfigOrDie(c)
+	clientset.ExtensionsClient = internalversionextensions.NewForConfigOrDie(c)
+	clientset.PolicyClient = internalversionpolicy.NewForConfigOrDie(c)
+	clientset.RbacClient = internalversionrbac.NewForConfigOrDie(c)
+	clientset.StorageClient = internalversionstorage.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c *restclient.RESTClient) *Clientset {
+func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = unversionedcore.New(c)
-	clientset.ExtensionsClient = unversionedextensions.New(c)
-	clientset.AutoscalingClient = unversionedautoscaling.New(c)
-	clientset.BatchClient = unversionedbatch.New(c)
-	clientset.RbacClient = unversionedrbac.New(c)
-	clientset.CertificatesClient = unversionedcertificates.New(c)
+	clientset.CoreClient = internalversioncore.New(c)
+	clientset.AppsClient = internalversionapps.New(c)
+	clientset.AuthenticationClient = internalversionauthentication.New(c)
+	clientset.AuthorizationClient = internalversionauthorization.New(c)
+	clientset.AutoscalingClient = internalversionautoscaling.New(c)
+	clientset.BatchClient = internalversionbatch.New(c)
+	clientset.CertificatesClient = internalversioncertificates.New(c)
+	clientset.ExtensionsClient = internalversionextensions.New(c)
+	clientset.PolicyClient = internalversionpolicy.New(c)
+	clientset.RbacClient = internalversionrbac.New(c)
+	clientset.StorageClient = internalversionstorage.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

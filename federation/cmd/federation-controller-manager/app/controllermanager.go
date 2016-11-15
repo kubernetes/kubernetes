@@ -20,15 +20,23 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"strconv"
 
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
+	configmapcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/configmap"
+	daemonset "k8s.io/kubernetes/federation/pkg/federation-controller/daemonset"
+	deploymentcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/deployment"
+	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
+	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
+	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
+	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -45,8 +53,13 @@ import (
 )
 
 const (
-	// "federation-apiserver-secret" is a reserved secret name which stores the kubeconfig for federation-apiserver.
-	FederationAPIServerSecretName = "federation-apiserver-secret"
+	// "federation-apiserver-kubeconfig" was the old name we used to
+	// store Federation API server kubeconfig secret. We are
+	// deprecating it in favor of `--kubeconfig` flag but giving people
+	// time to migrate.
+	// TODO(madhusudancs): this name is deprecated in 1.5 and should be
+	// removed in 1.6. Remove it in 1.6.
+	DeprecatedKubeconfigSecretName = "federation-apiserver-kubeconfig"
 )
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -77,11 +90,29 @@ func Run(s *options.CMServer) error {
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
 	}
-	// Create the config to talk to federation-apiserver.
-	kubeconfigGetter := util.KubeconfigGetterForSecret(FederationAPIServerSecretName)
-	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
-	if err != nil {
-		return err
+
+	// If s.Kubeconfig flag is empty, try with the deprecated name in 1.5.
+	// TODO(madhusudancs): Remove this in 1.6.
+	var restClientCfg *restclient.Config
+	var err error
+	if len(s.Kubeconfig) <= 0 {
+		restClientCfg, err = restClientConfigFromSecret(s.Master)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Create the config to talk to federation-apiserver.
+		restClientCfg, err = clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+		if err != nil || restClientCfg == nil {
+			// Retry with the deprecated name in 1.5.
+			// TODO(madhusudancs): Remove this in 1.6.
+			glog.V(2).Infof("Couldn't build the rest client config from flags: %v", err)
+			glog.V(2).Infof("Trying with deprecated secret: %s", DeprecatedKubeconfigSecretName)
+			restClientCfg, err = restClientConfigFromSecret(s.Master)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// Override restClientCfg qps/burst settings from flags
@@ -115,17 +146,66 @@ func Run(s *options.CMServer) error {
 }
 
 func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) error {
-
+	glog.Infof("Loading client config for cluster controller %q", "cluster-controller")
 	ccClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
+	glog.Infof("Running cluster controller")
 	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
 	dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
+
+	glog.Infof("Loading client config for namespace controller %q", "namespace-controller")
+	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
+	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
+	glog.Infof("Running namespace controller")
+	namespaceController.Run(wait.NeverStop)
+
+	secretcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "secret-controller"))
+	secretcontroller := secretcontroller.NewSecretController(secretcontrollerClientset)
+	secretcontroller.Run(wait.NeverStop)
+
+	configmapcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "configmap-controller"))
+	configmapcontroller := configmapcontroller.NewConfigMapController(configmapcontrollerClientset)
+	configmapcontroller.Run(wait.NeverStop)
+
+	daemonsetcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "daemonset-controller"))
+	daemonsetcontroller := daemonset.NewDaemonSetController(daemonsetcontrollerClientset)
+	daemonsetcontroller.Run(wait.NeverStop)
+
+	replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
+	replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
+	go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
+
+	deploymentClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, deploymentcontroller.UserAgentName))
+	deploymentController := deploymentcontroller.NewDeploymentController(deploymentClientset)
+	// TODO: rename s.ConcurentReplicaSetSyncs
+	go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
+
+	glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
+	ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
+	ingressController := ingresscontroller.NewIngressController(ingClientset)
+	glog.Infof("Running ingress controller")
+	ingressController.Run(wait.NeverStop)
+
+	glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
 	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
-	servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ZoneName)
+	servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ServiceDnsSuffix, s.ZoneName)
+	glog.Infof("Running service controller")
 	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}
+
 	select {}
+}
+
+// TODO(madhusudancs): Remove this in 1.6. This is only temporary to give an
+// upgrade path in 1.4/1.5.
+func restClientConfigFromSecret(master string) (*restclient.Config, error) {
+	kubeconfigGetter := util.KubeconfigGetterForSecret(DeprecatedKubeconfigSecretName)
+	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(master, kubeconfigGetter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find the Federation API server kubeconfig, tried the --kubeconfig flag and the deprecated secret %s: %v", DeprecatedKubeconfigSecretName, err)
+	}
+	return restClientCfg, nil
 }

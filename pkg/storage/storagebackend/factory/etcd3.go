@@ -17,29 +17,46 @@ limitations under the License.
 package factory
 
 import (
-	"strings"
-
-	"github.com/coreos/etcd/clientv3"
-	"golang.org/x/net/context"
-
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd3"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/pkg/transport"
+	"golang.org/x/net/context"
 )
 
-func newETCD3Storage(c storagebackend.Config, codec runtime.Codec) (storage.Interface, error) {
-	endpoints := c.ServerList
-	for i, s := range endpoints {
-		endpoints[i] = strings.TrimLeft(s, "http://")
+func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+	tlsInfo := transport.TLSInfo{
+		CertFile: c.CertFile,
+		KeyFile:  c.KeyFile,
+		CAFile:   c.CAFile,
+	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+	// NOTE: Client relies on nil tlsConfig
+	// for non-secure connections, update the implicit variable
+	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.CAFile) == 0 {
+		tlsConfig = nil
 	}
 	cfg := clientv3.Config{
-		Endpoints: endpoints,
+		Endpoints: c.ServerList,
+		TLS:       tlsConfig,
 	}
 	client, err := clientv3.New(cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	etcd3.StartCompactor(context.Background(), client)
-	return etcd3.New(client, codec, c.Prefix), nil
+	ctx, cancel := context.WithCancel(context.Background())
+	etcd3.StartCompactor(ctx, client)
+	destroyFunc := func() {
+		cancel()
+		client.Close()
+	}
+	if c.Quorum {
+		return etcd3.New(client, c.Codec, c.Prefix), destroyFunc, nil
+	}
+	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix), destroyFunc, nil
 }

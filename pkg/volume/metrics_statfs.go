@@ -17,9 +17,6 @@ limitations under the License.
 package volume
 
 import (
-	"errors"
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -44,7 +41,7 @@ func NewMetricsStatFS(path string) MetricsProvider {
 func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
 	metrics := &Metrics{}
 	if md.path == "" {
-		return metrics, errors.New("no path defined for disk usage metrics.")
+		return metrics, NewNoPathDefinedError()
 	}
 
 	err := md.getFsInfo(metrics)
@@ -57,12 +54,15 @@ func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
 
 // getFsInfo writes metrics.Capacity, metrics.Used and metrics.Available from the filesystem info
 func (md *metricsStatFS) getFsInfo(metrics *Metrics) error {
-	available, capacity, usage, err := util.FsInfo(md.path)
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := util.FsInfo(md.path)
 	if err != nil {
-		return fmt.Errorf("Failed to get FsInfo due to error %v", err)
+		return NewFsInfoFailedError(err)
 	}
 	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
 	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
 	metrics.Used = resource.NewQuantity(usage, resource.BinarySI)
+	metrics.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
+	metrics.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
+	metrics.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
 	return nil
 }

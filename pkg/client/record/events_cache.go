@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
@@ -116,12 +116,12 @@ type EventAggregator struct {
 	maxIntervalInSeconds int
 
 	// clock is used to allow for testing over a time interval
-	clock util.Clock
+	clock clock.Clock
 }
 
 // NewEventAggregator returns a new instance of an EventAggregator
 func NewEventAggregator(lruCacheSize int, keyFunc EventAggregatorKeyFunc, messageFunc EventAggregatorMessageFunc,
-	maxEvents int, maxIntervalInSeconds int, clock util.Clock) *EventAggregator {
+	maxEvents int, maxIntervalInSeconds int, clock clock.Clock) *EventAggregator {
 	return &EventAggregator{
 		cache:                lru.New(lruCacheSize),
 		keyFunc:              keyFunc,
@@ -207,11 +207,11 @@ type eventLog struct {
 type eventLogger struct {
 	sync.RWMutex
 	cache *lru.Cache
-	clock util.Clock
+	clock clock.Clock
 }
 
 // newEventLogger observes events and counts their frequencies
-func newEventLogger(lruCacheEntries int, clock util.Clock) *eventLogger {
+func newEventLogger(lruCacheEntries int, clock clock.Clock) *eventLogger {
 	return &eventLogger{cache: lru.New(lruCacheEntries), clock: clock}
 }
 
@@ -244,7 +244,9 @@ func (e *eventLogger) eventObserve(newEvent *api.Event) (*api.Event, []byte, err
 
 		newData, _ := json.Marshal(event)
 		oldData, _ := json.Marshal(eventCopy2)
-		patch, err = strategicpatch.CreateStrategicMergePatch(oldData, newData, event)
+		// TODO: need to figure out if we need to let eventObserve() use the new behavior of StrategicMergePatch.
+		// Currently default to old behavior now. Ref: issue #35936
+		patch, err = strategicpatch.CreateStrategicMergePatch(oldData, newData, event, strategicpatch.SMPatchVersion_1_0)
 	}
 
 	// record our new observation
@@ -326,7 +328,7 @@ type EventCorrelateResult struct {
 //     the same reason.
 //   * Events are incrementally counted if the exact same event is encountered multiple
 //     times.
-func NewEventCorrelator(clock util.Clock) *EventCorrelator {
+func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
 	cacheSize := maxLruCacheEntries
 	return &EventCorrelator{
 		filterFunc: DefaultEventFilterFunc,

@@ -22,8 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-var ValidateClusterName = validation.NameIsDNSSubdomain
-
 func ValidateClusterSpec(spec *federation.ClusterSpec, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// address is required.
@@ -34,7 +32,7 @@ func ValidateClusterSpec(spec *federation.ClusterSpec, fieldPath *field.Path) fi
 }
 
 func ValidateCluster(cluster *federation.Cluster) field.ErrorList {
-	allErrs := validation.ValidateObjectMeta(&cluster.ObjectMeta, false, ValidateClusterName, field.NewPath("metadata"))
+	allErrs := validation.ValidateObjectMeta(&cluster.ObjectMeta, false, validation.ValidateClusterName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateClusterSpec(&cluster.Spec, field.NewPath("spec"))...)
 	return allErrs
 }

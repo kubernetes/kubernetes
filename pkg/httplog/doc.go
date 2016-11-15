@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package httplog contains a helper object and functions to maintain a log
 // along with an http response.
-package httplog
+package httplog // import "k8s.io/kubernetes/pkg/httplog"

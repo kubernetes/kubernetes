@@ -32,6 +32,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -217,7 +218,7 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 		err = wait.Poll(5*time.Second, 20*time.Second, func() (bool, error) {
 			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, host, err)
 			if client, err = dialer.Dial("tcp", host, config); err != nil {
-				return false, nil
+				return false, err
 			}
 			return true, nil
 		})
@@ -276,6 +277,9 @@ func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", keyFile, err)
 	}
 	keyBlock, _ := pem.Decode(buffer)
+	if keyBlock == nil {
+		return nil, fmt.Errorf("error parsing SSH key %s: 'invalid PEM format'", keyFile)
+	}
 	key, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", keyFile, err)
@@ -360,6 +364,9 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 		Dial: e.Tunnel.Dial,
 		// TODO(cjcullen): Plumb real TLS options through.
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		// We don't reuse the clients, so disable the keep-alive to properly
+		// close the connection.
+		DisableKeepAlives: true,
 	})
 	client := &http.Client{Transport: transport}
 	resp, err := client.Get(l.healthCheckURL.String())
@@ -391,19 +398,27 @@ func (l *SSHTunnelList) Dial(net, addr string) (net.Conn, error) {
 	defer func() {
 		glog.Infof("[%x: %v] Dialed in %v.", id, addr, time.Now().Sub(start))
 	}()
-	tunnel, err := l.pickRandomTunnel()
+	tunnel, err := l.pickTunnel(strings.Split(addr, ":")[0])
 	if err != nil {
 		return nil, err
 	}
 	return tunnel.Dial(net, addr)
 }
 
-func (l *SSHTunnelList) pickRandomTunnel() (tunnel, error) {
+func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 	l.tunnelsLock.Lock()
 	defer l.tunnelsLock.Unlock()
 	if len(l.entries) == 0 {
 		return nil, fmt.Errorf("No SSH tunnels currently open. Were the targets able to accept an ssh-key for user %q?", l.user)
 	}
+	// Prefer same tunnel as kubelet
+	// TODO: Change l.entries to a map of address->tunnel
+	for _, entry := range l.entries {
+		if entry.Address == addr {
+			return entry.Tunnel, nil
+		}
+	}
+	glog.Warningf("SSH tunnel not found for address %q, picking random node", addr)
 	n := mathrand.Intn(len(l.entries))
 	return l.entries[n].Tunnel, nil
 }

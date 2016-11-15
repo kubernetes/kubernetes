@@ -18,13 +18,11 @@ package main
 
 import (
 	"os"
-	"runtime"
 
 	"k8s.io/kubernetes/cmd/kubectl/app"
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	if err := app.Run(); err != nil {
 		os.Exit(1)
 	}

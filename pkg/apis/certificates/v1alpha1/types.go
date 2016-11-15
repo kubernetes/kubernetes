@@ -21,17 +21,21 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
 	unversioned.TypeMeta `json:",inline"`
-	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// +optional
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// The certificate request itself and any additonal information.
+	// The certificate request itself and any additional information.
+	// +optional
 	Spec CertificateSigningRequestSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Derived information about the request.
+	// +optional
 	Status CertificateSigningRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -44,16 +48,21 @@ type CertificateSigningRequestSpec struct {
 
 	// Information about the requesting user (if relevant)
 	// See user.Info interface for details
-	Username string   `json:"username,omitempty" protobuf:"bytes,2,opt,name=username"`
-	UID      string   `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
-	Groups   []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
+	// +optional
+	Username string `json:"username,omitempty" protobuf:"bytes,2,opt,name=username"`
+	// +optional
+	UID string `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
+	// +optional
+	Groups []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
 }
 
 type CertificateSigningRequestStatus struct {
 	// Conditions applied to the request, such as approval or denial.
+	// +optional
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
+	// +optional
 	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }
 
@@ -69,16 +78,20 @@ type CertificateSigningRequestCondition struct {
 	// request approval state, currently Approved or Denied.
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
 	// brief reason for the request state
+	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
 	// human readable message with details about the request state
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// timestamp for the last update to this condition
+	// +optional
 	LastUpdateTime unversioned.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,4,opt,name=lastUpdateTime"`
 }
 
 type CertificateSigningRequestList struct {
 	unversioned.TypeMeta `json:",inline"`
+	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Items []CertificateSigningRequest `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	Items []CertificateSigningRequest `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

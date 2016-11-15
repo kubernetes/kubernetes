@@ -22,6 +22,7 @@ type (
 
 const (
 	A     = RrsType("A")
+	AAAA  = RrsType("AAAA")
 	CNAME = RrsType("CNAME")
 	// TODO:  Add other types as required
 )

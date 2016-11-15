@@ -14,7 +14,11 @@
 package model
 
 import (
+	"bytes"
+	"hash"
+	"hash/fnv"
 	"sort"
+	"sync"
 )
 
 // SeparatorByte is a byte that cannot occur in valid UTF-8 sequences and is
@@ -24,8 +28,29 @@ const SeparatorByte byte = 255
 
 var (
 	// cache the signature of an empty label set.
-	emptyLabelSignature = hashNew()
+	emptyLabelSignature = fnv.New64a().Sum64()
+
+	hashAndBufPool sync.Pool
 )
+
+type hashAndBuf struct {
+	h hash.Hash64
+	b bytes.Buffer
+}
+
+func getHashAndBuf() *hashAndBuf {
+	hb := hashAndBufPool.Get()
+	if hb == nil {
+		return &hashAndBuf{h: fnv.New64a()}
+	}
+	return hb.(*hashAndBuf)
+}
+
+func putHashAndBuf(hb *hashAndBuf) {
+	hb.h.Reset()
+	hb.b.Reset()
+	hashAndBufPool.Put(hb)
+}
 
 // LabelsToSignature returns a quasi-unique signature (i.e., fingerprint) for a
 // given label set. (Collisions are possible but unlikely if the number of label
@@ -41,14 +66,18 @@ func LabelsToSignature(labels map[string]string) uint64 {
 	}
 	sort.Strings(labelNames)
 
-	sum := hashNew()
+	hb := getHashAndBuf()
+	defer putHashAndBuf(hb)
+
 	for _, labelName := range labelNames {
-		sum = hashAdd(sum, labelName)
-		sum = hashAddByte(sum, SeparatorByte)
-		sum = hashAdd(sum, labels[labelName])
-		sum = hashAddByte(sum, SeparatorByte)
+		hb.b.WriteString(labelName)
+		hb.b.WriteByte(SeparatorByte)
+		hb.b.WriteString(labels[labelName])
+		hb.b.WriteByte(SeparatorByte)
+		hb.h.Write(hb.b.Bytes())
+		hb.b.Reset()
 	}
-	return sum
+	return hb.h.Sum64()
 }
 
 // labelSetToFingerprint works exactly as LabelsToSignature but takes a LabelSet as
@@ -64,14 +93,18 @@ func labelSetToFingerprint(ls LabelSet) Fingerprint {
 	}
 	sort.Sort(labelNames)
 
-	sum := hashNew()
+	hb := getHashAndBuf()
+	defer putHashAndBuf(hb)
+
 	for _, labelName := range labelNames {
-		sum = hashAdd(sum, string(labelName))
-		sum = hashAddByte(sum, SeparatorByte)
-		sum = hashAdd(sum, string(ls[labelName]))
-		sum = hashAddByte(sum, SeparatorByte)
+		hb.b.WriteString(string(labelName))
+		hb.b.WriteByte(SeparatorByte)
+		hb.b.WriteString(string(ls[labelName]))
+		hb.b.WriteByte(SeparatorByte)
+		hb.h.Write(hb.b.Bytes())
+		hb.b.Reset()
 	}
-	return Fingerprint(sum)
+	return Fingerprint(hb.h.Sum64())
 }
 
 // labelSetToFastFingerprint works similar to labelSetToFingerprint but uses a
@@ -83,12 +116,17 @@ func labelSetToFastFingerprint(ls LabelSet) Fingerprint {
 	}
 
 	var result uint64
+	hb := getHashAndBuf()
+	defer putHashAndBuf(hb)
+
 	for labelName, labelValue := range ls {
-		sum := hashNew()
-		sum = hashAdd(sum, string(labelName))
-		sum = hashAddByte(sum, SeparatorByte)
-		sum = hashAdd(sum, string(labelValue))
-		result ^= sum
+		hb.b.WriteString(string(labelName))
+		hb.b.WriteByte(SeparatorByte)
+		hb.b.WriteString(string(labelValue))
+		hb.h.Write(hb.b.Bytes())
+		result ^= hb.h.Sum64()
+		hb.h.Reset()
+		hb.b.Reset()
 	}
 	return Fingerprint(result)
 }
@@ -98,20 +136,24 @@ func labelSetToFastFingerprint(ls LabelSet) Fingerprint {
 // specified LabelNames into the signature calculation. The labels passed in
 // will be sorted by this function.
 func SignatureForLabels(m Metric, labels ...LabelName) uint64 {
-	if len(labels) == 0 {
+	if len(m) == 0 || len(labels) == 0 {
 		return emptyLabelSignature
 	}
 
 	sort.Sort(LabelNames(labels))
 
-	sum := hashNew()
+	hb := getHashAndBuf()
+	defer putHashAndBuf(hb)
+
 	for _, label := range labels {
-		sum = hashAdd(sum, string(label))
-		sum = hashAddByte(sum, SeparatorByte)
-		sum = hashAdd(sum, string(m[label]))
-		sum = hashAddByte(sum, SeparatorByte)
+		hb.b.WriteString(string(label))
+		hb.b.WriteByte(SeparatorByte)
+		hb.b.WriteString(string(m[label]))
+		hb.b.WriteByte(SeparatorByte)
+		hb.h.Write(hb.b.Bytes())
+		hb.b.Reset()
 	}
-	return sum
+	return hb.h.Sum64()
 }
 
 // SignatureWithoutLabels works like LabelsToSignature but takes a Metric as
@@ -133,12 +175,16 @@ func SignatureWithoutLabels(m Metric, labels map[LabelName]struct{}) uint64 {
 	}
 	sort.Sort(labelNames)
 
-	sum := hashNew()
+	hb := getHashAndBuf()
+	defer putHashAndBuf(hb)
+
 	for _, labelName := range labelNames {
-		sum = hashAdd(sum, string(labelName))
-		sum = hashAddByte(sum, SeparatorByte)
-		sum = hashAdd(sum, string(m[labelName]))
-		sum = hashAddByte(sum, SeparatorByte)
+		hb.b.WriteString(string(labelName))
+		hb.b.WriteByte(SeparatorByte)
+		hb.b.WriteString(string(m[labelName]))
+		hb.b.WriteByte(SeparatorByte)
+		hb.h.Write(hb.b.Bytes())
+		hb.b.Reset()
 	}
-	return sum
+	return hb.h.Sum64()
 }

@@ -105,7 +105,6 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
-		rootContext:     plugin.host.GetRootContext(),
 		MetricsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
 	}, nil
 }
@@ -126,6 +125,16 @@ func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.
 		MetricsProvider: volume.NewMetricsDu(getPath(podUID, volName, plugin.host)),
 	}
 	return ed, nil
+}
+
+func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	emptyDirVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(emptyDirVolume), nil
 }
 
 // mountDetector abstracts how to find what kind of mount a path is backed by.
@@ -154,7 +163,6 @@ type emptyDir struct {
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
-	rootContext   string
 	volume.MetricsProvider
 }
 
@@ -164,6 +172,13 @@ func (ed *emptyDir) GetAttributes() volume.Attributes {
 		Managed:         true,
 		SupportsSELinux: true,
 	}
+}
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *emptyDir) CanMount() error {
+	return nil
 }
 
 // SetUp creates new directory.
@@ -192,17 +207,11 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 		}
 	}
 
-	// Determine the effective SELinuxOptions to use for this volume.
-	securityContext := ""
-	if selinuxEnabled() {
-		securityContext = ed.rootContext
-	}
-
 	switch ed.medium {
 	case api.StorageMediumDefault:
 		err = ed.setupDir(dir)
 	case api.StorageMediumMemory:
-		err = ed.setupTmpfs(dir, securityContext)
+		err = ed.setupTmpfs(dir)
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
@@ -218,7 +227,7 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 
 // setupTmpfs creates a tmpfs mount at the specified directory with the
 // specified SELinux context.
-func (ed *emptyDir) setupTmpfs(dir string, selinux string) error {
+func (ed *emptyDir) setupTmpfs(dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
@@ -236,17 +245,8 @@ func (ed *emptyDir) setupTmpfs(dir string, selinux string) error {
 		return nil
 	}
 
-	// By default a tmpfs mount will receive a different SELinux context
-	// which is not readable from the SELinux context of a docker container.
-	var opts []string
-	if selinux != "" {
-		opts = []string{fmt.Sprintf("rootcontext=\"%v\"", selinux)}
-	} else {
-		opts = []string{}
-	}
-
-	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v with opts %v", ed.pod.UID, ed.volName, opts)
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", opts)
+	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", nil /* options */)
 }
 
 // setupDir creates the directory with the specified SELinux context and

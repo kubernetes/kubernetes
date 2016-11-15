@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 
 	kruntime "k8s.io/kubernetes/pkg/runtime"
 
@@ -35,7 +34,6 @@ var (
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 
 	if *typeSrc == "" {

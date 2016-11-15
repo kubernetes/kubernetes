@@ -24,12 +24,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -66,9 +67,9 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 		)
 
 		// Turn off rate limiting--it interferes with our measurements.
-		oldThrottle := f.Client.RESTClient.Throttle
-		f.Client.RESTClient.Throttle = flowcontrol.NewFakeAlwaysRateLimiter()
-		defer func() { f.Client.RESTClient.Throttle = oldThrottle }()
+		oldThrottle := f.ClientSet.Core().RESTClient().GetRateLimiter()
+		f.ClientSet.Core().RESTClient().(*restclient.RESTClient).Throttle = flowcontrol.NewFakeAlwaysRateLimiter()
+		defer func() { f.ClientSet.Core().RESTClient().(*restclient.RESTClient).Throttle = oldThrottle }()
 
 		failing := sets.NewString()
 		d, err := runServiceLatencies(f, parallelTrials, totalTrials)
@@ -116,9 +117,9 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 })
 
 func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
-	cfg := framework.RCConfig{
-		Client:       f.Client,
-		Image:        framework.GetPauseImageName(f.Client),
+	cfg := testutils.RCConfig{
+		Client:       f.ClientSet,
+		Image:        framework.GetPauseImageName(f.ClientSet),
 		Name:         "svc-latency-rc",
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,
@@ -127,7 +128,6 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 	if err := framework.RunRC(cfg); err != nil {
 		return nil, err
 	}
-	defer framework.DeleteRC(f.Client, f.Namespace.Name, cfg.Name)
 
 	// Run a single watcher, to reduce the number of API calls we have to
 	// make; this is to minimize the timing error. It's how kube-proxy
@@ -275,18 +275,19 @@ func (eq *endpointQueries) added(e *api.Endpoints) {
 
 // blocks until it has finished syncing.
 func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
-	_, controller := controllerframework.NewInformer(
+	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.Client.Endpoints(f.Namespace.Name).List(options)
+				obj, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(options)
+				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.Client.Endpoints(f.Namespace.Name).Watch(options)
+				return f.ClientSet.Core().Endpoints(f.Namespace.Name).Watch(options)
 			},
 		},
 		&api.Endpoints{},
 		0,
-		controllerframework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if e, ok := obj.(*api.Endpoints); ok {
 					if len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0 {
@@ -326,12 +327,11 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 		},
 	}
 	startTime := time.Now()
-	gotSvc, err := f.Client.Services(f.Namespace.Name).Create(svc)
+	gotSvc, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(svc)
 	if err != nil {
 		return 0, err
 	}
 	framework.Logf("Created: %v", gotSvc.Name)
-	defer f.Client.Services(gotSvc.Namespace).Delete(gotSvc.Name)
 
 	if e := q.request(gotSvc.Name); e == nil {
 		return 0, fmt.Errorf("Never got a result for endpoint %v", gotSvc.Name)

@@ -17,10 +17,15 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"os"
 	"path"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/storage"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 const readyFileName = "ready"
@@ -59,4 +64,99 @@ func SetReady(dir string) {
 		return
 	}
 	file.Close()
+}
+
+// UnmountPath is a common unmount routine that unmounts the given path and
+// deletes the remaining directory if successful.
+func UnmountPath(mountPath string, mounter mount.Interface) error {
+	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		return nil
+	}
+
+	notMnt, err := mounter.IsLikelyNotMountPoint(mountPath)
+	if err != nil {
+		return err
+	}
+	if notMnt {
+		glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
+		return os.Remove(mountPath)
+	}
+
+	// Unmount the mount path
+	if err := mounter.Unmount(mountPath); err != nil {
+		return err
+	}
+	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
+	if mntErr != nil {
+		return err
+	}
+	if notMnt {
+		glog.V(4).Info("%q is unmounted, deleting the directory", mountPath)
+		return os.Remove(mountPath)
+	}
+	return nil
+}
+
+// PathExists returns true if the specified path exists.
+func PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+// GetSecretForPod locates secret by name in the pod's namespace and returns secret map
+func GetSecretForPod(pod *api.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
+	secret := make(map[string]string)
+	if kubeClient == nil {
+		return secret, fmt.Errorf("Cannot get kube client")
+	}
+	secrets, err := kubeClient.Core().Secrets(pod.Namespace).Get(secretName)
+	if err != nil {
+		return secret, err
+	}
+	for name, data := range secrets.Data {
+		secret[name] = string(data)
+	}
+	return secret, nil
+}
+
+// GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map
+func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient clientset.Interface) (map[string]string, error) {
+	secret := make(map[string]string)
+	if kubeClient == nil {
+		return secret, fmt.Errorf("Cannot get kube client")
+	}
+	secrets, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName)
+	if err != nil {
+		return secret, err
+	}
+	if secrets.Type != api.SecretType(volumePluginName) {
+		return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
+	}
+	for name, data := range secrets.Data {
+		secret[name] = string(data)
+	}
+	return secret, nil
+}
+
+func GetClassForVolume(kubeClient clientset.Interface, pv *api.PersistentVolume) (*storage.StorageClass, error) {
+	// TODO: replace with a real attribute after beta
+	className, found := pv.Annotations["volume.beta.kubernetes.io/storage-class"]
+	if !found {
+		return nil, fmt.Errorf("Volume has no class annotation")
+	}
+
+	class, err := kubeClient.Storage().StorageClasses().Get(className)
+	if err != nil {
+		return nil, err
+	}
+	return class, nil
 }

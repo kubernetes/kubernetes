@@ -19,13 +19,14 @@ package cluster
 import (
 	"testing"
 
+	"reflect"
+
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"reflect"
 )
 
 func validNewCluster() *federation.Cluster {
@@ -78,7 +79,7 @@ func TestClusterStrategy(t *testing.T) {
 	}
 
 	cluster := validNewCluster()
-	Strategy.PrepareForCreate(cluster)
+	Strategy.PrepareForCreate(ctx, cluster)
 	if len(cluster.Status.Conditions) != 0 {
 		t.Errorf("Cluster should not allow setting conditions on create")
 	}
@@ -88,7 +89,7 @@ func TestClusterStrategy(t *testing.T) {
 	}
 
 	invalidCluster := invalidNewCluster()
-	Strategy.PrepareForUpdate(invalidCluster, cluster)
+	Strategy.PrepareForUpdate(ctx, invalidCluster, cluster)
 	if reflect.DeepEqual(invalidCluster.Spec, cluster.Spec) ||
 		!reflect.DeepEqual(invalidCluster.Status, cluster.Status) {
 		t.Error("Only spec is expected being changed")
@@ -113,7 +114,7 @@ func TestClusterStatusStrategy(t *testing.T) {
 
 	cluster := validNewCluster()
 	invalidCluster := invalidNewCluster()
-	StatusStrategy.PrepareForUpdate(cluster, invalidCluster)
+	StatusStrategy.PrepareForUpdate(ctx, cluster, invalidCluster)
 	if !reflect.DeepEqual(invalidCluster.Spec, cluster.Spec) ||
 		reflect.DeepEqual(invalidCluster.Status, cluster.Status) {
 		t.Logf("== cluster.Spec: %v\n", cluster.Spec)
@@ -154,9 +155,9 @@ func TestMatchCluster(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Federation.GroupVersion().String(),
+		registered.GroupOrDie(federation.GroupName).GroupVersion.String(),
 		"Cluster",
-		labels.Set(ClusterToSelectableFields(&federation.Cluster{})),
+		ClusterToSelectableFields(&federation.Cluster{}),
 		nil,
 	)
 }

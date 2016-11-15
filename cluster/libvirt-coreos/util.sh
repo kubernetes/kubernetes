@@ -25,7 +25,7 @@ source "$KUBE_ROOT/cluster/common.sh"
 
 export LIBVIRT_DEFAULT_URI=qemu:///system
 export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
-export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota}
 readonly POOL=kubernetes
 readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
 
@@ -152,7 +152,7 @@ function initialize-pool {
       virsh pool-create-as $POOL dir --target "$POOL_PATH"
   fi
 
-  wget -N -P "$ROOT" http://${COREOS_CHANNEL:-alpha}.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2
+  wget -N -P "$ROOT" https://${COREOS_CHANNEL:-alpha}.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2
   if [[ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]]; then
       bunzip2 -f -k "$ROOT/coreos_production_qemu_image.img.bz2"
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true

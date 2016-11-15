@@ -18,13 +18,14 @@ package initialresources
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/api"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/pkg/api"
 
 	assert "github.com/stretchr/testify/require"
 )

@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -159,6 +159,7 @@ func (t *Tester) TestCreate(valid runtime.Object, createFn CreateFunc, getFn Get
 	}
 	t.testCreateInvokesValidation(invalid...)
 	t.testCreateValidatesNames(copyOrDie(valid))
+	t.testCreateIgnoreClusterName(copyOrDie(valid))
 }
 
 // Test updating an object.
@@ -173,6 +174,8 @@ func (t *Tester) TestUpdate(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testUpdateWithWrongUID(copyOrDie(valid), createFn, getFn)
 	t.testUpdateRetrievesOldObject(copyOrDie(valid), createFn, getFn)
 	t.testUpdatePropagatesUpdatedObjectError(copyOrDie(valid), createFn, getFn)
+	t.testUpdateIgnoreGenerationUpdates(copyOrDie(valid), createFn, getFn)
+	t.testUpdateIgnoreClusterName(copyOrDie(valid), createFn, getFn)
 }
 
 // Test deleting an object.
@@ -188,6 +191,7 @@ func (t *Tester) TestDeleteGraceful(valid runtime.Object, createFn CreateFunc, g
 	t.testDeleteGracefulWithValue(copyOrDie(valid), createFn, getFn, expectedGrace)
 	t.testDeleteGracefulUsesZeroOnNil(copyOrDie(valid), createFn, expectedGrace)
 	t.testDeleteGracefulExtend(copyOrDie(valid), createFn, getFn, expectedGrace)
+	t.testDeleteGracefulShorten(copyOrDie(valid), createFn, getFn, expectedGrace)
 	t.testDeleteGracefulImmediate(copyOrDie(valid), createFn, getFn, expectedGrace)
 }
 
@@ -362,7 +366,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 }
 
 func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
-	for _, invalidName := range validation.NameMayNotBe {
+	for _, invalidName := range path.NameMayNotBe {
 		objCopy := copyOrDie(valid)
 		objCopyMeta := t.getObjectMetaOrFail(objCopy)
 		objCopyMeta.Name = invalidName
@@ -374,7 +378,7 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 		}
 	}
 
-	for _, invalidSuffix := range validation.NameMayNotContain {
+	for _, invalidSuffix := range path.NameMayNotContain {
 		objCopy := copyOrDie(valid)
 		objCopyMeta := t.getObjectMetaOrFail(objCopy)
 		objCopyMeta.Name += invalidSuffix
@@ -425,6 +429,22 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	defer t.delete(t.TestContext(), obj)
 	if objectMeta.UID == "bad-uid" || objectMeta.CreationTimestamp == now {
 		t.Errorf("ObjectMeta did not reset basic fields: %#v", objectMeta)
+	}
+}
+
+func (t *Tester) testCreateIgnoreClusterName(valid runtime.Object) {
+	objectMeta := t.getObjectMetaOrFail(valid)
+	objectMeta.Name = t.namer(3)
+	objectMeta.ClusterName = "clustername-to-ignore"
+
+	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer t.delete(t.TestContext(), obj)
+	createdObjectMeta := t.getObjectMetaOrFail(obj)
+	if len(createdObjectMeta.ClusterName) != 0 {
+		t.Errorf("Expected empty clusterName on created object, got '%v'", createdObjectMeta.ClusterName)
 	}
 }
 
@@ -612,6 +632,40 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 	}
 }
 
+func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
+	ctx := t.TestContext()
+
+	foo := copyOrDie(obj)
+	name := t.namer(8)
+	t.setObjectMeta(foo, name)
+
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	storedFoo, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	older := copyOrDie(storedFoo)
+	olderMeta := t.getObjectMetaOrFail(older)
+	olderMeta.Generation = 2
+
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, api.Scheme))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	updatedFoo, err := getFn(ctx, older)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exp, got := int64(1), t.getObjectMetaOrFail(updatedFoo).Generation; exp != got {
+		t.Errorf("Unexpected generation update: expected %d, got %d", exp, got)
+	}
+}
+
 func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
 	t.setObjectMeta(obj, t.namer(0))
 	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj, api.Scheme))
@@ -653,6 +707,41 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	} else if !strings.Contains(err.Error(), "does not match the namespace sent on the request") {
 		t.Errorf("expected 'does not match the namespace sent on the request' error, got '%v'", err.Error())
 	}
+}
+
+func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
+	ctx := t.TestContext()
+
+	foo := copyOrDie(obj)
+	name := t.namer(9)
+	t.setObjectMeta(foo, name)
+
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	storedFoo, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	older := copyOrDie(storedFoo)
+	olderMeta := t.getObjectMetaOrFail(older)
+	olderMeta.ClusterName = "clustername-to-ignore"
+
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, api.Scheme))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	updatedFoo, err := getFn(ctx, older)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if clusterName := t.getObjectMetaOrFail(updatedFoo).ClusterName; len(clusterName) != 0 {
+		t.Errorf("Unexpected clusterName update: expected empty, got %v", clusterName)
+	}
+
 }
 
 // =============================================================================
@@ -884,6 +973,47 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 	}
 	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name); !errors.IsNotFound(err) {
 		t.Errorf("unexpected error, object should not exist: %v", err)
+	}
+}
+
+// Regression test for bug discussed in #27539
+func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
+	ctx := t.TestContext()
+
+	foo := copyOrDie(obj)
+	t.setObjectMeta(foo, t.namer(6))
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	bigGrace := int64(time.Hour)
+	if expectedGrace > bigGrace {
+		bigGrace = 2 * expectedGrace
+	}
+	objectMeta := t.getObjectMetaOrFail(foo)
+	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(bigGrace))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	object, err := getFn(ctx, foo)
+	if err != nil {
+		t.Fatalf("did not gracefully delete resource: %v", err)
+	}
+	objectMeta = t.getObjectMetaOrFail(object)
+	deletionTimestamp := *objectMeta.DeletionTimestamp
+
+	// second delete duration is ignored
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	object, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	if err != nil {
+		t.Errorf("unexpected error, object should exist: %v", err)
+	}
+	objectMeta = t.getObjectMetaOrFail(object)
+	if objectMeta.DeletionTimestamp == nil || objectMeta.DeletionGracePeriodSeconds == nil ||
+		*objectMeta.DeletionGracePeriodSeconds != expectedGrace || !objectMeta.DeletionTimestamp.Before(deletionTimestamp) {
+		t.Errorf("unexpected deleted meta: %#v", objectMeta)
 	}
 }
 

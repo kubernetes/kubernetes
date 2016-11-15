@@ -43,27 +43,25 @@ func (c ChangesCreateCall) Do(opts ...googleapi.CallOption) (interfaces.Change, 
 		return nil, c.Error
 	}
 	zone := (c.Service.Service.ManagedZones_.Impl[c.Project][c.Zone]).(*ManagedZone)
-	rrsets := map[string]int{} // Simple mechanism to detect dupes and missing rrsets before committing - stores index+1
-	for i, set := range zone.Rrsets {
-		rrsets[hashKey(set)] = i + 1
-	}
-	for _, add := range c.Change.Additions() {
-		if rrsets[hashKey(add)] > 0 {
-			return nil, fmt.Errorf("Attempt to insert duplicate rrset %v", add)
-		}
+	rrsets := map[string]ResourceRecordSet{} // compute the new state
+	for _, set := range zone.Rrsets {
+		rrsets[hashKey(set)] = set
 	}
 	for _, del := range c.Change.Deletions() {
-		if !(rrsets[hashKey(del)] > 0) {
+		if _, found := rrsets[hashKey(del)]; !found {
 			return nil, fmt.Errorf("Attempt to delete non-existent rrset %v", del)
 		}
+		delete(rrsets, hashKey(del))
 	}
 	for _, add := range c.Change.Additions() {
-		zone.Rrsets = append(zone.Rrsets, *(add.(*ResourceRecordSet)))
+		if _, found := rrsets[hashKey(add)]; found {
+			return nil, fmt.Errorf("Attempt to insert duplicate rrset %v", add)
+		}
+		rrsets[hashKey(add)] = add.(ResourceRecordSet)
 	}
-	for _, del := range c.Change.Deletions() {
-		zone.Rrsets = append(
-			zone.Rrsets[:rrsets[hashKey(del)]-1],
-			zone.Rrsets[rrsets[hashKey(del)]:]...)
+	zone.Rrsets = []ResourceRecordSet{}
+	for _, rrset := range rrsets {
+		zone.Rrsets = append(zone.Rrsets, rrset)
 	}
 	return c.Change, nil
 }

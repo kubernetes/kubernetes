@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ type failureType struct {
 }
 
 type peerStatus struct {
-	id          types.ID
-	mu          sync.Mutex // protect variables below
-	active      bool
-	activeSince time.Time
+	id     types.ID
+	mu     sync.Mutex // protect variables below
+	active bool
+	since  time.Time
 }
 
 func newPeerStatus(id types.ID) *peerStatus {
@@ -44,9 +44,9 @@ func (s *peerStatus) activate() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.active {
-		plog.Infof("the connection with %s became active", s.id)
+		plog.Infof("peer %s became active", s.id)
 		s.active = true
-		s.activeSince = time.Now()
+		s.since = time.Now()
 	}
 }
 
@@ -56,9 +56,9 @@ func (s *peerStatus) deactivate(failure failureType, reason string) {
 	msg := fmt.Sprintf("failed to %s %s on %s (%s)", failure.action, s.id, failure.source, reason)
 	if s.active {
 		plog.Errorf(msg)
-		plog.Infof("the connection with %s became inactive", s.id)
+		plog.Infof("peer %s became inactive", s.id)
 		s.active = false
-		s.activeSince = time.Time{}
+		s.since = time.Time{}
 		return
 	}
 	plog.Debugf(msg)
@@ -68,4 +68,10 @@ func (s *peerStatus) isActive() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.active
+}
+
+func (s *peerStatus) activeSince() time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.since
 }

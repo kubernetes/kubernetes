@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/proposals/flannel-integration.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Flannel integration with Kubernetes
 
 ## Why?
@@ -120,11 +86,11 @@ From 1000 feet:
 __But will it blend?__
 
 Kubernetes integration is fairly straight-forward once we understand the pieces involved, and can be prioritized as follows:
-* Kubelet understands flannel daemon in client mode, flannel server manages independent etcd store on master, node controller backs off cidr allocation
+* Kubelet understands flannel daemon in client mode, flannel server manages independent etcd store on master, node controller backs off CIDR allocation
 * Flannel server consults the Kubernetes master for everything network related
 * Flannel daemon works through network plugins in a generic way without bothering the kubelet: needs CNI x Kubernetes standardization
 
-The first is accomplished in this PR, while a timeline for 2. and 3. are TDB. To implement the flannel api we can either run a proxy per node and get rid of the flannel server, or service all requests in the flannel server with something like a go-routine per node:
+The first is accomplished in this PR, while a timeline for 2. and 3. is TDB. To implement the flannel api we can either run a proxy per node and get rid of the flannel server, or service all requests in the flannel server with something like a go-routine per node:
 * `/network/config`: read network configuration and return
 * `/network/leases`:
 	- Post:  Return a lease as understood by flannel
@@ -136,12 +102,12 @@ The first is accomplished in this PR, while a timeline for 2. and 3. are TDB. To
 	- Put: This is a request for a lease. If the nodecontroller is allocating CIDRs we can probably just no-op.
 * `/network/reservations`: TDB, we can probably use this to accommodate node controller allocating CIDR instead of flannel requesting it
 
-The ick-iest part of this implementation is going to the the `GET /network/leases`, i.e the watch proxy. We can side-step by waiting for a more generic Kubernetes resource. However, we can also implement it as follows:
+The ick-iest part of this implementation is going to the `GET /network/leases`, i.e. the watch proxy. We can side-step by waiting for a more generic Kubernetes resource. However, we can also implement it as follows:
 * Watch all nodes, ignore heartbeats
 * On each change, figure out the lease for the node, construct a [lease watch result](https://github.com/coreos/flannel/blob/0bf263826eab1707be5262703a8092c7d15e0be4/subnet/subnet.go#L72), and send it down the watch with the RV from the node
 * Implement a lease list that does a similar translation
 
-I say this is gross without an api objet because for each node->lease translation one has to store and retrieve the node metadata sent by flannel (eg: VTEP) from node annotations. [Reference implementation](https://github.com/bprashanth/kubernetes/blob/network_vxlan/pkg/kubelet/flannel_server.go) and [watch proxy](https://github.com/bprashanth/kubernetes/blob/network_vxlan/pkg/kubelet/watch_proxy.go).
+I say this is gross without an api object because for each node->lease translation one has to store and retrieve the node metadata sent by flannel (eg: VTEP) from node annotations. [Reference implementation](https://github.com/bprashanth/kubernetes/blob/network_vxlan/pkg/kubelet/flannel_server.go) and [watch proxy](https://github.com/bprashanth/kubernetes/blob/network_vxlan/pkg/kubelet/watch_proxy.go).
 
 # Limitations
 
@@ -158,7 +124,7 @@ This proposal is really just a call for community help in writing a Kubernetes x
 * Flannel server talks to apiserver, described in proposal above
 * HTTPs between flannel daemon/server
 * Investigate flannel server running on every node (as done in the reference implementation mentioned above)
-* Use flannel reservation mode to support node controller podcidr alloction
+* Use flannel reservation mode to support node controller podcidr allocation
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

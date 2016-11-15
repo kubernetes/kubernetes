@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // core contains modules that interface with the core api group
-package core
+package core // import "k8s.io/kubernetes/pkg/quota/evaluator/core"

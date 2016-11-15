@@ -27,7 +27,9 @@ import (
 
 	flag "github.com/spf13/pflag"
 
+	"github.com/go-openapi/spec"
 	inf "gopkg.in/inf.v0"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 )
 
 // Quantity is a fixed-point representation of a number.
@@ -87,11 +89,11 @@ import (
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
 //
-// +gencopy=false
 // +protobuf=true
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:openapi-gen=true
 type Quantity struct {
 	// i is the quantity in int64 scaled form, if d.Dec == nil
 	i int64Amount
@@ -384,6 +386,28 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 
 	return Quantity{d: infDecAmount{amount}, Format: format}, nil
+}
+
+// DeepCopy returns a deep-copy of the Quantity value.  Note that the method
+// receiver is a value, so we can mutate it in-place and return it.
+func (q Quantity) DeepCopy() Quantity {
+	if q.d.Dec != nil {
+		tmp := &inf.Dec{}
+		q.d.Dec = tmp.Set(q.d.Dec)
+	}
+	return q
+}
+
+// OpenAPIDefinition returns openAPI definition for this type.
+func (_ Quantity) OpenAPIDefinition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"string"},
+				Format: "",
+			},
+		},
+	}
 }
 
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).

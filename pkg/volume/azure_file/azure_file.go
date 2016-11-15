@@ -124,6 +124,19 @@ func (plugin *azureFilePlugin) newUnmounterInternal(volName string, podUID types
 	}}, nil
 }
 
+func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	azureVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			AzureFile: &api.AzureFileVolumeSource{
+				SecretName: volName,
+				ShareName:  volName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(azureVolume), nil
+}
+
 // azureFile volumes represent mount of an AzureFile share.
 type azureFile struct {
 	volName string
@@ -153,6 +166,13 @@ func (b *azureFileMounter) GetAttributes() volume.Attributes {
 		Managed:         !b.readOnly,
 		SupportsSELinux: false,
 	}
+}
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *azureFileMounter) CanMount() error {
+	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

@@ -35,6 +35,8 @@ MINION_FLAVOR=${MINION_FLAVOR:-m1.medium}
 
 EXTERNAL_NETWORK=${EXTERNAL_NETWORK:-public}
 
+LBAAS_VERSION=${LBAAS_VERSION:-}
+
 SWIFT_SERVER_URL=${SWIFT_SERVER_URL:-}
 
 # Flag indicates if new image must be created. If 'false' then image with IMAGE_ID will be used.

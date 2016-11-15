@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/rand"
 )
 
@@ -116,20 +118,22 @@ func TestVSphereLogin(t *testing.T) {
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(vs.cfg, ctx)
+	err = vSphereLogin(vs, ctx)
 	if err != nil {
 		t.Errorf("Failed to create vSpere client: %s", err)
 	}
-	defer c.Logout(ctx)
+	defer vs.client.Logout(ctx)
 }
 
 func TestZones(t *testing.T) {
 	cfg := VSphereConfig{}
 	cfg.Global.Datacenter = "myDatacenter"
+	failureZone := "myCluster"
 
 	// Create vSphere configuration object
 	vs := VSphere{
-		cfg: &cfg,
+		cfg:         &cfg,
+		clusterName: failureZone,
 	}
 
 	z, ok := vs.Zones()
@@ -144,6 +148,10 @@ func TestZones(t *testing.T) {
 
 	if zone.Region != vs.cfg.Global.Datacenter {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
+	}
+
+	if zone.FailureDomain != failureZone {
+		t.Fatalf("GetZone() returned wrong Failure Zone (%s)", zone.FailureDomain)
 	}
 }
 
@@ -179,11 +187,30 @@ func TestInstances(t *testing.T) {
 	}
 	t.Logf("Found ExternalID(%s) = %s\n", srvs[0], externalId)
 
+	nonExistingVM := types.NodeName(rand.String(15))
+	externalId, err = i.ExternalID(nonExistingVM)
+	if err == cloudprovider.InstanceNotFound {
+		t.Logf("VM %s was not found as expected\n", nonExistingVM)
+	} else if err == nil {
+		t.Fatalf("Instances.ExternalID did not fail as expected, VM %s was found", nonExistingVM)
+	} else {
+		t.Fatalf("Instances.ExternalID did not fail as expected, err: %v", err)
+	}
+
 	instanceId, err := i.InstanceID(srvs[0])
 	if err != nil {
 		t.Fatalf("Instances.InstanceID(%s) failed: %s", srvs[0], err)
 	}
 	t.Logf("Found InstanceID(%s) = %s\n", srvs[0], instanceId)
+
+	instanceId, err = i.InstanceID(nonExistingVM)
+	if err == cloudprovider.InstanceNotFound {
+		t.Logf("VM %s was not found as expected\n", nonExistingVM)
+	} else if err == nil {
+		t.Fatalf("Instances.InstanceID did not fail as expected, VM %s was found", nonExistingVM)
+	} else {
+		t.Fatalf("Instances.InstanceID did not fail as expected, err: %v", err)
+	}
 
 	addrs, err := i.NodeAddresses(srvs[0])
 	if err != nil {
@@ -216,12 +243,13 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Instances.List() returned zero servers")
 	}
 
-	tags := map[string]string{
-		"adapterType": "lsiLogic",
-		"diskType":    "thin",
-	}
+	volumeOptions := &VolumeOptions{
+		CapacityKB: 1 * 1024 * 1024,
+		Tags:       nil,
+		Name:       "kubernetes-test-volume-" + rand.String(10),
+		DiskFormat: "thin"}
 
-	volPath, err := vs.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1*1024*1024, &tags)
+	volPath, err := vs.CreateVolume(volumeOptions)
 	if err != nil {
 		t.Fatalf("Cannot create a new VMDK volume: %v", err)
 	}

@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1beta1
+kind: StorageClass
+metadata:
+  name: slow
+provisioner: kubernetes.io/glusterfs
+parameters:
+  resturl: "http://127.0.0.1:8081"
+  restuser: "admin"
+  secretNamespace: "default"
+  secretName: "heketi-secret"

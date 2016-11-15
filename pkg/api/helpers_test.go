@@ -212,17 +212,17 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 			in: []NodeSelectorRequirement{{
 				Key:      "foo",
 				Operator: NodeSelectorOpGt,
-				Values:   []string{"1.1"},
+				Values:   []string{"1"},
 			}},
-			out: mustParse("foo>1.1"),
+			out: mustParse("foo>1"),
 		},
 		{
 			in: []NodeSelectorRequirement{{
 				Key:      "bar",
 				Operator: NodeSelectorOpLt,
-				Values:   []string{"7.1"},
+				Values:   []string{"7"},
 			}},
-			out: mustParse("bar<7.1"),
+			out: mustParse("bar<7"),
 		},
 	}
 
@@ -292,6 +292,250 @@ func TestGetAffinityFromPod(t *testing.T) {
 		}
 		if err != nil && !tc.expectErr {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+	}
+}
+
+func TestTaintToString(t *testing.T) {
+	testCases := []struct {
+		taint          *Taint
+		expectedString string
+	}{
+		{
+			taint: &Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectedString: "foo=bar:NoSchedule",
+		},
+		{
+			taint: &Taint{
+				Key:    "foo",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectedString: "foo:NoSchedule",
+		},
+	}
+
+	for i, tc := range testCases {
+		if tc.expectedString != tc.taint.ToString() {
+			t.Errorf("[%v] expected taint %v converted to %s, got %s", i, tc.taint, tc.expectedString, tc.taint.ToString())
+		}
+	}
+}
+
+func TestMatchTaint(t *testing.T) {
+	testCases := []struct {
+		description  string
+		taint        *Taint
+		taintToMatch Taint
+		expectMatch  bool
+	}{
+		{
+			description: "two taints with the same key,value,effect should match",
+			taint: &Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			taintToMatch: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectMatch: true,
+		},
+		{
+			description: "two taints with the same key,effect but different value should match",
+			taint: &Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			taintToMatch: Taint{
+				Key:    "foo",
+				Value:  "different-value",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectMatch: true,
+		},
+		{
+			description: "two taints with the different key cannot match",
+			taint: &Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			taintToMatch: Taint{
+				Key:    "different-key",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectMatch: false,
+		},
+		{
+			description: "two taints with the different effect cannot match",
+			taint: &Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			taintToMatch: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectPreferNoSchedule,
+			},
+			expectMatch: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.expectMatch != tc.taint.MatchTaint(tc.taintToMatch) {
+			t.Errorf("[%s] expect taint %s match taint %s", tc.description, tc.taint.ToString(), tc.taintToMatch.ToString())
+		}
+	}
+}
+
+func TestGetAvoidPodsFromNode(t *testing.T) {
+	controllerFlag := true
+	testCases := []struct {
+		node        *Node
+		expectValue AvoidPods
+		expectErr   bool
+	}{
+		{
+			node:        &Node{},
+			expectValue: AvoidPods{},
+			expectErr:   false,
+		},
+		{
+			node: &Node{
+				ObjectMeta: ObjectMeta{
+					Annotations: map[string]string{
+						PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+						                            "apiVersion": "v1",
+						                            "kind": "ReplicationController",
+						                            "name": "foo",
+						                            "uid": "abcdef123456",
+						                            "controller": true
+							                }
+							            },
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+					},
+				},
+			},
+			expectValue: AvoidPods{
+				PreferAvoidPods: []PreferAvoidPodsEntry{
+					{
+						PodSignature: PodSignature{
+							PodController: &OwnerReference{
+								APIVersion: "v1",
+								Kind:       "ReplicationController",
+								Name:       "foo",
+								UID:        "abcdef123456",
+								Controller: &controllerFlag,
+							},
+						},
+						Reason:  "some reason",
+						Message: "some message",
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			node: &Node{
+				// Missing end symbol of "podController" and "podSignature"
+				ObjectMeta: ObjectMeta{
+					Annotations: map[string]string{
+						PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+							                    "kind": "ReplicationController",
+							                    "apiVersion": "v1"
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+					},
+				},
+			},
+			expectValue: AvoidPods{},
+			expectErr:   true,
+		},
+	}
+
+	for i, tc := range testCases {
+		v, err := GetAvoidPodsFromNodeAnnotations(tc.node.Annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+		if !reflect.DeepEqual(tc.expectValue, v) {
+			t.Errorf("[%v]expect value %v but got %v with %v", i, tc.expectValue, v, v.PreferAvoidPods[0].PodSignature.PodController.Controller)
+		}
+	}
+}
+
+func TestSysctlsFromPodAnnotation(t *testing.T) {
+	type Test struct {
+		annotation  string
+		expectValue []Sysctl
+		expectErr   bool
+	}
+	for i, test := range []Test{
+		{
+			annotation:  "",
+			expectValue: nil,
+		},
+		{
+			annotation: "foo.bar",
+			expectErr:  true,
+		},
+		{
+			annotation: "=123",
+			expectErr:  true,
+		},
+		{
+			annotation:  "foo.bar=",
+			expectValue: []Sysctl{{Name: "foo.bar", Value: ""}},
+		},
+		{
+			annotation:  "foo.bar=42",
+			expectValue: []Sysctl{{Name: "foo.bar", Value: "42"}},
+		},
+		{
+			annotation: "foo.bar=42,",
+			expectErr:  true,
+		},
+		{
+			annotation:  "foo.bar=42,abc.def=1",
+			expectValue: []Sysctl{{Name: "foo.bar", Value: "42"}, {Name: "abc.def", Value: "1"}},
+		},
+	} {
+		sysctls, err := SysctlsFromPodAnnotation(test.annotation)
+		if test.expectErr && err == nil {
+			t.Errorf("[%v]expected error but got none", i)
+		} else if !test.expectErr && err != nil {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
+			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
 		}
 	}
 }

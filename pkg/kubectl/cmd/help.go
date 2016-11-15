@@ -22,13 +22,15 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const help_long = `Help provides help for any command in the application.
-Simply type kubectl help [path to command] for full details.`
+var help_long = templates.LongDesc(`
+	Help provides help for any command in the application.
+	Simply type kubectl help [path to command] for full details.`)
 
-func NewCmdHelp(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdHelp(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "help [command] | STRING_TO_SEARCH",
 		Short: "Help about any command",
@@ -41,7 +43,7 @@ func NewCmdHelp(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunHelp(cmd *cobra.Command, args []string) {
-	foundCmd, a, err := cmd.Root().Find(args)
+	foundCmd, _, err := cmd.Root().Find(args)
 
 	// NOTE(andreykurilin): actually, I did not find any cases when foundCmd can be nil,
 	//   but let's make this check since it is included in original code of initHelpCmd
@@ -69,10 +71,11 @@ func RunHelp(cmd *cobra.Command, args []string) {
 			// if nothing is found, just print usage
 			cmd.Root().Usage()
 		}
-	} else if len(a) == 0 {
-		// help message for help command :)
-		cmd.Root().Usage()
 	} else {
+		if len(args) == 0 {
+			// help message for help command :)
+			foundCmd = cmd
+		}
 		helpFunc := foundCmd.HelpFunc()
 		helpFunc(foundCmd, args)
 	}

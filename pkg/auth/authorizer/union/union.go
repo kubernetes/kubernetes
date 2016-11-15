@@ -17,6 +17,8 @@ limitations under the License.
 package union
 
 import (
+	"strings"
+
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
@@ -30,16 +32,26 @@ func New(authorizationHandlers ...authorizer.Authorizer) authorizer.Authorizer {
 }
 
 // Authorizes against a chain of authorizer.Authorizer objects and returns nil if successful and returns error if unsuccessful
-func (authzHandler unionAuthzHandler) Authorize(a authorizer.Attributes) error {
-	var errlist []error
+func (authzHandler unionAuthzHandler) Authorize(a authorizer.Attributes) (bool, string, error) {
+	var (
+		errlist    []error
+		reasonlist []string
+	)
+
 	for _, currAuthzHandler := range authzHandler {
-		err := currAuthzHandler.Authorize(a)
+		authorized, reason, err := currAuthzHandler.Authorize(a)
+
 		if err != nil {
 			errlist = append(errlist, err)
+		}
+		if len(reason) != 0 {
+			reasonlist = append(reasonlist, reason)
+		}
+		if !authorized {
 			continue
 		}
-		return nil
+		return true, reason, nil
 	}
 
-	return utilerrors.NewAggregate(errlist)
+	return false, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
 }

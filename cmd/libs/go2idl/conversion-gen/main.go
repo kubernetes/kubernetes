@@ -16,52 +16,57 @@ limitations under the License.
 
 // conversion-gen is a tool for auto-generating Conversion functions.
 //
-// Structs in the input directories with the below line in their comments
-// will be ignored during generation.
-// // +genconversion=false
+// Given a list of input directories, it will scan for "peer" packages and
+// generate functions that efficiently convert between same-name types in each
+// package.  For any pair of types that has a
+//     `Convert_<pkg1>_<type>_To_<pkg2>_<Type()`
+// function (and its reciprocal), it will simply call that.  use standard value
+// assignment whenever possible.  The resulting file will be stored in the same
+// directory as the processed source package.
+//
+// Generation is governed by comment tags in the source.  Any package may
+// request Conversion generation by including a comment in the file-comments of
+// one file, of the form:
+//   // +k8s:conversion-gen=<import-path-of-peer-package>
+//
+// When generating for a package, individual types or fields of structs may opt
+// out of Conversion generation by specifying a comment on the of the form:
+//   // +k8s:conversion-gen=false
 package main
 
 import (
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	"path/filepath"
+
+	"k8s.io/gengo/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/conversion-gen/generators"
 
 	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 )
 
 func main() {
 	arguments := args.Default()
 
-	// Override defaults. These are Kubernetes specific input locations.
-	arguments.InputDirs = []string{
-		"k8s.io/kubernetes/pkg/api/v1",
-		"k8s.io/kubernetes/pkg/api",
-		"k8s.io/kubernetes/pkg/apis/authentication.k8s.io",
-		"k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1",
-		"k8s.io/kubernetes/pkg/apis/authorization",
-		"k8s.io/kubernetes/pkg/apis/authorization/v1beta1",
-		"k8s.io/kubernetes/pkg/apis/autoscaling",
-		"k8s.io/kubernetes/pkg/apis/autoscaling/v1",
-		"k8s.io/kubernetes/pkg/apis/batch",
-		"k8s.io/kubernetes/pkg/apis/batch/v1",
-		"k8s.io/kubernetes/pkg/apis/batch/v2alpha1",
-		"k8s.io/kubernetes/pkg/apis/apps",
-		"k8s.io/kubernetes/pkg/apis/apps/v1alpha1",
-		"k8s.io/kubernetes/pkg/apis/certificates",
-		"k8s.io/kubernetes/pkg/apis/certificates/v1alpha1",
-		"k8s.io/kubernetes/pkg/apis/componentconfig",
-		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1",
-		"k8s.io/kubernetes/pkg/apis/policy",
-		"k8s.io/kubernetes/pkg/apis/policy/v1alpha1",
-		"k8s.io/kubernetes/pkg/apis/extensions",
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1",
-		"k8s.io/kubernetes/pkg/apis/rbac",
-		"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1",
-		"k8s.io/kubernetes/federation/apis/federation",
-		"k8s.io/kubernetes/federation/apis/federation/v1beta1",
-		"k8s.io/kubernetes/pkg/conversion",
-		"k8s.io/kubernetes/pkg/runtime",
-	}
+	// Override defaults.
+	arguments.OutputFileBaseName = "conversion_generated"
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 
+	// Custom args.
+	customArgs := &generators.CustomArgs{
+		ExtraPeerDirs: []string{
+			"k8s.io/kubernetes/pkg/api",
+			"k8s.io/kubernetes/pkg/api/v1",
+			"k8s.io/kubernetes/pkg/api/unversioned",
+			"k8s.io/kubernetes/pkg/conversion",
+			"k8s.io/kubernetes/pkg/runtime",
+		},
+		SkipUnsafe: false,
+	}
+	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
+		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
+	arguments.CustomArgs = customArgs
+
+	// Run it.
 	if err := arguments.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
@@ -69,5 +74,5 @@ func main() {
 	); err != nil {
 		glog.Fatalf("Error: %v", err)
 	}
-	glog.Info("Completed successfully.")
+	glog.V(2).Info("Completed successfully.")
 }

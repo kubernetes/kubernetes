@@ -29,21 +29,26 @@ const GroupName = ""
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1"}
 
-func AddToScheme(scheme *runtime.Scheme) {
-	// Add the API to Scheme.
-	addKnownTypes(scheme)
-	addConversionFuncs(scheme)
-	addDefaultingFuncs(scheme)
-	addDeepCopyFuncs(scheme)
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addConversionFuncs, addDefaultingFuncs)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&v1.Service{},
+		&v1.Namespace{},
+		&v1.NamespaceList{},
 		&v1.ServiceList{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
+		&v1.Secret{},
+		&v1.SecretList{},
+		&v1.Event{},
+		&v1.EventList{},
+		&v1.ConfigMap{},
+		&v1.ConfigMapList{},
 	)
 
 	// Add common types
@@ -51,4 +56,5 @@ func addKnownTypes(scheme *runtime.Scheme) {
 
 	// Add the watch version that applies
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
+	return nil
 }

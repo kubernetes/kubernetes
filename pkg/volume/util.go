@@ -18,24 +18,25 @@ package volume
 
 import (
 	"fmt"
-	"time"
+	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
-	"github.com/golang/glog"
 	"hash/fnv"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"math/rand"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
+
+type RecycleEventRecorder func(eventtype, message string)
 
 // RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume
 // Recyclers. This function will save the given Pod to the API and watch it
@@ -50,8 +51,8 @@ import (
 //  pod - the pod designed by a volume plugin to recycle the volume. pod.Name
 //        will be overwritten with unique name based on PV.Name.
 //	client - kube client for API operations.
-func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.Pod, kubeClient clientset.Interface) error {
-	return internalRecycleVolumeByWatchingPodUntilCompletion(pvName, pod, newRecyclerClient(kubeClient))
+func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.Pod, kubeClient clientset.Interface, recorder RecycleEventRecorder) error {
+	return internalRecycleVolumeByWatchingPodUntilCompletion(pvName, pod, newRecyclerClient(kubeClient, recorder))
 }
 
 // same as above func comments, except 'recyclerClient' is a narrower pod API
@@ -65,34 +66,61 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.P
 	pod.Name = "recycler-for-" + pvName
 	pod.GenerateName = ""
 
+	stopChannel := make(chan struct{})
+	defer close(stopChannel)
+	podCh, err := recyclerClient.WatchPod(pod.Name, pod.Namespace, stopChannel)
+	if err != nil {
+		glog.V(4).Infof("cannot start watcher for pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		return err
+	}
+
 	// Start the pod
-	_, err := recyclerClient.CreatePod(pod)
+	_, err = recyclerClient.CreatePod(pod)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			glog.V(5).Infof("old recycler pod %q found for volume", pod.Name)
 		} else {
-			return fmt.Errorf("Unexpected error creating recycler pod:  %+v\n", err)
+			return fmt.Errorf("unexpected error creating recycler pod:  %+v\n", err)
 		}
 	}
 	defer recyclerClient.DeletePod(pod.Name, pod.Namespace)
 
-	// Now only the old pod or the new pod run. Watch it until it finishes.
-	stopChannel := make(chan struct{})
-	defer close(stopChannel)
-	nextPod := recyclerClient.WatchPod(pod.Name, pod.Namespace, stopChannel)
-
+	// Now only the old pod or the new pod run. Watch it until it finishes
+	// and send all events on the pod to the PV
 	for {
-		watchedPod := nextPod()
-		if watchedPod.Status.Phase == api.PodSucceeded {
-			// volume.Recycle() returns nil on success, else error
-			return nil
-		}
-		if watchedPod.Status.Phase == api.PodFailed {
-			// volume.Recycle() returns nil on success, else error
-			if watchedPod.Status.Message != "" {
-				return fmt.Errorf(watchedPod.Status.Message)
-			} else {
-				return fmt.Errorf("pod failed, pod.Status.Message unknown.")
+		event := <-podCh
+		switch event.Object.(type) {
+		case *api.Pod:
+			// POD changed
+			pod := event.Object.(*api.Pod)
+			glog.V(4).Infof("recycler pod update received: %s %s/%s %s", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
+			switch event.Type {
+			case watch.Added, watch.Modified:
+				if pod.Status.Phase == api.PodSucceeded {
+					// Recycle succeeded.
+					return nil
+				}
+				if pod.Status.Phase == api.PodFailed {
+					if pod.Status.Message != "" {
+						return fmt.Errorf(pod.Status.Message)
+					} else {
+						return fmt.Errorf("pod failed, pod.Status.Message unknown.")
+					}
+				}
+
+			case watch.Deleted:
+				return fmt.Errorf("recycler pod was deleted")
+
+			case watch.Error:
+				return fmt.Errorf("recycler pod watcher failed")
+			}
+
+		case *api.Event:
+			// Event received
+			podEvent := event.Object.(*api.Event)
+			glog.V(4).Infof("recycler event received: %s %s/%s %s/%s %s", event.Type, podEvent.Namespace, podEvent.Name, podEvent.InvolvedObject.Namespace, podEvent.InvolvedObject.Name, podEvent.Message)
+			if event.Type == watch.Added {
+				recyclerClient.Event(podEvent.Type, podEvent.Message)
 			}
 		}
 	}
@@ -104,15 +132,24 @@ type recyclerClient interface {
 	CreatePod(pod *api.Pod) (*api.Pod, error)
 	GetPod(name, namespace string) (*api.Pod, error)
 	DeletePod(name, namespace string) error
-	WatchPod(name, namespace string, stopChannel chan struct{}) func() *api.Pod
+	// WatchPod returns a ListWatch for watching a pod.  The stopChannel is used
+	// to close the reflector backing the watch.  The caller is responsible for
+	// derring a close on the channel to stop the reflector.
+	WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error)
+	// Event sends an event to the volume that is being recycled.
+	Event(eventtype, message string)
 }
 
-func newRecyclerClient(client clientset.Interface) recyclerClient {
-	return &realRecyclerClient{client}
+func newRecyclerClient(client clientset.Interface, recorder RecycleEventRecorder) recyclerClient {
+	return &realRecyclerClient{
+		client,
+		recorder,
+	}
 }
 
 type realRecyclerClient struct {
-	client clientset.Interface
+	client   clientset.Interface
+	recorder RecycleEventRecorder
 }
 
 func (c *realRecyclerClient) CreatePod(pod *api.Pod) (*api.Pod, error) {
@@ -127,28 +164,60 @@ func (c *realRecyclerClient) DeletePod(name, namespace string) error {
 	return c.client.Core().Pods(namespace).Delete(name, nil)
 }
 
-// WatchPod returns a ListWatch for watching a pod.  The stopChannel is used
-// to close the reflector backing the watch.  The caller is responsible for
-// derring a close on the channel to stop the reflector.
-func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) func() *api.Pod {
-	fieldSelector, _ := fields.ParseSelector("metadata.name=" + name)
+func (c *realRecyclerClient) Event(eventtype, message string) {
+	c.recorder(eventtype, message)
+}
 
-	podLW := &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			options.FieldSelector = fieldSelector
-			return c.client.Core().Pods(namespace).List(options)
-		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			options.FieldSelector = fieldSelector
-			return c.client.Core().Pods(namespace).Watch(options)
-		},
+func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
+	podSelector, _ := fields.ParseSelector("metadata.name=" + name)
+	options := api.ListOptions{
+		FieldSelector: podSelector,
+		Watch:         true,
 	}
-	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
-	cache.NewReflector(podLW, &api.Pod{}, queue, 1*time.Minute).RunUntil(stopChannel)
 
-	return func() *api.Pod {
-		return cache.Pop(queue).(*api.Pod)
+	podWatch, err := c.client.Core().Pods(namespace).Watch(options)
+	if err != nil {
+		return nil, err
 	}
+
+	eventSelector, _ := fields.ParseSelector("involvedObject.name=" + name)
+	eventWatch, err := c.client.Core().Events(namespace).Watch(api.ListOptions{
+		FieldSelector: eventSelector,
+		Watch:         true,
+	})
+	if err != nil {
+		podWatch.Stop()
+		return nil, err
+	}
+
+	eventCh := make(chan watch.Event, 0)
+
+	go func() {
+		defer eventWatch.Stop()
+		defer podWatch.Stop()
+		defer close(eventCh)
+
+		for {
+			select {
+			case _ = <-stopChannel:
+				return
+
+			case podEvent, ok := <-podWatch.ResultChan():
+				if !ok {
+					return
+				}
+				eventCh <- podEvent
+
+			case eventEvent, ok := <-eventWatch.ResultChan():
+				if !ok {
+					return
+				}
+				eventCh <- eventEvent
+			}
+		}
+	}()
+
+	return eventCh, nil
 }
 
 // CalculateTimeoutForVolume calculates time for a Recycler pod to complete a
@@ -193,10 +262,19 @@ func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
 	return prefix + "-" + pvName
 }
 
+// Check if the path from the mounter is empty.
+func GetPath(mounter Mounter) (string, error) {
+	path := mounter.GetPath()
+	if path == "" {
+		return "", fmt.Errorf("Path is empty %s", reflect.TypeOf(mounter).String())
+	}
+	return path, nil
+}
+
 // ChooseZone implements our heuristics for choosing a zone for volume creation based on the volume name
 // Volumes are generally round-robin-ed across all active zones, using the hash of the PVC Name.
 // However, if the PVCName ends with `-<integer>`, we will hash the prefix, and then add the integer to the hash.
-// This means that a PetSet's volumes (`claimname-petsetname-id`) will spread across available zones,
+// This means that a StatefulSet's volumes (`claimname-statefulsetname-id`) will spread across available zones,
 // assuming the id values are consecutive.
 func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	// We create the volume in a zone determined by the name
@@ -212,8 +290,8 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	} else {
 		hashString := pvcName
 
-		// Heuristic to make sure that volumes in a PetSet are spread across zones
-		// PetSet PVCs are (currently) named ClaimName-PetSetName-Id,
+		// Heuristic to make sure that volumes in a StatefulSet are spread across zones
+		// StatefulSet PVCs are (currently) named ClaimName-StatefulSetName-Id,
 		// where Id is an integer index
 		lastDash := strings.LastIndexByte(pvcName, '-')
 		if lastDash != -1 {
@@ -224,7 +302,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 				index = uint32(petID)
 				// We still hash the volume name, but only the base
 				hashString = pvcName[:lastDash]
-				glog.V(2).Infof("Detected PetSet-style volume name %q; index=%d", pvcName, index)
+				glog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
 			}
 		}
 
@@ -236,7 +314,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 
 	// Zones.List returns zones in a consistent order (sorted)
 	// We do have a potential failure case where volumes will not be properly spread,
-	// if the set of zones changes during PetSet volume creation.  However, this is
+	// if the set of zones changes during StatefulSet volume creation.  However, this is
 	// probably relatively unlikely because we expect the set of zones to be essentially
 	// static for clusters.
 	// Hopefully we can address this problem if/when we do full scheduler integration of

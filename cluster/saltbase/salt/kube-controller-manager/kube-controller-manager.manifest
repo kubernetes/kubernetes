@@ -14,17 +14,18 @@
 {% if pillar['service_cluster_ip_range'] is defined and pillar['service_cluster_ip_range'] != "" -%}
   {% set service_cluster_ip_range = "--service_cluster_ip_range=" + pillar['service_cluster_ip_range'] -%}
 {% endif -%}
-# When we're using flannel it is responsible for cidr allocation.
-# This is expected to be a short-term compromise.
-{% if pillar.get('network_provider', '').lower() == 'flannel' %}
-  {% set allocate_node_cidrs = "--allocate-node-cidrs=false" -%}
-{% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
+{% if pillar.get('network_provider', '').lower() == 'kubenet' %}
   {% set allocate_node_cidrs = "--allocate-node-cidrs=true" -%}
 {% elif pillar['allocate_node_cidrs'] is defined -%}
   {% set allocate_node_cidrs = "--allocate-node-cidrs=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
 {% if pillar['terminated_pod_gc_threshold'] is defined -%}
   {% set terminated_pod_gc = "--terminated-pod-gc-threshold=" + pillar['terminated_pod_gc_threshold'] -%}
+{% endif -%}
+
+{% set enable_garbage_collector = "" -%}
+{% if pillar['enable_garbage_collector'] is defined -%}
+{% set enable_garbage_collector = "--enable-garbage-collector=" + pillar['enable_garbage_collector'] -%}
 {% endif -%}
 
 {% set cloud_provider = "" -%}
@@ -36,7 +37,7 @@
 {% set srv_kube_path = "/srv/kubernetes" -%}
 
 {% if grains.cloud is defined -%}
-  {% if grains.cloud not in ['vagrant', 'vsphere', 'photon-controller', 'azure-legacy'] -%}
+  {% if grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
     {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
   {% endif -%}
   {% set service_account_key = "--service-account-private-key-file=/srv/kubernetes/server.key" -%}
@@ -45,7 +46,7 @@
     {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
   {% endif -%}
 
-  {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
+  {% if grains.cloud in [ 'vsphere', 'aws', 'gce' ] and grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
     {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
     {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
@@ -68,8 +69,17 @@
   {% set log_level = pillar['controller_manager_test_log_level'] -%}
 {% endif -%}
 
-{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+{% set feature_gates = "" -%}
+{% if grains.feature_gates is defined -%}
+ {% set feature_gates = "--feature-gates=" + grains.feature_gates -%}
+{% endif -%}
 
+{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+{% set params = params + " " + feature_gates -%}
+
+{% if pillar.get('enable_hostpath_provisioner', '').lower() == 'true' -%}
+{% set params = params + " --enable-hostpath-provisioner" %}
+{% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['controller_manager_test_args'] is defined -%}

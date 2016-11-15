@@ -19,6 +19,7 @@
 # This is where the result of the go build goes
 /output*/
 /_output*/
+/_output
 
 # Emacs save files
 *~
@@ -55,11 +56,15 @@ network_closure.sh
 
 # Also ignore etcd installed by hack/install-etcd.sh
 /third_party/etcd*
+/default.etcd
 
 # User cluster configs
 .kubeconfig
 
 .tags*
+
+# Version file for dockerized build
+.dockerized-kube-version-defs
 
 # Web UI
 /www/master/node_modules/
@@ -88,6 +93,7 @@ network_closure.sh
 
 # Juju Stuff
 /cluster/juju/charms/*
+/cluster/juju/bundles/local.yaml
 
 # Downloaded Kubernetes binary release
 /kubernetes/
@@ -97,3 +103,18 @@ network_closure.sh
 
 # Downloaded kubernetes binary release tar ball
 kubernetes.tar.gz
+
+# generated files in any directory
+# TODO(thockin): uncomment this when we stop committing the generated files.
+#zz_generated.*
+
+# make-related metadata
+/.make/
+# Just in time generated data in the source, should never be commited
+/test/e2e/generated/bindata.go
+
+# This file used by some vendor repos (e.g. github.com/go-openapi/...) to store secret variables and should not be ignored
+!\.drone\.sec
+
+/bazel-*
+*.pyc

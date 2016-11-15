@@ -104,7 +104,7 @@ contribute!
 
 **NON_MASQUERADE_CIDR**
 
-The 'internal' IP range which Kuberenetes will use, which will therefore not
+The 'internal' IP range which Kubernetes will use, which will therefore not
 use IP masquerade.  By default kubernetes runs an internal network for traffic
 between pods (and between pods and services), and by default this uses the
 `10.0.0.0/8` range.  However, this sometimes overlaps with a range that you may

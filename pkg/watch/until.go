@@ -32,6 +32,7 @@ type ConditionFunc func(event Event) (bool, error)
 // encountered. The first condition that returns an error terminates the watch (and the event is also returned).
 // If no event has been received, the returned event will be nil.
 // Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
+// A zero timeout means to wait forever.
 func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc) (*Event, error) {
 	ch := watcher.ResultChan()
 	defer watcher.Stop()
@@ -40,7 +41,7 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 		after = time.After(timeout)
 	} else {
 		ch := make(chan time.Time)
-		close(ch)
+		defer close(ch)
 		after = ch
 	}
 	var lastEvent *Event
@@ -52,7 +53,7 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 				return lastEvent, err
 			}
 			if done {
-				break
+				continue
 			}
 		}
 	ConditionSucceeded:

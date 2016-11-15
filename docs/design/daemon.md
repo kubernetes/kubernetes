@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/daemon.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # DaemonSet in Kubernetes
 
 **Author**: Ananya Kumar (@AnanyaKumar)
@@ -174,7 +140,7 @@ upgradable, and more generally could not be managed through the API server
 interface.
 
 A third alternative is to generalize the Replication Controller. We would do
-something like: if you set the `replicas` field of the ReplicationConrollerSpec
+something like: if you set the `replicas` field of the ReplicationControllerSpec
 to -1, then it means "run exactly one replica on every node matching the
 nodeSelector in the pod template." The ReplicationController would pretend
 `replicas` had been set to some large number -- larger than the largest number
@@ -195,15 +161,15 @@ some discussion of this topic).
 #### Client
 
 - Add support for DaemonSet commands to kubectl and the client. Client code was
-added to client/unversioned. The main files in Kubectl that were modified are
-kubectl/describe.go and kubectl/stop.go, since for other calls like Get, Create,
+added to pkg/client/unversioned. The main files in Kubectl that were modified are
+pkg/kubectl/describe.go and pkg/kubectl/stop.go, since for other calls like Get, Create,
 and Update, the client simply forwards the request to the backend via the REST
 API.
 
 #### Apiserver
 
 - Accept, parse, validate client commands
-- REST API calls are handled in registry/daemon
+- REST API calls are handled in pkg/registry/daemonset
   - In particular, the api server will add the object to etcd
   - DaemonManager listens for updates to etcd (using Framework.informer)
 - API objects for DaemonSet were created in expapi/v1/types.go and

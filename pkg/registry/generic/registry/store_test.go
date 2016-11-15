@@ -21,9 +21,10 @@ import (
 	"path"
 	"reflect"
 	"strconv"
-	"testing"
-
+	"strings"
 	"sync"
+	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -33,15 +34,36 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/core/pod"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/selection"
+	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
+
+type testGracefulStrategy struct {
+	testRESTStrategy
+}
+
+func (t testGracefulStrategy) CheckGracefulDelete(ctx api.Context, obj runtime.Object, options *api.DeleteOptions) bool {
+	return true
+}
+
+var _ rest.RESTGracefulDeleteStrategy = testGracefulStrategy{}
+
+type testOrphanDeleteStrategy struct {
+	*testRESTStrategy
+}
+
+func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+	return rest.OrphanDependents
+}
 
 type testRESTStrategy struct {
 	runtime.ObjectTyper
@@ -55,7 +77,7 @@ func (t *testRESTStrategy) NamespaceScoped() bool          { return t.namespaceS
 func (t *testRESTStrategy) AllowCreateOnUpdate() bool      { return t.allowCreateOnUpdate }
 func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUnconditionalUpdate }
 
-func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object) {
+func (t *testRESTStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	metaObj, err := meta.Accessor(obj)
 	if err != nil {
 		panic(err.Error())
@@ -68,7 +90,7 @@ func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object) {
 	metaObj.SetLabels(labels)
 }
 
-func (t *testRESTStrategy) PrepareForUpdate(obj, old runtime.Object) {}
+func (t *testRESTStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {}
 func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	return nil
 }
@@ -77,88 +99,37 @@ func (t *testRESTStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Obje
 }
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}
 
-func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
-	return func(obj runtime.Object) bool {
-		actualPod := obj.(*api.Pod)
-		if !api.Semantic.DeepDerivative(pod.Status, actualPod.Status) {
-			t.Errorf("not a deep derivative %#v", actualPod)
-			return false
-		}
-		return api.HasObjectMetaSystemFieldValues(&actualPod.ObjectMeta)
-	}
+func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
+	return newTestGenericStoreRegistry(t, false)
 }
 
-func NewTestGenericStoreRegistry(t *testing.T) (*etcdtesting.EtcdTestServer, *Store) {
-	podPrefix := "/pods"
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	s := etcdstorage.NewEtcdStorage(server.Client, testapi.Default.StorageCodec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
-
-	return server, &Store{
-		NewFunc:           func() runtime.Object { return &api.Pod{} },
-		NewListFunc:       func() runtime.Object { return &api.PodList{} },
-		QualifiedResource: api.Resource("pods"),
-		CreateStrategy:    strategy,
-		UpdateStrategy:    strategy,
-		DeleteStrategy:    strategy,
-		KeyRootFunc: func(ctx api.Context) string {
-			return podPrefix
-		},
-		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			if _, ok := api.NamespaceFrom(ctx); !ok {
-				return "", fmt.Errorf("namespace is required")
-			}
-			return path.Join(podPrefix, id), nil
-		},
-		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return &generic.SelectionPredicate{
-				Label: label,
-				Field: field,
-				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-					pod, ok := obj.(*api.Pod)
-					if !ok {
-						return nil, nil, fmt.Errorf("not a pod")
-					}
-					return labels.Set(pod.ObjectMeta.Labels), generic.ObjectMetaFieldsSet(pod.ObjectMeta, true), nil
-				},
-			}
-		},
-		Storage: s,
-	}
-}
-
-// setMatcher is a matcher that matches any pod with id in the set.
+// matchPodName returns selection predicate that matches any pod with name in the set.
 // Makes testing simpler.
-type setMatcher struct {
-	sets.String
-}
-
-func (sm setMatcher) Matches(obj runtime.Object) (bool, error) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return false, fmt.Errorf("wrong object")
+func matchPodName(names ...string) storage.SelectionPredicate {
+	// Note: even if pod name is a field, we have to use labels,
+	// because field selector doesn't support "IN" operator.
+	l, err := labels.NewRequirement("name", selection.In, names)
+	if err != nil {
+		panic("Labels requirement must validate successfully")
 	}
-	return sm.Has(pod.Name), nil
-}
-
-func (sm setMatcher) MatchesSingle() (string, bool) {
-	if sm.Len() == 1 {
-		// Since pod name is its key, we can optimize this case.
-		return sm.List()[0], true
+	return storage.SelectionPredicate{
+		Label: labels.Everything().Add(*l),
+		Field: fields.Everything(),
+		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+			pod := obj.(*api.Pod)
+			return labels.Set{"name": pod.ObjectMeta.Name}, nil, nil
+		},
 	}
-	return "", false
 }
 
-// everythingMatcher matches everything
-type everythingMatcher struct{}
-
-func (everythingMatcher) Matches(obj runtime.Object) (bool, error) {
-	return true, nil
-}
-
-func (everythingMatcher) MatchesSingle() (string, bool) {
-	return "", false
+func matchEverything() storage.SelectionPredicate {
+	return storage.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.Everything(),
+		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+			return nil, nil, nil
+		},
+	}
 }
 
 func TestStoreList(t *testing.T) {
@@ -176,34 +147,34 @@ func TestStoreList(t *testing.T) {
 
 	table := map[string]struct {
 		in      *api.PodList
-		m       generic.Matcher
+		m       storage.SelectionPredicate
 		out     runtime.Object
 		context api.Context
 	}{
 		"notFound": {
 			in:  nil,
-			m:   everythingMatcher{},
+			m:   matchEverything(),
 			out: &api.PodList{Items: []api.Pod{}},
 		},
 		"normal": {
 			in:  &api.PodList{Items: []api.Pod{*podA, *podB}},
-			m:   everythingMatcher{},
+			m:   matchEverything(),
 			out: &api.PodList{Items: []api.Pod{*podA, *podB}},
 		},
 		"normalFiltered": {
 			in:  &api.PodList{Items: []api.Pod{*podA, *podB}},
-			m:   setMatcher{sets.NewString("foo")},
+			m:   matchPodName("foo"),
 			out: &api.PodList{Items: []api.Pod{*podB}},
 		},
 		"normalFilteredNoNamespace": {
 			in:      &api.PodList{Items: []api.Pod{*podA, *podB}},
-			m:       setMatcher{sets.NewString("foo")},
+			m:       matchPodName("foo"),
 			out:     &api.PodList{Items: []api.Pod{*podB}},
 			context: noNamespaceContext,
 		},
 		"normalFilteredMatchMultiple": {
 			in:  &api.PodList{Items: []api.Pod{*podA, *podB}},
-			m:   setMatcher{sets.NewString("foo", "makeMatchSingleReturnFalse")},
+			m:   matchPodName("foo", "makeMatchSingleReturnFalse"),
 			out: &api.PodList{Items: []api.Pod{*podB}},
 		},
 	}
@@ -213,7 +184,7 @@ func TestStoreList(t *testing.T) {
 		if item.context != nil {
 			ctx = item.context
 		}
-		server, registry := NewTestGenericStoreRegistry(t)
+		destroyFunc, registry := NewTestGenericStoreRegistry(t)
 
 		if item.in != nil {
 			if err := storagetesting.CreateList("/pods", registry.Storage, item.in); err != nil {
@@ -231,11 +202,76 @@ func TestStoreList(t *testing.T) {
 		if e, a := item.out, list; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v: Expected %#v, got %#v", name, e, a)
 		}
-		server.Terminate(t)
+		destroyFunc()
+	}
+}
+
+// TestStoreListResourceVersion tests that if List with ResourceVersion > 0, it will wait until
+// the results are as fresh as given version.
+func TestStoreListResourceVersion(t *testing.T) {
+	fooPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "foo"},
+		Spec:       api.PodSpec{NodeName: "machine"},
+	}
+	barPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "bar"},
+		Spec:       api.PodSpec{NodeName: "machine"},
+	}
+	ctx := api.WithNamespace(api.NewContext(), "test")
+
+	destroyFunc, registry := newTestGenericStoreRegistry(t, true)
+	defer destroyFunc()
+
+	obj, err := registry.Create(ctx, fooPod)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	versioner := etcdstorage.APIObjectVersioner{}
+	rev, err := versioner.ObjectResourceVersion(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	waitListCh := make(chan runtime.Object, 1)
+	go func(listRev uint64) {
+		option := &api.ListOptions{ResourceVersion: strconv.FormatUint(listRev, 10)}
+		// It will wait until we create the second pod.
+		l, err := registry.List(ctx, option)
+		if err != nil {
+			close(waitListCh)
+			t.Fatal(err)
+			return
+		}
+		waitListCh <- l
+	}(rev + 1)
+
+	select {
+	case <-time.After(500 * time.Millisecond):
+	case l := <-waitListCh:
+		t.Fatalf("expected waiting, but get %#v", l)
+	}
+
+	if _, err := registry.Create(ctx, barPod); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
+	case l, ok := <-waitListCh:
+		if !ok {
+			return
+		}
+		pl := l.(*api.PodList).Items
+		if len(pl) != 2 {
+			t.Errorf("Expected get 2 items, but got %d", len(pl))
+		}
 	}
 }
 
 func TestStoreCreate(t *testing.T) {
+	gracefulPeriod := int64(50)
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine"},
@@ -246,8 +282,10 @@ func TestStoreCreate(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+	// re-define delete strategy to have graceful delete capability
+	registry.DeleteStrategy = pod.Strategy
 
 	// create the object
 	objA, err := registry.Create(testContext, podA)
@@ -270,6 +308,31 @@ func TestStoreCreate(t *testing.T) {
 	_, err = registry.Create(testContext, podB)
 	if !errors.IsAlreadyExists(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// verify graceful delete capability is defined
+	_, ok := registry.DeleteStrategy.(rest.RESTGracefulDeleteStrategy)
+	if !ok {
+		t.Fatalf("No graceful capability set.")
+	}
+
+	// now delete pod with graceful period set
+	delOpts := &api.DeleteOptions{GracePeriodSeconds: &gracefulPeriod}
+	_, err = registry.Delete(testContext, podA.Name, delOpts)
+	if err != nil {
+		t.Fatalf("Failed to delete pod gracefully. Unexpected error: %v", err)
+	}
+
+	// try to create before graceful deletion period is over
+	_, err = registry.Create(testContext, podA)
+	if err == nil || !errors.IsAlreadyExists(err) {
+		t.Fatalf("Expected 'already exists' error from storage, but got %v", err)
+	}
+
+	// check the 'alredy exists' msg was edited
+	msg := &err.(*errors.StatusError).ErrStatus.Message
+	if !strings.Contains(*msg, "object is being deleted:") {
+		t.Errorf("Unexpected error without the 'object is being deleted:' in message: %v", err)
 	}
 }
 
@@ -306,8 +369,8 @@ func TestStoreUpdate(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	// Test1 try to update a non-existing node
 	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA, api.Scheme))
@@ -344,8 +407,8 @@ func TestStoreUpdate(t *testing.T) {
 }
 
 func TestNoOpUpdates(t *testing.T) {
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	newPod := func() *api.Pod {
 		return &api.Pod{
@@ -405,7 +468,7 @@ func TestNoOpUpdates(t *testing.T) {
 
 type testPodExport struct{}
 
-func (t testPodExport) Export(obj runtime.Object, exact bool) error {
+func (t testPodExport) Export(ctx api.Context, obj runtime.Object, exact bool) error {
 	pod := obj.(*api.Pod)
 	if pod.Labels == nil {
 		pod.Labels = map[string]string{}
@@ -426,8 +489,8 @@ func TestStoreCustomExport(t *testing.T) {
 		Spec: api.PodSpec{NodeName: "machine"},
 	}
 
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	registry.ExportStrategy = testPodExport{}
 
@@ -472,8 +535,8 @@ func TestStoreBasicExport(t *testing.T) {
 		Status: api.PodStatus{HostIP: "1.2.3.4"},
 	}
 
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
@@ -504,8 +567,8 @@ func TestStoreGet(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	_, err := registry.Get(testContext, podA.Name)
 	if !errors.IsNotFound(err) {
@@ -525,8 +588,8 @@ func TestStoreDelete(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	// test failure condition
 	_, err := registry.Delete(testContext, podA.Name, nil)
@@ -553,19 +616,76 @@ func TestStoreDelete(t *testing.T) {
 	}
 }
 
-func TestStoreHandleFinalizers(t *testing.T) {
-	EnableGarbageCollector = true
+func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	initialGeneration := int64(1)
-	defer func() { EnableGarbageCollector = false }()
 	podWithFinalizer := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = true
+	defaultDeleteStrategy := testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+	defer destroyFunc()
+	// create pod
+	_, err := registry.Create(testContext, podWithFinalizer)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
+	// delete the pod with grace period=0, the pod should still exist because it has a finalizer
+	_, err = registry.Delete(testContext, podWithFinalizer.Name, api.NewDeleteOptions(0))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	updatedPodWithFinalizer := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+		Spec:       api.PodSpec{NodeName: "machine"},
+	}
+	_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, api.Scheme))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// the object should still exist, because it still has a finalizer
+	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	podWithNoFinalizer := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+		Spec:       api.PodSpec{NodeName: "anothermachine"},
+	}
+	_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, api.Scheme))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// the pod should be removed, because its finalizer is removed
+	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	if !errors.IsNotFound(err) {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
+	initialGeneration := int64(1)
+	podWithFinalizer := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
+		Spec:       api.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = true
+	defer destroyFunc()
 	// create pod
 	_, err := registry.Create(testContext, podWithFinalizer)
 	if err != nil {
@@ -624,7 +744,7 @@ func TestStoreHandleFinalizers(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// the pod should be removed, because it's finalizer is removed
+	// the pod should be removed, because its finalizer is removed
 	_, err = registry.Get(testContext, podWithFinalizer.Name)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
@@ -632,9 +752,7 @@ func TestStoreHandleFinalizers(t *testing.T) {
 }
 
 func TestStoreDeleteWithOrphanDependents(t *testing.T) {
-	EnableGarbageCollector = true
 	initialGeneration := int64(1)
-	defer func() { EnableGarbageCollector = false }()
 	podWithOrphanFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
 			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"}, Generation: initialGeneration},
@@ -664,9 +782,16 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	nonOrphanOptions := &api.DeleteOptions{OrphanDependents: &falseVar}
 	nilOrphanOptions := &api.DeleteOptions{}
 
+	// defaultDeleteStrategy doesn't implement rest.GarbageCollectionDeleteStrategy.
+	defaultDeleteStrategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	// orphanDeleteStrategy indicates the default garbage collection policy is
+	// to orphan dependentes.
+	orphanDeleteStrategy := &testOrphanDeleteStrategy{defaultDeleteStrategy}
+
 	testcases := []struct {
 		pod               *api.Pod
 		options           *api.DeleteOptions
+		strategy          rest.RESTDeleteStrategy
 		expectNotFound    bool
 		updatedFinalizers []string
 	}{
@@ -674,109 +799,191 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 		{
 			podWithOrphanFinalizer("pod1"),
 			orphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
 		},
 		{
 			podWithOtherFinalizers("pod2"),
 			orphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
 		},
 		{
 			podWithNoFinalizer("pod3"),
 			orphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{api.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod4"),
 			orphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{api.FinalizerOrphan},
 		},
 		// cases run with DeleteOptions.OrphanDedependents=false
+		// these cases all have oprhanDeleteStrategy, which should be ignored
+		// because DeleteOptions has the highest priority.
 		{
 			podWithOrphanFinalizer("pod5"),
 			nonOrphanOptions,
+			orphanDeleteStrategy,
 			false,
 			[]string{"foo.com/x", "bar.com/y"},
 		},
 		{
 			podWithOtherFinalizers("pod6"),
 			nonOrphanOptions,
+			orphanDeleteStrategy,
 			false,
 			[]string{"foo.com/x", "bar.com/y"},
 		},
 		{
 			podWithNoFinalizer("pod7"),
 			nonOrphanOptions,
+			orphanDeleteStrategy,
 			true,
 			[]string{},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod8"),
 			nonOrphanOptions,
+			orphanDeleteStrategy,
 			true,
 			[]string{},
 		},
-		// cases run with nil DeleteOptions, the finalizers are not updated.
+		// cases run with nil DeleteOptions.OrphanDependents. If the object
+		// already has the orphan finalizer, then the DeleteStrategy should be
+		// ignored. Otherwise the DeleteStrategy decides whether to add the
+		// orphan finalizer.
 		{
 			podWithOrphanFinalizer("pod9"),
-			nil,
+			nilOrphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
 		},
 		{
-			podWithOtherFinalizers("pod10"),
-			nil,
+			podWithOrphanFinalizer("pod10"),
+			nilOrphanOptions,
+			orphanDeleteStrategy,
+			false,
+			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+		},
+		{
+			podWithOtherFinalizers("pod11"),
+			nilOrphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{"foo.com/x", "bar.com/y"},
 		},
 		{
-			podWithNoFinalizer("pod11"),
-			nil,
+			podWithOtherFinalizers("pod12"),
+			nilOrphanOptions,
+			orphanDeleteStrategy,
+			false,
+			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
+		},
+		{
+			podWithNoFinalizer("pod13"),
+			nilOrphanOptions,
+			defaultDeleteStrategy,
 			true,
 			[]string{},
 		},
 		{
-			podWithOnlyOrphanFinalizer("pod12"),
-			nil,
+			podWithNoFinalizer("pod14"),
+			nilOrphanOptions,
+			orphanDeleteStrategy,
 			false,
 			[]string{api.FinalizerOrphan},
 		},
-		// cases run with non-nil DeleteOptions, but nil OrphanDependents, it's treated as OrphanDependents=true
 		{
-			podWithOrphanFinalizer("pod13"),
+			podWithOnlyOrphanFinalizer("pod15"),
 			nilOrphanOptions,
+			defaultDeleteStrategy,
 			false,
-			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
-		},
-		{
-			podWithOtherFinalizers("pod14"),
-			nilOrphanOptions,
-			false,
-			[]string{"foo.com/x", "bar.com/y"},
-		},
-		{
-			podWithNoFinalizer("pod15"),
-			nilOrphanOptions,
-			true,
-			[]string{},
+			[]string{api.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod16"),
 			nilOrphanOptions,
+			orphanDeleteStrategy,
+			false,
+			[]string{api.FinalizerOrphan},
+		},
+
+		// cases run with nil DeleteOptions should have exact same behavior.
+		// They should be exactly the same as above cases where
+		// DeleteOptions.OrphanDependents is nil.
+		{
+			podWithOrphanFinalizer("pod17"),
+			nil,
+			defaultDeleteStrategy,
+			false,
+			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+		},
+		{
+			podWithOrphanFinalizer("pod18"),
+			nil,
+			orphanDeleteStrategy,
+			false,
+			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+		},
+		{
+			podWithOtherFinalizers("pod19"),
+			nil,
+			defaultDeleteStrategy,
+			false,
+			[]string{"foo.com/x", "bar.com/y"},
+		},
+		{
+			podWithOtherFinalizers("pod20"),
+			nil,
+			orphanDeleteStrategy,
+			false,
+			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
+		},
+		{
+			podWithNoFinalizer("pod21"),
+			nil,
+			defaultDeleteStrategy,
+			true,
+			[]string{},
+		},
+		{
+			podWithNoFinalizer("pod22"),
+			nil,
+			orphanDeleteStrategy,
+			false,
+			[]string{api.FinalizerOrphan},
+		},
+		{
+			podWithOnlyOrphanFinalizer("pod23"),
+			nil,
+			defaultDeleteStrategy,
+			false,
+			[]string{api.FinalizerOrphan},
+		},
+		{
+			podWithOnlyOrphanFinalizer("pod24"),
+			nil,
+			orphanDeleteStrategy,
 			false,
 			[]string{api.FinalizerOrphan},
 		},
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = true
+	defer destroyFunc()
 
 	for _, tc := range testcases {
+		registry.DeleteStrategy = tc.strategy
 		// create pod
 		_, err := registry.Create(testContext, tc.pod)
 		if err != nil {
@@ -819,8 +1026,8 @@ func TestStoreDeleteCollection(t *testing.T) {
 	podB := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	if _, err := registry.Create(testContext, podA); err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -848,8 +1055,8 @@ func TestStoreDeleteCollection(t *testing.T) {
 }
 
 func TestStoreDeleteCollectionNotFound(t *testing.T) {
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
 
@@ -894,8 +1101,8 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericStoreRegistry(t)
-	defer server.Terminate(t)
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	objCreated, err := registry.Create(testContext, podA)
 	if err != nil {
@@ -903,7 +1110,7 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 	podCreated := objCreated.(*api.Pod)
 
-	watcher, err := registry.WatchPredicate(testContext, setMatcher{sets.NewString("foo")}, podCreated.ResourceVersion)
+	watcher, err := registry.WatchPredicate(testContext, matchPodName("foo"), podCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -933,18 +1140,18 @@ func TestStoreWatch(t *testing.T) {
 	noNamespaceContext := api.NewContext()
 
 	table := map[string]struct {
-		generic.Matcher
-		context api.Context
+		selectPred storage.SelectionPredicate
+		context    api.Context
 	}{
 		"single": {
-			Matcher: setMatcher{sets.NewString("foo")},
+			selectPred: matchPodName("foo"),
 		},
 		"multi": {
-			Matcher: setMatcher{sets.NewString("foo", "bar")},
+			selectPred: matchPodName("foo", "bar"),
 		},
 		"singleNoNamespace": {
-			Matcher: setMatcher{sets.NewString("foo")},
-			context: noNamespaceContext,
+			selectPred: matchPodName("foo"),
+			context:    noNamespaceContext,
 		},
 	}
 
@@ -961,8 +1168,8 @@ func TestStoreWatch(t *testing.T) {
 			Spec: api.PodSpec{NodeName: "machine"},
 		}
 
-		server, registry := NewTestGenericStoreRegistry(t)
-		wi, err := registry.WatchPredicate(ctx, m, "0")
+		destroyFunc, registry := NewTestGenericStoreRegistry(t)
+		wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		} else {
@@ -979,7 +1186,74 @@ func TestStoreWatch(t *testing.T) {
 			}
 			wi.Stop()
 		}
+		destroyFunc()
+	}
+}
 
+func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
+	podPrefix := "/pods"
+	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+
+	sc.Codec = testapi.Default.StorageCodec()
+	s, dFunc, err := factory.Create(*sc)
+	if err != nil {
+		t.Fatalf("Error creating storage: %v", err)
+	}
+	destroyFunc := func() {
+		dFunc()
 		server.Terminate(t)
+	}
+	if hasCacheEnabled {
+		config := storage.CacherConfig{
+			CacheCapacity:  10,
+			Storage:        s,
+			Versioner:      etcdstorage.APIObjectVersioner{},
+			Type:           &api.Pod{},
+			ResourcePrefix: podPrefix,
+			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
+			NewListFunc:    func() runtime.Object { return &api.PodList{} },
+			Codec:          sc.Codec,
+		}
+		cacher := storage.NewCacherFromConfig(config)
+		d := destroyFunc
+		s = cacher
+		destroyFunc = func() {
+			cacher.Stop()
+			d()
+		}
+	}
+
+	return destroyFunc, &Store{
+		NewFunc:           func() runtime.Object { return &api.Pod{} },
+		NewListFunc:       func() runtime.Object { return &api.PodList{} },
+		QualifiedResource: api.Resource("pods"),
+		CreateStrategy:    strategy,
+		UpdateStrategy:    strategy,
+		DeleteStrategy:    strategy,
+		KeyRootFunc: func(ctx api.Context) string {
+			return podPrefix
+		},
+		KeyFunc: func(ctx api.Context, id string) (string, error) {
+			if _, ok := api.NamespaceFrom(ctx); !ok {
+				return "", fmt.Errorf("namespace is required")
+			}
+			return path.Join(podPrefix, id), nil
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
+		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+			return storage.SelectionPredicate{
+				Label: label,
+				Field: field,
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod, ok := obj.(*api.Pod)
+					if !ok {
+						return nil, nil, fmt.Errorf("not a pod")
+					}
+					return labels.Set(pod.ObjectMeta.Labels), generic.ObjectMetaFieldsSet(&pod.ObjectMeta, true), nil
+				},
+			}
+		},
+		Storage: s,
 	}
 }

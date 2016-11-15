@@ -59,7 +59,7 @@ func TestJobSpecConversion(t *testing.T) {
 			ManualSelector: test.in,
 		}
 		v := versioned.JobSpec{}
-		if err := api.Scheme.Convert(i, &v); err != nil {
+		if err := api.Scheme.Convert(i, &v, nil); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(test.expectOut, v.AutoSelector) {
@@ -73,7 +73,7 @@ func TestJobSpecConversion(t *testing.T) {
 			AutoSelector: test.in,
 		}
 		e := batch.JobSpec{}
-		if err := api.Scheme.Convert(i, &e); err != nil {
+		if err := api.Scheme.Convert(i, &e, nil); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(test.expectOut, e.ManualSelector) {

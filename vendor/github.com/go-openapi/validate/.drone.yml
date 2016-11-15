@@ -1,0 +1,40 @@
+clone:
+  path: github.com/go-openapi/validate
+
+matrix:
+  GO_VERSION:
+    - "1.6"
+
+build:
+  integration:
+    image: golang:$$GO_VERSION
+    pull: true
+    commands:
+      - go get -u github.com/axw/gocov/gocov
+      - go get -u gopkg.in/matm/v1/gocov-html
+      - go get -u github.com/cee-dub/go-junit-report
+      - go get -u github.com/stretchr/testify/assert
+      - go get -u gopkg.in/yaml.v2
+      - go get -u github.com/go-openapi/analysis
+      - go get -u github.com/go-openapi/errors
+      - go get -u github.com/go-openapi/loads
+      - go get -u github.com/go-openapi/strfmt
+      - go get -u github.com/go-openapi/runtime
+      - go test -race
+      - go test -v -cover -coverprofile=coverage.out -covermode=count
+
+notify:
+  slack:
+    channel: bots
+    webhook_url: $$SLACK_URL
+    username: drone
+
+publish:
+  coverage:
+    server: https://coverage.vmware.run
+    token: $$GITHUB_TOKEN
+    # threshold: 70
+    # must_increase: true
+    when:
+      matrix:
+        GO_VERSION: "1.6"

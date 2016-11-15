@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/proposals/api-group.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Supporting multiple API groups
 
 ## Goal
@@ -105,7 +71,7 @@ Documentation for other releases can be found at
 
     Types in the unversioned package will not have the APIVersion field, but may retain the Kind field.
 
-    For backward compatibility, when hanlding the Status, the server will encode it to v1 if the client expects the Status to be encoded in v1, otherwise the server will send the unversioned#Status. If an error occurs before the version can be determined, the server will send the unversioned#Status.
+    For backward compatibility, when handling the Status, the server will encode it to v1 if the client expects the Status to be encoded in v1, otherwise the server will send the unversioned#Status. If an error occurs before the version can be determined, the server will send the unversioned#Status.
 
   * non-top-level common API objects:
 
@@ -117,7 +83,7 @@ Documentation for other releases can be found at
 
 1. clients:
 
-  Currently we have structured (pkg/client/unversioned#ExperimentalClient, pkg/client/unversioned#Client) and unstructured (pkg/kubectl/resource#Helper) clients. The structured clients are not scalable because each of them implements specific interface, e.g., [here](../../pkg/client/unversioned/client.go#L32). Only the unstructured clients are scalable. We should either auto-generate the code for structured clients or migrate to use the unstructured clients as much as possible.
+  Currently we have structured (pkg/client/unversioned#ExperimentalClient, pkg/client/unversioned#Client) and unstructured (pkg/kubectl/resource#Helper) clients. The structured clients are not scalable because each of them implements specific interface, e.g., `[here]../../pkg/client/unversioned/client.go#L32`--fixed. Only the unstructured clients are scalable. We should either auto-generate the code for structured clients or migrate to use the unstructured clients as much as possible.
 
   We should also move the unstructured client to pkg/client/.
 

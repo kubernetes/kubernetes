@@ -26,11 +26,13 @@ import (
 // If a member of the form `*Fn` is set, that function will be called in place
 // of the real call.
 type FakeOS struct {
-	StatFn    func(string) (os.FileInfo, error)
-	ReadDirFn func(string) ([]os.FileInfo, error)
-	HostName  string
-	Removes   []string
-	Files     map[string][]*os.FileInfo
+	StatFn     func(string) (os.FileInfo, error)
+	ReadDirFn  func(string) ([]os.FileInfo, error)
+	MkdirAllFn func(string, os.FileMode) error
+	SymlinkFn  func(string, string) error
+	HostName   string
+	Removes    []string
+	Files      map[string][]*os.FileInfo
 }
 
 func NewFakeOS() *FakeOS {
@@ -41,12 +43,18 @@ func NewFakeOS() *FakeOS {
 }
 
 // Mkdir is a fake call that just returns nil.
-func (FakeOS) MkdirAll(path string, perm os.FileMode) error {
+func (f *FakeOS) MkdirAll(path string, perm os.FileMode) error {
+	if f.MkdirAllFn != nil {
+		return f.MkdirAllFn(path, perm)
+	}
 	return nil
 }
 
 // Symlink is a fake call that just returns nil.
-func (FakeOS) Symlink(oldname string, newname string) error {
+func (f *FakeOS) Symlink(oldname string, newname string) error {
+	if f.SymlinkFn != nil {
+		return f.SymlinkFn(oldname, newname)
+	}
 	return nil
 }
 
@@ -60,6 +68,12 @@ func (f FakeOS) Stat(path string) (os.FileInfo, error) {
 
 // Remove is a fake call that returns nil.
 func (f *FakeOS) Remove(path string) error {
+	f.Removes = append(f.Removes, path)
+	return nil
+}
+
+// RemoveAll is a fake call that just returns nil.
+func (f *FakeOS) RemoveAll(path string) error {
 	f.Removes = append(f.Removes, path)
 	return nil
 }
@@ -89,5 +103,10 @@ func (f *FakeOS) ReadDir(dirname string) ([]os.FileInfo, error) {
 	if f.ReadDirFn != nil {
 		return f.ReadDirFn(dirname)
 	}
-	return nil, errors.New("unimplemented testing mock")
+	return nil, nil
+}
+
+// Glob is a fake call that returns nil.
+func (f *FakeOS) Glob(pattern string) ([]string, error) {
+	return nil, nil
 }

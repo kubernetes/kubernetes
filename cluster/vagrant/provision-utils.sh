@@ -28,7 +28,14 @@ function prepare-package-manager() {
   echo "Prepare package manager"
 
   # Useful if a mirror is broken or slow
-  echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+  if [ -z "$CUSTOM_FEDORA_REPOSITORY_URL" ]; then
+      echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+  else
+      # remove trailing slash from URL if it's present
+      CUSTOM_FEDORA_REPOSITORY_URL="${CUSTOM_FEDORA_REPOSITORY_URL%/}"
+      sed -i -e "/^metalink=/d" /etc/yum.repos.d/*.repo
+      sed -i -e "s@^#baseurl=http://download.fedoraproject.org/pub/fedora@baseurl=$CUSTOM_FEDORA_REPOSITORY_URL@" /etc/yum.repos.d/*.repo
+  fi
 }
 
 
@@ -56,7 +63,6 @@ enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
 enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
-dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 federations_domain_map: ''
@@ -69,7 +75,14 @@ opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG" | sed -e "s/'/''/g")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET" | sed -e "s/'/''/g")'
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
+enable_hostpath_provisioner: '$(echo "$ENABLE_HOSTPATH_PROVISIONER" | sed -e "s/'/''/g")'
 EOF
+
+if [ -n "${EVICTION_HARD:-}" ]; then
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
+EOF
+fi
 
   cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
 log_level: warning
@@ -90,7 +103,17 @@ grains:
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
   master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
   keep_host_etcd: true
+  kube_user: '$(echo "$KUBE_USER" | sed -e "s/'/''/g")'
 EOF
+}
+
+function release_not_found() {
+  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
+  echo "are running from a clone of the git repo, please run 'make quick-release'." >&2
+  echo "Note that this requires having Docker installed.  If you are running " >&2
+  echo "from a release tarball, something is wrong.  Look at " >&2
+  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
+  exit 1
 }
 
 function install-salt() {

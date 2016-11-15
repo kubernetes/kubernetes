@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ import (
 
 var (
 	// MinClusterVersion is the min cluster version this etcd binary is compatible with.
-	MinClusterVersion = "2.2.0"
-	Version           = "2.3.0+git"
+	MinClusterVersion = "2.3.0"
+	Version           = "3.0.14"
 
 	// Git SHA Value will be set during build
 	GitSHA = "Not provided (use ./build instead of go build)"
