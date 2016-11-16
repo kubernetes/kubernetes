@@ -24,6 +24,7 @@ go_library(
         "//pkg/util:go_default_library",
         "//pkg/util/json:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
     ],
 )
 
@@ -35,6 +36,7 @@ go_test(
     deps = [
         "//pkg/genericapiserver/openapi/common:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
     ],
 )

@@ -24,6 +24,7 @@ go_library(
         "//pkg/util/interrupt:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//vendor:github.com/docker/docker/pkg/term",
+        "//vendor:github.com/mitchellh/go-wordwrap",
     ],
 )
 
