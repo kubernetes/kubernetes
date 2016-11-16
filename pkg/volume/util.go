@@ -407,3 +407,16 @@ func ValidatePVCSelector(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	}
 	return false, nil
 }
+
+// GetPVCMatchLabel returns:
+// - either (value, nil) for the key from the matchLabels Selector part of the PVC
+// - or ("", error) in case the key is missing in the matchLabels Selector part of the PVC
+func GetPVCMatchLabel(pvc *v1.PersistentVolumeClaim, key string) (string, error) {
+	if pvc.Spec.Selector == nil {
+		return "", fmt.Errorf("missing selector.matchLabels")
+	}
+	if value, ok := pvc.Spec.Selector.MatchLabels[key]; ok {
+		return value, nil
+	}
+	return "", fmt.Errorf("key %q not found in selector.matchLabels", key)
+}
