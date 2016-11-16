@@ -68,6 +68,10 @@ message APIResource {
 
   // kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
   optional string kind = 3;
+
+  // verbs is a list of supported kube verbs (this includes get, list, watch, create,
+  // update, patch, delete, deletecollection, and proxy)
+  repeated string verbs = 4;
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the

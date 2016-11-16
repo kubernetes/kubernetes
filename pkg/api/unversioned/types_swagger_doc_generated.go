@@ -53,6 +53,7 @@ var map_APIResource = map[string]string{
 	"name":       "name is the name of the resource.",
 	"namespaced": "namespaced indicates if a resource is namespaced or not.",
 	"kind":       "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
+	"verbs":      "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
 }
 
 func (APIResource) SwaggerDoc() map[string]string {
