@@ -44,6 +44,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		horizontalpodautoscaler.Strategy,
 		newListFunc,
+		horizontalpodautoscaler.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

@@ -43,6 +43,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		service.Strategy,
 		newListFunc,
+		service.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

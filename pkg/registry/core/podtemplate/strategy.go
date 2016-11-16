@@ -86,16 +86,19 @@ func PodTemplateToSelectableFields(podTemplate *api.PodTemplate) fields.Set {
 	return nil
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pt, ok := obj.(*api.PodTemplate)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a pod template.")
+	}
+	return labels.Set(pt.ObjectMeta.Labels), PodTemplateToSelectableFields(pt), nil
+}
+
 func MatchPodTemplate(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			pt, ok := obj.(*api.PodTemplate)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a pod template.")
-			}
-			return labels.Set(pt.ObjectMeta.Labels), PodTemplateToSelectableFields(pt), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }

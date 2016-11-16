@@ -69,6 +69,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		controller.Strategy,
 		newListFunc,
+		controller.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 
