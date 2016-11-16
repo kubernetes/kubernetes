@@ -403,12 +403,9 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
 	cmKubeconfigSecretName := federationName + "-controller-manager-kubeconfig"
-	pvCap := ""
-
-	if "" != etcdPVCapacity {
+	pvCap := "10Gi"
+	if etcdPVCapacity != "" {
 		pvCap = etcdPVCapacity
-	} else {
-		pvCap = "10Gi" //test for default value
 	}
 
 	capacity, err := resource.ParseQuantity(pvCap)

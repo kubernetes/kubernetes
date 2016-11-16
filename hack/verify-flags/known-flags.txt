@@ -169,6 +169,7 @@ etcd-config
 etcd-keyfile
 etcd-mutation-timeout
 etcd-prefix
+etcd-pv-capacity
 etcd-quorum-read
 etcd-server
 etcd-servers

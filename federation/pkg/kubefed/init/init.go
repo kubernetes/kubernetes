@@ -356,7 +356,6 @@ func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namesp
 }
 
 func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity string) (*api.PersistentVolumeClaim, error) {
-
 	capacity, err := resource.ParseQuantity(etcdPVCapacity)
 	if err != nil {
 		return nil, err
