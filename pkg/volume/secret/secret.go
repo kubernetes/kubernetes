@@ -18,8 +18,6 @@ package secret
 
 import (
 	"fmt"
-	"path/filepath"
-	"runtime"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -168,12 +166,7 @@ func (b *secretVolumeMounter) CanMount() error {
 }
 
 func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
-	// Update each Slash "/" character for Windows with seperator character
-	dir := b.GetPath()
-	if runtime.GOOS == "windows" {
-		dir = filepath.FromSlash(dir)
-	}
-	return b.SetUpAt(dir, fsGroup)
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
@@ -285,12 +278,7 @@ type secretVolumeUnmounter struct {
 var _ volume.Unmounter = &secretVolumeUnmounter{}
 
 func (c *secretVolumeUnmounter) TearDown() error {
-	// Update each Slash "/" character for Windows with seperator character
-	dir := c.GetPath()
-	if runtime.GOOS == "windows" {
-		dir = filepath.FromSlash(dir)
-	}
-	return c.TearDownAt(dir)
+	return c.TearDownAt(c.GetPath())
 }
 
 func (c *secretVolumeUnmounter) TearDownAt(dir string) error {
