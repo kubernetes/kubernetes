@@ -46,8 +46,21 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 		return false, err
 	}
 	matched := s.Label.Matches(labels)
-	if s.Field != nil {
+	if matched && s.Field != nil {
 		matched = (matched && s.Field.Matches(fields))
+	}
+	return matched, nil
+}
+
+// MatchesLabelsAndFields returns true if the given labels and fields
+// match s.Label and s.Field.
+func (s *SelectionPredicate) MatchesLabelsAndFields(l labels.Set, f fields.Set) (bool, error) {
+	if s.Label.Empty() && s.Field.Empty() {
+		return true, nil
+	}
+	matched := s.Label.Matches(l)
+	if matched && s.Field != nil {
+		matched = (matched && s.Field.Matches(f))
 	}
 	return matched, nil
 }

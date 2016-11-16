@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -58,6 +60,9 @@ type CacherConfig struct {
 
 	// KeyFunc is used to get a key in the underyling storage for a given object.
 	KeyFunc func(runtime.Object) (string, error)
+
+	// GetAttrsFunc is used to get object labels and fields.
+	GetAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)
 
 	// TriggerPublisherFunc is used for optimizing amount of watchers that
 	// needs to process an incoming event.
@@ -163,6 +168,9 @@ type Cacher struct {
 	// Versioner is used to handle resource versions.
 	versioner Versioner
 
+	// getAttrsFunc is used for getting objects labels and fields for filtering
+	// purposes.
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)
 	// triggerFunc is used for optimizing amount of watchers that needs to process
 	// an incoming event.
 	triggerFunc TriggerPublisherFunc
@@ -194,14 +202,15 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	}
 
 	cacher := &Cacher{
-		ready:       newReady(),
-		storage:     config.Storage,
-		objectType:  reflect.TypeOf(config.Type),
-		watchCache:  watchCache,
-		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
-		versioner:   config.Versioner,
-		triggerFunc: config.TriggerPublisherFunc,
-		watcherIdx:  0,
+		ready:        newReady(),
+		storage:      config.Storage,
+		objectType:   reflect.TypeOf(config.Type),
+		watchCache:   watchCache,
+		reflector:    cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
+		versioner:    config.Versioner,
+		getAttrsFunc: config.GetAttrsFunc,
+		triggerFunc:  config.TriggerPublisherFunc,
+		watcherIdx:   0,
 		watchers: indexedWatchers{
 			allWatchers:   make(map[int]*cacheWatcher),
 			valueWatchers: make(map[string]watchersMap),
