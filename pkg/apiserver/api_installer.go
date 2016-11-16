@@ -63,15 +63,16 @@ type documentable interface {
 
 // toDiscoveryKubeVerb maps an action.Verb to the logical kube verb, used for discovery
 var toDiscoveryKubeVerb = map[string]string{
-	"LIST": "list",
-	"POST": "update",
+	"LIST":             "list",
+	"POST":             "update",
 	"DELETECOLLECTION": "deletecollection",
-	"WATCHLIST": "watch",
-	"GET": "get",
-	"PUT": "create",
-	"DELETE": "delete",
-	"WATCH": "watch",
-	"PROXY": "proxy",
+	"WATCHLIST":        "watch",
+	"GET":              "get",
+	"PUT":              "create",
+	"DELETE":           "delete",
+	"WATCH":            "watch",
+	"PROXY":            "proxy",
+	"CONNECT":          "", // do not list in discovery. TODO: is this correct?
 }
 
 // errEmptyName is returned when API requests do not fill the name section of the path.
@@ -532,7 +533,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 
 		if kubeVerb, found := toDiscoveryKubeVerb[action.Verb]; found {
-			kubeVerbs[kubeVerb] = struct{}{}
+			if len(kubeVerb) != 0 {
+				kubeVerbs[kubeVerb] = struct{}{}
+			}
+		} else {
+			return nil, fmt.Errorf("unknown action verb for discovery: %s", action.Verb)
 		}
 
 		switch action.Verb {
