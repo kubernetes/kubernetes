@@ -2213,33 +2213,37 @@ __EOF__
   ## Set resource limits/request of a deployment
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Set resources of a local file without talking to the server 
+  kubectl set resources -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --local -o yaml "${kube_flags[@]}"
+  ! kubectl set resources -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --dry-run -o yaml "${kube_flags[@]}"
   # Create a deployment
-  kubectl create -f hack/testdata/deployment-multicontainer.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kubectl create -f hack/testdata/deployment-multicontainer-resources.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment-resources:'
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
   # Set the deployment's cpu limits
-  kubectl set resources deployment nginx-deployment --limits=cpu=100m "${kube_flags[@]}"
+  kubectl set resources deployment nginx-deployment-resources --limits=cpu=100m "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "100m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "100m:"
   # Set a non-existing container should fail
-  ! kubectl set resources deployment nginx-deployment -c=redis --limits=cpu=100m
+  ! kubectl set resources deployment nginx-deployment-resources -c=redis --limits=cpu=100m
   # Set the limit of a specific container in deployment
-  kubectl set resources deployment nginx-deployment -c=nginx --limits=cpu=200m "${kube_flags[@]}"
+  kubectl set resources deployment nginx-deployment-resources -c=nginx --limits=cpu=200m "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "100m:"
   # Set limits/requests of a deployment specified by a file
-  kubectl set resources -f hack/testdata/deployment-multicontainer.yaml -c=perl --limits=cpu=300m --requests=cpu=300m "${kube_flags[@]}"
+  kubectl set resources -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --limits=cpu=300m --requests=cpu=300m "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "300m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.requests.cpu}}:{{end}}" "300m:"
-  # Set limits on a local file without talking to the server
-  kubectl set resources deployment -f hack/testdata/deployment-multicontainer.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --dry-run -o yaml "${kube_flags[@]}"
+  # Show dry-run works on running deployments 
+  kubectl set resources deployment nginx-deployment-resources -c=perl --limits=cpu=400m --requests=cpu=400m --dry-run -o yaml "${kube_flags[@]}"
+  ! kubectl set resources deployment nginx-deployment-resources -c=perl --limits=cpu=400m --requests=cpu=400m --local -o yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "300m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.requests.cpu}}:{{end}}" "300m:"
   # Clean up
-  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment nginx-deployment-resources "${kube_flags[@]}"
 
 
   ######################
