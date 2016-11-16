@@ -69,7 +69,7 @@ var toDiscoveryKubeVerb = map[string]string{
 	"WATCHLIST": "watch",
 	"GET": "get",
 	"PUT": "create",
-	"DELETE": "delete",
+	"DELETE": "deletecollection",
 	"WATCH": "watch",
 	"PROXY": "proxy",
 }
