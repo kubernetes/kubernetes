@@ -168,7 +168,8 @@ func NewVolumeManager(
 			kubeClient,
 			volumePluginMgr,
 			recorder,
-			checkNodeCapabilitiesBeforeMount),
+			checkNodeCapabilitiesBeforeMount,
+			operationexecutor.NewOperationsGenerator()),
 	}
 
 	vm.reconciler = reconciler.NewReconciler(

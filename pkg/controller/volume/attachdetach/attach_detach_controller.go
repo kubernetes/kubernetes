@@ -121,7 +121,8 @@ func NewAttachDetachController(
 			kubeClient,
 			&adc.volumePluginMgr,
 			recorder,
-			false) // flag for experimental binary check for volume mount
+			false, /*checkNodeCapabilitiesBeforeMount*/
+			operationexecutor.NewOperationsGenerator())
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer, adc.actualStateOfWorld)
 	adc.reconciler = reconciler.NewReconciler(

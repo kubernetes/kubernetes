@@ -136,7 +136,6 @@ func (grm *nestedPendingOperations) Run(
 		defer k8sRuntime.RecoverFromPanic(&err)
 		return operationFunc()
 	}()
-
 	return nil
 }
 
