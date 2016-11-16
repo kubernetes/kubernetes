@@ -5408,13 +5408,13 @@ go_library(
 )
 
 go_library(
-    name = "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes",
+    name = "github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes",
     srcs = [
-        "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes/doc.go",
-        "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes/requests.go",
-        "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes/results.go",
-        "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes/urls.go",
-        "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes/util.go",
+        "github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes/doc.go",
+        "github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes/requests.go",
+        "github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes/results.go",
+        "github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes/urls.go",
+        "github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes/util.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -5843,7 +5843,7 @@ go_library(
     deps = [
         "//vendor:github.com/mitchellh/mapstructure",
         "//vendor:github.com/rackspace/gophercloud",
-        "//vendor:github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes",
+        "//vendor:github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes",
         "//vendor:github.com/rackspace/gophercloud/pagination",
     ],
 )

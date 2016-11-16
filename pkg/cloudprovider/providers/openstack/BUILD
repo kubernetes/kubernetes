@@ -32,7 +32,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/rackspace/gophercloud",
         "//vendor:github.com/rackspace/gophercloud/openstack",
-        "//vendor:github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes",
+        "//vendor:github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes",
         "//vendor:github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach",
         "//vendor:github.com/rackspace/gophercloud/openstack/compute/v2/flavors",
         "//vendor:github.com/rackspace/gophercloud/openstack/compute/v2/servers",
