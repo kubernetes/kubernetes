@@ -118,20 +118,23 @@ func ControllerToSelectableFields(controller *api.ReplicationController) fields.
 	return generic.MergeFieldsSets(objectMetaFieldsSet, controllerSpecificFieldsSet)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	rc, ok := obj.(*api.ReplicationController)
+	if !ok {
+		return nil, nil, fmt.Errorf("Given object is not a replication controller.")
+	}
+	return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), nil
+}
+
 // MatchController is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchController(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
 	return apistorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			rc, ok := obj.(*api.ReplicationController)
-			if !ok {
-				return nil, nil, fmt.Errorf("Given object is not a replication controller.")
-			}
-			return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

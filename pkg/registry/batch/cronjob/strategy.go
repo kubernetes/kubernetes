@@ -102,19 +102,22 @@ func CronJobToSelectableFields(scheduledJob *batch.CronJob) fields.Set {
 	return generic.ObjectMetaFieldsSet(&scheduledJob.ObjectMeta, true)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	scheduledJob, ok := obj.(*batch.CronJob)
+	if !ok {
+		return nil, nil, fmt.Errorf("Given object is not a scheduled job.")
+	}
+	return labels.Set(scheduledJob.ObjectMeta.Labels), CronJobToSelectableFields(scheduledJob), nil
+}
+
 // MatchCronJob is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchCronJob(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			scheduledJob, ok := obj.(*batch.CronJob)
-			if !ok {
-				return nil, nil, fmt.Errorf("Given object is not a scheduled job.")
-			}
-			return labels.Set(scheduledJob.ObjectMeta.Labels), CronJobToSelectableFields(scheduledJob), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }

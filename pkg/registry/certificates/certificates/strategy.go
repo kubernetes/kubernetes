@@ -168,18 +168,21 @@ func (csrApprovalStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Obje
 	return validation.ValidateCertificateSigningRequestUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	sa, ok := obj.(*certificates.CertificateSigningRequest)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a CertificateSigningRequest")
+	}
+	return labels.Set(sa.Labels), SelectableFields(sa), nil
+}
+
 // Matcher returns a generic matcher for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
 	return apistorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			sa, ok := obj.(*certificates.CertificateSigningRequest)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a CertificateSigningRequest")
-			}
-			return labels.Set(sa.Labels), SelectableFields(sa), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

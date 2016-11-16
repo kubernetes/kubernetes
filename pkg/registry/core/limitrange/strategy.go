@@ -85,16 +85,19 @@ func (limitrangeStrategy) Export(api.Context, runtime.Object, bool) error {
 	return nil
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	lr, ok := obj.(*api.LimitRange)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a limit range.")
+	}
+	return labels.Set(lr.ObjectMeta.Labels), LimitRangeToSelectableFields(lr), nil
+}
+
 func MatchLimitRange(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			lr, ok := obj.(*api.LimitRange)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a limit range.")
-			}
-			return labels.Set(lr.ObjectMeta.Labels), LimitRangeToSelectableFields(lr), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }

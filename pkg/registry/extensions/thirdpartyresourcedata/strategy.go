@@ -74,18 +74,21 @@ func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	tprd, ok := obj.(*extensions.ThirdPartyResourceData)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a ThirdPartyResourceData")
+	}
+	return labels.Set(tprd.Labels), SelectableFields(tprd), nil
+}
+
 // Matcher returns a generic matcher for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
 	return apistorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			tprd, ok := obj.(*extensions.ThirdPartyResourceData)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a ThirdPartyResourceData")
-			}
-			return labels.Set(tprd.Labels), SelectableFields(tprd), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

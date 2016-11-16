@@ -98,18 +98,21 @@ func (resourcequotaStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runt
 	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	resourcequotaObj, ok := obj.(*api.ResourceQuota)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a resourcequota")
+	}
+	return labels.Set(resourcequotaObj.Labels), ResourceQuotaToSelectableFields(resourcequotaObj), nil
+}
+
 // MatchResourceQuota returns a generic matcher for a given label and field selector.
 func MatchResourceQuota(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			resourcequotaObj, ok := obj.(*api.ResourceQuota)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a resourcequota")
-			}
-			return labels.Set(resourcequotaObj.Labels), ResourceQuotaToSelectableFields(resourcequotaObj), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 
