@@ -95,18 +95,21 @@ func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, 
 	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a persistentvolumeclaim")
+	}
+	return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), nil
+}
+
 // MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.
 func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a persistentvolumeclaim")
-			}
-			return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

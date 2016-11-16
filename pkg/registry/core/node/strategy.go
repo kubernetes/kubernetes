@@ -144,27 +144,21 @@ func NodeToSelectableFields(node *api.Node) fields.Set {
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	nodeObj, ok := obj.(*api.Node)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a node")
+	}
+	return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
+}
+
 // MatchNode returns a generic matcher for a given label and field selector.
 func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
 	return pkgstorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			nodeObj, ok := obj.(*api.Node)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a node")
-			}
-
-			// Compute fields only if field selectors is non-empty
-			// (otherwise those won't be used).
-			// Those are generally also not needed if label selector does
-			// not match labels, but additional computation of it is expensive.
-			var nodeFields fields.Set
-			if !field.Empty() {
-				nodeFields = NodeToSelectableFields(nodeObj)
-			}
-			return labels.Set(nodeObj.ObjectMeta.Labels), nodeFields, nil
-		},
+		Label:       label,
+		Field:       field,
+		GetAttrs:    GetAttrs,
 		IndexFields: []string{"metadata.name"},
 	}
 }

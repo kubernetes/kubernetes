@@ -71,6 +71,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
 		prefix,
 		deployment.Strategy,
 		newListFunc,
+		deployment.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

@@ -43,6 +43,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		persistentvolume.Strategy,
 		newListFunc,
+		persistentvolume.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

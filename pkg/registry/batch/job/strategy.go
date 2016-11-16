@@ -164,19 +164,22 @@ func JobToSelectableFields(job *batch.Job) fields.Set {
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	job, ok := obj.(*batch.Job)
+	if !ok {
+		return nil, nil, fmt.Errorf("Given object is not a job.")
+	}
+	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
+}
+
 // MatchJob is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchJob(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			job, ok := obj.(*batch.Job)
-			if !ok {
-				return nil, nil, fmt.Errorf("Given object is not a job.")
-			}
-			return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }

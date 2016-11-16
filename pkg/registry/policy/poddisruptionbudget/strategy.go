@@ -102,19 +102,22 @@ func PodDisruptionBudgetToSelectableFields(podDisruptionBudget *policy.PodDisrup
 	return generic.ObjectMetaFieldsSet(&podDisruptionBudget.ObjectMeta, true)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	podDisruptionBudget, ok := obj.(*policy.PodDisruptionBudget)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a PodDisruptionBudget.")
+	}
+	return labels.Set(podDisruptionBudget.ObjectMeta.Labels), PodDisruptionBudgetToSelectableFields(podDisruptionBudget), nil
+}
+
 // MatchPodDisruptionBudget is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
 func MatchPodDisruptionBudget(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			podDisruptionBudget, ok := obj.(*policy.PodDisruptionBudget)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a PodDisruptionBudget.")
-			}
-			return labels.Set(podDisruptionBudget.ObjectMeta.Labels), PodDisruptionBudgetToSelectableFields(podDisruptionBudget), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 
