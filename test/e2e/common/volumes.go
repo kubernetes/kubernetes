@@ -469,7 +469,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 })
 
 func isTestEnabled(c clientset.Interface) bool {
-	// Enable the test If the node image is GCI. (this check only works for node e2e test)
+	// Enable the test on node e2e if the node image is GCI.
 	nodeName := framework.TestContext.NodeName
 	if nodeName != "" {
 		if strings.Contains(nodeName, "-gci-dev-") {
