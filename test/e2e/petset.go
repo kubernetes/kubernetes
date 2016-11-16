@@ -54,6 +54,7 @@ const (
 	zookeeperManifestPath   = "test/e2e/testing-manifests/petset/zookeeper"
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/petset/mysql-galera"
 	redisManifestPath       = "test/e2e/testing-manifests/petset/redis"
+	cockroachDBManifestPath = "test/e2e/testing-manifests/petset/cockroachdb"
 	// Should the test restart statefulset clusters?
 	// TODO: enable when we've productionzed bringup of pets in this e2e.
 	restartCluster = false
@@ -174,6 +175,14 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 	})
 
 	framework.KubeDescribe("Deploy clustered applications [Slow] [Feature:PetSet]", func() {
+		var pst *statefulSetTester
+		var appTester *clusterAppTester
+
+		BeforeEach(func() {
+			pst = &statefulSetTester{c: c}
+			appTester = &clusterAppTester{tester: pst, ns: ns}
+		})
+
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
 				dumpDebugInfo(c, ns)
@@ -183,66 +192,23 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 		})
 
 		It("should creating a working zookeeper cluster [Feature:PetSet]", func() {
-			pst := &statefulSetTester{c: c}
-			pet := &zookeeperTester{tester: pst}
-			By("Deploying " + pet.name())
-			ps := pet.deploy(ns)
-
-			By("Creating foo:bar in member with index 0")
-			pet.write(0, map[string]string{"foo": "bar"})
-
-			if restartCluster {
-				By("Restarting pet set " + ps.Name)
-				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
-			}
-
-			By("Reading value under foo from member with index 2")
-			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
-				framework.Failf("%v", err)
-			}
+			appTester.pet = &zookeeperTester{tester: pst}
+			appTester.run()
 		})
 
 		It("should creating a working redis cluster [Feature:PetSet]", func() {
-			pst := &statefulSetTester{c: c}
-			pet := &redisTester{tester: pst}
-			By("Deploying " + pet.name())
-			ps := pet.deploy(ns)
-
-			By("Creating foo:bar in member with index 0")
-			pet.write(0, map[string]string{"foo": "bar"})
-
-			if restartCluster {
-				By("Restarting pet set " + ps.Name)
-				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
-			}
-
-			By("Reading value under foo from member with index 2")
-			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
-				framework.Failf("%v", err)
-			}
+			appTester.pet = &redisTester{tester: pst}
+			appTester.run()
 		})
 
 		It("should creating a working mysql cluster [Feature:PetSet]", func() {
-			pst := &statefulSetTester{c: c}
-			pet := &mysqlGaleraTester{tester: pst}
-			By("Deploying " + pet.name())
-			ps := pet.deploy(ns)
+			appTester.pet = &mysqlGaleraTester{tester: pst}
+			appTester.run()
+		})
 
-			By("Creating foo:bar in member with index 0")
-			pet.write(0, map[string]string{"foo": "bar"})
-
-			if restartCluster {
-				By("Restarting pet set " + ps.Name)
-				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
-			}
-
-			By("Reading value under foo from member with index 2")
-			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
-				framework.Failf("%v", err)
-			}
+		It("should creating a working CockroachDB cluster [Feature:PetSet]", func() {
+			appTester.pet = &cockroachDBTester{tester: pst}
+			appTester.run()
 		})
 	})
 })
@@ -392,6 +358,31 @@ type petTester interface {
 	name() string
 }
 
+type clusterAppTester struct {
+	ns     string
+	pet    petTester
+	tester *statefulSetTester
+}
+
+func (c *clusterAppTester) run() {
+	By("Deploying " + c.pet.name())
+	ps := c.pet.deploy(c.ns)
+
+	By("Creating foo:bar in member with index 0")
+	c.pet.write(0, map[string]string{"foo": "bar"})
+
+	if restartCluster {
+		By("Restarting stateful set " + ps.Name)
+		c.tester.restart(ps)
+		c.tester.waitForRunning(ps.Spec.Replicas, ps)
+	}
+
+	By("Reading value under foo from member with index 2")
+	if err := pollReadWithTimeout(c.pet, 2, "foo", "bar"); err != nil {
+		framework.Failf("%v", err)
+	}
+}
+
 type zookeeperTester struct {
 	ps     *apps.StatefulSet
 	tester *statefulSetTester
@@ -494,6 +485,44 @@ func (m *redisTester) write(petIndex int, kv map[string]string) {
 func (m *redisTester) read(petIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", m.ps.Name, petIndex)
 	return lastLine(m.redisExec(fmt.Sprintf("GET %v", key), m.ps.Namespace, name))
+}
+
+type cockroachDBTester struct {
+	ps     *apps.StatefulSet
+	tester *statefulSetTester
+}
+
+func (c *cockroachDBTester) name() string {
+	return "CockroachDB"
+}
+
+func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
+	cmd = fmt.Sprintf("/cockroach/cockroach sql --host %s.cockroachdb -e \"%v\"", podName, cmd)
+	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+}
+
+func (c *cockroachDBTester) deploy(ns string) *apps.StatefulSet {
+	c.ps = c.tester.createStatefulSet(cockroachDBManifestPath, ns)
+	framework.Logf("Deployed statefulset %v, initializing database", c.ps.Name)
+	for _, cmd := range []string{
+		"CREATE DATABASE IF NOT EXISTS foo;",
+		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
+	} {
+		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ps.Name)))
+	}
+	return c.ps
+}
+
+func (c *cockroachDBTester) write(petIndex int, kv map[string]string) {
+	name := fmt.Sprintf("%v-%d", c.ps.Name, petIndex)
+	for k, v := range kv {
+		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
+		framework.Logf(c.cockroachDBExec(cmd, c.ps.Namespace, name))
+	}
+}
+func (c *cockroachDBTester) read(petIndex int, key string) string {
+	name := fmt.Sprintf("%v-%d", c.ps.Name, petIndex)
+	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ps.Namespace, name))
 }
 
 func lastLine(out string) string {
