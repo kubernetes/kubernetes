@@ -29,6 +29,7 @@ go_library(
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/heketi/heketi/client/api/go-client",
         "//vendor:github.com/heketi/heketi/pkg/glusterfs/api",
