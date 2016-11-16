@@ -17,6 +17,7 @@ limitations under the License.
 package petset
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/types"
 
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -215,7 +217,6 @@ func (psc *StatefulSetController) deletePod(obj interface{}) {
 
 // getPodsForStatefulSets returns the pods that match the selectors of the given statefulset.
 func (psc *StatefulSetController) getPodsForStatefulSet(ps *apps.StatefulSet) ([]*api.Pod, error) {
-	// TODO: Do we want the statefulset to fight with RCs? check parent statefulset annoation, or name prefix?
 	sel, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
 		return []*api.Pod{}, err
@@ -226,10 +227,39 @@ func (psc *StatefulSetController) getPodsForStatefulSet(ps *apps.StatefulSet) ([
 	}
 	// TODO: Do we need to copy?
 	result := make([]*api.Pod, 0, len(pods))
+	// Check parent statefulset annotation to avoid fighting with other controllers, it's safer than using name prefix
 	for i := range pods {
-		result = append(result, &(*pods[i]))
+		if ps.UID == getStatefulSetUID(pods[i]) {
+			result = append(result, &(*pods[i]))
+		}
 	}
 	return result, nil
+}
+
+// getStatefulSetUIDFromPod extracts UID of pod's parent statefulset; return an empty UID if not found
+func getStatefulSetUID(pod *api.Pod) types.UID {
+	creatorRefJson, found := pod.ObjectMeta.Annotations[api.CreatedByAnnotation]
+	if !found {
+		glog.V(4).Infof("Unable to get parent UID: pod %s/%s with no created-by annotation", pod.Namespace, pod.Name)
+		return types.UID("")
+	}
+	var sr api.SerializedReference
+	err := json.Unmarshal([]byte(creatorRefJson), &sr)
+	if err != nil {
+		glog.V(4).Infof("Unable to get parent UID: pod %s/%s with unparsable created-by annotation: %v", pod.Namespace, pod.Name, err)
+		return types.UID("")
+	}
+	if sr.Reference.Kind != "StatefulSet" {
+		glog.V(4).Infof("Unable to get parent UID: pod %s/%s with non-StatefulSet parent", pod.Namespace, pod.Name)
+		return types.UID("")
+	}
+	// Don't believe a pod that claims to have a parent in a different namespace.
+	if sr.Reference.Namespace != pod.Namespace {
+		glog.V(4).Infof("Unable to get parent UID: pod %s/%s with parent in a different namespace (%s)", pod.Namespace, pod.Name, sr.Reference.Namespace)
+		return types.UID("")
+	}
+
+	return sr.Reference.UID
 }
 
 // getStatefulSetForPod returns the pet set managing the given pod.
