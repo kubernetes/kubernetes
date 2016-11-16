@@ -71,6 +71,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc:           poddisruptionbudget.MatchPodDisruptionBudget,
 		QualifiedResource:       policyapi.Resource("poddisruptionbudgets"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate controller creation

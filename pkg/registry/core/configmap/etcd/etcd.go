@@ -76,6 +76,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		QualifiedResource: api.Resource("configmaps"),
 
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: configmap.Strategy,

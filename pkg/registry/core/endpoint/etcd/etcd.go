@@ -60,6 +60,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc:           endpoint.MatchEndpoints,
 		QualifiedResource:       api.Resource("endpoints"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: endpoint.Strategy,

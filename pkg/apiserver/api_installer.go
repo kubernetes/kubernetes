@@ -350,6 +350,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var apiResource unversioned.APIResource
+
+	if discoverer, ok := storage.(rest.Discoverer); ok {
+		apiResource.SecondaryCohabitant = discoverer.IsSecondaryCohabitant()
+	}
+
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
 	case meta.RESTScopeNameRoot:

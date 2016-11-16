@@ -94,6 +94,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc:           replicaset.MatchReplicaSet,
 		QualifiedResource:       api.Resource("replicasets"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate ReplicaSet creation

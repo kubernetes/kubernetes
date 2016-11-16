@@ -41,6 +41,9 @@ type StorageFactory interface {
 	// centralized control over the shape of etcd directories
 	ResourcePrefix(groupResource unversioned.GroupResource) string
 
+	// PrimaryCohabitant returns true for the first active resource in a set of cohabitating resources.
+	PrimaryCohabitant(groupResource unversioned.GroupResource) bool
+
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
 	Backends() []string
@@ -176,6 +179,10 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource unversione
 	}
 
 	return groupResource
+}
+
+func (s *DefaultStorageFactory) PrimaryCohabitant(groupResource unversioned.GroupResource) bool {
+	return s.getStorageGroupResource(groupResource) == groupResource
 }
 
 // New finds the storage destination for the given group and resource. It will

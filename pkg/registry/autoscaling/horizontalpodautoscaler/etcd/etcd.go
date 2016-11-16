@@ -69,6 +69,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc:           horizontalpodautoscaler.MatchAutoscaler,
 		QualifiedResource:       autoscaling.Resource("horizontalpodautoscalers"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate autoscaler creation

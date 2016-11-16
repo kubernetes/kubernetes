@@ -71,6 +71,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc:           daemonset.MatchDaemonSet,
 		QualifiedResource:       extensions.Resource("daemonsets"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate daemon set creation

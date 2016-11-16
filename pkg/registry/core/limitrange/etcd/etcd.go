@@ -60,6 +60,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc:           limitrange.MatchLimitRange,
 		QualifiedResource:       api.Resource("limitranges"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: limitrange.Strategy,

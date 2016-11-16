@@ -95,6 +95,7 @@ func NewStorage(opts generic.RESTOptions, kubeletClientConfig client.KubeletClie
 		PredicateFunc:           node.MatchNode,
 		QualifiedResource:       api.Resource("nodes"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: node.Strategy,

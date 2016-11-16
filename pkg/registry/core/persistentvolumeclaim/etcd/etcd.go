@@ -61,6 +61,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc:           persistentvolumeclaim.MatchPersistentVolumeClaim,
 		QualifiedResource:       api.Resource("persistentvolumeclaims"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      persistentvolumeclaim.Strategy,

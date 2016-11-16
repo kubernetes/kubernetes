@@ -55,6 +55,7 @@ func NewREST(opts generic.RESTOptions, ttl uint64) *REST {
 		QualifiedResource: api.Resource("events"),
 
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: event.Strategy,

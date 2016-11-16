@@ -348,6 +348,7 @@ func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.R
 		DeleteCollectionWorkers: f.deleteCollectionWorkers,
 		EnableGarbageCollection: f.enableGarbageCollection,
 		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
+		SecondaryCohabitant:     !f.storageFactory.PrimaryCohabitant(resource),
 	}
 }
 

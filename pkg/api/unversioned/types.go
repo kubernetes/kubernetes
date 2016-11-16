@@ -395,6 +395,8 @@ type APIResource struct {
 	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
 	// verbs is a list of supported verbs out of "GET", "PUT", "POST", "DELETE"
 	Verbs []string `json:"verbs" protobuf:"bytes,4,rep,name=verbs"`
+	// cohabitant is true if this resource is an alias for another resource
+	SecondaryCohabitant bool `json:"secondaryCohabitant" protobuf:"varint,5,opt,name=secondaryCohabitant"`
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the

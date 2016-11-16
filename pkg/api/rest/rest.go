@@ -63,6 +63,14 @@ type KindProvider interface {
 	Kind() string
 }
 
+// Discoverer provides information for discovery.
+type Discoverer interface {
+	// IsSecondaryCohabitant returns true for resources which are an alias to another resource (possibly in
+	// another group). This is useful for e.g. controllers which want to watch only one instance of such a
+	// cohabitated resource.
+	IsSecondaryCohabitant() bool
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.

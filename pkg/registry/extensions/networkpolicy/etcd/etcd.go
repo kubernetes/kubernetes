@@ -70,6 +70,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc:           networkpolicy.MatchNetworkPolicy,
 		QualifiedResource:       extensionsapi.Resource("networkpolicies"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate controller creation

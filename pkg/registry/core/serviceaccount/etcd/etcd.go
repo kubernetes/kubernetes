@@ -60,6 +60,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc:           serviceaccount.Matcher,
 		QualifiedResource:       api.Resource("serviceaccounts"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      serviceaccount.Strategy,

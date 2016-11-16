@@ -26,4 +26,5 @@ type RESTOptions struct {
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
 	ResourcePrefix          string
+	SecondaryCohabitant     bool
 }

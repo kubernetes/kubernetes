@@ -62,6 +62,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		PredicateFunc:           clusterrolebinding.Matcher,
 		QualifiedResource:       rbac.Resource("clusterrolebindings"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
+		SecondaryCohabitant:     opts.SecondaryCohabitant,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: clusterrolebinding.Strategy,

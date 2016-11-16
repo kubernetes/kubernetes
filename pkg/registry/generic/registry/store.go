@@ -93,6 +93,10 @@ type Store struct {
 	// must be synced with the corresponding flag in kube-controller-manager.
 	EnableGarbageCollection bool
 
+	// SecondaryCohabitant marks resources which are an alias to another resource (possibly in another group).
+	// This is useful e.g. for controllers which want to watch only one instance of such a cohabitated resource.
+	SecondaryCohabitant bool
+
 	// DeleteCollectionWorkers is the maximum number of workers in a single
 	// DeleteCollection call.
 	DeleteCollectionWorkers int
@@ -949,4 +953,9 @@ func (e *Store) Export(ctx api.Context, name string, opts unversioned.ExportOpti
 		e.CreateStrategy.PrepareForCreate(ctx, obj)
 	}
 	return obj, nil
+}
+
+// Implements the test.Discoverer interface
+func (e *Store) IsSecondaryCohabitant() bool {
+	return e.SecondaryCohabitant
 }
