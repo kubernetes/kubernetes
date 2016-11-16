@@ -63,16 +63,17 @@ type documentable interface {
 
 // toDiscoveryKubeVerb maps an action.Verb to the logical kube verb, used for discovery
 var toDiscoveryKubeVerb = map[string]string{
-	"LIST":             "list",
-	"POST":             "update",
-	"DELETECOLLECTION": "deletecollection",
-	"WATCHLIST":        "watch",
-	"GET":              "get",
-	"PUT":              "create",
-	"DELETE":           "delete",
-	"WATCH":            "watch",
-	"PROXY":            "proxy",
 	"CONNECT":          "", // do not list in discovery. TODO: is this correct?
+	"DELETE":           "delete",
+	"DELETECOLLECTION": "deletecollection",
+	"GET":              "get",
+	"LIST":             "list",
+	"PATCH":            "patch",
+	"POST":             "update",
+	"PROXY":            "proxy",
+	"PUT":              "create",
+	"WATCH":            "watch",
+	"WATCHLIST":        "watch",
 }
 
 // errEmptyName is returned when API requests do not fill the name section of the path.
