@@ -63,6 +63,9 @@ const (
 	loadBalancerWidth = 16
 )
 
+// nilNamespace is the default value for cluster scoped resources which is not namespaced
+const nilNamespace = "<none>"
+
 // GetPrinter takes a format type, an optional format argument. It will return true
 // if the format is generic (untyped), otherwise it will return false. The printer
 // is agnostic to schema versions, so you must send arguments to PrintObj in the
@@ -1467,7 +1470,9 @@ func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
 	name := formatResourceName(options.Kind, node.Name, options.WithKind)
 
 	if options.WithNamespace {
-		return fmt.Errorf("node is not namespaced")
+		if _, err := fmt.Fprintf(w, "%s\t", nilNamespace); err != nil {
+			return err
+		}
 	}
 	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 	NodeAllConditions := []api.NodeConditionType{api.NodeReady}
@@ -1533,7 +1538,9 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, options PrintO
 	name := formatResourceName(options.Kind, pv.Name, options.WithKind)
 
 	if options.WithNamespace {
-		return fmt.Errorf("persistentVolume is not namespaced")
+		if _, err := fmt.Fprintf(w, "%s\t", nilNamespace); err != nil {
+			return err
+		}
 	}
 
 	claimRefUID := ""
@@ -1750,7 +1757,9 @@ func printRoleBindingList(list *rbac.RoleBindingList, w io.Writer, options Print
 
 func printClusterRole(clusterRole *rbac.ClusterRole, w io.Writer, options PrintOptions) error {
 	if options.WithNamespace {
-		return fmt.Errorf("clusterRole is not namespaced")
+		if _, err := fmt.Fprintf(w, "%s\t", nilNamespace); err != nil {
+			return err
+		}
 	}
 	return printObjectMeta(clusterRole.ObjectMeta, w, options, false)
 }

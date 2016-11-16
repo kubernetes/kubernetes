@@ -937,12 +937,14 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 	table := []struct {
 		obj          runtime.Object
 		isNamespaced bool
+		nilNamespace bool
 	}{
 		{
 			obj: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.ReplicationController{
@@ -974,6 +976,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				},
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.Service{
@@ -998,6 +1001,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				},
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.Endpoints{
@@ -1008,18 +1012,21 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				},
 				}},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.Namespace{
 				ObjectMeta: api.ObjectMeta{Name: name},
 			},
 			isNamespaced: false,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.Secret{
 				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.ServiceAccount{
@@ -1027,20 +1034,23 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				Secrets:    []api.ObjectReference{},
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: name},
 				Status:     api.NodeStatus{},
 			},
-			isNamespaced: false,
+			isNamespaced: true,
+			nilNamespace: true,
 		},
 		{
 			obj: &api.PersistentVolume{
 				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
 				Spec:       api.PersistentVolumeSpec{},
 			},
-			isNamespaced: false,
+			isNamespaced: true,
+			nilNamespace: true,
 		},
 		{
 			obj: &api.PersistentVolumeClaim{
@@ -1048,6 +1058,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				Spec:       api.PersistentVolumeClaimSpec{},
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.Event{
@@ -1060,18 +1071,21 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				Type:           api.EventTypeNormal,
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.LimitRange{
 				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.ResourceQuota{
 				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
 			isNamespaced: true,
+			nilNamespace: false,
 		},
 		{
 			obj: &api.ComponentStatus{
@@ -1080,6 +1094,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				},
 			},
 			isNamespaced: false,
+			nilNamespace: false,
 		},
 	}
 
@@ -1095,7 +1110,14 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			if err != nil {
 				t.Fatalf("An error occurred printing object: %#v", err)
 			}
-			matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s", namespaceName))
+
+			var matchName string
+			if test.nilNamespace {
+				matchName = "<none>"
+			} else {
+				matchName = namespaceName
+			}
+			matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s", matchName))
 			if !matched {
 				t.Errorf("Expect printing object to contain namespace: %#v", test.obj)
 			}
