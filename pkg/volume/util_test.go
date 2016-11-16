@@ -737,3 +737,60 @@ func TestValidatePVCSelector(t *testing.T) {
 		}
 	}
 }
+
+func TestGetPVCMatchLabel(t *testing.T) {
+	functionUnderTest := "getPVCMatchLabel"
+	// First part: want no error
+	succTests := []struct {
+		pvc  v1.PersistentVolumeClaim
+		key  string
+		want string
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{metav1.LabelZoneFailureDomain: "us-east-1a"},
+					},
+				},
+			},
+			key:  metav1.LabelZoneFailureDomain,
+			want: "us-east-1a",
+		},
+	}
+	for _, succTest := range succTests {
+		if zone, err := getPVCMatchLabel(&succTest.pvc, succTest.key); err != nil {
+			t.Errorf("%v(%v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, succTest.key, zone, err.Error(), succTest.want, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []struct {
+		pvc v1.PersistentVolumeClaim
+		key string
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			key: metav1.LabelZoneFailureDomain,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{},
+					},
+				},
+			},
+			key: metav1.LabelZoneFailureDomain,
+		},
+	}
+	for _, errCase := range errCases {
+		if zone, err := getPVCMatchLabel(&errCase.pvc, errCase.key); err == nil {
+			t.Errorf("%v(%v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase.pvc, errCase.key, zone, err, "", "an error")
+		}
+	}
+}
