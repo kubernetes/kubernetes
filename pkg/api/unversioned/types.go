@@ -393,7 +393,8 @@ type APIResource struct {
 	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
 	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
 	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
-	// verbs is a list of supported verbs out of "GET", "PUT", "POST", "DELETE"
+	// verbs is a list of supported kube verbs (this includes get, list, watch, create,
+	// update, patch, delete, deletecollection, and proxy)
 	Verbs []string `json:"verbs" protobuf:"bytes,4,rep,name=verbs"`
 }
 
