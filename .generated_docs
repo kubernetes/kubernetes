@@ -42,6 +42,7 @@ docs/man/man1/kubectl-create-secret-generic.1
 docs/man/man1/kubectl-create-secret-tls.1
 docs/man/man1/kubectl-create-secret.1
 docs/man/man1/kubectl-create-service-clusterip.1
+docs/man/man1/kubectl-create-service-externalname.1
 docs/man/man1/kubectl-create-service-loadbalancer.1
 docs/man/man1/kubectl-create-service-nodeport.1
 docs/man/man1/kubectl-create-service.1
@@ -118,6 +119,7 @@ docs/user-guide/kubectl/kubectl_create_secret_generic.md
 docs/user-guide/kubectl/kubectl_create_secret_tls.md
 docs/user-guide/kubectl/kubectl_create_service.md
 docs/user-guide/kubectl/kubectl_create_service_clusterip.md
+docs/user-guide/kubectl/kubectl_create_service_externalname.md
 docs/user-guide/kubectl/kubectl_create_service_loadbalancer.md
 docs/user-guide/kubectl/kubectl_create_service_nodeport.md
 docs/user-guide/kubectl/kubectl_create_serviceaccount.md
