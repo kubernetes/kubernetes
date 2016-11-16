@@ -92,6 +92,27 @@ func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
 
+// Each level has 2 spaces for PrefixWriter
+const (
+	LEVEL_0 = iota
+	LEVEL_1
+	LEVEL_2
+	LEVEL_3
+)
+
+type PrefixWriter struct {
+	out io.Writer
+}
+
+func (this *PrefixWriter) Write(level int, format string, a ...interface{}) {
+	levelSpace := "  "
+	prefix := ""
+	for i := 0; i < level; i++ {
+		prefix += levelSpace
+	}
+	fmt.Fprintf(this.out, prefix+format, a...)
+}
+
 func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
 	m := map[unversioned.GroupKind]Describer{
 		api.Kind("Pod"):                   &PodDescriber{c},
@@ -492,10 +513,12 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		}
 		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
 		fmt.Fprintf(out, "Controllers:\t%s\n", printControllers(pod.Annotations))
+
+		writer := &PrefixWriter{out}
 		if len(pod.Spec.InitContainers) > 0 {
-			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), out, "")
+			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), writer, "")
 		}
-		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), out, "")
+		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), writer, "")
 		if len(pod.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
@@ -504,7 +527,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 					c.Status)
 			}
 		}
-		describeVolumes(pod.Spec.Volumes, out, "")
+		describeVolumes(pod.Spec.Volumes, writer, "")
 		fmt.Fprintf(out, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
 		printTolerationsInAnnotationMultiline(out, "Tolerations", pod.Annotations)
 		if events != nil {
@@ -526,74 +549,73 @@ func printControllers(annotation map[string]string) string {
 	return "<none>"
 }
 
-// TODO: Do a better job at indenting, maybe by using a prefix writer
-func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
+func describeVolumes(volumes []api.Volume, writer *PrefixWriter, space string) {
 	if volumes == nil || len(volumes) == 0 {
-		fmt.Fprintf(out, "%sNo volumes.\n", space)
+		writer.Write(LEVEL_0, "%sNo volumes.\n", space)
 		return
 	}
-	fmt.Fprintf(out, "%sVolumes:\n", space)
+	writer.Write(LEVEL_0, "%sVolumes:\n", space)
 	for _, volume := range volumes {
 		nameIndent := ""
 		if len(space) > 0 {
 			nameIndent = " "
 		}
-		fmt.Fprintf(out, "  %s%v:\n", nameIndent, volume.Name)
+		writer.Write(LEVEL_1, "%s%v:\n", nameIndent, volume.Name)
 		switch {
 		case volume.VolumeSource.HostPath != nil:
-			printHostPathVolumeSource(volume.VolumeSource.HostPath, out)
+			printHostPathVolumeSource(volume.VolumeSource.HostPath, writer)
 		case volume.VolumeSource.EmptyDir != nil:
-			printEmptyDirVolumeSource(volume.VolumeSource.EmptyDir, out)
+			printEmptyDirVolumeSource(volume.VolumeSource.EmptyDir, writer)
 		case volume.VolumeSource.GCEPersistentDisk != nil:
-			printGCEPersistentDiskVolumeSource(volume.VolumeSource.GCEPersistentDisk, out)
+			printGCEPersistentDiskVolumeSource(volume.VolumeSource.GCEPersistentDisk, writer)
 		case volume.VolumeSource.AWSElasticBlockStore != nil:
-			printAWSElasticBlockStoreVolumeSource(volume.VolumeSource.AWSElasticBlockStore, out)
+			printAWSElasticBlockStoreVolumeSource(volume.VolumeSource.AWSElasticBlockStore, writer)
 		case volume.VolumeSource.GitRepo != nil:
-			printGitRepoVolumeSource(volume.VolumeSource.GitRepo, out)
+			printGitRepoVolumeSource(volume.VolumeSource.GitRepo, writer)
 		case volume.VolumeSource.Secret != nil:
-			printSecretVolumeSource(volume.VolumeSource.Secret, out)
+			printSecretVolumeSource(volume.VolumeSource.Secret, writer)
 		case volume.VolumeSource.ConfigMap != nil:
-			printConfigMapVolumeSource(volume.VolumeSource.ConfigMap, out)
+			printConfigMapVolumeSource(volume.VolumeSource.ConfigMap, writer)
 		case volume.VolumeSource.NFS != nil:
-			printNFSVolumeSource(volume.VolumeSource.NFS, out)
+			printNFSVolumeSource(volume.VolumeSource.NFS, writer)
 		case volume.VolumeSource.ISCSI != nil:
-			printISCSIVolumeSource(volume.VolumeSource.ISCSI, out)
+			printISCSIVolumeSource(volume.VolumeSource.ISCSI, writer)
 		case volume.VolumeSource.Glusterfs != nil:
-			printGlusterfsVolumeSource(volume.VolumeSource.Glusterfs, out)
+			printGlusterfsVolumeSource(volume.VolumeSource.Glusterfs, writer)
 		case volume.VolumeSource.PersistentVolumeClaim != nil:
-			printPersistentVolumeClaimVolumeSource(volume.VolumeSource.PersistentVolumeClaim, out)
+			printPersistentVolumeClaimVolumeSource(volume.VolumeSource.PersistentVolumeClaim, writer)
 		case volume.VolumeSource.RBD != nil:
-			printRBDVolumeSource(volume.VolumeSource.RBD, out)
+			printRBDVolumeSource(volume.VolumeSource.RBD, writer)
 		case volume.VolumeSource.Quobyte != nil:
-			printQuobyteVolumeSource(volume.VolumeSource.Quobyte, out)
+			printQuobyteVolumeSource(volume.VolumeSource.Quobyte, writer)
 		case volume.VolumeSource.DownwardAPI != nil:
-			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
+			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, writer)
 		case volume.VolumeSource.AzureDisk != nil:
-			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, out)
+			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, writer)
 		case volume.VolumeSource.VsphereVolume != nil:
-			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, out)
+			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, writer)
 		case volume.VolumeSource.Cinder != nil:
-			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
+			printCinderVolumeSource(volume.VolumeSource.Cinder, writer)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
-			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, out)
+			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, writer)
 		default:
-			fmt.Fprintf(out, "  <unknown>\n")
+			writer.Write(LEVEL_1, "<unknown>\n")
 		}
 	}
 }
 
-func printHostPathVolumeSource(hostPath *api.HostPathVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tHostPath (bare host directory volume)\n"+
+func printHostPathVolumeSource(hostPath *api.HostPathVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tHostPath (bare host directory volume)\n"+
 		"    Path:\t%v\n", hostPath.Path)
 }
 
-func printEmptyDirVolumeSource(emptyDir *api.EmptyDirVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
+func printEmptyDirVolumeSource(emptyDir *api.EmptyDirVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
 		"    Medium:\t%v\n", emptyDir.Medium)
 }
 
-func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tGCEPersistentDisk (a Persistent Disk resource in Google Compute Engine)\n"+
+func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tGCEPersistentDisk (a Persistent Disk resource in Google Compute Engine)\n"+
 		"    PDName:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    Partition:\t%v\n"+
@@ -601,8 +623,8 @@ func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, 
 		gce.PDName, gce.FSType, gce.Partition, gce.ReadOnly)
 }
 
-func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tAWSElasticBlockStore (a Persistent Disk resource in AWS)\n"+
+func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tAWSElasticBlockStore (a Persistent Disk resource in AWS)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    Partition:\t%v\n"+
@@ -610,41 +632,41 @@ func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSo
 		aws.VolumeID, aws.FSType, aws.Partition, aws.ReadOnly)
 }
 
-func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tGitRepo (a volume that is pulled from git when the pod is created)\n"+
+func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tGitRepo (a volume that is pulled from git when the pod is created)\n"+
 		"    Repository:\t%v\n"+
 		"    Revision:\t%v\n",
 		git.Repository, git.Revision)
 }
 
-func printSecretVolumeSource(secret *api.SecretVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tSecret (a volume populated by a Secret)\n"+
+func printSecretVolumeSource(secret *api.SecretVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tSecret (a volume populated by a Secret)\n"+
 		"    SecretName:\t%v\n", secret.SecretName)
 }
 
-func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
+func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
 		"    Name:\t%v\n", configMap.Name)
 }
 
-func printNFSVolumeSource(nfs *api.NFSVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tNFS (an NFS mount that lasts the lifetime of a pod)\n"+
+func printNFSVolumeSource(nfs *api.NFSVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tNFS (an NFS mount that lasts the lifetime of a pod)\n"+
 		"    Server:\t%v\n"+
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		nfs.Server, nfs.Path, nfs.ReadOnly)
 }
 
-func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tQuobyte (a Quobyte mount on the host that shares a pod's lifetime)\n"+
+func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tQuobyte (a Quobyte mount on the host that shares a pod's lifetime)\n"+
 		"    Registry:\t%v\n"+
 		"    Volume:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
 }
 
-func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
+func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
 		"    TargetPortal:\t%v\n"+
 		"    IQN:\t%v\n"+
 		"    Lun:\t%v\n"+
@@ -654,23 +676,23 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
 		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly)
 }
 
-func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
+func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		glusterfs.EndpointsName, glusterfs.Path, glusterfs.ReadOnly)
 }
 
-func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tPersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)\n"+
+func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tPersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)\n"+
 		"    ClaimName:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		claim.ClaimName, claim.ReadOnly)
 }
 
-func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
+func printRBDVolumeSource(rbd *api.RBDVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
 		"    CephMonitors:\t%v\n"+
 		"    RBDImage:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -682,20 +704,20 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
 		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
-func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
+func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
 	for _, mapping := range d.Items {
 		if mapping.FieldRef != nil {
-			fmt.Fprintf(out, "      %v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
+			writer.Write(LEVEL_3, "%v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
 		}
 		if mapping.ResourceFieldRef != nil {
-			fmt.Fprintf(out, "      %v -> %v\n", mapping.ResourceFieldRef.Resource, mapping.Path)
+			writer.Write(LEVEL_3, "%v -> %v\n", mapping.ResourceFieldRef.Resource, mapping.Path)
 		}
 	}
 }
 
-func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tAzureDisk (an Azure Data Disk mount on the host and bind mount to the pod)\n"+
+func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tAzureDisk (an Azure Data Disk mount on the host and bind mount to the pod)\n"+
 		"    DiskName:\t%v\n"+
 		"    DiskURI:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -704,22 +726,22 @@ func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
 		d.DiskName, d.DataDiskURI, *d.FSType, *d.CachingMode, *d.ReadOnly)
 }
 
-func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
+func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
 		"    VolumePath:\t%v\n"+
 		"    FSType:\t%v\n",
 		vsphere.VolumePath, vsphere.FSType)
 }
 
-func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tPhotonPersistentDisk (a Persistent Disk resource in photon platform)\n"+
+func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tPhotonPersistentDisk (a Persistent Disk resource in photon platform)\n"+
 		"    PdID:\t%v\n"+
 		"    FSType:\t%v\n",
 		photon.PdID, photon.FSType)
 }
 
-func printCinderVolumeSource(cinder *api.CinderVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
+func printCinderVolumeSource(cinder *api.CinderVolumeSource, writer *PrefixWriter) {
+	writer.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
@@ -761,31 +783,32 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		fmt.Fprintf(out, "Message:\t%s\n", pv.Status.Message)
 		fmt.Fprintf(out, "Source:\n")
 
+		writer := &PrefixWriter{out}
 		switch {
 		case pv.Spec.HostPath != nil:
-			printHostPathVolumeSource(pv.Spec.HostPath, out)
+			printHostPathVolumeSource(pv.Spec.HostPath, writer)
 		case pv.Spec.GCEPersistentDisk != nil:
-			printGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk, out)
+			printGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk, writer)
 		case pv.Spec.AWSElasticBlockStore != nil:
-			printAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore, out)
+			printAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore, writer)
 		case pv.Spec.NFS != nil:
-			printNFSVolumeSource(pv.Spec.NFS, out)
+			printNFSVolumeSource(pv.Spec.NFS, writer)
 		case pv.Spec.ISCSI != nil:
-			printISCSIVolumeSource(pv.Spec.ISCSI, out)
+			printISCSIVolumeSource(pv.Spec.ISCSI, writer)
 		case pv.Spec.Glusterfs != nil:
-			printGlusterfsVolumeSource(pv.Spec.Glusterfs, out)
+			printGlusterfsVolumeSource(pv.Spec.Glusterfs, writer)
 		case pv.Spec.RBD != nil:
-			printRBDVolumeSource(pv.Spec.RBD, out)
+			printRBDVolumeSource(pv.Spec.RBD, writer)
 		case pv.Spec.Quobyte != nil:
-			printQuobyteVolumeSource(pv.Spec.Quobyte, out)
+			printQuobyteVolumeSource(pv.Spec.Quobyte, writer)
 		case pv.Spec.VsphereVolume != nil:
-			printVsphereVolumeSource(pv.Spec.VsphereVolume, out)
+			printVsphereVolumeSource(pv.Spec.VsphereVolume, writer)
 		case pv.Spec.Cinder != nil:
-			printCinderVolumeSource(pv.Spec.Cinder, out)
+			printCinderVolumeSource(pv.Spec.Cinder, writer)
 		case pv.Spec.AzureDisk != nil:
-			printAzureDiskVolumeSource(pv.Spec.AzureDisk, out)
+			printAzureDiskVolumeSource(pv.Spec.AzureDisk, writer)
 		case pv.Spec.PhotonPersistentDisk != nil:
-			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, out)
+			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, writer)
 		}
 
 		if events != nil {
@@ -836,34 +859,13 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	})
 }
 
-type PrefixWriter struct {
-	out io.Writer
-}
-
-func (this *PrefixWriter) Write(level int, format string, a ...interface{}) {
-	levelSpace := "  "
-	prefix := ""
-	for i := 0; i < level; i++ {
-		prefix += levelSpace
-	}
-	fmt.Fprintf(this.out, prefix+format, a...)
-}
-
-const (
-	LEVEL_0 = iota
-	LEVEL_1
-	LEVEL_2
-	LEVEL_3
-)
-
-// TODO: Do a better job at indenting, maybe by using a prefix writer
-func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus, resolverFn EnvVarResolverFunc, out io.Writer, space string) {
+func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus,
+	resolverFn EnvVarResolverFunc, writer *PrefixWriter, space string) {
 	statuses := map[string]api.ContainerStatus{}
 	for _, status := range containerStatuses {
 		statuses[status.Name] = status
 	}
 
-	writer := &PrefixWriter{out}
 	describeContainersLabel(containers, label, space, writer)
 
 	for _, container := range containers {
@@ -872,7 +874,7 @@ func describeContainers(label string, containers []api.Container, containerStatu
 		describeContainerCommand(container, writer)
 		describeContainerResource(container, writer)
 		if ok {
-			describeContainerState(status, out, writer)
+			describeContainerState(status, writer)
 		}
 		describeContainerProbe(container, writer)
 		describeContainerVolumes(container, writer)
@@ -883,9 +885,9 @@ func describeContainers(label string, containers []api.Container, containerStatu
 func describeContainersLabel(containers []api.Container, label, space string, writer *PrefixWriter) {
 	none := ""
 	if len(containers) == 0 {
-		none = "<none>"
+		none = " <none>"
 	}
-	writer.Write(LEVEL_0, "%s%s: %s\n", space, label, none)
+	writer.Write(LEVEL_0, "%s%s:%s\n", space, label, none)
 }
 
 func describeContainerBasicInfo(container api.Container, status api.ContainerStatus, ok bool, space string, writer *PrefixWriter) {
@@ -951,10 +953,10 @@ func describeContainerResource(container api.Container, writer *PrefixWriter) {
 	}
 }
 
-func describeContainerState(status api.ContainerStatus, out io.Writer, writer *PrefixWriter) {
-	describeStatus("State", status.State, out)
+func describeContainerState(status api.ContainerStatus, writer *PrefixWriter) {
+	describeStatus("State", status.State, writer)
 	if status.LastTerminationState.Terminated != nil {
-		describeStatus("Last State", status.LastTerminationState, out)
+		describeStatus("Last State", status.LastTerminationState, writer)
 	}
 	writer.Write(LEVEL_2, "Ready:\t%v\n", printBool(status.Ready))
 	writer.Write(LEVEL_2, "Restart Count:\t%d\n", status.RestartCount)
@@ -1071,32 +1073,32 @@ func EnvValueRetriever(pod *api.Pod) EnvVarResolverFunc {
 	}
 }
 
-func describeStatus(stateName string, state api.ContainerState, out io.Writer) {
+func describeStatus(stateName string, state api.ContainerState, writer *PrefixWriter) {
 	switch {
 	case state.Running != nil:
-		fmt.Fprintf(out, "    %s:\tRunning\n", stateName)
-		fmt.Fprintf(out, "      Started:\t%v\n", state.Running.StartedAt.Time.Format(time.RFC1123Z))
+		writer.Write(LEVEL_2, "%s:\tRunning\n", stateName)
+		writer.Write(LEVEL_3, "Started:\t%v\n", state.Running.StartedAt.Time.Format(time.RFC1123Z))
 	case state.Waiting != nil:
-		fmt.Fprintf(out, "    %s:\tWaiting\n", stateName)
+		writer.Write(LEVEL_2, "%s:\tWaiting\n", stateName)
 		if state.Waiting.Reason != "" {
-			fmt.Fprintf(out, "      Reason:\t%s\n", state.Waiting.Reason)
+			writer.Write(LEVEL_3, "Reason:\t%s\n", state.Waiting.Reason)
 		}
 	case state.Terminated != nil:
-		fmt.Fprintf(out, "    %s:\tTerminated\n", stateName)
+		writer.Write(LEVEL_2, "%s:\tTerminated\n", stateName)
 		if state.Terminated.Reason != "" {
-			fmt.Fprintf(out, "      Reason:\t%s\n", state.Terminated.Reason)
+			writer.Write(LEVEL_3, "Reason:\t%s\n", state.Terminated.Reason)
 		}
 		if state.Terminated.Message != "" {
-			fmt.Fprintf(out, "      Message:\t%s\n", state.Terminated.Message)
+			writer.Write(LEVEL_3, "Message:\t%s\n", state.Terminated.Message)
 		}
-		fmt.Fprintf(out, "      Exit Code:\t%d\n", state.Terminated.ExitCode)
+		writer.Write(LEVEL_3, "Exit Code:\t%d\n", state.Terminated.ExitCode)
 		if state.Terminated.Signal > 0 {
-			fmt.Fprintf(out, "      Signal:\t%d\n", state.Terminated.Signal)
+			writer.Write(LEVEL_3, "Signal:\t%d\n", state.Terminated.Signal)
 		}
-		fmt.Fprintf(out, "      Started:\t%s\n", state.Terminated.StartedAt.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "      Finished:\t%s\n", state.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
+		writer.Write(LEVEL_3, "Started:\t%s\n", state.Terminated.StartedAt.Time.Format(time.RFC1123Z))
+		writer.Write(LEVEL_3, "Finished:\t%s\n", state.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
 	default:
-		fmt.Fprintf(out, "    %s:\tWaiting\n", stateName)
+		writer.Write(LEVEL_2, "%s:\tWaiting\n", stateName)
 	}
 }
 
@@ -1157,8 +1159,10 @@ func describeReplicationController(controller *api.ReplicationController, events
 		printLabelsMultiline(out, "Labels", controller.Labels)
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+
+		writer := &PrefixWriter{out}
 		if controller.Spec.Template != nil {
-			describeVolumes(controller.Spec.Template.Spec.Volumes, out, "")
+			describeVolumes(controller.Spec.Template.Spec.Volumes, writer, "")
 		}
 		if events != nil {
 			DescribeEvents(events, out)
@@ -1168,8 +1172,9 @@ func describeReplicationController(controller *api.ReplicationController, events
 }
 
 func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
+	writer := &PrefixWriter{out}
 	if template == nil {
-		fmt.Fprintf(out, "  <unset>")
+		writer.Write(LEVEL_1, "<unset>")
 		return
 	}
 	printLabelsMultiline(out, "  Labels", template.Labels)
@@ -1177,13 +1182,13 @@ func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
 		printLabelsMultiline(out, "  Annotations", template.Annotations)
 	}
 	if len(template.Spec.ServiceAccountName) > 0 {
-		fmt.Fprintf(out, "  Service Account:\t%s\n", template.Spec.ServiceAccountName)
+		writer.Write(LEVEL_1, "Service Account:\t%s\n", template.Spec.ServiceAccountName)
 	}
 	if len(template.Spec.InitContainers) > 0 {
-		describeContainers("Init Containers", template.Spec.InitContainers, nil, nil, out, "  ")
+		describeContainers("Init Containers", template.Spec.InitContainers, nil, nil, writer, "  ")
 	}
-	describeContainers("Containers", template.Spec.Containers, nil, nil, out, "  ")
-	describeVolumes(template.Spec.Volumes, out, "  ")
+	describeContainers("Containers", template.Spec.Containers, nil, nil, writer, "  ")
+	describeVolumes(template.Spec.Volumes, writer, "  ")
 }
 
 // ReplicaSetDescriber generates information about a ReplicaSet and the pods it has created.
@@ -1229,7 +1234,8 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		} else {
 			fmt.Fprintf(out, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		}
-		describeVolumes(rs.Spec.Template.Spec.Volumes, out, "")
+		writer := &PrefixWriter{out}
+		describeVolumes(rs.Spec.Template.Spec.Volumes, writer, "")
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1277,7 +1283,8 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		}
 		printLabelsMultiline(out, "Labels", job.Labels)
 		fmt.Fprintf(out, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
-		describeVolumes(job.Spec.Template.Spec.Volumes, out, "")
+		writer := &PrefixWriter{out}
+		describeVolumes(job.Spec.Template.Spec.Volumes, writer, "")
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1352,7 +1359,8 @@ func describeJobTemplate(jobTemplate batch.JobTemplateSpec, out io.Writer) {
 	if jobTemplate.Spec.ActiveDeadlineSeconds != nil {
 		fmt.Fprintf(out, "Active Deadline Seconds:\t%ds\n", *jobTemplate.Spec.ActiveDeadlineSeconds)
 	}
-	describeVolumes(jobTemplate.Spec.Template.Spec.Volumes, out, "")
+	writer := &PrefixWriter{out}
+	describeVolumes(jobTemplate.Spec.Template.Spec.Volumes, writer, "")
 }
 
 func printActiveJobs(out io.Writer, title string, jobs []api.ObjectReference) {
@@ -1960,7 +1968,8 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(ps.Annotations))
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-		describeVolumes(ps.Spec.Template.Spec.Volumes, out, "")
+		writer := &PrefixWriter{out}
+		describeVolumes(ps.Spec.Template.Spec.Volumes, writer, "")
 		if describerSettings.ShowEvents {
 			events, _ := p.client.Core().Events(namespace).Search(ps)
 			if events != nil {
@@ -2177,16 +2186,16 @@ func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceN
 	return
 }
 
-func DescribeEvents(el *api.EventList, w io.Writer) {
+func DescribeEvents(el *api.EventList, out io.Writer) {
 	if len(el.Items) == 0 {
-		fmt.Fprint(w, "No events.\n")
+		fmt.Fprintf(out, "No events.\n")
 		return
 	}
 	sort.Sort(events.SortableEvents(el.Items))
-	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubObjectPath\tType\tReason\tMessage\n")
-	fmt.Fprint(w, "  ---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
+	fmt.Fprintf(out, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubObjectPath\tType\tReason\tMessage\n")
+	fmt.Fprintf(out, "  ---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
 	for _, e := range el.Items {
-		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
+		fmt.Fprintf(out, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
 			translateTimestamp(e.FirstTimestamp),
 			translateTimestamp(e.LastTimestamp),
 			e.Count,

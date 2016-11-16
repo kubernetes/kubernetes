@@ -360,7 +360,8 @@ func TestDescribeContainers(t *testing.T) {
 				ContainerStatuses: []api.ContainerStatus{testCase.status},
 			},
 		}
-		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), out, "")
+		writer := &PrefixWriter{out}
+		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), writer, "")
 		output := out.String()
 		if strings.Contains(output, "%!s(MISSING)") {
 			t.Errorf("Test case %d: some field didn't print out in output: %q", i, output)
