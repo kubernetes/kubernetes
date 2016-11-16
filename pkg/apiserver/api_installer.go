@@ -65,7 +65,7 @@ type documentable interface {
 var toDiscoveryKubeVerb = map[string]string{
 	"LIST": "list",
 	"POST": "update",
-	"DELETECOLLECTION": "delete",
+	"DELETECOLLECTION": "deletecollection",
 	"WATCHLIST": "watch",
 	"GET": "get",
 	"PUT": "create",

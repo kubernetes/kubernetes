@@ -28,7 +28,7 @@ type Attributes interface {
 	// GetUser returns the user.Info object to authorize
 	GetUser() user.Info
 
-	// GetVerb returns the kube verb associated with API requests (this includes get, list, watch, create, update, patch, delete, and proxy),
+	// GetVerb returns the kube verb associated with API requests (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy),
 	// or the lowercased HTTP verb associated with non-API requests (this includes get, put, post, patch, and delete)
 	GetVerb() string
 
