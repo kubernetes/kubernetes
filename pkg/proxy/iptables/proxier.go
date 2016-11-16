@@ -959,12 +959,17 @@ func (proxier *Proxier) syncProxyRules() {
 			"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
 			"--dport", fmt.Sprintf("%d", svcInfo.port),
 		}
-		if proxier.masqueradeAll {
+
+		// There is no need to masquerade intra cluster traffic (unless forced to)
+		// However, if no clusterCIDR is specified we cannot distinguish
+		// intra cluster traffic from other traffic --> masquerade all
+		if proxier.masqueradeAll || len(proxier.clusterCIDR) == 0 {
 			writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-		}
-		if len(proxier.clusterCIDR) > 0 {
+		} else {
 			writeLine(natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
 		}
+		// External (or all) traffic to svc cluster is Masqueraded
+
 		writeLine(natRules, append(args, "-j", string(svcChain))...)
 
 		// Capture externalIPs.

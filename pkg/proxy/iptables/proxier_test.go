@@ -737,6 +737,13 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
 
+	// Every cluster IP should have a rule to masqChain
+	masqChain := string(KubeMarkMasqChain)
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(kubeSvcRules, masqChain, svcIP.String(), "") {
+		errorf(fmt.Sprintf("Failed to find jump to masq chain %v", masqChain), kubeSvcRules, t)
+	}
+
 	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
 	lbRules := ipt.GetRules(lbChain)
 	if hasJump(lbRules, nonLocalEpChain, "", "") {
