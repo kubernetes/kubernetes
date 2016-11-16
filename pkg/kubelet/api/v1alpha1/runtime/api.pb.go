@@ -667,6 +667,16 @@ type PodSandboxConfig struct {
 	//      * localhost/<profile-name>: the profile installed to the node's
 	//        local seccomp profile root
 	//
+	// 3. Sysctls
+	//
+	//      key: security.alpha.kubernetes.io/sysctls
+	//      description: list of safe sysctls which are set for the sandbox.
+	//      value: comma separated list of sysctl_name=value key-value pairs.
+	//
+	//      key: security.alpha.kubernetes.io/unsafe-sysctls
+	//      description: list of unsafe sysctls which are set for the sandbox.
+	//      value: comma separated list of sysctl_name=value key-value pairs.
+	//
 	Annotations map[string]string `protobuf:"bytes,7,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Optional configurations specific to Linux hosts.
 	Linux            *LinuxPodSandboxConfig `protobuf:"bytes,8,opt,name=linux" json:"linux,omitempty"`
