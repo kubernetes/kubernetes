@@ -469,7 +469,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 })
 
 func isTestEnabled() bool {
-	// TODO(timstclair): Pass this through the image setup rather than hardcoding.
+	// TODO: Pass this through the image setup rather than hardcoding.
 	if strings.Contains(framework.TestContext.NodeName, "-gci-dev-") {
 		gciVersionRe := regexp.MustCompile("-gci-dev-([0-9]+)-")
 		matches := gciVersionRe.FindStringSubmatch(framework.TestContext.NodeName)
@@ -486,6 +486,11 @@ func isTestEnabled() bool {
 	// Disable tests for containvm
 	if strings.Contains(framework.TestContext.NodeName, "-containervm-") {
 		//return true
+	}
+
+	// This is to enable cluster e2e test because cluster e2e does not setup node name.
+	if framework.TestContext.NodeName == "" {
+		return true
 	}
 	return false
 }

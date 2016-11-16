@@ -73,6 +73,15 @@ type VolumeTestConfig struct {
 	// Volumes needed to be mounted to the server container from the host
 	// map <host (source) path> -> <container (dst.) path>
 	volumes map[string]string
+
+	persistentDisks map[string]persistentDisk
+}
+
+type persistentDisk struct {
+	diskName  string
+	readOnly  bool
+	fsType    string
+	mountPath string
 }
 
 // Starts a container specified by config.serverImage and exports all
@@ -110,6 +119,20 @@ func startVolumeServer(client clientset.Interface, config VolumeTestConfig) *api
 		mounts[i].ReadOnly = false
 		mounts[i].MountPath = dst
 
+		i++
+	}
+
+	for diskName, disk := range config.persistentDisks {
+		volumes[i].Name = fmt.Sprintf("testdisk%v", i+1)
+		volumes[i].VolumeSource = api.VolumeSource{
+			GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+				PDName: diskName,
+				FSType: disk.fsType,
+			},
+		}
+		mounts[i].Name = fmt.Sprintf("path%d", i+1)
+		mounts[i].ReadOnly = disk.readOnly
+		mounts[i].MountPath = disk.mountPath
 		i++
 	}
 
@@ -401,17 +424,30 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 	framework.KubeDescribe("GlusterFS", func() {
 		It("should be mountable", func() {
+			disks := make(map[string]persistentDisk)
+			pdName, err := createPD()
+			if err != nil {
+				framework.Failf("Fail to create persistent disk %v", err)
+			}
+			disks[pdName] = persistentDisk{
+				diskName:  pdName,
+				readOnly:  false,
+				fsType:    "ext4",
+				mountPath: "/vol",
+			}
 			config := VolumeTestConfig{
-				namespace:   namespace.Name,
-				prefix:      "gluster",
-				serverImage: "gcr.io/google_containers/volume-gluster:0.2",
-				serverPorts: []int{24007, 24008, 49152},
+				namespace:       namespace.Name,
+				prefix:          "gluster",
+				serverImage:     "gcr.io/google_containers/volume-gluster:0.2",
+				serverPorts:     []int{24007, 24008, 49152},
+				persistentDisks: disks,
 			}
 
 			defer func() {
 				if clean {
 					volumeTestCleanup(f, config)
 				}
+				deletePD(pdName)
 			}()
 			pod := startVolumeServer(cs, config)
 			serverIP := pod.Status.PodIP
