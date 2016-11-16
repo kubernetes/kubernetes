@@ -3,6 +3,6 @@ images:
     image: e2e-node-containervm-v20160604-image
     project: kubernetes-node-e2e-images
   gci-family:
-    image_regex: gci-dev-55-8872-18-0
+    image_regex: gci-dev-56-8977-0-0
     project: google-containers
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml"
