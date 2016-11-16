@@ -25,7 +25,11 @@ limitations under the License.
 // separate packages.
 package v1
 
-import "strings"
+import (
+	"fmt"
+
+	"strings"
+)
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
@@ -403,6 +407,19 @@ type APIResource struct {
 	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
 	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
 	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
+	// verbs is a list of supported kube verbs (this includes get, list, watch, create,
+	// update, patch, delete, deletecollection, and proxy)
+	Verbs Verbs `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
+}
+
+// Verbs masks the value so protobuf can generate
+//
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type Verbs []string
+
+func (vs Verbs) String() string {
+	return fmt.Sprintf("%v", []string(vs))
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
