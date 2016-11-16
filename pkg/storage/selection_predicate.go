@@ -54,15 +54,15 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 
 // MatchesLabelsAndFields returns true if the given labels and fields
 // match s.Label and s.Field.
-func (s *SelectionPredicate) MatchesLabelsAndFields(l labels.Set, f fields.Set) (bool, error) {
+func (s *SelectionPredicate) MatchesLabelsAndFields(l labels.Set, f fields.Set) bool {
 	if s.Label.Empty() && s.Field.Empty() {
-		return true, nil
+		return true
 	}
 	matched := s.Label.Matches(l)
 	if matched && s.Field != nil {
 		matched = (matched && s.Field.Matches(f))
 	}
-	return matched, nil
+	return matched
 }
 
 // MatchesSingle will return (name, true) if and only if s.Field matches on the object's

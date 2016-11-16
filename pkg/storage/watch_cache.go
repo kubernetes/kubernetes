@@ -26,6 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/clock"
@@ -45,7 +47,11 @@ const (
 type watchCacheEvent struct {
 	Type            watch.EventType
 	Object          runtime.Object
+	ObjLabels       labels.Set
+	ObjFields       fields.Set
 	PrevObject      runtime.Object
+	PrevObjLabels   labels.Set
+	PrevObjFields   fields.Set
 	Key             string
 	ResourceVersion uint64
 }
@@ -93,6 +99,9 @@ type watchCache struct {
 	// keyFunc is used to get a key in the underlying storage for a given object.
 	keyFunc func(runtime.Object) (string, error)
 
+	// getAttrsFunc is used to get labels and fields of an object.
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)
+
 	// cache is used a cyclic buffer - its first element (with the smallest
 	// resourceVersion) is defined by startIndex, its last element is defined
 	// by endIndex (if cache is full it will be startIndex + capacity).
@@ -122,10 +131,14 @@ type watchCache struct {
 	clock clock.Clock
 }
 
-func newWatchCache(capacity int, keyFunc func(runtime.Object) (string, error)) *watchCache {
+func newWatchCache(
+	capacity int,
+	keyFunc func(runtime.Object) (string, error),
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)) *watchCache {
 	wc := &watchCache{
 		capacity:        capacity,
 		keyFunc:         keyFunc,
+		getAttrsFunc:    getAttrsFunc,
 		cache:           make([]watchCacheElement, capacity),
 		startIndex:      0,
 		endIndex:        0,
@@ -213,14 +226,28 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if err != nil {
 		return err
 	}
+	objLabels, objFields, err := w.getAttrsFunc(event.Object)
+	if err != nil {
+		return err
+	}
 	var prevObject runtime.Object
+	var prevObjLabels labels.Set
+	var prevObjFields fields.Set
 	if exists {
 		prevObject = previous.(*storeElement).Object
+		prevObjLabels, prevObjFields, err = w.getAttrsFunc(prevObject)
+		if err != nil {
+			return err
+		}
 	}
 	watchCacheEvent := watchCacheEvent{
 		Type:            event.Type,
 		Object:          event.Object,
+		ObjLabels:       objLabels,
+		ObjFields:       objFields,
 		PrevObject:      prevObject,
+		PrevObjLabels:   prevObjLabels,
+		PrevObjFields:   prevObjFields,
 		Key:             key,
 		ResourceVersion: resourceVersion,
 	}
@@ -394,9 +421,15 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 			if !ok {
 				return nil, fmt.Errorf("not a storeElement: %v", elem)
 			}
+			objLabels, objFields, err := w.getAttrsFunc(elem.Object)
+			if err != nil {
+				return nil, err
+			}
 			result[i] = watchCacheEvent{
 				Type:            watch.Added,
 				Object:          elem.Object,
+				ObjLabels:       objLabels,
+				ObjFields:       objFields,
 				Key:             elem.Key,
 				ResourceVersion: w.resourceVersion,
 			}
