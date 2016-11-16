@@ -61,6 +61,21 @@ type documentable interface {
 	SwaggerDoc() map[string]string
 }
 
+// toDiscoveryKubeVerb maps an action.Verb to the logical kube verb, used for discovery
+var toDiscoveryKubeVerb = map[string]string{
+	"CONNECT":          "", // do not list in discovery. TODO: is this correct?
+	"DELETE":           "delete",
+	"DELETECOLLECTION": "deletecollection",
+	"GET":              "get",
+	"LIST":             "list",
+	"PATCH":            "patch",
+	"POST":             "create",
+	"PROXY":            "proxy",
+	"PUT":              "update",
+	"WATCH":            "watch",
+	"WATCHLIST":        "watch",
+}
+
 // errEmptyName is returned when API requests do not fill the name section of the path.
 var errEmptyName = errors.NewBadRequest("name must be provided")
 
@@ -489,6 +504,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	allMediaTypes := append(mediaTypes, streamMediaTypes...)
 	ws.Produces(allMediaTypes...)
 
+	kubeVerbs := map[string]struct{}{}
 	reqScope := RequestScope{
 		ContextFunc:    ctxFn,
 		Serializer:     a.group.Serializer,
@@ -515,6 +531,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if action.AllNamespaces {
 			operationSuffix = operationSuffix + "ForAllNamespaces"
 			namespaced = ""
+		}
+
+		if kubeVerb, found := toDiscoveryKubeVerb[action.Verb]; found {
+			if len(kubeVerb) != 0 {
+				kubeVerbs[kubeVerb] = struct{}{}
+			}
+		} else {
+			return nil, fmt.Errorf("unknown action verb for discovery: %s", action.Verb)
 		}
 
 		switch action.Verb {
@@ -753,6 +777,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		// Note: update GetAttribs() when adding a custom handler.
 	}
+	for kubeVerb := range kubeVerbs {
+		apiResource.Verbs = append(apiResource.Verbs, kubeVerb)
+	}
+	sort.Strings(apiResource.Verbs)
+
 	return &apiResource, nil
 }
 
