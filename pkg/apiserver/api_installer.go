@@ -517,6 +517,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			namespaced = ""
 		}
 
+		apiResource.Verbs = append(apiResource.Verbs, action.Verb)
+
 		switch action.Verb {
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
