@@ -19,7 +19,6 @@ package scheduledjob
 import (
 	"encoding/json"
 	"fmt"
-	"hash/adler32"
 	"time"
 
 	"github.com/golang/glog"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 // Utilities for dealing with Jobs and ScheduledJobs and time.
@@ -215,10 +213,8 @@ func getJobFromTemplate(sj *batch.ScheduledJob, scheduledTime time.Time) (*batch
 	return job, nil
 }
 
-func getTimeHash(scheduledTime time.Time) uint32 {
-	timeHasher := adler32.New()
-	hashutil.DeepHashObject(timeHasher, scheduledTime)
-	return timeHasher.Sum32()
+func getTimeHash(scheduledTime time.Time) int64 {
+	return scheduledTime.Unix()
 }
 
 // makeCreatedByRefJson makes a json string with an object reference for use in "created-by" annotation value
