@@ -84,5 +84,6 @@ go_test(
         "//vendor:github.com/docker/engine-api/types/container",
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/stretchr/testify/require",
     ],
 )
