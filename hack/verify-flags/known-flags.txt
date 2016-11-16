@@ -73,6 +73,7 @@ clientset-path
 cloud-config
 cloud-provider
 cluster-cidr
+cluster-context
 cluster-dns
 cluster-domain
 cluster-ip
@@ -507,6 +508,7 @@ schema-cache-dir
 scopes
 seccomp-profile-root
 secondary-node-eviction-rate
+secret-name
 secure-port
 serialize-image-pulls
 server-start-timeout
