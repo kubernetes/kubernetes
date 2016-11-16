@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -226,4 +227,13 @@ func TestGetUserFromImageUser(t *testing.T) {
 		assert.Equal(t, test.uid, actualUID)
 		assert.Equal(t, test.name, actualName)
 	}
+}
+
+func TestParsingCreationConflictError(t *testing.T) {
+	// Expected error message from docker.
+	msg := "Conflict. The name \"/k8s_POD_pfpod_e2e-tests-port-forwarding-dlxt2_81a3469e-99e1-11e6-89f2-42010af00002_0\" is already in use by container 24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e. You have to remove (or rename) that container to be able to reuse that name."
+
+	matches := conflictRE.FindStringSubmatch(msg)
+	require.Len(t, matches, 2)
+	require.Equal(t, matches[1], "24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e")
 }
