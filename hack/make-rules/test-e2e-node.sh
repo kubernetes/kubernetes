@@ -140,10 +140,9 @@ else
     sudo -v || exit 1
   fi
 
-  # If the flag --disable-kubenet is not set, set true by default.
-  if ! [[ $test_args =~ "--disable-kubenet" ]]; then
-    test_args="$test_args --disable-kubenet=true"
-  fi
+  # Do not use any network plugin by default. User could override the flags with
+  # test_args.
+  test_args='--kubelet-flags="--network-plugin= --network-plugin-dir=" '$test_args
 
   # Test using the host the script was run on
   # Provided for backwards compatibility
