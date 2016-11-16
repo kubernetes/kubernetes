@@ -47,5 +47,5 @@ go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 --
   --images="$GCE_IMAGES" --image-project="$GCE_IMAGE_PROJECT" \
   --image-config-file="$GCE_IMAGE_CONFIG_PATH" --cleanup="$CLEANUP" \
   --results-dir="$ARTIFACTS" --ginkgo-flags="--nodes=$PARALLELISM $GINKGO_FLAGS" \
-  --test-timeout="$TIMEOUT" --setup-node="$SETUP_NODE" --test_args="$TEST_ARGS" \
+  --test-timeout="$TIMEOUT" --setup-node="$SETUP_NODE" --test_args="$TEST_ARGS --kubelet-flags=\"$KUBELET_ARGS\"" \
   --instance-metadata="$GCE_INSTANCE_METADATA"
