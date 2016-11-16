@@ -223,6 +223,12 @@ if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
     echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.3.7"
     return 0
   fi
+  echo "Backup and remove all existing v2 data"
+  ROLLBACK_BACKUP_DIR="${DATA_DIRECTORY}.bak"
+  rm -rf "${ROLLBACK_BACKUP_DIR}"
+  mkdir -p "${ROLLBACK_BACKUP_DIR}"
+  cp -r "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
+  rm -rf "${DATA_DIRECTORY}"/member/snap/*.snap
   echo "Performing etcd3 -> etcd2 rollback"
   ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
   if [ "$?" -ne "0" ]; then
