@@ -45,6 +45,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		ingress.Strategy,
 		newListFunc,
+		ingress.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

@@ -19,6 +19,8 @@ package generic
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -34,6 +36,7 @@ type StorageDecorator func(
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object,
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
 	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc)
 
 // Returns given 'storageInterface' without any decoration.
@@ -44,6 +47,7 @@ func UndecoratedStorage(
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object,
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
 	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 	return NewRawStorage(config)
 }

@@ -40,8 +40,15 @@ func NewREST(config *storagebackend.Config, storageDecorator generic.StorageDeco
 	newListFunc := func() runtime.Object { return &testgroup.TestTypeList{} }
 	// Usually you should reuse your RESTCreateStrategy.
 	strategy := &NotNamespaceScoped{}
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		testObj, ok := obj.(*testgroup.TestType)
+		if !ok {
+			return nil, nil, fmt.Errorf("not a TestType")
+		}
+		return labels.Set(testObj.Labels), nil, nil
+	}
 	storageInterface, _ := storageDecorator(
-		config, 100, &testgroup.TestType{}, prefix, strategy, newListFunc, storage.NoTriggerPublisher)
+		config, 100, &testgroup.TestType{}, prefix, strategy, newListFunc, getAttrs, storage.NoTriggerPublisher)
 	store := &registry.Store{
 		NewFunc: func() runtime.Object { return &testgroup.TestType{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.

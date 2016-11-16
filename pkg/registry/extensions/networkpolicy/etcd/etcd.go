@@ -44,6 +44,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		prefix,
 		networkpolicy.Strategy,
 		newListFunc,
+		networkpolicy.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

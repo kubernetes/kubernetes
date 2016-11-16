@@ -44,6 +44,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		prefix,
 		podsecuritypolicy.Strategy,
 		newListFunc,
+		podsecuritypolicy.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

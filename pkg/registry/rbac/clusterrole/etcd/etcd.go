@@ -44,6 +44,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		prefix,
 		clusterrole.Strategy,
 		newListFunc,
+		clusterrole.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

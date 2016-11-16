@@ -68,6 +68,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		replicaset.Strategy,
 		newListFunc,
+		replicaset.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

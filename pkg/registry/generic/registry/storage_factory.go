@@ -18,6 +18,8 @@ package registry
 
 import (
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -34,6 +36,7 @@ func StorageWithCacher(
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object,
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
 	triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 
 	s, d := generic.NewRawStorage(storageConfig)
@@ -46,6 +49,7 @@ func StorageWithCacher(
 		Type:                 objectType,
 		ResourcePrefix:       resourcePrefix,
 		NewListFunc:          newListFunc,
+		GetAttrsFunc:         getAttrsFunc,
 		TriggerPublisherFunc: triggerFunc,
 		Codec:                storageConfig.Codec,
 	}

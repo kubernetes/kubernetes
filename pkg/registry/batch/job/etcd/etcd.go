@@ -45,6 +45,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		job.Strategy,
 		newListFunc,
+		job.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

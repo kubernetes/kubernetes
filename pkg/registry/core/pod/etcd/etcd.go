@@ -69,6 +69,7 @@ func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTr
 		prefix,
 		pod.Strategy,
 		newListFunc,
+		pod.GetAttrs,
 		pod.NodeNameTriggerFunc,
 	)
 

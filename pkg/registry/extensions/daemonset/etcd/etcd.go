@@ -45,6 +45,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		daemonset.Strategy,
 		newListFunc,
+		daemonset.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 
