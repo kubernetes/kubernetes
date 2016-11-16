@@ -1934,6 +1934,22 @@ __EOF__
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
+  ### Create an ExternalName service
+  # Pre-condition: Only the default kubernetes service exist
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  # Command
+  kubectl create service externalname beep-boop --external-name bar.com
+  # Post-condition: beep-boop service is created
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'beep-boop:kubernetes:'
+
+  ### Delete beep-boop service by id
+  # Pre-condition: beep-boop service exists
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'beep-boop:kubernetes:'
+  # Command
+  kubectl delete service beep-boop "${kube_flags[@]}"
+  # Post-condition: Only the default kubernetes services exist
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+
 
   ###########################
   # Replication controllers #
