@@ -23,25 +23,12 @@ issue](https://github.com/kubernetes/kubernetes/issues/new).
 We'd love to accept your patches! Before we can take them, we have to jump a
 couple of legal hurdles.
 
+The Cloud Native Computing Foundation (CNCF) CLA [must be signed](https://github.com/kubernetes/community/blob/master/CLA.md) by all contributors.
 Please fill out either the individual or corporate Contributor License
-Agreement (CLA).  As of Q4 2016, we're transitioning from Google's CLA to the
-Cloud Native Computing Foundation (CNCF) CLA.
+Agreement (CLA). 
 
-Google:
-  * If you are an individual writing original source code and you're sure you
-    own the intellectual property, then you'll need to sign an [individual
-    CLA](http://code.google.com/legal/individual-cla-v1.0.html).
-  * If you work for a company that wants to allow you to contribute your work,
-    then you'll need to sign a [corporate
-    CLA](http://code.google.com/legal/corporate-cla-v1.0.html).
-
-CNCF:
-  * To contribute as an individual or as am employee of a signed organization,
-    [go here](https://identity.linuxfoundation.org/projects/cncf).
-  * To sign up as an organization, [go
-    here](https://identity.linuxfoundation.org/node/285/organization-signup).
-
-Once you are CLA'ed, we'll be able to accept your pull requests.
+Once you are CLA'ed, we'll be able to accept your pull requests. For any issues that you face during this process, 
+please add a comment [here](https://github.com/kubernetes/kubernetes/issues/27796) explaining the issue and we will help get it sorted out.
 
 ***NOTE***: Only original source code from you and other people that have
 signed the CLA can be accepted into the repository. This policy does not
