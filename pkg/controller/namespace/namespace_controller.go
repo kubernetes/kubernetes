@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
@@ -57,8 +59,8 @@ type NamespaceController struct {
 	controller *cache.Controller
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
-	// function to list of preferred group versions and their corresponding resource set for namespace deletion
-	groupVersionResourcesFn func() (map[schema.GroupVersionResource]struct{}, error)
+	// function to list of preferred resources for namespace deletion
+	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
 	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
 	opCache *operationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
@@ -69,36 +71,55 @@ type NamespaceController struct {
 func NewNamespaceController(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
-	groupVersionResourcesFn func() (map[schema.GroupVersionResource]struct{}, error),
+	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
-	// the namespace deletion code looks at the discovery document to enumerate the set of resources on the server.
-	// it then finds all namespaced resources, and in response to namespace deletion, will call delete on all of them.
-	// unfortunately, the discovery information does not include the list of supported verbs/methods.  if the namespace
-	// controller calls LIST/DELETECOLLECTION for a resource, it will get a 405 error from the server and cache that that was the case.
-	// we found in practice though that some auth engines when encountering paths they don't know about may return a 50x.
-	// until we have verbs, we pre-populate resources that do not support list or delete for well-known apis rather than
-	// probing the server once in order to be told no.
 	opCache := &operationNotSupportedCache{
 		m: make(map[operationKey]bool),
 	}
-	ignoredGroupVersionResources := []schema.GroupVersionResource{
-		{Group: "", Version: "v1", Resource: "bindings"},
+
+	// pre-fill opCache with the discovery info
+	//
+	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
+	resources, err := discoverResourcesFn()
+	if err != nil {
+		glog.Fatalf("Failed to get supported resources: %v", err)
 	}
-	for _, ignoredGroupVersionResource := range ignoredGroupVersionResources {
-		opCache.setNotSupported(operationKey{op: operationDeleteCollection, gvr: ignoredGroupVersionResource})
-		opCache.setNotSupported(operationKey{op: operationList, gvr: ignoredGroupVersionResource})
+	deletableGroupVersionResources := []schema.GroupVersionResource{}
+	for _, rl := range resources {
+		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
+		if err != nil {
+			glog.Errorf("Failed to parse GroupVersion %q, skipping: %v", rl.GroupVersion, err)
+			continue
+		}
+
+		for _, r := range rl.APIResources {
+			gvr := schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: r.Name}
+			verbs := sets.NewString([]string(r.Verbs)...)
+
+			if !verbs.Has("delete") {
+				glog.V(6).Infof("Skipping resource %v because it cannot be deleted.", gvr)
+			}
+
+			for _, op := range []operation{operationList, operationDeleteCollection} {
+				if !verbs.Has(string(op)) {
+					opCache.setNotSupported(operationKey{op: op, gvr: gvr})
+				}
+			}
+
+			deletableGroupVersionResources = append(deletableGroupVersionResources, gvr)
+		}
 	}
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		kubeClient: kubeClient,
-		clientPool: clientPool,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		groupVersionResourcesFn: groupVersionResourcesFn,
-		opCache:                 opCache,
-		finalizerToken:          finalizerToken,
+		kubeClient:          kubeClient,
+		clientPool:          clientPool,
+		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
+		discoverResourcesFn: discoverResourcesFn,
+		opCache:             opCache,
+		finalizerToken:      finalizerToken,
 	}
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
@@ -203,7 +224,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return err
 	}
 	namespace := obj.(*v1.Namespace)
-	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.groupVersionResourcesFn, namespace, nm.finalizerToken)
+	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.discoverResourcesFn, namespace, nm.finalizerToken)
 }
 
 // Run starts observing the system with the specified number of workers.

@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -113,8 +114,9 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 
 	// when doing a delete all of content, we will do a GET of a collection, and DELETE of a collection by default
 	dynamicClientActionSet := sets.NewString()
-	groupVersionResources := testGroupVersionResources()
-	for _, groupVersionResource := range groupVersionResources {
+	resources := testResources()
+	groupVersionResources, _ := discovery.GroupVersionResources(resources)
+	for groupVersionResource := range groupVersionResources {
 		urlPath := path.Join([]string{
 			dynamic.LegacyAPIPathResolverFunc(schema.GroupVersionKind{Group: groupVersionResource.Group, Version: groupVersionResource.Version}),
 			groupVersionResource.Group,
@@ -170,8 +172,8 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
 		clientPool := dynamic.NewClientPool(clientConfig, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 
-		fn := func() ([]schema.GroupVersionResource, error) {
-			return groupVersionResources, nil
+		fn := func() ([]*metav1.APIResourceList, error) {
+			return resources, nil
 		}
 
 		err := syncNamespace(mockClient, clientPool, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testInput.testNamespace, v1.FinalizerKubernetes)
@@ -243,8 +245,8 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: v1.NamespaceActive,
 		},
 	}
-	fn := func() ([]schema.GroupVersionResource, error) {
-		return testGroupVersionResources(), nil
+	fn := func() ([]*metav1.APIResourceList, error) {
+		return testResources(), nil
 	}
 	err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testNamespace, v1.FinalizerKubernetes)
 	if err != nil {
@@ -295,11 +297,37 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	response.Write([]byte("{\"kind\": \"List\",\"items\":null}"))
 }
 
-// testGroupVersionResources returns a mocked up set of resources across different api groups for testing namespace controller.
-func testGroupVersionResources() []schema.GroupVersionResource {
-	results := []schema.GroupVersionResource{}
-	results = append(results, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
-	results = append(results, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"})
-	results = append(results, schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
+// testResources returns a mocked up set of resources across different api groups for testing namespace controller.
+func testResources() []*metav1.APIResourceList {
+	results := []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "pods",
+					Namespaced: true,
+					Kind:       "Pod",
+					Verbs:      []string{"get", "list", "delete", "deletecollection", "create", "update"},
+				},
+				{
+					Name:       "services",
+					Namespaced: true,
+					Kind:       "Service",
+					Verbs:      []string{"get", "list", "delete", "deletecollection", "create", "update"},
+				},
+			},
+		},
+		{
+			GroupVersion: "extensions/v1beta1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "deployments",
+					Namespaced: true,
+					Kind:       "Deployment",
+					Verbs:      []string{"get", "list", "delete", "deletecollection", "create", "update"},
+				},
+			},
+		},
+	}
 	return results
 }
