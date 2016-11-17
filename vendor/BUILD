@@ -11716,3 +11716,13 @@ go_library(
     srcs = ["k8s.io/client-go/pkg/util/ratelimit/bucket.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "github.com/miekg/coredns/middleware/etcd/msg",
+    srcs = [
+        "github.com/miekg/coredns/middleware/etcd/msg/path.go",
+        "github.com/miekg/coredns/middleware/etcd/msg/service.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/miekg/dns"],
+)
