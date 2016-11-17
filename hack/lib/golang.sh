@@ -611,7 +611,7 @@ kube::golang::build_binaries() {
     local arg
 
     # Add any files with those //generate annotations in the array below.
-    readonly BINDATAS=( "${KUBE_ROOT}/test/e2e/framework/gobindata_util.go" )
+    readonly BINDATAS=( "${KUBE_ROOT}/test/e2e/generated/gobindata_util.go" )
     kube::log::status "Generating bindata:" "${BINDATAS[@]}"
     for bindata in ${BINDATAS[@]}; do
           # Only try to generate bindata if the file exists, since in some cases
