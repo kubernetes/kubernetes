@@ -29,6 +29,8 @@ go_library(
         "//pkg/registry/generic:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
+        "//pkg/util/sets:go_default_library",
+        "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/golang/glog",
     ],
 )

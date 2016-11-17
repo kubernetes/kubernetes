@@ -100,7 +100,7 @@ type thirdPartyEntry struct {
 }
 
 func (g *thirdPartyGroup) versionInstalled(version string) bool {
-	for installedVersion, _ := range g.versionedEntry {
+	for installedVersion := range g.versionedEntry {
 		if reflect.DeepEqual(version, installedVersion) {
 			return true
 		}
