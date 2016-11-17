@@ -217,7 +217,7 @@ func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath
 		if length == 3 {
 			sourceName = awsURLNamePrefix + names[1] + "/" + volName // names[1] is the zone label
 		}
-		glog.V(4).Info("Convert aws volume name from %q to %q ", volumeID, sourceName)
+		glog.V(4).Infof("Convert aws volume name from %q to %q ", volumeID, sourceName)
 	}
 
 	awsVolume := &api.Volume{
