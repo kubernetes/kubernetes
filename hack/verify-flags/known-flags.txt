@@ -318,6 +318,7 @@ kubelet-client-certificate
 kubelet-client-key
 kubelet-docker-endpoint
 kubelet-enable-debugging-handlers
+kubelet-flags
 kubelet-host-network-sources
 kubelet-https
 kubelet-kubeconfig

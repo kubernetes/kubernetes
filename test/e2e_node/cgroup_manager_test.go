@@ -54,7 +54,7 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *api.Pod {
 	// convert the names to their literal cgroupfs forms...
 	cgroupFsNames := []string{}
 	for _, cgroupName := range cgroupNames {
-		if framework.TestContext.CgroupDriver == "systemd" {
+		if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 			cgroupFsNames = append(cgroupFsNames, cm.ConvertCgroupNameToSystemd(cgroupName, true))
 		} else {
 			cgroupFsNames = append(cgroupFsNames, string(cgroupName))
@@ -103,7 +103,7 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *api.Pod {
 // makePodToVerifyCgroupRemoved verfies the specified cgroup does not exist.
 func makePodToVerifyCgroupRemoved(cgroupName cm.CgroupName) *api.Pod {
 	cgroupFsName := string(cgroupName)
-	if framework.TestContext.CgroupDriver == "systemd" {
+	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		cgroupFsName = cm.ConvertCgroupNameToSystemd(cm.CgroupName(cgroupName), true)
 	}
 	pod := &api.Pod{
@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
 			It("Top level QoS containers should have been created", func() {
-				if !framework.TestContext.CgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
 				cgroupsToVerify := []cm.CgroupName{cm.CgroupName(qos.Burstable), cm.CgroupName(qos.BestEffort)}
@@ -158,7 +158,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("Pod containers", func() {
 		Context("On scheduling a Guaranteed Pod", func() {
 			It("Pod containers should have been created under the cgroup-root", func() {
-				if !framework.TestContext.CgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
 				var (
@@ -202,7 +202,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 		Context("On scheduling a BestEffort Pod", func() {
 			It("Pod containers should have been created under the BestEffort cgroup", func() {
-				if !framework.TestContext.CgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
 				var (
@@ -246,7 +246,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 		Context("On scheduling a Burstable Pod", func() {
 			It("Pod containers should have been created under the Burstable cgroup", func() {
-				if !framework.TestContext.CgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
 				var (
