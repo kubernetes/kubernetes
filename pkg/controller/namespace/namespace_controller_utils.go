@@ -343,13 +343,13 @@ func deleteAllContent(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResources []schema.GroupVersionResource,
+	groupVersionResources map[schema.GroupVersionResource]struct{},
 	namespace string,
 	namespaceDeletedAt metav1.Time,
 ) (int64, error) {
 	estimate := int64(0)
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, gvrs: %v", namespace, groupVersionResources)
-	for _, gvr := range groupVersionResources {
+	for gvr := range groupVersionResources {
 		gvrEstimate, err := deleteAllContentForGroupVersionResource(kubeClient, clientPool, opCache, gvr, namespace, namespaceDeletedAt)
 		if err != nil {
 			return estimate, err
@@ -367,7 +367,7 @@ func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error),
+	groupVersionResourcesFn func() (map[schema.GroupVersionResource]struct{}, error),
 	namespace *v1.Namespace,
 	finalizerToken v1.FinalizerName,
 ) error {

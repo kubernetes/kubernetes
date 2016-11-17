@@ -58,7 +58,7 @@ type NamespaceController struct {
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
 	// function to list of preferred group versions and their corresponding resource set for namespace deletion
-	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error)
+	groupVersionResourcesFn func() (map[schema.GroupVersionResource]struct{}, error)
 	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
 	opCache *operationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
@@ -69,7 +69,7 @@ type NamespaceController struct {
 func NewNamespaceController(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
-	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error),
+	groupVersionResourcesFn func() (map[schema.GroupVersionResource]struct{}, error),
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
