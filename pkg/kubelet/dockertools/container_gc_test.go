@@ -29,11 +29,12 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 )
 
-func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient) {
+func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient, *fakeNetworkPlugin) {
 	fakeDocker := new(FakeDockerClient)
 	fakePodGetter := newFakePodGetter()
-	gc := NewContainerGC(fakeDocker, fakePodGetter, "")
-	return gc, fakeDocker
+	fakePlugin := newFakeNetworkPlugin("", nil)
+	gc := NewContainerGC(fakeDocker, fakePodGetter, newDockerNetwork(fakePlugin), "")
+	return gc, fakeDocker, fakePlugin
 }
 
 // Makes a stable time object, lower id is earlier time.
@@ -90,7 +91,7 @@ func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
 }
 
 func TestDeleteContainerSkipRunningContainer(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", true, makeTime(0)),
 	})
@@ -101,7 +102,7 @@ func TestDeleteContainerSkipRunningContainer(t *testing.T) {
 }
 
 func TestDeleteContainerRemoveDeadContainer(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 	})
@@ -111,8 +112,37 @@ func TestDeleteContainerRemoveDeadContainer(t *testing.T) {
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
+func TestGarbageCollectNetworkTeardown(t *testing.T) {
+	// Ensure infra container gets teardown called
+	gc, fakeDocker, fakePlugin := newTestContainerGC(t)
+	id := "1876"
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		makeContainer(id, "foo", "POD", false, makeTime(0)),
+	})
+	addPods(gc.podGetter, "foo")
+
+	assert.Nil(t, gc.deleteContainer(id))
+	assert.Len(t, fakeDocker.Removed, 1)
+	num, ok := fakePlugin.teardowns[id]
+	assert.Equal(t, ok, true)
+	assert.Equal(t, num, uint(1))
+
+	// Ensure non-infra container does not have teardown called
+	gc, fakeDocker, fakePlugin = newTestContainerGC(t)
+	id = "1877"
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		makeContainer(id, "foo", "adsfasdfasdf", false, makeTime(0)),
+	})
+	addPods(gc.podGetter, "foo")
+
+	assert.Nil(t, gc.deleteContainer(id))
+	assert.Len(t, fakeDocker.Removed, 1)
+	_, ok = fakePlugin.teardowns[id]
+	assert.Equal(t, ok, false)
+}
+
 func TestGarbageCollectZeroMaxContainers(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 	})
@@ -123,7 +153,7 @@ func TestGarbageCollectZeroMaxContainers(t *testing.T) {
 }
 
 func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 		makeContainer("2876", "foo1", "POD", false, makeTime(1)),
@@ -138,7 +168,7 @@ func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
 }
 
 func TestGarbageCollectNoMaxLimit(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 		makeContainer("2876", "foo1", "POD", false, makeTime(0)),
@@ -260,7 +290,7 @@ func TestGarbageCollect(t *testing.T) {
 	}
 	for i, test := range tests {
 		t.Logf("Running test case with index %d", i)
-		gc, fakeDocker := newTestContainerGC(t)
+		gc, fakeDocker, _ := newTestContainerGC(t)
 		fakeDocker.SetFakeContainers(test.containers)
 		addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4", "foo5", "foo6", "foo7")
 		assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}, true))
