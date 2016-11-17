@@ -20,7 +20,7 @@
     ],
     "volumes": [{
       "name":"kubectl",
-      "hostPath":{"path": "$KUBECTL_PATH"}
+      "hostPath":{"path": "/usr/bin/kubectl"}
     }]
   }
 }
