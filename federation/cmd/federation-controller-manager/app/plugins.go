@@ -23,5 +23,5 @@ import (
 	// DNS providers
 	_ "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53"
 	_ "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns"
-	_ "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/local/coredns"
+	_ "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns"
 )

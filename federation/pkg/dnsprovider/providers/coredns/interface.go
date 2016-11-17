@@ -18,7 +18,7 @@ package coredns
 
 import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/local/coredns/stubs"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns/stubs"
 )
 
 // Compile time check for interface adherence

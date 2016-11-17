@@ -28,9 +28,9 @@ import (
 	"strings"
 )
 
-// "local-coredns" should be used to use this DNS provider
+// "coredns" should be used to use this DNS provider
 const (
-	ProviderName = "local-coredns"
+	ProviderName = "coredns"
 )
 
 // Config to override defaults
@@ -63,10 +63,10 @@ func newCoreDNSProviderInterface(config io.Reader) (*Interface, error) {
 		etcdEndpoints = cfg.Global.EtcdEndpoints
 		dnsZones = cfg.Global.DNSZones
 	}
-	glog.Infof("Using local CoreDNS DNS provider")
+	glog.Infof("Using CoreDNS DNS provider")
 
 	if dnsZones == "" {
-		return nil, fmt.Errorf("Need to provide atleast one DNS Zone")
+		return nil, fmt.Errorf("Need to provide at least one DNS Zone")
 	}
 
 	etcdCfg := etcdc.Config{
