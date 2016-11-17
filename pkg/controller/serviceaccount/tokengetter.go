@@ -22,9 +22,9 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
-	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
+	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"
-	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/core/serviceaccount/etcd"
+	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -89,7 +89,7 @@ func NewGetterFromStorageInterface(config *storagebackend.Config, saPrefix, secr
 	saOpts := generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: saPrefix}
 	secretOpts := generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: secretPrefix}
 	return NewGetterFromRegistries(
-		serviceaccountregistry.NewRegistry(serviceaccountetcd.NewREST(saOpts)),
-		secret.NewRegistry(secretetcd.NewREST(secretOpts)),
+		serviceaccountregistry.NewRegistry(serviceaccountstore.NewREST(saOpts)),
+		secret.NewRegistry(secretstore.NewREST(secretOpts)),
 	)
 }
