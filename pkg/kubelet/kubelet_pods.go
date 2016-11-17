@@ -415,6 +415,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 
 	var (
 		configMaps = make(map[string]*api.ConfigMap)
+		tmpEnv     = make(map[string]string)
 	)
 	for _, envFrom := range container.EnvFrom {
 		if envFrom.ConfigMap != nil {
@@ -431,13 +432,17 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 				configMaps[name] = configMap
 			}
 			for k, v := range configMap.Data {
+				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
+					return result, fmt.Errorf("Invalid environment variable name, %v, from configmap %v/%v: %s", k, pod.Namespace, name, errMsgs[0])
+				}
+
 				// Accesses apiserver+Pods.
 				// So, the master may set service env vars, or kubelet may.  In case both are doing
 				// it, we delete the key from the kubelet-generated ones so we don't have duplicate
 				// env vars.
 				// TODO: remove this next line once all platforms use apiserver+Pods.
 				delete(serviceEnv, k)
-				result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
+				tmpEnv[k] = v
 			}
 		}
 	}
@@ -452,7 +457,6 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 	// 2.  Create the container's environment in the order variables are declared
 	// 3.  Add remaining service environment vars
 	var (
-		tmpEnv      = make(map[string]string)
 		secrets     = make(map[string]*api.Secret)
 		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	)
@@ -526,7 +530,11 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		}
 
 		tmpEnv[envVar.Name] = runtimeVal
-		result = append(result, kubecontainer.EnvVar{Name: envVar.Name, Value: tmpEnv[envVar.Name]})
+	}
+
+	// Append the env vars
+	for k, v := range tmpEnv {
+		result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
 	}
 
 	// Append remaining service env vars.
