@@ -342,6 +342,8 @@ PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same n
 Pet Store should scale to persist a nominal number ( * ) of transactions in * seconds,xiang90,1
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",alex-mohr,1
 "Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",rrati,0
+"Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",ghodss,1
+Pod Disks should be able to detach from a node whose api object was deleted,rkouj,0
 "Pod Disks should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession",saad-ali,0
 "Pod Disks should schedule a pod w/ a RW PD, ungracefully remove it, then schedule it on another host",mml,1
 "Pod Disks should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully.",saad-ali,1
@@ -470,6 +472,7 @@ StatefulSet Basic StatefulSet functionality should allow template updates,derekw
 StatefulSet Basic StatefulSet functionality should handle healthy stateful pod restarts during scale,kevin-wangzefeng,1
 StatefulSet Basic StatefulSet functionality should provide basic identity,bprashanth,1
 StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,derekwaynecarr,0
+StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,rkouj,0
 StatefulSet Deploy clustered applications should creating a working mysql cluster,yujuhong,1
 StatefulSet Deploy clustered applications should creating a working redis cluster,yifan-gu,1
 StatefulSet Deploy clustered applications should creating a working zookeeper cluster,pmorie,1
