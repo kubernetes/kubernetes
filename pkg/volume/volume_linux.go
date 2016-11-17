@@ -51,6 +51,11 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 			return err
 		}
 
+		// chown and chmod pass through to the underlying file for symlinks so skip
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+
 		stat, ok := info.Sys().(*syscall.Stat_t)
 		if !ok {
 			return nil
