@@ -166,6 +166,11 @@ readonly KUBE_STATIC_LIBRARIES=(
   kubectl
 )
 
+# Add any files with those //generate annotations in the array below.
+readonly KUBE_BINDATAS=(
+  test/e2e/framework/gobindata_util.go
+)
+
 kube::golang::is_statically_linked_library() {
   local e
   for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
@@ -414,12 +419,12 @@ kube::golang::fallback_if_stdlib_not_installable() {
 
 # Builds the toolchain necessary for building kube. This needs to be
 # built only on the host platform.
-# TODO: This builds only the `teststale` binary right now. As we expand
-# this function's capabilities we need to find this a right home.
+# TODO: Find this a proper home.
 # Ideally, not a shell script because testing shell scripts is painful.
 kube::golang::build_kube_toolchain() {
   local targets=(
     hack/cmd/teststale
+    vendor/github.com/jteeuwen/go-bindata/go-bindata
   )
 
   local binaries
@@ -610,17 +615,6 @@ kube::golang::build_binaries() {
     local -a targets=()
     local arg
 
-    # Add any files with those //generate annotations in the array below.
-    readonly BINDATAS=( "${KUBE_ROOT}/test/e2e/framework/gobindata_util.go" )
-    kube::log::status "Generating bindata:" "${BINDATAS[@]}"
-    for bindata in ${BINDATAS[@]}; do
-          # Only try to generate bindata if the file exists, since in some cases
-          # one-off builds of individual directories may exclude some files.
-      if [[ -f $bindata ]]; then
-          go generate "${bindata}"
-      fi
-    done
-
     for arg; do
       if [[ "${arg}" == "--use_go_build" ]]; then
         use_go_build=true
@@ -660,6 +654,15 @@ kube::golang::build_binaries() {
 
     # First build the toolchain before building any other targets
     kube::golang::build_kube_toolchain
+
+    kube::log::status "Generating bindata:" "${KUBE_BINDATAS[@]}"
+    for bindata in ${KUBE_BINDATAS[@]}; do
+      # Only try to generate bindata if the file exists, since in some cases
+      # one-off builds of individual directories may exclude some files.
+      if [[ -f "${KUBE_ROOT}/${bindata}" ]]; then
+        go "${goflags[@]:+${goflags[@]}}" generate "${KUBE_ROOT}/${bindata}"
+      fi
+    done
 
     if [[ "${parallel}" == "true" ]]; then
       kube::log::status "Building go targets for {${platforms[*]}} in parallel (output will appear in a burst when complete):" "${targets[@]}"
