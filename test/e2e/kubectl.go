@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/generated"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -150,7 +151,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 }
 
 func readTestFileOrDie(file string) []byte {
-	return framework.ReadOrDie(path.Join(kubeCtlManifestPath, file))
+	return generated.ReadOrDie(path.Join(kubeCtlManifestPath, file))
 }
 
 func runKubectlRetryOrDie(args ...string) string {
@@ -298,8 +299,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		var nautilus, kitten []byte
 		BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = framework.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml"))
-			kitten = framework.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml"))
+			nautilus = generated.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml"))
+			kitten = generated.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml"))
 		})
 		It("should create and stop a replication controller [Conformance]", func() {
 			defer cleanupKubectlInputs(string(nautilus), ns, updateDemoSelector)
@@ -344,7 +345,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				"examples/guestbook/redis-slave-deployment.yaml",
 				"examples/guestbook/redis-slave-service.yaml",
 			} {
-				contents := framework.ReadOrDie(gbAppFile)
+				contents := generated.ReadOrDie(gbAppFile)
 				run(string(contents))
 			}
 		}
@@ -370,7 +371,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		var podPath []byte
 
 		BeforeEach(func() {
-			podPath = framework.ReadOrDie(path.Join(kubeCtlManifestPath, "pod-with-readiness-probe.yaml"))
+			podPath = generated.ReadOrDie(path.Join(kubeCtlManifestPath, "pod-with-readiness-probe.yaml"))
 			By(fmt.Sprintf("creating the pod from %v", string(podPath)))
 			framework.RunKubectlOrDieInput(string(podPath[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(BeTrue())

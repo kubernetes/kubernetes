@@ -184,6 +184,7 @@ go_library(
         "//test/e2e/chaosmonkey:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/generated:go_default_library",
         "//test/images/net/nat:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
