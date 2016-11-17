@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -3361,6 +3362,30 @@ func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 		pollErr = fmt.Errorf("couldn't apply the provided updated to rc %q: %v", name, updateErr)
 	}
 	return rc, pollErr
+}
+
+type updateStatefulSetFunc func(*apps.StatefulSet)
+
+func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *apps.StatefulSet, err error) {
+	statefulSets := c.Apps().StatefulSets(namespace)
+	var updateErr error
+	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if statefulSet, err = statefulSets.Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(statefulSet)
+		if statefulSet, err = statefulSets.Update(statefulSet); err == nil {
+			Logf("Updating stateful set %s", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
+	}
+	return statefulSet, pollErr
 }
 
 // NodeAddresses returns the first address of the given type of each node.

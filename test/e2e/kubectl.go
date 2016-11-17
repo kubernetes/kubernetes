@@ -87,6 +87,7 @@ const (
 	runJobTimeout            = 5 * time.Minute
 	busyboxImage             = "gcr.io/google_containers/busybox:1.24"
 	nginxImage               = "gcr.io/google_containers/nginx-slim:0.7"
+	newNginxImage            = "gcr.io/google_containers/nginx-slim:0.8"
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json"
 	redisServiceFilename     = "redis-master-service.json"
