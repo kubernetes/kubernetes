@@ -67,9 +67,6 @@ func newSystemErrorWithCause(err error, cause string) Error {
 // stack frames skipped. This is only to be called by the other functions for
 // formatting the error.
 func createSystemError(err error, cause string) Error {
-	if le, ok := err.(Error); ok {
-		return le
-	}
 	gerr := &genericError{
 		Timestamp: time.Now(),
 		Err:       err,

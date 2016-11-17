@@ -107,19 +107,5 @@ var (
 			Permissions: "rwm",
 		},
 	}, DefaultSimpleDevices...)
-	DefaultAutoCreatedDevices = append([]*Device{
-		{
-			// /dev/fuse is created but not allowed.
-			// This is to allow java to work.  Because java
-			// Insists on there being a /dev/fuse
-			// https://github.com/docker/docker/issues/514
-			// https://github.com/docker/docker/issues/2393
-			//
-			Path:        "/dev/fuse",
-			Type:        'c',
-			Major:       10,
-			Minor:       229,
-			Permissions: "rwm",
-		},
-	}, DefaultSimpleDevices...)
+	DefaultAutoCreatedDevices = append([]*Device{}, DefaultSimpleDevices...)
 )

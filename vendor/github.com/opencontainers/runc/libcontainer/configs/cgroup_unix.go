@@ -120,5 +120,5 @@ type Resources struct {
 	NetPrioIfpriomap []*IfPrioMap `json:"net_prio_ifpriomap"`
 
 	// Set class identifier for container's network packets
-	NetClsClassid uint32 `json:"net_cls_classid"`
+	NetClsClassid uint32 `json:"net_cls_classid_u"`
 }
