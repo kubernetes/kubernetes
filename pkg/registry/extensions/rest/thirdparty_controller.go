@@ -94,7 +94,7 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 					Kind:    kind,
 				})
 				// place it in the set of resources that we expect, so that we don't delete it in the delete pass
-				fullAPIPath := MakeThirdPartyPath(group) + "/" + version.Name + "/" + plural.Resource
+				fullAPIPath := makeFullAPIPath(group, version.Name) + "/" + plural.Resource
 				existing.Insert(fullAPIPath)
 			}
 			// ensure a RESTful resource for this schema exists on the master
@@ -132,6 +132,16 @@ func MakeThirdPartyPath(group string) string {
 		return thirdpartyprefix
 	}
 	return thirdpartyprefix + "/" + group
+}
+
+func makeFullAPIPath(group, version string) string {
+	if len(group) == 0 {
+		return thirdpartyprefix
+	}
+	if len(version) == 0 {
+		return thirdpartyprefix + "/" + group
+	}
+	return thirdpartyprefix + "/" + group + "/" + version
 }
 
 func GetThirdPartyGroupName(path string) string {
