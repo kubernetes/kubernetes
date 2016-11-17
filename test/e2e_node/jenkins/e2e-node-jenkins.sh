@@ -32,7 +32,7 @@ go get -u github.com/jteeuwen/go-bindata/go-bindata
 make generated_files
 
 # TODO converge build steps with hack/build-go some day if possible.
-go generate test/e2e/framework/gobindata_util.go
+go generate test/e2e/generated/gobindata_util.go
 go build test/e2e_node/environment/conformance.go
 
 PARALLELISM=${PARALLELISM:-8}
