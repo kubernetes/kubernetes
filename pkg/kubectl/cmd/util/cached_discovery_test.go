@@ -139,19 +139,19 @@ func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
-func (c *fakeDiscoveryClient) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (c *fakeDiscoveryClient) ServerResources() ([]*unversioned.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return map[string]*unversioned.APIResourceList{}, nil
+	return []*unversioned.APIResourceList{}, nil
 }
 
-func (c *fakeDiscoveryClient) ServerPreferredResources() ([]schema.GroupVersionResource, error) {
+func (c *fakeDiscoveryClient) ServerPreferredResources() ([]*unversioned.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return []schema.GroupVersionResource{}, nil
+	return nil, nil
 }
 
-func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]schema.GroupVersionResource, error) {
+func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]*unversioned.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return []schema.GroupVersionResource{}, nil
+	return nil, nil
 }
 
 func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
