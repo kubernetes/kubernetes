@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 var (
@@ -176,7 +177,8 @@ func (o *ResourcesOptions) Validate() error {
 
 func (o *ResourcesOptions) Run() error {
 	allErrs := []error{}
-	patches := CalculatePatches(o.f, o.Infos, o.Encoder, cmdutil.GetDryRunFlag(o.Cmd), func(info *resource.Info) (bool, error) {
+	// Defauting to SMPatchVersion_1_5, since the func passed in doesn't update any lists of primitive
+	patches := CalculatePatches(o.f, o.Infos, o.Encoder, strategicpatch.SMPatchVersion_1_5, func(info *resource.Info) (bool, error) {
 		transformed := false
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)

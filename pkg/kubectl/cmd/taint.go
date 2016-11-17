@@ -321,11 +321,6 @@ func (o TaintOptions) RunTaint() error {
 		return err
 	}
 
-	smPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(o.f)
-	if err != nil {
-		return err
-	}
-
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -348,7 +343,8 @@ func (o TaintOptions) RunTaint() error {
 		if err != nil {
 			return err
 		}
-		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, smPatchVersion)
+		// Defaulting to SMPatchVersion_1_5 is safe, since we don't update list of primitives.
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, strategicpatch.SMPatchVersion_1_5)
 		createdPatch := err == nil
 		if err != nil {
 			glog.V(2).Infof("couldn't compute patch: %v", err)

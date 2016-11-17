@@ -244,9 +244,8 @@ func (e *eventLogger) eventObserve(newEvent *api.Event) (*api.Event, []byte, err
 
 		newData, _ := json.Marshal(event)
 		oldData, _ := json.Marshal(eventCopy2)
-		// TODO: need to figure out if we need to let eventObserve() use the new behavior of StrategicMergePatch.
-		// Currently default to old behavior now. Ref: issue #35936
-		patch, err = strategicpatch.CreateStrategicMergePatch(oldData, newData, event, strategicpatch.SMPatchVersion_1_0)
+		// Defaulting to SMPatchVersion_1_5 is safe, since we only update Count and LastTimestamp, and none of them has list of primitives
+		patch, err = strategicpatch.CreateStrategicMergePatch(oldData, newData, event, strategicpatch.SMPatchVersion_1_5)
 	}
 
 	// record our new observation
