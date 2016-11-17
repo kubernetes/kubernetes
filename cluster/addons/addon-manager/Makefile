@@ -36,7 +36,6 @@ ifeq ($(ARCH),ppc64le)
 	QEMUARCH=ppc64le
 endif
 ifeq ($(ARCH),s390x)
-	KUBECTL_VERSION?=v1.3.0-beta.2
 	BASEIMAGE?=s390x/python:2.7-slim
 	QEMUARCH=s390x
 endif
