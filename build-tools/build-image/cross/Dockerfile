@@ -52,12 +52,11 @@ RUN mkdir -p /usr/local/src/protobuf \
   && protoc --version
 
 # Use dynamic cgo linking for architectures other than amd64 for the server platforms
-# More info here: https://wiki.debian.org/CrossToolchains
-RUN echo "deb http://cz.archive.ubuntu.com/ubuntu xenial main universe" > /etc/apt/sources.list.d/cgocrosscompiling.list \
-  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
+# To install crossbuild essential for other architectures add the following repository.
+RUN echo "deb http://archive.ubuntu.com/ubuntu xenial main universe" > /etc/apt/sources.list.d/cgocrosscompiling.list \
   && apt-get update \
-  && apt-get install -y build-essential \
-  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
+  && apt-get install -y --force-yes  build-essential \
+  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y --force-yes crossbuild-essential-${platform}; done \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
   
 # work around 64MB tmpfs size in Docker 1.6
