@@ -1,7 +1,8 @@
 ## Abstract
 
 PodSecurityPolicy allows cluster administrators to control the creation and validation of a security
-context for a pod and containers.
+context for a pod and containers. The intent of PodSecurityPolicy is to protect the cluster from the
+pod and containers, not to protect a pod or containers from a user.
 
 ## Motivation
 
@@ -221,7 +222,9 @@ const (
 
 As reusable objects in the root scope, PodSecurityPolicy follows the lifecycle of the
 cluster itself.  Maintenance of constraints such as adding, assigning, or changing them is the
-responsibility of the cluster administrator.
+responsibility of the cluster administrator. Deleting is not considered in PodSecurityPolicy,
+It's important for controllers without the ability to use psps (like the namespace controller)
+to be able to delete pods.
 
 Creating a new user within a namespace should not require the cluster administrator to
 define the user's PodSecurityPolicy.  They should receive the default set of policies
