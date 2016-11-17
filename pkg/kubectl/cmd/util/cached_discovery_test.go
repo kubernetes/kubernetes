@@ -153,6 +153,16 @@ func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]unversione
 	return []unversioned.GroupVersionResource{}, nil
 }
 
+func (c *fakeDiscoveryClient) ServerPreferredResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	c.resourceCalls = c.resourceCalls + 1
+	return []unversioned.GroupVersionResource{}, nil
+}
+
+func (c *fakeDiscoveryClient) ServerPreferredNamespacedResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	c.resourceCalls = c.resourceCalls + 1
+	return []unversioned.GroupVersionResource{}, nil
+}
+
 func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
 	c.versionCalls = c.versionCalls + 1
 	return &version.Info{}, nil

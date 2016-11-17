@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -73,6 +74,12 @@ type ServerResourcesInterface interface {
 	// ServerPreferredNamespacedResources returns the supported namespaced resources with the
 	// version preferred by the server.
 	ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error)
+	// ServerPreferredResourcesWithVerbs returns the supported resources which support all the given
+	// verbs with the version preferred by the server.
+	ServerPreferredResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error)
+	// ServerPreferredNamespacedResourcesWithVerbs returns the supported namespaced resources which
+	// support all the given verbs and with the version preferred by the server.
+	ServerPreferredNamespacedResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error)
 }
 
 // ServerVersionInterface has a method for retrieving the server's version.
@@ -206,9 +213,9 @@ func IsGroupDiscoveryFailedError(err error) bool {
 	return err != nil && ok
 }
 
-// serverPreferredResources returns the supported resources with the version preferred by the
-// server. If namespaced is true, only namespaced resources will be returned.
-func (d *DiscoveryClient) serverPreferredResources(namespaced bool) ([]unversioned.GroupVersionResource, error) {
+// serverPreferredResources returns the supported resources which support all the given verbs with
+// the version preferred by the server. If namespaced is true, only namespaced resources will be returned.
+func (d *DiscoveryClient) serverPreferredResources(namespaced bool, verbs []string) ([]unversioned.GroupVersionResource, error) {
 	// retry in case the groups supported by the server change after ServerGroup() returns.
 	const maxRetries = 2
 	var failedGroups map[unversioned.GroupVersion]error
@@ -241,6 +248,10 @@ RetrieveGroups:
 				if strings.Contains(apiResource.Name, "/") {
 					continue
 				}
+				supportedVerbs := sets.NewString(apiResource.Verbs...)
+				if !supportedVerbs.HasAll(verbs...) {
+					continue
+				}
 				results = append(results, groupVersion.WithResource(apiResource.Name))
 			}
 		}
@@ -254,13 +265,25 @@ RetrieveGroups:
 // ServerPreferredResources returns the supported resources with the version preferred by the
 // server.
 func (d *DiscoveryClient) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
-	return d.serverPreferredResources(false)
+	return d.serverPreferredResources(false, nil)
 }
 
 // ServerPreferredNamespacedResources returns the supported namespaced resources with the
 // version preferred by the server.
 func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
-	return d.serverPreferredResources(true)
+	return d.serverPreferredResources(true, nil)
+}
+
+// ServerPreferredResourcesWithVerbs returns the supported resources which support all the given verbs
+// with the version preferred by the server.
+func (d *DiscoveryClient) ServerPreferredResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	return d.serverPreferredResources(false, verbs)
+}
+
+// ServerPreferredNamespacedResourcesWithVerbs returns the supported namespaced resources which support all the
+// the given verbs with the version preferred by the server.
+func (d *DiscoveryClient) ServerPreferredNamespacedResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	return d.serverPreferredResources(true, verbs)
 }
 
 // ServerVersion retrieves and parses the server's version (git version).

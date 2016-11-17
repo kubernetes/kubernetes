@@ -216,6 +216,14 @@ func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]unversio
 	return d.delegate.ServerPreferredNamespacedResources()
 }
 
+func (d *CachedDiscoveryClient) ServerPreferredResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	return d.delegate.ServerPreferredResourcesWithVerbs(verbs...)
+}
+
+func (d *CachedDiscoveryClient) ServerPreferredNamespacedResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	return d.delegate.ServerPreferredNamespacedResourcesWithVerbs(verbs...)
+}
+
 func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
 	return d.delegate.ServerVersion()
 }

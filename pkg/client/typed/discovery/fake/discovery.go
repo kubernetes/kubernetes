@@ -55,6 +55,14 @@ func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]unversioned.Grou
 	return nil, nil
 }
 
+func (c *FakeDiscovery) ServerPreferredResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	return nil, nil
+}
+
+func (c *FakeDiscovery) ServerPreferredNamespacedResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	return nil, nil
+}
+
 func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
 	return nil, nil
 }

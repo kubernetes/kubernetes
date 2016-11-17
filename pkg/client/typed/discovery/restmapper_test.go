@@ -316,6 +316,14 @@ func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResources() ([]u
 	return []unversioned.GroupVersionResource{}, nil
 }
 
+func (c *fakeCachedDiscoveryInterface) ServerPreferredResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	return c.ServerPreferredResources()
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResourcesWithVerbs(verbs ...string) ([]unversioned.GroupVersionResource, error) {
+	return c.ServerPreferredNamespacedResources()
+}
+
 func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
 	return &version.Info{}, nil
 }
