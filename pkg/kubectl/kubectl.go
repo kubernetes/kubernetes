@@ -107,6 +107,10 @@ var ResourcesShortcutStatic = []ResourceShortcuts{
 		LongForm:  schema.GroupResource{Resource: "services"},
 	},
 	{
+		ShortForm: schema.GroupResource{Group: "apps", Resource: "sts"},
+		LongForm:  schema.GroupResource{Group: "apps", Resource: "statefulsets"},
+	},
+	{
 		ShortForm: schema.GroupResource{Group: "autoscaling", Resource: "hpa"},
 		LongForm:  schema.GroupResource{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
 	},
