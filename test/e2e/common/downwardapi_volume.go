@@ -81,6 +81,21 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		})
 	})
 
+	It("should provide podname as non-root with fsgroup and defaultMode [Feature:FSGroup]", func() {
+		podName := "metadata-volume-" + string(uuid.NewUUID())
+		uid := int64(1001)
+		gid := int64(1234)
+		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
+		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podname", &mode, nil)
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			RunAsUser: &uid,
+			FSGroup:   &gid,
+		}
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
+			"mode of file \"/etc/podname\": -r--r-----",
+		})
+	})
+
 	It("should update labels on modification [Conformance]", func() {
 		labels := map[string]string{}
 		labels["key1"] = "value1"
