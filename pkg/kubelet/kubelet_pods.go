@@ -228,13 +228,29 @@ func makePortMappings(container *api.Container) (ports []kubecontainer.PortMappi
 	return
 }
 
+// truncatePodHostnameIfNeeded truncates the pod hostname if it's longer than 63 chars.
+func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
+	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
+	const hostnameMaxLen = 63
+	if len(hostname) <= hostnameMaxLen {
+		return hostname, nil
+	}
+	truncated := hostname[:hostnameMaxLen]
+	glog.Errorf("hostname for pod:%q was longer than %d. Truncated hostname to :%q", podName, hostnameMaxLen, truncated)
+	// hostname should not end with '-' or '.'
+	truncated = strings.TrimRight(truncated, "-.")
+	if len(truncated) == 0 {
+		// This should never happen.
+		return "", fmt.Errorf("hostname for pod %q was invalid: %q", podName, hostname)
+	}
+	return truncated, nil
+}
+
 // GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
 // given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, error) {
 	// TODO(vmarmol): Handle better.
-	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
 	clusterDomain := kl.clusterDomain
-	const hostnameMaxLen = 63
 	podAnnotations := pod.Annotations
 	if podAnnotations == nil {
 		podAnnotations = make(map[string]string)
@@ -252,9 +268,9 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 			hostname = hostnameCandidate
 		}
 	}
-	if len(hostname) > hostnameMaxLen {
-		hostname = hostname[:hostnameMaxLen]
-		glog.Errorf("hostname for pod:%q was longer than %d. Truncated hostname to :%q", pod.Name, hostnameMaxLen, hostname)
+	hostname, err := truncatePodHostnameIfNeeded(pod.Name, hostname)
+	if err != nil {
+		return "", "", err
 	}
 
 	hostDomain := ""
