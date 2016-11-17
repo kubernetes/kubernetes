@@ -103,15 +103,9 @@ type ServiceController struct {
 	dns              dnsprovider.Interface
 	federationClient fedclientset.Interface
 	federationName   string
-<<<<<<< Updated upstream
-	// serviceDnsSuffix is the DNS suffix we use when publishing service DNS names
-	serviceDnsSuffix string
-	// zoneName and zoneID are used to identify the zone in which to put records
-=======
 	// serviceDNSSuffix is the DNS suffix we use when publishing service DNS names
 	serviceDNSSuffix string
-	// zoneName is used to identify the zone in which to put records
->>>>>>> Stashed changes
+	// zoneName and zoneID are used to identify the zone in which to put records
 	zoneName string
 	zoneID   string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
@@ -305,8 +299,7 @@ func (s *ServiceController) init() error {
 		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records.")
 	}
 	s.dnsZones = zones
-<<<<<<< Updated upstream
-	matchingZones, err := getDnsZones(s.zoneName, s.zoneID, s.dnsZones)
+	matchingZones, err := getDNSZones(s.zoneName, s.zoneID, s.dnsZones)
 	if err != nil {
 		return fmt.Errorf("error querying for DNS zones: %v", err)
 	}
@@ -314,9 +307,6 @@ func (s *ServiceController) init() error {
 		if s.zoneName == "" {
 			return fmt.Errorf("ServiceController must be run with zoneName to create zone automatically.")
 		}
-=======
-	if _, err := getDNSZone(s.zoneName, s.dnsZones); err != nil {
->>>>>>> Stashed changes
 		glog.Infof("DNS zone %q not found.  Creating DNS zone %q.", s.zoneName, s.zoneName)
 		managedZone, err := s.dnsZones.New(s.zoneName)
 		if err != nil {

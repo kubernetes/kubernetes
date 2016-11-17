@@ -96,13 +96,9 @@ func (s *ServiceController) getServiceDNSSuffix() (string, error) {
 	return s.serviceDNSSuffix, nil
 }
 
-<<<<<<< Updated upstream
-// getDnsZones returns the DNS zones matching dnsZoneName and dnsZoneID (if specified)
-func getDnsZones(dnsZoneName string, dnsZoneID string, dnsZonesInterface dnsprovider.Zones) ([]dnsprovider.Zone, error) {
-=======
-// getDNSZone returns the zone, as identified by zoneName
-func getDNSZone(dnsZoneName string, dnsZonesInterface dnsprovider.Zones) (dnsprovider.Zone, error) {
->>>>>>> Stashed changes
+// getDNSZones returns the DNS zones matching dnsZoneName and dnsZoneID (if specified)
+func getDNSZones(dnsZoneName string, dnsZoneID string, dnsZonesInterface dnsprovider.Zones) ([]dnsprovider.Zone, error) {
+
 	// TODO: We need query-by-name and query-by-id functions
 	dnsZones, err := dnsZonesInterface.List()
 	if err != nil {
@@ -128,10 +124,10 @@ func getDNSZone(dnsZoneName string, dnsZonesInterface dnsprovider.Zones) (dnspro
 	return matches, nil
 }
 
-// getDnsZone returns the DNS zone, as identified by dnsZoneName and dnsZoneID
-// This is similar to getDnsZones, but returns an error if there are zero or multiple matching zones.
-func getDnsZone(dnsZoneName string, dnsZoneID string, dnsZonesInterface dnsprovider.Zones) (dnsprovider.Zone, error) {
-	dnsZones, err := getDnsZones(dnsZoneName, dnsZoneID, dnsZonesInterface)
+// getDNSZone returns the DNS zone, as identified by dnsZoneName and dnsZoneID
+// This is similar to getDNSZones, but returns an error if there are zero or multiple matching zones.
+func getDNSZone(dnsZoneName string, dnsZoneID string, dnsZonesInterface dnsprovider.Zones) (dnsprovider.Zone, error) {
+	dnsZones, err := getDNSZones(dnsZoneName, dnsZoneID, dnsZonesInterface)
 	if err != nil {
 		return nil, err
 	}
