@@ -664,8 +664,8 @@ type PodSandboxConfig struct {
 	//      The value of seccomp is runtime agnostic:
 	//      * runtime/default: the default profile for the container runtime
 	//      * unconfined: unconfined profile, ie, no seccomp sandboxing
-	//      * localhost/<profile-name>: the profile installed to the node's
-	//        local seccomp profile root
+	//      * /path/<profile-name>: the full profile path installed to
+	//        the node's local filesystem
 	//
 	// 3. Sysctls
 	//
