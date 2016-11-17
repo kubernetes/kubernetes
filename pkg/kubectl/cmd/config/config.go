@@ -18,6 +18,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -28,6 +29,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	"encoding/json"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
@@ -275,7 +277,8 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 					return err
 				}
 			}
-
+			buf, _ := json.Marshal(*configToWrite)
+			fmt.Println("========", string(buf))
 			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
 				return err
 			}
@@ -315,6 +318,8 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	}
 
 	for key, authInfo := range startingConfig.AuthInfos {
+		buf, _ := json.Marshal(newConfig)
+		fmt.Println(string(buf))
 		if _, exists := newConfig.AuthInfos[key]; !exists {
 			destinationFile := authInfo.LocationOfOrigin
 			if len(destinationFile) == 0 {

@@ -62,6 +62,8 @@ type Cluster struct {
 	APIVersion string `json:"api-version,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
+
+	ClusterUUID string `json:"cluster-uuid,omitempty"`
 	// CertificateAuthority is the path to a cert file for the certificate authority.
 	CertificateAuthority string `json:"certificate-authority,omitempty"`
 	// CertificateAuthorityData contains PEM-encoded certificate authority certificates. Overrides CertificateAuthority
@@ -85,7 +87,10 @@ type AuthInfo struct {
 	// Username is the username for basic authentication to the kubernetes cluster.
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
-	Password string `json:"password,omitempty"`
+	Password  string `json:"password,omitempty"`
+	AccessKey string `json:"access-key,omitempty"`
+	SecretKey string `json:"secret-key,omitempty"`
+	RegionID  string `json:"region-id,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
