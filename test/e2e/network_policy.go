@@ -473,7 +473,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 })
 
 func testCanConnect(f *framework.Framework, ns *api.Namespace, podName string, service *api.Service, targetPort int) {
-	By(fmt.Sprintf("Creating client pod %s that should successfully connect to %s."), podName, service.Name)
+	By(fmt.Sprintf("Creating client pod %s that should successfully connect to %s.", podName, service.Name))
 	podClient := createClientPod(f, ns, podName, service, targetPort)
 	defer func() {
 		By(fmt.Sprintf("Cleaning up the pod %s", podName))
@@ -492,7 +492,7 @@ func testCanConnect(f *framework.Framework, ns *api.Namespace, podName string, s
 }
 
 func testCannotConnect(f *framework.Framework, ns *api.Namespace, podName string, service *api.Service, targetPort int) {
-	By(fmt.Sprintf("Creating client pod %s that should not be able to connect to %s."), podName, service.Name)
+	By(fmt.Sprintf("Creating client pod %s that should not be able to connect to %s.", podName, service.Name))
 	podClient := createClientPod(f, ns, podName, service, targetPort)
 	defer func() {
 		By(fmt.Sprintf("Cleaning up the pod %s", podName))
