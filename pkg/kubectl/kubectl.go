@@ -101,6 +101,7 @@ var ShortForms = map[string]string{
 	"rs":     "replicasets",
 	"sa":     "serviceaccounts",
 	"svc":    "services",
+	"ss":     "statefulsets",
 }
 
 // ResourceShortFormFor looks up for a short form of resource names.

@@ -195,6 +195,7 @@ __custom_func() {
     * secrets
     * serviceaccounts (aka 'sa')
     * services (aka 'svc')
+    * statefulsets (aka 'ss')
     * storageclasses
     * thirdpartyresources
     `
