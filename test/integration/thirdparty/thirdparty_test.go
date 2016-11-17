@@ -135,12 +135,12 @@ func DoTestInstallMultipleAPIs(t *testing.T, client internalclientset.Interface,
 	)()
 
 	// TODO make multiple resources in one version work
-	// defer installThirdParty(t, client, clientConfig,
-	// 	&extensions.ThirdPartyResource{
-	// 		ObjectMeta: api.ObjectMeta{Name: "bar.company.com"},
-	// 		Versions:   []extensions.APIVersion{{Name: version}},
-	// 	}, group, version, "bars",
-	// )()
+	defer installThirdParty(t, client, clientConfig,
+		&extensions.ThirdPartyResource{
+			ObjectMeta: api.ObjectMeta{Name: "bar.company.com"},
+			Versions:   []extensions.APIVersion{{Name: version}},
+		}, group, version, "bars",
+	)()
 }
 
 func DoTestInstallThirdPartyAPIDelete(t *testing.T, client internalclientset.Interface, clientConfig *restclient.Config) {

@@ -108,6 +108,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	mediaTypes, streamMediaTypes := mediaTypesForSerializer(a.group.Serializer)
 	ws.Produces(append(mediaTypes, streamMediaTypes...)...)
 	ws.ApiVersion(a.group.GroupVersion.String())
+	ws.SetDynamicRoutes(true)
 
 	return ws
 }
@@ -192,6 +193,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("register resource handler for path: %s and the fqKind is: %v\n", path, fqKindToRegister)
 
 	versionedPtr, err := a.group.Creater.New(fqKindToRegister)
 	if err != nil {

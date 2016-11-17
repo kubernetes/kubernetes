@@ -18,9 +18,12 @@ package thirdparty
 
 import (
 	"fmt"
+	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -37,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // dynamicLister is used to list resources for dynamic third party
@@ -59,8 +63,8 @@ type ThirdPartyResourceServer struct {
 
 	// storage for third party objects
 	thirdPartyStorageConfig *storagebackend.Config
-	// map from api path to a tuple of (storage for the objects, APIGroup)
-	thirdPartyResources map[string]*thirdPartyEntry
+	// map from api path to a tuple of (versioned storage for the objects, APIGroup)
+	thirdPartyResources map[string]*thirdPartyGroup
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
 
@@ -71,7 +75,7 @@ type ThirdPartyResourceServer struct {
 func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPIServer, storageFactory genericapiserver.StorageFactory) *ThirdPartyResourceServer {
 	ret := &ThirdPartyResourceServer{
 		genericAPIServer:    genericAPIServer,
-		thirdPartyResources: map[string]*thirdPartyEntry{},
+		thirdPartyResources: map[string]*thirdPartyGroup{},
 	}
 
 	var err error
@@ -83,12 +87,25 @@ func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPISe
 	return ret
 }
 
+type thirdPartyGroup struct {
+	versionedEntry map[string]*thirdPartyEntry
+	group          unversioned.APIGroup
+}
+
 // thirdPartyEntry combines objects storage and API group into one struct
 // for easy lookup.
 type thirdPartyEntry struct {
 	// Map from plural resource name to entry
 	storage map[string]*thirdpartyresourcedataetcd.REST
-	group   unversioned.APIGroup
+}
+
+func (g *thirdPartyGroup) versionInstalled(version string) bool {
+	for installedVersion, _ := range g.versionedEntry {
+		if reflect.DeepEqual(version, installedVersion) {
+			return true
+		}
+	}
+	return false
 }
 
 // HasThirdPartyResource returns true if a particular third party resource currently installed.
@@ -100,8 +117,8 @@ func (m *ThirdPartyResourceServer) HasThirdPartyResource(rsrc *extensions.ThirdP
 	path := extensionsrest.MakeThirdPartyPath(group)
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
-	entry := m.thirdPartyResources[path]
-	if entry == nil {
+	tpg := m.thirdPartyResources[path]
+	if tpg == nil {
 		return false, nil
 	}
 	plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
@@ -109,14 +126,33 @@ func (m *ThirdPartyResourceServer) HasThirdPartyResource(rsrc *extensions.ThirdP
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
 	})
-	_, found := entry.storage[plural.Resource]
-	return found, nil
+	for _, version := range rsrc.Versions {
+		entry, _ := tpg.versionedEntry[version.Name]
+		if entry == nil {
+			return false, nil
+		}
+		_, found := entry.storage[plural.Resource]
+		if !found {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (m *ThirdPartyResourceServer) removeThirdPartyStorage(path, resource string) error {
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
-	entry, found := m.thirdPartyResources[path]
+	ix := strings.LastIndex(path, "/")
+	if ix == -1 {
+		return fmt.Errorf("expected <api-group>/<version>, saw: %s", path)
+	}
+	version := path[ix+1:]
+	group := path[0:ix]
+	tpg, found := m.thirdPartyResources[group]
+	if !found {
+		return nil
+	}
+	entry, found := tpg.versionedEntry[version]
 	if !found {
 		return nil
 	}
@@ -129,10 +165,13 @@ func (m *ThirdPartyResourceServer) removeThirdPartyStorage(path, resource string
 	}
 	delete(entry.storage, resource)
 	if len(entry.storage) == 0 {
-		delete(m.thirdPartyResources, path)
-		m.genericAPIServer.RemoveAPIGroupForDiscovery(extensionsrest.GetThirdPartyGroupName(path))
+		delete(tpg.versionedEntry, version)
+	}
+	if len(tpg.versionedEntry) == 0 {
+		delete(m.thirdPartyResources, group)
+		m.genericAPIServer.RemoveAPIGroupForDiscovery(group)
 	} else {
-		m.thirdPartyResources[path] = entry
+		m.thirdPartyResources[group] = tpg
 	}
 	return nil
 }
@@ -141,7 +180,7 @@ func (m *ThirdPartyResourceServer) removeThirdPartyStorage(path, resource string
 func (m *ThirdPartyResourceServer) RemoveThirdPartyResource(path string) error {
 	ix := strings.LastIndex(path, "/")
 	if ix == -1 {
-		return fmt.Errorf("expected <api-group>/<resource-plural-name>, saw: %s", path)
+		return fmt.Errorf("expected <api-group>/<version>/<resource-plural-name>, saw: %s", path)
 	}
 	resource := path[ix+1:]
 	path = path[0:ix]
@@ -150,11 +189,38 @@ func (m *ThirdPartyResourceServer) RemoveThirdPartyResource(path string) error {
 		return err
 	}
 
+	var ws *restful.WebService = nil
 	services := m.genericAPIServer.HandlerContainer.RegisteredWebServices()
 	for ix := range services {
 		root := services[ix].RootPath()
 		if root == path || strings.HasPrefix(root, path+"/") {
-			m.genericAPIServer.HandlerContainer.Remove(services[ix])
+			ws = services[ix]
+			break
+		}
+	}
+
+	if ws != nil {
+		pattern := path + "/.*/" + resource + ".*"
+		routesToRemove := []struct {
+			method string
+			path   string
+		}{}
+		routes := ws.Routes()
+		for _, route := range routes {
+			match, _ := regexp.MatchString(pattern, route.Path)
+			if match {
+				routesToRemove = append(routesToRemove, struct{ method, path string }{route.Method, route.Path})
+			}
+		}
+
+		for _, routeToRemove := range routesToRemove {
+			ws.RemoveRoute(routeToRemove.path, routeToRemove.method)
+		}
+		m.thirdPartyResourcesLock.Lock()
+		_, found := m.thirdPartyResources[path]
+		m.thirdPartyResourcesLock.Unlock()
+		if !found {
+			m.genericAPIServer.HandlerContainer.Remove(ws)
 		}
 	}
 	return nil
@@ -185,9 +251,11 @@ func (m *ThirdPartyResourceServer) ListThirdPartyResources() []string {
 	m.thirdPartyResourcesLock.RLock()
 	defer m.thirdPartyResourcesLock.RUnlock()
 	result := []string{}
-	for key := range m.thirdPartyResources {
-		for rsrc := range m.thirdPartyResources[key].storage {
-			result = append(result, key+"/"+rsrc)
+	for group := range m.thirdPartyResources {
+		for version, entry := range m.thirdPartyResources[group].versionedEntry {
+			for rsrc := range entry.storage {
+				result = append(result, group+"/"+version+"/"+rsrc)
+			}
 		}
 	}
 	return result
@@ -197,17 +265,26 @@ func (m *ThirdPartyResourceServer) getExistingThirdPartyResources(path string) [
 	result := []unversioned.APIResource{}
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
-	entry := m.thirdPartyResources[path]
-	if entry != nil {
-		for key, obj := range entry.storage {
-			result = append(result, unversioned.APIResource{
-				Name:       key,
-				Namespaced: true,
-				Kind:       obj.Kind(),
-			})
+	tpg := m.thirdPartyResources[path]
+	if tpg != nil {
+		for _, entry := range tpg.versionedEntry {
+			for key, obj := range entry.storage {
+				result = append(result, unversioned.APIResource{
+					Name:       key,
+					Namespaced: true,
+					Kind:       obj.Kind(),
+				})
+			}
 		}
 	}
 	return result
+}
+
+func (m *ThirdPartyResourceServer) getThirdPartyGroup(path string) *thirdPartyGroup {
+	m.thirdPartyResourcesLock.Lock()
+	defer m.thirdPartyResourcesLock.Unlock()
+	entry, _ := m.thirdPartyResources[path]
+	return entry
 }
 
 func (m *ThirdPartyResourceServer) hasThirdPartyGroupStorage(path string) bool {
@@ -217,21 +294,86 @@ func (m *ThirdPartyResourceServer) hasThirdPartyGroupStorage(path string) bool {
 	return found
 }
 
-func (m *ThirdPartyResourceServer) addThirdPartyResourceStorage(path, resource string, storage *thirdpartyresourcedataetcd.REST, apiGroup unversioned.APIGroup) {
+func (m *ThirdPartyResourceServer) addThirdPartyResourceStorage(path, version, resource string, storage *thirdpartyresourcedataetcd.REST) {
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
-	entry, found := m.thirdPartyResources[path]
+	group, _ := m.thirdPartyResources[path]
+	if group == nil {
+		group = &thirdPartyGroup{
+			group:          unversioned.APIGroup{},
+			versionedEntry: map[string]*thirdPartyEntry{},
+		}
+		m.thirdPartyResources[path] = group
+	}
+	entry, _ := group.versionedEntry[version]
 	if entry == nil {
 		entry = &thirdPartyEntry{
-			group:   apiGroup,
 			storage: map[string]*thirdpartyresourcedataetcd.REST{},
 		}
-		m.thirdPartyResources[path] = entry
+		group.versionedEntry[version] = entry
 	}
 	entry.storage[resource] = storage
-	if !found {
-		m.genericAPIServer.AddAPIGroupForDiscovery(apiGroup)
+}
+
+func (m *ThirdPartyResourceServer) setupGroupForDiscovery(group string, versions ...string) {
+	path := extensionsrest.MakeThirdPartyPath(group)
+	m.thirdPartyResourcesLock.Lock()
+	tpg, _ := m.thirdPartyResources[path]
+	m.thirdPartyResourcesLock.Unlock()
+	apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
+	var preferredVersion string
+	for i, version := range versions {
+		if i == 0 {
+			preferredVersion = version
+		}
+		apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
+			GroupVersion: group + "/" + version,
+			Version:      version,
+		})
 	}
+	preferedVersionForDiscovery := unversioned.GroupVersionForDiscovery{
+		GroupVersion: group + "/" + preferredVersion,
+		Version:      preferredVersion,
+	}
+	apiGroup := unversioned.APIGroup{
+		Name:             group,
+		Versions:         apiVersionsForDiscovery,
+		PreferredVersion: preferedVersionForDiscovery,
+	}
+	tpg.group = apiGroup
+	m.genericAPIServer.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, "/apis/"+apiGroup.Name, apiGroup))
+	m.genericAPIServer.AddAPIGroupForDiscovery(apiGroup)
+}
+
+func (m *ThirdPartyResourceServer) updateGroupForDiscovery(group string, versions ...string) {
+	path := extensionsrest.MakeThirdPartyPath(group)
+	m.thirdPartyResourcesLock.Lock()
+	tpg, _ := m.thirdPartyResources[path]
+	m.thirdPartyResourcesLock.Unlock()
+	existingAPIGroup := tpg.group
+	existingAPIVersions := existingAPIGroup.Versions
+	newVersions := sets.NewString()
+	for _, existingAPIVersion := range existingAPIVersions {
+		newVersions.Insert(existingAPIVersion.Version)
+	}
+	newVersions.Insert(versions...)
+	apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
+	for _, version := range newVersions.List() {
+		apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
+			GroupVersion: group + "/" + version,
+			Version:      version,
+		})
+	}
+	newAPIGroup := unversioned.APIGroup{
+		Name:             group,
+		Versions:         apiVersionsForDiscovery,
+		PreferredVersion: existingAPIGroup.PreferredVersion,
+	}
+	tpg.group = newAPIGroup
+	m.genericAPIServer.RemoveAPIGroupForDiscovery(existingAPIGroup.Name)
+	m.genericAPIServer.AddAPIGroupForDiscovery(newAPIGroup)
+	m.genericAPIServer.HandlerContainer.Remove(apiserver.NewGroupWebService(api.Codecs, "/apis/"+existingAPIGroup.Name, existingAPIGroup))
+	m.genericAPIServer.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, "/apis/"+newAPIGroup.Name, newAPIGroup))
 }
 
 // InstallThirdPartyResource installs a third party resource specified by 'rsrc'.  When a resource is
@@ -249,38 +391,64 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	if len(rsrc.Versions) == 0 {
 		return fmt.Errorf("ThirdPartyResource %s has no defined versions", rsrc.Name)
 	}
-	plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
-		Group:   group,
-		Version: rsrc.Versions[0].Name,
-		Kind:    kind,
-	})
+
 	path := extensionsrest.MakeThirdPartyPath(group)
+	var firstSeen, hasNewVersion bool
+	for _, version := range rsrc.Versions {
+		plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+			Group:   group,
+			Version: version.Name,
+			Kind:    kind,
+		})
 
-	groupVersion := unversioned.GroupVersionForDiscovery{
-		GroupVersion: group + "/" + rsrc.Versions[0].Name,
-		Version:      rsrc.Versions[0].Name,
+		thirdparty := m.thirdpartyapi(group, kind, version.Name, plural.Resource)
+		thirdPartyGroup := m.getThirdPartyGroup(path)
+		// If thirdPartyGroup is nil, this group has not ever been seen
+		if thirdPartyGroup == nil {
+			firstSeen = true
+			if err := thirdparty.InstallREST(m.genericAPIServer.HandlerContainer.Container); err != nil {
+				glog.Errorf("Unable to setup thirdparty api: %v", err)
+				return fmt.Errorf("Unable to setup thirdparty api: %v", err)
+			}
+
+			m.addThirdPartyResourceStorage(path, version.Name, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST))
+			continue
+		}
+
+		// if version installed, just update the group with the new API
+		if thirdPartyGroup.versionInstalled(version.Name) {
+			if err := thirdparty.UpdateREST(m.genericAPIServer.HandlerContainer.Container); err != nil {
+				glog.Errorf("Unable to update thirdparty api: %v", err)
+			}
+
+			m.addThirdPartyResourceStorage(path, version.Name, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST))
+			continue
+		}
+
+		hasNewVersion = true
+		if err := thirdparty.InstallREST(m.genericAPIServer.HandlerContainer.Container); err != nil {
+			glog.Errorf("Unable to setup thirdparty api: %v", err)
+			return fmt.Errorf("Unable to setup thirdparty api: %v", err)
+		}
+		m.addThirdPartyResourceStorage(path, version.Name, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST))
 	}
-	apiGroup := unversioned.APIGroup{
-		Name:             group,
-		Versions:         []unversioned.GroupVersionForDiscovery{groupVersion},
-		PreferredVersion: groupVersion,
+
+	if firstSeen {
+		// setup discovery
+		versions := []string{}
+		for _, version := range rsrc.Versions {
+			versions = append(versions, version.Name)
+		}
+		m.setupGroupForDiscovery(group, versions...)
+		return nil
 	}
-
-	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name, plural.Resource)
-
-	// If storage exists, this group has already been added, just update
-	// the group with the new API
-	if m.hasThirdPartyGroupStorage(path) {
-		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
-		return thirdparty.UpdateREST(m.genericAPIServer.HandlerContainer.Container)
+	if hasNewVersion {
+		versions := []string{}
+		for _, version := range rsrc.Versions {
+			versions = append(versions, version.Name)
+		}
+		m.updateGroupForDiscovery(group, versions...)
 	}
-
-	if err := thirdparty.InstallREST(m.genericAPIServer.HandlerContainer.Container); err != nil {
-		glog.Errorf("Unable to setup thirdparty api: %v", err)
-	}
-	m.genericAPIServer.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
-
-	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	return nil
 }
 
