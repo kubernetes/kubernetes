@@ -535,8 +535,8 @@ const (
 type PropagationMode string
 
 const (
-	PropagationPrivate PropagationMode = "private"
-	PropagationShared PropagationMode = "shared"
+	PropagationPrivate PropagationMode = "Private"
+	PropagationShared PropagationMode = "Shared"
 )
 
 // Represents a host path mapped into a pod.
