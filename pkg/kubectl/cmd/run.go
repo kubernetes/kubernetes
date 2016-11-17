@@ -367,17 +367,18 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 }
 
 // TODO turn this into reusable method checking available resources
-func contains(resourcesList map[string]*unversioned.APIResourceList, resource schema.GroupVersionResource) bool {
+func contains(resourcesList []*unversioned.APIResourceList, resource schema.GroupVersionResource) bool {
 	if resourcesList == nil {
 		return false
 	}
-	resourcesGroup, ok := resourcesList[resource.GroupVersion().String()]
-	if !ok {
-		return false
-	}
-	for _, item := range resourcesGroup.APIResources {
-		if resource.Resource == item.Name {
-			return true
+	for _, resourceGroup := range resourcesList {
+		if resourceGroup.GroupVersion == resource.GroupVersion().String() {
+			for _, item := range resourceGroup.APIResources {
+				if resource.Resource == item.Name {
+					return true
+				}
+			}
+			return false
 		}
 	}
 	return false

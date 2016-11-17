@@ -20,7 +20,10 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/selection"
+	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
@@ -180,4 +183,35 @@ func ExtractGroupVersions(l *APIGroupList) []string {
 		}
 	}
 	return groupVersions
+}
+
+// ExtractGroupVersionResourcesWithVerbs extracts the GroupVersionResources from a map. In case of
+// errors, an aggregate error is returned and those resources which could be parsed successfully.
+func ExtractGroupVersionResources(rls []*APIResourceList) ([]schema.GroupVersionResource, error) {
+	return ExtractGroupVersionResourcesWithVerbs(rls)
+}
+
+// ExtractGroupVersionResourcesWithVerbs extracts those GroupVersionResources which support all
+// given verbs. In case of errors, an aggregate error is returned and those resources which
+// could be parsed successfully.
+func ExtractGroupVersionResourcesWithVerbs(rls []*APIResourceList, verbs ...string) ([]schema.GroupVersionResource, error) {
+	var errs []error
+	gvrs := []schema.GroupVersionResource{}
+	for _, rl := range rls {
+		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		for i := range rl.APIResources {
+			if len(verbs) > 0 && !sets.NewString([]string(rl.APIResources[i].Verbs)...).HasAll(verbs...) {
+				continue
+			}
+			gvrs = append(gvrs, schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: rl.APIResources[i].Name})
+		}
+	}
+	if len(errs) > 0 {
+		return gvrs, errors.NewAggregate(errs)
+	}
+	return gvrs, nil
 }
