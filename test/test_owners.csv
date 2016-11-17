@@ -305,6 +305,13 @@ Network Partition should create new pods when node is partitioned,foxish,0
 Network Partition should eagerly create replacement pod during network partition when termination grace is non-zero,foxish,0
 Network Partition should not reschedule pets if there is a network partition,foxish,0
 Network should set TCP CLOSE_WAIT timeout,bowei,0
+"NetworkPolicy should enforce multiple, stacked policies with overlapping podSelectors",djosborne,0
+NetworkPolicy should enforce policy based on NamespaceSelector,djosborne,0
+NetworkPolicy should enforce policy based on PodSelector,djosborne,0
+NetworkPolicy should enforce policy based on Ports,djosborne,0
+NetworkPolicy should support allow-all policy,djosborne,0
+NetworkPolicy should support setting DefaultDeny namespace policy,djosborne,0
+NetworkPolicy shouldn't enforce policy when isolation is off,djosborne,0
 Networking Granular Checks: Pods should function for intra-pod communication: http,stts,0
 Networking Granular Checks: Pods should function for intra-pod communication: udp,freehan,0
 Networking Granular Checks: Pods should function for node-pod communication: http,spxtr,1
@@ -468,8 +475,10 @@ StatefulSet Basic StatefulSet functionality Scaling down before scale up is fini
 StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any pet is unhealthy,derekwaynecarr,0
 StatefulSet Basic StatefulSet functionality should allow template updates,derekwaynecarr,0
 StatefulSet Basic StatefulSet functionality should handle healthy pet restarts during scale,kevin-wangzefeng,1
+StatefulSet Basic StatefulSet functionality should allow template updates,djosborne,0
+StatefulSet Basic StatefulSet functionality should handle healthy pet restarts during scale,girishkalele,1
 StatefulSet Basic StatefulSet functionality should provide basic identity,bprashanth,1
-StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,derekwaynecarr,0
+StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,djosborne,0
 StatefulSet Deploy clustered applications should creating a working mysql cluster,yujuhong,1
 StatefulSet Deploy clustered applications should creating a working redis cluster,yifan-gu,1
 StatefulSet Deploy clustered applications should creating a working zookeeper cluster,pmorie,1
@@ -483,8 +492,11 @@ ThirdParty resources Simple Third Party creating/deleting thirdparty objects wor
 Upgrade cluster upgrade should maintain a functioning cluster,luxas,1
 Upgrade cluster upgrade should maintain responsive services,mikedanese,1
 Upgrade master upgrade should maintain responsive services,mikedanese,1
+Upgrade cluster upgrade should maintain a functioning cluster,girishkalele,1
+Upgrade cluster upgrade should maintain responsive services,djosborne,0
+Upgrade master upgrade should maintain responsive services,djosborne,0
 Upgrade node upgrade should maintain a functioning cluster,zmerlynn,1
-Upgrade node upgrade should maintain responsive services,childsb,1
+Upgrade node upgrade should maintain responsive services,djosborne,0
 V1Job should delete a job,soltysh,1
 V1Job should fail a job,soltysh,1
 V1Job should keep restarting failed pods,soltysh,1
@@ -560,6 +572,17 @@ k8s.io/kubernetes/pkg/api/v1,derekwaynecarr,0
 k8s.io/kubernetes/pkg/api/v1/endpoints,derekwaynecarr,0
 k8s.io/kubernetes/pkg/api/v1/pod,derekwaynecarr,0
 k8s.io/kubernetes/pkg/api/v1/service,derekwaynecarr,0
+k8s.io/kubernetes/pkg/api/util,ghodss,1
+k8s.io/kubernetes/pkg/api/v1,vulpecula,1
+k8s.io/kubernetes/pkg/api/v1/endpoints,sttts,0
+k8s.io/kubernetes/pkg/api/v1/pod,sttts,0
+k8s.io/kubernetes/pkg/api/v1/service,sttts,0
+k8s.io/kubernetes/pkg/api/v1/endpoints,madhusudancs,0
+k8s.io/kubernetes/pkg/api/v1/pod,madhusudancs,0
+k8s.io/kubernetes/pkg/api/v1/service,madhusudancs,0
+k8s.io/kubernetes/pkg/api/v1/endpoints,djosborne,0
+k8s.io/kubernetes/pkg/api/v1/pod,djosborne,0
+k8s.io/kubernetes/pkg/api/v1/service,djosborne,0
 k8s.io/kubernetes/pkg/api/validation,smarterclayton,1
 k8s.io/kubernetes/pkg/api/validation/path,luxas,1
 k8s.io/kubernetes/pkg/apimachinery,gmarek,1
@@ -798,6 +821,9 @@ k8s.io/kubernetes/pkg/registry/storage/storageclass,brendandburns,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd,eparis,1
 k8s.io/kubernetes/pkg/runtime,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/schema,derekwaynecarr,0
+k8s.io/kubernetes/pkg/runtime/schema,sttts,0
+k8s.io/kubernetes/pkg/runtime/schema,madhusudancs,0
+k8s.io/kubernetes/pkg/runtime/schema,djosborne,0
 k8s.io/kubernetes/pkg/runtime/serializer,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/json,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/protobuf,wojtek-t,0
