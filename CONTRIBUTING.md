@@ -12,7 +12,7 @@ please feel free to send a Pull Request.
 ## Filing issues
 
 If you have a question about Kubernetes or have a problem using it, please
-start with the [troubleshooting guide](docs/troubleshooting.md).  If that
+start with the [troubleshooting guide](http://kubernetes.io/docs/troubleshooting/).  If that
 doesn't answer your questions, or if you think you found a bug, please [file an
 issue](https://github.com/kubernetes/kubernetes/issues/new).
 

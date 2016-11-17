@@ -21,7 +21,7 @@
 * There are example files and walkthroughs in the [examples](../examples/)
   folder.
 
-* If something went wrong, see the [troubleshooting](troubleshooting.md) document for how to debug.
+* If something went wrong, see the [troubleshooting](http://kubernetes.io/docs/troubleshooting/) guide for how to debug.
 You should also check the [known issues for the release](../CHANGELOG.md) you're using.
 
 * To report a security issue, see [Reporting a Security Issue](reporting-security-issues.md).
