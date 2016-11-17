@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/registry/core/controller"
-	"k8s.io/kubernetes/pkg/registry/core/controller/etcd"
+	controllerstore "k8s.io/kubernetes/pkg/registry/core/controller/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -41,7 +41,7 @@ type ContainerStorage struct {
 
 func NewStorage(opts generic.RESTOptions) ContainerStorage {
 	// scale does not set status, only updates spec so we ignore the status
-	controllerREST, _ := etcd.NewREST(opts)
+	controllerREST, _ := controllerstore.NewREST(opts)
 	rcRegistry := controller.NewRegistry(controllerREST)
 
 	return ContainerStorage{
