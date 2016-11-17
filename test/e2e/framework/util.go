@@ -2587,10 +2587,14 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint api.Taint)
 
 		newTaints, err := deleteTaint(nodeTaints, taint)
 		ExpectNoError(err)
+		if len(newTaints) == 0 {
+			delete(node.Annotations, api.TaintsAnnotationKey)
+		} else {
+			taintsData, err := json.Marshal(newTaints)
+			ExpectNoError(err)
+			node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
+		}
 
-		taintsData, err := json.Marshal(newTaints)
-		ExpectNoError(err)
-		node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
 		_, err = c.Core().Nodes().Update(node)
 		if err != nil {
 			if !apierrs.IsConflict(err) {
