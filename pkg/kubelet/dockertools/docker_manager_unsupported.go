@@ -42,7 +42,11 @@ func getNetworkingMode() string {
 	return ""
 }
 
-func containerProvidesPodIP(name *KubeletContainerName) bool {
+func containerProvidesPodIP(containerName string) bool {
+	return false
+}
+
+func containerIsNetworked(containerName string) bool {
 	return false
 }
 
