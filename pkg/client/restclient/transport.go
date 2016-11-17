@@ -18,9 +18,8 @@ package restclient
 
 import (
 	"crypto/tls"
-	"net/http"
-
 	"k8s.io/kubernetes/pkg/client/transport"
+	"net/http"
 )
 
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
@@ -61,6 +60,10 @@ func (c *Config) transportConfig() *transport.Config {
 		},
 		Username:    c.Username,
 		Password:    c.Password,
+		AccessKey:   c.AccessKey,
+		SecretKey:   c.SecretKey,
+		RegionID:    c.RegionID,
+		ClusterUUID: c.ClusterUUID,
 		BearerToken: c.BearerToken,
 	}
 }
