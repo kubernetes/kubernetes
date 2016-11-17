@@ -26,6 +26,8 @@ import (
 	"github.com/google/gofuzz"
 )
 
+const RFC3339_Milli = "2006-01-02T15:04:05.000Z07:00"
+
 // Time is a wrapper around time.Time which supports correct
 // marshaling to YAML and JSON.  Wrappers are provided for many
 // of the factory methods that the time package offers.
@@ -89,9 +91,9 @@ func Unix(sec int64, nsec int64) Time {
 	return Time{time.Unix(sec, nsec)}
 }
 
-// Rfc3339Copy returns a copy of the Time at second-level precision.
+// Rfc3339Copy returns a copy of the Time at millisecond-level precision.
 func (t Time) Rfc3339Copy() Time {
-	copied, _ := time.Parse(time.RFC3339, t.Format(time.RFC3339))
+	copied, _ := time.Parse(RFC3339_Milli, t.Format(RFC3339_Milli))
 	return Time{copied}
 }
 
@@ -105,9 +107,13 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	var str string
 	json.Unmarshal(b, &str)
 
-	pt, err := time.Parse(time.RFC3339, str)
+	pt, err := time.Parse(RFC3339_Milli, str)
 	if err != nil {
-		return err
+		// fall back to parsing RFC3339
+		pt, err = time.Parse(time.RFC3339, str)
+		if err != nil {
+			return err
+		}
 	}
 
 	t.Time = pt.Local()
@@ -126,9 +132,12 @@ func (t *Time) UnmarshalQueryParameter(str string) error {
 		return nil
 	}
 
-	pt, err := time.Parse(time.RFC3339, str)
+	pt, err := time.Parse(RFC3339_Milli, str)
 	if err != nil {
-		return err
+		pt, err = time.Parse(time.RFC3339, str)
+		if err != nil {
+			return err
+		}
 	}
 
 	t.Time = pt.Local()
@@ -142,7 +151,7 @@ func (t Time) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.UTC().Format(time.RFC3339))
+	return json.Marshal(t.UTC().Format(RFC3339_Milli))
 }
 
 func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
@@ -163,7 +172,7 @@ func (t Time) MarshalQueryParameter() (string, error) {
 		return "", nil
 	}
 
-	return t.UTC().Format(time.RFC3339), nil
+	return t.UTC().Format(RFC3339_Milli), nil
 }
 
 // Fuzz satisfies fuzz.Interface.

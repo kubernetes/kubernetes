@@ -316,7 +316,7 @@ func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1"},
 			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
 			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
-			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: \"1970-01-01T00:16:40Z\": field is immutable; may only be changed via deletion"},
+			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: \"1970-01-01T00:16:40.000Z\": field is immutable; may only be changed via deletion"},
 		},
 		"invalid clear deletionTimestamp": {
 			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},

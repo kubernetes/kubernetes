@@ -135,8 +135,8 @@ func TestUnstructuredGetters(t *testing.T) {
 				"uid":               "test_uid",
 				"resourceVersion":   "test_resourceVersion",
 				"selfLink":          "test_selfLink",
-				"creationTimestamp": "2009-11-10T23:00:00Z",
-				"deletionTimestamp": "2010-11-10T23:00:00Z",
+				"creationTimestamp": "2009-11-10T23:00:00.000Z",
+				"deletionTimestamp": "2010-11-10T23:00:00.000Z",
 				"labels": map[string]interface{}{
 					"test_label": "test_value",
 				},
@@ -254,8 +254,8 @@ func TestUnstructuredSetters(t *testing.T) {
 				"uid":               "test_uid",
 				"resourceVersion":   "test_resourceVersion",
 				"selfLink":          "test_selfLink",
-				"creationTimestamp": "2009-11-10T23:00:00Z",
-				"deletionTimestamp": "2010-11-10T23:00:00Z",
+				"creationTimestamp": "2009-11-10T23:00:00.000Z",
+				"deletionTimestamp": "2010-11-10T23:00:00.000Z",
 				"labels": map[string]interface{}{
 					"test_label": "test_value",
 				},

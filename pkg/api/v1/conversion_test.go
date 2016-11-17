@@ -61,7 +61,7 @@ func TestPodLogOptions(t *testing.T) {
 		"follow":       {"true"},
 		"previous":     {"true"},
 		"sinceSeconds": {"1"},
-		"sinceTime":    {"2000-01-01T12:34:56Z"},
+		"sinceTime":    {"2000-01-01T12:34:56.000Z"},
 		"timestamps":   {"true"},
 		"tailLines":    {"2"},
 		"limitBytes":   {"3"},

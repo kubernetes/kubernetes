@@ -183,7 +183,7 @@ func TestConvert(t *testing.T) {
 				SinceTime:    &sinceTime, // test a custom marshaller
 				EmptyTime:    nil,        // test a nil custom marshaller without omitempty
 			},
-			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "sinceTime": {"2000-01-01T12:34:56Z"}, "emptyTime": {""}},
+			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "sinceTime": {"2000-01-01T12:34:56.000Z"}, "emptyTime": {""}},
 		},
 		{
 			input: &childStructs{
