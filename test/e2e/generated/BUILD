@@ -12,9 +12,6 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "bindata.go",
-        "main.go",
-    ],
+    srcs = ["main.go"],
     tags = ["automanaged"],
 )
