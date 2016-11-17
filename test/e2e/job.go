@@ -79,20 +79,13 @@ var _ = framework.KubeDescribe("Job", func() {
 
 	// Pods sometimes fail, but eventually succeed, after pod restarts
 	It("should run a job to completion when tasks sometimes fail and are not locally restarted", func() {
-		By("Creating a job")
 		// 50% chance of container success, local restarts.
 		// Can't use the failOnce approach because that relies
 		// on an emptyDir, which is not preserved across new pods.
 		// Worst case analysis: 15 failures, each taking 1 minute to
 		// run due to some slowness, 1 in 2^15 chance of happening,
 		// causing test flake.  Should be very rare.
-		job := newTestJob("randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
-		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring job reaches completions")
-		err = waitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
-		Expect(err).NotTo(HaveOccurred())
+		TestJobs(f, "randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
 	})
 
 	It("should keep restarting failed pods", func() {
@@ -338,4 +331,33 @@ func newBool(val bool) *bool {
 	p := new(bool)
 	*p = val
 	return p
+}
+
+func TestJobsSetup(f *framework.Framework, behavior, name string, rPol api.RestartPolicy, parallelism, completions int32) *batch.Job {
+	job := newTestJob(behavior, name, rPol, parallelism, completions)
+
+	By("Creating a job")
+	job, err := createJob(f.ClientSet, f.Namespace.Name, job)
+	Expect(err).NotTo(HaveOccurred())
+
+	return job
+}
+
+func TestJobsValidate(f *framework.Framework, job *batch.Job, completions int32) {
+	By("Ensuring job reaches completions")
+	err := waitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
+	Expect(err).NotTo(HaveOccurred())
+
+}
+
+func TestJobsTeardown(f *framework.Framework, job *batch.Job) {
+	By("Delete the job")
+	err := deleteJob(f.ClientSet, f.Namespace.Name, job.ObjectMeta.Name)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func TestJobs(f *framework.Framework, behavior, name string, rPol api.RestartPolicy, parallelism, completions int32) {
+	job := TestJobsSetup(f, behavior, name, rPol, parallelism, completions)
+	TestJobsValidate(f, job, completions)
+	TestJobsTeardown(f, job)
 }
