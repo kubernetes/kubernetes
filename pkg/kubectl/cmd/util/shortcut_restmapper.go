@@ -52,8 +52,8 @@ func (e ShortcutExpander) getAll() []schema.GroupResource {
 	}
 
 	availableResources := []schema.GroupVersionResource{}
-	for groupVersionString, resourceList := range apiResources {
-		currVersion, err := schema.ParseGroupVersion(groupVersionString)
+	for _, resourceList := range apiResources {
+		currVersion, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
 			return e.All
 		}
