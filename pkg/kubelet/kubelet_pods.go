@@ -483,7 +483,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					secret, err = kl.kubeClient.Core().Secrets(pod.Namespace).Get(name)
+					secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
 					if err != nil {
 						return result, err
 					}
@@ -598,14 +598,11 @@ func podUsesHostNetwork(pod *api.Pod) bool {
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
-// TODO: duplicate secrets are being retrieved multiple times and there
-// is no cache.  Creating and using a secret manager interface will make this
-// easier to address.
 func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	pullSecrets := []api.Secret{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
-		secret, err := kl.kubeClient.Core().Secrets(pod.Namespace).Get(secretRef.Name)
+		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
 		if err != nil {
 			glog.Warningf("Unable to retrieve pull secret %s/%s for %s/%s due to %v.  The image pull may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
 			continue
