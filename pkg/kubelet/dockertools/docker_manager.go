@@ -1210,11 +1210,15 @@ func GetSeccompOpts(annotations map[string]string, ctrName, profileRoot string) 
 		return nil, nil
 	}
 
-	if !strings.HasPrefix(profile, "localhost/") {
+	if !strings.HasPrefix(profile, "localhost/") && !strings.HasPrefix(profile, "/") {
 		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
 	}
 
 	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
+	if strings.HasPrefix(profile, "/") {
+		// Get profile name from its absolute path
+		name = filepath.Base(profile)
+	}
 	fname := filepath.Join(profileRoot, filepath.FromSlash(name))
 	file, err := ioutil.ReadFile(fname)
 	if err != nil {

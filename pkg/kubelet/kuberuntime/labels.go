@@ -18,7 +18,9 @@ package kuberuntime
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -92,8 +94,22 @@ func newPodLabels(pod *api.Pod) map[string]string {
 }
 
 // newPodAnnotations creates pod annotations from api.Pod.
-func newPodAnnotations(pod *api.Pod) map[string]string {
-	return pod.Annotations
+func newPodAnnotations(pod *api.Pod, seccompProfileRoot string) map[string]string {
+	annotations := pod.Annotations
+
+	for _, c := range pod.Spec.Containers {
+		containerSeccompKey := api.SeccompContainerAnnotationKeyPrefix + c.Name
+		profile, profileOK := annotations[containerSeccompKey]
+		if !profileOK || !strings.HasPrefix(profile, "localhost/") {
+			continue
+		}
+
+		name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
+		fname := filepath.Join(seccompProfileRoot, filepath.FromSlash(name))
+		annotations[containerSeccompKey] = fname
+	}
+
+	return annotations
 }
 
 // newContainerLabels creates container labels from api.Container and api.Pod.

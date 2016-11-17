@@ -208,7 +208,7 @@ func TestPodAnnotations(t *testing.T) {
 	}
 
 	// Test whether we can get right information from annotations
-	annotations := newPodAnnotations(pod)
+	annotations := newPodAnnotations(pod, "/")
 	podSandboxInfo := getPodSandboxInfoFromAnnotations(annotations)
 	if !reflect.DeepEqual(podSandboxInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, podSandboxInfo)
