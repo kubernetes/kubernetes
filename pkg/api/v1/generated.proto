@@ -1094,6 +1094,9 @@ message HostPathVolumeSource {
   // Path of the directory on the host.
   // More info: http://kubernetes.io/docs/user-guide/volumes#hostpath
   optional string path = 1;
+
+  // Mount the host path with propagation mode specified. Docker only.
+  optional string propagation = 2;
 }
 
 // Represents an ISCSI disk.

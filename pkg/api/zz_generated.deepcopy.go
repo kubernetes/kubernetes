@@ -1288,6 +1288,7 @@ func DeepCopy_api_HostPathVolumeSource(in interface{}, out interface{}, c *conve
 		in := in.(*HostPathVolumeSource)
 		out := out.(*HostPathVolumeSource)
 		out.Path = in.Path
+		out.Propagation = in.Propagation
 		return nil
 	}
 }

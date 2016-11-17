@@ -1474,6 +1474,10 @@
      "path": {
       "type": "string",
       "description": "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath"
+     },
+     "propagation": {
+      "type": "string",
+      "description": "Mount the host path with propagation mode specified. Docker only."
      }
     }
    },

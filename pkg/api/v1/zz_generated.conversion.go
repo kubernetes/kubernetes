@@ -1568,6 +1568,7 @@ func Convert_api_Handler_To_v1_Handler(in *api.Handler, out *Handler, s conversi
 
 func autoConvert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource(in *HostPathVolumeSource, out *api.HostPathVolumeSource, s conversion.Scope) error {
 	out.Path = in.Path
+	out.Propagation = api.PropagationMode(in.Propagation)
 	return nil
 }
 
@@ -1577,6 +1578,7 @@ func Convert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource(in *HostPathVol
 
 func autoConvert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource(in *api.HostPathVolumeSource, out *HostPathVolumeSource, s conversion.Scope) error {
 	out.Path = in.Path
+	out.Propagation = PropagationMode(in.Propagation)
 	return nil
 }
 

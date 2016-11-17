@@ -607,8 +607,9 @@ func (Handler) SwaggerDoc() map[string]string {
 }
 
 var map_HostPathVolumeSource = map[string]string{
-	"":     "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
-	"path": "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath",
+	"":            "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
+	"path":        "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath",
+	"propagation": "Mount the host path with propagation mode specified. Docker only.",
 }
 
 func (HostPathVolumeSource) SwaggerDoc() map[string]string {
