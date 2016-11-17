@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
-	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 
@@ -369,19 +368,22 @@ func (sb *summaryBuilder) containerInfoV2ToNetworkStats(name string, info *cadvi
 	if !found {
 		return nil
 	}
+	var rxBytes, rxErrors, txBytes, txErrors uint64
 	for _, inter := range cstat.Network.Interfaces {
-		if inter.Name == network.DefaultInterfaceName {
-			return &stats.NetworkStats{
-				Time:     unversioned.NewTime(cstat.Timestamp),
-				RxBytes:  &inter.RxBytes,
-				RxErrors: &inter.RxErrors,
-				TxBytes:  &inter.TxBytes,
-				TxErrors: &inter.TxErrors,
-			}
+		if inter.Name != "lo" {
+			rxBytes += inter.RxBytes
+			rxErrors += inter.RxErrors
+			txBytes += inter.TxBytes
+			txErrors += inter.TxErrors
 		}
 	}
-	glog.V(4).Infof("Missing default interface %q for %s", network.DefaultInterfaceName, name)
-	return nil
+	return &stats.NetworkStats{
+		Time:     unversioned.NewTime(cstat.Timestamp),
+		RxBytes:  &rxBytes,
+		RxErrors: &rxErrors,
+		TxBytes:  &txBytes,
+		TxErrors: &txErrors,
+	}
 }
 
 func (sb *summaryBuilder) containerInfoV2ToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []stats.UserDefinedMetric {
