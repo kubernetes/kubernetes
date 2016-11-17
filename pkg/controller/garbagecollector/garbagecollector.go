@@ -537,7 +537,7 @@ var ignoredResources = map[schema.GroupVersionResource]struct{}{
 	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
 }
 
-func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, resources []schema.GroupVersionResource) (*GarbageCollector, error) {
+func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, resources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
 	gc := &GarbageCollector{
 		metaOnlyClientPool:               metaOnlyClientPool,
 		clientPool:                       clientPool,
@@ -557,7 +557,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		},
 		gc: gc,
 	}
-	for _, resource := range resources {
+	for resource := range resources {
 		if _, ok := ignoredResources[resource]; ok {
 			glog.V(6).Infof("ignore resource %#v", resource)
 			continue

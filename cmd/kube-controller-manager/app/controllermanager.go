@@ -393,25 +393,40 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	namespaceKubeClient := clientBuilder.ClientOrDie("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(rootClientBuilder.ConfigOrDie("namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
-	var gvrFn func() ([]schema.GroupVersionResource, error)
+	gvrFn := func() (map[schema.GroupVersionResource]struct{}, error) {
+		resources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
+		if err != nil {
+			// best effort extraction
+			gvrs, _ := discovery.GroupVersionResources(resources)
+			return gvrs, fmt.Errorf("failed to get supported namespaced resources: %v", err)
+		}
+		gvrs, err := discovery.GroupVersionResources(resources)
+		if err != nil {
+			return gvrs, fmt.Errorf("failed to parse supported namespaced resources: %v", err)
+		}
+		return gvrs, nil
+	}
 	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
 	if err != nil {
 		return fmt.Errorf("failed to get group version resources: %v", err)
 	}
+	tprFound := false
+searchThirdPartyResource:
 	for _, rsrcList := range rsrcs {
 		for ix := range rsrcList.APIResources {
 			rsrc := &rsrcList.APIResources[ix]
 			if rsrc.Kind == "ThirdPartyResource" {
-				gvrFn = namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
+				tprFound = true
+				break searchThirdPartyResource
 			}
 		}
 	}
-	if gvrFn == nil {
-		gvr, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
+	if !tprFound {
+		gvr, err := gvrFn()
 		if err != nil {
 			return fmt.Errorf("failed to get resources: %v", err)
 		}
-		gvrFn = func() ([]schema.GroupVersionResource, error) {
+		gvrFn = func() (map[schema.GroupVersionResource]struct{}, error) {
 			return gvr, nil
 		}
 	}
@@ -548,9 +563,13 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 
 	if s.EnableGarbageCollector {
 		gcClientset := clientBuilder.ClientOrDie("generic-garbage-collector")
-		groupVersionResources, err := gcClientset.Discovery().ServerPreferredResources()
+		preferredResources, err := gcClientset.Discovery().ServerPreferredResources()
 		if err != nil {
 			return fmt.Errorf("failed to get supported resources from server: %v", err)
+		}
+		groupVersionResources, err := discovery.GroupVersionResources(preferredResources)
+		if err != nil {
+			glog.Fatalf("Failed to parse supported resources from server: %v", err)
 		}
 
 		config := rootClientBuilder.ConfigOrDie("generic-garbage-collector")

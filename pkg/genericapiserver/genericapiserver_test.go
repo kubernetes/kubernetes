@@ -28,14 +28,18 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -99,52 +103,165 @@ func TestInstallAPIGroups(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
+	config.DiscoveryAddresses = DefaultDiscoveryAddresses{DefaultAddress: "ExternalAddress"}
 
 	s, err := config.SkipComplete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	apiGroupMeta := registered.GroupOrDie(api.GroupName)
-	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
-	s.InstallLegacyAPIGroup("/apiPrefix", &APIGroupInfo{
-		// legacy group version
-		GroupMeta:                    *apiGroupMeta,
-		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		ParameterCodec:               api.ParameterCodec,
-		NegotiatedSerializer:         api.Codecs,
-	})
+	testAPI := func(gv schema.GroupVersion) APIGroupInfo {
+		getter, noVerbs := testGetterStorage{}, testNoVerbsStorage{}
 
-	apiGroupsInfo := []APIGroupInfo{
-		{
-			// extensions group version
-			GroupMeta:                    *extensionsGroupMeta,
-			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-			OptionsExternalVersion:       &apiGroupMeta.GroupVersion,
-			ParameterCodec:               api.ParameterCodec,
-			NegotiatedSerializer:         api.Codecs,
-		},
+		scheme := runtime.NewScheme()
+		scheme.AddKnownTypeWithName(gv.WithKind("Getter"), getter.New())
+		scheme.AddKnownTypeWithName(gv.WithKind("NoVerb"), noVerbs.New())
+		scheme.AddKnownTypes(v1.SchemeGroupVersion,
+			&v1.ListOptions{},
+			&v1.DeleteOptions{},
+			&metav1.ExportOptions{},
+			&metav1.Status{},
+		)
+
+		interfacesFor := func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
+			return &meta.VersionInterfaces{
+				ObjectConvertor:  scheme,
+				MetadataAccessor: meta.NewAccessor(),
+			}, nil
+		}
+
+		mapper := api.NewDefaultRESTMapperFromScheme([]schema.GroupVersion{gv}, interfacesFor, "", sets.NewString(), sets.NewString(), scheme)
+		groupMeta := apimachinery.GroupMeta{
+			GroupVersion:  gv,
+			GroupVersions: []schema.GroupVersion{gv},
+			RESTMapper:    mapper,
+			InterfacesFor: interfacesFor,
+		}
+
+		return APIGroupInfo{
+			GroupMeta: groupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				gv.Version: {
+					"getter":  &testGetterStorage{Version: gv.Version},
+					"noverbs": &testNoVerbsStorage{Version: gv.Version},
+				},
+			},
+			OptionsExternalVersion: &schema.GroupVersion{Version: "v1"},
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+			Scheme:                 scheme,
+		}
 	}
-	for i := range apiGroupsInfo {
-		s.InstallAPIGroup(&apiGroupsInfo[i])
+
+	apis := []APIGroupInfo{
+		testAPI(schema.GroupVersion{Group: "", Version: "v1"}),
+		testAPI(schema.GroupVersion{Group: "extensions", Version: "v1"}),
+		testAPI(schema.GroupVersion{Group: "batch", Version: "v1"}),
+	}
+
+	err = s.InstallLegacyAPIGroup("/apiPrefix", &apis[0])
+	assert.NoError(err)
+	groupPaths := []string{
+		config.LegacyAPIGroupPrefixes.List()[0], // /apiPrefix
+	}
+	for _, api := range apis[1:] {
+		err = s.InstallAPIGroup(&api)
+		assert.NoError(err)
+		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.GroupMeta.GroupVersion.Group) // /apis/<group>
 	}
 
 	server := httptest.NewServer(s.InsecureHandler)
 	defer server.Close()
-	validPaths := []string{
-		// "/api"
-		config.LegacyAPIGroupPrefixes.List()[0],
-		// "/api/v1"
-		config.LegacyAPIGroupPrefixes.List()[0] + "/" + apiGroupMeta.GroupVersion.Version,
-		// "/apis/extensions"
-		APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.Group,
-		// "/apis/extensions/v1beta1"
-		APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.String(),
-	}
-	for _, path := range validPaths {
-		_, err := http.Get(server.URL + path)
-		if !assert.NoError(err) {
-			t.Errorf("unexpected error: %v, for path: %s", err, path)
+
+	for i := range apis {
+		// should serve APIGroup at group path
+		info := &apis[i]
+		path := groupPaths[i]
+		resp, err := http.Get(server.URL + path)
+		if err != nil {
+			t.Errorf("[%d] unexpected error getting path %q path: %v", i, path, err)
+			continue
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("[%d] unexpected error reading body at path %q: %v", i, path, err)
+			continue
+		}
+
+		t.Logf("[%d] json at %s: %s", i, path, string(body))
+
+		if i == 0 {
+			// legacy API returns APIVersions
+			group := metav1.APIVersions{}
+			err = json.Unmarshal(body, &group)
+			if err != nil {
+				t.Errorf("[%d] unexpected error parsing json body at path %q: %v", i, path, err)
+				continue
+			}
+		} else {
+			// API groups return APIGroup
+			group := metav1.APIGroup{}
+			err = json.Unmarshal(body, &group)
+			if err != nil {
+				t.Errorf("[%d] unexpected error parsing json body at path %q: %v", i, path, err)
+				continue
+			}
+
+			if got, expected := group.Name, info.GroupMeta.GroupVersion.Group; got != expected {
+				t.Errorf("[%d] unexpected group name at path %q: got=%q expected=%q", i, path, got, expected)
+				continue
+			}
+
+			if got, expected := group.PreferredVersion.Version, info.GroupMeta.GroupVersion.Version; got != expected {
+				t.Errorf("[%d] unexpected group version at path %q: got=%q expected=%q", i, path, got, expected)
+				continue
+			}
+		}
+
+		// should serve APIResourceList at group path + /<group-version>
+		path = path + "/" + info.GroupMeta.GroupVersion.Version
+		resp, err = http.Get(server.URL + path)
+		if err != nil {
+			t.Errorf("[%d] unexpected error getting path %q path: %v", i, path, err)
+			continue
+		}
+
+		body, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("[%d] unexpected error reading body at path %q: %v", i, path, err)
+			continue
+		}
+
+		t.Logf("[%d] json at %s: %s", i, path, string(body))
+
+		resources := metav1.APIResourceList{}
+		err = json.Unmarshal(body, &resources)
+		if err != nil {
+			t.Errorf("[%d] unexpected error parsing json body at path %q: %v", i, path, err)
+			continue
+		}
+
+		if got, expected := resources.GroupVersion, info.GroupMeta.GroupVersion.String(); got != expected {
+			t.Errorf("[%d] unexpected groupVersion at path %q: got=%q expected=%q", i, path, got, expected)
+			continue
+		}
+
+		// the verbs should match the features of resources
+		for _, r := range resources.APIResources {
+			switch r.Name {
+			case "getter":
+				if got, expected := sets.NewString([]string(r.Verbs)...), sets.NewString("get"); !got.Equal(expected) {
+					t.Errorf("[%d] unexpected verbs for resource %s/%s: got=%v expected=%v", i, resources.GroupVersion, r.Name, got, expected)
+				}
+			case "noverbs":
+				if r.Verbs == nil {
+					t.Errorf("[%d] unexpected nil verbs slice. Expected: []string{}", i)
+				}
+				if got, expected := sets.NewString([]string(r.Verbs)...), sets.NewString(); !got.Equal(expected) {
+					t.Errorf("[%d] unexpected verbs for resource %s/%s: got=%v expected=%v", i, resources.GroupVersion, r.Name, got, expected)
+				}
+			}
 		}
 	}
 }
@@ -460,5 +577,35 @@ func TestGetServerAddressByClientCIDRs(t *testing.T) {
 		if a, e := discoveryAddresses.ServerAddressByClientCIDRs(utilnet.GetClientIP(&test.Request)), test.ExpectedMap; reflect.DeepEqual(e, a) != true {
 			t.Fatalf("test case %d failed. expected: %v, actual: %v", i+1, e, a)
 		}
+	}
+}
+
+type testGetterStorage struct {
+	Version string
+}
+
+func (p *testGetterStorage) New() runtime.Object {
+	return &metav1.APIGroup{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Getter",
+			APIVersion: p.Version,
+		},
+	}
+}
+
+func (p *testGetterStorage) Get(ctx api.Context, name string) (runtime.Object, error) {
+	return nil, nil
+}
+
+type testNoVerbsStorage struct {
+	Version string
+}
+
+func (p *testNoVerbsStorage) New() runtime.Object {
+	return &metav1.APIGroup{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "NoVerbs",
+			APIVersion: p.Version,
+		},
 	}
 }

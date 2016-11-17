@@ -35,9 +35,9 @@ type RegisteredRateLimiter struct {
 // NewRegisteredRateLimiter returns a new RegisteredRateLimiater.
 // TODO: NewRegisteredRateLimiter is not dynamic. We need to find a better way
 // when GC dynamically change the resources it monitors.
-func NewRegisteredRateLimiter(resources []schema.GroupVersionResource) *RegisteredRateLimiter {
+func NewRegisteredRateLimiter(resources map[schema.GroupVersionResource]struct{}) *RegisteredRateLimiter {
 	rateLimiters := make(map[schema.GroupVersion]*sync.Once)
-	for _, resource := range resources {
+	for resource := range resources {
 		gv := resource.GroupVersion()
 		if _, found := rateLimiters[gv]; !found {
 			rateLimiters[gv] = &sync.Once{}
