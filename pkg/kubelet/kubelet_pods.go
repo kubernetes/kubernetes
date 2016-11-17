@@ -414,8 +414,8 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 	}
 
 	var (
-		configMaps = make(map[string]*api.ConfigMap)
-		tmpEnv     = make(map[string]string)
+		configMaps   = make(map[string]*api.ConfigMap)
+		configMapEnv = make(map[string]string)
 	)
 	for _, envFrom := range container.EnvFrom {
 		if envFrom.ConfigMap != nil {
@@ -442,7 +442,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 				// env vars.
 				// TODO: remove this next line once all platforms use apiserver+Pods.
 				delete(serviceEnv, k)
-				tmpEnv[k] = v
+				configMapEnv[k] = v
 			}
 		}
 	}
@@ -457,8 +457,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 	// 2.  Create the container's environment in the order variables are declared
 	// 3.  Add remaining service environment vars
 	var (
+		tmpEnv      = make(map[string]string)
 		secrets     = make(map[string]*api.Secret)
-		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
+		mappingFunc = expansion.MappingFuncFor(tmpEnv, configMapEnv, serviceEnv)
 	)
 	for _, envVar := range container.Env {
 		// Accesses apiserver+Pods.
@@ -467,6 +468,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		// env vars.
 		// TODO: remove this next line once all platforms use apiserver+Pods.
 		delete(serviceEnv, envVar.Name)
+		delete(configMapEnv, envVar.Name)
 
 		runtimeVal := envVar.Value
 		if runtimeVal != "" {
@@ -530,10 +532,11 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		}
 
 		tmpEnv[envVar.Name] = runtimeVal
+		result = append(result, kubecontainer.EnvVar{Name: envVar.Name, Value: runtimeVal})
 	}
 
 	// Append the env vars
-	for k, v := range tmpEnv {
+	for k, v := range configMapEnv {
 		result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
 	}
 

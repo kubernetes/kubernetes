@@ -6099,7 +6099,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">envFrom</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">List of environment variables to set in the container. Cannot be updated.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All EnvVars will take precedence over any listed source. Cannot be updated.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_envfromsource">v1.EnvFromSource</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -8654,7 +8654,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-10 11:07:09 UTC
+Last updated 2016-11-17 21:44:18 UTC
 </div>
 </div>
 </body>
