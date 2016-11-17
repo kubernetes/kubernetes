@@ -288,7 +288,7 @@ func NewDockerManager(
 	cmdRunner := kubecontainer.DirectStreamingRunner(dm)
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, cmdRunner, dm)
 	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls, qps, burst)
-	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
+	dm.containerGC = NewContainerGC(client, podGetter, dm.network, containerLogsDir)
 
 	dm.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
@@ -421,7 +421,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		// Container that are running, restarting and paused
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = startedAt
-		if containerProvidesPodIP(dockerName) {
+		if containerProvidesPodIP(dockerName.ContainerName) {
 			ip, err = dm.network.determineContainerIP(podNamespace, podName, iResult)
 			// Kubelet doesn't handle the network error scenario
 			if err != nil {
@@ -2617,7 +2617,7 @@ func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string)
 			}
 		}
 		containerStatuses = append(containerStatuses, result)
-		if containerProvidesPodIP(dockerName) && ip != "" {
+		if containerProvidesPodIP(dockerName.ContainerName) && ip != "" {
 			podStatus.IP = ip
 		}
 	}
