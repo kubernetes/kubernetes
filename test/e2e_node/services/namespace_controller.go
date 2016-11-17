@@ -56,11 +56,7 @@ func (n *NamespaceController) Start() error {
 		return err
 	}
 	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	resources, err := client.Discovery().ServerPreferredNamespacedResources()
-	if err != nil {
-		return err
-	}
-	nc := namespacecontroller.NewNamespaceController(client, clientPool, resources, ncResyncPeriod, api.FinalizerKubernetes)
+	nc := namespacecontroller.NewNamespaceController(client, clientPool, ncResyncPeriod, api.FinalizerKubernetes)
 	go nc.Run(ncConcurrency, n.stopCh)
 	return nil
 }
