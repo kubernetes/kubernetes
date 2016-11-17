@@ -128,9 +128,13 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	groupVersionResources, err := clientSet.Discovery().ServerPreferredResources()
+	resources, err := clientSet.Discovery().ServerPreferredResources()
 	if err != nil {
 		t.Fatalf("Failed to get supported resources from server: %v", err)
+	}
+	groupVersionResources, err := unversioned.ExtractGroupVersionResourcesWithVerbs(resources, "delete")
+	if err != nil {
+		t.Fatalf("Failed to parse supported resources from server: %v", err)
 	}
 	config := &restclient.Config{Host: s.URL}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
