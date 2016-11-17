@@ -28,6 +28,15 @@ ${APISERVER_TEST_ARGS}
 --storage-backend=${STORAGE_BACKEND}
 --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}"
 EOF
+if [ -z "${CUSTOM_ADMISSION_PLUGINS:-}"]; then
+ cat >> "${RESOURCE_DIRECTORY}/apiserver_flags" <<EOF
+--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
+EOF
+else
+  cat >> "${RESOURCE_DIRECTORY}/apiserver_flags" <<EOF
+--admission-control=${CUSTOM_ADMISSION_PLUGINS}
+EOF
+fi
 sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/apiserver_flags"
 
   cat > "${RESOURCE_DIRECTORY}/scheduler_flags" <<EOF
