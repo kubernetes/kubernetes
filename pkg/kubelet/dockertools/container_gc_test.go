@@ -25,15 +25,55 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubenet "k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/types"
+	utilsets "k8s.io/kubernetes/pkg/util/sets"
 )
 
-func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient) {
+type fakeNetworkPlugin struct {
+	teardownCalled bool
+}
+
+func (plugin *fakeNetworkPlugin) Init(host kubenet.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
+	return nil
+}
+
+func (plugin *fakeNetworkPlugin) Event(name string, details map[string]interface{}) {
+}
+
+func (plugin *fakeNetworkPlugin) Name() string {
+	return "fakeplugin"
+}
+
+func (plugin *fakeNetworkPlugin) Capabilities() utilsets.Int {
+	return utilsets.NewInt()
+}
+
+func (plugin *fakeNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	return nil
+}
+
+func (plugin *fakeNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	plugin.teardownCalled = true
+	return nil
+}
+
+func (plugin *fakeNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*kubenet.PodNetworkStatus, error) {
+	return nil, nil
+}
+
+func (plugin *fakeNetworkPlugin) Status() error {
+	return nil
+}
+
+func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient, *fakeNetworkPlugin) {
 	fakeDocker := new(FakeDockerClient)
 	fakePodGetter := newFakePodGetter()
-	gc := NewContainerGC(fakeDocker, fakePodGetter, "")
-	return gc, fakeDocker
+	fakePlugin := &fakeNetworkPlugin{}
+	gc := NewContainerGC(fakeDocker, fakePodGetter, fakePlugin, "")
+	return gc, fakeDocker, fakePlugin
 }
 
 // Makes a stable time object, lower id is earlier time.
@@ -90,7 +130,7 @@ func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
 }
 
 func TestDeleteContainerSkipRunningContainer(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", true, makeTime(0)),
 	})
@@ -101,7 +141,7 @@ func TestDeleteContainerSkipRunningContainer(t *testing.T) {
 }
 
 func TestDeleteContainerRemoveDeadContainer(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 	})
@@ -111,8 +151,32 @@ func TestDeleteContainerRemoveDeadContainer(t *testing.T) {
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
+func TestGarbageCollectNetworkTeardown(t *testing.T) {
+	// Ensure infra container gets teardown called
+	gc, fakeDocker, fakePlugin := newTestContainerGC(t)
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		makeContainer("1876", "foo", "POD", false, makeTime(0)),
+	})
+	addPods(gc.podGetter, "foo")
+
+	assert.Nil(t, gc.deleteContainer("1876"))
+	assert.Len(t, fakeDocker.Removed, 1)
+	assert.Equal(t, fakePlugin.teardownCalled, true)
+
+	// Ensure non-infra container does not have teardown called
+	gc, fakeDocker, fakePlugin = newTestContainerGC(t)
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		makeContainer("1876", "foo", "adsfasdfasdf", false, makeTime(0)),
+	})
+	addPods(gc.podGetter, "foo")
+
+	assert.Nil(t, gc.deleteContainer("1876"))
+	assert.Len(t, fakeDocker.Removed, 1)
+	assert.Equal(t, fakePlugin.teardownCalled, false)
+}
+
 func TestGarbageCollectZeroMaxContainers(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 	})
@@ -123,7 +187,7 @@ func TestGarbageCollectZeroMaxContainers(t *testing.T) {
 }
 
 func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 		makeContainer("2876", "foo1", "POD", false, makeTime(1)),
@@ -138,7 +202,7 @@ func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
 }
 
 func TestGarbageCollectNoMaxLimit(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 		makeContainer("2876", "foo1", "POD", false, makeTime(0)),
@@ -260,7 +324,7 @@ func TestGarbageCollect(t *testing.T) {
 	}
 	for i, test := range tests {
 		t.Logf("Running test case with index %d", i)
-		gc, fakeDocker := newTestContainerGC(t)
+		gc, fakeDocker, _ := newTestContainerGC(t)
 		fakeDocker.SetFakeContainers(test.containers)
 		addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4", "foo5", "foo6", "foo7")
 		assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}, true))

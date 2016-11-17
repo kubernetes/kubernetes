@@ -27,19 +27,23 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/leaky"
+	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/types"
 )
 
 type containerGC struct {
 	client           DockerInterface
 	podGetter        podGetter
+	networkPlugin    network.NetworkPlugin
 	containerLogsDir string
 }
 
-func NewContainerGC(client DockerInterface, podGetter podGetter, containerLogsDir string) *containerGC {
+func NewContainerGC(client DockerInterface, podGetter podGetter, networkPlugin network.NetworkPlugin, containerLogsDir string) *containerGC {
 	return &containerGC{
 		client:           client,
 		podGetter:        podGetter,
+		networkPlugin:    networkPlugin,
 		containerLogsDir: containerLogsDir,
 	}
 }
@@ -49,9 +53,6 @@ type containerGCInfo struct {
 	// Docker ID of the container.
 	id string
 
-	// Docker name of the container.
-	name string
-
 	// Creation time for the container.
 	createTime time.Time
 
@@ -59,8 +60,14 @@ type containerGCInfo struct {
 	// This comes from dockertools.ParseDockerName(...)
 	podNameWithNamespace string
 
+	// Kubernetes pod UID
+	podUID types.UID
+
 	// Container name in pod
 	containerName string
+
+	// Container network mode
+	isHostNetwork bool
 }
 
 // Containers are considered for eviction as units of (UID, container name) pair.
@@ -111,11 +118,29 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	for i := numToKeep; i < len(containers); i++ {
-		cgc.removeContainer(containers[i].id, containers[i].podNameWithNamespace, containers[i].containerName)
+		cgc.removeContainer(containers[i])
 	}
 
 	// Assume we removed the containers so that we're not too aggressive.
 	return containers[:numToKeep]
+}
+
+// Returns a full GC info structure on success, or a partial one on failure
+func newContainerGCInfo(id string, inspectResult *dockertypes.ContainerJSON, created time.Time) (containerGCInfo, error) {
+	containerName, _, err := ParseDockerName(inspectResult.Name)
+	if err != nil {
+		return containerGCInfo{id: id}, fmt.Errorf("failed to parse docker name: %v", err)
+	}
+
+	networkMode := getDockerNetworkMode(inspectResult)
+	return containerGCInfo{
+		id:                   id,
+		podNameWithNamespace: containerName.PodFullName,
+		podUID:               containerName.PodUID,
+		containerName:        containerName.ContainerName,
+		createTime:           created,
+		isHostNetwork:        networkMode == namespaceModeHost,
+	}, nil
 }
 
 // Get all containers that are evictable. Evictable containers are: not running
@@ -147,23 +172,14 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			continue
 		}
 
-		containerInfo := containerGCInfo{
-			id:         container.ID,
-			name:       container.Names[0],
-			createTime: created,
-		}
-
-		containerName, _, err := ParseDockerName(container.Names[0])
-
+		containerInfo, err := newContainerGCInfo(container.ID, data, created)
 		if err != nil {
 			unidentifiedContainers = append(unidentifiedContainers, containerInfo)
 		} else {
 			key := evictUnit{
-				uid:  containerName.PodUID,
-				name: containerName.ContainerName,
+				uid:  containerInfo.podUID,
+				name: containerInfo.containerName,
 			}
-			containerInfo.podNameWithNamespace = containerName.PodFullName
-			containerInfo.containerName = containerName.ContainerName
 			evictUnits[key] = append(evictUnits[key], containerInfo)
 		}
 	}
@@ -186,10 +202,10 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy,
 
 	// Remove unidentified containers.
 	for _, container := range unidentifiedContainers {
-		glog.Infof("Removing unidentified dead container %q with ID %q", container.name, container.id)
+		glog.Infof("Removing unidentified dead container %q with ID %q", container.containerName, container.id)
 		err = cgc.client.RemoveContainer(container.id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 		if err != nil {
-			glog.Warningf("Failed to remove unidentified dead container %q: %v", container.name, err)
+			glog.Warningf("Failed to remove unidentified dead container %q: %v", container.containerName, err)
 		}
 	}
 
@@ -245,35 +261,47 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy,
 	return nil
 }
 
-func (cgc *containerGC) removeContainer(id string, podNameWithNamespace string, containerName string) {
-	glog.V(4).Infof("Removing container %q name %q", id, containerName)
-	err := cgc.client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
-	if err != nil {
-		glog.Warningf("Failed to remove container %q: %v", id, err)
+func (cgc *containerGC) removeContainer(containerInfo containerGCInfo) {
+	if !containerInfo.isHostNetwork && containerInfo.containerName == leaky.PodInfraContainerName {
+		podName, podNamespace, err := kubecontainer.ParsePodFullName(containerInfo.podNameWithNamespace)
+		if err == nil {
+			containerID := kubecontainer.DockerID(containerInfo.id).ContainerID()
+			if err := cgc.networkPlugin.TearDownPod(podNamespace, podName, containerID); err != nil {
+				glog.Warningf("failed to tear down container %q network: %v", containerInfo.id, err)
+			}
+		} else {
+			glog.Warningf("failed to parse pod full name %q: %v", containerInfo.id, err)
+		}
 	}
-	symlinkPath := LogSymlink(cgc.containerLogsDir, podNameWithNamespace, containerName, id)
+
+	glog.V(4).Infof("Removing container %q name %q", containerInfo.id, containerInfo.containerName)
+	err := cgc.client.RemoveContainer(containerInfo.id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	if err != nil {
+		glog.Warningf("Failed to remove container %q: %v", containerInfo.id, err)
+	}
+	symlinkPath := LogSymlink(cgc.containerLogsDir, containerInfo.podNameWithNamespace, containerInfo.containerName, containerInfo.id)
 	err = os.Remove(symlinkPath)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Warningf("Failed to remove container %q log symlink %q: %v", id, symlinkPath, err)
+		glog.Warningf("Failed to remove container %q log symlink %q: %v", containerInfo.id, symlinkPath, err)
 	}
 }
 
 func (cgc *containerGC) deleteContainer(id string) error {
-	containerInfo, err := cgc.client.InspectContainer(id)
+	data, err := cgc.client.InspectContainer(id)
 	if err != nil {
 		glog.Warningf("Failed to inspect container %q: %v", id, err)
 		return err
 	}
-	if containerInfo.State.Running {
+	if data.State.Running {
 		return fmt.Errorf("container %q is still running", id)
 	}
 
-	containerName, _, err := ParseDockerName(containerInfo.Name)
+	containerInfo, err := newContainerGCInfo(id, data, time.Now())
 	if err != nil {
 		return err
 	}
 
-	cgc.removeContainer(id, containerName.PodFullName, containerName.ContainerName)
+	cgc.removeContainer(containerInfo)
 	return nil
 }
 

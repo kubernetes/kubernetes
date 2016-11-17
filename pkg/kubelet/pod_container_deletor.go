@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -80,20 +81,27 @@ func getContainersToDeleteInPod(filterContainerId string, podStatus *kubecontain
 
 	// Find the exited containers whose name matches the name of the container with id being filterContainerId
 	var candidates containerStatusbyCreatedList
+	var infraCandidates containerStatusbyCreatedList
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.State != kubecontainer.ContainerStateExited {
 			continue
 		}
 		if matchedContainer == nil || matchedContainer.Name == containerStatus.Name {
-			candidates = append(candidates, containerStatus)
+			if containerStatus.Name == leaky.PodInfraContainerName {
+				infraCandidates = append(infraCandidates, containerStatus)
+			} else {
+				candidates = append(candidates, containerStatus)
+			}
 		}
 	}
 
 	if len(candidates) <= containersToKeep {
-		return containerStatusbyCreatedList{}
+		// Always destroy infra containers to ensure networking gets torn down
+		return infraCandidates
 	}
 	sort.Sort(candidates)
-	return candidates[containersToKeep:]
+	candidates = append(infraCandidates, candidates[containersToKeep:]...)
+	return candidates
 }
 
 // deleteContainersInPod issues container deletion requests for containers selected by getContainersToDeleteInPod.

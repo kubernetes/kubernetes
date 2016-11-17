@@ -65,6 +65,7 @@ go_library(
         "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/kuberuntime:go_default_library",
+        "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/network:go_default_library",

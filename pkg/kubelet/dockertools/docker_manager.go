@@ -286,7 +286,7 @@ func NewDockerManager(
 	cmdRunner := kubecontainer.DirectStreamingRunner(dm)
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, cmdRunner, dm)
 	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls, qps, burst)
-	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
+	dm.containerGC = NewContainerGC(client, podGetter, networkPlugin, containerLogsDir)
 
 	dm.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
