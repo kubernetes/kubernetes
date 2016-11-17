@@ -221,7 +221,6 @@ Kubectl client Kubectl run deployment should create a deployment from an image,j
 Kubectl client Kubectl run job should create a job from an image when restart is OnFailure,soltysh,1
 Kubectl client Kubectl run pod should create a pod from an image when restart is Never,janetkuo,0
 Kubectl client Kubectl run rc should create an rc from an image,janetkuo,0
-Kubectl client Kubectl should be able to talk to api server kubectl running in a pod could talk to api server,ymqytw,0
 Kubectl client Kubectl taint should remove all the taints with the same key off a node,erictune,1
 Kubectl client Kubectl taint should update the taint on a node,pwittrock,0
 Kubectl client Kubectl version should check is all data is printed,janetkuo,0
