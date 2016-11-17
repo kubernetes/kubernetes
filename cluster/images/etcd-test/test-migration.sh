@@ -3,7 +3,7 @@
 set -o nounset
 
 fail() {
-  echo FAIL
+  echo "FAIL $*"
   exit 1
 }
 
@@ -19,8 +19,7 @@ migrate_if_needed() {
   t0=$(date +%s)
   /usr/local/bin/migrate-if-needed.sh >> /var/log/migrate.log 2>&1
   if [ "$?" != 0 ]; then
-    echo "Migrate to ${TARGET_STORAGE}/${TARGET_VERSION} failed."
-    exit 1
+    fail "Migrate to ${TARGET_STORAGE}/${TARGET_VERSION} failed."
   fi
   t=$(date +%s)
   echo "Took $(( t - t0 )) seconds."
@@ -86,7 +85,7 @@ for what in nodes pods; do
   echo "Checking ${what}..."
   for dump in 237 upgraded; do
     echo -n " start vs ${dump}..."
-    diff -u /var/log/kubectl-${what}-start* /var/log/kubectl-${what}-${dump}* || fail
+    diff -u /var/log/kubectl-${what}-start* /var/log/kubectl-${what}-${dump}* || fail "start/${what} != ${dump}/${what}"
     echo OK
   done
 done
