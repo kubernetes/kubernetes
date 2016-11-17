@@ -94,7 +94,7 @@ func installThirdParty(t *testing.T, client clientset.Interface, clientConfig *r
 		t.Fatal(err)
 	}
 
-	err = wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+	err = wait.Poll(100 * time.Millisecond, 60 * time.Second, func() (bool, error) {
 		_, err := fooClient.Get().Namespace("default").Resource(resource).DoRaw()
 		if err == nil {
 			return true, nil
@@ -111,7 +111,7 @@ func installThirdParty(t *testing.T, client clientset.Interface, clientConfig *r
 
 	return func() {
 		client.Extensions().ThirdPartyResources().Delete(tpr.Name, nil)
-		err = wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+		err = wait.Poll(100 * time.Millisecond, 60 * time.Second, func() (bool, error) {
 			_, err := fooClient.Get().Namespace("default").Resource(resource).DoRaw()
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -136,13 +136,12 @@ func DoTestInstallMultipleAPIs(t *testing.T, client clientset.Interface, clientC
 		}, group, version, "foos",
 	)()
 
-	// TODO make multiple resources in one version work
-	// defer installThirdParty(t, client, clientConfig,
-	// 	&extensions.ThirdPartyResource{
-	// 		ObjectMeta: v1.ObjectMeta{Name: "bar.company.com"},
-	// 		Versions:   []extensions.APIVersion{{Name: version}},
-	// 	}, group, version, "bars",
-	// )()
+	defer installThirdParty(t, client, clientConfig,
+		&extensions.ThirdPartyResource{
+			ObjectMeta: api.ObjectMeta{Name: "bar.company.com"},
+			Versions:   []extensions.APIVersion{{Name: version}},
+		}, group, version, "bars",
+	)()
 }
 
 func DoTestInstallThirdPartyAPIDelete(t *testing.T, client clientset.Interface, clientConfig *restclient.Config) {

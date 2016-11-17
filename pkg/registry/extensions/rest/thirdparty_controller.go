@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
@@ -53,9 +55,7 @@ type ThirdPartyController struct {
 
 // SyncOneResource synchronizes a single resource with RESTful resources on the master
 func (t *ThirdPartyController) SyncOneResource(rsrc *extensions.ThirdPartyResource) error {
-	// TODO: we also need to test if the existing installed resource matches the resource we are sync-ing.
-	// Currently, if there is an older, incompatible resource installed, we won't remove it.  We should detect
-	// older, incompatible resources and remove them before testing if the resource exists.
+	// Check whether we have this resource installed.
 	hasResource, err := t.master.HasThirdPartyResource(rsrc)
 	if err != nil {
 		return err
@@ -83,12 +83,20 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 		for ix := range list.Items {
 			item := &list.Items[ix]
 			// extract the api group and resource kind from the schema
-			_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
+			kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
 			if err != nil {
 				return err
 			}
-			// place it in the set of resources that we expect, so that we don't delete it in the delete pass
-			existing.Insert(MakeThirdPartyPath(group))
+			for _, version := range item.Versions {
+				plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+					Group:   group,
+					Version: version.Name,
+					Kind:    kind,
+				})
+				// place it in the set of resources that we expect, so that we don't delete it in the delete pass
+				fullAPIPath := MakeThirdPartyPath(group) + "/" + version.Name + "/" + plural.Resource
+				existing.Insert(fullAPIPath)
+			}
 			// ensure a RESTful resource for this schema exists on the master
 			if err := t.SyncOneResource(item); err != nil {
 				return err
@@ -103,7 +111,7 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 		found := false
 		// search across the expected restful resources to see if this resource belongs to one of the expected ones
 		for _, apiPath := range existing.List() {
-			if installedAPI == apiPath || strings.HasPrefix(installedAPI, apiPath+"/") {
+			if installedAPI == apiPath {
 				found = true
 				break
 			}
@@ -127,5 +135,10 @@ func MakeThirdPartyPath(group string) string {
 }
 
 func GetThirdPartyGroupName(path string) string {
+	ix := strings.LastIndex(path, "/")
+	if ix == -1 {
+		return ""
+	}
+	path = path[0:ix]
 	return strings.TrimPrefix(strings.TrimPrefix(path, thirdpartyprefix), "/")
 }
