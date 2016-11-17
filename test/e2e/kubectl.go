@@ -334,34 +334,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	})
 
 	framework.KubeDescribe("Guestbook application", func() {
-		forEachGBFile := func(run func(s string)) {
-			for _, gbAppFile := range []string{
-				"examples/guestbook/frontend-deployment.yaml",
-				"examples/guestbook/frontend-service.yaml",
-				"examples/guestbook/redis-master-deployment.yaml",
-				"examples/guestbook/redis-master-service.yaml",
-				"examples/guestbook/redis-slave-deployment.yaml",
-				"examples/guestbook/redis-slave-service.yaml",
-			} {
-				contents := framework.ReadOrDie(gbAppFile)
-				run(string(contents))
-			}
-		}
-
 		It("should create and stop a working application [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(deploymentsVersion, c.Discovery())
-
-			defer forEachGBFile(func(contents string) {
-				cleanupKubectlInputs(contents, ns)
-			})
-			By("creating all guestbook components")
-			forEachGBFile(func(contents string) {
-				framework.Logf(contents)
-				framework.RunKubectlOrDieInput(contents, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			})
-
-			By("validating guestbook app")
-			validateGuestbookApp(c, ns)
+			guestbookApplication(c, ns)
 		})
 	})
 
@@ -1575,27 +1549,32 @@ func validateGuestbookApp(c clientset.Interface, ns string) {
 	err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Waiting for frontend to serve content.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
+	// the response could be {"data": ""} or "data": "TestEntry"} depending on how many times validateGuestbookApp is called
+	if !waitForGuestbookResponse(c, "get", "", []string{`{"data": ""}`, `{"data": "TestEntry"}`}, guestbookStartupTimeout, ns) {
 		framework.Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
 	}
 
 	framework.Logf("Trying to add a new entry to the guestbook.")
-	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message": "Updated"}`, guestbookResponseTimeout, ns) {
+	if !waitForGuestbookResponse(c, "set", "TestEntry", []string{`{"message": "Updated"}`}, guestbookResponseTimeout, ns) {
 		framework.Failf("Cannot added new entry in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 
 	framework.Logf("Verifying that added entry can be retrieved.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": "TestEntry"}`, guestbookResponseTimeout, ns) {
+	if !waitForGuestbookResponse(c, "get", "", []string{`{"data": "TestEntry"}`}, guestbookResponseTimeout, ns) {
 		framework.Failf("Entry to guestbook wasn't correctly added in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 }
 
 // Returns whether received expected response from guestbook on time.
-func waitForGuestbookResponse(c clientset.Interface, cmd, arg, expectedResponse string, timeout time.Duration, ns string) bool {
+func waitForGuestbookResponse(c clientset.Interface, cmd, arg string, expectedResponse []string, timeout time.Duration, ns string) bool {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		res, err := makeRequestToGuestbook(c, cmd, arg, ns)
-		if err == nil && res == expectedResponse {
-			return true
+		if err == nil {
+			for _, expResp := range expectedResponse {
+				if res == expResp {
+					return true
+				}
+			}
 		}
 		framework.Logf("Failed to get response from guestbook. err: %v, response: %s", err, res)
 	}
@@ -1809,4 +1788,46 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 	p.Verbose = true
 	p.Logger = log.New(logs, "", 0)
 	return httptest.NewServer(p), logs
+}
+
+func forEachGuestbookFile(run func(s string)) {
+	for _, gbAppFile := range []string{
+		"examples/guestbook/frontend-deployment.yaml",
+		"examples/guestbook/frontend-service.yaml",
+		"examples/guestbook/redis-master-deployment.yaml",
+		"examples/guestbook/redis-master-service.yaml",
+		"examples/guestbook/redis-slave-deployment.yaml",
+		"examples/guestbook/redis-slave-service.yaml",
+	} {
+		contents := framework.ReadOrDie(gbAppFile)
+		run(string(contents))
+	}
+}
+
+func GuestbookApplicationSetup(c clientset.Interface, ns string) {
+	framework.SkipUnlessServerVersionGTE(deploymentsVersion, c.Discovery())
+
+	By("creating all guestbook components")
+	forEachGuestbookFile(func(contents string) {
+		framework.Logf(contents)
+		framework.RunKubectlOrDieInput(contents, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+	})
+}
+
+func GuestbookApplicationValidate(c clientset.Interface, ns string) {
+	By("validating guestbook app")
+	validateGuestbookApp(c, ns)
+}
+
+func GuestbookApplicationTeardown(c clientset.Interface, ns string) {
+	By("teardown guestbook app")
+	forEachGuestbookFile(func(contents string) {
+		cleanupKubectlInputs(contents, ns)
+	})
+}
+
+func guestbookApplication(c clientset.Interface, ns string) {
+	GuestbookApplicationSetup(c, ns)
+	GuestbookApplicationValidate(c, ns)
+	GuestbookApplicationTeardown(c, ns)
 }
