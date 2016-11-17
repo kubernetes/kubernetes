@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -367,7 +368,7 @@ func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResourcesFn func() (map[schema.GroupVersionResource]struct{}, error),
+	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	namespace *v1.Namespace,
 	finalizerToken v1.FinalizerName,
 ) error {
@@ -418,7 +419,13 @@ func syncNamespace(
 	}
 
 	// there may still be content for us to remove
-	groupVersionResources, err := groupVersionResourcesFn()
+	resources, err := discoverResourcesFn()
+	if err != nil {
+		return err
+	}
+	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
+	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
+	groupVersionResources, err := discovery.GroupVersionResources(deletableResources)
 	if err != nil {
 		return err
 	}
