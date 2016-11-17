@@ -26,6 +26,7 @@ const (
 	DefaultKubernetesVersion = "v1.4.4"
 	DefaultAPIBindPort       = 6443
 	DefaultDiscoveryBindPort = 9898
+	DefaultImagePrefix       = "gcr.io/google_containers"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -55,6 +56,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.Networking.DNSDomain == "" {
 		obj.Networking.DNSDomain = DefaultServiceDNSDomain
+	}
+
+	if obj.ImagePrefix == "" {
+		obj.ImagePrefix = DefaultImagePrefix
 	}
 }
 

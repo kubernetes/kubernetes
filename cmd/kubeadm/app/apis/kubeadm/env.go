@@ -19,7 +19,6 @@ package kubeadm
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 )
 
@@ -36,7 +35,6 @@ func SetEnvParams() *EnvParams {
 		"host_pki_path":      "/etc/kubernetes/pki",
 		"host_etcd_path":     "/var/lib/etcd",
 		"hyperkube_image":    "",
-		"discovery_image":    fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
 		"etcd_image":         "",
 		"component_loglevel": "--v=2",
 	}
@@ -52,7 +50,6 @@ func SetEnvParams() *EnvParams {
 		HostPKIPath:       envParams["host_pki_path"],
 		HostEtcdPath:      envParams["host_etcd_path"],
 		HyperkubeImage:    envParams["hyperkube_image"],
-		DiscoveryImage:    envParams["discovery_image"],
 		EtcdImage:         envParams["etcd_image"],
 		ComponentLoglevel: envParams["component_loglevel"],
 	}

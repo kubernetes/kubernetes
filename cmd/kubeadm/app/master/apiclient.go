@@ -19,9 +19,7 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	"runtime"
-	"time"
-
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -31,11 +29,13 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"runtime"
+	"time"
 )
 
 const apiCallRetryInterval = 500 * time.Millisecond
 
-func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
+func CreateClientAndWaitForAPI(cfg *kubeadmapi.MasterConfiguration, adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*adminConfig,
 		&clientcmd.ConfigOverrides{},
@@ -98,7 +98,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		return true, nil
 	})
 
-	createDummyDeployment(client)
+	createDummyDeployment(cfg, client)
 
 	return client, nil
 }
@@ -238,13 +238,14 @@ func NativeArchitectureNodeAffinity() api.NodeSelectorRequirement {
 	}
 }
 
-func createDummyDeployment(client *clientset.Clientset) {
+func createDummyDeployment(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) {
 	fmt.Println("<master/apiclient> attempting a test deployment")
 	dummyDeployment := NewDeployment("dummy", 1, api.PodSpec{
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
-			Name:  "dummy",
-			Image: images.GetAddonImage("pause"),
+			Name:            "dummy",
+			Image:           images.GetAddonImage(cfg, "pause"),
+			ImagePullPolicy: api.PullIfNotPresent,
 		}},
 	})
 

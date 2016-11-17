@@ -105,8 +105,9 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
 		Containers: []api.Container{
 			// DNS server
 			{
-				Name:  "kube-dns",
-				Image: images.GetAddonImage(images.KubeDNSImage),
+				Name:            "kube-dns",
+				Image:           images.GetAddonImage(cfg, images.KubeDNSImage),
+				ImagePullPolicy: api.PullIfNotPresent,
 				Resources: api.ResourceRequirements{
 					Limits:   dnsPodResources,
 					Requests: dnsPodResources,
@@ -157,8 +158,9 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
 			},
 			// dnsmasq
 			{
-				Name:  "dnsmasq",
-				Image: images.GetAddonImage(images.KubeDNSmasqImage),
+				Name:            "dnsmasq",
+				Image:           images.GetAddonImage(cfg, images.KubeDNSmasqImage),
+				ImagePullPolicy: api.PullIfNotPresent,
 				Resources: api.ResourceRequirements{
 					Limits:   dnsPodResources,
 					Requests: dnsPodResources,
@@ -183,8 +185,9 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
 			},
 			// healthz
 			{
-				Name:  "healthz",
-				Image: images.GetAddonImage(images.KubeExechealthzImage),
+				Name:            "healthz",
+				Image:           images.GetAddonImage(cfg, images.KubeExechealthzImage),
+				ImagePullPolicy: api.PullIfNotPresent,
 				Resources: api.ResourceRequirements{
 					Limits:   healthzPodResources,
 					Requests: healthzPodResources,

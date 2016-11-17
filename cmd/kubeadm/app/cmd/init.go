@@ -23,11 +23,15 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/docker/docker/pkg/jsonmessage"
+	dockerapi "github.com/docker/engine-api/client"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
-
+	"golang.org/x/net/context"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -36,6 +40,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	"k8s.io/kubernetes/pkg/runtime"
 	netutil "k8s.io/kubernetes/pkg/util/net"
+	"os"
 )
 
 const (
@@ -155,6 +160,15 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"Port for JWS discovery service to bind to",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&cfg.ImagePrefix, "image-prefix", cfg.ImagePrefix,
+		"Specify an alternate location for all images. Currently this includes: etcd, kube-discovery, kube-apiserver, kube-controller-manager, kube-scheduler, kube-proxy, kubedns, kube-dnsmasq, exechealthz, pause",
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&cfg.PrePullImages, "pre-pull-images", cfg.PrePullImages,
+		"Pre pull all images before write static pods. Currently this includes: etcd, kube-discovery, kube-apiserver, kube-controller-manager, kube-scheduler, kube-proxy, kubedns, kube-dnsmasq, exechealthz, pause",
+	)
 	return cmd
 }
 
@@ -211,8 +225,46 @@ type joinArgsData struct {
 	DefaultDiscoveryBindPort int32
 }
 
+func PrePullImages(cfg *kubeadmapi.MasterConfiguration) error {
+	prePullImages := []string{}
+	for _, image := range images.GetCoreImageList(cfg) {
+		prePullImages = append(prePullImages, image)
+	}
+	for _, image := range images.GetAddonImageList(cfg) {
+		prePullImages = append(prePullImages, image)
+	}
+
+	client, err := dockerapi.NewEnvClient()
+	if err != nil {
+		return err
+	}
+
+	ctx, _ := context.WithCancel(context.Background())
+	opts := dockertypes.ImagePullOptions{}
+	for _, image := range prePullImages {
+		fmt.Printf("pre pull image: \"%s\"\n", image)
+		resp, err := client.ImagePull(ctx, image, opts)
+		if err != nil {
+			fmt.Printf("pre pull image \"%s\" failed: %s\n", image, err.Error())
+			return err
+		}
+		err = jsonmessage.DisplayJSONMessagesStream(resp, os.Stdout, os.Stdout.Fd(), true, nil)
+		if err != nil {
+			fmt.Printf("pre pull image \"%s\" failed: %s\n", image, err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
+	if i.cfg.PrePullImages {
+		if err := PrePullImages(i.cfg); err != nil {
+			return err
+		}
+	}
+
 	if err := kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
 		return err
 	}
@@ -246,7 +298,7 @@ func (i *Init) Run(out io.Writer) error {
 		}
 	}
 
-	client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
+	client, err := kubemaster.CreateClientAndWaitForAPI(i.cfg, kubeconfigs["admin"])
 	if err != nil {
 		return err
 	}
