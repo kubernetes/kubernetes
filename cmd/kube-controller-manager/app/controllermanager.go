@@ -541,9 +541,10 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		if err != nil {
 			return fmt.Errorf("failed to get supported resources from server: %v", err)
 		}
-		groupVersionResources, err := unversioned.ExtractGroupVersionResources(preferredResources)
+		deletableResources := discovery.FilteredBy(discovery.AllVerbsPredicate{Verbs: []string{"delete"}}, preferredResources)
+		deletableGroupVersionResources, err := discovery.ToGroupVersionResources(deletableResources)
 		if err != nil {
-			glog.Fatalf("Failed to parse supported resources from server: %v", err)
+			glog.Errorf("Failed to parse resources from server: %v", err)
 		}
 
 		config := rootClientBuilder.ConfigOrDie("generic-garbage-collector")
@@ -551,7 +552,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 		config.ContentConfig = dynamic.ContentConfig()
 		clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, groupVersionResources)
+		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources)
 		if err != nil {
 			glog.Errorf("Failed to start the generic garbage collector: %v", err)
 		} else {
