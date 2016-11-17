@@ -100,26 +100,18 @@ func pvPvcMapCleanup(c clientset.Interface, ns string, pvols pvmap, claims pvcma
 // Delete the PV.
 func deletePersistentVolume(c clientset.Interface, pvName string) {
 	if c != nil && len(pvName) > 0 {
-		_, err := c.Core().PersistentVolumes().Get(pvName)
-		if !apierrs.IsNotFound(err) {
-			Expect(err).NotTo(HaveOccurred())
-			framework.Logf("Deleting PersistentVolume %v", pvName)
-			err := c.Core().PersistentVolumes().Delete(pvName, nil)
-			Expect(err).NotTo(HaveOccurred())
-		}
+		framework.Logf("Deleting PersistentVolume %v", pvName)
+		err := c.Core().PersistentVolumes().Delete(pvName, nil)
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 	}
 }
 
 // Delete the Claim
 func deletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) {
 	if c != nil && len(pvcName) > 0 {
-		_, err := c.Core().PersistentVolumeClaims(ns).Get(pvcName)
-		if !apierrs.IsNotFound(err) {
-			Expect(err).NotTo(HaveOccurred())
-			framework.Logf("Deleting PersistentVolumeClaim %v", pvcName)
-			err := c.Core().PersistentVolumeClaims(ns).Delete(pvcName, nil)
-			Expect(err).NotTo(HaveOccurred())
-		}
+		framework.Logf("Deleting PersistentVolumeClaim %v", pvcName)
+		err := c.Core().PersistentVolumeClaims(ns).Delete(pvcName, nil)
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 	}
 }
 
@@ -403,17 +395,13 @@ func deletePod(f *framework.Framework, c clientset.Interface, ns string, pod *ap
 	if c != nil {
 		if pod != nil && len(pod.Name) > 0 {
 			framework.Logf("Deleting pod %v", pod.Name)
-			_, err := c.Core().Pods(ns).Get(pod.Name)
-			if !apierrs.IsNotFound(err) {
-				Expect(err).NotTo(HaveOccurred())
-				err := c.Core().Pods(ns).Delete(pod.Name, nil)
-				Expect(err).NotTo(HaveOccurred())
+			err := c.Core().Pods(ns).Delete(pod.Name, nil)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
-				// Wait for pod to terminate.  Expect apierr NotFound
-				err = f.WaitForPodTerminated(pod.Name, "")
-				Expect(err).To(HaveOccurred())
-				framework.Logf("Ignore \"not found\" error above. Pod %v successfully deleted", pod.Name)
-			}
+			// Wait for pod to terminate.  Expect apierr NotFound
+			err = f.WaitForPodTerminated(pod.Name, "")
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			framework.Logf("Ignore \"not found\" error above. Pod %v successfully deleted", pod.Name)
 		}
 	}
 }
