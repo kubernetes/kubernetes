@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -393,45 +394,19 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	namespaceKubeClient := clientBuilder.ClientOrDie("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(rootClientBuilder.ConfigOrDie("namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
-	gvrFn := func() ([]schema.GroupVersionResource, error) {
-		resources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
-		if err != nil {
-			// best effort extraction
-			gvrs, _ := unversioned.ExtractGroupVersionResources(resources)
-			return gvrs, fmt.Errorf("failed to get supported namespaced resources: %v", err)
-		}
-		gvrs, err := unversioned.ExtractGroupVersionResources(resources)
-		if err != nil {
-			return gvrs, fmt.Errorf("failed to parse supported namespaced resources: %v", err)
-		}
-		return gvrs, nil
-	}
-	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
+	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
+	preferredResources, err := discoverResourcesFn()
 	if err != nil {
-		return fmt.Errorf("failed to get group version resources: %v", err)
+		return fmt.Errorf("failed to get preferred server resources: %v", err)
 	}
-	tprFound := false
-searchThirdPartyResource:
-	for _, rsrcList := range rsrcs {
-		for ix := range rsrcList.APIResources {
-			rsrc := &rsrcList.APIResources[ix]
-			if rsrc.Kind == "ThirdPartyResource" {
-				tprFound = true
-				break searchThirdPartyResource
-			}
+	if !containsKind(preferredResources, "ThirdPartyResource") {
+		// make discovery static
+		discoverResourcesFn = func() ([]*unversioned.APIResourceList, error) {
+			return preferredResources, nil
 		}
 	}
-	if !tprFound {
-		gvr, err := gvrFn()
-		if err != nil {
-			return fmt.Errorf("failed to get resources: %v", err)
-		}
-		gvrFn = func() ([]schema.GroupVersionResource, error) {
-			return gvr, nil
-		}
-	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, gvrFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
-	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), stop)
+	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, discoverResourcesFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
+	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if availableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "daemonsets"}] {
@@ -588,4 +563,15 @@ searchThirdPartyResource:
 	sharedInformers.Start(stop)
 
 	select {}
+}
+
+func containsKind(resourceLists []*unversioned.APIResourceList, kind string) bool {
+	for _, list := range resourceLists {
+		for _, resource := range list.APIResources {
+			if resource.Kind == kind {
+				return true
+			}
+		}
+	}
+	return false
 }
