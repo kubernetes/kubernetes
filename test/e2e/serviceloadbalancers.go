@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/generated"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -265,7 +266,7 @@ func simpleGET(c *http.Client, url, host string) (string, error) {
 func rcFromManifest(fileName string) *api.ReplicationController {
 	var controller api.ReplicationController
 	framework.Logf("Parsing rc from %v", fileName)
-	data := framework.ReadOrDie(fileName)
+	data := generated.ReadOrDie(fileName)
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
@@ -278,7 +279,7 @@ func rcFromManifest(fileName string) *api.ReplicationController {
 func svcFromManifest(fileName string) *api.Service {
 	var svc api.Service
 	framework.Logf("Parsing service from %v", fileName)
-	data := framework.ReadOrDie(fileName)
+	data := generated.ReadOrDie(fileName)
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
