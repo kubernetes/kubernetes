@@ -275,7 +275,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 			return "", false, err
 		}
 		// Insert args at beginning of testArgs, so any values from command line take precedence
-		testArgs = fmt.Sprintf("--experimental-mounter-path=%s ", mounterPath) + testArgs
+		testArgs = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + testArgs
 	}
 
 	// Run the tests
