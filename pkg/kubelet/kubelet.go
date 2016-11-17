@@ -404,6 +404,12 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
+	// TODO: Create and use a more sophisticated secret mamanger.
+	secretManager, err := newSimpleSecretManager(kubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize secret manager: %v", err)
+	}
+
 	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
 
 	klet := &Kubelet{
@@ -429,6 +435,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
+		secretManager:                  secretManager,
 		cloud:                          kubeDeps.Cloud,
 		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		nodeRef:                   nodeRef,
@@ -912,6 +919,9 @@ type Kubelet struct {
 
 	// Diskspace manager.
 	diskSpaceManager diskSpaceManager
+
+	// Secret manager.
+	secretManager secretManager
 
 	// Cached MachineInfo returned by cadvisor.
 	machineInfo *cadvisorapi.MachineInfo
