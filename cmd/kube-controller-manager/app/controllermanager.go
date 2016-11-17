@@ -578,16 +578,17 @@ searchThirdPartyResource:
 		if err != nil {
 			glog.Fatalf("Failed to get supported resources from server: %v", err)
 		}
-		groupVersionResources, err := unversioned.ExtractGroupVersionResources(preferredResources)
+		deletableGroupVersionResources, err := unversioned.ExtractGroupVersionResourcesWithVerbs(preferredResources, "delete")
 		if err != nil {
-			glog.Fatalf("Failed to parse supported resources from server: %v", err)
+			// the resource without errors are returned. So don't make that fatal
+			glog.Errorf("Failed to parse resources from server: %v", err)
 		}
 		config := restclient.AddUserAgent(kubeconfig, "generic-garbage-collector")
 		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 		metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 		config.ContentConfig = dynamic.ContentConfig()
 		clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, groupVersionResources)
+		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources)
 		if err != nil {
 			glog.Errorf("Failed to start the generic garbage collector: %v", err)
 		} else {
