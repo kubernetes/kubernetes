@@ -101,23 +101,26 @@ fi
 start_etcd() {
   # Use random ports, so that apiserver cannot connect to etcd.
   ETCD_PORT=18629
-  ETCD_PEER_PORT=18630
+  ETCD_PEER_PORT=2380
   # Avoid collisions between etcd and event-etcd.
   case "${DATA_DIRECTORY}" in
     *event*)
       ETCD_PORT=18631
-      ETCD_PEER_PORT=18632
+      ETCD_PEER_PORT=2381
       ;;
   esac
   local ETCD_CMD="${ETCD:-/usr/local/bin/etcd-${START_VERSION}}"
   local ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
   local API_VERSION="$(echo ${START_STORAGE} | cut -c5-5)"
   if [ "${API_VERSION}" = "2" ]; then
-    ETCDCTL_CMD="${ETCDCTL_CMD} --endpoint=http://127.0.0.1:${ETCD_PORT} set"
+    ETCDCTL_CMD="${ETCDCTL_CMD} --debug --endpoint=http://127.0.0.1:${ETCD_PORT} set"
   else
     ETCDCTL_CMD="${ETCDCTL_CMD} --endpoints=http://127.0.0.1:${ETCD_PORT} put"
   fi
-  ${ETCD_CMD} --data-dir=${DATA_DIRECTORY} \
+  ${ETCD_CMD} \
+    --name="etcd-$(hostname)" \
+    --debug \
+    --data-dir=${DATA_DIRECTORY} \
     --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
     --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
     --listen-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
@@ -152,7 +155,7 @@ if [ "${CURRENT_VERSION}" = "2.2.1" -a ! -d "${BACKUP_DIR}" ]; then
   echo "Backup etcd before starting migration"
   mkdir ${BACKUP_DIR}
   ETCDCTL_CMD="/usr/local/bin/etcdctl-2.2.1"
-  ETCDCTL_API=2 ${ETCDCTL_CMD} backup --data-dir=${DATA_DIRECTORY} \
+  ETCDCTL_API=2 ${ETCDCTL_CMD} --debug backup --data-dir=${DATA_DIRECTORY} \
     --backup-dir=${BACKUP_DIR}
   echo "Backup done in ${BACKUP_DIR}"
 fi
@@ -222,6 +225,12 @@ if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
     echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.3.7"
     return 0
   fi
+  echo "Backup and remove all existing v2 data"
+  ROLLBACK_BACKUP_DIR="${DATA_DIRECTORY}.bak"
+  rm -rf "${ROLLBACK_BACKUP_DIR}"
+  mkdir -p "${ROLLBACK_BACKUP_DIR}"
+  cp -r "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
+  rm -rf "${DATA_DIRECTORY}"/member/snap/*.snap
   echo "Performing etcd3 -> etcd2 rollback"
   ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
   if [ "$?" -ne "0" ]; then

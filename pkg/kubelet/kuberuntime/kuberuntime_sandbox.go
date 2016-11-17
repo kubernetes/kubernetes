@@ -146,7 +146,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *api.Pod, 
 				HostIpc:     &sc.HostIPC,
 				HostPid:     &sc.HostPID,
 			},
-			RunAsUser: convertToRuntimeRunAsUser(sc.RunAsUser),
+			RunAsUser: sc.RunAsUser,
 		}
 
 		if sc.FSGroup != nil {

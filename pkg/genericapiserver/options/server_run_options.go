@@ -83,6 +83,7 @@ type ServerRunOptions struct {
 	AuditLogMaxSize              int
 	EnableGarbageCollection      bool
 	EnableProfiling              bool
+	EnableContentionProfiling    bool
 	EnableSwaggerUI              bool
 	EnableWatchCache             bool
 	EtcdServersOverrides         []string
@@ -139,6 +140,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		DeleteCollectionWorkers:                  1,
 		EnableGarbageCollection:                  true,
 		EnableProfiling:                          true,
+		EnableContentionProfiling:                false,
 		EnableWatchCache:                         true,
 		InsecureBindAddress:                      net.ParseIP("127.0.0.1"),
 		InsecurePort:                             8080,
@@ -347,6 +349,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", s.EnableContentionProfiling,
+		"Enable contention profiling. Requires --profiling to be set to work.")
 
 	fs.BoolVar(&s.EnableSwaggerUI, "enable-swagger-ui", s.EnableSwaggerUI,
 		"Enables swagger ui on the apiserver at /swagger-ui")

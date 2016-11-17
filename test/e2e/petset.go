@@ -54,6 +54,7 @@ const (
 	zookeeperManifestPath   = "test/e2e/testing-manifests/petset/zookeeper"
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/petset/mysql-galera"
 	redisManifestPath       = "test/e2e/testing-manifests/petset/redis"
+	cockroachDBManifestPath = "test/e2e/testing-manifests/petset/cockroachdb"
 	// Should the test restart statefulset clusters?
 	// TODO: enable when we've productionzed bringup of pets in this e2e.
 	restartCluster = false
@@ -82,9 +83,15 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			"baz": "blah",
 		}
 		headlessSvcName := "test"
+		var petMounts, podMounts []api.VolumeMount
+		var ps *apps.StatefulSet
 
 		BeforeEach(func() {
-			By("creating service " + headlessSvcName + " in namespace " + ns)
+			petMounts = []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+			podMounts = []api.VolumeMount{{Name: "home", MountPath: "/home"}}
+			ps = newStatefulSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels)
+
+			By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.Core().Services(ns).Create(headlessService)
 			Expect(err).NotTo(HaveOccurred())
@@ -99,10 +106,8 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 		})
 
 		It("should provide basic identity [Feature:StatefulSet]", func() {
-			By("creating statefulset " + psName + " in namespace " + ns)
-			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
-			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ps := newStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
+			By("Creating statefulset " + psName + " in namespace " + ns)
+			ps.Spec.Replicas = 3
 			setInitializedAnnotation(ps, "false")
 
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
@@ -136,12 +141,10 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 		})
 
 		It("should handle healthy pet restarts during scale [Feature:PetSet]", func() {
-			By("creating statefulset " + psName + " in namespace " + ns)
-
-			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
-			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ps := newStatefulSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels)
+			By("Creating statefulset " + psName + " in namespace " + ns)
+			ps.Spec.Replicas = 2
 			setInitializedAnnotation(ps, "false")
+
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -171,9 +174,52 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			By("Confirming all pets in statefulset are created.")
 			pst.saturate(ps)
 		})
+
+		It("should allow template updates", func() {
+			By("Creating stateful set " + psName + " in namespace " + ns)
+			ps.Spec.Replicas = 2
+
+			ps, err := c.Apps().StatefulSets(ns).Create(ps)
+			Expect(err).NotTo(HaveOccurred())
+
+			pst := statefulSetTester{c: c}
+
+			pst.waitForRunning(ps.Spec.Replicas, ps)
+
+			newImage := newNginxImage
+			oldImage := ps.Spec.Template.Spec.Containers[0].Image
+			By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
+			Expect(oldImage).NotTo(Equal(newImage), "Incorrect test setup: should update to a different image")
+			_, err = framework.UpdateStatefulSetWithRetries(c, ns, ps.Name, func(update *apps.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = newImage
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			updateIndex := 0
+			By(fmt.Sprintf("Deleting stateful pod at index %d", updateIndex))
+			pst.deletePetAtIndex(updateIndex, ps)
+
+			By("Waiting for all stateful pods to be running again")
+			pst.waitForRunning(ps.Spec.Replicas, ps)
+
+			By(fmt.Sprintf("Verifying stateful pod at index %d is updated", updateIndex))
+			verify := func(pod *api.Pod) {
+				podImage := pod.Spec.Containers[0].Image
+				Expect(podImage).To(Equal(newImage), fmt.Sprintf("Expected stateful pod image %s updated to %s", podImage, newImage))
+			}
+			pst.verifyPodAtIndex(updateIndex, ps, verify)
+		})
 	})
 
 	framework.KubeDescribe("Deploy clustered applications [Slow] [Feature:PetSet]", func() {
+		var pst *statefulSetTester
+		var appTester *clusterAppTester
+
+		BeforeEach(func() {
+			pst = &statefulSetTester{c: c}
+			appTester = &clusterAppTester{tester: pst, ns: ns}
+		})
+
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
 				dumpDebugInfo(c, ns)
@@ -183,66 +229,23 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 		})
 
 		It("should creating a working zookeeper cluster [Feature:PetSet]", func() {
-			pst := &statefulSetTester{c: c}
-			pet := &zookeeperTester{tester: pst}
-			By("Deploying " + pet.name())
-			ps := pet.deploy(ns)
-
-			By("Creating foo:bar in member with index 0")
-			pet.write(0, map[string]string{"foo": "bar"})
-
-			if restartCluster {
-				By("Restarting pet set " + ps.Name)
-				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
-			}
-
-			By("Reading value under foo from member with index 2")
-			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
-				framework.Failf("%v", err)
-			}
+			appTester.pet = &zookeeperTester{tester: pst}
+			appTester.run()
 		})
 
 		It("should creating a working redis cluster [Feature:PetSet]", func() {
-			pst := &statefulSetTester{c: c}
-			pet := &redisTester{tester: pst}
-			By("Deploying " + pet.name())
-			ps := pet.deploy(ns)
-
-			By("Creating foo:bar in member with index 0")
-			pet.write(0, map[string]string{"foo": "bar"})
-
-			if restartCluster {
-				By("Restarting pet set " + ps.Name)
-				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
-			}
-
-			By("Reading value under foo from member with index 2")
-			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
-				framework.Failf("%v", err)
-			}
+			appTester.pet = &redisTester{tester: pst}
+			appTester.run()
 		})
 
 		It("should creating a working mysql cluster [Feature:PetSet]", func() {
-			pst := &statefulSetTester{c: c}
-			pet := &mysqlGaleraTester{tester: pst}
-			By("Deploying " + pet.name())
-			ps := pet.deploy(ns)
+			appTester.pet = &mysqlGaleraTester{tester: pst}
+			appTester.run()
+		})
 
-			By("Creating foo:bar in member with index 0")
-			pet.write(0, map[string]string{"foo": "bar"})
-
-			if restartCluster {
-				By("Restarting pet set " + ps.Name)
-				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
-			}
-
-			By("Reading value under foo from member with index 2")
-			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
-				framework.Failf("%v", err)
-			}
+		It("should creating a working CockroachDB cluster [Feature:PetSet]", func() {
+			appTester.pet = &cockroachDBTester{tester: pst}
+			appTester.run()
 		})
 	})
 })
@@ -392,6 +395,31 @@ type petTester interface {
 	name() string
 }
 
+type clusterAppTester struct {
+	ns     string
+	pet    petTester
+	tester *statefulSetTester
+}
+
+func (c *clusterAppTester) run() {
+	By("Deploying " + c.pet.name())
+	ps := c.pet.deploy(c.ns)
+
+	By("Creating foo:bar in member with index 0")
+	c.pet.write(0, map[string]string{"foo": "bar"})
+
+	if restartCluster {
+		By("Restarting stateful set " + ps.Name)
+		c.tester.restart(ps)
+		c.tester.waitForRunning(ps.Spec.Replicas, ps)
+	}
+
+	By("Reading value under foo from member with index 2")
+	if err := pollReadWithTimeout(c.pet, 2, "foo", "bar"); err != nil {
+		framework.Failf("%v", err)
+	}
+}
+
 type zookeeperTester struct {
 	ps     *apps.StatefulSet
 	tester *statefulSetTester
@@ -496,6 +524,44 @@ func (m *redisTester) read(petIndex int, key string) string {
 	return lastLine(m.redisExec(fmt.Sprintf("GET %v", key), m.ps.Namespace, name))
 }
 
+type cockroachDBTester struct {
+	ps     *apps.StatefulSet
+	tester *statefulSetTester
+}
+
+func (c *cockroachDBTester) name() string {
+	return "CockroachDB"
+}
+
+func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
+	cmd = fmt.Sprintf("/cockroach/cockroach sql --host %s.cockroachdb -e \"%v\"", podName, cmd)
+	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+}
+
+func (c *cockroachDBTester) deploy(ns string) *apps.StatefulSet {
+	c.ps = c.tester.createStatefulSet(cockroachDBManifestPath, ns)
+	framework.Logf("Deployed statefulset %v, initializing database", c.ps.Name)
+	for _, cmd := range []string{
+		"CREATE DATABASE IF NOT EXISTS foo;",
+		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
+	} {
+		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ps.Name)))
+	}
+	return c.ps
+}
+
+func (c *cockroachDBTester) write(petIndex int, kv map[string]string) {
+	name := fmt.Sprintf("%v-%d", c.ps.Name, petIndex)
+	for k, v := range kv {
+		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
+		framework.Logf(c.cockroachDBExec(cmd, c.ps.Namespace, name))
+	}
+}
+func (c *cockroachDBTester) read(petIndex int, key string) string {
+	name := fmt.Sprintf("%v-%d", c.ps.Name, petIndex)
+	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ps.Namespace, name))
+}
+
 func lastLine(out string) string {
 	outLines := strings.Split(strings.Trim(out, "\n"), "\n")
 	return outLines[len(outLines)-1]
@@ -593,13 +659,26 @@ func (p *statefulSetTester) saturate(ps *apps.StatefulSet) {
 }
 
 func (p *statefulSetTester) deletePetAtIndex(index int, ps *apps.StatefulSet) {
-	// TODO: we won't use "-index" as the name strategy forever,
-	// pull the name out from an identity mapper.
-	name := fmt.Sprintf("%v-%v", ps.Name, index)
+	name := getPodNameAtIndex(index, ps)
 	noGrace := int64(0)
 	if err := p.c.Core().Pods(ps.Namespace).Delete(name, &api.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
-		framework.Failf("Failed to delete pet %v for StatefulSet %v: %v", name, ps.Name, ps.Namespace, err)
+		framework.Failf("Failed to delete pet %v for StatefulSet %v/%v: %v", name, ps.Namespace, ps.Name, err)
 	}
+}
+
+type verifyPodFunc func(*api.Pod)
+
+func (p *statefulSetTester) verifyPodAtIndex(index int, ps *apps.StatefulSet, verify verifyPodFunc) {
+	name := getPodNameAtIndex(index, ps)
+	pod, err := p.c.Core().Pods(ps.Namespace).Get(name)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get stateful pod %s for StatefulSet %s/%s", name, ps.Namespace, ps.Name))
+	verify(pod)
+}
+
+func getPodNameAtIndex(index int, ps *apps.StatefulSet) string {
+	// TODO: we won't use "-index" as the name strategy forever,
+	// pull the name out from an identity mapper.
+	return fmt.Sprintf("%v-%v", ps.Name, index)
 }
 
 func (p *statefulSetTester) scale(ps *apps.StatefulSet, count int32) error {
@@ -913,7 +992,7 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 					Containers: []api.Container{
 						{
 							Name:         "nginx",
-							Image:        "gcr.io/google_containers/nginx-slim:0.7",
+							Image:        nginxImage,
 							VolumeMounts: mounts,
 						},
 					},

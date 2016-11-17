@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -78,10 +79,12 @@ type Config struct {
 	// Allows api group versions or specific resources to be conditionally enabled/disabled.
 	APIResourceConfigSource APIResourceConfigSource
 	// allow downstream consumers to disable the index route
-	EnableIndex             bool
-	EnableProfiling         bool
-	EnableMetrics           bool
-	EnableGarbageCollection bool
+	EnableIndex     bool
+	EnableProfiling bool
+	// Requires generic profiling enabled
+	EnableContentionProfiling bool
+	EnableMetrics             bool
+	EnableGarbageCollection   bool
 
 	Version               *version.Info
 	CorsAllowedOriginList []string
@@ -285,6 +288,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.CorsAllowedOriginList = options.CorsAllowedOriginList
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
+	c.EnableContentionProfiling = options.EnableContentionProfiling
 	c.EnableSwaggerUI = options.EnableSwaggerUI
 	c.ExternalAddress = options.ExternalHost
 	c.MaxRequestsInFlight = options.MaxRequestsInFlight
@@ -462,6 +466,9 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	}
 	if c.EnableProfiling {
 		routes.Profiling{}.Install(s.HandlerContainer)
+		if c.EnableContentionProfiling {
+			goruntime.SetBlockProfileRate(1)
+		}
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {

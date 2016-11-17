@@ -105,6 +105,7 @@ container-port
 container-runtime
 container-runtime-endpoint
 contain-pod-resources
+contention-profiling
 controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
@@ -317,6 +318,7 @@ kubelet-client-certificate
 kubelet-client-key
 kubelet-docker-endpoint
 kubelet-enable-debugging-handlers
+kubelet-flags
 kubelet-host-network-sources
 kubelet-https
 kubelet-kubeconfig
@@ -594,6 +596,7 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
+zone-id
 zone-name
 garbage-collector-enabled
 viper-config

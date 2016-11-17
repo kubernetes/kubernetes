@@ -32,7 +32,6 @@ go_library(
         "//pkg/runtime:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/errors:go_default_library",
-        "//pkg/util/hash:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/wait:go_default_library",
