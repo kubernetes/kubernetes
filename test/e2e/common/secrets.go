@@ -31,12 +31,18 @@ var _ = framework.KubeDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
-		doSecretE2EWithoutMapping(f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()))
+		doSecretE2EWithoutMapping(f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()), nil)
 	})
 
 	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
 		defaultMode := int32(0400)
-		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()))
+		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), nil)
+	})
+
+	It("should be consumable from pods in volume with defaultMode and fsGroup set [Conformance]", func() {
+		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
+		fsGroup := int64(1001)
+		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), &fsGroup)
 	})
 
 	It("should be consumable from pods in volume with mappings [Conformance]", func() {
@@ -66,7 +72,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 		if secret2, err = f.ClientSet.Core().Secrets(namespace2.Name).Create(secret2); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
-		doSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name)
+		doSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil)
 	})
 
 	It("should be consumable in multiple volumes in a pod [Conformance]", func() {
@@ -135,7 +141,7 @@ func secretForTest(namespace, name string) *api.Secret {
 	}
 }
 
-func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secretName string) {
+func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secretName string, fsGroup *int64) {
 	var (
 		volumeName      = "secret-volume"
 		volumeMountPath = "/etc/secret-volume"
@@ -188,6 +194,12 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 	} else {
 		mode := int32(0644)
 		defaultMode = &mode
+	}
+
+	if fsGroup != nil {
+		pod.Spec.SecurityContext = &api.PodSecurityContext{
+			FSGroup: fsGroup,
+		}
 	}
 
 	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))

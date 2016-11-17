@@ -41,6 +41,11 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
 
+	It("should be consumable from pods in volume with defaultMode and fsGroup set [Conformance]", func() {
+		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
+		doConfigMapE2EWithoutMappings(f, 0, 1001, &defaultMode)
+	})
+
 	It("should be consumable from pods in volume as non-root [Conformance]", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
@@ -343,14 +348,10 @@ func DoConfigMapE2EWithoutMappingsSetup(f *framework.Framework, uid, fsGroup int
 		defaultMode = &mode
 	}
 
-	// Just check file mode if fsGroup is not set. If fsGroup is set, the
-	// final mode is adjusted and we are not testing that case.
+	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
 	output := []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
-	}
-	if fsGroup == 0 {
-		modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
-		output = append(output, "mode of file \"/etc/configmap-volume/data-1\": "+modeString)
+		"mode of file \"/etc/configmap-volume/data-1\": " + modeString,
 	}
 
 	return pod, output
