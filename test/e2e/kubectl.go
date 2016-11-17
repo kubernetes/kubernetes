@@ -575,7 +575,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("validating api verions")
 			framework.RunKubectlOrDieInput(podString, "create", "-f", "-", nsFlag)
-			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			err := wait.PollImmediate(2*time.Second, framework.PodStartTimeout, func() (bool, error) {
 				output := framework.RunKubectlOrDie("get", "pods/kubectl-in-pod", nsFlag)
 				if strings.Contains(output, "Running") {
 					return true, nil
