@@ -216,14 +216,14 @@ func (d *DiscoveryClient) serverResources(preferred, namespaced bool) ([]unversi
 	// retry in case the groups supported by the server change after ServerGroup() returns.
 	const maxRetries = 2
 	var failedGroups map[unversioned.GroupVersion]error
-	var results []unversioned.GroupVersionResource
+	var results map[unversioned.GroupResource]unversioned.GroupVersionResource
 RetrieveGroups:
 	for i := 0; i < maxRetries; i++ {
-		results = []unversioned.GroupVersionResource{}
+		results = map[unversioned.GroupResource]unversioned.GroupVersionResource{}
 		failedGroups = make(map[unversioned.GroupVersion]error)
 		serverGroupList, err := d.ServerGroups()
 		if err != nil {
-			return results, err
+			return getValues(results), err
 		}
 
 		for _, apiGroup := range serverGroupList.Groups {
@@ -249,15 +249,27 @@ RetrieveGroups:
 					if strings.Contains(apiResource.Name, "/") {
 						continue
 					}
-					results = append(results, groupVersion.WithResource(apiResource.Name))
+					newgvr := groupVersion.WithResource(apiResource.Name)
+					if oldgvr, ok := results[newgvr.GroupResource()]; ok && oldgvr.Version == apiGroup.PreferredVersion.Version {
+						continue
+					}
+					results[newgvr.GroupResource()] = newgvr
 				}
 			}
 		}
 		if len(failedGroups) == 0 {
-			return results, nil
+			return getValues(results), nil
 		}
 	}
-	return results, &ErrGroupDiscoveryFailed{Groups: failedGroups}
+	return getValues(results), &ErrGroupDiscoveryFailed{Groups: failedGroups}
+}
+
+func getValues(gvrMap map[unversioned.GroupResource]unversioned.GroupVersionResource) []unversioned.GroupVersionResource {
+	result := make([]unversioned.GroupVersionResource, 0, len(gvrMap))
+	for _, value := range gvrMap {
+		result = append(result, value)
+	}
+	return result
 }
 
 // ServerAllResources returns the supported resources for all groups and versions.

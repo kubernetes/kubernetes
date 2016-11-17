@@ -613,6 +613,7 @@ func TestServerAllNamespacedResources(t *testing.T) {
 									{GroupVersion: "batch/v1", Version: "v1"},
 									{GroupVersion: "batch/v2alpha1", Version: "v2alpha1"},
 								},
+								PreferredVersion: unversioned.GroupVersionForDiscovery{GroupVersion: "batch/v1", Version: "v1"},
 							},
 						},
 					}
@@ -636,7 +637,6 @@ func TestServerAllNamespacedResources(t *testing.T) {
 			},
 			expected: []unversioned.GroupVersionResource{
 				{Group: "batch", Version: "v1", Resource: "jobs"},
-				{Group: "batch", Version: "v2alpha1", Resource: "jobs"},
 				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"},
 			},
 		},
