@@ -29,6 +29,7 @@ go_library(
         "reason_cache.go",
         "runonce.go",
         "runtime.go",
+        "secret_manager.go",
         "util.go",
         "volume_host.go",
     ],
