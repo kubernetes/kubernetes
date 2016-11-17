@@ -371,7 +371,7 @@ func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error),
+	discoverResourcesFn func() ([]*unversioned.APIResourceList, error),
 	namespace *v1.Namespace,
 	finalizerToken v1.FinalizerName,
 ) error {
@@ -422,7 +422,12 @@ func syncNamespace(
 	}
 
 	// there may still be content for us to remove
-	groupVersionResources, err := groupVersionResourcesFn()
+	resources, err := discoverResourcesFn()
+	if err != nil {
+		return err
+	}
+	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
+	groupVersionResources, err := unversioned.ExtractGroupVersionResourcesWithVerbs(resources, "delete")
 	if err != nil {
 		return err
 	}

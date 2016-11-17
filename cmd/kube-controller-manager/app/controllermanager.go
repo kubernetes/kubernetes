@@ -376,19 +376,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	namespaceKubeClient := client("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
-	gvrFn := func() ([]schema.GroupVersionResource, error) {
-		resources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
-		if err != nil {
-			// best effort extraction
-			gvrs, _ := unversioned.ExtractGroupVersionResources(resources)
-			return gvrs, fmt.Errorf("failed to get supported namespaced resources: %v", err)
-		}
-		gvrs, err := unversioned.ExtractGroupVersionResources(resources)
-		if err != nil {
-			return gvrs, fmt.Errorf("failed to parse supported namespaced resources: %v", err)
-		}
-		return gvrs, nil
-	}
+	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
 	if err != nil {
 		glog.Fatalf("Failed to get group version resources: %v", err)
@@ -405,15 +393,15 @@ searchThirdPartyResource:
 		}
 	}
 	if !tprFound {
-		gvr, err := gvrFn()
+		resourceLists, err := discoverResourcesFn()
 		if err != nil {
 			glog.Fatalf("Failed to get resources: %v", err)
 		}
-		gvrFn = func() ([]schema.GroupVersionResource, error) {
-			return gvr, nil
+		discoverResourcesFn = func() ([]*unversioned.APIResourceList, error) {
+			return resourceLists, nil
 		}
 	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, gvrFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
+	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, discoverResourcesFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
 	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
