@@ -19,6 +19,7 @@ package transport
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -73,6 +74,58 @@ func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 type requestCanceler interface {
 	CancelRequest(*http.Request)
 }
+
+type authProxyRoundTripper struct {
+	username string
+	groups   []string
+	extra    map[string][]string
+
+	rt http.RoundTripper
+}
+
+// NewAuthProxyRoundTripper provides a roundtripper which will add auth proxy fields to requests for
+// authentication terminating proxy cases
+func NewAuthProxyRoundTripper(username string, groups []string, extra map[string][]string, rt http.RoundTripper) http.RoundTripper {
+	return &authProxyRoundTripper{
+		username: username,
+		groups:   groups,
+		extra:    extra,
+		rt:       rt,
+	}
+}
+
+func (rt *authProxyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = cloneRequest(req)
+	req.Header.Del("X-Remote-User")
+	req.Header.Del("X-Remote-Group")
+	for key := range req.Header {
+		if strings.HasPrefix(strings.ToLower(key), strings.ToLower("X-Remote-Extra-")) {
+			req.Header.Del(key)
+		}
+	}
+
+	req.Header.Set("X-Remote-User", rt.username)
+	for _, group := range rt.groups {
+		req.Header.Add("X-Remote-Group", group)
+	}
+	for key, values := range rt.extra {
+		for _, value := range values {
+			req.Header.Add("X-Remote-Extra-"+key, value)
+		}
+	}
+
+	return rt.rt.RoundTrip(req)
+}
+
+func (rt *authProxyRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
+func (rt *authProxyRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
 
 type userAgentRoundTripper struct {
 	agent string
