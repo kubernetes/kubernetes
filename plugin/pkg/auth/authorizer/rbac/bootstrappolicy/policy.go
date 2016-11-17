@@ -194,6 +194,15 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
 			},
 		},
+		{
+			// a role to use for allowing authentication and authorization delegation
+			ObjectMeta: api.ObjectMeta{Name: "system:auth-delegator"},
+			Rules: []rbac.PolicyRule{
+				// These creates are non-mutating
+				rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
+				rbac.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
+			},
+		},
 	}
 }
 
