@@ -18,6 +18,7 @@ package meta
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
@@ -157,12 +158,19 @@ func (m PriorityRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 	if err != nil {
 		return nil, err
 	}
-
 	// any versions the user provides take priority
 	priorities := m.KindPriority
 	if len(versions) > 0 {
 		priorities = make([]unversioned.GroupVersionKind, 0, len(m.KindPriority)+len(versions))
 		for _, version := range versions {
+			if strings.Count(version, "/") == 0 {
+				priorities = append(priorities, unversioned.GroupVersionKind{
+					Group:   gk.Group,
+					Version: version,
+					Kind:    gk.Kind,
+				})
+				continue
+			}
 			gv, err := unversioned.ParseGroupVersion(version)
 			if err != nil {
 				return nil, err
