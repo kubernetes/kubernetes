@@ -1084,7 +1084,11 @@ func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, n
 	}
 
 	// find out what content is supported on the server
-	groupVersionResources, err := c.Discovery().ServerPreferredNamespacedResources()
+	resources, err := c.Discovery().ServerPreferredNamespacedResources()
+	if err != nil {
+		return false, err
+	}
+	groupVersionResources, err := discovery.GroupVersionResources(resources)
 	if err != nil {
 		return false, err
 	}
@@ -1095,7 +1099,7 @@ func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, n
 	contentRemaining := false
 
 	// dump how many of resource type is on the server in a log.
-	for _, gvr := range groupVersionResources {
+	for gvr := range groupVersionResources {
 		// get a client for this group version...
 		dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
 		if err != nil {

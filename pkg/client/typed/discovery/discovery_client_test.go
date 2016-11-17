@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -141,14 +142,14 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	// ServerResources should not return an error even if server returns error at /api/v1.
-	resourceMap, err := client.ServerResources()
+	serverResources, err := client.ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, found := resourceMap["v1"]; !found {
-		t.Errorf("missing v1 in resource map")
+	gvs := groupVersions(serverResources)
+	if !sets.NewString(gvs...).Has("v1") {
+		t.Errorf("missing v1 in resource list: %v", serverResources)
 	}
-
 }
 
 func TestGetServerResources(t *testing.T) {
@@ -161,7 +162,7 @@ func TestGetServerResources(t *testing.T) {
 		},
 	}
 	beta := metav1.APIResourceList{
-		GroupVersion: "extensions/v1",
+		GroupVersion: "extensions/v1beta1",
 		APIResources: []metav1.APIResource{
 			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 			{Name: "ingresses", Namespaced: true, Kind: "Ingress"},
@@ -249,13 +250,14 @@ func TestGetServerResources(t *testing.T) {
 		}
 	}
 
-	resourceMap, err := client.ServerResources()
+	serverResources, err := client.ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	serverGroupVersions := sets.NewString(groupVersions(serverResources)...)
 	for _, api := range []string{"v1", "extensions/v1beta1"} {
-		if _, found := resourceMap[api]; !found {
-			t.Errorf("missing expected api: %s", api)
+		if !serverGroupVersions.Has(api) {
+			t.Errorf("missing expected api %q in %v", api, serverResources)
 		}
 	}
 }
@@ -332,12 +334,12 @@ func TestServerPreferredResources(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		resourcesList *metav1.APIResourceList
+		resourcesList []*metav1.APIResourceList
 		response      func(w http.ResponseWriter, req *http.Request)
 		expectErr     func(err error) bool
 	}{
 		{
-			resourcesList: &stable,
+			resourcesList: []*metav1.APIResourceList{&stable},
 			expectErr:     IsGroupDiscoveryFailedError,
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
@@ -426,7 +428,7 @@ func TestServerPreferredResources(t *testing.T) {
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		got, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResources()
 		if test.expectErr != nil {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -438,7 +440,13 @@ func TestServerPreferredResources(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 			continue
 		}
-		if !reflect.DeepEqual(got, test.resourcesList) {
+		got, err := GroupVersionResources(resources)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		expected, _ := GroupVersionResources(test.resourcesList)
+		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("expected:\n%v\ngot:\n%v\n", test.resourcesList, got)
 		}
 		server.Close()
@@ -533,8 +541,12 @@ func TestServerPreferredResourcesRetries(t *testing.T) {
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		got, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResources()
 		if !tc.expectedError(err) {
+			t.Errorf("case %d: unexpected error: %v", i, err)
+		}
+		got, err := GroupVersionResources(resources)
+		if err != nil {
 			t.Errorf("case %d: unexpected error: %v", i, err)
 		}
 		if len(got) != tc.expectResources {
@@ -575,7 +587,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 	}
 	tests := []struct {
 		response func(w http.ResponseWriter, req *http.Request)
-		expected []schema.GroupVersionResource
+		expected map[schema.GroupVersionResource]struct{}
 	}{
 		{
 			response: func(w http.ResponseWriter, req *http.Request) {
@@ -603,9 +615,9 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: []schema.GroupVersionResource{
-				{Group: "", Version: "v1", Resource: "pods"},
-				{Group: "", Version: "v1", Resource: "services"},
+			expected: map[schema.GroupVersionResource]struct{}{
+				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:     {},
+				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}: {},
 			},
 		},
 		{
@@ -646,9 +658,9 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: []schema.GroupVersionResource{
-				{Group: "batch", Version: "v1", Resource: "jobs"},
-				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"},
+			expected: map[schema.GroupVersionResource]struct{}{
+				schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}:           {},
+				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
 			},
 		},
 		{
@@ -689,27 +701,39 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: []schema.GroupVersionResource{
-				{Group: "batch", Version: "v2alpha1", Resource: "jobs"},
-				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"},
+			expected: map[schema.GroupVersionResource]struct{}{
+				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "jobs"}:     {},
+				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
 			},
 		},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		server := httptest.NewServer(http.HandlerFunc(test.response))
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		got, err := client.ServerPreferredNamespacedResources()
+		resources, err := client.ServerPreferredNamespacedResources()
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Errorf("[%d] unexpected error: %v", i, err)
 			continue
 		}
-		// we need deterministic order and since during processing in ServerPreferredNamespacedResources
-		// a map comes into play the result needs sorting
+		got, err := GroupVersionResources(resources)
+		if err != nil {
+			t.Errorf("[%d] unexpected error: %v", i, err)
+			continue
+		}
+
 		if !reflect.DeepEqual(got, test.expected) {
-			t.Errorf("expected:\n%v\ngot:\n%v\n", test.expected, got)
+			t.Errorf("[%d] expected:\n%v\ngot:\n%v\n", i, test.expected, got)
 		}
 		server.Close()
 	}
+}
+
+func groupVersions(resources []*metav1.APIResourceList) []string {
+	result := []string{}
+	for _, resourceList := range resources {
+		result = append(result, resourceList.GroupVersion)
+	}
+	return result
 }
