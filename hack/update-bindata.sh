@@ -29,6 +29,8 @@ if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
 	exit 1
 fi
 
+export PATH="${GOPATH}/bin:${PATH}"
+
 if ! which go-bindata &>/dev/null ; then
 	echo "Cannot find go-bindata. Install with"
 	echo "  go get -u github.com/jteeuwen/go-bindata/go-bindata"
