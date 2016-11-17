@@ -566,15 +566,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.SkipUnlessProviderIs("gke")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podJson := readTestFileOrDie(kubectlInPodFilename)
-
-			// Replace the host path to kubectl in json
-			podString := strings.Replace(string(podJson),
-				"$KUBECTL_PATH",
-				framework.TestContext.KubectlPath,
-				1)
-
 			By("validating api verions")
-			framework.RunKubectlOrDieInput(podString, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(string(podJson), "create", "-f", "-", nsFlag)
 			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 				output := framework.RunKubectlOrDie("get", "pods/kubectl-in-pod", nsFlag)
 				if strings.Contains(output, "Running") {
