@@ -21,15 +21,16 @@ import (
 	"testing"
 
 	"fmt"
+	"reflect"
+	"sort"
+
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"reflect"
-	"sort"
 )
 
-func TestServiceController_ensureDnsRecords(t *testing.T) {
+func TestServiceController_ensureDNSRecords(t *testing.T) {
 	tests := []struct {
 		name          string
 		service       v1.Service
@@ -93,7 +94,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		serviceController := ServiceController{
 			dns:              fakedns,
 			dnsZones:         fakednsZones,
-			serviceDnsSuffix: "federation.example.com",
+			serviceDNSSuffix: "federation.example.com",
 			zoneName:         "example.com",
 			federationName:   "myfederation",
 			serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
@@ -125,7 +126,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			cachedService.serviceStatusMap[clusterName] = test.serviceStatus
 		}
 
-		err := serviceController.ensureDnsRecords(clusterName, cachedService)
+		err := serviceController.ensureDNSRecords(clusterName, cachedService)
 		if err != nil {
 			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
 		}
