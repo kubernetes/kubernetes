@@ -573,6 +573,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				framework.TestContext.KubectlPath,
 				1)
 
+			framework.Logf("Starting pod using : %s", podString)
+
 			By("validating api verions")
 			framework.RunKubectlOrDieInput(podString, "create", "-f", "-", nsFlag)
 			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
@@ -584,7 +586,21 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				}
 			})
 			Expect(err).To(BeNil())
-			output := framework.RunKubectlOrDie("exec", "kubectl-in-pod", nsFlag, "--", "kubectl", "version")
+
+			output := framework.RunKubectlOrDie("exec", "kubectl-in-pod", nsFlag, "--", "ls", "-l", "/usr/bin/")
+			framework.Logf("Output from ls -l : %s", output)
+
+			output = framework.RunKubectlOrDie("exec", "kubectl-in-pod", nsFlag, "--", "env")
+			framework.Logf("Output from env : %s", output)
+
+			output = framework.RunKubectlOrDie("exec", "kubectl-in-pod", nsFlag, "--", "/usr/bin/kubectl", "version")
+			framework.Logf("Output from /usr/bin/kubectl version : %s", output)
+
+			output = framework.RunKubectlOrDie("exec", "kubectl-in-pod", nsFlag, "--", "which", "kubectl")
+			framework.Logf("Output from which kubectl : %s", output)
+
+			output = framework.RunKubectlOrDie("exec", "kubectl-in-pod", nsFlag, "--", "kubectl", "version")
+			framework.Logf("Output from kubectl version : %s", output)
 			if !strings.Contains(output, "Server Version") {
 				framework.Failf("kubectl in the pod fails to talk to api server")
 			}
