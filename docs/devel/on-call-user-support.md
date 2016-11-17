@@ -30,7 +30,7 @@ redirect users to Slack. Also check out the
 In general, try to direct support questions to:
 
 1. Documentation, such as the [user guide](../user-guide/README.md) and
-[troubleshooting guide](../troubleshooting.md)
+[troubleshooting guide](http://kubernetes.io/docs/troubleshooting/)
 
 2. Stackoverflow
 
