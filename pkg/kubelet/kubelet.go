@@ -404,7 +404,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
-	// TODO: Create and use a more sophisticated secret mamanger.
 	secretManager, err := newSimpleSecretManager(kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secret manager: %v", err)
