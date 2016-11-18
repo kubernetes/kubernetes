@@ -25,6 +25,7 @@ import (
 	admission "k8s.io/kubernetes/pkg/admission"
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -62,11 +63,15 @@ func newPlugin(kclient clientset.Interface) *claimDefaulterPlugin {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kclient.Storage().StorageClasses().List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return kclient.Storage().StorageClasses().List(internalOptions)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kclient.Storage().StorageClasses().Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return kclient.Storage().StorageClasses().Watch(internalOptions)
 			},
 		},
 		&storage.StorageClass{},

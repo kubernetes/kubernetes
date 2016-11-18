@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
@@ -91,11 +92,15 @@ func NewPlugin(kclient clientset.Interface, strategyFactory psp.StrategyFactory,
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kclient.Extensions().PodSecurityPolicies().List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return kclient.Extensions().PodSecurityPolicies().List(internalOptions)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kclient.Extensions().PodSecurityPolicies().Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return kclient.Extensions().PodSecurityPolicies().Watch(internalOptions)
 			},
 		},
 		&extensions.PodSecurityPolicy{},
@@ -228,7 +233,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		// since that is how the sc provider will eventually apply settings in the runtime.
 		// This results in an SC that is based on the Pod's PSC with the set fields from the container
 		// overriding pod level settings.
-		containerCopy.SecurityContext = sc.DetermineEffectiveSecurityContext(pod, &containerCopy)
+		containerCopy.SecurityContext = sc.InternalDetermineEffectiveSecurityContext(pod, &containerCopy)
 
 		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
 		if err != nil {
@@ -249,7 +254,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		// since that is how the sc provider will eventually apply settings in the runtime.
 		// This results in an SC that is based on the Pod's PSC with the set fields from the container
 		// overriding pod level settings.
-		containerCopy.SecurityContext = sc.DetermineEffectiveSecurityContext(pod, &containerCopy)
+		containerCopy.SecurityContext = sc.InternalDetermineEffectiveSecurityContext(pod, &containerCopy)
 
 		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
 		if err != nil {
