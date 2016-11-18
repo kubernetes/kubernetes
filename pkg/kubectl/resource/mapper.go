@@ -54,14 +54,12 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
 	}
 
-	fmt.Printf("info for data gvk is: %v\n", gvk)
 	obj, versioned := versions.Last(), versions.First()
 	mapping, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
 	}
 
-	fmt.Printf("info for data mapping is: %#v\n", mapping)
 	client, err := m.ClientForMapping(mapping)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
