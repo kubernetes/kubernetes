@@ -69,6 +69,7 @@ type podGetter interface {
 
 type kubeGenericRuntimeManager struct {
 	runtimeName         string
+	seccompProfileRoot  string
 	recorder            record.EventRecorder
 	osInterface         kubecontainer.OSInterface
 	containerRefManager *kubecontainer.RefManager
@@ -130,6 +131,7 @@ func NewKubeGenericRuntimeManager(
 	imagePullQPS float32,
 	imagePullBurst int,
 	cpuCFSQuota bool,
+	seccompProfileRoot string,
 	runtimeService internalApi.RuntimeService,
 	imageService internalApi.ImageManagerService,
 ) (KubeGenericRuntime, error) {
@@ -142,6 +144,7 @@ func NewKubeGenericRuntimeManager(
 		osInterface:         osInterface,
 		networkPlugin:       networkPlugin,
 		runtimeHelper:       runtimeHelper,
+		seccompProfileRoot:  seccompProfileRoot,
 		runtimeService:      runtimeService,
 		imageService:        imageService,
 		keyring:             credentialprovider.NewDockerKeyring(),

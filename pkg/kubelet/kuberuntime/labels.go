@@ -18,13 +18,16 @@ package kuberuntime
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 )
 
@@ -91,9 +94,35 @@ func newPodLabels(pod *api.Pod) map[string]string {
 	return labels
 }
 
+// getSeccompProfileFullPath gets seccomp profile fullpath from annotations[key], it
+// returns "" if the local profile is not found in annotations[key].
+func getSeccompProfileFullPath(annotations map[string]string, key, seccompProfileRoot string) string {
+	profile, profileOK := annotations[key]
+	if !profileOK || !strings.HasPrefix(profile, apparmor.ProfileNamePrefix) {
+		return ""
+	}
+
+	// by pod annotation validation, name is a valid subpath
+	name := strings.TrimPrefix(profile, apparmor.ProfileNamePrefix)
+	return filepath.Join(seccompProfileRoot, filepath.FromSlash(name))
+}
+
 // newPodAnnotations creates pod annotations from api.Pod.
-func newPodAnnotations(pod *api.Pod) map[string]string {
-	return pod.Annotations
+func newPodAnnotations(pod *api.Pod, seccompProfileRoot string) map[string]string {
+	annotations := pod.Annotations
+
+	// Set local seccomp profile to full path if applies.
+	if podSeccompPath := getSeccompProfileFullPath(annotations, api.SeccompPodAnnotationKey, seccompProfileRoot); len(podSeccompPath) > 0 {
+		annotations[api.SeccompPodAnnotationKey] = podSeccompPath
+	}
+	for _, c := range pod.Spec.Containers {
+		containerSeccompKey := api.SeccompContainerAnnotationKeyPrefix + c.Name
+		if fname := getSeccompProfileFullPath(annotations, containerSeccompKey, seccompProfileRoot); len(fname) > 0 {
+			annotations[containerSeccompKey] = fname
+		}
+	}
+
+	return annotations
 }
 
 // newContainerLabels creates container labels from api.Container and api.Pod.
