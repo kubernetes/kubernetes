@@ -12,19 +12,19 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["etcd.go"],
+    srcs = ["storage.go"],
     tags = ["automanaged"],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["etcd_test.go"],
+    srcs = ["storage_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
-        "//pkg/registry/core/service/allocator/etcd:go_default_library",
+        "//pkg/registry/core/service/allocator/storage:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",

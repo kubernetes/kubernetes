@@ -12,7 +12,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["etcd.go"],
+    srcs = ["storage.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

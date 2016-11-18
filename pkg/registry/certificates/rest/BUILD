@@ -19,6 +19,6 @@ go_library(
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/certificates/v1alpha1:go_default_library",
         "//pkg/genericapiserver:go_default_library",
-        "//pkg/registry/certificates/certificates/etcd:go_default_library",
+        "//pkg/registry/certificates/certificates/storage:go_default_library",
     ],
 )
