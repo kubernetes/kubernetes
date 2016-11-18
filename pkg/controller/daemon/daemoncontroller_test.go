@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -55,46 +55,46 @@ func getKey(ds *extensions.DaemonSet, t *testing.T) string {
 func newDaemonSet(name string) *extensions.DaemonSet {
 	return &extensions.DaemonSet{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &unversioned.LabelSelector{MatchLabels: simpleDaemonSetLabel},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: simpleDaemonSetLabel,
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Image: "foo/bar",
-							TerminationMessagePath: api.TerminationMessagePathDefault,
-							ImagePullPolicy:        api.PullIfNotPresent,
+							TerminationMessagePath: v1.TerminationMessagePathDefault,
+							ImagePullPolicy:        v1.PullIfNotPresent,
 							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 						},
 					},
-					DNSPolicy: api.DNSDefault,
+					DNSPolicy: v1.DNSDefault,
 				},
 			},
 		},
 	}
 }
 
-func newNode(name string, label map[string]string) *api.Node {
-	return &api.Node{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-		ObjectMeta: api.ObjectMeta{
+func newNode(name string, label map[string]string) *v1.Node {
+	return &v1.Node{
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 		},
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{Type: api.NodeReady, Status: api.ConditionTrue},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{Type: v1.NodeReady, Status: v1.ConditionTrue},
 			},
-			Allocatable: api.ResourceList{
-				api.ResourcePods: resource.MustParse("100"),
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods: resource.MustParse("100"),
 			},
 		},
 	}
@@ -106,28 +106,28 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 	}
 }
 
-func newPod(podName string, nodeName string, label map[string]string) *api.Pod {
-	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-		ObjectMeta: api.ObjectMeta{
+func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
+	pod := &v1.Pod{
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
 			GenerateName: podName,
 			Labels:       label,
-			Namespace:    api.NamespaceDefault,
+			Namespace:    v1.NamespaceDefault,
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			NodeName: nodeName,
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Image: "foo/bar",
-					TerminationMessagePath: api.TerminationMessagePathDefault,
-					ImagePullPolicy:        api.PullIfNotPresent,
+					TerminationMessagePath: v1.TerminationMessagePathDefault,
+					ImagePullPolicy:        v1.PullIfNotPresent,
 					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 				},
 			},
-			DNSPolicy: api.DNSDefault,
+			DNSPolicy: v1.DNSDefault,
 		},
 	}
-	api.GenerateName(api.SimpleNameGenerator, &pod.ObjectMeta)
+	v1.GenerateName(v1.SimpleNameGenerator, &pod.ObjectMeta)
 	return pod
 }
 
@@ -138,8 +138,8 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 }
 
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	informerFactory := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc())
 
 	manager := NewDaemonSetsController(informerFactory.DaemonSets(), informerFactory.Pods(), informerFactory.Nodes(), clientset, 0)
 	informerFactory.Start(wait.NeverStop)
@@ -212,8 +212,8 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("not-ready", nil)
-	node.Status.Conditions = []api.NodeCondition{
-		{Type: api.NodeReady, Status: api.ConditionFalse},
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeReady, Status: v1.ConditionFalse},
 	}
 	manager.nodeStore.Add(node)
 	ds := newDaemonSet("foo")
@@ -225,29 +225,29 @@ func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 func TestOutOfDiskNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("not-enough-disk", nil)
-	node.Status.Conditions = []api.NodeCondition{{Type: api.NodeOutOfDisk, Status: api.ConditionTrue}}
+	node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
 	manager.nodeStore.Add(node)
 	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
-func resourcePodSpec(nodeName, memory, cpu string) api.PodSpec {
-	return api.PodSpec{
+func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
+	return v1.PodSpec{
 		NodeName: nodeName,
-		Containers: []api.Container{{
-			Resources: api.ResourceRequirements{
+		Containers: []v1.Container{{
+			Resources: v1.ResourceRequirements{
 				Requests: allocatableResources(memory, cpu),
 			},
 		}},
 	}
 }
 
-func allocatableResources(memory, cpu string) api.ResourceList {
-	return api.ResourceList{
-		api.ResourceMemory: resource.MustParse(memory),
-		api.ResourceCPU:    resource.MustParse(cpu),
-		api.ResourcePods:   resource.MustParse("100"),
+func allocatableResources(memory, cpu string) v1.ResourceList {
+	return v1.ResourceList{
+		v1.ResourceMemory: resource.MustParse(memory),
+		v1.ResourceCPU:    resource.MustParse(cpu),
+		v1.ResourcePods:   resource.MustParse("100"),
 	}
 }
 
@@ -258,7 +258,7 @@ func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	node := newNode("too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
-	manager.podStore.Indexer.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&v1.Pod{
 		Spec: podSpec,
 	})
 	ds := newDaemonSet("foo")
@@ -273,9 +273,9 @@ func TestSufficentCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 	node := newNode("too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
-	manager.podStore.Indexer.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&v1.Pod{
 		Spec:   podSpec,
-		Status: api.PodStatus{Phase: api.PodSucceeded},
+		Status: v1.PodStatus{Phase: v1.PodSucceeded},
 	})
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec = podSpec
@@ -290,7 +290,7 @@ func TestSufficentCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	node := newNode("not-too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("200M", "200m")
 	manager.nodeStore.Add(node)
-	manager.podStore.Indexer.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&v1.Pod{
 		Spec: podSpec,
 	})
 	ds := newDaemonSet("foo")
@@ -306,7 +306,7 @@ func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 	node := newNode("not-too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("200M", "200m")
 	manager.nodeStore.Add(node)
-	manager.podStore.Indexer.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&v1.Pod{
 		Spec: podSpec,
 	})
 	ds := newDaemonSet("foo")
@@ -319,10 +319,10 @@ func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 
 // DaemonSets should not place onto nodes that would cause port conflicts
 func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	podSpec := api.PodSpec{
+	podSpec := v1.PodSpec{
 		NodeName: "port-conflict",
-		Containers: []api.Container{{
-			Ports: []api.ContainerPort{{
+		Containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
 				HostPort: 666,
 			}},
 		}},
@@ -330,7 +330,7 @@ func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("port-conflict", nil)
 	manager.nodeStore.Add(node)
-	manager.podStore.Indexer.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&v1.Pod{
 		Spec: podSpec,
 	})
 
@@ -345,10 +345,10 @@ func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
 //
 // Issue: https://github.com/kubernetes/kubernetes/issues/22309
 func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
-	podSpec := api.PodSpec{
+	podSpec := v1.PodSpec{
 		NodeName: "port-conflict",
-		Containers: []api.Container{{
-			Ports: []api.ContainerPort{{
+		Containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
 				HostPort: 666,
 			}},
 		}},
@@ -356,10 +356,10 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("port-conflict", nil)
 	manager.nodeStore.Add(node)
-	manager.podStore.Indexer.Add(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	manager.podStore.Indexer.Add(&v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Labels:    simpleDaemonSetLabel,
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 		},
 		Spec: podSpec,
 	})
@@ -371,18 +371,18 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 
 // DaemonSets should place onto nodes that would not cause port conflicts
 func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
-	podSpec1 := api.PodSpec{
+	podSpec1 := v1.PodSpec{
 		NodeName: "no-port-conflict",
-		Containers: []api.Container{{
-			Ports: []api.ContainerPort{{
+		Containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
 				HostPort: 6661,
 			}},
 		}},
 	}
-	podSpec2 := api.PodSpec{
+	podSpec2 := v1.PodSpec{
 		NodeName: "no-port-conflict",
-		Containers: []api.Container{{
-			Ports: []api.ContainerPort{{
+		Containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
 				HostPort: 6662,
 			}},
 		}},
@@ -390,7 +390,7 @@ func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("no-port-conflict", nil)
 	manager.nodeStore.Add(node)
-	manager.podStore.Indexer.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&v1.Pod{
 		Spec: podSpec1,
 	})
 	ds := newDaemonSet("foo")
@@ -406,12 +406,12 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 	manager, podControl := newTestController()
 	manager.nodeStore.Store.Add(newNode("node1", nil))
 	// Create pod not controlled by a daemonset.
-	manager.podStore.Indexer.Add(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	manager.podStore.Indexer.Add(&v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Labels:    map[string]string{"bang": "boom"},
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			NodeName: "node1",
 		},
 	})
@@ -554,7 +554,7 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 	addNodes(manager.nodeStore.Store, 4, 3, simpleNodeLabel)
 	daemon := newDaemonSet("foo")
 	affinity := map[string]string{
-		api.AffinityAnnotationKey: fmt.Sprintf(`
+		v1.AffinityAnnotationKey: fmt.Sprintf(`
 			{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
 				"nodeSelectorTerms": [{
 					"matchExpressions": [{
@@ -586,7 +586,7 @@ func TestNumberReadyStatus(t *testing.T) {
 	selector, _ := unversioned.LabelSelectorAsSelector(daemon.Spec.Selector)
 	daemonPods, _ := manager.podStore.Pods(daemon.Namespace).List(selector)
 	for _, pod := range daemonPods {
-		condition := api.PodCondition{Type: api.PodReady, Status: api.ConditionTrue}
+		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 		pod.Status.Conditions = append(pod.Status.Conditions, condition)
 	}
 

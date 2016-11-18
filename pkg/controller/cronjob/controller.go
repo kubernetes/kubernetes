@@ -34,14 +34,13 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -63,7 +62,7 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.Core().RESTClient().GetRateLimiter())
@@ -74,7 +73,7 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 		jobControl: realJobControl{KubeClient: kubeClient},
 		sjControl:  &realSJControl{KubeClient: kubeClient},
 		podControl: &realPodControl{KubeClient: kubeClient},
-		recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "cronjob-controller"}),
+		recorder:   eventBroadcaster.NewRecorder(v1.EventSource{Component: "cronjob-controller"}),
 	}
 
 	return jm
@@ -97,7 +96,7 @@ func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 
 // SyncAll lists all the CronJobs and Jobs and reconciles them.
 func (jm *CronJobController) SyncAll() {
-	sjl, err := jm.kubeClient.Batch().CronJobs(api.NamespaceAll).List(api.ListOptions{})
+	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(v1.NamespaceAll).List(v1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Error listing cronjobs: %v", err)
 		return
@@ -105,7 +104,7 @@ func (jm *CronJobController) SyncAll() {
 	sjs := sjl.Items
 	glog.V(4).Infof("Found %d cronjobs", len(sjs))
 
-	jl, err := jm.kubeClient.Batch().Jobs(api.NamespaceAll).List(api.ListOptions{})
+	jl, err := jm.kubeClient.BatchV2alpha1().Jobs(v1.NamespaceAll).List(v1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Error listing jobs")
 		return
@@ -131,8 +130,8 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	for i := range js {
 		j := js[i]
 		found := inActiveList(sj, j.ObjectMeta.UID)
-		if !found && !job.IsJobFinished(&j) {
-			recorder.Eventf(&sj, api.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %v", j.Name)
+		if !found && !IsJobFinished(&j) {
+			recorder.Eventf(&sj, v1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %v", j.Name)
 			// We found an unfinished job that has us as the parent, but it is not in our Active list.
 			// This could happen if we crashed right after creating the Job and before updating the status,
 			// or if our jobs list is newer than our sj status after a relist, or if someone intentionally created
@@ -143,10 +142,10 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 			// user has permission to create a job within a namespace, then they have permission to make any scheduledJob
 			// in the same namespace "adopt" that job.  ReplicaSets and their Pods work the same way.
 			// TBS: how to update sj.Status.LastScheduleTime if the adopted job is newer than any we knew about?
-		} else if found && job.IsJobFinished(&j) {
+		} else if found && IsJobFinished(&j) {
 			deleteFromActiveList(&sj, j.ObjectMeta.UID)
 			// TODO: event to call out failure vs success.
-			recorder.Eventf(&sj, api.EventTypeNormal, "SawCompletedJob", "Saw completed job: %v", j.Name)
+			recorder.Eventf(&sj, v1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %v", j.Name)
 		}
 	}
 	updatedSJ, err := sjc.UpdateStatus(&sj)
@@ -209,7 +208,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 			glog.V(4).Infof("Deleting job %s of %s that was still running at next scheduled start time", j.Name, nameForLog)
 			job, err := jc.GetJob(j.Namespace, j.Name)
 			if err != nil {
-				recorder.Eventf(&sj, api.EventTypeWarning, "FailedGet", "Get job: %v", err)
+				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedGet", "Get job: %v", err)
 				return
 			}
 			// scale job down to 0
@@ -218,16 +217,16 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 				job.Spec.Parallelism = &zero
 				job, err = jc.UpdateJob(job.Namespace, job)
 				if err != nil {
-					recorder.Eventf(&sj, api.EventTypeWarning, "FailedUpdate", "Update job: %v", err)
+					recorder.Eventf(&sj, v1.EventTypeWarning, "FailedUpdate", "Update job: %v", err)
 					return
 				}
 			}
 			// remove all pods...
 			selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
-			options := api.ListOptions{LabelSelector: selector}
+			options := v1.ListOptions{LabelSelector: selector.String()}
 			podList, err := pc.ListPods(job.Namespace, options)
 			if err != nil {
-				recorder.Eventf(&sj, api.EventTypeWarning, "FailedList", "List job-pods: %v", err)
+				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedList", "List job-pods: %v", err)
 			}
 			errList := []error{}
 			for _, pod := range podList.Items {
@@ -240,18 +239,18 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 				}
 			}
 			if len(errList) != 0 {
-				recorder.Eventf(&sj, api.EventTypeWarning, "FailedDelete", "Deleted job-pods: %v", utilerrors.NewAggregate(errList))
+				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedDelete", "Deleted job-pods: %v", utilerrors.NewAggregate(errList))
 				return
 			}
 			// ... the job itself...
 			if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
-				recorder.Eventf(&sj, api.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
+				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
 				glog.Errorf("Error deleting job %s from %s: %v", job.Name, nameForLog, err)
 				return
 			}
 			// ... and its reference from active list
 			deleteFromActiveList(&sj, job.ObjectMeta.UID)
-			recorder.Eventf(&sj, api.EventTypeNormal, "SuccessfulDelete", "Deleted job %v", j.Name)
+			recorder.Eventf(&sj, v1.EventTypeNormal, "SuccessfulDelete", "Deleted job %v", j.Name)
 		}
 	}
 
@@ -262,11 +261,11 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	}
 	jobResp, err := jc.CreateJob(sj.Namespace, jobReq)
 	if err != nil {
-		recorder.Eventf(&sj, api.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
+		recorder.Eventf(&sj, v1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
 		return
 	}
 	glog.V(4).Infof("Created Job %s for %s", jobResp.Name, nameForLog)
-	recorder.Eventf(&sj, api.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
+	recorder.Eventf(&sj, v1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
 
 	// ------------------------------------------------------------------ //
 
@@ -293,6 +292,6 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	return
 }
 
-func getRef(object runtime.Object) (*api.ObjectReference, error) {
-	return api.GetReference(object)
+func getRef(object runtime.Object) (*v1.ObjectReference, error) {
+	return v1.GetReference(object)
 }

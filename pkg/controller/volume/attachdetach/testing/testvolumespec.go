@@ -19,8 +19,8 @@ package testing
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -29,12 +29,12 @@ import (
 )
 
 // GetTestVolumeSpec returns a test volume spec
-func GetTestVolumeSpec(volumeName string, diskName api.UniqueVolumeName) *volume.Spec {
+func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.Spec {
 	return &volume.Spec{
-		Volume: &api.Volume{
+		Volume: &v1.Volume{
 			Name: volumeName,
-			VolumeSource: api.VolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+			VolumeSource: v1.VolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 					PDName:   string(diskName),
 					FSType:   "fake",
 					ReadOnly: false,
@@ -48,28 +48,28 @@ func CreateTestClient() *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &api.PodList{}
+		obj := &v1.PodList{}
 		podNamePrefix := "mypod"
 		namespace := "mynamespace"
 		for i := 0; i < 5; i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-			pod := api.Pod{
-				Status: api.PodStatus{
-					Phase: api.PodRunning,
+			pod := v1.Pod{
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
 				},
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      podName,
 					Namespace: namespace,
 					Labels: map[string]string{
 						"name": podName,
 					},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "containerName",
 							Image: "containerImage",
-							VolumeMounts: []api.VolumeMount{
+							VolumeMounts: []v1.VolumeMount{
 								{
 									Name:      "volumeMountName",
 									ReadOnly:  false,
@@ -78,11 +78,11 @@ func CreateTestClient() *fake.Clientset {
 							},
 						},
 					},
-					Volumes: []api.Volume{
+					Volumes: []v1.Volume{
 						{
 							Name: "volumeName",
-							VolumeSource: api.VolumeSource{
-								GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							VolumeSource: v1.VolumeSource{
+								GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 									PDName:   "pdName",
 									FSType:   "ext4",
 									ReadOnly: false,
@@ -104,9 +104,9 @@ func CreateTestClient() *fake.Clientset {
 }
 
 // NewPod returns a test pod object
-func NewPod(uid, name string) *api.Pod {
-	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func NewPod(uid, name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       types.UID(uid),
 			Name:      name,
 			Namespace: name,

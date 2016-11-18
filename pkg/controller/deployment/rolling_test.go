@@ -19,8 +19,8 @@ package deployment
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -110,7 +110,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			continue
 		}
 		updated := fake.Actions()[0].(core.UpdateAction).GetObject().(*extensions.ReplicaSet)
-		if e, a := test.expectedNewReplicas, int(updated.Spec.Replicas); e != a {
+		if e, a := test.expectedNewReplicas, int(*(updated.Spec.Replicas)); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}
@@ -372,7 +372,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			continue
 		}
 		updated := updateAction.GetObject().(*extensions.ReplicaSet)
-		if e, a := test.expectedOldReplicas, int(updated.Spec.Replicas); e != a {
+		if e, a := test.expectedOldReplicas, int(*(updated.Spec.Replicas)); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}

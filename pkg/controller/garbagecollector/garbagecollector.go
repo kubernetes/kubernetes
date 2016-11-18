@@ -232,7 +232,7 @@ func shouldOrphanDependents(e *event, accessor meta.Object) bool {
 	}
 	finalizers := accessor.GetFinalizers()
 	for _, finalizer := range finalizers {
-		if finalizer == api.FinalizerOrphan {
+		if finalizer == v1.FinalizerOrphan {
 			return true
 		}
 	}
@@ -277,7 +277,7 @@ func (gc *GarbageCollector) removeOrphanFinalizer(owner *node) error {
 		var newFinalizers []string
 		found := false
 		for _, f := range finalizers {
-			if f == api.FinalizerOrphan {
+			if f == v1.FinalizerOrphan {
 				found = true
 				break
 			} else {
@@ -450,24 +450,24 @@ type GarbageCollector struct {
 
 func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 			// APIResource.Kind is not used by the dynamic client, so
 			// leave it empty. We want to list this resource in all
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := unversioned.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, api.NamespaceAll).
+				Resource(&apiResource, v1.NamespaceAll).
 				List(&options)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 			// APIResource.Kind is not used by the dynamic client, so
 			// leave it empty. We want to list this resource in all
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := unversioned.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, api.NamespaceAll).
+				Resource(&apiResource, v1.NamespaceAll).
 				Watch(&options)
 		},
 	}

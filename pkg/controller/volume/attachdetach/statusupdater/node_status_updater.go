@@ -24,9 +24,9 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
@@ -42,7 +42,7 @@ type NodeStatusUpdater interface {
 
 // NewNodeStatusUpdater returns a new instance of NodeStatusUpdater.
 func NewNodeStatusUpdater(
-	kubeClient internalclientset.Interface,
+	kubeClient clientset.Interface,
 	nodeInformer kcache.SharedInformer,
 	actualStateOfWorld cache.ActualStateOfWorld) NodeStatusUpdater {
 	return &nodeStatusUpdater{
@@ -53,7 +53,7 @@ func NewNodeStatusUpdater(
 }
 
 type nodeStatusUpdater struct {
-	kubeClient         internalclientset.Interface
+	kubeClient         clientset.Interface
 	nodeInformer       kcache.SharedInformer
 	actualStateOfWorld cache.ActualStateOfWorld
 }
@@ -81,7 +81,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 				err)
 		}
 
-		node, ok := clonedNode.(*api.Node)
+		node, ok := clonedNode.(*v1.Node)
 		if !ok || node == nil {
 			return fmt.Errorf(
 				"failed to cast %q object %#v to Node",

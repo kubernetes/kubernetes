@@ -24,13 +24,13 @@ import (
 
 	"encoding/json"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
-	utilpod "k8s.io/kubernetes/pkg/api/pod"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/endpoints"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
@@ -80,14 +80,14 @@ func NewEndpointController(podInformer cache.SharedIndexInformer, client clients
 
 	e.serviceStore.Indexer, e.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Core().Services(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return e.client.Core().Services(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Core().Services(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return e.client.Core().Services(v1.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Service{},
+		&v1.Service{},
 		// TODO: Can we have much longer period here?
 		FullServiceResyncPeriod,
 		cache.ResourceEventHandlerFuncs{
@@ -180,7 +180,7 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (e *EndpointController) getPodServiceMemberships(pod *api.Pod) (sets.String, error) {
+func (e *EndpointController) getPodServiceMemberships(pod *v1.Pod) (sets.String, error) {
 	set := sets.String{}
 	services, err := e.serviceStore.GetPodServices(pod)
 	if err != nil {
@@ -199,9 +199,9 @@ func (e *EndpointController) getPodServiceMemberships(pod *api.Pod) (sets.String
 }
 
 // When a pod is added, figure out what services it will be a member of and
-// enqueue them. obj must have *api.Pod type.
+// enqueue them. obj must have *v1.Pod type.
 func (e *EndpointController) addPod(obj interface{}) {
-	pod := obj.(*api.Pod)
+	pod := obj.(*v1.Pod)
 	services, err := e.getPodServiceMemberships(pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", pod.Namespace, pod.Name, err))
@@ -214,10 +214,10 @@ func (e *EndpointController) addPod(obj interface{}) {
 
 // When a pod is updated, figure out what services it used to be a member of
 // and what services it will be a member of, and enqueue the union of these.
-// old and cur must be *api.Pod types.
+// old and cur must be *v1.Pod types.
 func (e *EndpointController) updatePod(old, cur interface{}) {
-	newPod := cur.(*api.Pod)
-	oldPod := old.(*api.Pod)
+	newPod := cur.(*v1.Pod)
+	oldPod := old.(*v1.Pod)
 	if newPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
@@ -244,12 +244,12 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 	}
 }
 
-func hostNameAndDomainAreEqual(pod1, pod2 *api.Pod) bool {
+func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
 	return getHostname(pod1) == getHostname(pod2) &&
 		getSubdomain(pod1) == getSubdomain(pod2)
 }
 
-func getHostname(pod *api.Pod) string {
+func getHostname(pod *v1.Pod) string {
 	if len(pod.Spec.Hostname) > 0 {
 		return pod.Spec.Hostname
 	}
@@ -259,7 +259,7 @@ func getHostname(pod *api.Pod) string {
 	return ""
 }
 
-func getSubdomain(pod *api.Pod) string {
+func getSubdomain(pod *v1.Pod) string {
 	if len(pod.Spec.Subdomain) > 0 {
 		return pod.Spec.Subdomain
 	}
@@ -270,9 +270,9 @@ func getSubdomain(pod *api.Pod) string {
 }
 
 // When a pod is deleted, enqueue the services the pod used to be a member of.
-// obj could be an *api.Pod, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
 func (e *EndpointController) deletePod(obj interface{}) {
-	if _, ok := obj.(*api.Pod); ok {
+	if _, ok := obj.(*v1.Pod); ok {
 		// Enqueue all the services that the pod used to be a member
 		// of. This happens to be exactly the same thing we do when a
 		// pod is added.
@@ -289,7 +289,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 	// TODO: keep a map of pods to services to handle this condition.
 }
 
-// obj could be an *api.Service, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
 func (e *EndpointController) enqueueService(obj interface{}) {
 	key, err := keyFunc(obj)
 	if err != nil {
@@ -354,7 +354,7 @@ func (e *EndpointController) syncService(key string) error {
 		return nil
 	}
 
-	service := obj.(*api.Service)
+	service := obj.(*v1.Service)
 	if service.Spec.Selector == nil {
 		// services without a selector receive no endpoints from this controller;
 		// these services will receive the endpoints that are created out-of-band via the REST API.
@@ -369,7 +369,7 @@ func (e *EndpointController) syncService(key string) error {
 		return err
 	}
 
-	subsets := []api.EndpointSubset{}
+	subsets := []v1.EndpointSubset{}
 	podHostNames := map[string]endpoints.HostRecord{}
 
 	var tolerateUnreadyEndpoints bool
@@ -407,11 +407,11 @@ func (e *EndpointController) syncService(key string) error {
 				continue
 			}
 
-			epp := api.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
-			epa := api.EndpointAddress{
+			epp := v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
+			epa := v1.EndpointAddress{
 				IP:       pod.Status.PodIP,
 				NodeName: &pod.Spec.NodeName,
-				TargetRef: &api.ObjectReference{
+				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       pod.ObjectMeta.Namespace,
 					Name:            pod.ObjectMeta.Name,
@@ -431,17 +431,17 @@ func (e *EndpointController) syncService(key string) error {
 				epa.Hostname = hostname
 			}
 
-			if tolerateUnreadyEndpoints || api.IsPodReady(pod) {
-				subsets = append(subsets, api.EndpointSubset{
-					Addresses: []api.EndpointAddress{epa},
-					Ports:     []api.EndpointPort{epp},
+			if tolerateUnreadyEndpoints || v1.IsPodReady(pod) {
+				subsets = append(subsets, v1.EndpointSubset{
+					Addresses: []v1.EndpointAddress{epa},
+					Ports:     []v1.EndpointPort{epp},
 				})
 				readyEps++
 			} else {
 				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
-				subsets = append(subsets, api.EndpointSubset{
-					NotReadyAddresses: []api.EndpointAddress{epa},
-					Ports:             []api.EndpointPort{epp},
+				subsets = append(subsets, v1.EndpointSubset{
+					NotReadyAddresses: []v1.EndpointAddress{epa},
+					Ports:             []v1.EndpointPort{epp},
 				})
 				notReadyEps++
 			}
@@ -453,8 +453,8 @@ func (e *EndpointController) syncService(key string) error {
 	currentEndpoints, err := e.client.Core().Endpoints(service.Namespace).Get(service.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			currentEndpoints = &api.Endpoints{
-				ObjectMeta: api.ObjectMeta{
+			currentEndpoints = &v1.Endpoints{
+				ObjectMeta: v1.ObjectMeta{
 					Name:   service.Name,
 					Labels: service.Labels,
 				},
@@ -521,7 +521,7 @@ func (e *EndpointController) syncService(key string) error {
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
 func (e *EndpointController) checkLeftoverEndpoints() {
-	list, err := e.client.Core().Endpoints(api.NamespaceAll).List(api.ListOptions{})
+	list, err := e.client.Core().Endpoints(v1.NamespaceAll).List(v1.ListOptions{})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
 		return

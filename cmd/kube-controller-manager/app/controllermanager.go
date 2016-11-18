@@ -34,10 +34,11 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -159,8 +160,8 @@ func Run(s *options.CMServer) error {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controller-manager"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "controller-manager"})
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
@@ -194,7 +195,7 @@ func Run(s *options.CMServer) error {
 
 	// TODO: enable other lock types
 	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: api.ObjectMeta{
+		EndpointsMeta: v1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-controller-manager",
 		},
@@ -225,7 +226,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
 	discoveryClient := client("controller-discovery").Discovery()
-	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), ResyncPeriod(s)())
+	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), nil, ResyncPeriod(s)())
 
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 {
@@ -392,7 +393,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 			return gvr, nil
 		}
 	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, gvrFn, s.NamespaceSyncPeriod.Duration, api.FinalizerKubernetes)
+	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, gvrFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
 	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
