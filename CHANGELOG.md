@@ -301,6 +301,19 @@ filename | sha256 hash
 * Add sync state loop in master's volume reconciler ([#34859](https://github.com/kubernetes/kubernetes/pull/34859), [@jingxu97](https://github.com/jingxu97))
 * AWS: strong-typing for k8s vs aws volume ids ([#35883](https://github.com/kubernetes/kubernetes/pull/35883), [@justinsb](https://github.com/justinsb))
 * Bump GCI version to gci-beta-55-8872-47-0 ([#36679](https://github.com/kubernetes/kubernetes/pull/36679), [@mtaufen](https://github.com/mtaufen))
+
+```
+  gci-beta-55-8872-47-0:
+  Date:           Nov 11, 2016
+  Kernel:         ChromiumOS-4.4
+  Kubernetes:     v1.4.5
+  Docker:         v1.11.2
+  Changelog (vs 55-8872-18-0)
+    * Cherry-pick runc PR#608: Eliminate redundant parsing of mountinfo
+    * Updated kubernetes to v1.4.5
+    * Fixed a bug in e2fsprogs that caused mke2fs to take a very long time. Upstream fix: http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/commit/?h=next&id=d33e690fe7a6cbeb51349d9f2c7fb16a6ebec9c2 
+```
+
 * Fix fetching pids running in a cgroup, which caused problems with OOM score adjustments & setting the /system cgroup ("misc" in the summary API). ([#36614](https://github.com/kubernetes/kubernetes/pull/36614), [@timstclair](https://github.com/timstclair))
 * DELETE requests can now pass in their DeleteOptions as a query parameter or a body parameter, rather than just as a body parameter. ([#35806](https://github.com/kubernetes/kubernetes/pull/35806), [@bdbauer](https://github.com/bdbauer))
 * rkt: Convert image name to be a valid acidentifier ([#34375](https://github.com/kubernetes/kubernetes/pull/34375), [@euank](https://github.com/euank))
