@@ -145,6 +145,11 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
+	err = kubenode.CheckForNodeNameDuplicates(connectionDetails)
+	if err != nil {
+		return err
+	}
+
 	kubeconfig, err := kubenode.PerformTLSBootstrap(connectionDetails)
 	if err != nil {
 		return err
