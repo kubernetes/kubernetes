@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -471,7 +472,7 @@ func TestGetFirstPod(t *testing.T) {
 
 		podList  *api.PodList
 		watching []watch.Event
-		sortBy   func([]*api.Pod) sort.Interface
+		sortBy   func([]*v1.Pod) sort.Interface
 
 		expected    *api.Pod
 		expectedNum int
@@ -480,7 +481,7 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl logs - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-1",
@@ -502,7 +503,7 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl logs - one unhealthy, one healthy",
 			podList: newPodList(2, -1, 1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-2",
@@ -525,7 +526,7 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl attach - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-1",
@@ -568,7 +569,7 @@ func TestGetFirstPod(t *testing.T) {
 					},
 				},
 			},
-			sortBy: func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
+			sortBy: func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-1",
@@ -607,6 +608,7 @@ func TestGetFirstPod(t *testing.T) {
 		selector := labels.Set(labelSet).AsSelector()
 
 		pod, numPods, err := GetFirstPod(fake.Core(), api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
+		pod.Spec.SecurityContext = nil
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
