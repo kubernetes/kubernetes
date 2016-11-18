@@ -61,7 +61,6 @@ spec:
             }
         ]'
     spec:
-      terminationGracePeriodSeconds: 0
       containers:
       - name: zk
         image: java:openjdk-8-jre

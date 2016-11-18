@@ -55,9 +55,8 @@ const (
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/petset/mysql-galera"
 	redisManifestPath       = "test/e2e/testing-manifests/petset/redis"
 	cockroachDBManifestPath = "test/e2e/testing-manifests/petset/cockroachdb"
-	// Should the test restart statefulset clusters?
-	// TODO: enable when we've productionzed bringup of pets in this e2e.
-	restartCluster = false
+	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
+	restartCluster = true
 
 	// Timeout for reads from databases running on pets.
 	readTimeout = 60 * time.Second
@@ -408,10 +407,15 @@ func (c *clusterAppTester) run() {
 	By("Creating foo:bar in member with index 0")
 	c.pet.write(0, map[string]string{"foo": "bar"})
 
-	if restartCluster {
-		By("Restarting stateful set " + ps.Name)
-		c.tester.restart(ps)
-		c.tester.waitForRunning(ps.Spec.Replicas, ps)
+	switch c.pet.(type) {
+	case *mysqlGaleraTester:
+		// Don't restart MySQL cluster since it doesn't handle restarts well
+	default:
+		if restartCluster {
+			By("Restarting stateful set " + ps.Name)
+			c.tester.restart(ps)
+			c.tester.waitForRunning(ps.Spec.Replicas, ps)
+		}
 	}
 
 	By("Reading value under foo from member with index 2")
