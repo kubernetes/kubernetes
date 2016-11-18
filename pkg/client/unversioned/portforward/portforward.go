@@ -203,8 +203,13 @@ func (pf *PortForwarder) listenOnPortAndAddress(port *ForwardedPort, protocol st
 
 // getListener creates a listener on the interface targeted by the given hostname on the given port with
 // the given protocol. protocol is in net.Listen style which basically admits values like tcp, tcp4, tcp6
-func (pf *PortForwarder) getListener(protocol string, hostname string, port *ForwardedPort) (net.Listener, error) {
-	listener, err := net.Listen(protocol, fmt.Sprintf("%s:%d", hostname, port.Local))
+func (pf *PortForwarder) getListener(protocol string, hostname string, port *ForwardedPort) (*net.TCPListener, error) {
+	addr, err := net.ResolveTCPAddr(protocol, net.JoinHostPort(hostname, fmt.Sprintf("%d", port.Local)))
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("Unable to resolve address: Error %s", err))
+		return nil, err
+	}
+	listener, err := net.ListenTCP(protocol, addr)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("Unable to create listener: Error %s", err))
 		return nil, err
@@ -226,9 +231,9 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 
 // waitForConnection waits for new connections to listener and handles them in
 // the background.
-func (pf *PortForwarder) waitForConnection(listener net.Listener, port ForwardedPort) {
+func (pf *PortForwarder) waitForConnection(listener *net.TCPListener, port ForwardedPort) {
 	for {
-		conn, err := listener.Accept()
+		conn, err := listener.AcceptTCP()
 		if err != nil {
 			// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
 			if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
@@ -250,7 +255,7 @@ func (pf *PortForwarder) nextRequestID() int {
 
 // handleConnection copies data between the local connection and the stream to
 // the remote server.
-func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
+func (pf *PortForwarder) handleConnection(conn *net.TCPConn, port ForwardedPort) {
 	defer conn.Close()
 
 	if pf.out != nil {
@@ -291,40 +296,18 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		runtime.HandleError(fmt.Errorf("error creating forwarding stream for port %d -> %d: %v", port.Local, port.Remote, err))
 		return
 	}
+	defer dataStream.Reset()
 
-	localError := make(chan struct{})
-	remoteDone := make(chan struct{})
+	connIn, connOut := httpstream.SplitTCPConn(conn)
+	streamIn, streamOut := httpstream.SplitStream(dataStream)
+	err = httpstream.CopyBothWays(connIn, connOut, streamIn, streamOut)
 
-	go func() {
-		// Copy from the remote side to the local port.
-		if _, err := io.Copy(conn, dataStream); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
-			runtime.HandleError(fmt.Errorf("error copying from remote stream to local connection: %v", err))
-		}
-
-		// inform the select below that the remote copy is done
-		close(remoteDone)
-	}()
-
-	go func() {
-		// inform server we're not sending any more data after copy unblocks
-		defer dataStream.Close()
-
-		// Copy from the local port to the remote side.
-		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
-			runtime.HandleError(fmt.Errorf("error copying from local connection to remote stream: %v", err))
-			// break out of the select below without waiting for the other copy to finish
-			close(localError)
-		}
-	}()
-
-	// wait for either a local->remote error or for copying from remote->local to finish
-	select {
-	case <-remoteDone:
-	case <-localError:
+	// always expect something on errorChan.
+	if errChan := <-errorChan; errChan != nil {
+		// give precedence to error channel error as it is more high level
+		err = errChan
 	}
 
-	// always expect something on errorChan (it may be nil)
-	err = <-errorChan
 	if err != nil {
 		runtime.HandleError(err)
 	}
