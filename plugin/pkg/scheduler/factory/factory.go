@@ -31,10 +31,12 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/fields"
+	runtimeobj "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -538,7 +540,16 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 // scheduled.
 func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWatch {
 	selector := fields.ParseSelectorOrDie("spec.nodeName==" + "" + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "pods", api.NamespaceAll, selector)
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtimeobj.Object, error) {
+			options.FieldSelector = selector
+			return factory.Client.Core().Pods(api.NamespaceAll).List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = selector
+			return factory.Client.Core().Pods(api.NamespaceAll).Watch(options)
+		},
+	}
 }
 
 // Returns a cache.ListWatch that finds all pods that are
@@ -546,7 +557,16 @@ func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWa
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedNonTerminatedPodLW() *cache.ListWatch {
 	selector := fields.ParseSelectorOrDie("spec.nodeName!=" + "" + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "pods", api.NamespaceAll, selector)
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtimeobj.Object, error) {
+			options.FieldSelector = selector
+			return factory.Client.Core().Pods(api.NamespaceAll).List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = selector
+			return factory.Client.Core().Pods(api.NamespaceAll).Watch(options)
+		},
+	}
 }
 
 // createNodeLW returns a cache.ListWatch that gets all changes to nodes.
@@ -554,32 +574,74 @@ func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 	// all nodes are considered to ensure that the scheduler cache has access to all nodes for lookups
 	// the NodeCondition is used to filter out the nodes that are not ready or unschedulable
 	// the filtered list is used as the super set of nodes to consider for scheduling
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "nodes", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtimeobj.Object, error) {
+			return factory.Client.Core().Nodes().List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			return factory.Client.Core().Nodes().Watch(options)
+		},
+	}
 }
 
 // createPersistentVolumeLW returns a cache.ListWatch that gets all changes to persistentVolumes.
 func (factory *ConfigFactory) createPersistentVolumeLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "persistentVolumes", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtimeobj.Object, error) {
+			return factory.Client.Core().PersistentVolumes().List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			return factory.Client.Core().PersistentVolumes().Watch(options)
+		},
+	}
 }
 
 // createPersistentVolumeClaimLW returns a cache.ListWatch that gets all changes to persistentVolumeClaims.
 func (factory *ConfigFactory) createPersistentVolumeClaimLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "persistentVolumeClaims", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtimeobj.Object, error) {
+			return factory.Client.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			return factory.Client.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
+		},
+	}
 }
 
 // Returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "services", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtimeobj.Object, error) {
+			return factory.Client.Core().Services(api.NamespaceAll).List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			return factory.Client.Core().Services(api.NamespaceAll).Watch(options)
+		},
+	}
 }
 
 // Returns a cache.ListWatch that gets all changes to controllers.
 func (factory *ConfigFactory) createControllerLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "replicationControllers", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtimeobj.Object, error) {
+			return factory.Client.Core().ReplicationControllers(api.NamespaceAll).List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			return factory.Client.Core().ReplicationControllers(api.NamespaceAll).Watch(options)
+		},
+	}
 }
 
 // Returns a cache.ListWatch that gets all changes to replicasets.
 func (factory *ConfigFactory) createReplicaSetLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Extensions().RESTClient(), "replicasets", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtimeobj.Object, error) {
+			return factory.Client.Extensions().ReplicaSets(api.NamespaceAll).List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			return factory.Client.Extensions().ReplicaSets(api.NamespaceAll).Watch(options)
+		},
+	}
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {

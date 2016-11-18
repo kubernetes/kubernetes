@@ -34,14 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-func parseSelectorOrDie(s string) fields.Selector {
-	selector, err := fields.ParseSelector(s)
-	if err != nil {
-		panic(err)
-	}
-	return selector
-}
-
 // buildQueryValues is a convenience function for knowing if a namespace should be in a query param or not
 func buildQueryValues(query url.Values) url.Values {
 	v := url.Values{}
@@ -72,7 +64,7 @@ func TestListWatchesCanList(t *testing.T) {
 			location:      testapi.Default.ResourcePath("nodes", api.NamespaceAll, ""),
 			resource:      "nodes",
 			namespace:     api.NamespaceAll,
-			fieldSelector: parseSelectorOrDie(""),
+			fieldSelector: fields.Everything(),
 		},
 		// pod with "assigned" field selector.
 		{
@@ -102,9 +94,13 @@ func TestListWatchesCanList(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.List(api.ListOptions{})
+		switch item.resource {
+		case "pods":
+			client.Core().Pods(item.namespace).List(api.ListOptions{FieldSelector: item.fieldSelector})
+		case "nodes":
+			client.Core().Nodes().List(api.ListOptions{FieldSelector: item.fieldSelector})
+		}
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }
@@ -126,7 +122,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 			rv:            "",
 			resource:      "nodes",
 			namespace:     api.NamespaceAll,
-			fieldSelector: parseSelectorOrDie(""),
+			fieldSelector: fields.Everything(),
 		},
 		{
 			location: buildLocation(
@@ -135,7 +131,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 			rv:            "42",
 			resource:      "nodes",
 			namespace:     api.NamespaceAll,
-			fieldSelector: parseSelectorOrDie(""),
+			fieldSelector: fields.Everything(),
 		},
 		// pod with "assigned" field selector.
 		{
@@ -168,9 +164,14 @@ func TestListWatchesCanWatch(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.Watch(api.ListOptions{ResourceVersion: item.rv})
+		switch item.resource {
+		case "pods":
+			client.Core().Pods(item.namespace).Watch(api.ListOptions{ResourceVersion: item.rv, FieldSelector: item.fieldSelector})
+		case "nodes":
+			client.Core().Nodes().Watch(api.ListOptions{ResourceVersion: item.rv, FieldSelector: item.fieldSelector})
+		}
+
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }

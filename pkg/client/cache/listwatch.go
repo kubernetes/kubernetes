@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -53,29 +52,6 @@ type ListWatch struct {
 // Getter interface knows how to access Get method from RESTClient.
 type Getter interface {
 	Get() *restclient.Request
-}
-
-// NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
-func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
-	listFunc := func(options api.ListOptions) (runtime.Object, error) {
-		return c.Get().
-			Namespace(namespace).
-			Resource(resource).
-			VersionedParams(&options, api.ParameterCodec).
-			FieldsSelectorParam(fieldSelector).
-			Do().
-			Get()
-	}
-	watchFunc := func(options api.ListOptions) (watch.Interface, error) {
-		return c.Get().
-			Prefix("watch").
-			Namespace(namespace).
-			Resource(resource).
-			VersionedParams(&options, api.ParameterCodec).
-			FieldsSelectorParam(fieldSelector).
-			Watch()
-	}
-	return &ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
 }
 
 func timeoutFromListOptions(options api.ListOptions) time.Duration {

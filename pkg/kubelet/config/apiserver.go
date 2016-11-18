@@ -23,13 +23,27 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
 func NewSourceApiserver(c *clientset.Clientset, nodeName types.NodeName, updates chan<- interface{}) {
-	lw := cache.NewListWatchFromClient(c.Core().RESTClient(), "pods", api.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
-	newSourceApiserverFromLW(lw, updates)
+	selector := fields.OneTermEqualSelector(api.PodHostField, string(nodeName))
+	newSourceApiserverFromLW(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = selector
+				return c.Core().Pods(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = selector
+				return c.Core().Pods(api.NamespaceAll).Watch(options)
+			},
+		},
+		updates,
+	)
 }
 
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.

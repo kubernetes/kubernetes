@@ -46,7 +46,6 @@ go_library(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/clock:go_default_library",

@@ -25,5 +25,7 @@ if [[ $("${GOPATH}/bin/gazel" -dry-run -root="$(kube::realpath ${KUBE_ROOT})" 2>
   echo
   echo "BUILD files are not up to date"
   echo "Run ./hack/update-bazel.sh"
+  echo "===="
+  cat /dev/stderr
   exit 1
 fi
