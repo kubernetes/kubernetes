@@ -28,8 +28,6 @@ import (
 	federationcache "k8s.io/kubernetes/federation/client/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
@@ -145,7 +143,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: UserAgentName})
+	recorder := broadcaster.NewRecorder(v1.EventSource{Component: UserAgentName})
 
 	s := &ServiceController{
 		dns:              dns,
@@ -166,13 +164,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	}
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return s.federationClient.Core().Services(v1.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},
@@ -191,13 +187,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return s.federationClient.Federation().Clusters().List(versionedOptions)
+			ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+				return s.federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return s.federationClient.Federation().Clusters().Watch(versionedOptions)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return s.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
 		&v1beta1.Cluster{},

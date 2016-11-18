@@ -108,7 +108,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	glog.V(4).Infof("->NewIngressController V(4)")
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-ingress-controller"})
+	recorder := broadcaster.NewRecorder(v1.EventSource{Component: "federated-ingress-controller"})
 	ic := &IngressController{
 		federatedApiClient:    client,
 		ingressReviewDelay:    time.Second * 10,
@@ -129,13 +129,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	// Start informer in federated API servers on ingresses that should be federated.
 	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions_v1beta1.Ingress{},
@@ -152,13 +150,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
+					ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
+					WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
 					},
 				},
 				&extensions_v1beta1.Ingress{},
@@ -187,19 +183,17 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			glog.V(4).Infof("Returning new informer for cluster %q", cluster.Name)
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
+					ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(versionedOptions) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(versionedOptions) // as above
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(options) // as above
 					},
 				},
 				&v1.ConfigMap{},
