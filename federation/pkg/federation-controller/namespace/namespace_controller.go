@@ -84,7 +84,7 @@ type NamespaceController struct {
 func NewNamespaceController(client federationclientset.Interface) *NamespaceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-namespace-controller"})
+	recorder := broadcaster.NewRecorder(api_v1.EventSource{Component: "federated-namespace-controller"})
 
 	nc := &NamespaceController{
 		federatedApiClient:    client,
@@ -103,13 +103,11 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 	// Start informer in federated API servers on namespaces that should be federated.
 	nc.namespaceInformerStore, nc.namespaceInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Core().Namespaces().List(versionedOptions)
+			ListFunc: func(options api_v1.ListOptions) (runtime.Object, error) {
+				return client.Core().Namespaces().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Core().Namespaces().Watch(versionedOptions)
+			WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
+				return client.Core().Namespaces().Watch(options)
 			},
 		},
 		&api_v1.Namespace{},
@@ -122,13 +120,11 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().Namespaces().List(versionedOptions)
+					ListFunc: func(options api_v1.ListOptions) (runtime.Object, error) {
+						return targetClient.Core().Namespaces().List(options)
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().Namespaces().Watch(versionedOptions)
+					WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
+						return targetClient.Core().Namespaces().Watch(options)
 					},
 				},
 				&api_v1.Namespace{},
