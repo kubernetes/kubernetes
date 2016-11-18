@@ -22,9 +22,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -61,16 +61,16 @@ var _ = framework.KubeDescribe("Multi-AZ Clusters", func() {
 func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string) {
 	// First create the service
 	serviceName := "test-service"
-	serviceSpec := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+	serviceSpec := &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: f.Namespace.Name,
 		},
-		Spec: api.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{
 				"service": serviceName,
 			},
-			Ports: []api.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Port:       80,
 				TargetPort: intstr.FromInt(80),
 			}},
@@ -80,13 +80,13 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now create some pods behind the service
-	podSpec := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	podSpec := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:   serviceName,
 			Labels: map[string]string{"service": serviceName},
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "test",
 					Image: framework.GetPauseImageName(f.ClientSet),
@@ -113,7 +113,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 }
 
 // Find the name of the zone in which a Node is running
-func getZoneNameForNode(node api.Node) (string, error) {
+func getZoneNameForNode(node v1.Node) (string, error) {
 	for key, value := range node.Labels {
 		if key == unversioned.LabelZoneFailureDomain {
 			return value, nil
@@ -126,7 +126,7 @@ func getZoneNameForNode(node api.Node) (string, error) {
 // Find the names of all zones in which we have nodes in this cluster.
 func getZoneNames(c clientset.Interface) ([]string, error) {
 	zoneNames := sets.NewString()
-	nodes, err := c.Core().Nodes().List(api.ListOptions{})
+	nodes, err := c.Core().Nodes().List(v1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func getZoneCount(c clientset.Interface) (int, error) {
 }
 
 // Find the name of the zone in which the pod is scheduled
-func getZoneNameForPod(c clientset.Interface, pod api.Pod) (string, error) {
+func getZoneNameForPod(c clientset.Interface, pod v1.Pod) (string, error) {
 	By(fmt.Sprintf("Getting zone name for pod %s, on node %s", pod.Name, pod.Spec.NodeName))
 	node, err := c.Core().Nodes().Get(pod.Spec.NodeName)
 	Expect(err).NotTo(HaveOccurred())
@@ -157,7 +157,7 @@ func getZoneNameForPod(c clientset.Interface, pod api.Pod) (string, error) {
 
 // Determine whether a set of pods are approximately evenly spread
 // across a given set of zones
-func checkZoneSpreading(c clientset.Interface, pods *api.PodList, zoneNames []string) (bool, error) {
+func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []string) (bool, error) {
 	podsPerZone := make(map[string]int)
 	for _, zoneName := range zoneNames {
 		podsPerZone[zoneName] = 0
@@ -190,26 +190,26 @@ func checkZoneSpreading(c clientset.Interface, pods *api.PodList, zoneNames []st
 func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	By(fmt.Sprintf("Creating replication controller %s", name))
-	controller, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
+	controller, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(&v1.ReplicationController{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: f.Namespace.Name,
 			Name:      name,
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: replicaCount,
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: &replicaCount,
 			Selector: map[string]string{
 				"name": name,
 			},
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{"name": name},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  name,
 							Image: image,
-							Ports: []api.ContainerPort{{ContainerPort: 9376}},
+							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 						},
 					},
 				},
@@ -220,7 +220,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()

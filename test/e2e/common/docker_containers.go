@@ -17,7 +17,7 @@ limitations under the License.
 package common
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -67,21 +67,21 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 const testContainerName = "test-container"
 
 // Return a prototypical entrypoint test pod
-func entrypointTestPod() *api.Pod {
+func entrypointTestPod() *v1.Pod {
 	podName := "client-containers-" + string(uuid.NewUUID())
 
-	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: podName,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  testContainerName,
 					Image: "gcr.io/google_containers/eptest:0.1",
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 }

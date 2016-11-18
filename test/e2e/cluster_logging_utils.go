@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -41,14 +42,14 @@ const (
 )
 
 func createSynthLogger(f *framework.Framework, linesCount int) {
-	f.PodClient().Create(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	f.PodClient().Create(&v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      synthLoggerPodName,
 			Namespace: f.Namespace.Name,
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyOnFailure,
+			Containers: []v1.Container{
 				{
 					Name:  synthLoggerPodName,
 					Image: "gcr.io/google_containers/busybox:1.24",
@@ -72,7 +73,7 @@ func reportLogsFromFluentdPod(f *framework.Framework) error {
 	}
 
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "fluentd-logging"}))
-	options := api.ListOptions{LabelSelector: label}
+	options := v1.ListOptions{LabelSelector: label.String()}
 	fluentdPods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
 
 	for _, fluentdPod := range fluentdPods.Items {

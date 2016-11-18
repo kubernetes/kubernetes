@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -70,11 +70,12 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 
 	// TODO: Use a more realistic workload
 	Expect(framework.RunRC(testutils.RCConfig{
-		Client:    f.ClientSet,
-		Name:      rcName,
-		Namespace: f.Namespace.Name,
-		Image:     framework.GetPauseImageName(f.ClientSet),
-		Replicas:  totalPods,
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           rcName,
+		Namespace:      f.Namespace.Name,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       totalPods,
 	})).NotTo(HaveOccurred())
 
 	// Log once and flush the stats.
@@ -116,7 +117,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	By("Deleting the RC")
-	framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, rcName)
+	framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rcName)
 }
 
 func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {

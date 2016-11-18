@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -144,7 +144,7 @@ var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
 	})
 })
 
-func fetchDNSScalingConfigMap(c clientset.Interface) (*api.ConfigMap, error) {
+func fetchDNSScalingConfigMap(c clientset.Interface) (*v1.ConfigMap, error) {
 	cm, err := c.Core().ConfigMaps(DNSNamespace).Get(DNSAutoscalerLabelName)
 	if err != nil {
 		return nil, err
@@ -160,15 +160,15 @@ func deleteDNSScalingConfigMap(c clientset.Interface) error {
 	return nil
 }
 
-func packDNSScalingConfigMap(params map[string]string) *api.ConfigMap {
-	configMap := api.ConfigMap{}
+func packDNSScalingConfigMap(params map[string]string) *v1.ConfigMap {
+	configMap := v1.ConfigMap{}
 	configMap.ObjectMeta.Name = DNSAutoscalerLabelName
 	configMap.ObjectMeta.Namespace = DNSNamespace
 	configMap.Data = params
 	return &configMap
 }
 
-func updateDNSScalingConfigMap(c clientset.Interface, configMap *api.ConfigMap) error {
+func updateDNSScalingConfigMap(c clientset.Interface, configMap *v1.ConfigMap) error {
 	_, err := c.Core().ConfigMaps(DNSNamespace).Update(configMap)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func updateDNSScalingConfigMap(c clientset.Interface, configMap *api.ConfigMap) 
 
 func getDNSReplicas(c clientset.Interface) (int, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: KubeDNSLabelName}))
-	listOpts := api.ListOptions{LabelSelector: label}
+	listOpts := v1.ListOptions{LabelSelector: label.String()}
 	deployments, err := c.Extensions().Deployments(DNSNamespace).List(listOpts)
 	if err != nil {
 		return 0, err
@@ -187,12 +187,12 @@ func getDNSReplicas(c clientset.Interface) (int, error) {
 	Expect(len(deployments.Items)).Should(Equal(1))
 
 	deployment := deployments.Items[0]
-	return int(deployment.Spec.Replicas), nil
+	return int(*(deployment.Spec.Replicas)), nil
 }
 
 func deleteDNSAutoscalerPod(c clientset.Interface) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: DNSAutoscalerLabelName}))
-	listOpts := api.ListOptions{LabelSelector: label}
+	listOpts := v1.ListOptions{LabelSelector: label.String()}
 	pods, err := c.Core().Pods(DNSNamespace).List(listOpts)
 	if err != nil {
 		return err
@@ -227,7 +227,7 @@ func waitForDNSReplicasSatisfied(c clientset.Interface, expected int, timeout ti
 	return nil
 }
 
-func waitForDNSConfigMapCreated(c clientset.Interface, timeout time.Duration) (configMap *api.ConfigMap, err error) {
+func waitForDNSConfigMapCreated(c clientset.Interface, timeout time.Duration) (configMap *v1.ConfigMap, err error) {
 	framework.Logf("Waiting up to %v for DNS autoscaling ConfigMap got re-created", timeout)
 	condition := func() (bool, error) {
 		configMap, err = fetchDNSScalingConfigMap(c)

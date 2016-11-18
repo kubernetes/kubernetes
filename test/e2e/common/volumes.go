@@ -47,10 +47,10 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -79,31 +79,31 @@ type VolumeTestConfig struct {
 // Starts a container specified by config.serverImage and exports all
 // config.serverPorts from it. The returned pod should be used to get the server
 // IP address and create appropriate VolumeSource.
-func startVolumeServer(f *framework.Framework, config VolumeTestConfig) *api.Pod {
+func startVolumeServer(f *framework.Framework, config VolumeTestConfig) *v1.Pod {
 	podClient := f.PodClient()
 
 	portCount := len(config.serverPorts)
-	serverPodPorts := make([]api.ContainerPort, portCount)
+	serverPodPorts := make([]v1.ContainerPort, portCount)
 
 	for i := 0; i < portCount; i++ {
 		portName := fmt.Sprintf("%s-%d", config.prefix, i)
 
-		serverPodPorts[i] = api.ContainerPort{
+		serverPodPorts[i] = v1.ContainerPort{
 			Name:          portName,
 			ContainerPort: int32(config.serverPorts[i]),
-			Protocol:      api.ProtocolTCP,
+			Protocol:      v1.ProtocolTCP,
 		}
 	}
 
 	volumeCount := len(config.volumes)
-	volumes := make([]api.Volume, volumeCount)
-	mounts := make([]api.VolumeMount, volumeCount)
+	volumes := make([]v1.Volume, volumeCount)
+	mounts := make([]v1.VolumeMount, volumeCount)
 
 	i := 0
 	for src, dst := range config.volumes {
 		mountName := fmt.Sprintf("path%d", i)
 		volumes[i].Name = mountName
-		volumes[i].VolumeSource.HostPath = &api.HostPathVolumeSource{
+		volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
 			Path: src,
 		}
 
@@ -117,24 +117,24 @@ func startVolumeServer(f *framework.Framework, config VolumeTestConfig) *api.Pod
 	By(fmt.Sprint("creating ", config.prefix, " server pod"))
 	privileged := new(bool)
 	*privileged = true
-	serverPod := &api.Pod{
+	serverPod := &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: config.prefix + "-server",
 			Labels: map[string]string{
 				"role": config.prefix + "-server",
 			},
 		},
 
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  config.prefix + "-server",
 					Image: config.serverImage,
-					SecurityContext: &api.SecurityContext{
+					SecurityContext: &v1.SecurityContext{
 						Privileged: privileged,
 					},
 					Args:         config.serverArgs,
@@ -191,21 +191,21 @@ func volumeTestCleanup(f *framework.Framework, config VolumeTestConfig) {
 
 // Start a client pod using given VolumeSource (exported by startVolumeServer())
 // and check that the pod sees the data from the server pod.
-func testVolumeClient(f *framework.Framework, config VolumeTestConfig, volume api.VolumeSource, fsGroup *int64, expectedContent string) {
+func testVolumeClient(f *framework.Framework, config VolumeTestConfig, volume v1.VolumeSource, fsGroup *int64, expectedContent string) {
 	By(fmt.Sprint("starting ", config.prefix, " client"))
-	clientPod := &api.Pod{
+	clientPod := &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: config.prefix + "-client",
 			Labels: map[string]string{
 				"role": config.prefix + "-client",
 			},
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:       config.prefix + "-client",
 					Image:      "gcr.io/google_containers/busybox:1.24",
@@ -218,7 +218,7 @@ func testVolumeClient(f *framework.Framework, config VolumeTestConfig, volume ap
 						"-c",
 						"while true ; do cat /opt/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done ",
 					},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      config.prefix + "-volume",
 							MountPath: "/opt/",
@@ -226,12 +226,12 @@ func testVolumeClient(f *framework.Framework, config VolumeTestConfig, volume ap
 					},
 				},
 			},
-			SecurityContext: &api.PodSecurityContext{
-				SELinuxOptions: &api.SELinuxOptions{
+			SecurityContext: &v1.PodSecurityContext{
+				SELinuxOptions: &v1.SELinuxOptions{
 					Level: "s0:c0,c1",
 				},
 			},
-			Volumes: []api.Volume{
+			Volumes: []v1.Volume{
 				{
 					Name:         config.prefix + "-volume",
 					VolumeSource: volume,
@@ -265,29 +265,29 @@ func testVolumeClient(f *framework.Framework, config VolumeTestConfig, volume ap
 // Insert index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func injectHtml(client clientset.Interface, config VolumeTestConfig, volume api.VolumeSource, content string) {
+func injectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.VolumeSource, content string) {
 	By(fmt.Sprint("starting ", config.prefix, " injector"))
 	podClient := client.Core().Pods(config.namespace)
 
-	injectPod := &api.Pod{
+	injectPod := &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: config.prefix + "-injector",
 			Labels: map[string]string{
 				"role": config.prefix + "-injector",
 			},
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:    config.prefix + "-injector",
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      config.prefix + "-volume",
 							MountPath: "/mnt",
@@ -295,13 +295,13 @@ func injectHtml(client clientset.Interface, config VolumeTestConfig, volume api.
 					},
 				},
 			},
-			SecurityContext: &api.PodSecurityContext{
-				SELinuxOptions: &api.SELinuxOptions{
+			SecurityContext: &v1.PodSecurityContext{
+				SELinuxOptions: &v1.SELinuxOptions{
 					Level: "s0:c0,c1",
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
-			Volumes: []api.Volume{
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
 				{
 					Name:         config.prefix + "-volume",
 					VolumeSource: volume,
@@ -350,7 +350,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	// note that namespace deletion is handled by delete-namespace flag
 	clean := true
 	// filled in BeforeEach
-	var namespace *api.Namespace
+	var namespace *v1.Namespace
 
 	BeforeEach(func() {
 		if !isTestEnabled(f.ClientSet) {
@@ -381,8 +381,8 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 			serverIP := pod.Status.PodIP
 			framework.Logf("NFS server IP address: %v", serverIP)
 
-			volume := api.VolumeSource{
-				NFS: &api.NFSVolumeSource{
+			volume := v1.VolumeSource{
+				NFS: &v1.NFSVolumeSource{
 					Server:   serverIP,
 					Path:     "/",
 					ReadOnly: true,
@@ -416,26 +416,26 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 			framework.Logf("Gluster server IP address: %v", serverIP)
 
 			// create Endpoints for the server
-			endpoints := api.Endpoints{
+			endpoints := v1.Endpoints{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Endpoints",
 					APIVersion: "v1",
 				},
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: config.prefix + "-server",
 				},
-				Subsets: []api.EndpointSubset{
+				Subsets: []v1.EndpointSubset{
 					{
-						Addresses: []api.EndpointAddress{
+						Addresses: []v1.EndpointAddress{
 							{
 								IP: serverIP,
 							},
 						},
-						Ports: []api.EndpointPort{
+						Ports: []v1.EndpointPort{
 							{
 								Name:     "gluster",
 								Port:     24007,
-								Protocol: api.ProtocolTCP,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
@@ -454,8 +454,8 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 				framework.Failf("Failed to create endpoints for Gluster server: %v", err)
 			}
 
-			volume := api.VolumeSource{
-				Glusterfs: &api.GlusterfsVolumeSource{
+			volume := v1.VolumeSource{
+				Glusterfs: &v1.GlusterfsVolumeSource{
 					EndpointsName: config.prefix + "-server",
 					// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 					Path:     "test_vol",

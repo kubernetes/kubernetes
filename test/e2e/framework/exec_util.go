@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -62,7 +63,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 		Namespace(options.Namespace).
 		SubResource("exec").
 		Param("container", options.ContainerName)
-	req.VersionedParams(&api.PodExecOptions{
+	req.VersionedParams(&v1.PodExecOptions{
 		Container: options.ContainerName,
 		Command:   options.Command,
 		Stdin:     options.Stdin != nil,

@@ -29,8 +29,8 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/system"
 )
@@ -250,7 +250,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 			finished:   false,
 		})
 	} else {
-		pods, err := c.Core().Pods("kube-system").List(api.ListOptions{})
+		pods, err := c.Core().Pods("kube-system").List(v1.ListOptions{})
 		if err != nil {
 			Logf("Error while listing Pods: %v", err)
 			return nil, err
@@ -262,14 +262,14 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 				g.containerIDs = append(g.containerIDs, containerID)
 			}
 		}
-		nodeList, err := c.Core().Nodes().List(api.ListOptions{})
+		nodeList, err := c.Core().Nodes().List(v1.ListOptions{})
 		if err != nil {
 			Logf("Error while listing Nodes: %v", err)
 			return nil, err
 		}
 
 		for _, node := range nodeList.Items {
-			if !options.masterOnly || system.IsMasterNode(&node) {
+			if !options.masterOnly || system.IsMasterNode(node.Name) {
 				g.workerWg.Add(1)
 				g.workers = append(g.workers, resourceGatherWorker{
 					c:                    c,
