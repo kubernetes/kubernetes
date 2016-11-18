@@ -111,6 +111,9 @@ retry sudo docker run --net=host \
 	--listen-client-urls=http://0.0.0.0:2379 \
 	--data-dir=/var/etcd/data ${ETCD_QUOTA_BYTES} 1>> /var/log/etcd.log 2>&1"
 
+# Run logrotate regularly
+echo '*/5 * * * * root logrotate /etc/logrotate.conf' >> "/etc/crontab"
+
 # Increase the allowed number of open file descriptors
 ulimit -n 65536
 
