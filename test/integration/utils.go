@@ -17,43 +17,14 @@ limitations under the License.
 package integration
 
 import (
-	"fmt"
-	"math/rand"
 	"testing"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api/errors"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/test/integration/framework"
 )
-
-func newEtcdClient() etcd.Client {
-	cfg := etcd.Config{
-		Endpoints: []string{framework.GetEtcdURLFromEnv()},
-	}
-	client, err := etcd.New(cfg)
-	if err != nil {
-		glog.Fatalf("unable to connect to etcd for testing: %v", err)
-	}
-	return client
-}
-
-func RequireEtcd() {
-	if _, err := etcd.NewKeysAPI(newEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
-		glog.Fatalf("unable to connect to etcd for integration testing: %v", err)
-	}
-}
-
-func withEtcdKey(f func(string)) {
-	prefix := fmt.Sprintf("/test-%d", rand.Int63())
-	defer etcd.NewKeysAPI(newEtcdClient()).Delete(context.TODO(), prefix, &etcd.DeleteOptions{Recursive: true})
-	f(prefix)
-}
 
 func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
 	if err := c.Core().Pods(ns).Delete(name, nil); err != nil {

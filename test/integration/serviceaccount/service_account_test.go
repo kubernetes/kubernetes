@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
-	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -61,10 +60,6 @@ const (
 	readOnlyServiceAccountName  = "ro"
 	readWriteServiceAccountName = "rw"
 )
-
-func init() {
-	integration.RequireEtcd()
-}
 
 func TestServiceAccountAutoCreate(t *testing.T) {
 	c, _, stopFunc := startServiceAccountTestServer(t)
