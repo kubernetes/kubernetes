@@ -19,6 +19,7 @@ package version
 import (
 	"fmt"
 	"runtime"
+	"strings"
 )
 
 // Info contains versioning information.
@@ -57,4 +58,8 @@ func Get() Info {
 // String returns info as a human-friendly version string.
 func (info Info) String() string {
 	return info.GitVersion
+}
+
+func (info Info) ShortVersionString() string {
+	return strings.Split(info.GitVersion, "-")[0]
 }

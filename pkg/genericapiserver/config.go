@@ -207,8 +207,7 @@ func NewConfig() *Config {
 			IgnorePrefixes: []string{"/swaggerapi"},
 			Info: &spec.Info{
 				InfoProps: spec.InfoProps{
-					Title:   "Generic API Server",
-					Version: "unversioned",
+					Title: "Generic API Server",
 				},
 			},
 			DefaultResponse: &spec.Response{
@@ -395,6 +394,14 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		openAPIConfig:        c.OpenAPIConfig,
 
 		postStartHooks: map[string]postStartHookEntry{},
+	}
+
+	if s.openAPIConfig.Info.Version == "" {
+		if c.Version != nil {
+			s.openAPIConfig.Info.Version = c.Version.ShortVersionString()
+		} else {
+			s.openAPIConfig.Info.Version = "unversioned"
+		}
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
