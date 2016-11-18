@@ -26,16 +26,17 @@ package photon
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
-	"github.com/vmware/photon-controller-go-sdk/photon"
-	"gopkg.in/gcfg.v1"
 	"io"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	k8stypes "k8s.io/kubernetes/pkg/types"
 	"log"
 	"os/exec"
 	"strings"
+
+	"github.com/golang/glog"
+	"github.com/vmware/photon-controller-go-sdk/photon"
+	"gopkg.in/gcfg.v1"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 )
 
 const (
@@ -284,8 +285,8 @@ func (pc *PCCloud) List(filter string) ([]k8stypes.NodeName, error) {
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]api.NodeAddress, error) {
-	addrs := []api.NodeAddress{}
+func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
+	addrs := []v1.NodeAddress{}
 	name := string(nodeName)
 
 	var vmID string
@@ -326,10 +327,10 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]api.NodeAddress,
 						if val, ok := network["ipAddress"]; ok && val != nil {
 							ipAddr := val.(string)
 							if ipAddr != "-" {
-								api.AddToNodeAddresses(&addrs,
-									api.NodeAddress{
+								v1.AddToNodeAddresses(&addrs,
+									v1.NodeAddress{
 										// TODO: figure out the type of the IP
-										Type:    api.NodeInternalIP,
+										Type:    v1.NodeInternalIP,
 										Address: ipAddr,
 									},
 								)

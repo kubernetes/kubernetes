@@ -42,7 +42,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	k8stypes "k8s.io/kubernetes/pkg/types"
 	k8runtime "k8s.io/kubernetes/pkg/util/runtime"
@@ -492,8 +492,8 @@ func (i *Instances) List(filter string) ([]k8stypes.NodeName, error) {
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (i *Instances) NodeAddresses(nodeName k8stypes.NodeName) ([]api.NodeAddress, error) {
-	addrs := []api.NodeAddress{}
+func (i *Instances) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
+	addrs := []v1.NodeAddress{}
 
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -512,15 +512,15 @@ func (i *Instances) NodeAddresses(nodeName k8stypes.NodeName) ([]api.NodeAddress
 
 	// retrieve VM's ip(s)
 	for _, v := range mvm.Guest.Net {
-		var addressType api.NodeAddressType
+		var addressType v1.NodeAddressType
 		if i.cfg.Network.PublicNetwork == v.Network {
-			addressType = api.NodeExternalIP
+			addressType = v1.NodeExternalIP
 		} else {
-			addressType = api.NodeInternalIP
+			addressType = v1.NodeInternalIP
 		}
 		for _, ip := range v.IpAddress {
-			api.AddToNodeAddresses(&addrs,
-				api.NodeAddress{
+			v1.AddToNodeAddresses(&addrs,
+				v1.NodeAddress{
 					Type:    addressType,
 					Address: ip,
 				},

@@ -39,8 +39,8 @@ import (
 	neutron_ports "github.com/rackspace/gophercloud/openstack/networking/v2/ports"
 	"github.com/rackspace/gophercloud/pagination"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -282,7 +282,7 @@ func getListenersByLoadBalancerID(client *gophercloud.ServiceClient, id string) 
 }
 
 // get listener for a port or nil if does not exist
-func getListenerForPort(existingListeners []listeners.Listener, port api.ServicePort) *listeners.Listener {
+func getListenerForPort(existingListeners []listeners.Listener, port v1.ServicePort) *listeners.Listener {
 	for _, l := range existingListeners {
 		if l.Protocol == string(port.Protocol) && l.ProtocolPort == int(port.Port) {
 			return &l
@@ -418,7 +418,7 @@ func popMember(members []v2_pools.Member, addr string, port int) []v2_pools.Memb
 	return members
 }
 
-func getSecurityGroupName(clusterName string, service *api.Service) string {
+func getSecurityGroupName(clusterName string, service *v1.Service) string {
 	return fmt.Sprintf("lb-sg-%s-%v", clusterName, service.Name)
 }
 
@@ -521,7 +521,7 @@ func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGrou
 	return nil
 }
 
-func (lbaas *LbaasV2) createLoadBalancer(service *api.Service, name string) (*loadbalancers.LoadBalancer, error) {
+func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string) (*loadbalancers.LoadBalancer, error) {
 	createOpts := loadbalancers.CreateOpts{
 		Name:        name,
 		Description: fmt.Sprintf("Kubernetes external service %s", name),
@@ -549,7 +549,7 @@ func stringInArray(x string, list []string) bool {
 	return false
 }
 
-func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
 	if err == ErrNotFound {
@@ -559,8 +559,8 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *api.Service) 
 		return nil, false, err
 	}
 
-	status := &api.LoadBalancerStatus{}
-	status.Ingress = []api.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+	status := &v1.LoadBalancerStatus{}
+	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
 
 	return status, true, err
 }
@@ -570,7 +570,7 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *api.Service) 
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Service, nodeNames []string) (*api.LoadBalancerStatus, error) {
+func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodeNames []string) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodeNames, apiService.Annotations)
 
 	ports := apiService.Spec.Ports
@@ -581,7 +581,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 	// Check for TCP protocol on each port
 	// TODO: Convert all error messages to use an event recorder
 	for _, port := range ports {
-		if port.Protocol != api.ProtocolTCP {
+		if port.Protocol != v1.ProtocolTCP {
 			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for openstack load balancers")
 		}
 	}
@@ -595,12 +595,12 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers without managing security groups")
 	}
 
-	affinity := api.ServiceAffinityNone
+	affinity := v1.ServiceAffinityNone
 	var persistence *v2_pools.SessionPersistence
 	switch affinity {
-	case api.ServiceAffinityNone:
+	case v1.ServiceAffinityNone:
 		persistence = nil
-	case api.ServiceAffinityClientIP:
+	case v1.ServiceAffinityClientIP:
 		persistence = &v2_pools.SessionPersistence{Type: "SOURCE_IP"}
 	default:
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
@@ -794,9 +794,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		glog.V(2).Infof("Deleted obsolete listener: %s", listener.ID)
 	}
 
-	status := &api.LoadBalancerStatus{}
+	status := &v1.LoadBalancerStatus{}
 
-	status.Ingress = []api.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
 
 	port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
 	if err != nil {
@@ -818,7 +818,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		}
 	}
 	if floatIP != nil {
-		status.Ingress = append(status.Ingress, api.LoadBalancerIngress{IP: floatIP.FloatingIP})
+		status.Ingress = append(status.Ingress, v1.LoadBalancerIngress{IP: floatIP.FloatingIP})
 	}
 
 	if lbaas.opts.ManageSecurityGroups {
@@ -939,7 +939,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 	return status, nil
 }
 
-func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *api.Service, nodeNames []string) error {
+func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodeNames)
 
@@ -1086,7 +1086,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *api.Servic
 	return nil
 }
 
-func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
+func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", clusterName, loadBalancerName)
 
@@ -1256,7 +1256,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 	return nil
 }
 
-func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	vip, err := getVipByName(lb.network, loadBalancerName)
 	if err == ErrNotFound {
@@ -1266,8 +1266,8 @@ func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *api.Service) (*a
 		return nil, false, err
 	}
 
-	status := &api.LoadBalancerStatus{}
-	status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}}
+	status := &v1.LoadBalancerStatus{}
+	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
 
 	return status, true, err
 }
@@ -1277,7 +1277,7 @@ func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *api.Service) (*a
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *api.Service, nodeNames []string) (*api.LoadBalancerStatus, error) {
+func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodeNames []string) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodeNames, apiService.Annotations)
 
 	ports := apiService.Spec.Ports
@@ -1289,16 +1289,16 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *api.Servic
 
 	// The service controller verified all the protocols match on the ports, just check and use the first one
 	// TODO: Convert all error messages to use an event recorder
-	if ports[0].Protocol != api.ProtocolTCP {
+	if ports[0].Protocol != v1.ProtocolTCP {
 		return nil, fmt.Errorf("Only TCP LoadBalancer is supported for openstack load balancers")
 	}
 
 	affinity := apiService.Spec.SessionAffinity
 	var persistence *vips.SessionPersistence
 	switch affinity {
-	case api.ServiceAffinityNone:
+	case v1.ServiceAffinityNone:
 		persistence = nil
-	case api.ServiceAffinityClientIP:
+	case v1.ServiceAffinityClientIP:
 		persistence = &vips.SessionPersistence{Type: "SOURCE_IP"}
 	default:
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
@@ -1405,9 +1405,9 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *api.Servic
 		return nil, err
 	}
 
-	status := &api.LoadBalancerStatus{}
+	status := &v1.LoadBalancerStatus{}
 
-	status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}}
+	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
 
 	if lb.opts.FloatingNetworkId != "" {
 		floatIPOpts := floatingips.CreateOpts{
@@ -1419,14 +1419,14 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *api.Servic
 			return nil, err
 		}
 
-		status.Ingress = append(status.Ingress, api.LoadBalancerIngress{IP: floatIP.FloatingIP})
+		status.Ingress = append(status.Ingress, v1.LoadBalancerIngress{IP: floatIP.FloatingIP})
 	}
 
 	return status, nil
 
 }
 
-func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *api.Service, nodeNames []string) error {
+func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodeNames)
 
@@ -1488,7 +1488,7 @@ func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *api.Service, 
 	return nil
 }
 
-func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
+func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", clusterName, loadBalancerName)
 
