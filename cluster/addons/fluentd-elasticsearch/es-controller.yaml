@@ -38,6 +38,11 @@ spec:
         volumeMounts:
         - name: es-persistent-storage
           mountPath: /data
+        env:
+        - name: "NAMESPACE"
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
       volumes:
       - name: es-persistent-storage
         emptyDir: {}
