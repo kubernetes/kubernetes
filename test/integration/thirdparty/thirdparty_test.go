@@ -29,8 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -43,7 +44,7 @@ func TestThirdPartyDelete(t *testing.T) {
 	defer s.Close()
 
 	clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
-	client := internalclientset.NewForConfigOrDie(clientConfig)
+	client := clientset.NewForConfigOrDie(clientConfig)
 
 	DoTestInstallThirdPartyAPIDelete(t, client, clientConfig)
 }
@@ -53,7 +54,7 @@ func TestThirdPartyMultiple(t *testing.T) {
 	defer s.Close()
 
 	clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
-	client := internalclientset.NewForConfigOrDie(clientConfig)
+	client := clientset.NewForConfigOrDie(clientConfig)
 
 	DoTestInstallMultipleAPIs(t, client, clientConfig)
 }
@@ -63,7 +64,7 @@ var versionsToTest = []string{"v1"}
 
 type Foo struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty" description:"standard object metadata"`
+	v1.ObjectMeta        `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
@@ -77,7 +78,7 @@ type FooList struct {
 }
 
 // installThirdParty installs a third party resoure and returns a defer func
-func installThirdParty(t *testing.T, client internalclientset.Interface, clientConfig *restclient.Config, tpr *extensions.ThirdPartyResource, group, version, resource string) func() {
+func installThirdParty(t *testing.T, client clientset.Interface, clientConfig *restclient.Config, tpr *extensions.ThirdPartyResource, group, version, resource string) func() {
 	var err error
 	_, err = client.Extensions().ThirdPartyResources().Create(tpr)
 	if err != nil {
@@ -123,13 +124,13 @@ func installThirdParty(t *testing.T, client internalclientset.Interface, clientC
 	}
 }
 
-func DoTestInstallMultipleAPIs(t *testing.T, client internalclientset.Interface, clientConfig *restclient.Config) {
+func DoTestInstallMultipleAPIs(t *testing.T, client clientset.Interface, clientConfig *restclient.Config) {
 	group := "company.com"
 	version := "v1"
 
 	defer installThirdParty(t, client, clientConfig,
 		&extensions.ThirdPartyResource{
-			ObjectMeta: api.ObjectMeta{Name: "foo.company.com"},
+			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
 			Versions:   []extensions.APIVersion{{Name: version}},
 		}, group, version, "foos",
 	)()
@@ -137,24 +138,24 @@ func DoTestInstallMultipleAPIs(t *testing.T, client internalclientset.Interface,
 	// TODO make multiple resources in one version work
 	// defer installThirdParty(t, client, clientConfig,
 	// 	&extensions.ThirdPartyResource{
-	// 		ObjectMeta: api.ObjectMeta{Name: "bar.company.com"},
+	// 		ObjectMeta: v1.ObjectMeta{Name: "bar.company.com"},
 	// 		Versions:   []extensions.APIVersion{{Name: version}},
 	// 	}, group, version, "bars",
 	// )()
 }
 
-func DoTestInstallThirdPartyAPIDelete(t *testing.T, client internalclientset.Interface, clientConfig *restclient.Config) {
+func DoTestInstallThirdPartyAPIDelete(t *testing.T, client clientset.Interface, clientConfig *restclient.Config) {
 	for _, version := range versionsToTest {
 		testInstallThirdPartyAPIDeleteVersion(t, client, clientConfig, version)
 	}
 }
 
-func testInstallThirdPartyAPIDeleteVersion(t *testing.T, client internalclientset.Interface, clientConfig *restclient.Config, version string) {
+func testInstallThirdPartyAPIDeleteVersion(t *testing.T, client clientset.Interface, clientConfig *restclient.Config, version string) {
 	group := "company.com"
 
 	defer installThirdParty(t, client, clientConfig,
 		&extensions.ThirdPartyResource{
-			ObjectMeta: api.ObjectMeta{Name: "foo.company.com"},
+			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
 			Versions:   []extensions.APIVersion{{Name: version}},
 		}, group, version, "foos",
 	)()
@@ -168,7 +169,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, client internalclientse
 	}
 
 	expectedObj := Foo{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "test",
 			Namespace: "default",
 		},
