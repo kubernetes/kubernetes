@@ -70,6 +70,7 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
@@ -409,8 +410,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
-	// TODO: Create and use a more sophisticated secret mamanger.
-	secretManager, err := newSimpleSecretManager(kubeClient)
+	secretManager, err := secret.NewSimpleSecretManager(kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secret manager: %v", err)
 	}
@@ -921,7 +921,7 @@ type Kubelet struct {
 	diskSpaceManager diskSpaceManager
 
 	// Secret manager.
-	secretManager secretManager
+	secretManager secret.Manager
 
 	// Cached MachineInfo returned by cadvisor.
 	machineInfo *cadvisorapi.MachineInfo
