@@ -17,40 +17,20 @@ limitations under the License.
 package v1
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
-	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-    "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/davecgh/go-spew/spew"
 )
-
-// Conversion error conveniently packages up errors in conversions.
-type ConversionError struct {
-	In, Out interface{}
-	Message string
-}
-
-// Return a helpful string about the error
-func (c *ConversionError) Error() string {
-	return spew.Sprintf(
-		"Conversion error: %s. (in: %v(%+v) out: %v)",
-		c.Message, reflect.TypeOf(c.In), c.In, reflect.TypeOf(c.Out),
-	)
-}
 
 // Semantic can do semantic deep equality checks for api objects.
 // Example: api.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
@@ -73,58 +53,10 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 )
 
-var standardResourceQuotaScopes = sets.NewString(
-	string(ResourceQuotaScopeTerminating),
-	string(ResourceQuotaScopeNotTerminating),
-	string(ResourceQuotaScopeBestEffort),
-	string(ResourceQuotaScopeNotBestEffort),
-)
-
-// IsStandardResourceQuotaScope returns true if the scope is a standard value
-func IsStandardResourceQuotaScope(str string) bool {
-	return standardResourceQuotaScopes.Has(str)
-}
-
-var podObjectCountQuotaResources = sets.NewString(
-	string(ResourcePods),
-)
-
-var podComputeQuotaResources = sets.NewString(
-	string(ResourceCPU),
-	string(ResourceMemory),
-	string(ResourceLimitsCPU),
-	string(ResourceLimitsMemory),
-	string(ResourceRequestsCPU),
-	string(ResourceRequestsMemory),
-)
-
-// IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
-func IsResourceQuotaScopeValidForResource(scope ResourceQuotaScope, resource string) bool {
-	switch scope {
-	case ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeNotBestEffort:
-		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
-	case ResourceQuotaScopeBestEffort:
-		return podObjectCountQuotaResources.Has(resource)
-	default:
-		return true
-	}
-}
-
-var standardContainerResources = sets.NewString(
-	string(ResourceCPU),
-	string(ResourceMemory),
-)
-
-// IsStandardContainerResourceName returns true if the container can make a resource request
-// for the specified resource
-func IsStandardContainerResourceName(str string) bool {
-	return standardContainerResources.Has(str)
-}
-
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
 // integer resource prefix.
 func IsOpaqueIntResourceName(name ResourceName) bool {
-	return strings.HasPrefix(string(name), api.ResourceOpaqueIntPrefix)
+	return strings.HasPrefix(string(name), ResourceOpaqueIntPrefix)
 }
 
 // OpaqueIntResourceName returns a ResourceName with the canonical opaque
@@ -135,82 +67,6 @@ func OpaqueIntResourceName(name string) ResourceName {
 		return ResourceName(name)
 	}
 	return ResourceName(fmt.Sprintf("%s%s", api.ResourceOpaqueIntPrefix, name))
-}
-
-var standardLimitRangeTypes = sets.NewString(
-	string(LimitTypePod),
-	string(LimitTypeContainer),
-	string(LimitTypePersistentVolumeClaim),
-)
-
-// IsStandardLimitRangeType returns true if the type is Pod or Container
-func IsStandardLimitRangeType(str string) bool {
-	return standardLimitRangeTypes.Has(str)
-}
-
-var standardQuotaResources = sets.NewString(
-	string(ResourceCPU),
-	string(ResourceMemory),
-	string(ResourceRequestsCPU),
-	string(ResourceRequestsMemory),
-	string(ResourceRequestsStorage),
-	string(ResourceLimitsCPU),
-	string(ResourceLimitsMemory),
-	string(ResourcePods),
-	string(ResourceQuotas),
-	string(ResourceServices),
-	string(ResourceReplicationControllers),
-	string(ResourceSecrets),
-	string(ResourcePersistentVolumeClaims),
-	string(ResourceConfigMaps),
-	string(ResourceServicesNodePorts),
-	string(ResourceServicesLoadBalancers),
-)
-
-// IsStandardQuotaResourceName returns true if the resource is known to
-// the quota tracking system
-func IsStandardQuotaResourceName(str string) bool {
-	return standardQuotaResources.Has(str)
-}
-
-var standardResources = sets.NewString(
-	string(ResourceCPU),
-	string(ResourceMemory),
-	string(ResourceRequestsCPU),
-	string(ResourceRequestsMemory),
-	string(ResourceLimitsCPU),
-	string(ResourceLimitsMemory),
-	string(ResourcePods),
-	string(ResourceQuotas),
-	string(ResourceServices),
-	string(ResourceReplicationControllers),
-	string(ResourceSecrets),
-	string(ResourceConfigMaps),
-	string(ResourcePersistentVolumeClaims),
-	string(ResourceStorage),
-	string(ResourceRequestsStorage),
-)
-
-// IsStandardResourceName returns true if the resource is known to the system
-func IsStandardResourceName(str string) bool {
-	return standardResources.Has(str)
-}
-
-var integerResources = sets.NewString(
-	string(ResourcePods),
-	string(ResourceQuotas),
-	string(ResourceServices),
-	string(ResourceReplicationControllers),
-	string(ResourceSecrets),
-	string(ResourceConfigMaps),
-	string(ResourcePersistentVolumeClaims),
-	string(ResourceServicesNodePorts),
-	string(ResourceServicesLoadBalancers),
-)
-
-// IsIntegerResourceName returns true if the resource is measured in integer values
-func IsIntegerResourceName(str string) bool {
-	return integerResources.Has(str) || IsOpaqueIntResourceName(ResourceName(str))
 }
 
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
@@ -295,14 +151,6 @@ func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
 			*addresses = append(*addresses, add)
 		}
 	}
-}
-
-func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
-	data, err := runtime.Encode(codec, obj)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", md5.Sum(data)), nil
 }
 
 // TODO: make method on LoadBalancerStatus?
@@ -395,18 +243,6 @@ func containsAccessMode(modes []PersistentVolumeAccessMode, mode PersistentVolum
 		}
 	}
 	return false
-}
-
-// ParseRFC3339 parses an RFC3339 date in either RFC3339Nano or RFC3339 format.
-func ParseRFC3339(s string, nowFn func() unversioned.Time) (unversioned.Time, error) {
-	if t, timeErr := time.Parse(time.RFC3339Nano, s); timeErr == nil {
-		return unversioned.Time{Time: t}, nil
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return unversioned.Time{}, err
-	}
-	return unversioned.Time{Time: t}, nil
 }
 
 // NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
@@ -632,7 +468,7 @@ func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
 }
 
 type Sysctl struct {
-	Name string
+	Name  string
 	Value string
 }
 
