@@ -19,11 +19,35 @@ package quota
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Equals returns true if the two lists are equivalent
 func Equals(a api.ResourceList, b api.ResourceList) bool {
+	for key, value1 := range a {
+		value2, found := b[key]
+		if !found {
+			return false
+		}
+		if value1.Cmp(value2) != 0 {
+			return false
+		}
+	}
+	for key, value1 := range b {
+		value2, found := a[key]
+		if !found {
+			return false
+		}
+		if value1.Cmp(value2) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// V1Equals returns true if the two lists are equivalent
+func V1Equals(a v1.ResourceList, b v1.ResourceList) bool {
 	for key, value1 := range a {
 		value2, found := b[key]
 		if !found {
