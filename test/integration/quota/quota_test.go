@@ -41,13 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
-	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
-
-func init() {
-	integration.RequireEtcd()
-}
 
 // 1.2 code gets:
 // 	quota_test.go:95: Took 4.218619579s to scale up without quota

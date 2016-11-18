@@ -41,15 +41,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 
 	"github.com/golang/glog"
 )
-
-func init() {
-	integration.RequireEtcd()
-}
 
 // Several tests in this file are configurable by environment variables:
 // KUBE_INTEGRATION_PV_OBJECTS - nr. of PVs/PVCs to be created
