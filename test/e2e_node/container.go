@@ -19,8 +19,8 @@ package e2e_node
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -28,29 +28,29 @@ import (
 // One pod one container
 // TODO: This should be migrated to the e2e framework.
 type ConformanceContainer struct {
-	Container        api.Container
-	RestartPolicy    api.RestartPolicy
-	Volumes          []api.Volume
+	Container        v1.Container
+	RestartPolicy    v1.RestartPolicy
+	Volumes          []v1.Volume
 	ImagePullSecrets []string
 
 	PodClient          *framework.PodClient
 	podName            string
-	PodSecurityContext *api.PodSecurityContext
+	PodSecurityContext *v1.PodSecurityContext
 }
 
 func (cc *ConformanceContainer) Create() {
 	cc.podName = cc.Container.Name + string(uuid.NewUUID())
-	imagePullSecrets := []api.LocalObjectReference{}
+	imagePullSecrets := []v1.LocalObjectReference{}
 	for _, s := range cc.ImagePullSecrets {
-		imagePullSecrets = append(imagePullSecrets, api.LocalObjectReference{Name: s})
+		imagePullSecrets = append(imagePullSecrets, v1.LocalObjectReference{Name: s})
 	}
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: cc.podName,
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			RestartPolicy: cc.RestartPolicy,
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				cc.Container,
 			},
 			SecurityContext:  cc.PodSecurityContext,
@@ -62,7 +62,7 @@ func (cc *ConformanceContainer) Create() {
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.PodClient.Delete(cc.podName, api.NewDeleteOptions(0))
+	return cc.PodClient.Delete(cc.podName, v1.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {
@@ -70,25 +70,25 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return api.IsPodReady(pod), nil
+	return v1.IsPodReady(pod), nil
 }
 
-func (cc *ConformanceContainer) GetPhase() (api.PodPhase, error) {
+func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
 	pod, err := cc.PodClient.Get(cc.podName)
 	if err != nil {
-		return api.PodUnknown, err
+		return v1.PodUnknown, err
 	}
 	return pod.Status.Phase, nil
 }
 
-func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, error) {
+func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
 	pod, err := cc.PodClient.Get(cc.podName)
 	if err != nil {
-		return api.ContainerStatus{}, err
+		return v1.ContainerStatus{}, err
 	}
 	statuses := pod.Status.ContainerStatuses
 	if len(statuses) != 1 || statuses[0].Name != cc.Container.Name {
-		return api.ContainerStatus{}, fmt.Errorf("unexpected container statuses %v", statuses)
+		return v1.ContainerStatus{}, fmt.Errorf("unexpected container statuses %v", statuses)
 	}
 	return statuses[0], nil
 }
@@ -113,7 +113,7 @@ const (
 	ContainerStateUnknown    ContainerState = "Unknown"
 )
 
-func GetContainerState(state api.ContainerState) ContainerState {
+func GetContainerState(state v1.ContainerState) ContainerState {
 	if state.Waiting != nil {
 		return ContainerStateWaiting
 	}

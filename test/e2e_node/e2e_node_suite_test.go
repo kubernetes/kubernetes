@@ -31,8 +31,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -212,7 +212,7 @@ func waitForNodeReady() {
 		if err != nil {
 			return fmt.Errorf("failed to get node: %v", err)
 		}
-		if !api.IsNodeReady(node) {
+		if !v1.IsNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil
@@ -245,8 +245,8 @@ func updateTestContext() error {
 }
 
 // getNode gets node object from the apiserver.
-func getNode(c *clientset.Clientset) (*api.Node, error) {
-	nodes, err := c.Nodes().List(api.ListOptions{})
+func getNode(c *clientset.Clientset) (*v1.Node, error) {
+	nodes, err := c.Nodes().List(v1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")

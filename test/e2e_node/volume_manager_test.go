@@ -19,7 +19,7 @@ package e2e_node
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -35,24 +35,24 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 		Context("On terminatation of pod with memory backed volume", func() {
 			It("should remove the volume from the node", func() {
 				var (
-					memoryBackedPod *api.Pod
+					memoryBackedPod *v1.Pod
 					volumeName      string
 				)
 				By("Creating a pod with a memory backed volume that exits success without restart", func() {
 					volumeName = "memory-volume"
-					memoryBackedPod = f.PodClient().Create(&api.Pod{
-						ObjectMeta: api.ObjectMeta{
+					memoryBackedPod = f.PodClient().Create(&v1.Pod{
+						ObjectMeta: v1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyNever,
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							RestartPolicy: v1.RestartPolicyNever,
+							Containers: []v1.Container{
 								{
 									Image:   "gcr.io/google_containers/busybox:1.24",
 									Name:    "container" + string(uuid.NewUUID()),
 									Command: []string{"sh", "-c", "echo"},
-									VolumeMounts: []api.VolumeMount{
+									VolumeMounts: []v1.VolumeMount{
 										{
 											Name:      volumeName,
 											MountPath: "/tmp",
@@ -60,11 +60,11 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 									},
 								},
 							},
-							Volumes: []api.Volume{
+							Volumes: []v1.Volume{
 								{
 									Name: volumeName,
-									VolumeSource: api.VolumeSource{
-										EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory},
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory},
 									},
 								},
 							},
@@ -79,19 +79,19 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 					for i := 0; i < 10; i++ {
 						// need to create a new verification pod on each pass since updates
 						//to the HostPath volume aren't propogated to the pod
-						pod := f.PodClient().Create(&api.Pod{
-							ObjectMeta: api.ObjectMeta{
+						pod := f.PodClient().Create(&v1.Pod{
+							ObjectMeta: v1.ObjectMeta{
 								Name:      "pod" + string(uuid.NewUUID()),
 								Namespace: f.Namespace.Name,
 							},
-							Spec: api.PodSpec{
-								RestartPolicy: api.RestartPolicyNever,
-								Containers: []api.Container{
+							Spec: v1.PodSpec{
+								RestartPolicy: v1.RestartPolicyNever,
+								Containers: []v1.Container{
 									{
 										Image:   "gcr.io/google_containers/busybox:1.24",
 										Name:    "container" + string(uuid.NewUUID()),
 										Command: []string{"sh", "-c", "if [ -d " + volumePath + " ]; then exit 1; fi;"},
-										VolumeMounts: []api.VolumeMount{
+										VolumeMounts: []v1.VolumeMount{
 											{
 												Name:      "kubelet-pods",
 												MountPath: "/tmp",
@@ -99,13 +99,13 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 										},
 									},
 								},
-								Volumes: []api.Volume{
+								Volumes: []v1.Volume{
 									{
 										Name: "kubelet-pods",
-										VolumeSource: api.VolumeSource{
+										VolumeSource: v1.VolumeSource{
 											// TODO: remove hardcoded kubelet volume directory path
 											// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
-											HostPath: &api.HostPathVolumeSource{Path: "/var/lib/kubelet/pods"},
+											HostPath: &v1.HostPathVolumeSource{Path: "/var/lib/kubelet/pods"},
 										},
 									},
 								},
@@ -113,7 +113,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 						})
 						err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 						gp := int64(1)
-						f.PodClient().Delete(pod.Name, &api.DeleteOptions{GracePeriodSeconds: &gp})
+						f.PodClient().Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})
 						if err == nil {
 							break
 						}
