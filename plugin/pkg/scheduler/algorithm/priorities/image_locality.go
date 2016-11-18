@@ -19,7 +19,7 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -29,7 +29,7 @@ import (
 // based on the total size of those images.
 // - If none of the images are present, this node will be given the lowest priority.
 // - If some of the images are present on a node, the larger their sizes' sum, the higher the node's priority.
-func ImageLocalityPriorityMap(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
@@ -66,7 +66,7 @@ func calculateScoreFromSize(sumSize int64) int {
 }
 
 // checkContainerImageOnNode checks if a container image is present on a node and returns its size.
-func checkContainerImageOnNode(node *api.Node, container *api.Container) int64 {
+func checkContainerImageOnNode(node *v1.Node, container *v1.Container) int64 {
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
 			if container.Image == name {

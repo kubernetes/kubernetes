@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -57,7 +57,7 @@ type schedulerCache struct {
 }
 
 type podState struct {
-	pod *api.Pod
+	pod *v1.Pod
 	// Used by assumedPod to determinate expiration.
 	deadline *time.Time
 }
@@ -90,10 +90,10 @@ func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*
 	return nil
 }
 
-func (cache *schedulerCache) List(selector labels.Selector) ([]*api.Pod, error) {
+func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
-	var pods []*api.Pod
+	var pods []*v1.Pod
 	for _, info := range cache.nodes {
 		for _, pod := range info.pods {
 			if selector.Matches(labels.Set(pod.Labels)) {
@@ -104,12 +104,12 @@ func (cache *schedulerCache) List(selector labels.Selector) ([]*api.Pod, error) 
 	return pods, nil
 }
 
-func (cache *schedulerCache) AssumePod(pod *api.Pod) error {
+func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
 	return cache.assumePod(pod, time.Now())
 }
 
 // assumePod exists for making test deterministic by taking time as input argument.
-func (cache *schedulerCache) assumePod(pod *api.Pod, now time.Time) error {
+func (cache *schedulerCache) assumePod(pod *v1.Pod, now time.Time) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -132,7 +132,7 @@ func (cache *schedulerCache) assumePod(pod *api.Pod, now time.Time) error {
 	return nil
 }
 
-func (cache *schedulerCache) ForgetPod(pod *api.Pod) error {
+func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 	key, err := getPodKey(pod)
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func (cache *schedulerCache) ForgetPod(pod *api.Pod) error {
 	return nil
 }
 
-func (cache *schedulerCache) AddPod(pod *api.Pod) error {
+func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 	key, err := getPodKey(pod)
 	if err != nil {
 		return err
@@ -184,7 +184,7 @@ func (cache *schedulerCache) AddPod(pod *api.Pod) error {
 	return nil
 }
 
-func (cache *schedulerCache) UpdatePod(oldPod, newPod *api.Pod) error {
+func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
 	key, err := getPodKey(oldPod)
 	if err != nil {
 		return err
@@ -207,7 +207,7 @@ func (cache *schedulerCache) UpdatePod(oldPod, newPod *api.Pod) error {
 	return nil
 }
 
-func (cache *schedulerCache) updatePod(oldPod, newPod *api.Pod) error {
+func (cache *schedulerCache) updatePod(oldPod, newPod *v1.Pod) error {
 	if err := cache.removePod(oldPod); err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (cache *schedulerCache) updatePod(oldPod, newPod *api.Pod) error {
 	return nil
 }
 
-func (cache *schedulerCache) addPod(pod *api.Pod) {
+func (cache *schedulerCache) addPod(pod *v1.Pod) {
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
 		n = NewNodeInfo()
@@ -224,7 +224,7 @@ func (cache *schedulerCache) addPod(pod *api.Pod) {
 	n.addPod(pod)
 }
 
-func (cache *schedulerCache) removePod(pod *api.Pod) error {
+func (cache *schedulerCache) removePod(pod *v1.Pod) error {
 	n := cache.nodes[pod.Spec.NodeName]
 	if err := n.removePod(pod); err != nil {
 		return err
@@ -235,7 +235,7 @@ func (cache *schedulerCache) removePod(pod *api.Pod) error {
 	return nil
 }
 
-func (cache *schedulerCache) RemovePod(pod *api.Pod) error {
+func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 	key, err := getPodKey(pod)
 	if err != nil {
 		return err
@@ -260,7 +260,7 @@ func (cache *schedulerCache) RemovePod(pod *api.Pod) error {
 	return nil
 }
 
-func (cache *schedulerCache) AddNode(node *api.Node) error {
+func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -272,7 +272,7 @@ func (cache *schedulerCache) AddNode(node *api.Node) error {
 	return n.SetNode(node)
 }
 
-func (cache *schedulerCache) UpdateNode(oldNode, newNode *api.Node) error {
+func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -284,7 +284,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *api.Node) error {
 	return n.SetNode(newNode)
 }
 
-func (cache *schedulerCache) RemoveNode(node *api.Node) error {
+func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
