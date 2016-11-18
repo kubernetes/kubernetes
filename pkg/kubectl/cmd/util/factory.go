@@ -211,6 +211,7 @@ const (
 	ConfigMapV1GeneratorName                    = "configmap/v1"
 	ClusterRoleBindingV1GeneratorName           = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
 	ClusterV1Beta1GeneratorName                 = "cluster/v1beta1"
+	PodDisruptionBudgetV1GeneratorName          = "poddisruptionbudget/v1beta1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances

@@ -388,6 +388,7 @@ mesos-launch-grace-period
 mesos-master
 mesos-sandbox-overlay
 mesos-user
+min-available
 min-pr-number
 min-request-timeout
 min-resync-period
