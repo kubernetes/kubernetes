@@ -47,14 +47,12 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:           "gcr.io/google_containers/busybox:1.24",
-							ImagePullPolicy: "Always",
-							Name:            "container-inode-hog-pod",
+							Image: "gcr.io/google_containers/busybox:1.24",
+							Name:  "container-inode-hog-pod",
 							Command: []string{
 								"sh",
-								"-c", // Make 1 billion small files (more than we have inodes)
-								"for A in `seq 1 1 10000`; do for B in `seq 1 1 100000`; do touch smallfile$A.$B.txt; sleep 0.001; done; done;",
-								// If getting out of memory (OOM) errors, `seq 1 1 xxxxxxxx` may not fit in memory
+								"-c", // Make 100 billion small files (more than we have inodes)
+								"i=0; while [[ $i -lt 100000000000 ]]; do touch smallfile$i.txt; sleep 0.001; i=$((i+=1)); done;",
 							},
 						},
 					},
@@ -69,14 +67,12 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:           "gcr.io/google_containers/busybox:1.24",
-							ImagePullPolicy: "Always",
-							Name:            "volume-inode-hog-pod",
+							Image: "gcr.io/google_containers/busybox:1.24",
+							Name:  "volume-inode-hog-pod",
 							Command: []string{
 								"sh",
-								"-c", // Make 1 billion small files (more than we have inodes)
-								"for A in `seq 1 1 10000`; do for B in `seq 1 1 100000`; do touch /test-empty-dir-mnt/smallfile$A.$B.txt; sleep 0.001; done; done;",
-								// If getting out of memory (OOM) errors, `seq 1 1 xxxxxxxx` may not fit in memory
+								"-c", // Make 100 billion small files (more than we have inodes)
+								"i=0; while [[ $i -lt 100000000000 ]]; do touch /test-empty-dir-mnt/smallfile$i.txt; sleep 0.001; i=$((i+=1)); done;",
 							},
 							VolumeMounts: []api.VolumeMount{
 								{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
@@ -97,9 +93,8 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:           "gcr.io/google_containers/busybox:1.24",
-							ImagePullPolicy: "Always",
-							Name:            "normal-memory-usage-pod",
+							Image: "gcr.io/google_containers/busybox:1.24",
+							Name:  "normal-memory-usage-pod",
 							Command: []string{
 								"sh",
 								"-c", //make one big (5 Gb) file
@@ -119,10 +114,11 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 
 // Struct used by runEvictionTest that specifies the pod, and when that pod should be evicted, relative to other pods
 type podTestSpec struct {
-	evictionPriority int // 0 should never be evicted, 1 shouldn't evict before 2, etc.
+	// 0 should never be evicted, 1 shouldn't evict before 2, etc.
 	// If two are ranked at 1, either is permitted to fail before the other.
 	// The test ends when all other than the 0 have been evicted
-	pod api.Pod
+	evictionPriority int
+	pod              api.Pod
 }
 
 // runEvictionTest sets up a testing environment given the provided nodes, and checks a few things:
@@ -140,53 +136,72 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			By("seting up pods to be used by tests")
 			for _, spec := range podTestSpecs {
 				By(fmt.Sprintf("creating pod with container: %s", spec.pod.Name))
-				f.PodClient().Create(&spec.pod)
+				f.PodClient().CreateSync(&spec.pod)
 			}
 		})
 
 		It(fmt.Sprintf("should eventually see %s, and then evict all of the correct pods", testCondition), func() {
 			Eventually(func() error {
-
-				// Gather current information
-				currentPods := getCurrentPods(f, podTestSpecs)
 				hasPressure, err := hasPressureCondition(f, testCondition)
 				framework.ExpectNoError(err, fmt.Sprintf("checking if we have %s", testCondition))
-
 				if hasPressure {
-					By("checking eviction ordering and ensuring important pods dont fail")
-					done := true
-					for i, priorityPodSpec := range podTestSpecs {
-						priorityPod := currentPods[i]
-
-						// Check eviction ordering.
-						// Note: it is alright for a priority 1 and priority 2 pod (for example) to fail in the same round
-						for j, lowPriorityPodSpec := range podTestSpecs {
-							lowPriorityPod := currentPods[j]
-							if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == api.PodRunning {
-								Expect(priorityPod.Status.Phase).NotTo(Equal(api.PodFailed),
-									fmt.Sprintf("%s pod failed before %s pod", priorityPodSpec.pod.Name, lowPriorityPodSpec.pod.Name))
-							}
-						}
-
-						// EvictionPriority 0 pods should not fail
-						if priorityPodSpec.evictionPriority == 0 {
-							Expect(priorityPod.Status.Phase).NotTo(Equal(api.PodFailed),
-								fmt.Sprintf("%s pod failed (and shouldn't have failed)", priorityPodSpec.pod.Name))
-						}
-
-						// If a pod that is not evictionPriority 0 has not been evicted, we are not done
-						if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != api.PodFailed {
-							done = false
-						}
-					}
-					if done {
-						return nil
-					}
-					return fmt.Errorf("pods that caused %s have not been evicted.", testCondition)
-
+					return nil
 				}
 				return fmt.Errorf("Condition: %s not encountered", testCondition)
+			}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
 
+			Eventually(func() error {
+				// Gather current information
+				updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(api.ListOptions{})
+				updatedPods := updatedPodList.Items
+				for _, p := range updatedPods {
+					framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
+				}
+				_, err = hasPressureCondition(f, testCondition)
+				framework.ExpectNoError(err, fmt.Sprintf("checking if we have %s", testCondition))
+
+				By("checking eviction ordering and ensuring important pods dont fail")
+				done := true
+				for _, priorityPodSpec := range podTestSpecs {
+					var priorityPod api.Pod
+					for _, p := range updatedPods {
+						if p.Name == priorityPodSpec.pod.Name {
+							priorityPod = p
+						}
+					}
+					Expect(priorityPod).NotTo(BeNil())
+
+					// Check eviction ordering.
+					// Note: it is alright for a priority 1 and priority 2 pod (for example) to fail in the same round
+					for _, lowPriorityPodSpec := range podTestSpecs {
+						var lowPriorityPod api.Pod
+						for _, p := range updatedPods {
+							if p.Name == lowPriorityPodSpec.pod.Name {
+								lowPriorityPod = p
+							}
+						}
+						Expect(lowPriorityPod).NotTo(BeNil())
+						if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == api.PodRunning {
+							Expect(priorityPod.Status.Phase).NotTo(Equal(api.PodFailed),
+								fmt.Sprintf("%s pod failed before %s pod", priorityPodSpec.pod.Name, lowPriorityPodSpec.pod.Name))
+						}
+					}
+
+					// EvictionPriority 0 pods should not fail
+					if priorityPodSpec.evictionPriority == 0 {
+						Expect(priorityPod.Status.Phase).NotTo(Equal(api.PodFailed),
+							fmt.Sprintf("%s pod failed (and shouldn't have failed)", priorityPod.Name))
+					}
+
+					// If a pod that is not evictionPriority 0 has not been evicted, we are not done
+					if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != api.PodFailed {
+						done = false
+					}
+				}
+				if done {
+					return nil
+				}
+				return fmt.Errorf("pods that caused %s have not been evicted.", testCondition)
 			}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
 		})
 
@@ -206,7 +221,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(BeFalse())
 
 			By("making sure we can start a new pod after the test")
-			podName := "admit-best-effort-pod"
+			podName := "test-admit-pod"
 			f.PodClient().Create(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
@@ -239,7 +254,8 @@ func hasInodePressure(f *framework.Framework, testCondition string) (bool, error
 	}
 
 	_, pressure := api.GetNodeCondition(&nodeList.Items[0].Status, api.NodeDiskPressure)
-	hasPressure := (*pressure).Status == api.ConditionTrue
+	Expect(pressure).NotTo(BeNil())
+	hasPressure := pressure.Status == api.ConditionTrue
 	By(fmt.Sprintf("checking if pod has %s: %v", testCondition, hasPressure))
 
 	// Additional Logging relating to Inodes
@@ -247,38 +263,17 @@ func hasInodePressure(f *framework.Framework, testCondition string) (bool, error
 	if err != nil {
 		return false, err
 	}
-	framework.Logf("imageFsInfo.Inodes: %d, imageFsInfo.InodesFree: %d",
-		*summary.Node.Runtime.ImageFs.Inodes, *summary.Node.Runtime.ImageFs.InodesFree)
-	framework.Logf("rootFsInfo.Inodes: %d, rootFsInfo.InodesFree: %d",
-		*summary.Node.Fs.Inodes, *summary.Node.Fs.InodesFree)
+	framework.Logf("imageFsInfo.Inodes: %d, imageFsInfo.InodesFree: %d", *summary.Node.Runtime.ImageFs.Inodes, *summary.Node.Runtime.ImageFs.InodesFree)
+	framework.Logf("rootFsInfo.Inodes: %d, rootFsInfo.InodesFree: %d", *summary.Node.Fs.Inodes, *summary.Node.Fs.InodesFree)
 	for _, pod := range summary.Pods {
 		framework.Logf("Pod: %s", pod.PodRef.Name)
 		for _, container := range pod.Containers {
-			if container.Rootfs != nil {
-				framework.Logf("--- summary Container: %s inodeUsage: %d",
-					container.Name, *container.Rootfs.InodesUsed)
-			}
+			framework.Logf("--- summary Container: %s inodeUsage: %d", container.Name, *container.Rootfs.InodesUsed)
 		}
 		for _, volume := range pod.VolumeStats {
-			if volume.FsStats.Inodes != nil && volume.FsStats.InodesUsed != nil {
-				framework.Logf("--- summary Volume: %s inodeUsage: %d",
-					volume.Name, *volume.FsStats.InodesUsed)
-			}
+			framework.Logf("--- summary Volume: %s inodeUsage: %d", volume.Name, *volume.FsStats.InodesUsed)
 		}
 	}
 	return hasPressure, nil
 }
 
-// Returns a list of pointers to the pods retrieved from the testing node
-func getCurrentPods(f *framework.Framework, podTestSpecs []podTestSpec) (currentPods []*api.Pod) {
-	By("getting current information on pods")
-
-	for _, podSpec := range podTestSpecs {
-		updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podSpec.pod.Name)
-		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podSpec.pod.Name))
-
-		currentPods = append(currentPods, updatedPod)
-		framework.Logf("fetching pod %s; phase= %v", updatedPod.Name, updatedPod.Status.Phase)
-	}
-	return
-}
