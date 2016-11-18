@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,11 +32,11 @@ type fakeLW struct {
 	watchResp watch.Interface
 }
 
-func (lw fakeLW) List(options api.ListOptions) (runtime.Object, error) {
+func (lw fakeLW) List(options v1.ListOptions) (runtime.Object, error) {
 	return lw.listResp, nil
 }
 
-func (lw fakeLW) Watch(options api.ListOptions) (watch.Interface, error) {
+func (lw fakeLW) Watch(options v1.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 
