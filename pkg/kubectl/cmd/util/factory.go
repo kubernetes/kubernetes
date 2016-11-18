@@ -386,18 +386,6 @@ func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, er
 		return nil, nil, err
 	}
 
-	// Register unknown APIs as third party for now to make
-	// validation happy. TODO perhaps make a dynamic schema
-	// validator to avoid this.
-	for _, group := range groupResources {
-		for _, version := range group.Group.Versions {
-			gv := unversioned.GroupVersion{Group: group.Group.Name, Version: version.Version}
-			if !registered.IsRegisteredVersion(gv) {
-				registered.AddThirdPartyAPIGroupVersions(gv)
-			}
-		}
-	}
-
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 	return NewShortcutExpander(mapper, discoveryClient), typer, nil
@@ -1148,10 +1136,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return err
 	}
 	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.EnabledVersions())
-	}
-	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
-		// Don't attempt to validate third party objects
+		// if we don't have this in our scheme, just skip validation because its an object we don't recognize
 		return nil
 	}
 
