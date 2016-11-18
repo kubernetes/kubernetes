@@ -1343,8 +1343,26 @@ func (dm *DockerManager) UpdatePodCIDR(podCIDR string) error {
 	return nil
 }
 
+type logReadWriteCloser struct {
+	io.ReadWriteCloser
+}
+
+func (w *logReadWriteCloser) Write(p []byte) (n int, err error) {
+	n, err = w.ReadWriteCloser.Write(p)
+	glog.Infof("logWriter Write => %d bytes written", n)
+	return
+}
+
+func (w *logReadWriteCloser) Read(p []byte) (n int, err error) {
+	n, err = w.ReadWriteCloser.Read(p)
+	glog.Infof("logWriter Read => %d bytes read", n)
+	return
+}
+
 // Temporarily export this function to share with dockershim.
 func PortForward(client DockerInterface, podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
+	stream = &logReadWriteCloser{stream}
+
 	container, err := client.InspectContainer(podInfraContainerID)
 	if err != nil {
 		return err
