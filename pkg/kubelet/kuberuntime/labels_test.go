@@ -17,11 +17,15 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -192,25 +196,91 @@ func TestPodLabels(t *testing.T) {
 }
 
 func TestPodAnnotations(t *testing.T) {
-	pod := &api.Pod{
+	profileRoot := "/var/lib/kubelet/profiles"
+	basePod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:        "test_pod",
-			Namespace:   "test_pod_namespace",
-			UID:         "test_pod_uid",
 			Annotations: map[string]string{"foo": "bar"},
 		},
 		Spec: api.PodSpec{
-			Containers: []api.Container{},
+			Containers: []api.Container{
+				{
+					Name: "container1",
+				},
+				{
+					Name: "container2",
+				},
+			},
 		},
 	}
-	expected := &annotatedPodSandboxInfo{
-		Annotations: map[string]string{"foo": "bar"},
+	podWithDefaultSeccomp := basePod
+	podWithDefaultSeccomp.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: apparmor.ProfileRuntimeDefault,
 	}
-
-	// Test whether we can get right information from annotations
-	annotations := newPodAnnotations(pod)
-	podSandboxInfo := getPodSandboxInfoFromAnnotations(annotations)
-	if !reflect.DeepEqual(podSandboxInfo, expected) {
-		t.Errorf("expected %v, got %v", expected, podSandboxInfo)
+	podWithLocalSeccomp := basePod
+	podWithLocalSeccomp.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "localhost/testprofile",
+	}
+	podWithContainerDefaultSeccomp := basePod
+	containerSeccompAnnotationKey := api.SeccompContainerAnnotationKeyPrefix + "container1"
+	podWithContainerDefaultSeccomp.Annotations = map[string]string{
+		containerSeccompAnnotationKey: apparmor.ProfileRuntimeDefault,
+	}
+	podWithContainerLocalSeccomp := basePod
+	podWithContainerLocalSeccomp.Annotations = map[string]string{
+		containerSeccompAnnotationKey: "localhost/testprofile",
+	}
+	for _, test := range []struct {
+		description string                   // description of the test case
+		pod         *api.Pod                 // templates of sandboxes
+		expected    *annotatedPodSandboxInfo // expected result
+	}{
+		{
+			description: "pod without seccomp",
+			pod:         &basePod,
+			expected: &annotatedPodSandboxInfo{
+				Annotations: map[string]string{"foo": "bar"},
+			},
+		},
+		{
+			description: "pod with default seccomp",
+			pod:         &podWithDefaultSeccomp,
+			expected: &annotatedPodSandboxInfo{
+				Annotations: map[string]string{
+					api.SeccompPodAnnotationKey: apparmor.ProfileRuntimeDefault,
+				},
+			},
+		},
+		{
+			description: "pod with local seccomp",
+			pod:         &podWithLocalSeccomp,
+			expected: &annotatedPodSandboxInfo{
+				Annotations: map[string]string{
+					api.SeccompPodAnnotationKey: filepath.Join(profileRoot, "testprofile"),
+				},
+			},
+		},
+		{
+			description: "pod with container default seccomp",
+			pod:         &podWithContainerDefaultSeccomp,
+			expected: &annotatedPodSandboxInfo{
+				Annotations: map[string]string{
+					containerSeccompAnnotationKey: apparmor.ProfileRuntimeDefault,
+				},
+			},
+		},
+		{
+			description: "pod with container local seccomp",
+			pod:         &podWithContainerLocalSeccomp,
+			expected: &annotatedPodSandboxInfo{
+				Annotations: map[string]string{
+					containerSeccompAnnotationKey: filepath.Join(profileRoot, "testprofile"),
+				},
+			},
+		},
+	} {
+		// Test whether we can get right information from annotations
+		annotations := newPodAnnotations(test.pod, profileRoot)
+		podSandboxInfo := getPodSandboxInfoFromAnnotations(annotations)
+		assert.Equal(t, test.expected, podSandboxInfo, "[Test case %q]", test.description)
 	}
 }

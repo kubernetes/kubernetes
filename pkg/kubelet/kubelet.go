@@ -536,7 +536,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "docker":
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			// Use the new CRI shim for docker.
-			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups)
+			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.PodInfraContainerImage, streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups)
 			if err != nil {
 				return nil, err
 			}
@@ -601,6 +601,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			float32(kubeCfg.RegistryPullQPS),
 			int(kubeCfg.RegistryBurst),
 			klet.cpuCFSQuota,
+			kubeCfg.SeccompProfileRoot,
 			runtimeService,
 			kuberuntime.NewInstrumentedImageManagerService(imageService),
 		)

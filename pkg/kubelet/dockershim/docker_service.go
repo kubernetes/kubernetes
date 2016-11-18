@@ -100,13 +100,12 @@ type NetworkPluginSettings struct {
 var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings, cgroupsName string) (DockerService, error) {
+func NewDockerService(client dockertools.DockerInterface, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings, cgroupsName string) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	ds := &dockerService{
-		seccompProfileRoot: seccompProfileRoot,
-		client:             c,
-		os:                 kubecontainer.RealOS{},
-		podSandboxImage:    podSandboxImage,
+		client:          c,
+		os:              kubecontainer.RealOS{},
+		podSandboxImage: podSandboxImage,
 		streamingRuntime: &streamingRuntime{
 			client: client,
 			// Only the native exec handling is supported for now.
@@ -149,14 +148,13 @@ type DockerService interface {
 }
 
 type dockerService struct {
-	seccompProfileRoot string
-	client             dockertools.DockerInterface
-	os                 kubecontainer.OSInterface
-	podSandboxImage    string
-	streamingRuntime   *streamingRuntime
-	streamingServer    streaming.Server
-	networkPlugin      network.NetworkPlugin
-	containerManager   cm.ContainerManager
+	client           dockertools.DockerInterface
+	os               kubecontainer.OSInterface
+	podSandboxImage  string
+	streamingRuntime *streamingRuntime
+	streamingServer  streaming.Server
+	networkPlugin    network.NetworkPlugin
+	containerManager cm.ContainerManager
 }
 
 // Version returns the runtime name, runtime version and runtime API version
