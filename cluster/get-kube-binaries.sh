@@ -27,6 +27,7 @@
 #    * arm
 #    * arm64
 #    * ppc64le
+#    * s390x
 #
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
@@ -86,9 +87,12 @@ function detect_client_info() {
     i?86*)
       CLIENT_ARCH="386"
       ;;
+    s390x*)
+      CLIENT_ARCH="s390x"
+      ;;	  
     *)
       echo "Unknown, unsupported architecture (${machine})." >&2
-      echo "Supported architectures x86_64, i686, arm, arm64." >&2
+      echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
       echo "Bailing out." >&2
       exit 3
       ;;

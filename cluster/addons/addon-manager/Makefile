@@ -30,6 +30,10 @@ endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/debian
 endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/python:2.7-slim
+	QEMUARCH=s390x
+endif
 
 .PHONY: build push
 
