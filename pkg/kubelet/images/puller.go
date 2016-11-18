@@ -19,13 +19,13 @@ package images
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type imagePuller interface {
-	pullImage(kubecontainer.ImageSpec, []api.Secret, chan<- error)
+	pullImage(kubecontainer.ImageSpec, []v1.Secret, chan<- error)
 }
 
 var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
@@ -38,7 +38,7 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 	return &parallelImagePuller{imageService}
 }
 
-func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []api.Secret, errChan chan<- error) {
+func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, errChan chan<- error) {
 	go func() {
 		errChan <- pip.imageService.PullImage(spec, pullSecrets)
 	}()
@@ -60,11 +60,11 @@ func newSerialImagePuller(imageService kubecontainer.ImageService) imagePuller {
 
 type imagePullRequest struct {
 	spec        kubecontainer.ImageSpec
-	pullSecrets []api.Secret
+	pullSecrets []v1.Secret
 	errChan     chan<- error
 }
 
-func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []api.Secret, errChan chan<- error) {
+func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, errChan chan<- error) {
 	sip.pullRequests <- &imagePullRequest{
 		spec:        spec,
 		pullSecrets: pullSecrets,

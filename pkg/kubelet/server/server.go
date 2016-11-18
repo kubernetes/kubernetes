@@ -39,7 +39,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/v1/validation"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/healthz"
@@ -162,19 +162,19 @@ type HostInterface interface {
 	GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
-	GetPods() []*api.Pod
-	GetRunningPods() ([]*api.Pod, error)
-	GetPodByName(namespace, name string) (*api.Pod, bool)
+	GetPods() []*v1.Pod
+	GetRunningPods() ([]*v1.Pod, error)
+	GetPodByName(namespace, name string) (*v1.Pod, bool)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error
-	GetKubeletContainerLogs(podFullName, containerName string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error
+	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
 	StreamingConnectionIdleTimeout() time.Duration
 	ResyncInterval() time.Duration
 	GetHostname() string
-	GetNode() (*api.Node, error)
+	GetNode() (*v1.Node, error)
 	GetNodeConfig() cm.NodeConfig
 	LatestLoopEntryTime() time.Time
 	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
@@ -456,7 +456,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		}
 	}
 	// container logs on the kubelet are locked to the v1 API version of PodLogOptions
-	logOptions := &api.PodLogOptions{}
+	logOptions := &v1.PodLogOptions{}
 	if err := api.ParameterCodec.DecodeParameters(query, v1.SchemeGroupVersion, logOptions); err != nil {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to decode query."}`))
 		return
@@ -511,17 +511,17 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	}
 }
 
-// encodePods creates an api.PodList object from pods and returns the encoded
+// encodePods creates an v1.PodList object from pods and returns the encoded
 // PodList.
-func encodePods(pods []*api.Pod) (data []byte, err error) {
-	podList := new(api.PodList)
+func encodePods(pods []*v1.Pod) (data []byte, err error) {
+	podList := new(v1.PodList)
 	for _, pod := range pods {
 		podList.Items = append(podList.Items, *pod)
 	}
 	// TODO: this needs to be parameterized to the kubelet, not hardcoded. Depends on Kubelet
 	//   as API server refactor.
 	// TODO: Locked to v1, needs to be made generic
-	codec := api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"})
+	codec := api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: v1.GroupName, Version: "v1"})
 	return runtime.Encode(codec, podList)
 }
 

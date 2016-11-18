@@ -20,8 +20,8 @@ package testing
 // a fake host is created here that can be used by plugins for testing
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -38,7 +38,7 @@ func NewFakeHost(kubeClient clientset.Interface) *fakeNetworkHost {
 	return host
 }
 
-func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
+func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
 	return nil, false
 }
 

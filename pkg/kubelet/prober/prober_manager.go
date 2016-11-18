@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -39,19 +39,19 @@ import (
 type Manager interface {
 	// AddPod creates new probe workers for every container probe. This should be called for every
 	// pod created.
-	AddPod(pod *api.Pod)
+	AddPod(pod *v1.Pod)
 
 	// RemovePod handles cleaning up the removed pod state, including terminating probe workers and
 	// deleting cached results.
-	RemovePod(pod *api.Pod)
+	RemovePod(pod *v1.Pod)
 
 	// CleanupPods handles cleaning up pods which should no longer be running.
 	// It takes a list of "active pods" which should not be cleaned up.
-	CleanupPods(activePods []*api.Pod)
+	CleanupPods(activePods []*v1.Pod)
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
-	UpdatePodStatus(types.UID, *api.PodStatus)
+	UpdatePodStatus(types.UID, *v1.PodStatus)
 
 	// Start starts the Manager sync loops.
 	Start()
@@ -127,7 +127,7 @@ func (t probeType) String() string {
 	}
 }
 
-func (m *manager) AddPod(pod *api.Pod) {
+func (m *manager) AddPod(pod *v1.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
@@ -161,7 +161,7 @@ func (m *manager) AddPod(pod *api.Pod) {
 	}
 }
 
-func (m *manager) RemovePod(pod *api.Pod) {
+func (m *manager) RemovePod(pod *v1.Pod) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
@@ -177,7 +177,7 @@ func (m *manager) RemovePod(pod *api.Pod) {
 	}
 }
 
-func (m *manager) CleanupPods(activePods []*api.Pod) {
+func (m *manager) CleanupPods(activePods []*v1.Pod) {
 	desiredPods := make(map[types.UID]sets.Empty)
 	for _, pod := range activePods {
 		desiredPods[pod.UID] = sets.Empty{}
@@ -193,7 +193,7 @@ func (m *manager) CleanupPods(activePods []*api.Pod) {
 	}
 }
 
-func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *api.PodStatus) {
+func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 	for i, c := range podStatus.ContainerStatuses {
 		var ready bool
 		if c.State.Running == nil {

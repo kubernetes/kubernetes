@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -146,7 +146,7 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 
 // cleanupBandwidthLimits updates the status of bandwidth-limited containers
 // and ensures that only the appropriate CIDRs are active on the node.
-func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
+func (kl *Kubelet) cleanupBandwidthLimits(allPods []*v1.Pod) error {
 	if kl.shaper == nil {
 		return nil
 	}
@@ -174,7 +174,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 			}
 			status = kl.generateAPIPodStatus(pod, s)
 		}
-		if status.Phase == api.PodRunning {
+		if status.Phase == v1.PodRunning {
 			possibleCIDRs.Insert(fmt.Sprintf("%s/32", status.PodIP))
 		}
 	}

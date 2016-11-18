@@ -28,7 +28,7 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -235,7 +235,7 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
 func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, error) {
 	var results map[string]string
 
-	sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(annotations)
+	sysctls, unsafeSysctls, err := v1.SysctlsFromPodAnnotations(annotations)
 	if err != nil {
 		return nil, err
 	}

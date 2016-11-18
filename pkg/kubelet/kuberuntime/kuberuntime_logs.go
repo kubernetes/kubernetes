@@ -31,7 +31,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // Notice that the current kuberuntime logs implementation doesn't handle
@@ -85,8 +85,8 @@ type logOptions struct {
 	timestamp bool
 }
 
-// newLogOptions convert the api.PodLogOptions to internal logOptions.
-func newLogOptions(apiOpts *api.PodLogOptions, now time.Time) *logOptions {
+// newLogOptions convert the v1.PodLogOptions to internal logOptions.
+func newLogOptions(apiOpts *v1.PodLogOptions, now time.Time) *logOptions {
 	opts := &logOptions{
 		tail:      -1, // -1 by default which means read all logs.
 		bytes:     -1, // -1 by default which means read all logs.
@@ -109,14 +109,14 @@ func newLogOptions(apiOpts *api.PodLogOptions, now time.Time) *logOptions {
 }
 
 // ReadLogs read the container log and redirect into stdout and stderr.
-func ReadLogs(path string, apiOpts *api.PodLogOptions, stdout, stderr io.Writer) error {
+func ReadLogs(path string, apiOpts *v1.PodLogOptions, stdout, stderr io.Writer) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
 	}
 	defer f.Close()
 
-	// Convert api.PodLogOptions into internal log options.
+	// Convert v1.PodLogOptions into internal log options.
 	opts := newLogOptions(apiOpts, time.Now())
 
 	// Search start point based on tail line.

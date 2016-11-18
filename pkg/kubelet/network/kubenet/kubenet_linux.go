@@ -27,13 +27,14 @@ import (
 	"syscall"
 	"time"
 
+	"io/ioutil"
+
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netlink/nl"
-	"io/ioutil"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -337,7 +338,7 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 // setup sets up networking through CNI using the given ns/name and sandbox ID.
 // TODO: Don't pass the pod to this method, it only needs it for bandwidth
 // shaping and hostport management.
-func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, pod *api.Pod) error {
+func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, pod *v1.Pod) error {
 	// Bring up container loopback interface
 	if _, err := plugin.addContainerToNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
 		return err

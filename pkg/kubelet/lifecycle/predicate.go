@@ -20,13 +20,13 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-type getNodeAnyWayFuncType func() (*api.Node, error)
+type getNodeAnyWayFuncType func() (*v1.Node, error)
 type predicateAdmitHandler struct {
 	getNodeAnyWayFunc getNodeAnyWayFuncType
 }
