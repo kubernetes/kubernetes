@@ -141,10 +141,10 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 	})
 })
 
-// Verifies that namespaces are deleted from underlying clusters when orphan dependents is false
-// and they are not deleted when orphan dependents is true.
-func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface,
-	clusters map[string]*cluster, orphanDependents *bool) {
+// verifyNsCascadingDeletion verifies that namespaces are deleted from
+// underlying clusters when orphan dependents is false and they are not
+// deleted when orphan dependents is true.
+func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface, clusters map[string]*cluster, orphanDependents *bool) {
 	nsName := createNamespace(nsClient)
 	// Check subclusters if the namespace was created there.
 	By(fmt.Sprintf("Waiting for namespace %s to be created in all underlying clusters", nsName))
@@ -167,11 +167,13 @@ func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface,
 
 	By(fmt.Sprintf("Verifying namespaces %s in underlying clusters", nsName))
 	errMessages := []string{}
+	// namespace should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
 		_, err := clusterClientset.Core().Namespaces().Get(nsName)
-		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
+		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for namespace %s in cluster %s, expected namespace to exist", nsName, clusterName))
-		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
+		} else if !shouldExist && !errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for namespace %s in cluster %s, got error: %v", nsName, clusterName, err))
 		}
 	}

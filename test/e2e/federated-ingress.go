@@ -197,12 +197,9 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 // Deletes all Ingresses in the given namespace name.
 func deleteAllIngressesOrFail(clientset *fedclientset.Clientset, nsName string) {
-	IngressList, err := clientset.Extensions().Ingresses(nsName).List(v1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
 	orphanDependents := false
-	for _, Ingress := range IngressList.Items {
-		deleteIngressOrFail(clientset, nsName, Ingress.Name, &orphanDependents)
-	}
+	err := clientset.Extensions().Ingresses(nsName).DeleteCollection(&v1.DeleteOptions{OrphanDependents: &orphanDependents}, v1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error in deleting ingresses in namespace: %s", nsName))
 }
 
 /*
@@ -212,38 +209,28 @@ func equivalentIngress(federatedIngress, clusterIngress v1beta1.Ingress) bool {
 	return reflect.DeepEqual(clusterIngress.Spec, federatedIngress.Spec)
 }
 
-// Verifies that ingresses are deleted from underlying clusters when orphan dependents is false
-// and they are not deleted when orphan dependents is true.
-func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset,
-	clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+// verifyCascadingDeletionForIngress verifies that ingresses are deleted from
+// underlying clusters when orphan dependents is false and they are not deleted
+// when orphan dependents is true.
+func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
 	ingress := createIngressOrFail(clientset, nsName)
 	ingressName := ingress.Name
 	// Check subclusters if the ingress was created there.
 	By(fmt.Sprintf("Waiting for ingress %s to be created in all underlying clusters", ingressName))
-	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
-		for _, cluster := range clusters {
-			_, err := cluster.Extensions().Ingresses(nsName).Get(ingressName)
-			if err != nil {
-				if !errors.IsNotFound(err) {
-					return false, err
-				}
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	framework.ExpectNoError(err, "Not all ingresses created")
+	waitForIngressShardsOrFail(nsName, ingress, clusters)
 
 	By(fmt.Sprintf("Deleting ingress %s", ingressName))
 	deleteIngressOrFail(clientset, nsName, ingressName, orphanDependents)
 
 	By(fmt.Sprintf("Verifying ingresses %s in underlying clusters", ingressName))
 	errMessages := []string{}
+	// ingress should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
 		_, err := clusterClientset.Extensions().Ingresses(nsName).Get(ingressName)
-		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
+		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for ingress %s in cluster %s, expected ingress to exist", ingressName, clusterName))
-		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
+		} else if !shouldExist && !errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for ingress %s in cluster %s, got error: %v", ingressName, clusterName, err))
 		}
 	}
@@ -338,7 +325,7 @@ func deleteIngressOrFail(clientset *fedclientset.Clientset, namespace string, in
 	err := clientset.Ingresses(namespace).Delete(ingressName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
 	// Wait for the ingress to be deleted.
-	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	err = wait.Poll(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
 		_, err := clientset.Extensions().Ingresses(namespace).Get(ingressName)
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil

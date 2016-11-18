@@ -116,7 +116,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			nsName := f.FederationNamespace.Name
 			orphanDependents := false
 			verifyCascadingDeletionForReplicaSet(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
-			By(fmt.Sprintf("Verified that replicaSets were deleted from underlying clusters"))
+			By(fmt.Sprintf("Verified that replica sets were deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
@@ -124,19 +124,19 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			nsName := f.FederationNamespace.Name
 			orphanDependents := true
 			verifyCascadingDeletionForReplicaSet(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
-			By(fmt.Sprintf("Verified that replicaSets were not deleted from underlying clusters"))
+			By(fmt.Sprintf("Verified that replica sets were not deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
 			framework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			verifyCascadingDeletionForReplicaSet(f.FederationClientset_1_5, clusters, nil, nsName)
-			By(fmt.Sprintf("Verified that replicaSets were not deleted from underlying clusters"))
+			By(fmt.Sprintf("Verified that replica sets were not deleted from underlying clusters"))
 		})
 	})
 })
 
-// Deletes all replicasets in the given namespace name.
+// deleteAllReplicaSetsOrFail deletes all replicasets in the given namespace name.
 func deleteAllReplicaSetsOrFail(clientset *fedclientset.Clientset, nsName string) {
 	replicasetList, err := clientset.Extensions().ReplicaSets(nsName).List(v1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
@@ -146,39 +146,39 @@ func deleteAllReplicaSetsOrFail(clientset *fedclientset.Clientset, nsName string
 	}
 }
 
-// Verifies that replicaSets are deleted from underlying clusters when orphan dependents is false
-// and they are not deleted when orphan dependents is true.
-func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset,
-	clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+// verifyCascadingDeletionForReplicaSet verifies that replicaSets are deleted
+// from underlying clusters when orphan dependents is false and they are not
+// deleted when orphan dependents is true.
+func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
 	replicaSet := createReplicaSetOrFail(clientset, nsName)
 	replicaSetName := replicaSet.Name
 	// Check subclusters if the replicaSet was created there.
-	By(fmt.Sprintf("Waiting for replicaSet %s to be created in all underlying clusters", replicaSetName))
+	By(fmt.Sprintf("Waiting for replica sets %s to be created in all underlying clusters", replicaSetName))
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
 			_, err := cluster.Extensions().ReplicaSets(nsName).Get(replicaSetName)
-			if err != nil {
-				if !errors.IsNotFound(err) {
-					return false, err
-				}
+			if err != nil && errors.IsNotFound(err) {
 				return false, nil
+			}
+			if err != nil {
+				return false, err
 			}
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err, "Not all replicaSets created")
+	framework.ExpectNoError(err, "Not all replica sets created")
 
-	By(fmt.Sprintf("Deleting replicaSet %s", replicaSetName))
+	By(fmt.Sprintf("Deleting replica set %s", replicaSetName))
 	deleteReplicaSetOrFail(clientset, nsName, replicaSetName, orphanDependents)
 
-	By(fmt.Sprintf("Verifying replicaSets %s in underlying clusters", replicaSetName))
+	By(fmt.Sprintf("Verifying replica sets %s in underlying clusters", replicaSetName))
 	errMessages := []string{}
 	for clusterName, clusterClientset := range clusters {
 		_, err := clusterClientset.Extensions().ReplicaSets(nsName).Get(replicaSetName)
 		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
-			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for replicaSet %s in cluster %s, expected replicaSet to exist", replicaSetName, clusterName))
+			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for replica set %s in cluster %s, expected replica set to exist", replicaSetName, clusterName))
 		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
-			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for replicaSet %s in cluster %s, got error: %v", replicaSetName, clusterName, err))
+			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for replica set %s in cluster %s, got error: %v", replicaSetName, clusterName, err))
 		}
 	}
 	if len(errMessages) != 0 {
@@ -188,7 +188,7 @@ func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset,
 
 func waitForReplicaSetOrFail(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters map[string]*cluster) {
 	err := waitForReplicaSet(c, namespace, replicaSetName, clusters)
-	framework.ExpectNoError(err, "Failed to verify replicaset %q/%q, err: %v", namespace, replicaSetName, err)
+	framework.ExpectNoError(err, "Failed to verify replica set %q/%q, err: %v", namespace, replicaSetName, err)
 }
 
 func waitForReplicaSet(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters map[string]*cluster) error {
@@ -245,9 +245,9 @@ func createReplicaSetOrFail(clientset *fedclientset.Clientset, namespace string)
 }
 
 func deleteReplicaSetOrFail(clientset *fedclientset.Clientset, nsName string, replicaSetName string, orphanDependents *bool) {
-	By(fmt.Sprintf("Deleting replicaSet %q in namespace %q", replicaSetName, nsName))
+	By(fmt.Sprintf("Deleting replica set %q in namespace %q", replicaSetName, nsName))
 	err := clientset.Extensions().ReplicaSets(nsName).Delete(replicaSetName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting replicaSet %q in namespace %q", replicaSetName, nsName)
+	framework.ExpectNoError(err, "Error deleting replica set %q in namespace %q", replicaSetName, nsName)
 
 	// Wait for the replicaSet to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
@@ -258,7 +258,7 @@ func deleteReplicaSetOrFail(clientset *fedclientset.Clientset, nsName string, re
 		return false, err
 	})
 	if err != nil {
-		framework.Failf("Error in deleting replicaSet %s: %v", replicaSetName, err)
+		framework.Failf("Error in deleting replica set %s: %v", replicaSetName, err)
 	}
 }
 

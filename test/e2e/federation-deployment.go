@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 	})
 })
 
-// Deletes all deployments in the given namespace name.
+// deleteAllDeploymentsOrFail deletes all deployments in the given namespace name.
 func deleteAllDeploymentsOrFail(clientset *fedclientset.Clientset, nsName string) {
 	deploymentList, err := clientset.Extensions().Deployments(nsName).List(v1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
@@ -146,10 +146,10 @@ func deleteAllDeploymentsOrFail(clientset *fedclientset.Clientset, nsName string
 	}
 }
 
-// Verifies that deployments are deleted from underlying clusters when orphan dependents is false
-// and they are not deleted when orphan dependents is true.
-func verifyCascadingDeletionForDeployment(clientset *fedclientset.Clientset,
-	clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+// verifyCascadingDeletionForDeployment verifies that deployments are deleted
+// from underlying clusters when orphan dependents is false and they are not
+// deleted when orphan dependents is true.
+func verifyCascadingDeletionForDeployment(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
 	deployment := createDeploymentOrFail(clientset, nsName)
 	deploymentName := deployment.Name
 	// Check subclusters if the deployment was created there.
@@ -157,11 +157,11 @@ func verifyCascadingDeletionForDeployment(clientset *fedclientset.Clientset,
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
 			_, err := cluster.Extensions().Deployments(nsName).Get(deploymentName)
-			if err != nil {
-				if !errors.IsNotFound(err) {
-					return false, err
-				}
+			if err != nil && errors.IsNotFound(err) {
 				return false, nil
+			}
+			if err != nil {
+				return false, err
 			}
 		}
 		return true, nil
@@ -173,11 +173,13 @@ func verifyCascadingDeletionForDeployment(clientset *fedclientset.Clientset,
 
 	By(fmt.Sprintf("Verifying deployments %s in underlying clusters", deploymentName))
 	errMessages := []string{}
+	// deployment should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
 		_, err := clusterClientset.Extensions().Deployments(nsName).Get(deploymentName)
-		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
+		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for deployment %s in cluster %s, expected deployment to exist", deploymentName, clusterName))
-		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
+		} else if shouldExist && !errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for deployment %s in cluster %s, got error: %v", deploymentName, clusterName, err))
 		}
 	}

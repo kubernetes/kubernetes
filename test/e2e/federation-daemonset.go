@@ -100,7 +100,7 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 	})
 })
 
-// Deletes all DaemonSets in the given namespace name.
+// deleteAllDaemonSetsOrFail deletes all DaemonSets in the given namespace name.
 func deleteAllDaemonSetsOrFail(clientset *fedclientset.Clientset, nsName string) {
 	DaemonSetList, err := clientset.Extensions().DaemonSets(nsName).List(v1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
@@ -110,10 +110,10 @@ func deleteAllDaemonSetsOrFail(clientset *fedclientset.Clientset, nsName string)
 	}
 }
 
-// Verifies that daemonsets are deleted from underlying clusters when orphan dependents is false
-// and they are not deleted when orphan dependents is true.
-func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset,
-	clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+// verifyCascadingDeletionForDS verifies that daemonsets are deleted from
+// underlying clusters when orphan dependents is false and they are not
+// deleted when orphan dependents is true.
+func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
 	daemonset := createDaemonSetOrFail(clientset, nsName)
 	daemonsetName := daemonset.Name
 	// Check subclusters if the daemonset was created there.
@@ -121,11 +121,11 @@ func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset,
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
 			_, err := cluster.Extensions().DaemonSets(nsName).Get(daemonsetName)
-			if err != nil {
-				if !errors.IsNotFound(err) {
-					return false, err
-				}
+			if err != nil && errors.IsNotFound(err) {
 				return false, nil
+			}
+			if err != nil {
+				return false, err
 			}
 		}
 		return true, nil
@@ -137,12 +137,13 @@ func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset,
 
 	By(fmt.Sprintf("Verifying daemonsets %s in underlying clusters", daemonsetName))
 	errMessages := []string{}
+	// daemon set should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
 		_, err := clusterClientset.Extensions().DaemonSets(nsName).Get(daemonsetName)
-
-		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
+		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for daemonset %s in cluster %s, expected daemonset to exist", daemonsetName, clusterName))
-		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
+		} else if !shouldExist && !errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for daemonset %s in cluster %s, got error: %v", daemonsetName, clusterName, err))
 		}
 	}
@@ -202,6 +203,7 @@ func deleteDaemonSetOrFail(clientset *fedclientset.Clientset, nsName string, dae
 		framework.Failf("Error in deleting daemonset %s: %v", daemonsetName, err)
 	}
 }
+
 func updateDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) *v1beta1.DaemonSet {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to updateDaemonSetOrFail: clientset: %v, namespace: %v", clientset, namespace))

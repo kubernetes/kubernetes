@@ -97,7 +97,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 	})
 })
 
-// Deletes all Secrets in the given namespace name.
+// deleteAllSecretsOrFail deletes all secrets in the given namespace name.
 func deleteAllSecretsOrFail(clientset *fedclientset.Clientset, nsName string) {
 	SecretList, err := clientset.Core().Secrets(nsName).List(v1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
@@ -107,10 +107,10 @@ func deleteAllSecretsOrFail(clientset *fedclientset.Clientset, nsName string) {
 	}
 }
 
-// Verifies that secrets are deleted from underlying clusters when orphan dependents is false
-// and they are not deleted when orphan dependents is true.
-func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset,
-	clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+// verifyCascadingDeletionForSecret verifies that secrets are deleted from
+// underlying clusters when orphan dependents is false and they are not
+// deleted when orphan dependents is true.
+func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
 	secret := createSecretOrFail(clientset, nsName)
 	secretName := secret.Name
 	// Check subclusters if the secret was created there.
@@ -134,11 +134,13 @@ func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset,
 
 	By(fmt.Sprintf("Verifying secrets %s in underlying clusters", secretName))
 	errMessages := []string{}
+	// secret should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
 		_, err := clusterClientset.Core().Secrets(nsName).Get(secretName)
-		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
+		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for secret %s in cluster %s, expected secret to exist", secretName, clusterName))
-		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
+		} else if !shouldExist && !errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for secret %s in cluster %s, got error: %v", secretName, clusterName, err))
 		}
 	}
