@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 
 	dockercontainer "github.com/docker/engine-api/types/container"

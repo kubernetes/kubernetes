@@ -72,11 +72,11 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 		},
 		Spec: extensions.DeploymentSpec{
 			Strategy: extensions.DeploymentStrategy{
-				Type:          extensions.RollingUpdateDeploymentStrategyType,
+				Type: extensions.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &extensions.RollingUpdateDeployment{
-    MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
-    MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
-},
+					MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
+					MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
+				},
 			},
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: &unversioned.LabelSelector{MatchLabels: selector},

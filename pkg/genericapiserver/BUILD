@@ -34,6 +34,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apiserver:go_default_library",

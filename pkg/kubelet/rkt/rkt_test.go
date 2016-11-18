@@ -1245,7 +1245,7 @@ func TestGenerateRunCommand(t *testing.T) {
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
-						HostNetwork: true,
+					HostNetwork: true,
 
 					Containers: []v1.Container{{Name: "container-foo"}},
 				},
@@ -1266,7 +1266,7 @@ func TestGenerateRunCommand(t *testing.T) {
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
-						HostNetwork: false,
+					HostNetwork: false,
 
 					Containers: []v1.Container{{Name: "container-foo"}},
 				},
@@ -1287,7 +1287,7 @@ func TestGenerateRunCommand(t *testing.T) {
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
-						HostNetwork: true,
+					HostNetwork: true,
 
 					Containers: []v1.Container{{Name: "container-foo"}},
 				},

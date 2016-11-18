@@ -64,6 +64,7 @@ pkg/api/meta
 pkg/api/resource
 pkg/api/service
 pkg/api/v1
+pkg/api/v1/service
 pkg/apimachinery
 pkg/apis/abac/v0
 pkg/apis/apps/install
@@ -88,6 +89,7 @@ pkg/apiserver/audit
 pkg/apiserver/openapi
 pkg/auth/authenticator
 pkg/auth/authorizer/union
+pkg/client/conditions
 pkg/client/listers/apps/internalversion
 pkg/client/listers/apps/v1alpha1
 pkg/client/listers/apps/v1beta1

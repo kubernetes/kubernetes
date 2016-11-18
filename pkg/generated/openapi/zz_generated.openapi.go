@@ -9633,6 +9633,31 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"v1.NodeResources": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeResources is an object for conveying resource information about a node. see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.",
+				Properties: map[string]spec.Schema{
+					"Capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Capacity represents the available resources of a node",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"Capacity"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
 	"v1.NodeSelector": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12841,6 +12866,28 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.LoadBalancerStatus"},
 	},
+	"v1.Sysctl": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"Name": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"Value": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"Name", "Value"},
+			},
+		},
+		Dependencies: []string{},
+	},
 	"v1.TCPSocketAction": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13244,6 +13291,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.PodAffinityTerm"},
 	},
+	"v1.simpleNameGenerator": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "simpleNameGenerator generates random names.",
+				Properties:  map[string]spec.Schema{},
+			},
+		},
+		Dependencies: []string{},
+	},
 	"v1alpha1.CertificateSigningRequest": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13479,6 +13535,23 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1alpha1.RoleRef", "v1alpha1.Subject"},
+	},
+	"v1alpha1.ClusterRoleBindingBuilder": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types. We use it to construct bindings in code.  It's more compact than trying to write them out in a literal.",
+				Properties: map[string]spec.Schema{
+					"ClusterRoleBinding": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1alpha1.ClusterRoleBinding"),
+						},
+					},
+				},
+				Required: []string{"ClusterRoleBinding"},
+			},
+		},
+		Dependencies: []string{
+			"v1alpha1.ClusterRoleBinding"},
 	},
 	"v1alpha1.ClusterRoleBindingList": {
 		Schema: spec.Schema{
@@ -15002,6 +15075,23 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"runtime.RawExtension"},
+	},
+	"v1alpha1.PolicyRuleBuilder": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PolicyRuleBuilder let's us attach methods.  A no-no for API types. We use it to construct rules in code.  It's more compact than trying to write them out in a literal and allows us to perform some basic checking during construction",
+				Properties: map[string]spec.Schema{
+					"PolicyRule": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1alpha1.PolicyRule"),
+						},
+					},
+				},
+				Required: []string{"PolicyRule"},
+			},
+		},
+		Dependencies: []string{
+			"v1alpha1.PolicyRule"},
 	},
 	"v1alpha1.Role": {
 		Schema: spec.Schema{

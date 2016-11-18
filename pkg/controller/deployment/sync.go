@@ -24,13 +24,13 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/labels"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
@@ -131,10 +131,10 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(deployment *ext
 func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extensions.Deployment) ([]*extensions.ReplicaSet, *v1.PodList, error) {
 	rsList, err := deploymentutil.ListReplicaSets(deployment,
 		func(namespace string, options v1.ListOptions) ([]*extensions.ReplicaSet, error) {
-parsed, err := labels.Parse(options.LabelSelector)
-if err != nil {
-    return nil, err
-}
+			parsed, err := labels.Parse(options.LabelSelector)
+			if err != nil {
+				return nil, err
+			}
 			return dc.rsLister.ReplicaSets(namespace).List(parsed)
 		})
 	if err != nil {
@@ -208,10 +208,10 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
 	}
 	options := v1.ListOptions{LabelSelector: selector.String()}
-parsed, err := labels.Parse(options.LabelSelector)
-if err != nil {
-    return nil, err
-}
+	parsed, err := labels.Parse(options.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
 	pods, err := dc.podLister.Pods(namespace).List(parsed)
 	if err != nil {
 		return nil, fmt.Errorf("error in getting pod list for namespace %s and list options %+v: %s", namespace, options, err)
@@ -266,10 +266,10 @@ if err != nil {
 func (dc *DeploymentController) listPods(deployment *extensions.Deployment) (*v1.PodList, error) {
 	return deploymentutil.ListPods(deployment,
 		func(namespace string, options v1.ListOptions) (*v1.PodList, error) {
-parsed, err := labels.Parse(options.LabelSelector)
-if err != nil {
-    return nil, err
-}
+			parsed, err := labels.Parse(options.LabelSelector)
+			if err != nil {
+				return nil, err
+			}
 			pods, err := dc.podLister.Pods(namespace).List(parsed)
 			result := v1.PodList{Items: make([]v1.Pod, 0, len(pods))}
 			for i := range pods {
@@ -353,7 +353,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 			Namespace: namespace,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: func(i int32) *int32 { return &i }(0),
+			Replicas:        func(i int32) *int32 { return &i }(0),
 			MinReadySeconds: deployment.Spec.MinReadySeconds,
 			Selector:        newRSSelector,
 			Template:        newRSTemplate,

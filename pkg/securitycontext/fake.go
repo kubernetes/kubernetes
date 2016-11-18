@@ -18,7 +18,7 @@ package securitycontext
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
 )

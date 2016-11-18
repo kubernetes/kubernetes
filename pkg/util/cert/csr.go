@@ -44,7 +44,7 @@ func ParseCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateReq
 	return csr, nil
 }
 
-// ParseCSR extracts the CSR from the API object and decodes it.
+// ParseCSRV1alpha1 extracts the CSR from the API object and decodes it.
 func ParseCSRV1alpha1(obj *v1alpha1.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	// extract PEM from request object
 	pemBytes := obj.Spec.Request
