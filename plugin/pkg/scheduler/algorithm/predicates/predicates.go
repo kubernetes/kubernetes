@@ -109,7 +109,7 @@ type predicateMetadata struct {
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 	// fast path if there is no conflict checking targets.
-	if volume.GCEPersistentDisk == nil && volume.AWSElasticBlockStore == nil && volume.RBD == nil {
+	if volume.GCEPersistentDisk == nil && volume.AWSElasticBlockStore == nil && volume.RBD == nil && volume.ISCSI == nil {
 		return false
 	}
 
@@ -124,6 +124,12 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 
 		if volume.AWSElasticBlockStore != nil && existingVolume.AWSElasticBlockStore != nil {
 			if volume.AWSElasticBlockStore.VolumeID == existingVolume.AWSElasticBlockStore.VolumeID {
+				return true
+			}
+		}
+
+		if volume.ISCSI != nil && existingVolume.ISCSI != nil {
+			if volume.ISCSI.IQN == existingVolume.ISCSI.IQN {
 				return true
 			}
 		}
@@ -150,6 +156,7 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // - GCE PD allows multiple mounts as long as they're all read-only
 // - AWS EBS forbids any two pods mounting the same volume ID
 // - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image.
+// - ISCSI forbids if any two pods share at least same IQN
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	for _, v := range pod.Spec.Volumes {
