@@ -96,6 +96,11 @@ func WithAudit(handler http.Handler, attributeGetter RequestAttributeGetter, out
 			internalError(w, req, err)
 			return
 		}
+
+		groups := "<none>"
+		if userGroups := attribs.GetUser().GetGroups(); len(userGroups) > 0 {
+			groups = auditStringSlice(userGroups)
+		}
 		asuser := req.Header.Get(authenticationapi.ImpersonateUserHeader)
 		if len(asuser) == 0 {
 			asuser = "<self>"
@@ -103,11 +108,7 @@ func WithAudit(handler http.Handler, attributeGetter RequestAttributeGetter, out
 		asgroups := "<lookup>"
 		requestedGroups := req.Header[authenticationapi.ImpersonateGroupHeader]
 		if len(requestedGroups) > 0 {
-			quotedGroups := make([]string, len(requestedGroups))
-			for i, group := range requestedGroups {
-				quotedGroups[i] = fmt.Sprintf("%q", group)
-			}
-			asgroups = strings.Join(quotedGroups, ", ")
+			asgroups = auditStringSlice(requestedGroups)
 		}
 		namespace := attribs.GetNamespace()
 		if len(namespace) == 0 {
@@ -115,14 +116,26 @@ func WithAudit(handler http.Handler, attributeGetter RequestAttributeGetter, out
 		}
 		id := uuid.NewRandom().String()
 
-		line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q as=%q asgroups=%q namespace=%q uri=%q\n",
-			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, attribs.GetUser().GetName(), asuser, asgroups, namespace, req.URL)
+		line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q groups=%q as=%q asgroups=%q namespace=%q uri=%q\n",
+			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, attribs.GetUser().GetName(), groups, asuser, asgroups, namespace, req.URL)
 		if _, err := fmt.Fprint(out, line); err != nil {
 			glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
 		}
 		respWriter := decorateResponseWriter(w, out, id)
 		handler.ServeHTTP(respWriter, req)
 	})
+}
+
+func auditStringSlice(inList []string) string {
+	if len(inList) == 0 {
+		return ""
+	}
+
+	quotedElements := make([]string, len(inList))
+	for i, in := range inList {
+		quotedElements[i] = fmt.Sprintf("%q", in)
+	}
+	return strings.Join(quotedElements, ",")
 }
 
 func decorateResponseWriter(responseWriter http.ResponseWriter, out io.Writer, id string) http.ResponseWriter {
