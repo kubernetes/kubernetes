@@ -22,11 +22,12 @@ import (
 	"sync"
 	"time"
 
+	"errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -34,10 +35,10 @@ import (
 
 // ConnectionDetails represents a master API endpoint connection
 type ConnectionDetails struct {
-	CertClient *certclient.CertificatesClient
-	Endpoint   string
-	CACert     []byte
-	NodeName   types.NodeName
+	ClientSet *clientset.Clientset
+	Endpoint  string
+	CACert    []byte
+	NodeName  types.NodeName
 }
 
 // retryTimeout between the subsequent attempts to connect
@@ -82,10 +83,10 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 				// connection established, stop all wait threads
 				close(stopChan)
 				result <- &ConnectionDetails{
-					CertClient: clientSet.CertificatesClient,
-					Endpoint:   apiEndpoint,
-					CACert:     caCert,
-					NodeName:   nodeName,
+					ClientSet: clientSet,
+					Endpoint:  apiEndpoint,
+					CACert:    caCert,
+					NodeName:  nodeName,
 				}
 			}, retryTimeout*time.Second, stopChan)
 		}(endpoint)
@@ -103,6 +104,23 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 			"for any of the provided API endpoints")
 	}
 	return establishedConnection, nil
+}
+
+// check to see if there are other nodes in the cluster with identical node names.
+func CheckForNodeNameDuplicates(connection *ConnectionDetails) error {
+	hostName, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("<node/bootstrap> failed to get node hostname [%v]", err)
+	}
+	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33641
+	nodeName := types.NodeName(hostName)
+	nodeList, err := connection.ClientSet.Nodes().List(api.ListOptions{})
+	for _, node := range nodeList.Items {
+		if nodeName == types.NodeName(node.Name) {
+			return errors.New("Node with name: [" + node.Name + "] already exisit")
+		}
+	}
+	return nil
 }
 
 // creates a set of clients for this endpoint

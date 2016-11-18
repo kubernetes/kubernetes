@@ -28,7 +28,7 @@ import (
 // PerformTLSBootstrap executes a certificate signing request with the
 // provided connection details.
 func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, error) {
-	csrClient := connection.CertClient.CertificateSigningRequests()
+	csrClient := connection.ClientSet.CertificatesClient.CertificateSigningRequests()
 
 	fmt.Println("<node/csr> created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
