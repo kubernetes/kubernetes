@@ -427,8 +427,12 @@ func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTy
 	return cmdutil.NewShortcutExpander(mapper, nil), typer, nil
 }
 
-func (f *fakeAPIFactory) Decoder(bool) runtime.Decoder {
-	return testapi.Default.Codec()
+func (f *fakeAPIFactory) Decoder(toInternal bool) runtime.Decoder {
+	if toInternal {
+		return api.Codecs.UniversalDecoder()
+	} else {
+		return api.Codecs.UniversalDeserializer()
+	}
 }
 
 func (f *fakeAPIFactory) JSONEncoder() runtime.Encoder {
