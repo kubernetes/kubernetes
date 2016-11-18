@@ -219,8 +219,7 @@ func DefaultOpenAPIConfig(definitions *openapicommon.OpenAPIDefinitions) *openap
 		IgnorePrefixes: []string{"/swaggerapi"},
 		Info: &spec.Info{
 			InfoProps: spec.InfoProps{
-				Title:   "Generic API Server",
-				Version: "unversioned",
+				Title: "Generic API Server",
 			},
 		},
 		DefaultResponse: &spec.Response{
@@ -547,6 +546,19 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
+
+	if s.openAPIConfig != nil {
+		if s.openAPIConfig.Info == nil {
+			s.openAPIConfig.Info = &spec.Info{}
+		}
+		if s.openAPIConfig.Info.Version == "" {
+			if c.Version != nil {
+				s.openAPIConfig.Info.Version = strings.Split(c.Version.String(), "-")[0]
+			} else {
+				s.openAPIConfig.Info.Version = "unversioned"
+			}
+		}
+	}
 
 	s.installAPI(c.Config)
 
