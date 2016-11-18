@@ -21,12 +21,14 @@ ENV GOARM 6
 ENV KUBE_DYNAMIC_CROSSPLATFORMS \
   armel \
   arm64 \
+  s390x \
   ppc64el
 
 ENV KUBE_CROSSPLATFORMS \
   linux/386 \
   linux/arm linux/arm64 \
   linux/ppc64le \
+  linux/s390x \
   darwin/amd64 darwin/386 \
   windows/amd64 windows/386
 
@@ -50,10 +52,9 @@ RUN mkdir -p /usr/local/src/protobuf \
   && protoc --version
 
 # Use dynamic cgo linking for architectures other than amd64 for the server platforms
-# More info here: https://wiki.debian.org/CrossToolchains
-RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
-  && curl -s http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
-  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do dpkg --add-architecture ${platform}; done \
+# To install crossbuild essential for other architectures add the following repository.
+RUN echo "deb http://archive.ubuntu.com/ubuntu xenial main universe" > /etc/apt/sources.list.d/cgocrosscompiling.list \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
   && apt-get update \
   && apt-get install -y build-essential \
   && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
