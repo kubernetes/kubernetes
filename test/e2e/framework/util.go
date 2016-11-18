@@ -2456,6 +2456,15 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		// won't install correctly), so we can't expect them to be ready at any point.
 		//
 		// However, we only allow non-ready nodes with some specific reasons.
+		if len(notSchedulable) > 0 {
+			Logf("Unschedulable nodes:")
+			for i := range notSchedulable {
+				Logf("-> %s Ready=%t Network=%t",
+					notSchedulable[i].Name,
+					IsNodeConditionSetAsExpected(notSchedulable[i], api.NodeReady, true),
+					IsNodeConditionSetAsExpected(notSchedulable[i], api.NodeNetworkUnavailable, false))
+			}
+		}
 		if len(notSchedulable) > TestContext.AllowedNotReadyNodes {
 			return false, nil
 		}
