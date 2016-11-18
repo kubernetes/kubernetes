@@ -402,7 +402,7 @@ func (e *EndpointController) syncService(key string) error {
 				glog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
-			if pod.DeletionTimestamp != nil {
+			if !tolerateUnreadyEndpoints && pod.DeletionTimestamp != nil {
 				glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
