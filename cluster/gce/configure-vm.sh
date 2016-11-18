@@ -142,6 +142,23 @@ for k,v in yaml.load(sys.stdin).iteritems():
   ' < """${kube_env_yaml}""")"
 }
 
+function set-kube-master-certs() {
+  local kube_master_certs_yaml="${INSTALL_DIR}/kube_master_certs.yaml"
+
+  until curl-metadata kube-master-certs > "${kube_master_certs_yaml}"; do
+    echo 'Waiting for kube-master-certs...'
+    sleep 3
+  done
+
+  eval "$(python -c '
+import pipes,sys,yaml
+
+for k,v in yaml.load(sys.stdin).iteritems():
+  print("""readonly {var}={value}""".format(var = k, value = pipes.quote(str(v))))
+  print("""export {var}""".format(var = k))
+  ' < """${kube_master_certs_yaml}""")"
+}
+
 function remove-docker-artifacts() {
   echo "== Deleting docker0 =="
   apt-get-install bridge-utils
@@ -615,6 +632,11 @@ EOF
 scheduling_algorithm_provider: '$(echo "${SCHEDULING_ALGORITHM_PROVIDER}" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubelet_auth_ca_cert: /var/lib/kubelet/kubelet_auth_ca.crt
+EOF
+    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes
@@ -657,6 +679,13 @@ function create-salt-master-auth() {
         # fetching clients certs from the master VM.
         echo "${KUBECFG_CERT:-}" | base64 --decode > /srv/kubernetes/kubecfg.crt;
         echo "${KUBECFG_KEY:-}" | base64 --decode > /srv/kubernetes/kubecfg.key)
+    fi
+  fi
+  if [ ! -e /srv/kubernetes/kubeapiserver.cert ]; then
+    if [[ ! -z "${KUBEAPISERVER_CERT:-}" ]] && [[ ! -z "${KUBEAPISERVER_KEY:-}" ]]; then
+      (umask 077;
+        echo "${KUBEAPISERVER_CERT}" | base64 --decode > /srv/kubernetes/kubeapiserver.cert;
+        echo "${KUBEAPISERVER_KEY}" | base64 --decode > /srv/kubernetes/kubeapiserver.key)
     fi
   fi
   if [ ! -e "${BASIC_AUTH_FILE}" ]; then
@@ -725,6 +754,11 @@ contexts:
 current-context: service-account-context
 EOF
 )
+  fi
+  local -r kubelet_auth_ca_file="/srv/salt-overlay/salt/kubelet/kubelet_auth_ca.crt"
+  if [ ! -e "${kubelet_auth_ca_file}" ] && [[ ! -z "${KUBELET_AUTH_CA_CERT:-}" ]]; then
+    (umask 077;
+      echo "${KUBELET_AUTH_CA_CERT}" | base64 --decode > "${kubelet_auth_ca_file}")
   fi
 }
 
@@ -1099,6 +1133,7 @@ if [[ -z "${is_push}" ]]; then
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
+    set-kube-master-certs
     create-salt-master-auth
     create-salt-master-etcd-auth
     create-salt-master-kubelet-auth
