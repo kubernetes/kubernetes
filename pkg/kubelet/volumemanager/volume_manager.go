@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -138,6 +139,9 @@ type VolumeManager interface {
 	// Marks the specified volume as having successfully been reported as "in
 	// use" in the nodes's volume status.
 	MarkVolumesAsReportedInUse(volumesReportedAsInUse []api.UniqueVolumeName)
+
+	// Volume Manager can act as a volume garbage collector for the eviction manager.
+	eviction.VolumeGC
 }
 
 // NewVolumeManager returns a new concrete instance implementing the
@@ -364,6 +368,12 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *api.Pod) error {
 
 	glog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
 	return nil
+}
+
+func (vm *volumeManager) DeleteUnusedVolumes() (int64, error) {
+	vm.desiredStateOfWorldPopulator.DeleteTerminatedPodVolumes()
+	// TODO: no reasonable way to calculate space freed by this
+	return 0, nil
 }
 
 // verifyVolumesMountedFunc returns a method that returns true when all expected

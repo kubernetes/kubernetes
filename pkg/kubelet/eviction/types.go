@@ -119,6 +119,12 @@ type ImageGC interface {
 	DeleteUnusedImages() (int64, error)
 }
 
+// VolumeGC is responsible for performing garbage collection of unused volumes.
+type VolumeGC interface {
+	// DeleteUnusedVolumes deletes unused volumes and returns the number of bytes freed, or an error.
+	DeleteUnusedVolumes() (int64, error)
+}
+
 // KillPodFunc kills a pod.
 // The pod status is updated, and then it is killed with the specified grace period.
 // This function must block until either the pod is killed or an error is encountered.

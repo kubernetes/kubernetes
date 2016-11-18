@@ -18,6 +18,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
