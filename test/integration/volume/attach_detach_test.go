@@ -137,15 +137,14 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		t.Fatalf("Pod not added to desired state of world")
 	}
 
-	// lets stop pod events from triggered
+	// let's stop pod events from getting triggered
 	close(podStopCh)
-	podInformer.GetStore().Delete(podInformerObj)
-
-	waitToObservePods(t, podInformer, 0)
-
+	err = podInformer.GetStore().Delete(podInformerObj)
 	if err != nil {
 		t.Fatalf("Error deleting pod : %v", err)
 	}
+
+	waitToObservePods(t, podInformer, 0)
 
 	// the populator loop turns every 1 minute
 	time.Sleep(2 * time.Minute)
