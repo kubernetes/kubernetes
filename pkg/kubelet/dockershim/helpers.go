@@ -198,12 +198,12 @@ func makePortsAndBindings(pm []*runtimeApi.PortMapping) (map[dockernat.Port]stru
 // getContainerSecurityOpt gets container security options from container and sandbox config, currently from sandbox
 // annotations.
 // It is an experimental feature and may be promoted to official runtime api in the future.
-func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeApi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeApi.PodSandboxConfig) ([]string, error) {
 	appArmorOpts, err := dockertools.GetAppArmorOpts(sandboxConfig.GetAnnotations(), containerName)
 	if err != nil {
 		return nil, err
 	}
-	seccompOpts, err := dockertools.GetSeccompOpts(sandboxConfig.GetAnnotations(), containerName, seccompProfileRoot)
+	seccompOpts, err := dockertools.GetSeccompOpts(sandboxConfig.GetAnnotations(), containerName, "/")
 	if err != nil {
 		return nil, err
 	}
@@ -216,9 +216,9 @@ func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeApi.Po
 	return opts, nil
 }
 
-func getSandboxSecurityOpts(sandboxConfig *runtimeApi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+func getSandboxSecurityOpts(sandboxConfig *runtimeApi.PodSandboxConfig) ([]string, error) {
 	// sandboxContainerName doesn't exist in the pod, so pod security options will be returned by default.
-	return getContainerSecurityOpts(sandboxContainerName, sandboxConfig, seccompProfileRoot)
+	return getContainerSecurityOpts(sandboxContainerName, sandboxConfig)
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) string {

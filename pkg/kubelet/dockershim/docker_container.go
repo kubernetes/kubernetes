@@ -166,7 +166,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	hc.Resources.Devices = devices
 
 	// Apply appArmor and seccomp options.
-	securityOpts, err := getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
+	securityOpts, err := getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.GetName(), err)
 	}
