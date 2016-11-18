@@ -212,6 +212,64 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			pst.verifyPodAtIndex(updateIndex, ps, verify)
 		})
 
+		It("scaling down before scale up is finished should wait until current pod will be running and ready before it will be removed", func() {
+			By("creating petset " + psName + " in namespace " + ns)
+			testProbe := &api.Probe{Handler: api.Handler{HTTPGet: &api.HTTPGetAction{
+				Path: "/index.html",
+				Port: intstr.IntOrString{IntVal: 80}}}}
+			ps := newStatefulSet(psName, ns, headlessSvcName, 1, nil, nil, labels, testProbe)
+			setInitializedAnnotation(ps, "false")
+			ps, err := c.Apps().StatefulSets(ns).Create(ps)
+			Expect(err).NotTo(HaveOccurred())
+			pst := &statefulSetTester{c: c}
+			pst.waitForRunningAndReady(1, ps)
+
+			By("scaling up stateful set " + psName + " to 3 replicas")
+			pst.setHealthy(ps)
+			pst.updateReplicas(ps, 3)
+			pst.waitForRunningAndReady(2, ps)
+
+			By("before scale up finished setting 2nd pod to be not ready by breaking readiness probe")
+			pst.breakProbe(ps, testProbe)
+			pst.waitForRunningAndNotReady(2, ps)
+
+			By("scaling down to 1 replica and restoring health of 2nd pod")
+			pst.setHealthy(ps)
+			pst.updateReplicas(ps, 1)
+
+			By("verifying that 2nd pod will not be removed if it is not healthy")
+			pst.confirmPetCount(2, ps, 10*time.Second)
+			expectedPodName := strings.Join([]string{ps.Name, "-1"}, "")
+			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName)
+			Expect(err).NotTo(HaveOccurred())
+			watcher, err := f.ClientSet.Core().Pods(ns).Watch(api.SingleObject(
+				api.ObjectMeta{
+					Name:            expectedPod.Name,
+					ResourceVersion: expectedPod.ResourceVersion,
+				},
+			))
+			Expect(err).NotTo(HaveOccurred())
+			pst.restoreProbe(ps, testProbe)
+
+			By("verifying that 2nd pod will enter running and ready before it will be removed by scale down")
+			_, err = watch.Until(statefulsetTimeout, watcher, func(event watch.Event) (bool, error) {
+				pod := event.Object.(*api.Pod)
+				if event.Type == watch.Deleted && pod.Name == expectedPodName {
+					return false, fmt.Errorf("Pod %v was deleted before enter running", pod.Name)
+				}
+				framework.Logf("Observed event %v for pod %v. Phase %v, Pod is ready %v",
+					event.Type, pod.Name, pod.Status.Phase, api.IsPodReady(pod))
+				if pod.Name != expectedPodName {
+					return false, nil
+				}
+				if pod.Status.Phase == api.PodRunning && api.IsPodReady(pod) {
+					return true, nil
+				}
+				return false, nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("Scaling should happen in predictable order and halt if any pet is unhealthy", func() {
 			psLabels := klabels.Set(labels)
 			By("initializing watcher for selector " + psLabels.String())
@@ -235,7 +293,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			By("confirming that stateful set scale up will halt with unhealthy pet")
 			pst.breakProbe(ps, testProbe)
 			pst.waitForRunningAndNotReady(ps.Spec.Replicas, ps)
-			pst.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = 3 })
+			pst.updateReplicas(ps, 3)
 			pst.confirmPetCount(1, ps, 10*time.Second)
 
 			By("scalling up stateful set " + psName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
@@ -265,7 +323,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 
 			pst.breakProbe(ps, testProbe)
 			pst.waitForRunningAndNotReady(3, ps)
-			pst.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = 0 })
+			pst.updateReplicas(ps, 0)
 			pst.confirmPetCount(3, ps, 10*time.Second)
 
 			By("scalling down stateful set " + psName + " to 0 replicas and waiting until none of pods will run " + ns)
@@ -294,11 +352,11 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			pst.scale(ps, 3)
-			pst.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = 5 })
-			pst.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = 2 })
+			pst.updateReplicas(ps, 5)
+			pst.updateReplicas(ps, 2)
 			pst.scale(ps, 4)
 			var previous string
-			lastExpected := fmt.Sprintf("%v-%d", ps.Name, ps.Spec.Replicas)
+			lastExpected := fmt.Sprintf("%v-3", ps.Name)
 			_, err = watch.Until(statefulsetTimeout, watcher, func(event watch.Event) (bool, error) {
 				if event.Type != watch.Added {
 					return false, nil
@@ -818,6 +876,10 @@ func (p *statefulSetTester) scale(ps *apps.StatefulSet, count int32) error {
 		return fmt.Errorf("Failed to scale statefulset to %d in %v. Remaining pods:\n%v", count, statefulsetTimeout, unhealthy)
 	}
 	return nil
+}
+
+func (p *statefulSetTester) updateReplicas(ps *apps.StatefulSet, count int32) {
+	p.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = count })
 }
 
 func (p *statefulSetTester) restart(ps *apps.StatefulSet) {
