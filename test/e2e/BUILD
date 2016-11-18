@@ -210,20 +210,13 @@ go_library(
     ],
 )
 
-go_test(
+# phony go_default_test. Bazel test run interprets these as
+# regular go tests where as they are actually ginkgo tests and
+# chokes on some of the method signatures.
+filegroup(
     name = "go_default_test",
     srcs = [
         "e2e_test.go",
         "metrics_grabber_test.go",
-    ],
-    library = "go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/metrics:go_default_library",
-        "//test/e2e/framework:go_default_library",
-        "//vendor:github.com/onsi/ginkgo",
-        "//vendor:github.com/onsi/gomega",
     ],
 )
