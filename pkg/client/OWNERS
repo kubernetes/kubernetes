@@ -9,10 +9,8 @@ reviewers:
 - lavalamp
 - smarterclayton
 - wojtek-t
-- bgrant0607
 - deads2k
 - yujuhong
-- brendandburns
 - derekwaynecarr
 - caesarxuchao
 - vishh
@@ -20,7 +18,6 @@ reviewers:
 - liggitt
 - nikhiljindal
 - bprashanth
-- ixdy
 - gmarek
 - erictune
 - davidopp
