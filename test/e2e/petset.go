@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -36,8 +37,10 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
+	klabels "k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -88,7 +91,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 		BeforeEach(func() {
 			petMounts = []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts = []api.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ps = newStatefulSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels)
+			ps = newStatefulSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels, nil)
 
 			By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
@@ -149,13 +152,13 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 
 			pst := statefulSetTester{c: c}
 
-			pst.waitForRunning(1, ps)
+			pst.waitForRunningAndReady(1, ps)
 
 			By("Marking pet at index 0 as healthy.")
 			pst.setHealthy(ps)
 
 			By("Waiting for pet at index 1 to enter running.")
-			pst.waitForRunning(2, ps)
+			pst.waitForRunningAndReady(2, ps)
 
 			// Now we have 1 healthy and 1 unhealthy pet. Deleting the healthy pet should *not*
 			// create a new pet till the remaining pet becomes healthy, which won't happen till
@@ -183,7 +186,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 
 			pst := statefulSetTester{c: c}
 
-			pst.waitForRunning(ps.Spec.Replicas, ps)
+			pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
 
 			newImage := newNginxImage
 			oldImage := ps.Spec.Template.Spec.Containers[0].Image
@@ -199,7 +202,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			pst.deletePetAtIndex(updateIndex, ps)
 
 			By("Waiting for all stateful pods to be running again")
-			pst.waitForRunning(ps.Spec.Replicas, ps)
+			pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
 
 			By(fmt.Sprintf("Verifying stateful pod at index %d is updated", updateIndex))
 			verify := func(pod *api.Pod) {
@@ -207,6 +210,112 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 				Expect(podImage).To(Equal(newImage), fmt.Sprintf("Expected stateful pod image %s updated to %s", podImage, newImage))
 			}
 			pst.verifyPodAtIndex(updateIndex, ps, verify)
+		})
+
+		It("Scaling should happen in predictable order and halt if any pet is unhealthy", func() {
+			psLabels := klabels.Set(labels)
+			By("initializing watcher for selector " + psLabels.String())
+			watcher, err := f.ClientSet.Core().Pods(ns).Watch(api.ListOptions{
+				LabelSelector: psLabels.AsSelector(),
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating stateful set " + psName + " in namespace " + ns)
+			testProbe := &api.Probe{Handler: api.Handler{HTTPGet: &api.HTTPGetAction{
+				Path: "/index.html",
+				Port: intstr.IntOrString{IntVal: 80}}}}
+			ps := newStatefulSet(psName, ns, headlessSvcName, 1, nil, nil, psLabels, testProbe)
+			ps, err = c.Apps().StatefulSets(ns).Create(ps)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting until all stateful set " + psName + " replicas will be running in namespace " + ns)
+			pst := &statefulSetTester{c: c}
+			pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
+
+			By("confirming that stateful set scale up will halt with unhealthy pet")
+			pst.breakProbe(ps, testProbe)
+			pst.waitForRunningAndNotReady(ps.Spec.Replicas, ps)
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = 3 })
+			pst.confirmPetCount(1, ps, 10*time.Second)
+
+			By("scalling up stateful set " + psName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
+			pst.restoreProbe(ps, testProbe)
+			pst.waitForRunningAndReady(3, ps)
+
+			By("verifying that stateful set " + psName + " was scaled up in order")
+			expectedOrder := []string{"pet-0", "pet-1", "pet-2"}
+			_, err = watch.Until(statefulsetTimeout, watcher, func(event watch.Event) (bool, error) {
+				if event.Type != watch.Added {
+					return false, nil
+				}
+				pod := event.Object.(*api.Pod)
+				if pod.Name == expectedOrder[0] {
+					expectedOrder = expectedOrder[1:]
+				}
+				return len(expectedOrder) == 0, nil
+
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("scale down will halt with unhealthy pet")
+			watcher, err = f.ClientSet.Core().Pods(ns).Watch(api.ListOptions{
+				LabelSelector: psLabels.AsSelector(),
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			pst.breakProbe(ps, testProbe)
+			pst.waitForRunningAndNotReady(3, ps)
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = 0 })
+			pst.confirmPetCount(3, ps, 10*time.Second)
+
+			By("scalling down stateful set " + psName + " to 0 replicas and waiting until none of pods will run " + ns)
+			pst.restoreProbe(ps, testProbe)
+			pst.scale(ps, 0)
+
+			By("verifying that stateful set " + psName + " was scaled down in reverse order")
+			expectedOrder = []string{"pet-2", "pet-1", "pet-0"}
+			_, err = watch.Until(statefulsetTimeout, watcher, func(event watch.Event) (bool, error) {
+				if event.Type != watch.Deleted {
+					return false, nil
+				}
+				pod := event.Object.(*api.Pod)
+				if pod.Name == expectedOrder[0] {
+					expectedOrder = expectedOrder[1:]
+				}
+				return len(expectedOrder) == 0, nil
+
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that scaling up before scale down is finished will not be out of order")
+			watcher, err = f.ClientSet.Core().Pods(ns).Watch(api.ListOptions{
+				LabelSelector: psLabels.AsSelector(),
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			pst.scale(ps, 3)
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = 5 })
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = 2 })
+			pst.scale(ps, 4)
+			var previous string
+			lastExpected := strings.Join([]string{ps.Name, "-3"}, "")
+			_, err = watch.Until(statefulsetTimeout, watcher, func(event watch.Event) (bool, error) {
+				if event.Type != watch.Added {
+					return false, nil
+				}
+				pod := event.Object.(*api.Pod)
+				if previous != "" {
+					msg := fmt.Sprintf("scaling should be in order, %v should be after %v", previous, pod.Name)
+					if strings.Split(previous, "-")[1] > strings.Split(pod.Name, "-")[1] {
+						return false, errors.New(msg)
+					} else {
+						framework.Logf(msg)
+					}
+				}
+				previous = pod.Name
+				return lastExpected == pod.Name, nil
+			})
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
@@ -307,7 +416,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		framework.ExpectNoError(err)
 
 		By("creating statefulset with conflicting port in namespace " + f.Namespace.Name)
-		ps := newStatefulSet(statefulSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+		ps := newStatefulSet(statefulSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels, nil)
 		petContainer := &ps.Spec.Template.Spec.Containers[0]
 		petContainer.Ports = append(petContainer.Ports, conflictingPort)
 		ps.Spec.Template.Spec.NodeName = node.Name
@@ -414,7 +523,7 @@ func (c *clusterAppTester) run() {
 		if restartCluster {
 			By("Restarting stateful set " + ps.Name)
 			c.tester.restart(ps)
-			c.tester.waitForRunning(ps.Spec.Replicas, ps)
+			c.tester.waitForRunningAndReady(ps.Spec.Replicas, ps)
 		}
 	}
 
@@ -605,7 +714,7 @@ func (p *statefulSetTester) createStatefulSet(manifestPath, ns string) *apps.Sta
 
 	framework.Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ps.Namespace, ps.Name, ps.Spec.Replicas, ps.Spec.Selector))
 	framework.RunKubectlOrDie("create", "-f", mkpath("petset.yaml"), fmt.Sprintf("--namespace=%v", ns))
-	p.waitForRunning(ps.Spec.Replicas, ps)
+	p.waitForRunningAndReady(ps.Spec.Replicas, ps)
 	return ps
 }
 
@@ -656,7 +765,7 @@ func (p *statefulSetTester) saturate(ps *apps.StatefulSet) {
 	var i int32
 	for i = 0; i < ps.Spec.Replicas; i++ {
 		framework.Logf("Waiting for pet at index " + fmt.Sprintf("%v", i+1) + " to enter Running")
-		p.waitForRunning(i+1, ps)
+		p.waitForRunningAndReady(i+1, ps)
 		framework.Logf("Marking pet at index " + fmt.Sprintf("%v", i) + " healthy")
 		p.setHealthy(ps)
 	}
@@ -757,7 +866,7 @@ func (p *statefulSetTester) confirmPetCount(count int, ps *apps.StatefulSet, tim
 	}
 }
 
-func (p *statefulSetTester) waitForRunning(numPets int32, ps *apps.StatefulSet) {
+func (p *statefulSetTester) waitForRunning(numPets int32, ps *apps.StatefulSet, shouldBeReady bool) {
 	pollErr := wait.PollImmediate(statefulsetPoll, statefulsetTimeout,
 		func() (bool, error) {
 			podList := p.getPodList(ps)
@@ -770,8 +879,9 @@ func (p *statefulSetTester) waitForRunning(numPets int32, ps *apps.StatefulSet) 
 			}
 			for _, p := range podList.Items {
 				isReady := api.IsPodReady(&p)
-				if p.Status.Phase != api.PodRunning || !isReady {
-					framework.Logf("Waiting for pod %v to enter %v - Ready=True, currently %v - Ready=%v", p.Name, api.PodRunning, p.Status.Phase, isReady)
+				desiredReadiness := shouldBeReady == isReady
+				framework.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, api.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+				if p.Status.Phase != api.PodRunning || !desiredReadiness {
 					return false, nil
 				}
 			}
@@ -780,8 +890,32 @@ func (p *statefulSetTester) waitForRunning(numPets int32, ps *apps.StatefulSet) 
 	if pollErr != nil {
 		framework.Failf("Failed waiting for pods to enter running: %v", pollErr)
 	}
+}
 
-	p.waitForStatus(ps, numPets)
+func (p *statefulSetTester) waitForRunningAndReady(numPets int32, ps *apps.StatefulSet) {
+	p.waitForRunning(numPets, ps, true)
+}
+
+func (p *statefulSetTester) waitForRunningAndNotReady(numPets int32, ps *apps.StatefulSet) {
+	p.waitForRunning(numPets, ps, false)
+}
+
+func (p *statefulSetTester) breakProbe(ps *apps.StatefulSet, probe *api.Probe) error {
+	path := probe.HTTPGet.Path
+	if path == "" {
+		return fmt.Errorf("Path expected to be not empty: %v", path)
+	}
+	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/", path)
+	return p.execInPets(ps, cmd)
+}
+
+func (p *statefulSetTester) restoreProbe(ps *apps.StatefulSet, probe *api.Probe) error {
+	path := probe.HTTPGet.Path
+	if path == "" {
+		return fmt.Errorf("Path expected to be not empty: %v", path)
+	}
+	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/", path)
+	return p.execInPets(ps, cmd)
 }
 
 func (p *statefulSetTester) setHealthy(ps *apps.StatefulSet) {
@@ -954,7 +1088,7 @@ func newPVC(name string) api.PersistentVolumeClaim {
 	}
 }
 
-func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string) *apps.StatefulSet {
+func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string, readinessProbe *api.Probe) *apps.StatefulSet {
 	mounts := append(petMounts, podMounts...)
 	claims := []api.PersistentVolumeClaim{}
 	for _, m := range petMounts {
@@ -995,9 +1129,10 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:         "nginx",
-							Image:        nginxImage,
-							VolumeMounts: mounts,
+							Name:           "nginx",
+							Image:          nginxImage,
+							VolumeMounts:   mounts,
+							ReadinessProbe: readinessProbe,
 						},
 					},
 					Volumes: vols,
