@@ -751,7 +751,7 @@ func TestAdmitSELinux(t *testing.T) {
 func TestAdmitAppArmor(t *testing.T) {
 	createPodWithAppArmor := func(profile string) *kapi.Pod {
 		pod := goodPod()
-		apparmor.SetProfileName(pod, defaultContainerName, profile)
+		apparmor.SetProfileNameFromPodAnnotations(pod.Annotations, defaultContainerName, profile)
 		return pod
 	}
 
@@ -822,7 +822,7 @@ func TestAdmitAppArmor(t *testing.T) {
 		testPSPAdmit(k, []*extensions.PodSecurityPolicy{v.psp}, v.pod, v.shouldPass, v.psp.Name, t)
 
 		if v.shouldPass {
-			assert.Equal(t, v.expectedProfile, apparmor.GetProfileName(v.pod, defaultContainerName), k)
+			assert.Equal(t, v.expectedProfile, apparmor.GetProfileNameFromPodAnnotations(v.pod.Annotations, defaultContainerName), k)
 		}
 	}
 }
