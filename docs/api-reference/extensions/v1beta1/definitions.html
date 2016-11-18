@@ -1341,7 +1341,7 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">maxUnavailable</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -6818,7 +6818,7 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-11-08 08:09:17 UTC
+Last updated 2016-11-18 14:07:18 UTC
 </div>
 </div>
 </body>
