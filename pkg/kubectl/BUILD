@@ -29,6 +29,7 @@ go_library(
         "interfaces.go",
         "kubectl.go",
         "namespace.go",
+        "pdb.go",
         "proxy_server.go",
         "quota.go",
         "resource_filter.go",
