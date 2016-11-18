@@ -22,8 +22,8 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -48,10 +48,10 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/aws-ebs" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -70,15 +70,15 @@ func TestGetAccessModes(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) {
-		t.Errorf("Expected to support AccessModeTypes:  %s", api.ReadWriteOnce)
+	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) {
+		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteOnce)
 	}
-	if contains(plug.GetAccessModes(), api.ReadOnlyMany) {
-		t.Errorf("Expected not to support AccessModeTypes:  %s", api.ReadOnlyMany)
+	if contains(plug.GetAccessModes(), v1.ReadOnlyMany) {
+		t.Errorf("Expected not to support AccessModeTypes:  %s", v1.ReadOnlyMany)
 	}
 }
 
-func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
+func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true
@@ -118,10 +118,10 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
+	spec := &v1.Volume{
 		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 				VolumeID: "pd",
 				FSType:   "ext4",
 			},
@@ -181,8 +181,8 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
-		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*awsElasticBlockStorePlugin).newProvisionerInternal(options, &fakePDManager{})
 	persistentSpec, err := provisioner.Provision()
@@ -193,7 +193,7 @@ func TestPlugin(t *testing.T) {
 	if persistentSpec.Spec.PersistentVolumeSource.AWSElasticBlockStore.VolumeID != "test-aws-volume-name" {
 		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.AWSElasticBlockStore.VolumeID)
 	}
-	cap := persistentSpec.Spec.Capacity[api.ResourceStorage]
+	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
 	if size != 100*1024*1024*1024 {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
@@ -215,30 +215,30 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	pv := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "pvA",
 		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{},
 			},
-			ClaimRef: &api.ObjectReference{
+			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
 			},
 		},
 	}
 
-	claim := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "claimA",
 			Namespace: "nsA",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
+		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "pvA",
 		},
-		Status: api.PersistentVolumeClaimStatus{
-			Phase: api.ClaimBound,
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
 		},
 	}
 
@@ -255,7 +255,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
 
 	if !mounter.GetAttributes().ReadOnly {
@@ -276,10 +276,10 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
+	spec := &v1.Volume{
 		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 				VolumeID: "pd",
 				FSType:   "ext4",
 			},

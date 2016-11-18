@@ -22,7 +22,7 @@ import (
 	"runtime"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -49,7 +49,7 @@ var _ volume.VolumePlugin = &secretPlugin{}
 
 func wrappedVolumeSpec() volume.Spec {
 	return volume.Spec{
-		Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+		Volume: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory}}},
 	}
 }
 
@@ -83,7 +83,7 @@ func (plugin *secretPlugin) RequiresRemount() bool {
 	return true
 }
 
-func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &secretVolumeMounter{
 		secretVolume: &secretVolume{
 			spec.Name(),
@@ -113,10 +113,10 @@ func (plugin *secretPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 }
 
 func (plugin *secretPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
-	secretVolume := &api.Volume{
+	secretVolume := &v1.Volume{
 		Name: volName,
-		VolumeSource: api.VolumeSource{
-			Secret: &api.SecretVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
 				SecretName: volName,
 			},
 		},
@@ -144,8 +144,8 @@ func (sv *secretVolume) GetPath() string {
 type secretVolumeMounter struct {
 	*secretVolume
 
-	source api.SecretVolumeSource
-	pod    api.Pod
+	source v1.SecretVolumeSource
+	pod    v1.Pod
 	opts   *volume.VolumeOptions
 }
 
@@ -232,7 +232,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-func makePayload(mappings []api.KeyToPath, secret *api.Secret, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
+func makePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}
@@ -267,7 +267,7 @@ func makePayload(mappings []api.KeyToPath, secret *api.Secret, defaultMode *int3
 	return payload, nil
 }
 
-func totalSecretBytes(secret *api.Secret) int {
+func totalSecretBytes(secret *v1.Secret) int {
 	totalSize := 0
 	for _, bytes := range secret.Data {
 		totalSize += len(bytes)
@@ -303,9 +303,9 @@ func (c *secretVolumeUnmounter) TearDownAt(dir string) error {
 	return wrapped.TearDownAt(dir)
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.SecretVolumeSource, bool) {
+func getVolumeSource(spec *volume.Spec) (*v1.SecretVolumeSource, bool) {
 	var readOnly bool
-	var volumeSource *api.SecretVolumeSource
+	var volumeSource *v1.SecretVolumeSource
 
 	if spec.Volume != nil && spec.Volume.Secret != nil {
 		volumeSource = spec.Volume.Secret

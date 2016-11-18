@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -187,9 +187,9 @@ func newDetacher(testcase *testcase) *photonPersistentDiskDetacher {
 
 func createVolSpec(name string, readOnly bool) *volume.Spec {
 	return &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
 					PdID: name,
 				},
 			},
@@ -199,10 +199,10 @@ func createVolSpec(name string, readOnly bool) *volume.Spec {
 
 func createPVSpec(name string, readOnly bool) *volume.Spec {
 	return &volume.Spec{
-		PersistentVolume: &api.PersistentVolume{
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
 						PdID: name,
 					},
 				},

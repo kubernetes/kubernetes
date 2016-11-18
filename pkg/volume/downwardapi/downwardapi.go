@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -51,7 +51,7 @@ var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
 func wrappedVolumeSpec() volume.Spec {
 	return volume.Spec{
-		Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+		Volume: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory}}},
 	}
 }
 
@@ -82,7 +82,7 @@ func (plugin *downwardAPIPlugin) RequiresRemount() bool {
 	return true
 }
 
-func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName: spec.Name(),
 		items:   spec.Volume.DownwardAPI.Items,
@@ -108,10 +108,10 @@ func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) 
 }
 
 func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	downwardAPIVolume := &api.Volume{
+	downwardAPIVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			DownwardAPI: &api.DownwardAPIVolumeSource{},
+		VolumeSource: v1.VolumeSource{
+			DownwardAPI: &v1.DownwardAPIVolumeSource{},
 		},
 	}
 	return volume.NewSpecFromVolume(downwardAPIVolume), nil
@@ -120,9 +120,9 @@ func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath strin
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.
 type downwardAPIVolume struct {
 	volName string
-	items   []api.DownwardAPIVolumeFile
-	pod     *api.Pod
-	podUID  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *api.POD and not only types.UID
+	items   []v1.DownwardAPIVolumeFile
+	pod     *v1.Pod
+	podUID  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *v1.POD and not only types.UID
 	plugin  *downwardAPIPlugin
 	volume.MetricsNil
 }
@@ -131,7 +131,7 @@ type downwardAPIVolume struct {
 // and dumps it in files
 type downwardAPIVolumeMounter struct {
 	*downwardAPIVolume
-	source api.DownwardAPIVolumeSource
+	source v1.DownwardAPIVolumeSource
 	opts   *volume.VolumeOptions
 }
 
@@ -286,9 +286,9 @@ func (b *downwardAPIVolumeMounter) getMetaDir() string {
 	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.DownwardAPIVolumeSource, bool) {
+func getVolumeSource(spec *volume.Spec) (*v1.DownwardAPIVolumeSource, bool) {
 	var readOnly bool
-	var volumeSource *api.DownwardAPIVolumeSource
+	var volumeSource *v1.DownwardAPIVolumeSource
 
 	if spec.Volume != nil && spec.Volume.DownwardAPI != nil {
 		volumeSource = spec.Volume.DownwardAPI
