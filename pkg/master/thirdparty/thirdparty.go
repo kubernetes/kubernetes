@@ -246,6 +246,9 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	if err != nil {
 		return err
 	}
+	if len(rsrc.Versions) == 0 {
+		return fmt.Errorf("ThirdPartyResource %s has no defined versions", rsrc.Name)
+	}
 	plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
 		Group:   group,
 		Version: rsrc.Versions[0].Name,
