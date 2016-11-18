@@ -33,10 +33,10 @@ var (
 
 	quotaExample = templates.Examples(`
 		# Create a new resourcequota named my-quota
-		$ kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
+		kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
 
 		# Create a new resourcequota named best-effort
-		$ kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`)
+		kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`)
 )
 
 // NewCmdCreateQuota is a macro command to create a new quota
