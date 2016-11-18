@@ -61,6 +61,7 @@ else
     linux/amd64
     linux/arm
     linux/arm64
+    linux/s390x
   )
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
     KUBE_SERVER_PLATFORMS+=(linux/ppc64le)
@@ -78,6 +79,7 @@ else
     darwin/386
     windows/amd64
     windows/386
+    linux/s390x
   )
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
     KUBE_CLIENT_PLATFORMS+=(linux/ppc64le)
@@ -233,18 +235,32 @@ kube::golang::set_platform_envs() {
 
     # Dynamic CGO linking for other server architectures than linux/amd64 goes here
     # If you want to include support for more server platforms than these, add arch-specific gcc names here
-    if [[ ${platform} == "linux/arm" ]]; then
-      export CGO_ENABLED=1
-      export CC=arm-linux-gnueabi-gcc
-      # See https://github.com/kubernetes/kubernetes/issues/29904
-      export GOROOT=${K8S_PATCHED_GOROOT}
-    elif [[ ${platform} == "linux/arm64" ]]; then
-      export CGO_ENABLED=1
-      export CC=aarch64-linux-gnu-gcc
-    elif [[ ${platform} == "linux/ppc64le" ]]; then
-      export CGO_ENABLED=1
-      export CC=powerpc64le-linux-gnu-gcc
-    fi
+    case "${platform}" in
+      "linux/amd64")
+        ;;
+      "linux/arm")
+        export CGO_ENABLED=1
+        export CC=arm-linux-gnueabi-gcc
+        # See https://github.com/kubernetes/kubernetes/issues/29904
+        export GOROOT=${K8S_PATCHED_GOROOT}
+        ;;
+      "linux/arm64")
+        export CGO_ENABLED=1
+        export CC=aarch64-linux-gnu-gcc
+        ;;
+      "linux/ppc64le")
+        export CGO_ENABLED=1
+        export CC=powerpc64le-linux-gnu-gcc
+        ;;
+      "linux/s390x")
+        export CGO_ENABLED=1
+        export CC=s390x-linux-gnu-gcc
+        ;;
+      *)
+        echo "Unsupported architecture to cross-compile from linux/amd64." >&2
+        exit 1
+        ;;
+    esac
   fi
 }
 

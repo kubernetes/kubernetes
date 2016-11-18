@@ -29,6 +29,9 @@ $ make push ARCH=arm64
 
 $ make push ARCH=ppc64le
 # ---> gcr.io/google-containers/kube-addon-manager-ppc64le:VERSION
+
+$ make push ARCH=s390x
+# ---> gcr.io/google-containers/kube-addon-manager-s390x:VERSION
 ```
 
 If you don't want to push the images, run `make` or `make build` instead
