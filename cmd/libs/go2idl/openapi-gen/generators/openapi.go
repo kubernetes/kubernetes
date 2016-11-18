@@ -446,10 +446,15 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 	}
 	g.Do("Type: []string{\"object\"},\n", nil)
 	g.Do("AdditionalProperties: &spec.SchemaOrBool{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
+	typeString, format := common.GetOpenAPITypeFormat(elemType.String())
+	if typeString != "" {
+		g.generateSimpleProperty(typeString, format)
+		g.Do("},\n},\n},\n", nil)
+		return nil
+	}
 	switch elemType.Kind {
 	case types.Builtin:
-		typeString, format := common.GetOpenAPITypeFormat(elemType.String())
-		g.generateSimpleProperty(typeString, format)
+		return fmt.Errorf("please add type %v to getOpenAPITypeFormat function.", elemType)
 	case types.Struct:
 		g.generateReferenceProperty(t.Elem)
 	case types.Slice, types.Array:
@@ -465,10 +470,15 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	elemType := resolveAliasAndPtrType(t.Elem)
 	g.Do("Type: []string{\"array\"},\n", nil)
 	g.Do("Items: &spec.SchemaOrArray{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
+	typeString, format := common.GetOpenAPITypeFormat(elemType.String())
+	if typeString != "" {
+		g.generateSimpleProperty(typeString, format)
+		g.Do("},\n},\n},\n", nil)
+		return nil
+	}
 	switch elemType.Kind {
 	case types.Builtin:
-		typeString, format := common.GetOpenAPITypeFormat(elemType.String())
-		g.generateSimpleProperty(typeString, format)
+		return fmt.Errorf("please add type %v to getOpenAPITypeFormat function.", elemType)
 	case types.Struct:
 		g.generateReferenceProperty(t.Elem)
 	default:
