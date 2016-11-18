@@ -210,7 +210,10 @@ go_library(
     ],
 )
 
-go_test(
+# this is a private library until we can support building the
+# test binary
+# TODO(mikedanese): fix @io_bazelbuild/rules_go
+go_library(
     name = "go_default_test",
     srcs = [
         "e2e_test.go",
@@ -218,12 +221,12 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/metrics:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor:github.com/onsi/ginkgo",
-        "//vendor:github.com/onsi/gomega",
     ],
 )
