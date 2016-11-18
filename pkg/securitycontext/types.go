@@ -17,7 +17,7 @@ limitations under the License.
 package securitycontext
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
 )
@@ -26,7 +26,7 @@ type SecurityContextProvider interface {
 	// ModifyContainerConfig is called before the Docker createContainer call.
 	// The security context provider can make changes to the Config with which
 	// the container is created.
-	ModifyContainerConfig(pod *api.Pod, container *api.Container, config *dockercontainer.Config)
+	ModifyContainerConfig(pod *v1.Pod, container *v1.Container, config *dockercontainer.Config)
 
 	// ModifyHostConfig is called before the Docker createContainer call.
 	// The security context provider can make changes to the HostConfig, affecting
@@ -37,7 +37,7 @@ type SecurityContextProvider interface {
 	// - pod: the pod to modify the docker hostconfig for
 	// - container: the container to modify the hostconfig for
 	// - supplementalGids: additional supplemental GIDs associated with the pod's volumes
-	ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64)
+	ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64)
 }
 
 const (

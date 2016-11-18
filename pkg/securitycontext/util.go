@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // HasPrivilegedRequest returns the value of SecurityContext.Privileged, taking into account
 // the possibility of nils
-func HasPrivilegedRequest(container *api.Container) bool {
+func HasPrivilegedRequest(container *v1.Container) bool {
 	if container.SecurityContext == nil {
 		return false
 	}
@@ -37,7 +37,7 @@ func HasPrivilegedRequest(container *api.Container) bool {
 
 // HasCapabilitiesRequest returns true if Adds or Drops are defined in the security context
 // capabilities, taking into account nils
-func HasCapabilitiesRequest(container *api.Container) bool {
+func HasCapabilitiesRequest(container *v1.Container) bool {
 	if container.SecurityContext == nil {
 		return false
 	}
@@ -52,14 +52,14 @@ const expectedSELinuxFields = 4
 // ParseSELinuxOptions parses a string containing a full SELinux context
 // (user, role, type, and level) into an SELinuxOptions object.  If the
 // context is malformed, an error is returned.
-func ParseSELinuxOptions(context string) (*api.SELinuxOptions, error) {
+func ParseSELinuxOptions(context string) (*v1.SELinuxOptions, error) {
 	fields := strings.SplitN(context, ":", expectedSELinuxFields)
 
 	if len(fields) != expectedSELinuxFields {
 		return nil, fmt.Errorf("expected %v fields in selinux; got %v (context: %v)", expectedSELinuxFields, len(fields), context)
 	}
 
-	return &api.SELinuxOptions{
+	return &v1.SELinuxOptions{
 		User:  fields[0],
 		Role:  fields[1],
 		Type:  fields[2],
@@ -68,7 +68,7 @@ func ParseSELinuxOptions(context string) (*api.SELinuxOptions, error) {
 }
 
 // HasNonRootUID returns true if the runAsUser is set and is greater than 0.
-func HasRootUID(container *api.Container) bool {
+func HasRootUID(container *v1.Container) bool {
 	if container.SecurityContext == nil {
 		return false
 	}
@@ -79,11 +79,11 @@ func HasRootUID(container *api.Container) bool {
 }
 
 // HasRunAsUser determines if the sc's runAsUser field is set.
-func HasRunAsUser(container *api.Container) bool {
+func HasRunAsUser(container *v1.Container) bool {
 	return container.SecurityContext != nil && container.SecurityContext.RunAsUser != nil
 }
 
 // HasRootRunAsUser returns true if the run as user is set and it is set to 0.
-func HasRootRunAsUser(container *api.Container) bool {
+func HasRootRunAsUser(container *v1.Container) bool {
 	return HasRunAsUser(container) && HasRootUID(container)
 }
