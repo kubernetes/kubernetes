@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -74,7 +74,7 @@ func (plugin *configMapPlugin) RequiresRemount() bool {
 	return true
 }
 
-func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &configMapVolumeMounter{
 		configMapVolume: &configMapVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
 		source:          *spec.Volume.ConfigMap,
@@ -87,10 +87,10 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 }
 
 func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	configMapVolume := &api.Volume{
+	configMapVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			ConfigMap: &api.ConfigMapVolumeSource{},
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{},
 		},
 	}
 	return volume.NewSpecFromVolume(configMapVolume), nil
@@ -116,8 +116,8 @@ func (sv *configMapVolume) GetPath() string {
 type configMapVolumeMounter struct {
 	*configMapVolume
 
-	source api.ConfigMapVolumeSource
-	pod    api.Pod
+	source v1.ConfigMapVolumeSource
+	pod    v1.Pod
 	opts   *volume.VolumeOptions
 }
 
@@ -137,7 +137,7 @@ func wrappedVolumeSpec() volume.Spec {
 		// This should be on a tmpfs instead of the local disk; the problem is
 		// charging the memory for the tmpfs to the right cgroup.  We should make
 		// this a tmpfs when we can do the accounting correctly.
-		Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+		Volume: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 	}
 }
 
@@ -209,7 +209,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-func makePayload(mappings []api.KeyToPath, configMap *api.ConfigMap, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
+func makePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}
@@ -245,7 +245,7 @@ func makePayload(mappings []api.KeyToPath, configMap *api.ConfigMap, defaultMode
 	return payload, nil
 }
 
-func totalBytes(configMap *api.ConfigMap) int {
+func totalBytes(configMap *v1.ConfigMap) int {
 	totalSize := 0
 	for _, value := range configMap.Data {
 		totalSize += len(value)
@@ -276,9 +276,9 @@ func (c *configMapVolumeUnmounter) TearDownAt(dir string) error {
 	return wrapped.TearDownAt(dir)
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.ConfigMapVolumeSource, bool) {
+func getVolumeSource(spec *volume.Spec) (*v1.ConfigMapVolumeSource, bool) {
 	var readOnly bool
-	var volumeSource *api.ConfigMapVolumeSource
+	var volumeSource *v1.ConfigMapVolumeSource
 
 	if spec.Volume != nil && spec.Volume.ConfigMap != nil {
 		volumeSource = spec.Volume.ConfigMap

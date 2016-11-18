@@ -24,7 +24,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -48,11 +48,11 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != azureDataDiskPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{AzureDisk: &api.AzureDiskVolumeSource{}}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{AzureDisk: &v1.AzureDiskVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
 
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{AzureDisk: &api.AzureDiskVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{AzureDisk: &v1.AzureDiskVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -114,11 +114,11 @@ func TestPlugin(t *testing.T) {
 	}
 	fs := "ext4"
 	ro := false
-	caching := api.AzureDataDiskCachingNone
-	spec := &api.Volume{
+	caching := v1.AzureDataDiskCachingNone
+	spec := &v1.Volume{
 		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			AzureDisk: &api.AzureDiskVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			AzureDisk: &v1.AzureDiskVolumeSource{
 				DiskName:    fakeDiskName,
 				DataDiskURI: fakeDiskUri,
 				FSType:      &fs,

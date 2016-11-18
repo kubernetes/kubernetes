@@ -22,7 +22,7 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -43,7 +43,7 @@ var _ volume.VolumePlugin = &gitRepoPlugin{}
 
 func wrappedVolumeSpec() volume.Spec {
 	return volume.Spec{
-		Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+		Volume: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 	}
 }
 
@@ -81,7 +81,7 @@ func (plugin *gitRepoPlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &gitRepoVolumeMounter{
 		gitRepoVolume: &gitRepoVolume{
 			volName: spec.Name(),
@@ -108,10 +108,10 @@ func (plugin *gitRepoPlugin) NewUnmounter(volName string, podUID types.UID) (vol
 }
 
 func (plugin *gitRepoPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	gitVolume := &api.Volume{
+	gitVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			GitRepo: &api.GitRepoVolumeSource{},
+		VolumeSource: v1.VolumeSource{
+			GitRepo: &v1.GitRepoVolumeSource{},
 		},
 	}
 	return volume.NewSpecFromVolume(gitVolume), nil
@@ -137,7 +137,7 @@ func (gr *gitRepoVolume) GetPath() string {
 type gitRepoVolumeMounter struct {
 	*gitRepoVolume
 
-	pod      api.Pod
+	pod      v1.Pod
 	source   string
 	revision string
 	target   string
@@ -263,9 +263,9 @@ func (c *gitRepoVolumeUnmounter) TearDownAt(dir string) error {
 	return wrapped.TearDownAt(dir)
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.GitRepoVolumeSource, bool) {
+func getVolumeSource(spec *volume.Spec) (*v1.GitRepoVolumeSource, bool) {
 	var readOnly bool
-	var volumeSource *api.GitRepoVolumeSource
+	var volumeSource *v1.GitRepoVolumeSource
 
 	if spec.Volume != nil && spec.Volume.GitRepo != nil {
 		volumeSource = spec.Volume.GitRepo
