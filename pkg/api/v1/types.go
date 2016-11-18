@@ -1233,10 +1233,10 @@ type SecretKeySelector struct {
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
 }
 
-// EnvFromSource represents the source of a set of EnvVars
+// EnvFromSource represents the source of a set of ConfigMaps
 type EnvFromSource struct {
 	// The ConfigMap to select from
-	ConfigMap *LocalObjectReference `json:"configMap,omitempty" protobuf:"bytes,1,opt,name=configMap"`
+	ConfigMapRef *LocalObjectReference `json:"configMapRef,omitempty" protobuf:"bytes,1,opt,name=configMapRef"`
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes
@@ -1419,6 +1419,14 @@ type Container struct {
 	// Cannot be updated.
 	// +optional
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
+	// List of sources to populate environment variables in the container.
+	// The keys defined within a source must be a C_IDENTIFIER.
+	// When a key exists in multiple sources, the value associated with the last
+	// source will take precedence.
+	// All env values will take precedence over any listed source.
+	// Cannot be updated.
+	// +optional
+	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
 	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources
@@ -1484,14 +1492,6 @@ type Container struct {
 	// Default is false.
 	// +optional
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
-	// List of sources to populate environment variables in the container.
-	// The keys defined within a source must be a C_IDENTIFIER.
-	// When a key exists in multiple sources, the value associated with the last
-	// source will take precedence.
-	// All EnvVars will take precedence over any listed source.
-	// Cannot be updated.
-	// +optional
-	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 }
 
 // Handler defines a specific action that should be taken

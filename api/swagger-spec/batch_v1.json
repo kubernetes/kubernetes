@@ -2158,6 +2158,13 @@
       },
       "description": "List of environment variables to set in the container. Cannot be updated."
      },
+     "envFrom": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.EnvFromSource"
+      },
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All env values will take precedence over any listed source. Cannot be updated."
+     },
      "resources": {
       "$ref": "v1.ResourceRequirements",
       "description": "Compute Resources required by this container. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources"
@@ -2204,13 +2211,6 @@
      "tty": {
       "type": "boolean",
       "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false."
-     },
-     "envFrom": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.EnvFromSource"
-      },
-      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All EnvVars will take precedence over any listed source. Cannot be updated."
      }
     }
    },
@@ -2319,6 +2319,16 @@
      "key": {
       "type": "string",
       "description": "The key of the secret to select from.  Must be a valid secret key."
+     }
+    }
+   },
+   "v1.EnvFromSource": {
+    "id": "v1.EnvFromSource",
+    "description": "EnvFromSource represents the source of a set of ConfigMaps",
+    "properties": {
+     "configMapRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "The ConfigMap to select from"
      }
     }
    },
@@ -2587,16 +2597,6 @@
      "level": {
       "type": "string",
       "description": "Level is SELinux level label that applies to the container."
-     }
-    }
-   },
-   "v1.EnvFromSource": {
-    "id": "v1.EnvFromSource",
-    "description": "EnvFromSource represents the source of a set of EnvVars",
-    "properties": {
-     "configMap": {
-      "$ref": "v1.LocalObjectReference",
-      "description": "The ConfigMap to select from"
      }
     }
    },

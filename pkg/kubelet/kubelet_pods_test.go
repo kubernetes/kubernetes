@@ -628,7 +628,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 				EnvFrom: []api.EnvFromSource{
-					{ConfigMap: &api.LocalObjectReference{Name: "test-config-map"}},
+					{ConfigMapRef: &api.LocalObjectReference{Name: "test-config-map"}},
 				},
 			},
 			masterServiceNs: "nothing",
@@ -695,7 +695,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			ns:   "test1",
 			container: &api.Container{
 				EnvFrom: []api.EnvFromSource{
-					{ConfigMap: &api.LocalObjectReference{Name: "test-config-map"}},
+					{ConfigMapRef: &api.LocalObjectReference{Name: "test-config-map"}},
 				},
 			},
 			masterServiceNs: "nothing",
@@ -706,7 +706,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			ns:   "test1",
 			container: &api.Container{
 				EnvFrom: []api.EnvFromSource{
-					{ConfigMap: &api.LocalObjectReference{Name: "test-config-map"}},
+					{ConfigMapRef: &api.LocalObjectReference{Name: "test-config-map"}},
 				},
 			},
 			masterServiceNs: "nothing",

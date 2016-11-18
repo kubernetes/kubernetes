@@ -373,6 +373,15 @@ message Container {
   // +optional
   repeated EnvVar env = 7;
 
+  // List of sources to populate environment variables in the container.
+  // The keys defined within a source must be a C_IDENTIFIER.
+  // When a key exists in multiple sources, the value associated with the last
+  // source will take precedence.
+  // All env values will take precedence over any listed source.
+  // Cannot be updated.
+  // +optional
+  repeated EnvFromSource envFrom = 19;
+
   // Compute Resources required by this container.
   // Cannot be updated.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources
@@ -444,15 +453,6 @@ message Container {
   // Default is false.
   // +optional
   optional bool tty = 18;
-
-  // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a C_IDENTIFIER.
-  // When a key exists in multiple sources, the value associated with the last
-  // source will take precedence.
-  // All EnvVars will take precedence over any listed source.
-  // Cannot be updated.
-  // +optional
-  repeated EnvFromSource envFrom = 19;
 }
 
 // Describe a container image
@@ -779,10 +779,10 @@ message EndpointsList {
   repeated Endpoints items = 2;
 }
 
-// EnvFromSource represents the source of a set of EnvVars
+// EnvFromSource represents the source of a set of ConfigMaps
 message EnvFromSource {
   // The ConfigMap to select from
-  optional LocalObjectReference configMap = 1;
+  optional LocalObjectReference configMapRef = 1;
 }
 
 // EnvVar represents an environment variable present in a Container.

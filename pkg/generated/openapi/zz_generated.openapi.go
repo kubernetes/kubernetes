@@ -7224,6 +7224,19 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"envFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All env values will take precedence over any listed source. Cannot be updated.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.EnvFromSource"),
+									},
+								},
+							},
+						},
+					},
 					"resources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Compute Resources required by this container. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
@@ -7300,19 +7313,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Description: "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
 							Type:        []string{"boolean"},
 							Format:      "",
-						},
-					},
-					"envFrom": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All EnvVars will take precedence over any listed source. Cannot be updated.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.EnvFromSource"),
-									},
-								},
-							},
 						},
 					},
 				},
@@ -7948,16 +7948,16 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"v1.EnvFromSource": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "EnvFromSource represents the source of a set of EnvVars",
+				Description: "EnvFromSource represents the source of a set of ConfigMaps",
 				Properties: map[string]spec.Schema{
-					"configMap": {
+					"configMapRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The ConfigMap to select from",
 							Ref:         spec.MustCreateRef("#/definitions/v1.LocalObjectReference"),
 						},
 					},
 				},
-				Required: []string{"configMap"},
+				Required: []string{"configMapRef"},
 			},
 		},
 		Dependencies: []string{

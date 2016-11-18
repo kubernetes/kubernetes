@@ -1006,12 +1006,12 @@ func DeepCopy_api_EnvFromSource(in interface{}, out interface{}, c *conversion.C
 	{
 		in := in.(*EnvFromSource)
 		out := out.(*EnvFromSource)
-		if in.ConfigMap != nil {
-			in, out := &in.ConfigMap, &out.ConfigMap
+		if in.ConfigMapRef != nil {
+			in, out := &in.ConfigMapRef, &out.ConfigMapRef
 			*out = new(LocalObjectReference)
 			**out = **in
 		} else {
-			out.ConfigMap = nil
+			out.ConfigMapRef = nil
 		}
 		return nil
 	}

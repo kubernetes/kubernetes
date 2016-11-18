@@ -32735,7 +32735,7 @@
       }
      },
      "envFrom": {
-      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All EnvVars will take precedence over any listed source. Cannot be updated.",
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All env values will take precedence over any listed source. Cannot be updated.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1.EnvFromSource"
@@ -33143,12 +33143,12 @@
     }
    },
    "v1.EnvFromSource": {
-    "description": "EnvFromSource represents the source of a set of EnvVars",
+    "description": "EnvFromSource represents the source of a set of ConfigMaps",
     "required": [
-     "configMap"
+     "configMapRef"
     ],
     "properties": {
-     "configMap": {
+     "configMapRef": {
       "description": "The ConfigMap to select from",
       "$ref": "#/definitions/v1.LocalObjectReference"
      }

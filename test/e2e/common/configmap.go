@@ -150,7 +150,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 	It("should be consumable via environment variable [Conformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
-		configMap := newConfigMap(f, name)
+		configMap := newEnvFromConfigMap(f, name)
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
@@ -175,14 +175,14 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 										LocalObjectReference: api.LocalObjectReference{
 											Name: name,
 										},
-										Key: "data-1",
+										Key: "data_1",
 									},
 								},
 							},
 						},
 						EnvFrom: []api.EnvFromSource{
 							{
-								ConfigMap: &api.LocalObjectReference{Name: name},
+								ConfigMapRef: &api.LocalObjectReference{Name: name},
 							},
 						},
 					},
@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		}
 
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
-			"CONFIG_DATA_1=value-1", "data-1=value-1", "data-2=value-2", "data-3=value-3",
+			"CONFIG_DATA_1=value-1", "data_1=value-1", "data_2=value-2", "data_3=value-3",
 		})
 	})
 
@@ -279,6 +279,20 @@ func newConfigMap(f *framework.Framework, name string) *api.ConfigMap {
 			"data-1": "value-1",
 			"data-2": "value-2",
 			"data-3": "value-3",
+		},
+	}
+}
+
+func newEnvFromConfigMap(f *framework.Framework, name string) *api.ConfigMap {
+	return &api.ConfigMap{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: f.Namespace.Name,
+			Name:      name,
+		},
+		Data: map[string]string{
+			"data_1": "value-1",
+			"data_2": "value-2",
+			"data_3": "value-3",
 		},
 	}
 }

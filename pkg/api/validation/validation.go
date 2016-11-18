@@ -1422,7 +1422,7 @@ func validateEnvFrom(vars []api.EnvFromSource, fldPath *field.Path) field.ErrorL
 	allErrs := field.ErrorList{}
 	for i, ev := range vars {
 		idxPath := fldPath.Index(i)
-		if ev.ConfigMap != nil && len(ev.ConfigMap.Name) == 0 {
+		if ev.ConfigMapRef != nil && len(ev.ConfigMapRef.Name) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("configMap"), ""))
 		}
 	}

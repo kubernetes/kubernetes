@@ -19156,7 +19156,7 @@ func (x *EnvFromSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq1378 [1]bool
 			_, _, _ = yysep1378, yyq1378, yy2arr1378
 			const yyr1378 bool = false
-			yyq1378[0] = x.ConfigMap != nil
+			yyq1378[0] = x.ConfigMapRef != nil
 			var yynn1378 int
 			if yyr1378 || yy2arr1378 {
 				r.EncodeArrayStart(1)
@@ -19173,10 +19173,10 @@ func (x *EnvFromSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr1378 || yy2arr1378 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq1378[0] {
-					if x.ConfigMap == nil {
+					if x.ConfigMapRef == nil {
 						r.EncodeNil()
 					} else {
-						x.ConfigMap.CodecEncodeSelf(e)
+						x.ConfigMapRef.CodecEncodeSelf(e)
 					}
 				} else {
 					r.EncodeNil()
@@ -19184,12 +19184,12 @@ func (x *EnvFromSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq1378[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("configMap"))
+					r.EncodeString(codecSelferC_UTF81234, string("configMapRef"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.ConfigMap == nil {
+					if x.ConfigMapRef == nil {
 						r.EncodeNil()
 					} else {
-						x.ConfigMap.CodecEncodeSelf(e)
+						x.ConfigMapRef.CodecEncodeSelf(e)
 					}
 				}
 			}
@@ -19254,16 +19254,16 @@ func (x *EnvFromSource) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		yys1382 := string(yys1382Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys1382 {
-		case "configMap":
+		case "configMapRef":
 			if r.TryDecodeAsNil() {
-				if x.ConfigMap != nil {
-					x.ConfigMap = nil
+				if x.ConfigMapRef != nil {
+					x.ConfigMapRef = nil
 				}
 			} else {
-				if x.ConfigMap == nil {
-					x.ConfigMap = new(LocalObjectReference)
+				if x.ConfigMapRef == nil {
+					x.ConfigMapRef = new(LocalObjectReference)
 				}
-				x.ConfigMap.CodecDecodeSelf(d)
+				x.ConfigMapRef.CodecDecodeSelf(d)
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys1382)
@@ -19291,14 +19291,14 @@ func (x *EnvFromSource) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		if x.ConfigMap != nil {
-			x.ConfigMap = nil
+		if x.ConfigMapRef != nil {
+			x.ConfigMapRef = nil
 		}
 	} else {
-		if x.ConfigMap == nil {
-			x.ConfigMap = new(LocalObjectReference)
+		if x.ConfigMapRef == nil {
+			x.ConfigMapRef = new(LocalObjectReference)
 		}
-		x.ConfigMap.CodecDecodeSelf(d)
+		x.ConfigMapRef.CodecDecodeSelf(d)
 	}
 	for {
 		yyj1384++

@@ -218,6 +218,7 @@ var map_Container = map[string]string{
 	"workingDir":             "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
 	"ports":                  "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
 	"env":                    "List of environment variables to set in the container. Cannot be updated.",
+	"envFrom":                "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All env values will take precedence over any listed source. Cannot be updated.",
 	"resources":              "Compute Resources required by this container. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
 	"volumeMounts":           "Pod volumes to mount into the container's filesystem. Cannot be updated.",
 	"livenessProbe":          "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
@@ -229,7 +230,6 @@ var map_Container = map[string]string{
 	"stdin":                  "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
 	"stdinOnce":              "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
 	"tty":                    "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
-	"envFrom":                "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. When a key exists in multiple sources, the value associated with the last source will take precedence. All EnvVars will take precedence over any listed source. Cannot be updated.",
 }
 
 func (Container) SwaggerDoc() map[string]string {
@@ -426,8 +426,8 @@ func (EndpointsList) SwaggerDoc() map[string]string {
 }
 
 var map_EnvFromSource = map[string]string{
-	"":          "EnvFromSource represents the source of a set of EnvVars",
-	"configMap": "The ConfigMap to select from",
+	"":             "EnvFromSource represents the source of a set of ConfigMaps",
+	"configMapRef": "The ConfigMap to select from",
 }
 
 func (EnvFromSource) SwaggerDoc() map[string]string {

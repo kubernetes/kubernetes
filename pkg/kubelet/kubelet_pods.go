@@ -418,8 +418,8 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		configMapEnv = make(map[string]string)
 	)
 	for _, envFrom := range container.EnvFrom {
-		if envFrom.ConfigMap != nil {
-			name := envFrom.ConfigMap.Name
+		if envFrom.ConfigMapRef != nil {
+			name := envFrom.ConfigMapRef.Name
 			configMap, ok := configMaps[name]
 			if !ok {
 				if kl.kubeClient == nil {

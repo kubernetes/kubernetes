@@ -2602,7 +2602,7 @@ func TestValidateEnv(t *testing.T) {
 
 func TestValidateEnvFrom(t *testing.T) {
 	successCase := []api.EnvFromSource{
-		{ConfigMap: &api.LocalObjectReference{Name: "abc"}},
+		{ConfigMapRef: &api.LocalObjectReference{Name: "abc"}},
 	}
 	if errs := validateEnvFrom(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -2615,7 +2615,7 @@ func TestValidateEnvFrom(t *testing.T) {
 	}{
 		{
 			name:          "zero-length name",
-			envs:          []api.EnvFromSource{{ConfigMap: &api.LocalObjectReference{Name: ""}}},
+			envs:          []api.EnvFromSource{{ConfigMapRef: &api.LocalObjectReference{Name: ""}}},
 			expectedError: "field[0].configMap: Required value",
 		},
 	}

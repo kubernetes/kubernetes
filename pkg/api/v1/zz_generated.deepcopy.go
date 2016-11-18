@@ -564,6 +564,17 @@ func DeepCopy_v1_Container(in interface{}, out interface{}, c *conversion.Cloner
 		} else {
 			out.Env = nil
 		}
+		if in.EnvFrom != nil {
+			in, out := &in.EnvFrom, &out.EnvFrom
+			*out = make([]EnvFromSource, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_EnvFromSource(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.EnvFrom = nil
+		}
 		if err := DeepCopy_v1_ResourceRequirements(&in.Resources, &out.Resources, c); err != nil {
 			return err
 		}
@@ -617,17 +628,6 @@ func DeepCopy_v1_Container(in interface{}, out interface{}, c *conversion.Cloner
 		out.Stdin = in.Stdin
 		out.StdinOnce = in.StdinOnce
 		out.TTY = in.TTY
-		if in.EnvFrom != nil {
-			in, out := &in.EnvFrom, &out.EnvFrom
-			*out = make([]EnvFromSource, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_EnvFromSource(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.EnvFrom = nil
-		}
 		return nil
 	}
 }
@@ -978,12 +978,12 @@ func DeepCopy_v1_EnvFromSource(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*EnvFromSource)
 		out := out.(*EnvFromSource)
-		if in.ConfigMap != nil {
-			in, out := &in.ConfigMap, &out.ConfigMap
+		if in.ConfigMapRef != nil {
+			in, out := &in.ConfigMapRef, &out.ConfigMapRef
 			*out = new(LocalObjectReference)
 			**out = **in
 		} else {
-			out.ConfigMap = nil
+			out.ConfigMapRef = nil
 		}
 		return nil
 	}

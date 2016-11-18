@@ -285,7 +285,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Env
 		{
-			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{ConfigMap: &api.LocalObjectReference{Name: "a123"}}}},
+			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{ConfigMapRef: &api.LocalObjectReference{Name: "a123"}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
 				Ready:        true,

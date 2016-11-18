@@ -374,7 +374,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		},
 		func(ev *api.EnvFromSource, c fuzz.Continue) {
 			if c.RandBool() {
-				ev.ConfigMap = &api.LocalObjectReference{Name: c.RandString()}
+				ev.ConfigMapRef = &api.LocalObjectReference{Name: c.RandString()}
 			}
 		},
 		func(sc *api.SecurityContext, c fuzz.Continue) {

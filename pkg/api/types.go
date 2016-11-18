@@ -1136,7 +1136,7 @@ type SecretKeySelector struct {
 type EnvFromSource struct {
 	// The ConfigMap to select from.
 	//+optional
-	ConfigMap *LocalObjectReference `json:"configMap,omitempty"`
+	ConfigMapRef *LocalObjectReference `json:"configMapRef,omitempty"`
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes
