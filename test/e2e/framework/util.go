@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -3386,6 +3387,30 @@ func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string,
 		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
 	}
 	return statefulSet, pollErr
+}
+
+type updateJobFunc func(*batch.Job)
+
+func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateJobFunc) (job *batch.Job, err error) {
+	jobs := c.Batch().Jobs(namespace)
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if job, err = jobs.Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(job)
+		if job, err = jobs.Update(job); err == nil {
+			Logf("Updating job %s", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to job %q: %v", name, updateErr)
+	}
+	return job, pollErr
 }
 
 // NodeAddresses returns the first address of the given type of each node.
