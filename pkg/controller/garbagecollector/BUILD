@@ -51,7 +51,6 @@ go_test(
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/meta/metatypes:go_default_library",
         "//pkg/api/unversioned:go_default_library",

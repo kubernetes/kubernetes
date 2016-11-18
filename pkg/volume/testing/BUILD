@@ -18,9 +18,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/io:go_default_library",

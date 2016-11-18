@@ -44,9 +44,9 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 		return synthesized
 	}
 	synthesized.NamespaceOptions = &runtimeapi.NamespaceOption{
-    HostNetwork: &pod.Spec.HostNetwork,
-    HostIpc:     &pod.Spec.HostIPC,
-    HostPid:     &pod.Spec.HostPID,
+		HostNetwork: &pod.Spec.HostNetwork,
+		HostIpc:     &pod.Spec.HostIPC,
+		HostPid:     &pod.Spec.HostPID,
 	}
 	if podSc.FSGroup != nil {
 		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, *podSc.FSGroup)

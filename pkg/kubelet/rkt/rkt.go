@@ -1976,8 +1976,7 @@ func (r *Runtime) cleanupPodNetworkFromServiceFile(serviceFilePath string) error
 			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
-				HostNetwork: hostnetwork,
-
+			HostNetwork: hostnetwork,
 		},
 	})
 }

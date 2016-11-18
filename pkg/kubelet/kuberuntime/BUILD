@@ -29,8 +29,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/api:go_default_library",
@@ -78,8 +78,8 @@ go_test(
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet/api/testing:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",

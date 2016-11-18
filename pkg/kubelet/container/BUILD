@@ -28,8 +28,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -59,8 +59,8 @@ go_test(
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/types:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",

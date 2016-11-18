@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/diff"
 )

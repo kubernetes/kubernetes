@@ -190,8 +190,8 @@ func (config *KubeletManagedHostConfig) createPodSpecWithHostNetwork(podName str
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
-HostNetwork: true,
-SecurityContext: &v1.PodSecurityContext{},
+			HostNetwork:     true,
+			SecurityContext: &v1.PodSecurityContext{},
 			Containers: []v1.Container{
 				{
 					Name:            "busybox-1",

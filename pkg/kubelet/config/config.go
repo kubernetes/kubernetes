@@ -324,15 +324,15 @@ func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecor
 	names := sets.String{}
 	for i, pod := range pods {
 		var errlist field.ErrorList
-// TODO: remove the conversion when validation is performed on versioned objects.
-internalPod := &api.Pod{}
+		// TODO: remove the conversion when validation is performed on versioned objects.
+		internalPod := &api.Pod{}
 		if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
 			name := kubecontainer.GetPodFullName(pod)
 			glog.Warningf("Pod[%d] (%s) from %s failed to convert to v1, ignoring: %v", i+1, name, source, err)
 			recorder.Eventf(pod, v1.EventTypeWarning, "FailedConversion", "Error converting pod %s from %s, ignoring: %v", name, source, err)
 			continue
 		}
-        		if errs := validation.ValidatePod(internalPod); len(errs) != 0 {
+		if errs := validation.ValidatePod(internalPod); len(errs) != 0 {
 			errlist = append(errlist, errs...)
 			// If validation fails, don't trust it any further -
 			// even Name could be bad.

@@ -18,8 +18,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/runtime:go_default_library",
     ],

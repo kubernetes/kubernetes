@@ -258,8 +258,7 @@ func newTestPods(count int) []*v1.Pod {
 	for i := 0; i < count; i++ {
 		pods[i] = &v1.Pod{
 			Spec: v1.PodSpec{
-					HostNetwork: true,
-
+				HostNetwork: true,
 			},
 			ObjectMeta: v1.ObjectMeta{
 				UID:  types.UID(10000 + i),
@@ -951,8 +950,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		Containers: []v1.Container{
 			{Name: "foo"},
 		},
-			HostNetwork: true,
-
+		HostNetwork: true,
 	})
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 
@@ -984,8 +982,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 		Containers: []v1.Container{
 			{Name: "foo"},
 		},
-			HostNetwork: true,
-
+		HostNetwork: true,
 	})
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 
@@ -1068,7 +1065,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	})
 
 	pod := podWithUidNameNsSpec("12345678", "hostnetwork", "new", v1.PodSpec{
-			HostNetwork: false,
+		HostNetwork: false,
 
 		Containers: []v1.Container{
 			{Name: "foo"},
