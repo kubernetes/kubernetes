@@ -177,12 +177,12 @@ includes a script to help install etcd on your machine.
 
 # Option a) install inside kubernetes root
 hack/install-etcd.sh  # Installs in ./third_party/etcd
-echo export PATH="$PATH:$(pwd)/third_party/etcd" >> ~/.profile  # Add to PATH
+echo export PATH="\$PATH:$(pwd)/third_party/etcd" >> ~/.profile  # Add to PATH
 
 # Option b) install manually
 grep -E "image.*etcd" cluster/saltbase/etcd/etcd.manifest  # Find version
 # Install that version using yum/apt-get/etc
-echo export PATH="$PATH:<LOCATION>" >> ~/.profile  # Add to PATH
+echo export PATH="\$PATH:<LOCATION>" >> ~/.profile  # Add to PATH
 ```
 
 ### Etcd test data
