@@ -17,35 +17,35 @@ limitations under the License.
 package schedulercache
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // PodsToCache is used for testing
-type PodsToCache []*api.Pod
+type PodsToCache []*v1.Pod
 
-func (p PodsToCache) AssumePod(pod *api.Pod) error { return nil }
+func (p PodsToCache) AssumePod(pod *v1.Pod) error { return nil }
 
-func (p PodsToCache) ForgetPod(pod *api.Pod) error { return nil }
+func (p PodsToCache) ForgetPod(pod *v1.Pod) error { return nil }
 
-func (p PodsToCache) AddPod(pod *api.Pod) error { return nil }
+func (p PodsToCache) AddPod(pod *v1.Pod) error { return nil }
 
-func (p PodsToCache) UpdatePod(oldPod, newPod *api.Pod) error { return nil }
+func (p PodsToCache) UpdatePod(oldPod, newPod *v1.Pod) error { return nil }
 
-func (p PodsToCache) RemovePod(pod *api.Pod) error { return nil }
+func (p PodsToCache) RemovePod(pod *v1.Pod) error { return nil }
 
-func (p PodsToCache) AddNode(node *api.Node) error { return nil }
+func (p PodsToCache) AddNode(node *v1.Node) error { return nil }
 
-func (p PodsToCache) UpdateNode(oldNode, newNode *api.Node) error { return nil }
+func (p PodsToCache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 
-func (p PodsToCache) RemoveNode(node *api.Node) error { return nil }
+func (p PodsToCache) RemoveNode(node *v1.Node) error { return nil }
 
 func (p PodsToCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
 	return nil
 }
 
-func (p PodsToCache) List(s labels.Selector) (selected []*api.Pod, err error) {
+func (p PodsToCache) List(s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range p {
 		if s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)

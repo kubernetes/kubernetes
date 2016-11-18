@@ -21,7 +21,7 @@ import (
 	"os"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -228,7 +228,7 @@ func copyAndReplace(set sets.String, replaceWhat, replaceWith string) sets.Strin
 }
 
 // GetEquivalencePod returns a EquivalencePod which contains a group of pod attributes which can be reused.
-func GetEquivalencePod(pod *api.Pod) interface{} {
+func GetEquivalencePod(pod *v1.Pod) interface{} {
 	equivalencePod := EquivalencePod{}
 	// For now we only consider pods:
 	// 1. OwnerReferences is Controller
@@ -260,5 +260,5 @@ func isValidControllerKind(kind string) bool {
 
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
 type EquivalencePod struct {
-	ControllerRef api.OwnerReference
+	ControllerRef v1.OwnerReference
 }
