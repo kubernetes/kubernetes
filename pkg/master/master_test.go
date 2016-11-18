@@ -42,12 +42,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -173,25 +172,36 @@ func (*fakeEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP,
 	return nil
 }
 
+func makeNodeList(nodes []string, nodeResources apiv1.NodeResources) *apiv1.NodeList {
+	list := apiv1.NodeList{
+		Items: make([]apiv1.Node, len(nodes)),
+	}
+	for i := range nodes {
+		list.Items[i].Name = nodes[i]
+		list.Items[i].Status.Capacity = nodeResources.Capacity
+	}
+	return &list
+}
+
 // TestGetNodeAddresses verifies that proper results are returned
 // when requesting node addresses.
 func TestGetNodeAddresses(t *testing.T) {
 	assert := assert.New(t)
 
-	fakeNodeClient := fake.NewSimpleClientset(registrytest.MakeNodeList([]string{"node1", "node2"}, api.NodeResources{})).Core().Nodes()
+	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2"}, apiv1.NodeResources{})).Core().Nodes()
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Fail case (no addresses associated with nodes)
-	nodes, _ := fakeNodeClient.List(api.ListOptions{})
+	nodes, _ := fakeNodeClient.List(apiv1.ListOptions{})
 	addrs, err := addressProvider.externalAddresses()
 
 	assert.Error(err, "addresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ = fakeNodeClient.List(api.ListOptions{})
+	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
 	for index := range nodes.Items {
-		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeExternalIP, Address: "127.0.0.1"}}
+		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
 		fakeNodeClient.Update(&nodes.Items[index])
 	}
 	addrs, err = addressProvider.externalAddresses()
@@ -199,9 +209,9 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 
 	// Pass case with LegacyHost type IP
-	nodes, _ = fakeNodeClient.List(api.ListOptions{})
+	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
 	for index := range nodes.Items {
-		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.2"}}
+		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeLegacyHostIP, Address: "127.0.0.2"}}
 		fakeNodeClient.Update(&nodes.Items[index])
 	}
 	addrs, err = addressProvider.externalAddresses()
