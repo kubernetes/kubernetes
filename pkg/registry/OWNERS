@@ -10,10 +10,8 @@ reviewers:
 - bgrant0607
 - deads2k
 - yujuhong
-- brendandburns
 - derekwaynecarr
 - caesarxuchao
-- vishh
 - mikedanese
 - liggitt
 - nikhiljindal
@@ -23,7 +21,6 @@ reviewers:
 - davidopp
 - pmorie
 - kargakis
-- dchen1107
 - saad-ali
 - zmerlynn
 - luxas
@@ -39,7 +36,6 @@ reviewers:
 - jlowdermilk
 - soltysh
 - piosz
-- jbeda
 - dims
 - madhusudancs
 - hongchaodeng
