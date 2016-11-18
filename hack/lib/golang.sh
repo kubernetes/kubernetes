@@ -610,16 +610,12 @@ kube::golang::build_binaries() {
     local -a targets=()
     local arg
 
-    # Add any files with those //generate annotations in the array below.
-    readonly BINDATAS=( "${KUBE_ROOT}/test/e2e/framework/gobindata_util.go" )
-    kube::log::status "Generating bindata:" "${BINDATAS[@]}"
-    for bindata in ${BINDATAS[@]}; do
-          # Only try to generate bindata if the file exists, since in some cases
-          # one-off builds of individual directories may exclude some files.
-      if [[ -f $bindata ]]; then
-          go generate "${bindata}"
-      fi
-    done
+    # TODO generalize this optimization somehow: Build bindata stuff is only really required for e2e as of now.
+    if [[ $@ == *"e2e"* ]]; then
+	 pushd `dirname test/e2e/`
+	 go generate ./...
+	 popd
+    fi
 
     for arg; do
       if [[ "${arg}" == "--use_go_build" ]]; then
@@ -658,8 +654,10 @@ kube::golang::build_binaries() {
       fi
     fi
 
-    # First build the toolchain before building any other targets
-    kube::golang::build_kube_toolchain
+    # TODO, generalize this optimization somehow: First build the toolchain before building any other targets.
+    if [[ $@ == *"cmd"* ]]; then
+        kube::golang::build_kube_toolchain
+    fi
 
     if [[ "${parallel}" == "true" ]]; then
       kube::log::status "Building go targets for {${platforms[*]}} in parallel (output will appear in a burst when complete):" "${targets[@]}"
