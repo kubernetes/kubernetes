@@ -81,9 +81,16 @@ start_apiserver
 try_dump upgraded
 kill_em_all
 
+# TODO(mml): Currently busted: https://github.com/kubernetes/kubernetes/issues/36555
+migrate_if_needed etcd2 2.3.7
+start_etcd
+start_apiserver
+try_dump rollback
+kill_em_all
+
 for what in nodes pods; do
   echo "Checking ${what}..."
-  for dump in 237 upgraded; do
+  for dump in 237 upgraded rollback; do
     echo -n " start vs ${dump}..."
     diff -u /var/log/kubectl-${what}-start* /var/log/kubectl-${what}-${dump}* || fail "start/${what} != ${dump}/${what}"
     echo OK
@@ -92,9 +99,3 @@ done
 
 pass
 
-# TODO(mml): Currently busted: https://github.com/kubernetes/kubernetes/issues/36555
-# migrate_if_needed etcd2 2.3.7
-# start_etcd
-# start_apiserver
-# try_dump rollback
-# kill_em_all
