@@ -17,8 +17,8 @@ limitations under the License.
 package e2e_node
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -30,20 +30,20 @@ var _ = framework.KubeDescribe("SimpleMount", func() {
 	// This is a very simple test that exercises the Kubelet's mounter code path.
 	// If the mount fails, the pod will not be able to run, and CreateSync will timeout.
 	It("should be able to mount an emptydir on a container", func() {
-		pod := &api.Pod{
+		pod := &v1.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind:       "Pod",
 				APIVersion: "v1",
 			},
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "simple-mount-pod",
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "simple-mount-container",
 						Image: framework.GetPauseImageNameForHostArch(),
-						VolumeMounts: []api.VolumeMount{
+						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      "simply-mounted-volume",
 								MountPath: "/opt/",
@@ -51,11 +51,11 @@ var _ = framework.KubeDescribe("SimpleMount", func() {
 						},
 					},
 				},
-				Volumes: []api.Volume{
+				Volumes: []v1.Volume{
 					{
 						Name: "simply-mounted-volume",
-						VolumeSource: api.VolumeSource{
-							EmptyDir: &api.EmptyDirVolumeSource{
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
 								Medium: "Memory",
 							},
 						},

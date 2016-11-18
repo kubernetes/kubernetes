@@ -17,7 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -33,17 +33,17 @@ var _ = framework.KubeDescribe("ImageID", func() {
 	f := framework.NewDefaultFramework("image-id-test")
 
 	It("should be set to the manifest digest (from RepoDigests) when available", func() {
-		podDesc := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		podDesc := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "pod-with-repodigest",
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
 					Name:    "test",
 					Image:   busyBoxImage,
 					Command: []string{"sh"},
 				}},
-				RestartPolicy: api.RestartPolicyNever,
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 
