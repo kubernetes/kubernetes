@@ -5,7 +5,6 @@ reviewers:
 - wojtek-t
 - deads2k
 - yujuhong
-- brendandburns
 - derekwaynecarr
 - caesarxuchao
 - mikedanese
@@ -30,7 +29,6 @@ reviewers:
 - fgrzadkowski
 - xiang90
 - resouer
-- david-mcmahon
 - mqliang
 - feihujiang
 - sdminonne
