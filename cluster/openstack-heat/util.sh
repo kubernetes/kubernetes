@@ -106,7 +106,9 @@ function create-stack() {
 #   ROOT
 #   KUBERNETES_RELEASE_TAR
 function upload-resources() {
-  swift post kubernetes --read-acl '.r:*,.rlistings'
+  set -x
+  env
+  swift --debug post ${KUBE_SWIFT_PREFIX}kubernetes --read-acl '.r:*,.rlistings'
 
   locations=(
     "${ROOT}/../../_output/release-tars/${KUBERNETES_RELEASE_TAR}"
@@ -117,11 +119,11 @@ function upload-resources() {
   RELEASE_TAR_PATH=$(dirname ${RELEASE_TAR_LOCATION})
 
   echo "[INFO] Uploading ${KUBERNETES_RELEASE_TAR}"
-  swift upload kubernetes ${RELEASE_TAR_PATH}/${KUBERNETES_RELEASE_TAR} \
+  swift upload ${KUBE_SWIFT_PREFIX}kubernetes ${RELEASE_TAR_PATH}/${KUBERNETES_RELEASE_TAR} \
     --object-name kubernetes-server.tar.gz
 
   echo "[INFO] Uploading kubernetes-salt.tar.gz"
-  swift upload kubernetes ${RELEASE_TAR_PATH}/kubernetes-salt.tar.gz \
+  swift upload ${KUBE_SWIFT_PREFIX}kubernetes ${RELEASE_TAR_PATH}/kubernetes-salt.tar.gz \
     --object-name kubernetes-salt.tar.gz
 }
 
@@ -188,7 +190,7 @@ function run-heat-script() {
   if [[ -z $SWIFT_SERVER_URL ]]; then
     SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "publicURL: (.+)$" | cut -d" " -f2)
   fi
-  local swift_repo_url="${SWIFT_SERVER_URL}/kubernetes"
+  local swift_repo_url="${SWIFT_SERVER_URL}/${KUBE_SWIFT_PREFIX}kubernetes"
 
   if [ $CREATE_IMAGE = true ]; then
     echo "[INFO] Retrieve new image ID"
@@ -215,6 +217,7 @@ function run-heat-script() {
       --parameter kubernetes_server_url=${swift_repo_url}/kubernetes-server.tar.gz \
       --parameter os_auth_url=${OS_AUTH_URL} \
       --parameter os_username=${OS_USERNAME} \
+      --parameter token_kubelet=${KUBE_BEARER_TOKEN} \
       --parameter os_password=${OS_PASSWORD} \
       --parameter os_region_name=${OS_REGION_NAME} \
       --parameter os_tenant_id=${OS_TENANT_ID} \
@@ -241,7 +244,7 @@ function configure-kubectl() {
 
   export KUBE_MASTER_IP=$(nova show "${STACK_NAME}"-master | awk '$3=="network" {print $6}')
   export CONTEXT="openstack-${STACK_NAME}"
-  export KUBE_BEARER_TOKEN="TokenKubelet"
+  export KUBE_BEARER_TOKEN
 
   if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
     echo 'export NO_PROXY=$NO_PROXY,'"${KUBE_MASTER_IP}" > /tmp/kube-proxy-env

@@ -61,6 +61,15 @@ STACK_CREATE_TIMEOUT=${STACK_CREATE_TIMEOUT:-60}
 # Enable Proxy, if true kube-up will apply your current proxy settings(defined by *_PROXY environment variables) to the deployment.
 ENABLE_PROXY=${ENABLE_PROXY:-false}
 
+# Prefix for the swift container
+KUBE_SWIFT_PREFIX=${KUBE_SWIFT_PREFIX:-}
+
+# Generate a token for this cluster
+KUBE_BEARER_TOKEN=${KUBE_BEARER_TOKEN:-$(openssl rand -hex 32)}
+
+# Default Network CIDR
+FIXED_NETWORK_CIDR=${FIXED_NETWORK_CIDR-10.0.0.0/24}
+
 # Per-protocol proxy settings.
 FTP_PROXY=${FTP_PROXY:-}
 HTTP_PROXY=${HTTP_PROXY:-}
