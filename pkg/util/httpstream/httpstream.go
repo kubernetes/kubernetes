@@ -19,8 +19,10 @@ package httpstream
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -82,6 +84,9 @@ type Connection interface {
 
 // Stream represents a bidirectional communications channel that is part of an
 // upgraded connection.
+//
+// NOTE: in contrast to Connection, here Close() closes only the sending half of the stream
+//       and Reset() closes both.
 type Stream interface {
 	io.ReadWriteCloser
 	// Reset closes both directions of the stream, indicating that neither client
@@ -146,4 +151,91 @@ func Handshake(req *http.Request, w http.ResponseWriter, serverProtocols []strin
 
 	w.Header().Add(HeaderProtocolVersion, negotiatedProtocol)
 	return negotiatedProtocol, nil
+}
+
+type tcpReadCloser struct {
+	*net.TCPConn
+}
+
+type tcpWriteCloser struct {
+	*net.TCPConn
+}
+
+func (rc tcpReadCloser) Close() error {
+	return rc.TCPConn.CloseRead()
+}
+
+func (wc tcpWriteCloser) Close() error {
+	return wc.TCPConn.CloseWrite()
+}
+
+type streadReadCloser struct {
+	Stream
+}
+
+type streamWriteCloser struct {
+	Stream
+}
+
+func (rc streadReadCloser) Close() error {
+	return rc.Stream.Close()
+}
+
+func (wc streamWriteCloser) Close() error {
+	return wc.Stream.Reset() // this closes both sides. Best we can do for a Stream.
+}
+
+// SplitTCPConn splits a TCP connection into a WriteCloser and ReadCloser. Closing one of them turns an open
+// connection into an half-open one.
+func SplitTCPConn(conn *net.TCPConn) (io.WriteCloser, io.ReadCloser) {
+	return tcpWriteCloser{conn}, tcpReadCloser{conn}
+}
+
+// SplitTCPConn splits a httpstream.Stream into a WriteCloser and ReadCloser. Closing the former closes the
+// the write half of the stream, closing the later closes both halfs.
+func SplitStream(stream Stream) (io.WriteCloser, io.ReadCloser) {
+	return streadReadCloser{stream}, streamWriteCloser{stream}
+}
+
+// CopyBothWays copies data from conn to dataStream and the other way around. An EOF on either side is passed along
+// as a one-sided Close call. On error the connection state is undefined and must be cleaned up by the caller.
+// If no error occurs, both connections are kept half-open.
+func CopyBothWays(remoteIn io.WriteCloser, remoteOut io.ReadCloser, localIn io.WriteCloser, localOut io.ReadCloser) error {
+	localError := make(chan error, 2)
+	copiesDone := make(chan struct{})
+
+	copiesGroup := sync.WaitGroup{}
+	copiesGroup.Add(2)
+
+	// Copy from the remote side to the local port.
+	go func() {
+		defer copiesGroup.Done()
+		defer remoteIn.Close()
+		if _, err := io.Copy(remoteIn, localOut); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			localError <- err
+		}
+	}()
+
+	// Copy from the local port to the remote side.
+	go func() {
+		defer copiesGroup.Done()
+		defer localIn.Close()
+		if _, err := io.Copy(localIn, remoteOut); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			localError <- err
+		}
+	}()
+
+	go func() {
+		defer close(copiesDone)
+		copiesGroup.Wait()
+	}()
+
+	// wait for either both copies finish or an error occurs
+	select {
+	case <-copiesDone:
+	case err := <-localError: // catch the first error, potentially ignore the second
+		return err
+	}
+
+	return nil
 }
