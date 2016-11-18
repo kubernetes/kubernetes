@@ -97,7 +97,8 @@ func (h *handler) openHostports(pod *api.Pod) error {
 				continue
 			}
 			hp := hostport{
-				port:     port.HostPort,
+				port: port.HostPort,
+				// When cleaning it up, we also check the protocal in lower format.
 				protocol: strings.ToLower(string(port.Protocol)),
 			}
 			socket, err := h.portOpener(&hp)
@@ -370,7 +371,7 @@ func (h *handler) cleanupHostportMap(containerPortMap map[api.ContainerPort]targ
 	for containerPort := range containerPortMap {
 		hp := hostport{
 			port:     containerPort.HostPort,
-			protocol: string(containerPort.Protocol),
+			protocol: strings.ToLower(string(containerPort.Protocol)),
 		}
 		currentHostports[hp] = true
 	}
@@ -379,6 +380,7 @@ func (h *handler) cleanupHostportMap(containerPortMap map[api.ContainerPort]targ
 	for hp, socket := range h.hostPortMap {
 		if _, ok := currentHostports[hp]; !ok {
 			socket.Close()
+			glog.V(3).Infof("Closed local port %s", hp.String())
 			delete(h.hostPortMap, hp)
 		}
 	}
