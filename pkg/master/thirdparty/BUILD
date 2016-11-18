@@ -22,7 +22,7 @@ go_library(
         "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
-        "//pkg/registry/extensions/thirdpartyresourcedata/etcd:go_default_library",
+        "//pkg/registry/extensions/thirdpartyresourcedata/storage:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",

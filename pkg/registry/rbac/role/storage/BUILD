@@ -9,7 +9,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["etcd.go"],
+    srcs = ["storage.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
