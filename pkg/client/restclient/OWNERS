@@ -1,6 +1,7 @@
 reviewers:
 - thockin
 - smarterclayton
+- caesarxuchao
 - wojtek-t
 - deads2k
 - brendandburns
@@ -16,7 +17,6 @@ reviewers:
 - krousey
 - resouer
 - cjcullen
-- david-mcmahon
 - rmmh
 - lixiaobing10051267
 - asalkeld
