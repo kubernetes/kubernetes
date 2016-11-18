@@ -283,13 +283,10 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *util.
 
 // WaitUntilFreshAndList returns list of pointers to <storeElement> objects.
 func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *util.Trace) ([]interface{}, uint64, error) {
-	// If resourceVersion == 0 we'll return the data that we currently have in cache.
-	if resourceVersion != 0 {
-		err := w.waitUntilFreshAndBlock(resourceVersion, trace)
-		defer w.RUnlock()
-		if err != nil {
-			return nil, 0, err
-		}
+	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
+	defer w.RUnlock()
+	if err != nil {
+		return nil, 0, err
 	}
 	return w.store.List(), w.resourceVersion, nil
 }
