@@ -24,10 +24,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/rand"
@@ -87,23 +87,23 @@ func getServiceSelector() map[string]string {
 type NetworkingTestConfig struct {
 	// TestContaienrPod is a test pod running the netexec image. It is capable
 	// of executing tcp/udp requests against ip:port.
-	TestContainerPod *api.Pod
+	TestContainerPod *v1.Pod
 	// HostTestContainerPod is a pod running with hostNetworking=true, and the
 	// hostexec image.
-	HostTestContainerPod *api.Pod
+	HostTestContainerPod *v1.Pod
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
-	EndpointPods []*api.Pod
+	EndpointPods []*v1.Pod
 	f            *Framework
 	podClient    *PodClient
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
-	NodePortService *api.Service
+	NodePortService *v1.Service
 	// ExternalAddrs is a list of external IPs of nodes in the cluster.
 	ExternalAddrs []string
 	// Nodes is a list of nodes in the cluster.
-	Nodes []api.Node
+	Nodes []v1.Node
 	// MaxTries is the number of retries tolerated for tests run against
 	// endpoints and services created by this config.
 	MaxTries int
@@ -298,41 +298,41 @@ func (config *NetworkingTestConfig) GetSelfURL(path string, expected string) {
 	}
 }
 
-func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node string) *api.Pod {
-	probe := &api.Probe{
+func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node string) *v1.Pod {
+	probe := &v1.Probe{
 		InitialDelaySeconds: 10,
 		TimeoutSeconds:      30,
 		PeriodSeconds:       10,
 		SuccessThreshold:    1,
 		FailureThreshold:    3,
-		Handler: api.Handler{
-			HTTPGet: &api.HTTPGetAction{
+		Handler: v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
 				Path: "/healthz",
 				Port: intstr.IntOrString{IntVal: EndpointHttpPort},
 			},
 		},
 	}
-	pod := &api.Pod{
+	pod := &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      podName,
 			Namespace: config.Namespace,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:            "webserver",
 					Image:           NetexecImageName,
-					ImagePullPolicy: api.PullIfNotPresent,
+					ImagePullPolicy: v1.PullIfNotPresent,
 					Command: []string{
 						"/netexec",
 						fmt.Sprintf("--http-port=%d", EndpointHttpPort),
 						fmt.Sprintf("--udp-port=%d", EndpointUdpPort),
 					},
-					Ports: []api.ContainerPort{
+					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
 							ContainerPort: EndpointHttpPort,
@@ -340,7 +340,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 						{
 							Name:          "udp",
 							ContainerPort: EndpointUdpPort,
-							Protocol:      api.ProtocolUDP,
+							Protocol:      v1.ProtocolUDP,
 						},
 					},
 					LivenessProbe:  probe,
@@ -355,28 +355,28 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 	return pod
 }
 
-func (config *NetworkingTestConfig) createTestPodSpec() *api.Pod {
-	pod := &api.Pod{
+func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
+	pod := &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      testPodName,
 			Namespace: config.Namespace,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:            "webserver",
 					Image:           NetexecImageName,
-					ImagePullPolicy: api.PullIfNotPresent,
+					ImagePullPolicy: v1.PullIfNotPresent,
 					Command: []string{
 						"/netexec",
 						fmt.Sprintf("--http-port=%d", EndpointHttpPort),
 						fmt.Sprintf("--udp-port=%d", EndpointUdpPort),
 					},
-					Ports: []api.ContainerPort{
+					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
 							ContainerPort: TestContainerHttpPort,
@@ -390,15 +390,15 @@ func (config *NetworkingTestConfig) createTestPodSpec() *api.Pod {
 }
 
 func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
-	serviceSpec := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+	serviceSpec := &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name: nodePortServiceName,
 		},
-		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeNodePort,
-			Ports: []api.ServicePort{
-				{Port: ClusterHttpPort, Name: "http", Protocol: api.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHttpPort)},
-				{Port: ClusterUdpPort, Name: "udp", Protocol: api.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUdpPort)},
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeNodePort,
+			Ports: []v1.ServicePort{
+				{Port: ClusterHttpPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHttpPort)},
+				{Port: ClusterUdpPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUdpPort)},
 			},
 			Selector: selector,
 		},
@@ -434,7 +434,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 	}
 }
 
-func (config *NetworkingTestConfig) createService(serviceSpec *api.Service) *api.Service {
+func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.Service {
 	_, err := config.getServiceClient().Create(serviceSpec)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
@@ -468,10 +468,10 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	By("Getting node addresses")
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
-	config.ExternalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
+	config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeExternalIP)
 	if len(config.ExternalAddrs) < 2 {
 		// fall back to legacy IPs
-		config.ExternalAddrs = NodeAddresses(nodeList, api.NodeLegacyHostIP)
+		config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeLegacyHostIP)
 	}
 	Expect(len(config.ExternalAddrs)).To(BeNumerically(">=", 2), fmt.Sprintf("At least two nodes necessary with an external or LegacyHostIP"))
 	config.Nodes = nodeList.Items
@@ -481,9 +481,9 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 	for _, p := range config.NodePortService.Spec.Ports {
 		switch p.Protocol {
-		case api.ProtocolUDP:
+		case v1.ProtocolUDP:
 			config.NodeUdpPort = int(p.NodePort)
-		case api.ProtocolTCP:
+		case v1.ProtocolTCP:
 			config.NodeHttpPort = int(p.NodePort)
 		default:
 			continue
@@ -495,7 +495,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 func (config *NetworkingTestConfig) cleanup() {
 	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(api.ListOptions{})
+	nsList, err := nsClient.List(v1.ListOptions{})
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.Namespace {
@@ -507,8 +507,8 @@ func (config *NetworkingTestConfig) cleanup() {
 
 // shuffleNodes copies nodes from the specified slice into a copy in random
 // order. It returns a new slice.
-func shuffleNodes(nodes []api.Node) []api.Node {
-	shuffled := make([]api.Node, len(nodes))
+func shuffleNodes(nodes []v1.Node) []v1.Node {
+	shuffled := make([]v1.Node, len(nodes))
 	perm := rand.Perm(len(nodes))
 	for i, j := range perm {
 		shuffled[j] = nodes[i]
@@ -516,7 +516,7 @@ func shuffleNodes(nodes []api.Node) []api.Node {
 	return shuffled
 }
 
-func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
+func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 
@@ -529,7 +529,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	}
 
 	// create pods, one for each node
-	createdPods := make([]*api.Pod, 0, len(nodes))
+	createdPods := make([]*v1.Pod, 0, len(nodes))
 	for i, n := range nodes {
 		podName := fmt.Sprintf("%s-%d", podName, i)
 		pod := config.createNetShellPodSpec(podName, n.Name)
@@ -539,7 +539,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	}
 
 	// wait that all of them are up
-	runningPods := make([]*api.Pod, 0, len(nodes))
+	runningPods := make([]*v1.Pod, 0, len(nodes))
 	for _, p := range createdPods {
 		ExpectNoError(config.f.WaitForPodReady(p.Name))
 		rp, err := config.getPodClient().Get(p.Name)
@@ -552,7 +552,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 
 func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	pod := config.EndpointPods[0]
-	config.getPodClient().Delete(pod.Name, api.NewDeleteOptions(0))
+	config.getPodClient().Delete(pod.Name, v1.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
 	err := WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
@@ -568,7 +568,7 @@ func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	time.Sleep(5 * time.Second)
 }
 
-func (config *NetworkingTestConfig) createPod(pod *api.Pod) *api.Pod {
+func (config *NetworkingTestConfig) createPod(pod *v1.Pod) *v1.Pod {
 	return config.getPodClient().Create(pod)
 }
 

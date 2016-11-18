@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 
 	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace", func() {
 		var (
-			namespace2  *api.Namespace
+			namespace2  *v1.Namespace
 			err         error
 			secret2Name = "secret-test-" + string(uuid.NewUUID())
 		)
@@ -88,37 +88,37 @@ var _ = framework.KubeDescribe("Secrets", func() {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
 					{
 						Name: volumeName,
-						VolumeSource: api.VolumeSource{
-							Secret: &api.SecretVolumeSource{
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
 								SecretName: name,
 							},
 						},
 					},
 					{
 						Name: volumeName2,
-						VolumeSource: api.VolumeSource{
-							Secret: &api.SecretVolumeSource{
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
 								SecretName: name,
 							},
 						},
 					},
 				},
-				Containers: []api.Container{
+				Containers: []v1.Container{
 					{
 						Name:  "secret-volume-test",
 						Image: "gcr.io/google_containers/mounttest:0.7",
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
 							"--file_mode=/etc/secret-volume/data-1"},
-						VolumeMounts: []api.VolumeMount{
+						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
 								MountPath: volumeMountPath,
@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 						},
 					},
 				},
-				RestartPolicy: api.RestartPolicyNever,
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 
@@ -152,22 +152,22 @@ var _ = framework.KubeDescribe("Secrets", func() {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:    "secret-env-test",
 						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
-						Env: []api.EnvVar{
+						Env: []v1.EnvVar{
 							{
 								Name: "SECRET_DATA",
-								ValueFrom: &api.EnvVarSource{
-									SecretKeyRef: &api.SecretKeySelector{
-										LocalObjectReference: api.LocalObjectReference{
+								ValueFrom: &v1.EnvVarSource{
+									SecretKeyRef: &v1.SecretKeySelector{
+										LocalObjectReference: v1.LocalObjectReference{
 											Name: name,
 										},
 										Key: "data-1",
@@ -177,7 +177,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 						},
 					},
 				},
-				RestartPolicy: api.RestartPolicyNever,
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 
@@ -187,9 +187,9 @@ var _ = framework.KubeDescribe("Secrets", func() {
 	})
 })
 
-func secretForTest(namespace, name string) *api.Secret {
-	return &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+func secretForTest(namespace, name string) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
@@ -214,30 +214,30 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "pod-secrets-" + string(uuid.NewUUID()),
 			Namespace: f.Namespace.Name,
 		},
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
 				{
 					Name: volumeName,
-					VolumeSource: api.VolumeSource{
-						Secret: &api.SecretVolumeSource{
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
 							SecretName: secretName,
 						},
 					},
 				},
 			},
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
 					Image: "gcr.io/google_containers/mounttest:0.7",
 					Args: []string{
 						"--file_content=/etc/secret-volume/data-1",
 						"--file_mode=/etc/secret-volume/data-1"},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
 							MountPath: volumeMountPath,
@@ -245,7 +245,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 
@@ -279,18 +279,18 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "pod-secrets-" + string(uuid.NewUUID()),
 		},
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
 				{
 					Name: volumeName,
-					VolumeSource: api.VolumeSource{
-						Secret: &api.SecretVolumeSource{
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
 							SecretName: name,
-							Items: []api.KeyToPath{
+							Items: []v1.KeyToPath{
 								{
 									Key:  "data-1",
 									Path: "new-path-data-1",
@@ -300,14 +300,14 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 					},
 				},
 			},
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
 					Image: "gcr.io/google_containers/mounttest:0.7",
 					Args: []string{
 						"--file_content=/etc/secret-volume/new-path-data-1",
 						"--file_mode=/etc/secret-volume/new-path-data-1"},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
 							MountPath: volumeMountPath,
@@ -315,7 +315,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 

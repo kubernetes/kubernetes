@@ -19,12 +19,12 @@ package e2e
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/storage"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -39,8 +39,8 @@ const (
 	expectedSize = "2Gi"
 )
 
-func testDynamicProvisioning(client clientset.Interface, claim *api.PersistentVolumeClaim) {
-	err := framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
+	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("checking the claim")
@@ -54,16 +54,16 @@ func testDynamicProvisioning(client clientset.Interface, claim *api.PersistentVo
 
 	// Check sizes
 	expectedCapacity := resource.MustParse(expectedSize)
-	pvCapacity := pv.Spec.Capacity[api.ResourceName(api.ResourceStorage)]
+	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
 	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()))
 
 	requestedCapacity := resource.MustParse(requestedSize)
-	claimCapacity := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	claimCapacity := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()))
 
 	// Check PV properties
-	Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(api.PersistentVolumeReclaimDelete))
-	expectedAccessModes := []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+	Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(v1.PersistentVolumeReclaimDelete))
+	expectedAccessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 	Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
 	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
 	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
@@ -153,19 +153,19 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 })
 
-func newClaim(ns string, alpha bool) *api.PersistentVolumeClaim {
-	claim := api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+func newClaim(ns string, alpha bool) *v1.PersistentVolumeClaim {
+	claim := v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
 			},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse(requestedSize),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(requestedSize),
 				},
 			},
 		},
@@ -187,22 +187,22 @@ func newClaim(ns string, alpha bool) *api.PersistentVolumeClaim {
 
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
 func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
-	pod := &api.Pod{
+	pod := &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
 							MountPath: "/mnt/test",
@@ -210,12 +210,12 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
-			Volumes: []api.Volume{
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
 				{
 					Name: "my-volume",
-					VolumeSource: api.VolumeSource{
-						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 							ClaimName: claimName,
 							ReadOnly:  false,
 						},
@@ -248,7 +248,7 @@ func newStorageClass() *storage.StorageClass {
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "fast",
 		},
 		Provisioner: pluginName,

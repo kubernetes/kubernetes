@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/unversioned"
-	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
@@ -127,15 +127,15 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			}
 
 			// Locate a running pod.
-			var pod api.Pod
+			var pod v1.Pod
 			err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-				podList, err := cs.Pods(ns).List(api.ListOptions{})
+				podList, err := cs.Pods(ns).List(v1.ListOptions{})
 				if err != nil {
 					return false, err
 				}
 
 				for i := range podList.Items {
-					if podList.Items[i].Status.Phase == api.PodRunning {
+					if podList.Items[i].Status.Phase == v1.PodRunning {
 						pod = podList.Items[i]
 						return true, nil
 					}
@@ -146,7 +146,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			e := &policy.Eviction{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      pod.Name,
 					Namespace: ns,
 				},
@@ -184,7 +184,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 
 func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvailable intstr.IntOrString) {
 	pdb := policy.PodDisruptionBudget{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
@@ -199,20 +199,20 @@ func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvai
 
 func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	for i := 0; i < n; i++ {
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%d", i),
 				Namespace: ns,
 				Labels:    map[string]string{"foo": "bar"},
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "busybox",
 						Image: "gcr.io/google_containers/echoserver:1.4",
 					},
 				},
-				RestartPolicy: api.RestartPolicyAlways,
+				RestartPolicy: v1.RestartPolicyAlways,
 			},
 		}
 
@@ -224,7 +224,7 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	By("Waiting for all pods to be running")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		pods, err := cs.Core().Pods(ns).List(api.ListOptions{LabelSelector: "foo=bar"})
+		pods, err := cs.Core().Pods(ns).List(v1.ListOptions{LabelSelector: "foo=bar"})
 		if err != nil {
 			return false, err
 		}
@@ -237,7 +237,7 @@ func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 		}
 		ready := 0
 		for i := 0; i < n; i++ {
-			if pods.Items[i].Status.Phase == api.PodRunning {
+			if pods.Items[i].Status.Phase == v1.PodRunning {
 				ready++
 			}
 		}
@@ -251,18 +251,18 @@ func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 }
 
 func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, exclusive bool) {
-	container := api.Container{
+	container := v1.Container{
 		Name:  "busybox",
 		Image: "gcr.io/google_containers/echoserver:1.4",
 	}
 	if exclusive {
-		container.Ports = []api.ContainerPort{
+		container.Ports = []v1.ContainerPort{
 			{HostPort: 5555, ContainerPort: 5555},
 		}
 	}
 
 	rs := &extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "rs",
 			Namespace: ns,
 		},
@@ -271,12 +271,12 @@ func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, excl
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{container},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{container},
 				},
 			},
 		},

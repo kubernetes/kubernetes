@@ -23,7 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,12 +45,12 @@ type pausePodConfig struct {
 	Name                              string
 	Affinity                          string
 	Annotations, Labels, NodeSelector map[string]string
-	Resources                         *api.ResourceRequirements
+	Resources                         *v1.ResourceRequirements
 }
 
 var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	var cs clientset.Interface
-	var nodeList *api.NodeList
+	var nodeList *v1.NodeList
 	var systemPodsNo int
 	var totalPodCapacity int64
 	var RCName string
@@ -59,9 +60,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 	AfterEach(func() {
 		rc, err := cs.Core().ReplicationControllers(ns).Get(RCName)
-		if err == nil && rc.Spec.Replicas != 0 {
+		if err == nil && *(rc.Spec.Replicas) != 0 {
 			By("Cleaning up the replication controller")
-			err := framework.DeleteRCAndPods(f.ClientSet, ns, RCName)
+			err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, RCName)
 			framework.ExpectNoError(err)
 		}
 	})
@@ -69,7 +70,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
-		nodeList = &api.NodeList{}
+		nodeList = &v1.NodeList{}
 
 		framework.WaitForAllNodesHealthy(cs, time.Minute)
 		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
@@ -156,11 +157,11 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		framework.WaitForStableCluster(cs, masterNodes)
 
-		pods, err := cs.Core().Pods(api.NamespaceAll).List(api.ListOptions{})
+		pods, err := cs.Core().Pods(v1.NamespaceAll).List(v1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
-			if found && pod.Status.Phase != api.PodSucceeded && pod.Status.Phase != api.PodFailed {
+			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
 				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
@@ -189,11 +190,11 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
-					Resources: &api.ResourceRequirements{
-						Limits: api.ResourceList{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
 							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 						},
-						Requests: api.ResourceList{
+						Requests: v1.ResourceList{
 							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 						},
 					},
@@ -203,8 +204,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		createPausePod(f, pausePodConfig{
 			Name:   podName,
 			Labels: map[string]string{"name": "additional"},
-			Resources: &api.ResourceRequirements{
-				Limits: api.ResourceList{
+			Resources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
 					"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 				},
 			},
@@ -511,8 +512,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cannot be scheduled onto it.
 		By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
-		defer framework.DeleteRCAndPods(f.ClientSet, ns, "host-port")
-		podList, err := cs.Core().Pods(ns).List(api.ListOptions{})
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, "host-port")
+		podList, err := cs.Core().Pods(ns).List(v1.ListOptions{})
 		ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))
 		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
@@ -671,10 +672,10 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		nodeName := getNodeThatCanRunPodWithoutToleration(f)
 
 		By("Trying to apply a random taint on the found node.")
-		testTaint := api.Taint{
+		testTaint := v1.Taint{
 			Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID())),
 			Value:  "testing-taint-value",
-			Effect: api.TaintEffectNoSchedule,
+			Effect: v1.TaintEffectNoSchedule,
 		}
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
@@ -723,10 +724,10 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		nodeName := getNodeThatCanRunPodWithoutToleration(f)
 
 		By("Trying to apply a random taint on the found node.")
-		testTaint := api.Taint{
+		testTaint := v1.Taint{
 			Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID())),
 			Value:  "testing-taint-value",
-			Effect: api.TaintEffectNoSchedule,
+			Effect: v1.TaintEffectNoSchedule,
 		}
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
@@ -757,25 +758,25 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	})
 })
 
-func initPausePod(f *framework.Framework, conf pausePodConfig) *api.Pod {
+func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	if conf.Affinity != "" {
 		if conf.Annotations == nil {
 			conf.Annotations = map[string]string{
-				api.AffinityAnnotationKey: conf.Affinity,
+				v1.AffinityAnnotationKey: conf.Affinity,
 			}
 		} else {
-			conf.Annotations[api.AffinityAnnotationKey] = conf.Affinity
+			conf.Annotations[v1.AffinityAnnotationKey] = conf.Affinity
 		}
 	}
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:        conf.Name,
 			Labels:      conf.Labels,
 			Annotations: conf.Annotations,
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			NodeSelector: conf.NodeSelector,
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Name:  podName,
 					Image: framework.GetPauseImageName(f.ClientSet),
@@ -789,13 +790,13 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *api.Pod {
 	return pod
 }
 
-func createPausePod(f *framework.Framework, conf pausePodConfig) *api.Pod {
+func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
 	framework.ExpectNoError(err)
 	return pod
 }
 
-func runPausePod(f *framework.Framework, conf pausePodConfig) *api.Pod {
+func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
 	pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(conf.Name)
@@ -811,13 +812,13 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 	pod := runPausePod(f, conf)
 
 	By("Explicitly delete pod here to free the resource it takes.")
-	err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+	err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0))
 	framework.ExpectNoError(err)
 
 	return pod.Spec.NodeName
 }
 
-func createPodWithNodeAffinity(f *framework.Framework) *api.Pod {
+func createPodWithNodeAffinity(f *framework.Framework) *v1.Pod {
 	return createPausePod(f, pausePodConfig{
 		Name: "with-nodeaffinity-" + string(uuid.NewUUID()),
 		Affinity: `{
@@ -836,7 +837,7 @@ func createPodWithNodeAffinity(f *framework.Framework) *api.Pod {
 	})
 }
 
-func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *api.Pod {
+func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *v1.Pod {
 	return createPausePod(f, pausePodConfig{
 		Name: "with-podantiaffinity-" + string(uuid.NewUUID()),
 		Affinity: `{
@@ -869,23 +870,23 @@ func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *api.P
 }
 
 // Returns a number of currently scheduled and not scheduled Pods.
-func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
+func getPodsScheduled(pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
 	for _, pod := range pods.Items {
 		if !masterNodes.Has(pod.Spec.NodeName) {
 			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
+				_, scheduledCondition := v1.GetPodCondition(&pod.Status, v1.PodScheduled)
 				// We can't assume that the scheduledCondition is always set if Pod is assigned to Node,
 				// as e.g. DaemonController doesn't set it when assigning Pod to a Node. Currently
 				// Kubelet sets this condition when it gets a Pod without it, but if we were expecting
 				// that it would always be not nil, this would cause a rare race condition.
 				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(api.ConditionTrue))
+					Expect(scheduledCondition.Status).To(Equal(v1.ConditionTrue))
 				}
 				scheduledPods = append(scheduledPods, pod)
 			} else {
-				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
+				_, scheduledCondition := v1.GetPodCondition(&pod.Status, v1.PodScheduled)
 				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(api.ConditionFalse))
+					Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
 				}
 				if scheduledCondition.Reason == "Unschedulable" {
 					notScheduledPods = append(notScheduledPods, pod)
@@ -896,7 +897,7 @@ func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.
 	return
 }
 
-func getRequestedCPU(pod api.Pod) int64 {
+func getRequestedCPU(pod v1.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
 		result += container.Resources.Requests.Cpu().MilliValue()
@@ -913,7 +914,7 @@ func waitForScheduler() {
 
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
 func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string) {
-	allPods, err := c.Core().Pods(ns).List(api.ListOptions{})
+	allPods, err := c.Core().Pods(ns).List(v1.ListOptions{})
 	framework.ExpectNoError(err)
 	scheduledPods, notScheduledPods := framework.GetPodsScheduled(masterNodes, allPods)
 

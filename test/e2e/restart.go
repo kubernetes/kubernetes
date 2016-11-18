@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/labels"
@@ -32,15 +33,15 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func isNotRestartAlwaysMirrorPod(p *api.Pod) bool {
+func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
 	if !kubepod.IsMirrorPod(p) {
 		return false
 	}
-	return p.Spec.RestartPolicy != api.RestartPolicyAlways
+	return p.Spec.RestartPolicy != v1.RestartPolicyAlways
 }
 
-func filterIrrelevantPods(pods []*api.Pod) []*api.Pod {
-	var results []*api.Pod
+func filterIrrelevantPods(pods []*v1.Pod) []*v1.Pod {
+	var results []*v1.Pod
 	for _, p := range pods {
 		if isNotRestartAlwaysMirrorPod(p) {
 			// Mirror pods with restart policy == Never will not get
@@ -128,7 +129,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 // returning their names if it can do so before timeout.
 func waitForNPods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
 	// Loop until we find expect pods or timeout is passed.
-	var pods []*api.Pod
+	var pods []*v1.Pod
 	var errLast error
 	found := wait.Poll(framework.Poll, timeout, func() (bool, error) {
 		allPods := ps.List()

@@ -22,7 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -38,7 +38,7 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 		for count < 1000 {
 			pod, err := createTerminatingPod(f)
 			pod.ResourceVersion = ""
-			pod.Status.Phase = api.PodFailed
+			pod.Status.Phase = v1.PodFailed
 			pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).UpdateStatus(pod)
 			if err != nil {
 				framework.Failf("err failing pod: %v", err)
@@ -55,13 +55,13 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 		// The gc controller polls every 30s and fires off a goroutine per
 		// pod to terminate.
 		var err error
-		var pods *api.PodList
+		var pods *v1.PodList
 		timeout := 2 * time.Minute
 		gcThreshold := 100
 
 		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
-			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(api.ListOptions{})
+			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{})
 			if err != nil {
 				framework.Logf("Failed to list pod %v", err)
 				return false, nil
@@ -78,17 +78,17 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 	})
 })
 
-func createTerminatingPod(f *framework.Framework) (*api.Pod, error) {
+func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 	uuid := uuid.NewUUID()
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: string(uuid),
 			Annotations: map[string]string{
 				"scheduler.alpha.kubernetes.io/name": "please don't schedule my pods",
 			},
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  string(uuid),
 					Image: "gcr.io/google_containers/busybox:1.24",

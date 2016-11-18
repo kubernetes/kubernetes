@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -37,18 +37,18 @@ import (
 func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
 	zero := int64(0)
 	return &extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: rsName,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: replicas,
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: rsPodLabels,
 				},
-				Spec: api.PodSpec{
+				Spec: v1.PodSpec{
 					TerminationGracePeriodSeconds: &zero,
-					Containers: []api.Container{
+					Containers: []v1.Container{
 						{
 							Name:  imageName,
 							Image: image,
@@ -60,14 +60,14 @@ func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageNa
 	}
 }
 
-func newPodQuota(name, number string) *api.ResourceQuota {
-	return &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+func newPodQuota(name, number string) *v1.ResourceQuota {
+	return &v1.ResourceQuota{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourcePods: resource.MustParse(number),
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{
+				v1.ResourcePods: resource.MustParse(number),
 			},
 		},
 	}
@@ -103,24 +103,24 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating ReplicaSet %s", name))
 	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(&extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: replicas,
+			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{
 				"name": name,
 			}},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{"name": name},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  name,
 							Image: image,
-							Ports: []api.ContainerPort{{ContainerPort: 9376}},
+							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 						},
 					},
 				},
@@ -131,7 +131,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	// Cleanup the ReplicaSet when we are done.
 	defer func() {
 		// Resize the ReplicaSet to zero to get rid of pods.
-		if err := framework.DeleteReplicaSet(f.ClientSet, f.Namespace.Name, rs.Name); err != nil {
+		if err := framework.DeleteReplicaSet(f.ClientSet, f.InternalClientset, f.Namespace.Name, rs.Name); err != nil {
 			framework.Logf("Failed to cleanup ReplicaSet %v: %v.", rs.Name, err)
 		}
 	}()
@@ -184,7 +184,7 @@ func rsConditionCheck(f *framework.Framework) {
 			return false, err
 		}
 		quantity := resource.MustParse("2")
-		podQuota := quota.Status.Hard[api.ResourcePods]
+		podQuota := quota.Status.Hard[v1.ResourcePods]
 		return (&podQuota).Cmp(quantity) == 0, nil
 	})
 	if err == wait.ErrWaitTimeout {
@@ -222,7 +222,8 @@ func rsConditionCheck(f *framework.Framework) {
 
 	By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
 	rs, err = framework.UpdateReplicaSetWithRetries(c, namespace, name, func(update *extensions.ReplicaSet) {
-		update.Spec.Replicas = 2
+		x := int32(2)
+		update.Spec.Replicas = &x
 	})
 	Expect(err).NotTo(HaveOccurred())
 
