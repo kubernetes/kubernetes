@@ -420,3 +420,52 @@ func GetPVCMatchLabel(pvc *v1.PersistentVolumeClaim, key string) (string, error)
 	}
 	return "", fmt.Errorf("key %q not found in selector.matchLabels", key)
 }
+
+// GetPVCMatchExpression returns:
+// - either ([]setOfValues, nil) for all matching (key, operator) from the matchExpressions Selector part of the PVC
+// - or ([]emptySet, error) in case the operator or the key is missing in the matchExpressions Selector part of the PVC
+// Example:
+// selector:
+//     matchExpressions:
+//       - key: failure-domain.beta.kubernetes.io/zone
+//         operator: In
+//         values:
+//           - us-east-1a
+//           - us-east-2a
+//           - us-east-3a
+//       - key: failure-domain.beta.kubernetes.io/zone
+//             operator: In
+//             values:
+//               - us-east-3a
+//               - us-east-4a
+// Returns (sets.String{"us-east-3a": sets.Empty{}}, nil) because all operators are ANDed.
+func GetPVCMatchExpression(pvc *v1.PersistentVolumeClaim, key string, operator metav1.LabelSelectorOperator) ([]sets.String, error) {
+	if pvc.Spec.Selector == nil {
+		return make([]sets.String, 0), fmt.Errorf("missing selector.matchExpressions")
+	}
+	if len(pvc.Spec.Selector.MatchExpressions) < 1 {
+		return make([]sets.String, 0), fmt.Errorf("key(s), operator(s) and value(s) are missing in selector.matchExpressions")
+	}
+	capacity := 0
+	for _, item := range pvc.Spec.Selector.MatchExpressions {
+		if item.Key == key && item.Operator == operator && len(item.Values) > 0 {
+			capacity++
+		}
+	}
+	if capacity == 0 {
+		return make([]sets.String, 0), fmt.Errorf("operator %q for key %q not found in selector.matchExpressions", key, operator)
+	}
+
+	ret := make([]sets.String, 0, capacity)
+	index := 0
+	for _, item := range pvc.Spec.Selector.MatchExpressions {
+		if item.Key == key && item.Operator == operator && len(item.Values) > 0 {
+			ret = append(ret, make(sets.String))
+			for _, value := range item.Values {
+				ret[index].Insert(value)
+			}
+			index++
+		}
+	}
+	return ret, nil
+}
