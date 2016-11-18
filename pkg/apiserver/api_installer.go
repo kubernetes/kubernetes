@@ -193,7 +193,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("register resource handler for path: %s and the fqKind is: %v\n", path, fqKindToRegister)
 
 	versionedPtr, err := a.group.Creater.New(fqKindToRegister)
 	if err != nil {
