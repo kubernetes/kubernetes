@@ -21,8 +21,8 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -35,7 +35,7 @@ func newPCB(id string, ps *apps.StatefulSet) (*pcb, error) {
 	for _, im := range newIdentityMappers(ps) {
 		im.SetIdentity(id, petPod)
 	}
-	petPVCs := []api.PersistentVolumeClaim{}
+	petPVCs := []v1.PersistentVolumeClaim{}
 	vMapper := &VolumeIdentityMapper{ps}
 	for _, c := range vMapper.GetClaims(id) {
 		petPVCs = append(petPVCs, c)
@@ -87,7 +87,7 @@ func (pt *petQueue) empty() bool {
 }
 
 // NewPetQueue returns a queue for tracking pets
-func NewPetQueue(ps *apps.StatefulSet, podList []*api.Pod) *petQueue {
+func NewPetQueue(ps *apps.StatefulSet, podList []*v1.Pod) *petQueue {
 	pt := petQueue{pets: []*pcb{}, idMapper: &NameIdentityMapper{ps}}
 	// Seed the queue with existing pets. Assume all pets are scheduled for
 	// deletion, enqueuing a pet will "undelete" it. We always want to delete
@@ -118,7 +118,7 @@ type statefulSetIterator struct {
 func (pi *statefulSetIterator) Next() bool {
 	var pet *pcb
 	var err error
-	if pi.petCount < pi.ps.Spec.Replicas {
+	if pi.petCount < *(pi.ps.Spec.Replicas) {
 		pet, err = newPCB(fmt.Sprintf("%d", pi.petCount), pi.ps)
 		if err != nil {
 			pi.errs = append(pi.errs, err)
@@ -139,7 +139,7 @@ func (pi *statefulSetIterator) Value() *pcb {
 
 // NewStatefulSetIterator returns a new iterator. All pods in the given podList
 // are used to seed the queue of the iterator.
-func NewStatefulSetIterator(ps *apps.StatefulSet, podList []*api.Pod) *statefulSetIterator {
+func NewStatefulSetIterator(ps *apps.StatefulSet, podList []*v1.Pod) *statefulSetIterator {
 	pi := &statefulSetIterator{
 		ps:       ps,
 		queue:    NewPetQueue(ps, podList),
@@ -150,7 +150,7 @@ func NewStatefulSetIterator(ps *apps.StatefulSet, podList []*api.Pod) *statefulS
 }
 
 // PodsByCreationTimestamp sorts a list of Pods by creation timestamp, using their names as a tie breaker.
-type PodsByCreationTimestamp []*api.Pod
+type PodsByCreationTimestamp []*v1.Pod
 
 func (o PodsByCreationTimestamp) Len() int      { return len(o) }
 func (o PodsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

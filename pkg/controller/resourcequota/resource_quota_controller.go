@@ -23,8 +23,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -93,14 +94,14 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	// build the controller that observes quota
 	rq.rqIndexer, rq.rqController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.Core().ResourceQuotas(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.Core().ResourceQuotas(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).Watch(options)
 			},
 		},
-		&api.ResourceQuota{},
+		&v1.ResourceQuota{},
 		rq.resyncPeriod(),
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: rq.addQuota,
@@ -113,9 +114,9 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 				// that cannot be backed by a cache and result in a full query of a namespace's content, we do not
 				// want to pay the price on spurious status updates.  As a result, we have a separate routine that is
 				// responsible for enqueue of all resource quotas when doing a full resync (enqueueAll)
-				oldResourceQuota := old.(*api.ResourceQuota)
-				curResourceQuota := cur.(*api.ResourceQuota)
-				if quota.Equals(curResourceQuota.Spec.Hard, oldResourceQuota.Spec.Hard) {
+				oldResourceQuota := old.(*v1.ResourceQuota)
+				curResourceQuota := cur.(*v1.ResourceQuota)
+				if quota.V1Equals(oldResourceQuota.Spec.Hard, curResourceQuota.Spec.Hard) {
 					return
 				}
 				rq.addQuota(curResourceQuota)
@@ -152,7 +153,7 @@ func (rq *ResourceQuotaController) enqueueAll() {
 	}
 }
 
-// obj could be an *api.ResourceQuota, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1.ResourceQuota, or a DeletionFinalStateUnknown marker item.
 func (rq *ResourceQuotaController) enqueueResourceQuota(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
@@ -169,10 +170,10 @@ func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 		return
 	}
 
-	resourceQuota := obj.(*api.ResourceQuota)
+	resourceQuota := obj.(*v1.ResourceQuota)
 
 	// if we declared an intent that is not yet captured in status (prioritize it)
-	if !api.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
+	if !v1.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
 		rq.missingUsageQueue.Add(key)
 		return
 	}
@@ -180,7 +181,7 @@ func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 	// if we declared a constraint that has no usage (which this controller can calculate, prioritize it)
 	for constraint := range resourceQuota.Status.Hard {
 		if _, usageFound := resourceQuota.Status.Used[constraint]; !usageFound {
-			matchedResources := []api.ResourceName{constraint}
+			matchedResources := []api.ResourceName{api.ResourceName(constraint)}
 
 			for _, evaluator := range rq.registry.Evaluators() {
 				if intersection := quota.Intersection(evaluator.MatchesResources(), matchedResources); len(intersection) != 0 {
@@ -260,14 +261,19 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 		rq.queue.Add(key)
 		return err
 	}
-	quota := *obj.(*api.ResourceQuota)
+	quota := *obj.(*v1.ResourceQuota)
 	return rq.syncResourceQuota(quota)
 }
 
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
-func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQuota) (err error) {
+func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
-	dirty := !api.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard)
+	dirty := !v1.Semantic.DeepEqual(v1ResourceQuota.Spec.Hard, v1ResourceQuota.Status.Hard)
+
+	resourceQuota := api.ResourceQuota{}
+	if err := v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(&v1ResourceQuota, &resourceQuota, nil); err != nil {
+		return err
+	}
 
 	// dirty tracks if the usage status differs from the previous sync,
 	// if so, we send a new usage with latest status
@@ -311,7 +317,11 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
-		_, err = rq.kubeClient.Core().ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+		v1Usage := &v1.ResourceQuota{}
+		if err := v1.Convert_api_ResourceQuota_To_v1_ResourceQuota(&usage, v1Usage, nil); err != nil {
+			return err
+		}
+		_, err = rq.kubeClient.Core().ResourceQuotas(usage.Namespace).UpdateStatus(v1Usage)
 		return err
 	}
 	return nil
@@ -327,7 +337,7 @@ func (rq *ResourceQuotaController) replenishQuota(groupKind unversioned.GroupKin
 	}
 
 	// check if this namespace even has a quota...
-	indexKey := &api.ResourceQuota{}
+	indexKey := &v1.ResourceQuota{}
 	indexKey.Namespace = namespace
 	resourceQuotas, err := rq.rqIndexer.Index("namespace", indexKey)
 	if err != nil {
@@ -340,8 +350,13 @@ func (rq *ResourceQuotaController) replenishQuota(groupKind unversioned.GroupKin
 	// only queue those quotas that are tracking a resource associated with this kind.
 	matchedResources := evaluator.MatchesResources()
 	for i := range resourceQuotas {
-		resourceQuota := resourceQuotas[i].(*api.ResourceQuota)
-		resourceQuotaResources := quota.ResourceNames(resourceQuota.Status.Hard)
+		resourceQuota := resourceQuotas[i].(*v1.ResourceQuota)
+		internalResourceQuota := &api.ResourceQuota{}
+		if err := v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(resourceQuota, internalResourceQuota, nil); err != nil {
+			glog.Error(err)
+			continue
+		}
+		resourceQuotaResources := quota.ResourceNames(internalResourceQuota.Status.Hard)
 		if len(quota.Intersection(matchedResources, resourceQuotaResources)) > 0 {
 			// TODO: make this support targeted replenishment to a specific kind, right now it does a full recalc on that quota.
 			rq.enqueueResourceQuota(resourceQuota)

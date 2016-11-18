@@ -24,9 +24,11 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -80,11 +82,11 @@ func (dc *DeploymentController) checkPausedConditions(d *extensions.Deployment) 
 
 	needsUpdate := false
 	if d.Spec.Paused && !pausedCondExists {
-		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionUnknown, deploymentutil.PausedDeployReason, "Deployment is paused")
+		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionUnknown, deploymentutil.PausedDeployReason, "Deployment is paused")
 		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
 		needsUpdate = true
 	} else if !d.Spec.Paused && pausedCondExists {
-		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionUnknown, deploymentutil.ResumedDeployReason, "Deployment is resumed")
+		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionUnknown, deploymentutil.ResumedDeployReason, "Deployment is resumed")
 		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
 		needsUpdate = true
 	}
@@ -126,10 +128,14 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(deployment *ext
 }
 
 // rsAndPodsWithHashKeySynced returns the RSes and pods the given deployment targets, with pod-template-hash information synced.
-func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extensions.Deployment) ([]*extensions.ReplicaSet, *api.PodList, error) {
+func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extensions.Deployment) ([]*extensions.ReplicaSet, *v1.PodList, error) {
 	rsList, err := deploymentutil.ListReplicaSets(deployment,
-		func(namespace string, options api.ListOptions) ([]*extensions.ReplicaSet, error) {
-			return dc.rsLister.ReplicaSets(namespace).List(options.LabelSelector)
+		func(namespace string, options v1.ListOptions) ([]*extensions.ReplicaSet, error) {
+parsed, err := labels.Parse(options.LabelSelector)
+if err != nil {
+    return nil, err
+}
+			return dc.rsLister.ReplicaSets(namespace).List(parsed)
 		})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing ReplicaSets: %v", err)
@@ -201,12 +207,16 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	if err != nil {
 		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
 	}
-	options := api.ListOptions{LabelSelector: selector}
-	pods, err := dc.podLister.Pods(namespace).List(options.LabelSelector)
+	options := v1.ListOptions{LabelSelector: selector.String()}
+parsed, err := labels.Parse(options.LabelSelector)
+if err != nil {
+    return nil, err
+}
+	pods, err := dc.podLister.Pods(namespace).List(parsed)
 	if err != nil {
 		return nil, fmt.Errorf("error in getting pod list for namespace %s and list options %+v: %s", namespace, options, err)
 	}
-	podList := api.PodList{Items: make([]api.Pod, 0, len(pods))}
+	podList := v1.PodList{Items: make([]v1.Pod, 0, len(pods))}
 	for i := range pods {
 		podList.Items = append(podList.Items, *pods[i])
 	}
@@ -253,11 +263,15 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	return updatedRS, nil
 }
 
-func (dc *DeploymentController) listPods(deployment *extensions.Deployment) (*api.PodList, error) {
+func (dc *DeploymentController) listPods(deployment *extensions.Deployment) (*v1.PodList, error) {
 	return deploymentutil.ListPods(deployment,
-		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			pods, err := dc.podLister.Pods(namespace).List(options.LabelSelector)
-			result := api.PodList{Items: make([]api.Pod, 0, len(pods))}
+		func(namespace string, options v1.ListOptions) (*v1.PodList, error) {
+parsed, err := labels.Parse(options.LabelSelector)
+if err != nil {
+    return nil, err
+}
+			pods, err := dc.podLister.Pods(namespace).List(parsed)
+			result := v1.PodList{Items: make([]v1.Pod, 0, len(pods))}
 			for i := range pods {
 				result.Items = append(result.Items, *pods[i])
 			}
@@ -307,7 +321,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 		cond := deploymentutil.GetDeploymentCondition(deployment.Status, extensions.DeploymentProgressing)
 		if deployment.Spec.ProgressDeadlineSeconds != nil && cond == nil {
 			msg := fmt.Sprintf("Found new replica set %q", rsCopy.Name)
-			condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionTrue, deploymentutil.FoundNewRSReason, msg)
+			condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, deploymentutil.FoundNewRSReason, msg)
 			deploymentutil.SetDeploymentCondition(&deployment.Status, *condition)
 			updateConditions = true
 		}
@@ -333,13 +347,13 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 
 	// Create new ReplicaSet
 	newRS := extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			// Make the name deterministic, to ensure idempotence
 			Name:      deployment.Name + "-" + fmt.Sprintf("%d", podTemplateSpecHash),
 			Namespace: namespace,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas:        0,
+			Replicas: func(i int32) *int32 { return &i }(0),
 			MinReadySeconds: deployment.Spec.MinReadySeconds,
 			Selector:        newRSSelector,
 			Template:        newRSTemplate,
@@ -351,7 +365,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 		return nil, err
 	}
 
-	newRS.Spec.Replicas = newReplicasCount
+	*(newRS.Spec.Replicas) = newReplicasCount
 	// Set new replica set's annotation
 	deploymentutil.SetNewReplicaSetAnnotations(deployment, &newRS, newRevision, false)
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
@@ -365,7 +379,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
 		if deployment.Spec.ProgressDeadlineSeconds != nil {
-			cond := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionFalse, deploymentutil.FailedRSCreateReason, msg)
+			cond := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionFalse, deploymentutil.FailedRSCreateReason, msg)
 			deploymentutil.SetDeploymentCondition(&deployment.Status, *cond)
 			// We don't really care about this error at this point, since we have a bigger issue to report.
 			// TODO: Update the rest of the Deployment status, too. We may need to do this every time we
@@ -375,17 +389,17 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 			// these reasons as well. Related issue: https://github.com/kubernetes/kubernetes/issues/18568
 			_, _ = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
 		}
-		dc.eventRecorder.Eventf(deployment, api.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
+		dc.eventRecorder.Eventf(deployment, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
 		return nil, err
 	}
 	if newReplicasCount > 0 {
-		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
+		dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
 	}
 
 	deploymentutil.SetDeploymentRevision(deployment, newRevision)
 	if deployment.Spec.ProgressDeadlineSeconds != nil {
 		msg := fmt.Sprintf("Created new replica set %q", createdRS.Name)
-		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionTrue, deploymentutil.NewReplicaSetReason, msg)
+		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, deploymentutil.NewReplicaSetReason, msg)
 		deploymentutil.SetDeploymentCondition(&deployment.Status, *condition)
 	}
 	_, err = dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
@@ -401,10 +415,10 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 	// If there is only one active replica set then we should scale that up to the full count of the
 	// deployment. If there is no active replica set, then we should scale up the newest replica set.
 	if activeOrLatest := deploymentutil.FindActiveOrLatest(newRS, oldRSs); activeOrLatest != nil {
-		if activeOrLatest.Spec.Replicas == deployment.Spec.Replicas {
+		if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
 			return nil
 		}
-		_, _, err := dc.scaleReplicaSetAndRecordEvent(activeOrLatest, deployment.Spec.Replicas, deployment)
+		_, _, err := dc.scaleReplicaSetAndRecordEvent(activeOrLatest, *(deployment.Spec.Replicas), deployment)
 		return err
 	}
 
@@ -427,8 +441,8 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 		allRSsReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 
 		allowedSize := int32(0)
-		if deployment.Spec.Replicas > 0 {
-			allowedSize = deployment.Spec.Replicas + deploymentutil.MaxSurge(*deployment)
+		if *(deployment.Spec.Replicas) > 0 {
+			allowedSize = *(deployment.Spec.Replicas) + deploymentutil.MaxSurge(*deployment)
 		}
 
 		// Number of additional replicas that can be either added or removed from the total
@@ -465,10 +479,10 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 			if deploymentReplicasToAdd != 0 {
 				proportion := deploymentutil.GetProportion(rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
 
-				nameToSize[rs.Name] = rs.Spec.Replicas + proportion
+				nameToSize[rs.Name] = *(rs.Spec.Replicas) + proportion
 				deploymentReplicasAdded += proportion
 			} else {
-				nameToSize[rs.Name] = rs.Spec.Replicas
+				nameToSize[rs.Name] = *(rs.Spec.Replicas)
 			}
 		}
 
@@ -497,11 +511,11 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 
 func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.ReplicaSet, newScale int32, deployment *extensions.Deployment) (bool, *extensions.ReplicaSet, error) {
 	// No need to scale
-	if rs.Spec.Replicas == newScale {
+	if *(rs.Spec.Replicas) == newScale {
 		return false, rs, nil
 	}
 	var scalingOperation string
-	if rs.Spec.Replicas < newScale {
+	if *(rs.Spec.Replicas) < newScale {
 		scalingOperation = "up"
 	} else {
 		scalingOperation = "down"
@@ -517,14 +531,14 @@ func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newSc
 	}
 	rsCopy := objCopy.(*extensions.ReplicaSet)
 
-	sizeNeedsUpdate := rsCopy.Spec.Replicas != newScale
-	annotationsNeedUpdate := deploymentutil.SetReplicasAnnotations(rsCopy, deployment.Spec.Replicas, deployment.Spec.Replicas+deploymentutil.MaxSurge(*deployment))
+	sizeNeedsUpdate := *(rsCopy.Spec.Replicas) != newScale
+	annotationsNeedUpdate := deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 
 	if sizeNeedsUpdate || annotationsNeedUpdate {
-		rsCopy.Spec.Replicas = newScale
+		*(rsCopy.Spec.Replicas) = newScale
 		rs, err = dc.client.Extensions().ReplicaSets(rsCopy.Namespace).Update(rsCopy)
 		if err == nil && sizeNeedsUpdate {
-			dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
+			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
 		}
 	}
 	return rs, err
@@ -549,7 +563,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 	for i := int32(0); i < diff; i++ {
 		rs := oldRSs[i]
 		// Avoid delete replica set with non-zero replica counts
-		if rs.Status.Replicas != 0 || rs.Spec.Replicas != 0 || rs.Generation > rs.Status.ObservedGeneration {
+		if rs.Status.Replicas != 0 || *(rs.Spec.Replicas) != 0 || rs.Generation > rs.Status.ObservedGeneration {
 			continue
 		}
 		if err := dc.client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, nil); err != nil && !errors.IsNotFound(err) {
@@ -579,11 +593,11 @@ func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet,
 	availableReplicas := deploymentutil.GetAvailableReplicaCountForReplicaSets(allRSs)
 	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 
-	if availableReplicas >= deployment.Spec.Replicas-deploymentutil.MaxUnavailable(*deployment) {
-		minAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, api.ConditionTrue, deploymentutil.MinimumReplicasAvailable, "Deployment has minimum availability.")
+	if availableReplicas >= *(deployment.Spec.Replicas)-deploymentutil.MaxUnavailable(*deployment) {
+		minAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, v1.ConditionTrue, deploymentutil.MinimumReplicasAvailable, "Deployment has minimum availability.")
 		deploymentutil.SetDeploymentCondition(&deployment.Status, *minAvailability)
 	} else {
-		noMinAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, api.ConditionFalse, deploymentutil.MinimumReplicasUnavailable, "Deployment does not have minimum availability.")
+		noMinAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, v1.ConditionFalse, deploymentutil.MinimumReplicasUnavailable, "Deployment does not have minimum availability.")
 		deploymentutil.SetDeploymentCondition(&deployment.Status, *noMinAvailability)
 	}
 
@@ -611,7 +625,7 @@ func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment) (bool, 
 		if !ok {
 			continue
 		}
-		if desired != d.Spec.Replicas {
+		if desired != *(d.Spec.Replicas) {
 			return true, nil
 		}
 	}
