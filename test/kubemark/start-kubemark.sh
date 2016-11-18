@@ -90,6 +90,13 @@ run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
   --type "${MASTER_DISK_TYPE}" \
   --size "${MASTER_DISK_SIZE}"
 
+if [ "${EVENT_PD:-false}" == "true" ]; then
+  run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
+    ${GCLOUD_COMMON_ARGS} \
+    --type "${MASTER_DISK_TYPE}" \
+    --size "${MASTER_DISK_SIZE}"
+fi
+
 run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
   --project "${PROJECT}" \
   --region "${REGION}" -q
@@ -108,6 +115,11 @@ run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
   --scopes "storage-ro,compute-rw,logging-write" \
   --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
   --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
+
+if [ "${EVENT_PD:-false}" == "true" ]; then
+  echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
+  run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" --disk "${MASTER_NAME}-event-pd" --device-name="master-event-pd"
+fi
 
 run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
   --project "${PROJECT}" \
@@ -157,7 +169,7 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
   --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && \
-             sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${ETCD_IMAGE:-}"
+             sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${EVENT_PD:-false} ${ETCD_IMAGE:-}"
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
