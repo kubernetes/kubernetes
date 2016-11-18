@@ -20,7 +20,7 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 const (
@@ -57,7 +57,7 @@ const (
 )
 
 // NeedsHealthCheck Check service for health check annotations
-func NeedsHealthCheck(service *api.Service) bool {
+func NeedsHealthCheck(service *v1.Service) bool {
 	// First check the alpha annotation and then the beta. This is so existing
 	// Services continue to work till the user decides to transition to beta.
 	// If they transition to beta, there's no way to go back to alpha without
@@ -77,7 +77,7 @@ func NeedsHealthCheck(service *api.Service) bool {
 }
 
 // GetServiceHealthCheckNodePort Return health check node port annotation for service, if one exists
-func GetServiceHealthCheckNodePort(service *api.Service) int32 {
+func GetServiceHealthCheckNodePort(service *v1.Service) int32 {
 	if !NeedsHealthCheck(service) {
 		return 0
 	}
@@ -96,4 +96,16 @@ func GetServiceHealthCheckNodePort(service *api.Service) int32 {
 		}
 	}
 	return 0
+}
+
+// GetServiceHealthCheckPathPort Return the path and nodePort programmed into the Cloud LB Health Check
+func GetServiceHealthCheckPathPort(service *v1.Service) (string, int32) {
+	if !NeedsHealthCheck(service) {
+		return "", 0
+	}
+	port := GetServiceHealthCheckNodePort(service)
+	if port == 0 {
+		return "", 0
+	}
+	return "/healthz", port
 }
