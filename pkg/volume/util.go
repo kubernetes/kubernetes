@@ -398,3 +398,44 @@ func GetPVCMatchLabel(pvc *v1.PersistentVolumeClaim, key string) (string, error)
 	}
 	return "", fmt.Errorf("Persistent volume claim (%v): %v key not found in the matchLabels part", pvc.Name, key)
 }
+
+// GetPVCMatchExpression returns:
+// - either (setOfValues, nil) for all matching (key, operator) from the matchExpressions Selector part of the PVC
+// - or (emptySet, error) in case the operator or the key is missing in the matchExpressions Selector part of the PVC
+// Example:
+// selector:
+//     matchExpressions:
+//       - key: failure-domain.beta.kubernetes.io/zone
+//         operator: In
+//         values:
+//           - us-east-1a
+//           - us-east-2a
+//           - us-east-3a
+//       - key: failure-domain.beta.kubernetes.io/zone
+//             operator: In
+//             values:
+//               - us-east-3a
+//               - us-east-4a
+// Returns (sets.String{"us-east-1a": sets.Empty{}, "us-east-2a": sets.Empty{}, "us-east-3a": sets.Empty{}, "us-east-4a": sets.Empty{}}, nil)
+func GetPVCMatchExpression(pvc *v1.PersistentVolumeClaim, key string, operator unversioned.LabelSelectorOperator) (sets.String, error) {
+	if pvc.Spec.Selector == nil {
+		return make(sets.String), fmt.Errorf("Persistent volume claim (%v) does not contain any matchExpressions", pvc.Name)
+	}
+	if len(pvc.Spec.Selector.MatchExpressions) < 1 {
+		return make(sets.String), fmt.Errorf("Persistent volume claim (%v) does not contain any values in the matchExpressions part", pvc.Name)
+	}
+	found := false
+	ret := make(sets.String)
+	for _, item := range pvc.Spec.Selector.MatchExpressions {
+		if item.Key == key && item.Operator == operator && len(item.Values) > 0 {
+			found = true
+			for _, value := range item.Values {
+				ret.Insert(value)
+			}
+		}
+	}
+	if found {
+		return ret, nil
+	}
+	return make(sets.String), fmt.Errorf("Persistent volume claim (%v): %v operator for %v key not found in the matchExpressions part", pvc.Name, key, operator)
+}

@@ -547,3 +547,151 @@ func TestGetPVCMatchLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestGetPVCMatchExpression(t *testing.T) {
+	functionUnderTest := "GetPVCMatchExpression"
+	emptySet := make(sets.String)
+	// First part: want no error
+	succTests := []struct {
+		pvc      v1.PersistentVolumeClaim
+		key      string
+		operator unversioned.LabelSelectorOperator
+		want     sets.String
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
+							{
+								Key:      unversioned.LabelZoneFailureDomain,
+								Operator: unversioned.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			key:      unversioned.LabelZoneFailureDomain,
+			operator: unversioned.LabelSelectorOpIn,
+			want:     sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}},
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
+							{
+								Key:      unversioned.LabelZoneFailureDomain,
+								Operator: unversioned.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-2a", "us-east-3a"},
+							},
+							{
+								Key:      unversioned.LabelZoneFailureDomain,
+								Operator: unversioned.LabelSelectorOpIn,
+								Values:   []string{"us-east-3a", "us-east-4a"},
+							},
+						},
+					},
+				},
+			},
+			key:      unversioned.LabelZoneFailureDomain,
+			operator: unversioned.LabelSelectorOpIn,
+			want:     sets.String{"us-east-1a": sets.Empty{}, "us-east-2a": sets.Empty{}, "us-east-3a": sets.Empty{}, "us-east-4a": sets.Empty{}},
+		},
+	}
+	for _, succTest := range succTests {
+		if zones, err := GetPVCMatchExpression(&succTest.pvc, succTest.key, succTest.operator); err != nil {
+			t.Errorf("%v(%v, %v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, succTest.key, succTest.operator, zones, err.Error(), succTest.want, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []struct {
+		pvc      v1.PersistentVolumeClaim
+		key      string
+		operator unversioned.LabelSelectorOperator
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			key:      unversioned.LabelZoneFailureDomain,
+			operator: unversioned.LabelSelectorOpIn,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{},
+					},
+				},
+			},
+			key:      unversioned.LabelZoneRegion,
+			operator: unversioned.LabelSelectorOpNotIn,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: unversioned.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			key:      unversioned.LabelZoneRegion,
+			operator: unversioned.LabelSelectorOpIn,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
+							{
+								Key:      unversioned.LabelZoneFailureDomain,
+								Operator: "foo",
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			key:      unversioned.LabelZoneFailureDomain,
+			operator: unversioned.LabelSelectorOpIn,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchExpressions: []unversioned.LabelSelectorRequirement{
+							{
+								Key:      unversioned.LabelZoneFailureDomain,
+								Operator: unversioned.LabelSelectorOpIn,
+								Values:   []string{},
+							},
+						},
+					},
+				},
+			},
+			key:      unversioned.LabelZoneFailureDomain,
+			operator: unversioned.LabelSelectorOpIn,
+		},
+	}
+	for _, errCase := range errCases {
+		if zones, err := GetPVCMatchExpression(&errCase.pvc, errCase.key, errCase.operator); err == nil {
+			t.Errorf("%v(%v, %v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase.pvc, errCase.key, errCase.operator, zones, err, emptySet, "an error")
+		}
+	}
+
+}
