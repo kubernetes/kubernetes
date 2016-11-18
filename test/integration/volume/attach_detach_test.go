@@ -1,7 +1,7 @@
 // +build integration,!no-etcd
 
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,8 +80,8 @@ func fakePodWithVol(namespace string) *api.Pod {
 }
 
 func TestPodDeletionWithDswp(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, server := framework.RunAMaster(nil)
+	defer server.Close()
 	namespaceName := "test-pod-deletion"
 
 	node := &api.Node{
@@ -93,10 +93,10 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		},
 	}
 
-	ns := framework.CreateTestingNamespace(namespaceName, s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace(namespaceName, server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
 
-	testClient, ctrl, podInformer, nodeInformer := createAdClients(ns, t, s, defaultSyncPeriod)
+	testClient, ctrl, podInformer, nodeInformer := createAdClients(ns, t, server, defaultSyncPeriod)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
@@ -137,15 +137,14 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		t.Fatalf("Pod not added to desired state of world")
 	}
 
-	// lets stop pod events from triggered
+	// let's stop pod events from getting triggered
 	close(podStopCh)
-	podInformer.GetStore().Delete(podInformerObj)
-
-	waitToObservePods(t, podInformer, 0)
-
+	err = podInformer.GetStore().Delete(podInformerObj)
 	if err != nil {
 		t.Fatalf("Error deleting pod : %v", err)
 	}
+
+	waitToObservePods(t, podInformer, 0)
 
 	// the populator loop turns every 1 minute
 	time.Sleep(2 * time.Minute)
@@ -174,9 +173,9 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 	}
 }
 
-func createAdClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeriod time.Duration) (*internalclientset.Clientset, attachdetach.AttachDetachController, cache.SharedIndexInformer, cache.SharedIndexInformer) {
+func createAdClients(ns *api.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration) (*internalclientset.Clientset, attachdetach.AttachDetachController, cache.SharedIndexInformer, cache.SharedIndexInformer) {
 	config := restclient.Config{
-		Host:          s.URL,
+		Host:          server.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
 		QPS:           1000000,
 		Burst:         1000000,
