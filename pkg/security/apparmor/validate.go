@@ -25,7 +25,7 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
@@ -36,7 +36,7 @@ var isDisabledBuild bool
 
 // Interface for validating that a pod with with an AppArmor profile can be run by a Node.
 type Validator interface {
-	Validate(pod *api.Pod) error
+	Validate(pod *v1.Pod) error
 	ValidateHost() error
 }
 
@@ -60,7 +60,7 @@ type validator struct {
 	appArmorFS      string
 }
 
-func (v *validator) Validate(pod *api.Pod) error {
+func (v *validator) Validate(pod *v1.Pod) error {
 	if !isRequired(pod) {
 		return nil
 	}
