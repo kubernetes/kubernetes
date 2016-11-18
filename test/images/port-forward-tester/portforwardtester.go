@@ -47,24 +47,40 @@ func getEnvInt(name string) int {
 	return value
 }
 
+// taken from net/http/server.go:
+//
+// rstAvoidanceDelay is the amount of time we sleep after closing the
+// write side of a TCP connection before closing the entire socket.
+// By sleeping, we increase the chances that the client sees our FIN
+// and processes its final data before they process the subsequent RST
+// from closing a connection with known unread data.
+// This RST seems to occur mostly on BSD systems. (And Windows?)
+// This timeout is somewhat arbitrary (~latency around the planet).
+const rstAvoidanceDelay = 500 * time.Millisecond
+
 func main() {
 	bindAddress := os.Getenv("BIND_ADDRESS")
 	if bindAddress == "" {
 		bindAddress = "localhost"
 	}
 	bindPort := os.Getenv("BIND_PORT")
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", bindAddress, bindPort))
+	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(bindAddress, bindPort))
+	if err != nil {
+		fmt.Printf("Error resolving: %v\n", err)
+		os.Exit(1)
+	}
+	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		fmt.Printf("Error listening: %v\n", err)
 		os.Exit(1)
 	}
 
-	conn, err := listener.Accept()
+	conn, err := listener.AcceptTCP()
 	if err != nil {
 		fmt.Printf("Error accepting connection: %v\n", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+
 	fmt.Println("Accepted client connection")
 
 	expectedClientData := os.Getenv("EXPECTED_CLIENT_DATA")
@@ -105,6 +121,21 @@ func main() {
 			time.Sleep(time.Duration(chunkInterval) * time.Millisecond)
 		}
 	}
+
+	fmt.Println("Shutting down connection")
+
+	// set linger timeout to flush buffers. This is the official way according to the go api docs. But
+	// there are controversial discussions whether this value has any impact on most platforms
+	// (compare https://codereview.appspot.com/95320043).
+	conn.SetLinger(-1)
+
+	// Flush the connection cleanly, following https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable:
+	// 1. close write half of connection which sends a FIN packet
+	// 2. give client some time to receive the FIN
+	// 3. close the complete connection
+	conn.CloseWrite()
+	time.Sleep(rstAvoidanceDelay)
+	conn.Close()
 
 	fmt.Println("Done")
 }
