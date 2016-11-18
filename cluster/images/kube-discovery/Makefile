@@ -37,6 +37,10 @@ endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/debian:jessie
 endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/debian:jessie
+endif
+
 
 all: build
 

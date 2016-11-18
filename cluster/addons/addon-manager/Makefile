@@ -30,6 +30,9 @@ endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/debian
 endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/debian
+endif
 
 .PHONY: build push
 

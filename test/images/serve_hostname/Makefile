@@ -24,10 +24,10 @@ TAG ?= v1.5
 REGISTRY ?= gcr.io/google_containers
 TEST_REGISTRY ?= b.gcr.io/k8s_authenticated_test
 
-# Architectures supported: amd64, arm, arm64 and ppc64le
+# Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
 
-ALL_ARCH = amd64 arm arm64 ppc64le
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 GOARM=6
 TEMP_DIR := $(shell mktemp -d)
@@ -51,6 +51,9 @@ ifeq ($(ARCH),arm64)
 endif
 ifeq ($(ARCH),ppc64le)
         BASEIMAGE?=ppc64le/busybox
+endif
+ifeq ($(ARCH),s390x)
+        BASEIMAGE?=s390x/busybox
 endif
 
 # If you want to build AND push all containers, see the 'all-push' rule.
