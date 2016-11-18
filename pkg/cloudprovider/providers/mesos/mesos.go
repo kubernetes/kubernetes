@@ -28,7 +28,7 @@ import (
 	log "github.com/golang/glog"
 	"github.com/mesos/mesos-go/detector"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -284,15 +284,15 @@ func (c *MesosCloud) ListWithoutKubelet() ([]string, error) {
 }
 
 // NodeAddresses returns the addresses of the instance with the specified nodeName.
-func (c *MesosCloud) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, error) {
+func (c *MesosCloud) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, error) {
 	name := mapNodeNameToHostname(nodeName)
 	ip, err := ipAddress(name)
 	if err != nil {
 		return nil, err
 	}
-	return []api.NodeAddress{
-		{Type: api.NodeLegacyHostIP, Address: ip.String()},
-		{Type: api.NodeInternalIP, Address: ip.String()},
-		{Type: api.NodeExternalIP, Address: ip.String()},
+	return []v1.NodeAddress{
+		{Type: v1.NodeLegacyHostIP, Address: ip.String()},
+		{Type: v1.NodeInternalIP, Address: ip.String()},
+		{Type: v1.NodeExternalIP, Address: ip.String()},
 	}, nil
 }
