@@ -23,7 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -48,7 +49,7 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      ServiceConstraintsFunc,
 		UsageFunc:            ServiceUsageFunc,
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().Services(namespace).List(options)
 			if err != nil {
 				return nil, err
@@ -65,42 +66,54 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 // ServiceUsageFunc knows how to measure usage associated with services
 func ServiceUsageFunc(object runtime.Object) api.ResourceList {
 	result := api.ResourceList{}
-	if service, ok := object.(*api.Service); ok {
-		// default service usage
-		result[api.ResourceServices] = resource.MustParse("1")
-		result[api.ResourceServicesLoadBalancers] = resource.MustParse("0")
-		result[api.ResourceServicesNodePorts] = resource.MustParse("0")
-		switch service.Spec.Type {
-		case api.ServiceTypeNodePort:
-			// node port services need to count node ports
-			value := resource.NewQuantity(int64(len(service.Spec.Ports)), resource.DecimalSI)
-			result[api.ResourceServicesNodePorts] = *value
-		case api.ServiceTypeLoadBalancer:
-			// load balancer services need to count load balancers
-			result[api.ResourceServicesLoadBalancers] = resource.MustParse("1")
-		}
+	var serviceType api.ServiceType
+	var ports int
+
+	switch t := object.(type) {
+	case *v1.Service:
+		serviceType = api.ServiceType(t.Spec.Type)
+		ports = len(t.Spec.Ports)
+	case *api.Service:
+		serviceType = t.Spec.Type
+		ports = len(t.Spec.Ports)
+	default:
+		panic(fmt.Sprintf("expect *api.Service or *v1.Service, got %v", t))
+	}
+
+	// default service usage
+	result[api.ResourceServices] = resource.MustParse("1")
+	result[api.ResourceServicesLoadBalancers] = resource.MustParse("0")
+	result[api.ResourceServicesNodePorts] = resource.MustParse("0")
+	switch serviceType {
+	case api.ServiceTypeNodePort:
+		// node port services need to count node ports
+		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
+		result[api.ResourceServicesNodePorts] = *value
+	case api.ServiceTypeLoadBalancer:
+		// load balancer services need to count load balancers
+		result[api.ResourceServicesLoadBalancers] = resource.MustParse("1")
 	}
 	return result
 }
 
 // QuotaServiceType returns true if the service type is eligible to track against a quota
-func QuotaServiceType(service *api.Service) bool {
+func QuotaServiceType(service *v1.Service) bool {
 	switch service.Spec.Type {
-	case api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer:
+	case v1.ServiceTypeNodePort, v1.ServiceTypeLoadBalancer:
 		return true
 	}
 	return false
 }
 
 //GetQuotaServiceType returns ServiceType if the service type is eligible to track against a quota, nor return ""
-func GetQuotaServiceType(service *api.Service) api.ServiceType {
+func GetQuotaServiceType(service *v1.Service) v1.ServiceType {
 	switch service.Spec.Type {
-	case api.ServiceTypeNodePort:
-		return api.ServiceTypeNodePort
-	case api.ServiceTypeLoadBalancer:
-		return api.ServiceTypeLoadBalancer
+	case v1.ServiceTypeNodePort:
+		return v1.ServiceTypeNodePort
+	case v1.ServiceTypeLoadBalancer:
+		return v1.ServiceTypeLoadBalancer
 	}
-	return api.ServiceType("")
+	return v1.ServiceType("")
 }
 
 // ServiceConstraintsFunc verifies that all required resources are captured in service usage.

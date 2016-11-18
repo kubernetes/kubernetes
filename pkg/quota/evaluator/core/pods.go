@@ -24,8 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/quota"
@@ -40,7 +41,7 @@ func listPodsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.
 	// TODO: ideally, we could pass dynamic client pool down into this code, and have one way of doing this.
 	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
 	// structured objects.
-	return func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+	return func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 		itemList, err := kubeClient.Core().Pods(namespace).List(options)
 		if err != nil {
 			return nil, err
@@ -163,23 +164,32 @@ func podUsageHelper(requests api.ResourceList, limits api.ResourceList) api.Reso
 	return result
 }
 
-// PodUsageFunc knows how to measure usage associated with pods
-func PodUsageFunc(object runtime.Object) api.ResourceList {
-	pod, ok := object.(*api.Pod)
-	if !ok {
-		return api.ResourceList{}
+func toInternalPodOrDie(obj runtime.Object) *api.Pod {
+	pod := &api.Pod{}
+	switch t := obj.(type) {
+	case *v1.Pod:
+		if err := v1.Convert_v1_Pod_To_api_Pod(t, pod, nil); err != nil {
+			panic(err)
+		}
+	case *api.Pod:
+		pod = t
+	default:
+		panic(fmt.Sprintf("expect *api.Pod or *v1.Pod, got %v", t))
 	}
+	return pod
+}
 
+// PodUsageFunc knows how to measure usage associated with pods
+func PodUsageFunc(obj runtime.Object) api.ResourceList {
+	pod := toInternalPodOrDie(obj)
 	// by convention, we do not quota pods that have reached an end-of-life state
 	if !QuotaPod(pod) {
 		return api.ResourceList{}
 	}
-
-	// TODO: fix this when we have pod level cgroups
-	// when we have pod level cgroups, we can just read pod level requests/limits
 	requests := api.ResourceList{}
 	limits := api.ResourceList{}
-
+	// TODO: fix this when we have pod level cgroups
+	// when we have pod level cgroups, we can just read pod level requests/limits
 	for i := range pod.Spec.Containers {
 		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
 		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
@@ -197,10 +207,7 @@ func PodUsageFunc(object runtime.Object) api.ResourceList {
 
 // PodMatchesScopeFunc is a function that knows how to evaluate if a pod matches a scope
 func PodMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bool {
-	pod, ok := object.(*api.Pod)
-	if !ok {
-		return false
-	}
+	pod := toInternalPodOrDie(object)
 	switch scope {
 	case api.ResourceQuotaScopeTerminating:
 		return isTerminating(pod)
@@ -215,7 +222,7 @@ func PodMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bo
 }
 
 func isBestEffort(pod *api.Pod) bool {
-	return qos.GetPodQOS(pod) == qos.BestEffort
+	return qos.InternalGetPodQOS(pod) == qos.BestEffort
 }
 
 func isTerminating(pod *api.Pod) bool {
@@ -228,7 +235,11 @@ func isTerminating(pod *api.Pod) bool {
 // QuotaPod returns true if the pod is eligible to track against a quota
 // if it's not in a terminal state according to its phase.
 func QuotaPod(pod *api.Pod) bool {
-	// see GetPhase in kubelet.go for details on how it covers all restart policy conditions
-	// https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet.go#L3001
 	return !(api.PodFailed == pod.Status.Phase || api.PodSucceeded == pod.Status.Phase)
+}
+
+// QuotaV1Pod returns true if the pod is eligible to track against a quota
+// if it's not in a terminal state according to its phase.
+func QuotaV1Pod(pod *v1.Pod) bool {
+	return !(v1.PodFailed == pod.Status.Phase || v1.PodSucceeded == pod.Status.Phase)
 }
