@@ -46,6 +46,9 @@ endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/busybox
 endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/busybox
+endif
 
 build:
 	# Copy the content in this dir to the temp dir,

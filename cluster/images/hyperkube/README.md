@@ -25,6 +25,9 @@ $ make push VERSION={target_version} ARCH=arm64
 
 $ make push VERSION={target_version} ARCH=ppc64le
 # ---> gcr.io/google_containers/hyperkube-ppc64le:VERSION
+
+$ make push VERSION={target_version} ARCH=s390x
+# ---> gcr.io/google_containers/hyperkube-s390x:VERSION
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

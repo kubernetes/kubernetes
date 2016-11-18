@@ -35,6 +35,9 @@ make container PREFIX=<your-docker-hub> TAG=rc
 
 	$ make push ARCH=ppc64le
 	# ---> gcr.io/google_containers/kube-dns-ppc64le:TAG
+
+	$ make push ARCH=s390x
+	# ---> gcr.io/google_containers/kube-dns-s390x:TAG
 	```
 
 6. Manually deploy this to your own cluster by updating the replication

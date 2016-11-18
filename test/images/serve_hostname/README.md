@@ -25,6 +25,9 @@ $ make push ARCH=arm64
 
 $ make push ARCH=ppc64le
 # ---> gcr.io/google_containers/serve_hostname-ppc64le:TAG
+
+$ make push ARCH=s390x
+# ---> gcr.io/google_containers/serve_hostname-s390x:TAG
 ```
 
 Of course, if you don't want to push the images, run `make all-container` or `make container ARCH={target_arch}` instead.

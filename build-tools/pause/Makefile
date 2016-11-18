@@ -20,10 +20,10 @@ LEGACY_AMD64_IMAGE = $(REGISTRY)/pause
 
 TAG = 3.0
 
-# Architectures supported: amd64, arm, arm64 and ppc64le
+# Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
 
-ALL_ARCH = amd64 arm arm64 ppc64le
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 CFLAGS = -Os -Wall -static
 KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
@@ -46,6 +46,10 @@ endif
 
 ifeq ($(ARCH),ppc64le)
 	TRIPLE ?= powerpc64le-linux-gnu
+endif
+
+ifeq ($(ARCH),s390x)
+	TRIPLE ?= s390x-linux-gnu
 endif
 
 # If you want to build AND push all containers, see the 'all-push' rule.

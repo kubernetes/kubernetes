@@ -61,6 +61,7 @@ else
     linux/amd64
     linux/arm
     linux/arm64
+    linux/s390x
   )
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
     KUBE_SERVER_PLATFORMS+=(linux/ppc64le)
@@ -78,6 +79,7 @@ else
     darwin/386
     windows/amd64
     windows/386
+    linux/s390x
   )
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
     KUBE_CLIENT_PLATFORMS+=(linux/ppc64le)
@@ -240,6 +242,10 @@ kube::golang::set_platform_envs() {
       export CGO_ENABLED=1
       export CC=powerpc64le-linux-gnu-gcc
     fi
+    elif [[ ${platform} == "linux/s390x" ]]; then
+      export CGO_ENABLED=1
+      export CC=s390x-linux-gnu-gcc
+    fi	
   fi
 }
 
@@ -691,3 +697,4 @@ kube::golang::build_binaries() {
     fi
   )
 }
+

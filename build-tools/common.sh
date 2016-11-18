@@ -120,6 +120,13 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v4
         );;
+    "s390x")
+        local targets=(
+          kube-apiserver,s390x/busybox
+          kube-controller-manager,s390x/busybox
+          kube-scheduler,s390x/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-s390x:v4
+        );;		
   esac
 
   echo "${targets[@]}"

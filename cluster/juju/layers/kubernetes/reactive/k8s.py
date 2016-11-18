@@ -478,7 +478,7 @@ def arch():
     # Convert the binary result into a string.
     architecture = architecture.decode('utf-8')
     # Validate the architecture is supported by kubernetes.
-    if architecture not in ['amd64', 'arm', 'arm64', 'ppc64le']:
+    if architecture not in ['amd64', 'arm', 'arm64', 'ppc64le', 's390x']:
         message = 'Unsupported machine architecture: {0}'.format(architecture)
         status_set('blocked', message)
         raise Exception(message)
