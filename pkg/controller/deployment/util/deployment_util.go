@@ -132,6 +132,18 @@ func GetDeploymentCondition(status extensions.DeploymentStatus, condType extensi
 	return nil
 }
 
+// TODO: remove the duplicate
+// GetDeploymentConditionInternal returns the condition with the provided type.
+func GetDeploymentConditionInternal(status internalextensions.DeploymentStatus, condType internalextensions.DeploymentConditionType) *internalextensions.DeploymentCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
 // SetDeploymentCondition updates the deployment to include the provided condition. If the condition that
 // we are about to add already exists and has the same status and reason then we are not going to update.
 func SetDeploymentCondition(status *extensions.DeploymentStatus, condition extensions.DeploymentCondition) {
@@ -729,8 +741,8 @@ func GetNewReplicaSetTemplate(deployment *extensions.Deployment) v1.PodTemplateS
 }
 
 // TODO: remove the duplicate
-// GetNewInternalReplicaSetTemplate returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
-func GetNewInternalReplicaSetTemplate(deployment *internalextensions.Deployment) api.PodTemplateSpec {
+// GetNewReplicaSetTemplateInternal returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
+func GetNewReplicaSetTemplateInternal(deployment *internalextensions.Deployment) api.PodTemplateSpec {
 	// newRS will have the same template as in deployment spec, plus a unique label in some cases.
 	newRSTemplate := api.PodTemplateSpec{
 		ObjectMeta: deployment.Spec.Template.ObjectMeta,
@@ -916,6 +928,19 @@ func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) b
 // Returns error if polling timesout.
 func WaitForObservedDeployment(getDeploymentFunc func() (*extensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	// TODO: This should take clientset.Interface when all code is updated to use clientset. Keeping it this way allows the function to be used by callers who have client.Interface.
+	return wait.Poll(interval, timeout, func() (bool, error) {
+		deployment, err := getDeploymentFunc()
+		if err != nil {
+			return false, err
+		}
+		return deployment.Status.ObservedGeneration >= desiredGeneration, nil
+	})
+}
+
+// TODO: remove the duplicate
+// WaitForObservedInternalDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
+// Returns error if polling timesout.
+func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		deployment, err := getDeploymentFunc()
 		if err != nil {
