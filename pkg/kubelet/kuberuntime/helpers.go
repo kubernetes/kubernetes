@@ -22,7 +22,7 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
@@ -85,12 +85,12 @@ func toKubeContainerState(state runtimeApi.ContainerState) kubecontainer.Contain
 	return kubecontainer.ContainerStateUnknown
 }
 
-// toRuntimeProtocol converts api.Protocol to runtimeApi.Protocol.
-func toRuntimeProtocol(protocol api.Protocol) runtimeApi.Protocol {
+// toRuntimeProtocol converts v1.Protocol to runtimeApi.Protocol.
+func toRuntimeProtocol(protocol v1.Protocol) runtimeApi.Protocol {
 	switch protocol {
-	case api.ProtocolTCP:
+	case v1.ProtocolTCP:
 		return runtimeApi.Protocol_TCP
-	case api.ProtocolUDP:
+	case v1.ProtocolUDP:
 		return runtimeApi.Protocol_UDP
 	}
 
@@ -131,7 +131,7 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeApi.PodSand
 }
 
 // getContainerSpec gets the container spec by containerName.
-func getContainerSpec(pod *api.Pod, containerName string) *api.Container {
+func getContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 	for i, c := range pod.Spec.Containers {
 		if containerName == c.Name {
 			return &pod.Spec.Containers[i]
@@ -217,7 +217,7 @@ func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 // getStableKey generates a key (string) to uniquely identify a
 // (pod, container) tuple. The key should include the content of the
 // container, so that any change to the container generates a new key.
-func getStableKey(pod *api.Pod, container *api.Container) string {
+func getStableKey(pod *v1.Pod, container *v1.Container) string {
 	hash := strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
 }

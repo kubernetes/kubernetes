@@ -21,7 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -34,7 +34,7 @@ import (
 type volumeStatCalculator struct {
 	statsProvider StatsProvider
 	jitterPeriod  time.Duration
-	pod           *api.Pod
+	pod           *v1.Pod
 	stopChannel   chan struct{}
 	startO        sync.Once
 	stopO         sync.Once
@@ -47,7 +47,7 @@ type PodVolumeStats struct {
 }
 
 // newVolumeStatCalculator creates a new VolumeStatCalculator
-func newVolumeStatCalculator(statsProvider StatsProvider, jitterPeriod time.Duration, pod *api.Pod) *volumeStatCalculator {
+func newVolumeStatCalculator(statsProvider StatsProvider, jitterPeriod time.Duration, pod *v1.Pod) *volumeStatCalculator {
 	return &volumeStatCalculator{
 		statsProvider: statsProvider,
 		jitterPeriod:  jitterPeriod,

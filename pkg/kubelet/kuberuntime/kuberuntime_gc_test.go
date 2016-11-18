@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -34,12 +34,12 @@ func TestSandboxGC(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	pods := []*api.Pod{
-		makeTestPod("foo1", "new", "1234", []api.Container{
+	pods := []*v1.Pod{
+		makeTestPod("foo1", "new", "1234", []v1.Container{
 			makeTestContainer("bar1", "busybox"),
 			makeTestContainer("bar2", "busybox"),
 		}),
-		makeTestPod("foo2", "new", "5678", []api.Container{
+		makeTestPod("foo2", "new", "5678", []v1.Container{
 			makeTestContainer("bar3", "busybox"),
 		}),
 	}
@@ -129,7 +129,7 @@ func TestContainerGC(t *testing.T) {
 	fakePodGetter := m.containerGC.podGetter.(*fakePodGetter)
 	makeGCContainer := func(podName, containerName string, attempt int, createdAt int64, state runtimeApi.ContainerState) containerTemplate {
 		container := makeTestContainer(containerName, "test-image")
-		pod := makeTestPod(podName, "test-ns", podName, []api.Container{container})
+		pod := makeTestPod(podName, "test-ns", podName, []v1.Container{container})
 		if podName != "deleted" {
 			// initialize the pod getter, explicitly exclude deleted pod
 			fakePodGetter.pods[pod.UID] = pod

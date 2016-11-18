@@ -161,7 +161,7 @@ func (d *kubeDockerClient) StartContainer(id string) error {
 	return err
 }
 
-// Stopping an already stopped container will not cause an error in engine-api.
+// Stopping an already stopped container will not cause an error in engine-v1.
 func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
 	ctx, cancel := d.getCustomTimeoutContext(time.Duration(timeout) * time.Second)
 	defer cancel()

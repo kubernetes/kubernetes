@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
@@ -35,7 +35,7 @@ func NewFakeHandlerRunner() *FakeHandlerRunner {
 	return &FakeHandlerRunner{HandlerRuns: []string{}}
 }
 
-func (hr *FakeHandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) (string, error) {
+func (hr *FakeHandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
 	hr.Lock()
 	defer hr.Unlock()
 

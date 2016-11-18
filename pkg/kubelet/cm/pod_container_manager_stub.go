@@ -17,7 +17,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -26,15 +26,15 @@ type podContainerManagerStub struct {
 
 var _ PodContainerManager = &podContainerManagerStub{}
 
-func (m *podContainerManagerStub) Exists(_ *api.Pod) bool {
+func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *podContainerManagerStub) EnsureExists(_ *api.Pod) error {
+func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
 	return nil
 }
 
-func (m *podContainerManagerStub) GetPodContainerName(_ *api.Pod) (CgroupName, string) {
+func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
 	return "", ""
 }
 

@@ -21,7 +21,7 @@ package cm
 import (
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
@@ -32,7 +32,7 @@ type containerManagerImpl struct {
 
 var _ ContainerManager = &containerManagerImpl{}
 
-func (cm *containerManagerImpl) Start(_ *api.Node) error {
+func (cm *containerManagerImpl) Start(_ *v1.Node) error {
 	glog.V(2).Infof("Starting Windows stub container manager")
 	return nil
 }
