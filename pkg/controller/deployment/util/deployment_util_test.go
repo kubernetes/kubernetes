@@ -255,7 +255,7 @@ func TestGetNewRC(t *testing.T) {
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
-		if !v1.Semantic.DeepEqual(rs, test.expected) {
+		if !api.Semantic.DeepEqual(rs, test.expected) {
 			t.Errorf("In test case %s, expected %#v, got %#v", test.test, test.expected, rs)
 		}
 	}

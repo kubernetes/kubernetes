@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -465,7 +466,7 @@ func TestWatchControllers(t *testing.T) {
 			t.Errorf("Expected to find controller under key %v", key)
 		}
 		controllerSpec := *obj.(*v1.ReplicationController)
-		if !v1.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
+		if !api.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
 			t.Errorf("Expected %#v, but got %#v", testControllerSpec, controllerSpec)
 		}
 		close(received)
@@ -508,7 +509,7 @@ func TestWatchPods(t *testing.T) {
 			t.Errorf("Expected to find controller under key %v", key)
 		}
 		controllerSpec := obj.(*v1.ReplicationController)
-		if !v1.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
+		if !api.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testControllerSpec, controllerSpec)
 		}
 		close(received)
@@ -702,7 +703,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	// Size up the controller, then size it down, and confirm the expected create/delete pattern
 	for _, replicas := range []int{numReplicas, 0} {
 
-		*(controllerSpec.Spec.Replicas) =  int32(replicas)
+		*(controllerSpec.Spec.Replicas) = int32(replicas)
 		manager.rcStore.Indexer.Add(controllerSpec)
 
 		for i := 0; i < numReplicas; i += burstReplicas {

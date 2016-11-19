@@ -22,35 +22,11 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
-)
-
-// Semantic can do semantic deep equality checks for api objects.
-// Example: api.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
-var Semantic = conversion.EqualitiesOrDie(
-	func(a, b resource.Quantity) bool {
-		// Ignore formatting, only care that numeric value stayed the same.
-		// TODO: if we decide it's important, it should be safe to start comparing the format.
-		//
-		// Uninitialized quantities are equivalent to 0 quantities.
-		return a.Cmp(b) == 0
-	},
-	func(a, b unversioned.Time) bool {
-		return a.UTC() == b.UTC()
-	},
-	func(a, b labels.Selector) bool {
-		return a.String() == b.String()
-	},
-	func(a, b fields.Selector) bool {
-		return a.String() == b.String()
-	},
 )
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque

@@ -116,7 +116,7 @@ func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager) Mana
 // This method normalizes the status before comparing so as to make sure that meaningless
 // changes will be ignored.
 func isStatusEqual(oldStatus, status *v1.PodStatus) bool {
-	return v1.Semantic.DeepEqual(status, oldStatus)
+	return api.Semantic.DeepEqual(status, oldStatus)
 }
 
 func (m *manager) Start() {

@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -656,7 +657,7 @@ func TestWatchJobs(t *testing.T) {
 			t.Errorf("Expected to find job under key %v: %v", key, err)
 			return nil
 		}
-		if !v1.Semantic.DeepDerivative(*job, testJob) {
+		if !api.Semantic.DeepDerivative(*job, testJob) {
 			t.Errorf("Expected %#v, but got %#v", testJob, *job)
 		}
 		return nil
@@ -699,7 +700,7 @@ func TestWatchPods(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected to find job under key %v: %v", key, err)
 		}
-		if !v1.Semantic.DeepDerivative(job, testJob) {
+		if !api.Semantic.DeepDerivative(job, testJob) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testJob, job)
 			close(received)
 			return nil

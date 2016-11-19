@@ -38,6 +38,7 @@ import (
 	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -314,10 +315,10 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 		}
 		setEntrypointAndCommand(tc.container, opts, actualOpts)
 
-		if e, a := tc.expected.Config.Entrypoint, actualOpts.Config.Entrypoint; !v1.Semantic.DeepEqual(e, a) {
+		if e, a := tc.expected.Config.Entrypoint, actualOpts.Config.Entrypoint; !api.Semantic.DeepEqual(e, a) {
 			t.Errorf("%v: unexpected entrypoint: expected %v, got %v", tc.name, e, a)
 		}
-		if e, a := tc.expected.Config.Cmd, actualOpts.Config.Cmd; !v1.Semantic.DeepEqual(e, a) {
+		if e, a := tc.expected.Config.Cmd, actualOpts.Config.Cmd; !api.Semantic.DeepEqual(e, a) {
 			t.Errorf("%v: unexpected command: expected %v, got %v", tc.name, e, a)
 		}
 	}
@@ -1302,8 +1303,7 @@ func TestSyncPodWithHostNetwork(t *testing.T) {
 		Containers: []v1.Container{
 			{Name: "bar"},
 		},
-			HostNetwork: true,
-
+		HostNetwork: true,
 	})
 
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
