@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"sync"
 
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -32,6 +33,8 @@ type ErrRequeue struct {
 	// Err is returned by the Pop function
 	Err error
 }
+
+var FIFOClosedError error = errors.New("DeltaFIFO: reading from closed queue")
 
 func (e ErrRequeue) Error() string {
 	if e.Err == nil {
@@ -58,6 +61,9 @@ type Queue interface {
 
 	// Return true if the first batch of items has been popped
 	HasSynced() bool
+
+	// Close queue
+	Close()
 }
 
 // Helper function for popping from Queue.
@@ -105,6 +111,10 @@ type FIFO struct {
 var (
 	_ = Queue(&FIFO{}) // FIFO is a Queue
 )
+
+func (f *FIFO) Close() {
+
+}
 
 // Return true if an Add/Update/Delete/AddIfNotPresent are called first,
 // or an Update called first but the first batch of items inserted by Replace() has been popped

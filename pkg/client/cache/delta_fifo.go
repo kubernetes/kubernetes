@@ -118,6 +118,9 @@ type DeltaFIFO struct {
 	// purpose of figuring out which items have been deleted
 	// when Replace() or Delete() is called.
 	knownObjects KeyListerGetter
+
+	// indication the queue is closed
+	closed bool
 }
 
 var (
@@ -131,6 +134,12 @@ var (
 	// but included for completeness).
 	ErrZeroLengthDeltasObject = errors.New("0 length Deltas object; can't get key")
 )
+
+// Close the queue.
+func (f *DeltaFIFO) Close() {
+	f.closed = true
+	f.cond.Broadcast()
+}
 
 // KeyOf exposes f's keyFunc, but also detects the key of a Deltas object or
 // DeletedFinalStateUnknown objects.
@@ -404,6 +413,12 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	defer f.lock.Unlock()
 	for {
 		for len(f.queue) == 0 {
+			// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
+			// When Close() is called, the f.closed is set and the condition is broadcasted.
+			// Which causes this loop to continue and return from the Pop().
+			if f.closed {
+				return nil, FIFOClosedError
+			}
 			f.cond.Wait()
 		}
 		id := f.queue[0]
