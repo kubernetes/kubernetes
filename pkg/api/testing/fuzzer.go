@@ -478,6 +478,20 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 				*obj.ReadOnly = false
 			}
 		},
+		func(sio *api.ScaleIOVolumeSource, c fuzz.Continue) {
+			sio.ProtectionDomain = c.RandString()
+			if sio.ProtectionDomain == "" {
+				sio.ProtectionDomain = "default"
+			}
+			sio.StoragePool = c.RandString()
+			if sio.StoragePool == "" {
+				sio.StoragePool = "default"
+			}
+			sio.StorageMode = c.RandString()
+			if sio.StorageMode == "" {
+				sio.StorageMode = "ThinProvisioned"
+			}
+		},
 		func(s *api.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
 		},

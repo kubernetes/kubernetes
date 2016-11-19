@@ -137,6 +137,9 @@ func SetObjectDefaults_PersistentVolume(in *PersistentVolume) {
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
 		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
 	}
+	if in.Spec.PersistentVolumeSource.ScaleIO != nil {
+		SetDefaults_ScaleIOVolumeSource(in.Spec.PersistentVolumeSource.ScaleIO)
+	}
 }
 
 func SetObjectDefaults_PersistentVolumeClaim(in *PersistentVolumeClaim) {
@@ -189,6 +192,9 @@ func SetObjectDefaults_Pod(in *Pod) {
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+		}
+		if a.VolumeSource.ScaleIO != nil {
+			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.InitContainers {
@@ -321,6 +327,9 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 	}
 	for i := range in.Template.Spec.InitContainers {
 		a := &in.Template.Spec.InitContainers[i]
@@ -445,6 +454,9 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 			}
 			if a.VolumeSource.AzureDisk != nil {
 				SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			}
+			if a.VolumeSource.ScaleIO != nil {
+				SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 			}
 		}
 		for i := range in.Spec.Template.Spec.InitContainers {
