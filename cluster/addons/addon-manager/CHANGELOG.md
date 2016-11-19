@@ -1,3 +1,6 @@
+### Version 6.0 (Fri November 18 2016 Zihong Zheng <zihongz@google.com>)
+ - Upgrade Addon Manager to use `kubectl apply`.
+
 ### Version 5.2 (Wed October 26 2016 Zihong Zheng <zihongz@google.com>)
  - Added support for ConfigMap and upgraded kubectl version to v1.4.4 (pr #35255)
 
