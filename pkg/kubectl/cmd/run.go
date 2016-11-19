@@ -384,7 +384,7 @@ func contains(resourcesList map[string]*unversioned.APIResourceList, resource un
 
 // waitForPod watches the given pod until the exitCondition is true. Each two seconds
 // the tick function is called e.g. for progress output.
-func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition watch.ConditionFunc, tick func(*api.Pod)) (*api.Pod, error) {
+func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*api.Pod, error) {
 	w, err := podClient.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: name}))
 	if err != nil {
 		return nil, err
@@ -399,7 +399,6 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 		if pod == nil {
 			return
 		}
-		tick(pod)
 
 		t := time.NewTicker(2 * time.Second)
 		defer t.Stop()
@@ -414,7 +413,6 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 				if !ok {
 					return
 				}
-				tick(pod)
 			}
 		}
 	}()
@@ -436,11 +434,7 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 }
 
 func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady, func(pod *api.Pod) {
-		if !quiet {
-			fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: false\n", pod.Namespace, pod.Name, pod.Status.Phase)
-		}
-	})
+	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
 
 	// fix generic not found error with empty name in PodRunningAndReady
 	if err != nil && errors.IsNotFound(err) {
@@ -451,11 +445,7 @@ func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.
 }
 
 func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted, func(pod *api.Pod) {
-		if !quiet {
-			fmt.Fprintf(out, "Waiting for pod %s/%s to terminate, status is %s\n", pod.Namespace, pod.Name, pod.Status.Phase)
-		}
-	})
+	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted)
 
 	// fix generic not found error with empty name in PodCompleted
 	if err != nil && errors.IsNotFound(err) {
