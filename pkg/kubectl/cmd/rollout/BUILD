@@ -32,6 +32,7 @@ go_library(
         "//pkg/runtime:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/interrupt:go_default_library",
+        "//pkg/util/strategicpatch:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",

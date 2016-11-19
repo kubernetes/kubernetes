@@ -123,17 +123,8 @@ type Patch struct {
 // If local is true, it will be default to use SMPatchVersionLatest to calculate a patch without contacting the server to
 // get the server supported SMPatchVersion. If you are using a patch's Patch field generated in local mode, be careful.
 // If local is false, it will talk to the server to check which StategicMergePatchVersion to use.
-func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime.Encoder, local bool, mutateFn func(*resource.Info) (bool, error)) []*Patch {
+func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime.Encoder, smPatchVersion strategicpatch.StrategicMergePatchVersion, mutateFn func(*resource.Info) (bool, error)) []*Patch {
 	var patches []*Patch
-	smPatchVersion := strategicpatch.SMPatchVersionLatest
-	var err error
-	if !local {
-		smPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
-		if err != nil {
-			return patches
-		}
-	}
-
 	for _, info := range infos {
 		patch := &Patch{Info: info}
 		patch.Before, patch.Err = runtime.Encode(encoder, info.Object)

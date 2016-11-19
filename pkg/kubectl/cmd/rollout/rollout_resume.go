@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -138,7 +139,8 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 
 func (o ResumeConfig) RunResume() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.f, o.Infos, o.Encoder, false, o.Resumer) {
+	// Defaulting to SMPatchVersion_1_5 is safe, since Resumer only update a boolean variable
+	for _, patch := range set.CalculatePatches(o.f, o.Infos, o.Encoder, strategicpatch.SMPatchVersion_1_5, o.Resumer) {
 		info := patch.Info
 
 		if patch.Err != nil {
