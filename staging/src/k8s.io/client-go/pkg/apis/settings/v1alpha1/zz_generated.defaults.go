@@ -84,6 +84,9 @@ func SetObjectDefaults_PodPreset(in *PodPreset) {
 				}
 			}
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 	}
 }
 

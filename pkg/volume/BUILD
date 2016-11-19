@@ -114,6 +114,7 @@ filegroup(
         "//pkg/volume/projected:all-srcs",
         "//pkg/volume/quobyte:all-srcs",
         "//pkg/volume/rbd:all-srcs",
+        "//pkg/volume/scaleio:all-srcs",
         "//pkg/volume/secret:all-srcs",
         "//pkg/volume/testing:all-srcs",
         "//pkg/volume/util:all-srcs",

@@ -359,3 +359,18 @@ func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
 		obj.Keyring = "/etc/ceph/keyring"
 	}
 }
+
+func SetDefaults_ScaleIOVolumeSource(obj *ScaleIOVolumeSource) {
+	if obj.ProtectionDomain == "" {
+		obj.ProtectionDomain = "default"
+	}
+	if obj.StoragePool == "" {
+		obj.StoragePool = "default"
+	}
+	if obj.StorageMode == "" {
+		obj.StorageMode = "ThinProvisioned"
+	}
+	if obj.FSType == "" {
+		obj.FSType = "xfs"
+	}
+}
