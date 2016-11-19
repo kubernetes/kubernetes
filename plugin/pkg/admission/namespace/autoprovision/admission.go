@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("NamespaceAutoProvision", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("NamespaceAutoProvision", func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		return NewProvision(client), nil
 	})
 }

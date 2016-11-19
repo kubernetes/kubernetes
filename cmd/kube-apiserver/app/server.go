@@ -290,7 +290,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
 
-	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
+	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer, nil)
 	if err != nil {
 		glog.Fatalf("Failed to initialize plugins: %v", err)
 	}

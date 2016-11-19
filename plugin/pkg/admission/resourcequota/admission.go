@@ -30,11 +30,15 @@ import (
 
 func init() {
 	admission.RegisterPlugin("ResourceQuota",
-		func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+		func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 			// NOTE: we do not provide informers to the registry because admission level decisions
 			// does not require us to open watches for all items tracked by quota.
 			registry := install.NewRegistry(client, nil)
-			return NewResourceQuota(client, registry, 5, make(chan struct{}))
+			stopChannel := stopCh
+			if stopCh == nil {
+				stopChannel = make(chan struct{})
+			}
+			return NewResourceQuota(client, registry, 5, stopChannel)
 		})
 }
 

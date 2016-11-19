@@ -38,7 +38,7 @@ import (
 var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
 
 func init() {
-	admission.RegisterPlugin("PodNodeSelector", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("PodNodeSelector", func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		pluginConfig := readConfig(config)
 		plugin := NewPodNodeSelector(client, pluginConfig.PodNodeSelectorPluginConfig)
 		return plugin, nil

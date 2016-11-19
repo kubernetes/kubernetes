@@ -29,7 +29,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("LimitPodHardAntiAffinityTopology", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("LimitPodHardAntiAffinityTopology", func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		return NewInterPodAntiAffinity(client), nil
 	})
 }

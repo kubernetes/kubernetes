@@ -23,10 +23,10 @@ type chainAdmissionHandler []Interface
 
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func NewFromPlugins(client clientset.Interface, pluginNames []string, configFilePath string, plugInit PluginInitializer) (Interface, error) {
+func NewFromPlugins(client clientset.Interface, pluginNames []string, configFilePath string, plugInit PluginInitializer, stopCh chan struct{}) (Interface, error) {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
-		plugin := InitPlugin(pluginName, client, configFilePath)
+		plugin := InitPlugin(pluginName, client, configFilePath, stopCh)
 		if plugin != nil {
 			plugins = append(plugins, plugin)
 		}

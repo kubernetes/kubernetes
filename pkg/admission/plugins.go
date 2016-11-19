@@ -34,7 +34,7 @@ import (
 // The config parameter provides an io.Reader handler to the factory in
 // order to load specific configurations. If no configuration is provided
 // the parameter is nil.
-type Factory func(client clientset.Interface, config io.Reader) (Interface, error)
+type Factory func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (Interface, error)
 
 // All registered admission options.
 var (
@@ -79,7 +79,7 @@ func RegisterPlugin(name string, plugin Factory) {
 // the name is not known. The error is returned only when the named provider was
 // known but failed to initialize.  The config parameter specifies the io.Reader
 // handler of the configuration file for the cloud provider, or nil for no configuration.
-func getPlugin(name string, client clientset.Interface, config io.Reader) (Interface, bool, error) {
+func getPlugin(name string, client clientset.Interface, config io.Reader, stopCh chan struct{}) (Interface, bool, error) {
 	pluginsMutex.Lock()
 	defer pluginsMutex.Unlock()
 	f, found := plugins[name]
@@ -95,7 +95,7 @@ func getPlugin(name string, client clientset.Interface, config io.Reader) (Inter
 		return nil, true, nil
 	}
 
-	ret, err := f(client, config2)
+	ret, err := f(client, config2, stopCh)
 	return ret, true, err
 }
 
@@ -114,7 +114,7 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 }
 
 // InitPlugin creates an instance of the named interface.
-func InitPlugin(name string, client clientset.Interface, configFilePath string) Interface {
+func InitPlugin(name string, client clientset.Interface, configFilePath string, stopCh chan struct{}) Interface {
 	var (
 		config *os.File
 		err    error
@@ -135,7 +135,7 @@ func InitPlugin(name string, client clientset.Interface, configFilePath string) 
 		defer config.Close()
 	}
 
-	plugin, found, err := getPlugin(name, client, config)
+	plugin, found, err := getPlugin(name, client, config, stopCh)
 	if err != nil {
 		glog.Fatalf("Couldn't init admission plugin %q: %v", name, err)
 	}

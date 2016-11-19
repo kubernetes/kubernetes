@@ -46,7 +46,7 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		plugin := NewPlugin(client, psp.NewSimpleStrategyFactory(), getMatchingPolicies, true)
 		plugin.Run()
 		return plugin, nil

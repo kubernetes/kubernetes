@@ -43,7 +43,7 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin("LimitRanger", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("LimitRanger", func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		return NewLimitRanger(client, &DefaultLimitRangerActions{})
 	})
 }

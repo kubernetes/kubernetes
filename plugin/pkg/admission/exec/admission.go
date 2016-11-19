@@ -29,13 +29,13 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("DenyEscalatingExec", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("DenyEscalatingExec", func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		return NewDenyEscalatingExec(client), nil
 	})
 
 	// This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 	// of the time DenyEscalatingExec should be preferred.
-	admission.RegisterPlugin("DenyExecOnPrivileged", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("DenyExecOnPrivileged", func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		return NewDenyExecOnPrivileged(client), nil
 	})
 }

@@ -35,7 +35,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysPullImages", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("AlwaysPullImages", func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		return NewAlwaysPullImages(), nil
 	})
 }

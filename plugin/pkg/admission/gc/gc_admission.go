@@ -29,7 +29,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("OwnerReferencesPermissionEnforcement", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("OwnerReferencesPermissionEnforcement", func(client clientset.Interface, config io.Reader, stopCh chan struct{}) (admission.Interface, error) {
 		return &gcPermissionsEnforcement{
 			Handler: admission.NewHandler(admission.Create, admission.Update),
 		}, nil
