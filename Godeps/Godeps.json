@@ -402,6 +402,14 @@
 			"Rev": "2b8b7259d3139c96c4a6871031355808ab3fd3b3"
 		},
 		{
+			"ImportPath": "github.com/codedellemc/goscaleio",
+			"Rev": "8ed64a07d23f79bab973f1630651841ccc656887"
+		},
+		{
+			"ImportPath": "github.com/codedellemc/goscaleio/types/v1",
+			"Rev": "8ed64a07d23f79bab973f1630651841ccc656887"
+		},
+		{
 			"ImportPath": "github.com/codegangsta/negroni",
 			"Comment": "v0.1.0-62-g8d75e11",
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"

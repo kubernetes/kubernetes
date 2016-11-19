@@ -906,6 +906,7 @@ var (
 	AzureDisk             FSType = "azureDisk"
 	PhotonPersistentDisk  FSType = "photonPersistentDisk"
 	Projected             FSType = "projected"
+	ScaleIO               FSType = "scaleIO"
 	All                   FSType = "*"
 )
 
