@@ -23,10 +23,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api"
-"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -301,16 +301,16 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		}
 		update := (<-ch).(kubetypes.PodUpdate)
 
-		if !v1.Semantic.DeepEqual(testCase.expected, update) {
+		if !api.Semantic.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
 		for _, pod := range update.Pods {
 			// TODO: remove the conversion when validation is performed on versioned objects.
-				internalPod := &api.Pod{}
-				if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
-					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
-				}
-				if errs := validation.ValidatePod(internalPod); len(errs) != 0 {
+			internalPod := &api.Pod{}
+			if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+				t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
+			}
+			if errs := validation.ValidatePod(internalPod); len(errs) != 0 {
 				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, errs.ToAggregate())
 			}
 		}

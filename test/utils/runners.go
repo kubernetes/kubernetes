@@ -696,7 +696,7 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
 		}
 		updatedNode := strategy.CleanupNode(node)
-		if v1.Semantic.DeepEqual(node, updatedNode) {
+		if api.Semantic.DeepEqual(node, updatedNode) {
 			return nil
 		}
 		if _, err = client.Core().Nodes().Update(updatedNode); err == nil {

@@ -29,10 +29,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api"
-"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -58,7 +58,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 	case got := <-ch:
 		update := got.(kubetypes.PodUpdate)
 		expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
-		if !v1.Semantic.DeepDerivative(expected, update) {
+		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("expected %#v, Got %#v", expected, update)
 		}
 
@@ -87,15 +87,15 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 				update := got.(kubetypes.PodUpdate)
 				for _, pod := range update.Pods {
 					// TODO: remove the conversion when validation is performed on versioned objects.
-				internalPod := &api.Pod{}
-				if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
-					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
-				}
-				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+					internalPod := &api.Pod{}
+					if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+						t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
+					}
+					if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
 						t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 					}
 				}
-				if !v1.Semantic.DeepEqual(testCase.expected, update) {
+				if !api.Semantic.DeepEqual(testCase.expected, update) {
 					t.Fatalf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
@@ -159,7 +159,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 
 	update := (<-ch).(kubetypes.PodUpdate)
 	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
-	if !v1.Semantic.DeepEqual(expected, update) {
+	if !api.Semantic.DeepEqual(expected, update) {
 		t.Fatalf("expected %#v, Got %#v", expected, update)
 	}
 }
@@ -371,7 +371,7 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 				}
 			}
 
-			if !v1.Semantic.DeepEqual(testCase.expected, update) {
+			if !api.Semantic.DeepEqual(testCase.expected, update) {
 				t.Fatalf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 			}
 			return

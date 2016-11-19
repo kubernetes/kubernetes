@@ -27,6 +27,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -225,7 +226,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if maxImagesInNodeStatus != len(updatedNode.Status.Images) {
 		t.Errorf("unexpected image list length in node status, expected: %v, got: %v", maxImagesInNodeStatus, len(updatedNode.Status.Images))
 	} else {
-		if !v1.Semantic.DeepEqual(expectedNode, updatedNode) {
+		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
 			t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 		}
 	}
@@ -498,7 +499,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
-	if !v1.Semantic.DeepEqual(expectedNode, updatedNode) {
+	if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 }
@@ -806,7 +807,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			LastHeartbeatTime:  unversioned.Time{},
 			LastTransitionTime: unversioned.Time{},
 		}
-		if !v1.Semantic.DeepEqual(expectedNode, updatedNode) {
+		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
 			t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 		}
 	}

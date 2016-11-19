@@ -773,7 +773,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 		}
 
 		_, currentCondition := v1.GetNodeCondition(&node.Status, v1.NodeReady)
-		if !v1.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
+		if !api.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
 			if _, err = nc.kubeClient.Core().Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)
 				return gracePeriod, observedReadyCondition, currentReadyCondition, err

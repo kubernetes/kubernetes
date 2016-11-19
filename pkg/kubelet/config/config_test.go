@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -100,7 +101,7 @@ func expectPodUpdate(t *testing.T, ch <-chan kubetypes.PodUpdate, expected ...ku
 		// except for "Pods", which are compared separately below.
 		expectedCopy, updateCopy := expected[i], update
 		expectedCopy.Pods, updateCopy.Pods = nil, nil
-		if !v1.Semantic.DeepEqual(expectedCopy, updateCopy) {
+		if !api.Semantic.DeepEqual(expectedCopy, updateCopy) {
 			t.Fatalf("Expected %#v, Got %#v", expectedCopy, updateCopy)
 		}
 

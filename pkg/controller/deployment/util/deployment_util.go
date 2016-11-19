@@ -611,7 +611,7 @@ func equalIgnoreHash(template1, template2 v1.PodTemplateSpec) (bool, error) {
 
 	// Then, compare the templates without comparing their labels
 	template1.Labels, template2.Labels = nil, nil
-	result := v1.Semantic.DeepEqual(template1, template2)
+	result := api.Semantic.DeepEqual(template1, template2)
 	return result, nil
 }
 
