@@ -14,12 +14,6 @@
 
 FROM BASEIMAGE
 
-# If we're building for another architecture than amd64, the CROSS_BUILD_ placeholder is removed so e.g. CROSS_BUILD_COPY turns into COPY
-# If we're building normally, for amd64, CROSS_BUILD lines are removed
-CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
-
-RUN pip install pyyaml
-
 ADD kube-addons.sh /opt/
 ADD namespace.yaml /opt/
 ADD kubectl /usr/local/bin/

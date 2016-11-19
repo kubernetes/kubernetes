@@ -7,8 +7,7 @@ Kubernetes clusters. The add-ons are visible through the API (they can be listed
 because the system will bring them back to the original state, in particular:
 - If an add-on is deleted, it will be recreated automatically.
 - If an add-on is updated through Apiserver, it will be reconfigured to the state given by
-the supplied fields in the initial config. Though it is fine to modify a field that was
-unspecified.
+the supplied fields in the initial config.
 
 On the cluster, the add-ons are kept in `/etc/kubernetes/addons` on the master node, in
 yaml / json files. The addon manager periodically `kubectl apply`s the contents of this
