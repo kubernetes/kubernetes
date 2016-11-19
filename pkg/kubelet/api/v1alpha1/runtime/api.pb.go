@@ -665,7 +665,8 @@ type PodSandboxConfig struct {
 	//      * runtime/default: the default profile for the container runtime
 	//      * unconfined: unconfined profile, ie, no seccomp sandboxing
 	//      * localhost/<profile-name>: the profile installed to the node's
-	//        local seccomp profile root
+	//        local seccomp profile root. Note that profile root is set in
+	//        kubelet, and it is not passed in CRI yet, see https://issues.k8s.io/36997.
 	//
 	// 3. Sysctls
 	//
