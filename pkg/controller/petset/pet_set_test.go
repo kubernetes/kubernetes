@@ -329,3 +329,51 @@ func TestStatefulSetReplicaCount(t *testing.T) {
 		t.Errorf("Replicas count sent as status update for StatefulSet should be 1, is %d instead", fpsc.replicas)
 	}
 }
+
+func TestExpectedPodName(t *testing.T) {
+	ss := newStatefulSet(3)
+
+	testCases := []struct {
+		podName  string
+		expected bool
+	}{
+		{
+			podName:  "foo-0",
+			expected: true,
+		},
+		{
+			podName:  "foo-2",
+			expected: true,
+		},
+		{
+			podName:  "foo-",
+			expected: false,
+		},
+		{
+			podName:  "foo-a",
+			expected: false,
+		},
+		{
+			podName:  "foo-3",
+			expected: false,
+		},
+		{
+			podName:  "foo-1.1",
+			expected: false,
+		},
+		{
+			podName:  "oo-1",
+			expected: false,
+		},
+	}
+
+	for _, test := range testCases {
+		if test.expected != expectedPodName(test.podName, ss) {
+			maybeNot := ""
+			if !test.expected {
+				maybeNot = " not"
+			}
+			t.Errorf("pod name %q should%s belong to Stateful Set %q with %d replicas", test.podName, maybeNot, ss.Name, ss.Spec.Replicas)
+		}
+	}
+}
