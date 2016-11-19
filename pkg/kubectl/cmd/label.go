@@ -192,14 +192,6 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	smPatchVersion := strategicpatch.SMPatchVersionLatest
-	if !o.local {
-		smPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
-		if err != nil {
-			return err
-		}
-	}
-
 	// only apply resource version locking on a single resource
 	if !one && len(o.resourceVersion) > 0 {
 		return fmt.Errorf("--resource-version may only be used with a single resource")
@@ -254,7 +246,8 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if !reflect.DeepEqual(oldData, newData) {
 				dataChangeMsg = "labeled"
 			}
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, smPatchVersion)
+			// Defaulting to SMPatchVersion_1_5 is safe, since we only update labels and change cause, and none of them has list of primitives
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, strategicpatch.SMPatchVersion_1_5)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)

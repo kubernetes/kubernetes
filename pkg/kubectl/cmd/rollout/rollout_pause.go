@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // PauseConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -134,7 +135,8 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 
 func (o PauseConfig) RunPause() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.f, o.Infos, o.Encoder, false, o.Pauser) {
+	// Defaulting to SMPatchVersion_1_5 is safe, since Pauser only update a boolean variable
+	for _, patch := range set.CalculatePatches(o.f, o.Infos, o.Encoder, strategicpatch.SMPatchVersion_1_5, o.Pauser) {
 		info := patch.Info
 		if patch.Err != nil {
 			allErrs = append(allErrs, fmt.Errorf("error: %s %q %v", info.Mapping.Resource, info.Name, patch.Err))

@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -37,6 +38,7 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -142,6 +144,58 @@ func readAndAnnotateService(t *testing.T, filename string) (string, []byte) {
 	return annotateRuntimeObject(t, svc1, svc2, "Service")
 }
 
+func setFinalizersRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object) (string, []byte) {
+	originalAccessor, err := meta.Accessor(originalObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	originalFinalizers := []string{"a/a"}
+	originalAccessor.SetFinalizers(originalFinalizers)
+	original, err := runtime.Encode(testapi.Default.Codec(), originalObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentAccessor, err := meta.Accessor(currentObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentFinalizers := []string{"b/b"}
+	currentAccessor.SetFinalizers(currentFinalizers)
+
+	currentAnnotations := currentAccessor.GetAnnotations()
+	if currentAnnotations == nil {
+		currentAnnotations = make(map[string]string)
+	}
+	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(original)
+	currentAccessor.SetAnnotations(currentAnnotations)
+	current, err := runtime.Encode(testapi.Default.Codec(), currentObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return currentAccessor.GetName(), current
+}
+
+func readAndSetFinalizersReplicationController(t *testing.T, filename string) (string, []byte) {
+	rc1 := readReplicationControllerFromFile(t, filename)
+	rc2 := readReplicationControllerFromFile(t, filename)
+	name, rcBytes := setFinalizersRuntimeObject(t, rc1, rc2)
+	return name, rcBytes
+}
+
+func isSMPatchVersion_1_5(t *testing.T, req *http.Request) bool {
+	patch, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// SMPatchVersion_1_5 patch should has string "mergeprimitiveslist"
+	return strings.Contains(string(patch), strategicpatch.MergePrimitivesListDirective)
+}
+
 func validatePatchApplication(t *testing.T, req *http.Request) {
 	patch, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -215,6 +269,65 @@ func TestApplyObject(t *testing.T) {
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
+
+	// uses the name from the file, not the response
+	expectRC := "replicationcontroller/" + nameRC + "\n"
+	if buf.String() != expectRC {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+	}
+}
+
+func TestApplyRetryWithSMPatchVersion_1_5(t *testing.T) {
+	initTestErrorHandler(t)
+	nameRC, currentRC := readAndSetFinalizersReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	firstPatch := true
+	retry := false
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == pathRC && m == "GET":
+				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+			case p == pathRC && m == "PATCH":
+				if firstPatch {
+					if !isSMPatchVersion_1_5(t, req) {
+						t.Fatalf("apply didn't try to send SMPatchVersion_1_5 for the first time")
+					}
+					firstPatch = false
+					statusErr := kubeerr.NewInternalError(fmt.Errorf("Server encountered internal error."))
+					bodyBytes, _ := json.Marshal(statusErr)
+					bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
+					return &http.Response{StatusCode: http.StatusInternalServerError, Header: defaultHeader(), Body: bodyErr}, nil
+				}
+				retry = true
+				if isSMPatchVersion_1_5(t, req) {
+					t.Fatalf("apply didn't try to send SMPatchVersion_1_0 after SMPatchVersion_1_5 patch encounter an Internal Error (500)")
+				}
+				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	if !retry {
+		t.Fatalf("apply didn't retry when get Internal Error (500)")
+	}
 
 	// uses the name from the file, not the response
 	expectRC := "replicationcontroller/" + nameRC + "\n"
