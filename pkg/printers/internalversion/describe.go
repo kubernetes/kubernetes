@@ -626,6 +626,8 @@ func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
 		case volume.VolumeSource.PortworxVolume != nil:
 			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, w)
+		case volume.VolumeSource.ScaleIO != nil:
+			printScaleIOVolumeSource(volume.VolumeSource.ScaleIO, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -788,6 +790,19 @@ func printCinderVolumeSource(cinder *api.CinderVolumeSource, w *PrefixWriter) {
 		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
 }
 
+func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tScaleIO (a persistent volume backed by a block device in ScaleIO)\n"+
+		"    Gateway:\t%v\n"+
+		"    System:\t%v\n"+
+		"    Protection Domain:\t%v\n"+
+		"    Storage Pool:\t%v\n"+
+		"    Storage Mode:\t%v\n"+
+		"    VolumeName:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, sio.FSType, sio.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -852,6 +867,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
 		case pv.Spec.PortworxVolume != nil:
 			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
+		case pv.Spec.ScaleIO != nil:
+			printScaleIOVolumeSource(pv.Spec.ScaleIO, w)
 		}
 
 		if events != nil {

@@ -12961,6 +12961,56 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.ScaleIOVolumeSource": {
+    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+    "required": [
+     "gateway",
+     "system",
+     "secretRef"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "gateway": {
+      "description": "The host address of the ScaleIO API Gateway.",
+      "type": "string"
+     },
+     "protectionDomain": {
+      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\").",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "secretRef": {
+      "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
+     },
+     "sslEnabled": {
+      "description": "Flag to enable/disable SSL communication with Gateway, default false",
+      "type": "boolean"
+     },
+     "storageMode": {
+      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\").",
+      "type": "string"
+     },
+     "storagePool": {
+      "description": "The Storage Pool associated with the protection domain (defaults to \"default\").",
+      "type": "string"
+     },
+     "system": {
+      "description": "The name of the storage system as configured in ScaleIO.",
+      "type": "string"
+     },
+     "volumeName": {
+      "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.Secret": {
     "description": "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
     "properties": {
@@ -13450,6 +13500,10 @@
      "rbd": {
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
+     },
+     "scaleIO": {
+      "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ScaleIOVolumeSource"
      },
      "secret": {
       "description": "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
