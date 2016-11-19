@@ -630,13 +630,13 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 func checkLocation(r rest.Redirector, ctx api.Context, id, e string, t *testing.T) {
 	location, _, err := r.ResourceLocation(ctx, id)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Errorf("Unexpected error: %v, id is: %s", err, id)
 	}
 	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
+		t.Errorf("Unexpected nil: %v, id is: %s", location, id)
 	}
 	if a := location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
+		t.Errorf("Expected %v, but got %v, id is: %s", e, a, id)
 	}
 }
 
