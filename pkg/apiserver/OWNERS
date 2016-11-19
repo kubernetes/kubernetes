@@ -2,6 +2,7 @@ approvers:
 - lavalamp
 - nikhiljindal
 - smarterclayton
+- deads2k
 reviewers:
 - thockin
 - lavalamp
@@ -9,7 +10,6 @@ reviewers:
 - wojtek-t
 - bgrant0607
 - deads2k
-- brendandburns
 - derekwaynecarr
 - caesarxuchao
 - mikedanese
@@ -20,14 +20,12 @@ reviewers:
 - erictune
 - davidopp
 - sttts
-- dchen1107
 - zmerlynn
 - luxas
 - roberthbailey
 - ncdc
 - timstclair
 - yifan-gu
-- eparis
 - timothysc
 - feiskyer
 - soltysh
@@ -41,5 +39,4 @@ reviewers:
 - krousey
 - vmarmol
 - fgrzadkowski
-- satnam6502
 - xiang90
