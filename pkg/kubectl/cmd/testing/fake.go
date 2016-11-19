@@ -284,12 +284,12 @@ func (f *FakeFactory) LogsForObject(object, options runtime.Object) (*restclient
 	return nil, nil
 }
 
-func (f *FakeFactory) Pauser(info *resource.Info) (bool, error) {
-	return false, nil
+func (f *FakeFactory) Pauser(info *resource.Info) ([]byte, error) {
+	return nil, nil
 }
 
-func (f *FakeFactory) Resumer(info *resource.Info) (bool, error) {
-	return false, nil
+func (f *FakeFactory) Resumer(info *resource.Info) ([]byte, error) {
+	return nil, nil
 }
 
 func (f *FakeFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {

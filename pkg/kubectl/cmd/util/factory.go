@@ -130,9 +130,9 @@ type Factory interface {
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject(object, options runtime.Object) (*restclient.Request, error)
 	// Pauser marks the object in the info as paused ie. it will not be reconciled by its controller.
-	Pauser(info *resource.Info) (bool, error)
+	Pauser(info *resource.Info) ([]byte, error)
 	// Resumer resumes a paused object inside the info ie. it will be reconciled by its controller.
-	Resumer(info *resource.Info) (bool, error)
+	Resumer(info *resource.Info) ([]byte, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
@@ -636,29 +636,29 @@ func (f *factory) LogsForObject(object, options runtime.Object) (*restclient.Req
 	}
 }
 
-func (f *factory) Pauser(info *resource.Info) (bool, error) {
+func (f *factory) Pauser(info *resource.Info) ([]byte, error) {
 	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
 		if obj.Spec.Paused {
-			return true, errors.New("is already paused")
+			return nil, errors.New("is already paused")
 		}
 		obj.Spec.Paused = true
-		return true, nil
+		return runtime.Encode(f.JSONEncoder(), info.Object)
 	default:
-		return false, fmt.Errorf("pausing is not supported")
+		return nil, fmt.Errorf("pausing is not supported")
 	}
 }
 
-func (f *factory) Resumer(info *resource.Info) (bool, error) {
+func (f *factory) Resumer(info *resource.Info) ([]byte, error) {
 	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
 		if !obj.Spec.Paused {
-			return true, errors.New("is not paused")
+			return nil, errors.New("is not paused")
 		}
 		obj.Spec.Paused = false
-		return true, nil
+		return runtime.Encode(f.JSONEncoder(), info.Object)
 	default:
-		return false, fmt.Errorf("resuming is not supported")
+		return nil, fmt.Errorf("resuming is not supported")
 	}
 }
 

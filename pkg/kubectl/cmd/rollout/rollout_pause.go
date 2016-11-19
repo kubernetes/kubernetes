@@ -39,7 +39,7 @@ type PauseConfig struct {
 	resource.FilenameOptions
 
 	f       cmdutil.Factory
-	Pauser  func(info *resource.Info) (bool, error)
+	Pauser  func(info *resource.Info) ([]byte, error)
 	Mapper  meta.RESTMapper
 	Typer   runtime.ObjectTyper
 	Encoder runtime.Encoder
