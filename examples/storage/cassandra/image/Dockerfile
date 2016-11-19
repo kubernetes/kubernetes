@@ -20,8 +20,7 @@ ENV DI_VERSION="1.1.1" DI_SHA="dec8167091671df0dd3748a8938102479db5fffc"
 
 RUN mv /java.list /etc/apt/sources.list.d/java.list \
   && apt-get update \
-  && apt-get -qq -y install --no-install-recommends procps openjdk-8-jre-headless libjemalloc1 curl \
-    localepurge \
+  && apt-get -qq -y --force-yes install --no-install-recommends procps openjdk-8-jre-headless libjemalloc1 curl localepurge \
   && curl -L https://github.com/Yelp/dumb-init/releases/download/v${DI_VERSION}/dumb-init_${DI_VERSION}_amd64 > /sbin/dumb-init \
   && echo "$DI_SHA  /sbin/dumb-init" | sha1sum -c - \
   && mv /cassandra.list /etc/apt/sources.list.d/cassandra.list \
@@ -31,11 +30,13 @@ RUN mv /java.list /etc/apt/sources.list.d/java.list \
   && gpg --export --armor 2B5C1B00 | apt-key add - \
   && gpg --keyserver pgp.mit.edu --recv-keys 0353B12C \
   && gpg --export --armor 0353B12C | apt-key add - \
+  && gpg --keyserver pool.sks-keyservers.net --recv-keys A278B781FE4B2BDA \
+  && gpg --export --armor A278B781FE4B2BDA | apt-key add - \
   && apt-get update \
-  && apt-get -qq -y install --no-install-recommends curl cassandra localepurge \
+  && apt-get -qq -y --force-yes install --no-install-recommends curl cassandra localepurge \
   && chmod a+rx /run.sh /sbin/dumb-init /ready-probe.sh \
   && mkdir -p /cassandra_data/data \
-  && mv /logback.xml /cassandra.yaml /etc/cassandra/ \
+  && mv /logback.xml /cassandra.yaml /jvm.options /etc/cassandra/ \
 
   # Not able to run as cassandra until https://github.com/kubernetes/kubernetes/issues/2630 is resolved
   # && chown -R cassandra: /etc/cassandra /cassandra_data /run.sh /kubernetes-cassandra.jar \
@@ -60,7 +61,6 @@ RUN mv /java.list /etc/apt/sources.list.d/java.list \
         /usr/share/doc-base/ \
         /usr/share/man/ \
         /tmp/*
-
 
 VOLUME ["/cassandra_data"]
 
