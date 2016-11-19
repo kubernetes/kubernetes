@@ -278,7 +278,7 @@ func newConfigMap(f *framework.Framework, name string) *api.ConfigMap {
 	}
 }
 
-func DoConfigMapE2EWithoutMappingsSetup(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) (*api.Pod, []string) {
+func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
 	var (
 		name            = "configmap-test-volume-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
@@ -352,17 +352,8 @@ func DoConfigMapE2EWithoutMappingsSetup(f *framework.Framework, uid, fsGroup int
 		modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
 		output = append(output, "mode of file \"/etc/configmap-volume/data-1\": "+modeString)
 	}
-
-	return pod, output
-}
-
-func DoConfigMapE2EWithoutMappingsValidate(f *framework.Framework, pod *api.Pod, output []string) {
 	f.TestContainerOutput("consume configMaps", pod, 0, output)
-}
 
-func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
-	pod, output := DoConfigMapE2EWithoutMappingsSetup(f, uid, fsGroup, defaultMode)
-	DoConfigMapE2EWithoutMappingsValidate(f, pod, output)
 }
 
 func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
