@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -49,10 +50,11 @@ const systemOOMEvent = "SystemOOM"
 func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
 	request := events.Request{
 		EventType: map[cadvisorapi.EventType]bool{
-			cadvisorapi.EventOom: true,
+			cadvisorapi.EventOom:     true,
+			cadvisorapi.EventOomKill: true,
 		},
 		ContainerName:        "/",
-		IncludeSubcontainers: false,
+		IncludeSubcontainers: true,
 	}
 	eventChannel, err := ow.cadvisor.WatchEvents(&request)
 	if err != nil {
@@ -64,7 +66,13 @@ func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
 
 		for event := range eventChannel.GetChannel() {
 			glog.V(2).Infof("Got sys oom event from cadvisor: %v", event)
-			ow.recorder.PastEventf(ref, unversioned.Time{Time: event.Timestamp}, api.EventTypeWarning, systemOOMEvent, "System OOM encountered")
+			var msg string
+			if event.EventType == cadvisorapi.EventOomKill {
+				msg = fmt.Sprintf("System OOM encountered. Victim: %s", event.ContainerName)
+			} else {
+				msg = fmt.Sprintf("System OOM encountered. Trigger: %s", event.ContainerName)
+			}
+			ow.recorder.PastEventf(ref, unversioned.Time{Time: event.Timestamp}, api.EventTypeWarning, systemOOMEvent, msg)
 		}
 		glog.Errorf("Unexpectedly stopped receiving OOM notifications from cAdvisor")
 	}()
