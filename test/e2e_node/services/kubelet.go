@@ -123,6 +123,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// by kubelet-flags.
 		"--feature-gates", framework.TestContext.FeatureGates,
 		"--eviction-hard", "memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%", // The hard eviction thresholds.
+		"--eviction-minimum-reclaim", "nodefs.available=5%,nodefs.inodesFree=5%", // The minimum reclaimed resources after eviction.
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
 	// Enable kubenet by default.
