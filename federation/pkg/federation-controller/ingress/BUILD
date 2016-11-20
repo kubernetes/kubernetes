@@ -22,6 +22,7 @@ go_library(
         "//federation/pkg/federation-controller/util/eventsink:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/cache:go_default_library",

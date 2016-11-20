@@ -41,6 +41,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 const (
@@ -53,6 +57,11 @@ const (
 	uidConfigMapName        = "ingress-uid"                                 // Name of the config-map and key the ingress controller stores its uid in.
 	uidConfigMapNamespace   = "kube-system"
 	uidKey                  = "uid"
+	ControllerName          = "ingress"
+)
+
+var (
+	RequiredResources = []unversioned.GroupVersionResource{extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"), apiv1.SchemeGroupVersion.WithResource("configmaps")}
 )
 
 type IngressController struct {
