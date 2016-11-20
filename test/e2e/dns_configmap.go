@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	fed "k8s.io/kubernetes/pkg/dns/federation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -42,12 +42,12 @@ type dnsConfigMapTest struct {
 	name   string
 	labels []string
 
-	cm      *api.ConfigMap
+	cm      *v1.ConfigMap
 	isValid bool
 
-	dnsPod      *api.Pod
-	utilPod     *api.Pod
-	utilService *api.Service
+	dnsPod      *v1.Pod
+	utilPod     *v1.Pod
+	utilService *v1.Service
 }
 
 var _ = framework.KubeDescribe("DNS config map", func() {
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("DNS config map", func() {
 func (t *dnsConfigMapTest) init() {
 	By("Finding a DNS pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
-	options := api.ListOptions{LabelSelector: label}
+	options := v1.ListOptions{LabelSelector: label.String()}
 
 	pods, err := t.f.ClientSet.Core().Pods("kube-system").List(options)
 	Expect(err).NotTo(HaveOccurred())
@@ -94,19 +94,19 @@ func (t *dnsConfigMapTest) run() {
 	invalid := map[string]string{"federations": "invalid.map=xyz"}
 
 	By("empty -> valid1")
-	t.setConfigMap(&api.ConfigMap{Data: valid1}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid1}, true)
 	t.validate()
 
 	By("valid1 -> valid2")
-	t.setConfigMap(&api.ConfigMap{Data: valid2}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid2}, true)
 	t.validate()
 
 	By("valid2 -> invalid")
-	t.setConfigMap(&api.ConfigMap{Data: invalid}, false)
+	t.setConfigMap(&v1.ConfigMap{Data: invalid}, false)
 	t.validate()
 
 	By("invalid -> valid1")
-	t.setConfigMap(&api.ConfigMap{Data: valid1}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid1}, true)
 	t.validate()
 
 	By("valid1 -> deleted")
@@ -114,7 +114,7 @@ func (t *dnsConfigMapTest) run() {
 	t.validate()
 
 	By("deleted -> invalid")
-	t.setConfigMap(&api.ConfigMap{Data: invalid}, false)
+	t.setConfigMap(&v1.ConfigMap{Data: invalid}, false)
 	t.validate()
 }
 
@@ -210,7 +210,7 @@ func (t *dnsConfigMapTest) runDig(dnsName string) []string {
 	}
 }
 
-func (t *dnsConfigMapTest) setConfigMap(cm *api.ConfigMap, isValid bool) {
+func (t *dnsConfigMapTest) setConfigMap(cm *v1.ConfigMap, isValid bool) {
 	if isValid {
 		t.cm = cm
 	}
@@ -219,11 +219,11 @@ func (t *dnsConfigMapTest) setConfigMap(cm *api.ConfigMap, isValid bool) {
 	cm.ObjectMeta.Namespace = t.ns
 	cm.ObjectMeta.Name = t.name
 
-	options := api.ListOptions{
+	options := v1.ListOptions{
 		FieldSelector: fields.Set{
 			"metadata.namespace": t.ns,
 			"metadata.name":      t.name,
-		}.AsSelector(),
+		}.AsSelector().String(),
 	}
 	cmList, err := t.c.Core().ConfigMaps(t.ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
@@ -253,22 +253,22 @@ func (t *dnsConfigMapTest) createUtilPod() {
 	// Actual port # doesn't matter, just need to exist.
 	const servicePort = 10101
 
-	t.utilPod = &api.Pod{
+	t.utilPod = &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "Pod",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace:    t.f.Namespace.Name,
 			Labels:       map[string]string{"app": "e2e-dns-configmap"},
 			GenerateName: "e2e-dns-configmap-",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:    "util",
 					Image:   "gcr.io/google_containers/dnsutils:e2e",
 					Command: []string{"sleep", "10000"},
-					Ports: []api.ContainerPort{
+					Ports: []v1.ContainerPort{
 						{ContainerPort: servicePort, Protocol: "TCP"},
 					},
 				},
@@ -282,17 +282,17 @@ func (t *dnsConfigMapTest) createUtilPod() {
 	framework.Logf("Created pod %v", t.utilPod)
 	Expect(t.f.WaitForPodRunning(t.utilPod.Name)).NotTo(HaveOccurred())
 
-	t.utilService = &api.Service{
+	t.utilService = &v1.Service{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "Service",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: t.f.Namespace.Name,
 			Name:      "e2e-dns-configmap",
 		},
-		Spec: api.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"app": "e2e-dns-configmap"},
-			Ports: []api.ServicePort{
+			Ports: []v1.ServicePort{
 				{
 					Protocol:   "TCP",
 					Port:       servicePort,
@@ -309,7 +309,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 
 func (t *dnsConfigMapTest) deleteUtilPod() {
 	podClient := t.c.Core().Pods(t.f.Namespace.Name)
-	if err := podClient.Delete(t.utilPod.Name, api.NewDeleteOptions(0)); err != nil {
+	if err := podClient.Delete(t.utilPod.Name, v1.NewDeleteOptions(0)); err != nil {
 		framework.Logf("Delete of pod %v:%v failed: %v",
 			t.utilPod.Namespace, t.utilPod.Name, err)
 	}
