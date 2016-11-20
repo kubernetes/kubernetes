@@ -1879,6 +1879,7 @@ function prepare-e2e() {
 # Writes configure-vm.sh to a temporary location with comments stripped. GCE
 # limits the size of metadata fields to 32K, and stripping comments is the
 # easiest way to buy us a little more room.
+# For POSIX compliance, use [[:space:]] instead of \s which is a GNU sed extension
 function prepare-startup-script() {
-  sed '/^\s*#\([^!].*\)*$/ d' ${KUBE_ROOT}/cluster/gce/configure-vm.sh > ${KUBE_TEMP}/configure-vm.sh
+  sed '/^[[:space:]]*#\([^!].*\)*$/ d' ${KUBE_ROOT}/cluster/gce/configure-vm.sh > ${KUBE_TEMP}/configure-vm.sh
 }
