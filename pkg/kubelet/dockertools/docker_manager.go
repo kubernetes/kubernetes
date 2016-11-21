@@ -1660,19 +1660,17 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 			if container == nil {
 				err = fmt.Errorf("unable to find container %s in pod %v", name, pod)
 			}
-		} else {
-			pod = nil
+			// As pod could't be nil, need not run the code below, we return directly here
+			return
 		}
 	}
 
 	// attempt to find the default grace period if we didn't commit a pod, but set the generic metadata
 	// field (the one used by kill)
-	if pod == nil {
-		if period, ok := labels[kubernetesPodTerminationGracePeriodLabel]; ok {
-			if seconds, err := strconv.ParseInt(period, 10, 64); err == nil {
-				pod = &api.Pod{}
-				pod.DeletionGracePeriodSeconds = &seconds
-			}
+	if period, ok := labels[kubernetesPodTerminationGracePeriodLabel]; ok {
+		if seconds, err := strconv.ParseInt(period, 10, 64); err == nil {
+			pod = &api.Pod{}
+			pod.DeletionGracePeriodSeconds = &seconds
 		}
 	}
 
