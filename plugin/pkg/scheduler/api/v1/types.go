@@ -64,6 +64,10 @@ type PredicateArgument struct {
 	// The predicate that checks whether a particular node has a certain label
 	// defined or not, regardless of value
 	LabelsPresence *LabelsPresence `json:"labelsPresence"`
+	// Require the named condition be present with one of the specified values (or if no values are specified, be present with any value)
+	RequireCondition *ConditionSpec `json:"requireCondition"`
+	// Require the named condition not be present with one of the specified values (or if no values are specified, not be present at all)
+	ForbidCondition *ConditionSpec `json:"forbidCondition"`
 }
 
 // Represents the arguments that the different types of priorities take.
@@ -107,6 +111,14 @@ type LabelPreference struct {
 	// If true, higher priority is given to nodes that have the label
 	// If false, higher priority is given to nodes that do not have the label
 	Presence bool `json:"presence"`
+}
+
+// Holds the parameters that are used to configure the corresponding predicate
+type ConditionSpec struct {
+	// The type of the condition
+	ConditionType string `json:"conditionType"`
+	// The set of statuses to require or forbid
+	ConditionStatuses []string `json:"conditionStatuses"`
 }
 
 // Holds the parameters used to communicate with the extender. If a verb is unspecified/empty,

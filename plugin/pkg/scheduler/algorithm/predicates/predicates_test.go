@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/codeinspector"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -1270,6 +1271,158 @@ func TestNodeLabelPresence(t *testing.T) {
 
 		labelChecker := NodeLabelChecker{test.labels, test.presence}
 		fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}
+
+func TestNodeCondition(t *testing.T) {
+	conditions := []v1.NodeCondition{
+		{Type: "present-with-status", Status: "status"},
+		{Type: "present-and-empty", Status: ""},
+	}
+
+	tests := []struct {
+		conditionType   string
+		conditionValues []string
+		presence        bool
+		fits            bool
+		test            string
+	}{
+		{
+			conditionType:   "missing",
+			conditionValues: nil,
+			presence:        false,
+			fits:            true,
+			test:            "forbidden missing condition with no values should fit",
+		},
+		{
+			conditionType:   "missing",
+			conditionValues: []string{"value1", "value2"},
+			presence:        false,
+			fits:            true,
+			test:            "forbidden missing condition with values should fit",
+		},
+
+		{
+			conditionType:   "present-and-empty",
+			conditionValues: nil,
+			presence:        false,
+			fits:            false,
+			test:            "forbidden present-and-empty condition with no values should not fit",
+		},
+		{
+			conditionType:   "present-and-empty",
+			conditionValues: []string{""},
+			presence:        false,
+			fits:            false,
+			test:            "forbidden present-and-empty condition with matching value should not fit",
+		},
+		{
+			conditionType:   "present-and-empty",
+			conditionValues: []string{"value1", "value2"},
+			presence:        false,
+			fits:            true,
+			test:            "forbidden present-and-empty condition with mismatched values should fit",
+		},
+
+		{
+			conditionType:   "present-with-status",
+			conditionValues: nil,
+			presence:        false,
+			fits:            false,
+			test:            "forbidden present-with-status condition with no values should not fit",
+		},
+		{
+			conditionType:   "present-with-status",
+			conditionValues: []string{"status"},
+			presence:        false,
+			fits:            false,
+			test:            "forbidden present-with-status condition with matching value should not fit",
+		},
+		{
+			conditionType:   "present-with-status",
+			conditionValues: []string{"value1", "value2"},
+			presence:        false,
+			fits:            true,
+			test:            "forbidden present-with-status condition with mismatched values should fit",
+		},
+
+		{
+			conditionType:   "missing",
+			conditionValues: nil,
+			presence:        true,
+			fits:            false,
+			test:            "required missing condition with no values should not fit",
+		},
+		{
+			conditionType:   "missing",
+			conditionValues: []string{"value1", "value2"},
+			presence:        true,
+			fits:            false,
+			test:            "required missing condition with values should not fit",
+		},
+
+		{
+			conditionType:   "present-and-empty",
+			conditionValues: nil,
+			presence:        true,
+			fits:            true,
+			test:            "required present-and-empty condition with no values should fit",
+		},
+		{
+			conditionType:   "present-and-empty",
+			conditionValues: []string{""},
+			presence:        true,
+			fits:            true,
+			test:            "required present-and-empty condition with matching value should fit",
+		},
+		{
+			conditionType:   "present-and-empty",
+			conditionValues: []string{"value1", "value2"},
+			presence:        true,
+			fits:            false,
+			test:            "required present-and-empty condition with mismatched values should not fit",
+		},
+
+		{
+			conditionType:   "present-with-status",
+			conditionValues: nil,
+			presence:        true,
+			fits:            true,
+			test:            "required present-with-status condition with no values should fit",
+		},
+		{
+			conditionType:   "present-with-status",
+			conditionValues: []string{"status"},
+			presence:        true,
+			fits:            true,
+			test:            "required present-with-status condition with matching value should fit",
+		},
+		{
+			conditionType:   "present-with-status",
+			conditionValues: []string{"value1", "value2"},
+			presence:        true,
+			fits:            false,
+			test:            "required present-with-status condition with mismatched values should not fit",
+		},
+	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeConditionPresenceViolated}
+
+	for _, test := range tests {
+		node := v1.Node{Status: v1.NodeStatus{Conditions: conditions}}
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(&node)
+
+		checker := NodeConditionChecker{test.conditionType, sets.NewString(test.conditionValues...), test.presence}
+		fits, reasons, err := checker.CheckNodeConditionPresence(nil, PredicateMetadata(nil, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
