@@ -1047,7 +1047,7 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 }
 
 func TestScaleUpRCImmediately(t *testing.T) {
-	time := unversioned.Time{time.Now()}
+	time := unversioned.Time{Time: time.Now()}
 	tc := testCase{
 		minReplicas:         2,
 		maxReplicas:         6,
@@ -1063,7 +1063,7 @@ func TestScaleUpRCImmediately(t *testing.T) {
 }
 
 func TestScaleDownRCImmediately(t *testing.T) {
-	time := unversioned.Time{time.Now()}
+	time := unversioned.Time{Time: time.Now()}
 	tc := testCase{
 		minReplicas:         2,
 		maxReplicas:         5,
