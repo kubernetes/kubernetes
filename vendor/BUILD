@@ -11716,3 +11716,2456 @@ go_library(
     srcs = ["k8s.io/client-go/pkg/util/ratelimit/bucket.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "github.com/gophercloud/gophercloud",
+    srcs = [
+        "github.com/gophercloud/gophercloud/auth_options.go",
+        "github.com/gophercloud/gophercloud/doc.go",
+        "github.com/gophercloud/gophercloud/endpoint_search.go",
+        "github.com/gophercloud/gophercloud/errors.go",
+        "github.com/gophercloud/gophercloud/params.go",
+        "github.com/gophercloud/gophercloud/provider_client.go",
+        "github.com/gophercloud/gophercloud/results.go",
+        "github.com/gophercloud/gophercloud/service_client.go",
+        "github.com/gophercloud/gophercloud/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/clients",
+    srcs = ["github.com/gophercloud/gophercloud/acceptance/clients/clients.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack",
+    srcs = ["github.com/gophercloud/gophercloud/acceptance/openstack/common.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud/openstack/common/extensions"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/extensions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/extensions/extensions.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/extensions/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/v1",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/v1/blockstorage.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/v1/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/v2",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/v2/blockstorage.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/blockstorage/v2/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/clients",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/compute/v2",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/compute/v2/compute.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/compute/v2/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/clients",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/schedulerhints",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/flavors",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/images",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+        "//vendor:golang.org/x/crypto/ssh",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/db/v1",
+    srcs = ["github.com/gophercloud/gophercloud/acceptance/openstack/db/v1/pkg.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/identity/v2",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/identity/v2/identity.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/identity/v2/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/users",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/identity/v3",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/identity/v3/identity.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/identity/v3/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v3/endpoints",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v3/services",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/networking.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/apiversions",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/subnets",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/extensions.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/fwaas",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/fwaas/fwaas.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/fwaas/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/firewalls",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/policies",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/rules",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/layer3",
+    srcs = ["github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/layer3/layer3.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/clients",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/lbaas",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/lbaas/lbaas.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/lbaas/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/lbaas_v2",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/lbaas_v2/lbaas_v2.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/lbaas_v2/pkg.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/portsbinding",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/portsbinding/pkg.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/networking/v2/extensions/portsbinding/portsbinding.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/objectstorage/v1",
+    srcs = ["github.com/gophercloud/gophercloud/acceptance/openstack/objectstorage/v1/pkg.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/orchestration/v1",
+    srcs = ["github.com/gophercloud/gophercloud/acceptance/openstack/orchestration/v1/pkg.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/openstack/sharedfilesystems/v2",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/openstack/sharedfilesystems/v2/pkg.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/sharedfilesystems/v2/sharenetworks.go",
+        "github.com/gophercloud/gophercloud/acceptance/openstack/sharedfilesystems/v2/sharetypes.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/acceptance/tools",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharenetworks",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharetypes",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/acceptance/tools",
+    srcs = [
+        "github.com/gophercloud/gophercloud/acceptance/tools/pkg.go",
+        "github.com/gophercloud/gophercloud/acceptance/tools/tools.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/auth_env.go",
+        "github.com/gophercloud/gophercloud/openstack/client.go",
+        "github.com/gophercloud/gophercloud/openstack/endpoint_location.go",
+        "github.com/gophercloud/gophercloud/openstack/errors.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/utils",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions/results.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/results.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots/results.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots/urls.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/snapshots/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/results.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/urls.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes/results.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumetypes/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/results.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/urls.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/cdn/v1/base",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/base/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/base/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/base/results.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/base/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/cdn/v1/base/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/base/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/base/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/cdn/v1/flavors",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/flavors/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/flavors/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/flavors/results.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/flavors/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/cdn/v1/flavors/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/flavors/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/flavors/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/cdn/v1/serviceassets",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/serviceassets/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/serviceassets/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/serviceassets/results.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/serviceassets/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/cdn/v1/serviceassets/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/serviceassets/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/serviceassets/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/cdn/v1/services",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/services/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/services/errors.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/services/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/services/results.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/services/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/cdn/v1/services/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/services/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/cdn/v1/services/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/common/extensions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/common/extensions/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/common/extensions/errors.go",
+        "github.com/gophercloud/gophercloud/openstack/common/extensions/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/common/extensions/results.go",
+        "github.com/gophercloud/gophercloud/openstack/common/extensions/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/common/extensions/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/common/extensions/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/common/extensions/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/common/extensions",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/delegate.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/common/extensions",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/defsecrules/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/diskconfig",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/diskconfig/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/diskconfig/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/diskconfig/results.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/diskconfig/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/diskconfig/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/schedulerhints",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/schedulerhints/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/schedulerhints/requests.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/schedulerhints/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/schedulerhints/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop/requests.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tenantnetworks",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/compute/v2/flavors/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/images",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/images/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/images/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/images/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/images/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/images/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/compute/v2/images/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/errors.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/results.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/urls.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/flavors",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/images",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/compute/v2/servers/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/configurations",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/configurations/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/configurations/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/configurations/results.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/configurations/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/instances",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/configurations/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/configurations/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/configurations/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/configurations"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/databases",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/databases/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/databases/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/databases/results.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/databases/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/databases/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/databases/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/databases/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud/testhelper/fixture"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/datastores",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/datastores/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/datastores/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/datastores/results.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/datastores/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/datastores/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/datastores/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/datastores/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/datastores",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/flavors",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/flavors/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/flavors/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/flavors/results.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/flavors/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/flavors/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/flavors/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/flavors/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud/testhelper/fixture"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/instances",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/instances/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/instances/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/instances/results.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/instances/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/databases",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/datastores",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/flavors",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/users",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/instances/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/instances/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/instances/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/datastores",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/flavors",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/instances",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/fixture",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/users",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/users/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/users/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/users/results.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/users/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/db/v1/databases",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/db/v1/users/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/db/v1/users/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/db/v1/users/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud/testhelper/fixture"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/delegate.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/common/extensions",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles/docs.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles/results.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/admin/roles/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/extensions/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants/results.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens/results.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/users",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/users/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/users/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/users/results.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/users/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v2/users/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/users/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v2/users/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/endpoints",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/endpoints/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/endpoints/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/endpoints/results.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/endpoints/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/endpoints/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/identity/v3/endpoints/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts/results.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/roles",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/roles/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/roles/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/roles/results.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/roles/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/roles/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/identity/v3/roles/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/services",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/services/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/services/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/services/results.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/services/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/services/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/identity/v3/services/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens/results.go",
+        "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/identity/v3/tokens/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/apiversions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/apiversions/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/apiversions/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/apiversions/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/apiversions/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/apiversions/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/apiversions/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/common",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/common/common_tests.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/delegate.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/common/extensions",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external/results.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/firewalls",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/firewalls/errors.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/firewalls/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/firewalls/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/firewalls/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/firewalls/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/firewalls/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/policies",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/policies/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/policies/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/policies/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/policies/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/policies/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/rules",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/rules/errors.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/rules/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/rules/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/rules/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/rules/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/fwaas/rules/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsbinding/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/common",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider/results.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/networks/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/networks/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/networks/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/networks/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/networks/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/networks/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/ports/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/ports/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/ports/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/ports/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/ports/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/ports/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets/results.go",
+        "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/networking/v2/subnets/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts/results.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers/results.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects/errors.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects/results.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/objectstorage/v1/accounts",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth/results.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/apiversions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/apiversions/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/apiversions/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/apiversions/results.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/apiversions/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/apiversions/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/orchestration/v1/apiversions/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo/results.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/orchestration/v1/buildinfo",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents/results.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackevents",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources/results.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/orchestration/v1/stackresources",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/environment.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/errors.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/fixtures.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/results.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/template.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/urls.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/utils.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+        "//vendor:gopkg.in/yaml.v2",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates/results.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates/testing",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates/testing/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates/testing/fixtures.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacktemplates",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharenetworks",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharenetworks/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharenetworks/results.go",
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharenetworks/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharenetworks/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharenetworks/testing/fixtures.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares/results.go",
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares/testing/fixtures.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharetypes",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharetypes/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharetypes/results.go",
+        "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharetypes/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharetypes/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/sharetypes/testing/fixtures.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/utils",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/utils/choose_version.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/utils/testing",
+    srcs = ["github.com/gophercloud/gophercloud/openstack/utils/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/pagination",
+    srcs = [
+        "github.com/gophercloud/gophercloud/pagination/http.go",
+        "github.com/gophercloud/gophercloud/pagination/linked.go",
+        "github.com/gophercloud/gophercloud/pagination/marker.go",
+        "github.com/gophercloud/gophercloud/pagination/pager.go",
+        "github.com/gophercloud/gophercloud/pagination/pkg.go",
+        "github.com/gophercloud/gophercloud/pagination/single.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gophercloud/gophercloud"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/pagination/testing",
+    srcs = ["github.com/gophercloud/gophercloud/pagination/testing/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/testhelper",
+    srcs = [
+        "github.com/gophercloud/gophercloud/testhelper/convenience.go",
+        "github.com/gophercloud/gophercloud/testhelper/doc.go",
+        "github.com/gophercloud/gophercloud/testhelper/http_responses.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/testhelper/client",
+    srcs = ["github.com/gophercloud/gophercloud/testhelper/client/fake.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/testhelper/fixture",
+    srcs = ["github.com/gophercloud/gophercloud/testhelper/fixture/helper.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud/testhelper",
+        "//vendor:github.com/gophercloud/gophercloud/testhelper/client",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/testing",
+    srcs = ["github.com/gophercloud/gophercloud/testing/doc.go"],
+    tags = ["automanaged"],
+)
