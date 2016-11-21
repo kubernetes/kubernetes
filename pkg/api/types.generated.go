@@ -13784,11 +13784,12 @@ func (x *CinderVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			const yyr946 bool = false
 			yyq946[1] = x.FSType != ""
 			yyq946[2] = x.ReadOnly != false
+			yyq946[3] = x.SecretRef != ""
 			var yynn946 int
 			if yyr946 || yy2arr946 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn946 = 2
+				yynn946 = 1
 				for _, b := range yyq946 {
 					if b {
 						yynn946++
@@ -13868,21 +13869,27 @@ func (x *CinderVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr946 || yy2arr946 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym957 := z.EncBinary()
-				_ = yym957
-				if false {
+				if yyq946[3] {
+					yym957 := z.EncBinary()
+					_ = yym957
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.SecretRef))
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.SecretRef))
+					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("secretRef"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym958 := z.EncBinary()
-				_ = yym958
-				if false {
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.SecretRef))
+				if yyq946[3] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("secretRef"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym958 := z.EncBinary()
+					_ = yym958
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.SecretRef))
+					}
 				}
 			}
 			if yyr946 || yy2arr946 {

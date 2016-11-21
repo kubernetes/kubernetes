@@ -847,7 +847,7 @@ type CinderVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// Optional: Used to configure the Cinder credentials instead of using the
 	// Cloud Provider.
-	SecretRef string `json:"secretRef"`
+	SecretRef string `json:"secretRef,omitempty"`
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
