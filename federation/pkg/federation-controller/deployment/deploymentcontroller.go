@@ -561,9 +561,10 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 			return statusError, err
 		}
 
+		// The object can be modified.
 		ld := &extensionsv1.Deployment{
-			ObjectMeta: fedutil.CopyObjectMeta(fd.ObjectMeta),
-			Spec:       fd.Spec,
+			ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(fd.ObjectMeta),
+			Spec:       fedutil.DeepCopyApiTypeOrPanic(fd.Spec).(extensionsv1.DeploymentSpec),
 		}
 		specReplicas := int32(replicas)
 		ld.Spec.Replicas = &specReplicas
