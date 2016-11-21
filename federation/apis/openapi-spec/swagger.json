@@ -9757,11 +9757,7 @@
     "description": "DeploymentCondition describes the state of a deployment at a certain point.",
     "required": [
      "type",
-     "status",
-     "lastUpdateTime",
-     "lastTransitionTime",
-     "reason",
-     "message"
+     "status"
     ],
     "properties": {
      "lastTransitionTime": {
@@ -9836,8 +9832,7 @@
    "v1beta1.DeploymentSpec": {
     "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
-     "template",
-     "progressDeadlineSeconds"
+     "template"
     ],
     "properties": {
      "minReadySeconds": {
@@ -9884,9 +9879,6 @@
    },
    "v1beta1.DeploymentStatus": {
     "description": "DeploymentStatus is the most recently observed status of the Deployment.",
-    "required": [
-     "conditions"
-    ],
     "properties": {
      "availableReplicas": {
       "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
