@@ -6333,7 +6333,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
-	"unversioned.Patch": {
+	"unversioned.MicroTime": unversioned.MicroTime{}.OpenAPIDefinition(), "unversioned.Patch": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",

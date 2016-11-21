@@ -266,6 +266,19 @@ func DeepCopy_unversioned_ListMeta(in interface{}, out interface{}, c *conversio
 	}
 }
 
+func DeepCopy_unversioned_MicroTime(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*MicroTime)
+		out := out.(*MicroTime)
+		if newVal, err := c.DeepCopy(&in.Time); err != nil {
+			return err
+		} else {
+			out.Time = *newVal.(*time.Time)
+		}
+		return nil
+	}
+}
+
 func DeepCopy_unversioned_Patch(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Patch)
