@@ -644,7 +644,7 @@ $ <kubernetes>/cluster/kube-down.sh
 
 If you are having trouble bringing up your guestbook app, double check that your external IP is properly defined for your frontend Service, and that the firewall for your cluster nodes is open to port 80.
 
-Then, see the [troubleshooting documentation](../../docs/troubleshooting.md) for a further list of common issues and how you can diagnose them.
+Then, see the [troubleshooting documentation](http://kubernetes.io/docs/troubleshooting/) for a further list of common issues and how you can diagnose them.
 
 
 

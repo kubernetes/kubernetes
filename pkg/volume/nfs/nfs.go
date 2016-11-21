@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -332,7 +333,11 @@ func (r *nfsRecycler) GetPath() string {
 // Recycle recycles/scrubs clean an NFS volume.
 // Recycle blocks until the pod has completed or any error occurs.
 func (r *nfsRecycler) Recycle() error {
-	pod := r.config.RecyclerPodTemplate
+	templateClone, err := conversion.NewCloner().DeepCopy(r.config.RecyclerPodTemplate)
+	if err != nil {
+		return err
+	}
+	pod := templateClone.(*api.Pod)
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &r.timeout
 	pod.GenerateName = "pv-recycler-nfs-"

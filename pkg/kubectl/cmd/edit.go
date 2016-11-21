@@ -424,13 +424,8 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info,
 	results *editResults,
 	file string) error {
 
-	smPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
-	if err != nil {
-		return err
-	}
-
 	patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-	err = patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		currOriginalObj := originalObj
 
 		// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
@@ -491,7 +486,8 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info,
 
 		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
 			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, smPatchVersion, preconditions...)
+		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, strategicpatch.SMPatchVersion_1_5, preconditions...)
+		// If creating a patch fails, retrying with SMPatchVersion_1_0 is not helpful. So we return the error.
 		if err != nil {
 			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 			if strategicpatch.IsPreconditionFailed(err) {
@@ -503,8 +499,20 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info,
 		results.version = defaultVersion
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 		if err != nil {
-			fmt.Fprintln(out, results.addError(err, info))
-			return nil
+			// Retry SMPatchVersion_1_0 when applying the SMPatchVersion_1_5 patch returns an Internal Error (500).
+			// Because the failure may be due to the server not supporting the SMPatchVersion_1_5 patch.
+			if errors.IsInternalError(err) {
+				patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, strategicpatch.SMPatchVersion_1_0)
+				if err != nil {
+					glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+					return err
+				}
+				patched, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+			}
+			if err != nil {
+				fmt.Fprintln(out, results.addError(err, info))
+				return nil
+			}
 		}
 		info.Refresh(patched, true)
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")

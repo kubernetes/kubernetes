@@ -139,11 +139,6 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
 	}
 
-	smPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
-	if err != nil {
-		return err
-	}
-
 	counter := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -169,7 +164,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command(), smPatchVersion)
+			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command())
 			if err != nil {
 				return err
 			}

@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -39,7 +40,7 @@ const (
 )
 
 // Create/delete daemonset api objects
-var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation12]", func() {
+var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", func() {
 	var clusters map[string]*cluster // All clusters, keyed by cluster name
 
 	f := framework.NewDefaultFederatedFramework("federated-daemonset")
@@ -54,6 +55,9 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation12]", f
 
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.ClientSet)
+			// Delete all daemonsets.
+			nsName := f.FederationNamespace.Name
+			deleteAllDaemonSetsOrFail(f.FederationClientset_1_5, nsName)
 			unregisterClusters(clusters, f)
 		})
 
@@ -71,8 +75,82 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation12]", f
 			daemonset = updateDaemonSetOrFail(f.FederationClientset_1_5, nsName)
 			waitForDaemonSetShardsUpdatedOrFail(nsName, daemonset, clusters)
 		})
+
+		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
+			framework.SkipUnlessFederated(f.ClientSet)
+			nsName := f.FederationNamespace.Name
+			orphanDependents := false
+			verifyCascadingDeletionForDS(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			By(fmt.Sprintf("Verified that daemonsets were deleted from underlying clusters"))
+		})
+
+		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
+			framework.SkipUnlessFederated(f.ClientSet)
+			nsName := f.FederationNamespace.Name
+			orphanDependents := true
+			verifyCascadingDeletionForDS(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			By(fmt.Sprintf("Verified that daemonsets were not deleted from underlying clusters"))
+		})
+		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
+			framework.SkipUnlessFederated(f.ClientSet)
+			nsName := f.FederationNamespace.Name
+			verifyCascadingDeletionForDS(f.FederationClientset_1_5, clusters, nil, nsName)
+			By(fmt.Sprintf("Verified that daemonsets were not deleted from underlying clusters"))
+		})
 	})
 })
+
+// deleteAllDaemonSetsOrFail deletes all DaemonSets in the given namespace name.
+func deleteAllDaemonSetsOrFail(clientset *fedclientset.Clientset, nsName string) {
+	DaemonSetList, err := clientset.Extensions().DaemonSets(nsName).List(v1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	orphanDependents := false
+	for _, daemonSet := range DaemonSetList.Items {
+		deleteDaemonSetOrFail(clientset, nsName, daemonSet.Name, &orphanDependents)
+	}
+}
+
+// verifyCascadingDeletionForDS verifies that daemonsets are deleted from
+// underlying clusters when orphan dependents is false and they are not
+// deleted when orphan dependents is true.
+func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+	daemonset := createDaemonSetOrFail(clientset, nsName)
+	daemonsetName := daemonset.Name
+	// Check subclusters if the daemonset was created there.
+	By(fmt.Sprintf("Waiting for daemonset %s to be created in all underlying clusters", daemonsetName))
+	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
+		for _, cluster := range clusters {
+			_, err := cluster.Extensions().DaemonSets(nsName).Get(daemonsetName)
+			if err != nil && errors.IsNotFound(err) {
+				return false, nil
+			}
+			if err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "Not all daemonsets created")
+
+	By(fmt.Sprintf("Deleting daemonset %s", daemonsetName))
+	deleteDaemonSetOrFail(clientset, nsName, daemonsetName, orphanDependents)
+
+	By(fmt.Sprintf("Verifying daemonsets %s in underlying clusters", daemonsetName))
+	errMessages := []string{}
+	// daemon set should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
+	for clusterName, clusterClientset := range clusters {
+		_, err := clusterClientset.Extensions().DaemonSets(nsName).Get(daemonsetName)
+		if shouldExist && errors.IsNotFound(err) {
+			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for daemonset %s in cluster %s, expected daemonset to exist", daemonsetName, clusterName))
+		} else if !shouldExist && !errors.IsNotFound(err) {
+			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for daemonset %s in cluster %s, got error: %v", daemonsetName, clusterName, err))
+		}
+	}
+	if len(errMessages) != 0 {
+		framework.Failf("%s", strings.Join(errMessages, "; "))
+	}
+}
 
 func createDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) *v1beta1.DaemonSet {
 	if clientset == nil || len(namespace) == 0 {
@@ -106,6 +184,24 @@ func createDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) 
 	framework.ExpectNoError(err, "Failed to create daemonset %s", daemonset.Name)
 	By(fmt.Sprintf("Successfully created federated daemonset %q in namespace %q", FederatedDaemonSetName, namespace))
 	return daemonset
+}
+
+func deleteDaemonSetOrFail(clientset *fedclientset.Clientset, nsName string, daemonsetName string, orphanDependents *bool) {
+	By(fmt.Sprintf("Deleting daemonset %q in namespace %q", daemonsetName, nsName))
+	err := clientset.Extensions().DaemonSets(nsName).Delete(daemonsetName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
+	framework.ExpectNoError(err, "Error deleting daemonset %q in namespace %q", daemonsetName, nsName)
+
+	// Wait for the daemonset to be deleted.
+	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := clientset.Extensions().DaemonSets(nsName).Get(daemonsetName)
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		framework.Failf("Error in deleting daemonset %s: %v", daemonsetName, err)
+	}
 }
 
 func updateDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) *v1beta1.DaemonSet {

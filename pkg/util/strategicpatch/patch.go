@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/json"
 	forkedjson "k8s.io/kubernetes/third_party/forked/golang/json"
 
@@ -46,7 +45,7 @@ const (
 	deleteDirective              = "delete"
 	replaceDirective             = "replace"
 	mergeDirective               = "merge"
-	mergePrimitivesListDirective = "mergeprimitiveslist"
+	MergePrimitivesListDirective = "mergeprimitiveslist"
 
 	// different versions of StrategicMergePatch
 	SMPatchVersion_1_0   StrategicMergePatchVersion = "v1.0.0"
@@ -394,7 +393,7 @@ loopB:
 func diffListsOfScalarsIntoMap(originalScalars, modifiedScalars []interface{}, ignoreChangesAndAdditions, ignoreDeletions bool) (map[string]interface{}, error) {
 	originalIndex, modifiedIndex := 0, 0
 	patch := map[string]interface{}{}
-	patch[directiveMarker] = mergePrimitivesListDirective
+	patch[directiveMarker] = MergePrimitivesListDirective
 
 	for originalIndex < len(originalScalars) && modifiedIndex < len(modifiedScalars) {
 		originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
@@ -628,7 +627,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 			return map[string]interface{}{}, nil
 		}
 
-		if v == mergePrimitivesListDirective {
+		if v == MergePrimitivesListDirective {
 			// delete the directiveMarker's key-value pair to avoid delta map and delete map
 			// overlaping with each other when calculating a ThreeWayDiff for list of Primitives.
 			// Otherwise, the overlaping will cause it calling LookupPatchMetadata() which will
@@ -719,7 +718,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 // the patch because getting a deep copy of a slice in golang is highly
 // non-trivial.
 // The patch could be a map[string]interface{} representing a slice of primitives.
-// If the patch map doesn't has the specific directiveMarker (mergePrimitivesListDirective),
+// If the patch map doesn't has the specific directiveMarker (MergePrimitivesListDirective),
 // it returns an error. Please check patch_test.go and find the test case named
 // "merge lists of scalars for list of primitives" to see what the patch looks like.
 // Patch is still []interface{} for all the other types.
@@ -732,7 +731,7 @@ func mergeSlice(original []interface{}, patch interface{}, elemType reflect.Type
 	if patchMap, ok := patch.(map[string]interface{}); ok {
 		// We try to merge the original slice with a patch map only when the map has
 		// a specific directiveMarker. Otherwise, this patch will be treated as invalid.
-		if directiveValue, ok := patchMap[directiveMarker]; ok && directiveValue == mergePrimitivesListDirective {
+		if directiveValue, ok := patchMap[directiveMarker]; ok && directiveValue == MergePrimitivesListDirective {
 			return mergeSliceOfScalarsWithPatchMap(original, patchMap)
 		} else {
 			return nil, fmt.Errorf("Unable to merge a slice with an invalid map")
@@ -839,10 +838,10 @@ func mergeSlice(original []interface{}, patch interface{}, elemType reflect.Type
 
 // mergeSliceOfScalarsWithPatchMap merges the original slice with a patch map and
 // returns an uniqified and sorted slice of primitives.
-// The patch map must have the specific directiveMarker (mergePrimitivesListDirective).
+// The patch map must have the specific directiveMarker (MergePrimitivesListDirective).
 func mergeSliceOfScalarsWithPatchMap(original []interface{}, patch map[string]interface{}) ([]interface{}, error) {
 	// make sure the patch has the specific directiveMarker ()
-	if directiveValue, ok := patch[directiveMarker]; ok && directiveValue != mergePrimitivesListDirective {
+	if directiveValue, ok := patch[directiveMarker]; ok && directiveValue != MergePrimitivesListDirective {
 		return nil, fmt.Errorf("Unable to merge a slice with an invalid map")
 	}
 	delete(patch, directiveMarker)
@@ -1182,7 +1181,7 @@ func mergingMapFieldsHaveConflicts(
 					return true, nil
 				}
 
-				if leftMarker == mergePrimitivesListDirective && rightMarker == mergePrimitivesListDirective {
+				if leftMarker == MergePrimitivesListDirective && rightMarker == MergePrimitivesListDirective {
 					return false, nil
 				}
 			}
@@ -1210,7 +1209,7 @@ func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, structType 
 	isForListOfPrimitives := false
 	if leftDirective, ok := typedLeft[directiveMarker]; ok {
 		if rightDirective, ok := typedRight[directiveMarker]; ok {
-			if leftDirective == mergePrimitivesListDirective && rightDirective == rightDirective {
+			if leftDirective == MergePrimitivesListDirective && rightDirective == rightDirective {
 				isForListOfPrimitives = true
 			}
 		}
@@ -1429,21 +1428,4 @@ func toYAML(v interface{}) (string, error) {
 	}
 
 	return string(y), nil
-}
-
-// GetServerSupportedSMPatchVersion takes a discoveryClient,
-// returns the max StrategicMergePatch version supported
-func GetServerSupportedSMPatchVersion(discoveryClient discovery.DiscoveryInterface) (StrategicMergePatchVersion, error) {
-	serverVersion, err := discoveryClient.ServerVersion()
-	if err != nil {
-		return Unknown, err
-	}
-	serverGitVersion := serverVersion.GitVersion
-	if serverGitVersion >= string(SMPatchVersion_1_5) {
-		return SMPatchVersion_1_5, nil
-	}
-	if serverGitVersion >= string(SMPatchVersion_1_0) {
-		return SMPatchVersion_1_0, nil
-	}
-	return Unknown, fmt.Errorf("The version is too old: %v\n", serverVersion)
 }
