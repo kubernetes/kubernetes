@@ -30,6 +30,7 @@ go_library(
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/client/restclient:go_default_library",
+        "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/cloudprovider:go_default_library",

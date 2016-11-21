@@ -262,10 +262,7 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 }
 
 func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
-	client := func(serviceAccountName string) clientset.Interface {
-		return rootClientBuilder.ClientOrDie(serviceAccountName)
-	}
-	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), ResyncPeriod(s)())
+	sharedInformers := informers.NewSharedInformerFactory(rootClientBuilder.ClientOrDie("shared-informers"), ResyncPeriod(s)())
 
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 {
@@ -302,7 +299,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		return err
 	}
 
-	go endpointcontroller.NewEndpointController(sharedInformers.Pods().Informer(), client("endpoint-controller")).
+	go endpointcontroller.NewEndpointController(sharedInformers.Pods().Informer(), clientBuilder.ClientOrDie("endpoint-controller")).
 		Run(int(s.ConcurrentEndpointSyncs), stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
@@ -316,7 +313,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	).Run(int(s.ConcurrentRCSyncs), stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	go podgc.NewPodGC(client("pod-garbage-collector"), sharedInformers.Pods().Informer(),
+	go podgc.NewPodGC(clientBuilder.ClientOrDie("pod-garbage-collector"), sharedInformers.Pods().Informer(),
 		int(s.TerminatedPodGCThreshold)).Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
@@ -335,7 +332,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	}
 	nodeController, err := nodecontroller.NewNodeController(
 		sharedInformers.Pods(), sharedInformers.Nodes(), sharedInformers.DaemonSets(),
-		cloud, client("node-controller"),
+		cloud, clientBuilder.ClientOrDie("node-controller"),
 		s.PodEvictionTimeout.Duration, s.NodeEvictionRate, s.SecondaryNodeEvictionRate, s.LargeClusterSizeThreshold, s.UnhealthyZoneThreshold, s.NodeMonitorGracePeriod.Duration,
 		s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR,
 		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
@@ -345,7 +342,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	serviceController, err := servicecontroller.New(cloud, client("service-controller"), s.ClusterName)
+	serviceController, err := servicecontroller.New(cloud, clientBuilder.ClientOrDie("service-controller"), s.ClusterName)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	} else {
@@ -359,7 +356,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			routeController := routecontroller.New(routes, client("route-controller"), s.ClusterName, clusterCIDR)
+			routeController := routecontroller.New(routes, clientBuilder.ClientOrDie("route-controller"), s.ClusterName, clusterCIDR)
 			routeController.Run(s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
@@ -367,7 +364,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.AllocateNodeCIDRs, s.ConfigureCloudRoutes)
 	}
 
-	resourceQuotaControllerClient := client("resourcequota-controller")
+	resourceQuotaControllerClient := clientBuilder.ClientOrDie("resourcequota-controller")
 	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, sharedInformers)
 	groupKindsToReplenish := []unversioned.GroupKind{
 		api.Kind("Pod"),
@@ -392,7 +389,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	restMapper := registered.RESTMapper()
 
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
-	namespaceKubeClient := client("namespace-controller")
+	namespaceKubeClient := clientBuilder.ClientOrDie("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(rootClientBuilder.ConfigOrDie("namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
 	var gvrFn func() ([]unversioned.GroupVersionResource, error)
@@ -422,35 +419,35 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if availableResources[unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "daemonsets"}] {
-		go daemon.NewDaemonSetsController(sharedInformers.DaemonSets(), sharedInformers.Pods(), sharedInformers.Nodes(), client("daemon-set-controller"), int(s.LookupCacheSizeForDaemonSet)).
+		go daemon.NewDaemonSetsController(sharedInformers.DaemonSets(), sharedInformers.Pods(), sharedInformers.Nodes(), clientBuilder.ClientOrDie("daemon-set-controller"), int(s.LookupCacheSizeForDaemonSet)).
 			Run(int(s.ConcurrentDaemonSetSyncs), stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
 	if availableResources[unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "jobs"}] {
 		glog.Infof("Starting job controller")
-		go job.NewJobController(sharedInformers.Pods().Informer(), sharedInformers.Jobs(), client("job-controller")).
+		go job.NewJobController(sharedInformers.Pods().Informer(), sharedInformers.Jobs(), clientBuilder.ClientOrDie("job-controller")).
 			Run(int(s.ConcurrentJobSyncs), stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
 	if availableResources[unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}] {
 		glog.Infof("Starting deployment controller")
-		go deployment.NewDeploymentController(sharedInformers.Deployments(), sharedInformers.ReplicaSets(), sharedInformers.Pods(), client("deployment-controller")).
+		go deployment.NewDeploymentController(sharedInformers.Deployments(), sharedInformers.ReplicaSets(), sharedInformers.Pods(), clientBuilder.ClientOrDie("deployment-controller")).
 			Run(int(s.ConcurrentDeploymentSyncs), stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
 	if availableResources[unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicasets"}] {
 		glog.Infof("Starting ReplicaSet controller")
-		go replicaset.NewReplicaSetController(sharedInformers.ReplicaSets(), sharedInformers.Pods(), client("replicaset-controller"), replicaset.BurstReplicas, int(s.LookupCacheSizeForRS), s.EnableGarbageCollector).
+		go replicaset.NewReplicaSetController(sharedInformers.ReplicaSets(), sharedInformers.Pods(), clientBuilder.ClientOrDie("replicaset-controller"), replicaset.BurstReplicas, int(s.LookupCacheSizeForRS), s.EnableGarbageCollector).
 			Run(int(s.ConcurrentRSSyncs), stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
 	if availableResources[unversioned.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
 		glog.Infof("Starting horizontal pod autoscaler controller.")
-		hpaClient := client("horizontal-pod-autoscaler")
+		hpaClient := clientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 		metricsClient := metrics.NewHeapsterMetricsClient(
 			hpaClient,
 			metrics.DefaultHeapsterNamespace,
@@ -466,7 +463,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 
 	if availableResources[unversioned.GroupVersionResource{Group: "policy", Version: "v1beta1", Resource: "poddisruptionbudgets"}] {
 		glog.Infof("Starting disruption controller")
-		go disruption.NewDisruptionController(sharedInformers.Pods().Informer(), client("disruption-controller")).Run(stop)
+		go disruption.NewDisruptionController(sharedInformers.Pods().Informer(), clientBuilder.ClientOrDie("disruption-controller")).Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
@@ -475,7 +472,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		resyncPeriod := ResyncPeriod(s)()
 		go petset.NewStatefulSetController(
 			sharedInformers.Pods().Informer(),
-			client("statefulset-controller"),
+			clientBuilder.ClientOrDie("statefulset-controller"),
 			resyncPeriod,
 		).Run(1, stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
@@ -495,7 +492,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		return fmt.Errorf("an backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
 	params := persistentvolumecontroller.ControllerParameters{
-		KubeClient:                client("persistent-volume-binder"),
+		KubeClient:                clientBuilder.ClientOrDie("persistent-volume-binder"),
 		SyncPeriod:                s.PVClaimBinderSyncPeriod.Duration,
 		AlphaProvisioner:          alphaProvisioner,
 		VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
@@ -509,7 +506,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
-			client("attachdetach-controller"),
+			clientBuilder.ClientOrDie("attachdetach-controller"),
 			sharedInformers.Pods().Informer(),
 			sharedInformers.Nodes().Informer(),
 			sharedInformers.PersistentVolumeClaims().Informer(),
@@ -526,7 +523,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		glog.Infof("Starting certificate request controller")
 		resyncPeriod := ResyncPeriod(s)()
 		certController, err := certcontroller.NewCertificateController(
-			client("certificate-controller"),
+			clientBuilder.ClientOrDie("certificate-controller"),
 			resyncPeriod,
 			s.ClusterSigningCertFile,
 			s.ClusterSigningKeyFile,
@@ -542,13 +539,13 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 
 	go serviceaccountcontroller.NewServiceAccountsController(
 		sharedInformers.ServiceAccounts(), sharedInformers.Namespaces(),
-		client("service-account-controller"),
+		clientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run(1, stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if s.EnableGarbageCollector {
-		gcClientset := client("generic-garbage-collector")
+		gcClientset := clientBuilder.ClientOrDie("generic-garbage-collector")
 		groupVersionResources, err := gcClientset.Discovery().ServerPreferredResources()
 		if err != nil {
 			return fmt.Errorf("failed to get supported resources from server: %v", err)
