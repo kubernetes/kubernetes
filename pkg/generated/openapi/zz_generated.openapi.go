@@ -5196,11 +5196,17 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 							Ref:         spec.MustCreateRef("#/definitions/v1.PhotonPersistentDiskVolumeSource"),
 						},
 					},
+					"scaleIO": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ScaleIOVolumeSource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.ScaleIOVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.PersistentVolumeSpec": {
 		Schema: spec.Schema{
@@ -5322,6 +5328,12 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 							Ref:         spec.MustCreateRef("#/definitions/v1.PhotonPersistentDiskVolumeSource"),
 						},
 					},
+					"scaleIO": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ScaleIOVolumeSource"),
+						},
+					},
 					"accessModes": {
 						SchemaProps: spec.SchemaProps{
 							Description: "AccessModes contains all ways the volume can be mounted. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes",
@@ -5353,7 +5365,7 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 			},
 		},
 		Dependencies: []string{
-			"resource.Quantity", "v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.ObjectReference", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"resource.Quantity", "v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.ObjectReference", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.ScaleIOVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.PersistentVolumeStatus": {
 		Schema: spec.Schema{
@@ -7252,6 +7264,94 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.ScaleSpec", "v1.ScaleStatus"},
 	},
+	"v1.ScaleIOVolumeSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+				Properties: map[string]spec.Schema{
+					"gateway": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The host address of the ScaleIO API Gateway.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"system": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the storage system as configured in ScaleIO.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"secretRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.LocalObjectReference"),
+						},
+					},
+					"sslEnabled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Flag to enable/disable SSL communication with Gateway, default false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"protectionDomain": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the Protection Domain for the configured storage (defaults to \"default\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"storagePool": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The Storage Pool associated with the protection domain (defaults to \"default\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"storageMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"volumeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional: the name of a volume already created in the ScaleIO system that is associated with this volume source.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"fsType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"readOnly": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"sdcRootPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The root path where the SDC binaries are located.  Default is /opt/emc/scaleio/sdc.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"gateway", "system", "secretRef"},
+			},
+		},
+		Dependencies: []string{
+			"v1.LocalObjectReference"},
+	},
 	"v1.ScaleSpec": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8518,12 +8618,18 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 							Ref:         spec.MustCreateRef("#/definitions/v1.PhotonPersistentDiskVolumeSource"),
 						},
 					},
+					"scaleIO": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ScaleIOVolumeSource"),
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.ScaleIOVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.VolumeMount": {
 		Schema: spec.Schema{
@@ -8707,11 +8813,17 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 							Ref:         spec.MustCreateRef("#/definitions/v1.PhotonPersistentDiskVolumeSource"),
 						},
 					},
+					"scaleIO": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ScaleIOVolumeSource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.ScaleIOVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.VsphereVirtualDiskVolumeSource": {
 		Schema: spec.Schema{

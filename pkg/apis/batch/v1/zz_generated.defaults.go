@@ -64,6 +64,9 @@ func SetObjectDefaults_Job(in *Job) {
 		if a.VolumeSource.AzureDisk != nil {
 			api_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			api_v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]

@@ -13554,3 +13554,115 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors/doc.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors/errors.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi/common.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
+    ],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/rand",
+    srcs = ["k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/rand/rand.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version/doc.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version/types.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect/deep_equal.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect/type.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/admission_test",
+    srcs = ["k8s.io/apiserver/pkg/admission/chain_test.go"],
+    library = ":k8s.io/apiserver/pkg/admission",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime/schema"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/admission",
+    srcs = [
+        "k8s.io/apiserver/pkg/admission/attributes.go",
+        "k8s.io/apiserver/pkg/admission/chain.go",
+        "k8s.io/apiserver/pkg/admission/errors.go",
+        "k8s.io/apiserver/pkg/admission/handler.go",
+        "k8s.io/apiserver/pkg/admission/interfaces.go",
+        "k8s.io/apiserver/pkg/admission/plugins.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "github.com/codedellemc/goscaleio",
+    srcs = [
+        "github.com/codedellemc/goscaleio/api.go",
+        "github.com/codedellemc/goscaleio/certs.go",
+        "github.com/codedellemc/goscaleio/device.go",
+        "github.com/codedellemc/goscaleio/instance.go",
+        "github.com/codedellemc/goscaleio/protectiondomain.go",
+        "github.com/codedellemc/goscaleio/scsiinitiator.go",
+        "github.com/codedellemc/goscaleio/sdc.go",
+        "github.com/codedellemc/goscaleio/sds.go",
+        "github.com/codedellemc/goscaleio/storagepool.go",
+        "github.com/codedellemc/goscaleio/system.go",
+        "github.com/codedellemc/goscaleio/user.go",
+        "github.com/codedellemc/goscaleio/volume.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Sirupsen/logrus",
+        "//vendor:github.com/codedellemc/goscaleio/types/v1",
+    ],
+)
+
+go_library(
+    name = "github.com/codedellemc/goscaleio/types/v1",
+    srcs = ["github.com/codedellemc/goscaleio/types/v1/types.go"],
+    tags = ["automanaged"],
+)
