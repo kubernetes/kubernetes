@@ -23,7 +23,7 @@ import (
 const (
 	DefaultServiceDNSDomain  = "cluster.local"
 	DefaultServicesSubnet    = "10.96.0.0/12"
-	DefaultKubernetesVersion = "v1.4.4"
+	DefaultKubernetesVersion = "stable"
 	DefaultAPIBindPort       = 6443
 	DefaultDiscoveryBindPort = 9898
 )
