@@ -27,8 +27,6 @@ spec:
     metadata:
       labels:
         app: nginx-statefulset
-      annotations:
-        pod.alpha.kubernetes.io/initialized: "true"
     spec:
       terminationGracePeriodSeconds: 0
       containers:

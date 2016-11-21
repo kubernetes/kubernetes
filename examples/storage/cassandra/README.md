@@ -188,8 +188,6 @@ spec:
   replicas: 3
   template:
     metadata:
-      annotations:
-        pod.alpha.kubernetes.io/initialized: "true"
       labels:
         app: cassandra
     spec:
