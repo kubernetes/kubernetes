@@ -118,7 +118,10 @@ run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
 
 if [ "${EVENT_PD:-false}" == "true" ]; then
   echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
-  run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" --disk "${MASTER_NAME}-event-pd" --device-name="master-event-pd"
+  run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" \
+  ${GCLOUD_COMMON_ARGS} \
+  --disk "${MASTER_NAME}-event-pd" \
+  --device-name="master-event-pd"
 fi
 
 run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
