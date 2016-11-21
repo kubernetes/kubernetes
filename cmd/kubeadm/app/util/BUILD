@@ -16,6 +16,7 @@ go_library(
         "error.go",
         "kubeconfig.go",
         "tokens.go",
+        "version.go",
     ],
     tags = ["automanaged"],
     deps = [
