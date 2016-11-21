@@ -115,3 +115,23 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
 }
+
+func TestConstructVolumeSpec(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cephTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	cephfsSpec, err := plug.(*cephfsPlugin).ConstructVolumeSpec("cephfsVolume", "/dev/")
+
+	if cephfsSpec.Name() != "cephfsVolume" {
+		t.Errorf("get cephfs spec name error")
+	}
+}
