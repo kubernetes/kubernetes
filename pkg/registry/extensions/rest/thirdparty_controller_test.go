@@ -66,7 +66,12 @@ func TestSyncAPIs(t *testing.T) {
 	resourcesNamed := func(names ...string) []expapi.ThirdPartyResource {
 		result := []expapi.ThirdPartyResource{}
 		for _, name := range names {
-			result = append(result, expapi.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: name}})
+			result = append(result, expapi.ThirdPartyResource{
+				ObjectMeta: api.ObjectMeta{Name: name},
+				Versions: []expapi.APIVersion{
+					{Name: "v1"},
+				},
+			})
 		}
 		return result
 	}

@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
@@ -82,6 +84,12 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 		// Loop across all schema objects for third party resources
 		for ix := range list.Items {
 			item := &list.Items[ix]
+
+			if len(item.Versions) == 0 {
+				glog.Fatalf("ThirdPartyResource %s has no defined version, skip sync", item.Name)
+				continue
+			}
+
 			// extract the api group and resource kind from the schema
 			_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
 			if err != nil {
