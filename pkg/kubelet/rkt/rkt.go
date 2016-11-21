@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -2103,8 +2104,11 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 //  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
 //
 // TODO(yifan): Merge with the same function in dockertools.
-func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
 	glog.V(4).Infof("Rkt port forwarding in container.")
+
+	defer streamIn.Close()
+	defer streamOut.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
 	defer cancel()
@@ -2158,7 +2162,6 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 	}
 
 	command := exec.Command(fwCaller, args...)
-	command.Stdout = stream
 
 	// If we use Stdin, command.Run() won't return until the goroutine that's copying
 	// from stream finishes. Unfortunately, if you have a client like telnet connected
@@ -2173,12 +2176,32 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 	if err != nil {
 		return fmt.Errorf("unable to do port forwarding: error creating stdin pipe: %v", err)
 	}
+
+	outPipe, err := command.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("unable to do port forwarding: error creating stdout pipe: %v", err)
+	}
+
+	stderr := new(bytes.Buffer)
+	command.Stderr = stderr
+
+	copyErr := make(chan error)
 	go func() {
-		io.Copy(inPipe, stream)
-		inPipe.Close()
+		copyErr <- httpstream.CopyBothWays(inPipe, outPipe, streamIn, streamOut)
 	}()
 
-	return command.Run()
+	if err := command.Start(); err != nil {
+		return fmt.Errorf("%v: %s", err, stderr.String())
+	}
+
+	// wait for stdout/stdin processing, because if StdoutPipe() is used, Wait() must not be called before that
+	err = <-copyErr
+
+	if commandErr := command.Wait(); err != nil {
+		return fmt.Errorf("%v: %s", commandErr, stderr.String())
+	}
+
+	return err
 }
 
 // UpdatePodCIDR updates the runtimeconfig with the podCIDR.

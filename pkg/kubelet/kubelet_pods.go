@@ -1299,7 +1299,7 @@ func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, contain
 
 // PortForward connects to the pod's port and copies data between the port
 // and the stream.
-func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
+func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
 	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
 	if !ok {
 		return fmt.Errorf("streaming methods not supported by runtime")
@@ -1314,7 +1314,7 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 	if pod.IsEmpty() {
 		return fmt.Errorf("pod not found (%q)", podFullName)
 	}
-	return streamingRuntime.PortForward(&pod, port, stream)
+	return streamingRuntime.PortForward(&pod, port, streamIn, streamOut)
 }
 
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.

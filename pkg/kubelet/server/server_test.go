@@ -72,7 +72,7 @@ type fakeKubelet struct {
 	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
 	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	attachFunc                         func(pod string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool) error
-	portForwardFunc                    func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
+	portForwardFunc                    func(name string, uid types.UID, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error
 	containerLogsFunc                  func(podFullName, containerName string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error
 	streamingConnectionIdleTimeoutFunc func() time.Duration
 	hostnameFunc                       func() string
@@ -138,8 +138,8 @@ func (fk *fakeKubelet) AttachContainer(name string, uid types.UID, container str
 	return fk.attachFunc(name, uid, container, in, out, err, tty)
 }
 
-func (fk *fakeKubelet) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
-	return fk.portForwardFunc(name, uid, port, stream)
+func (fk *fakeKubelet) PortForward(name string, uid types.UID, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
+	return fk.portForwardFunc(name, uid, port, streamIn, streamOut)
 }
 
 func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommand.Options) (*url.URL, error) {
@@ -1516,7 +1516,7 @@ func TestServePortForward(t *testing.T) {
 
 		portForwardFuncDone := make(chan struct{})
 
-		fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+		fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
 			defer close(portForwardFuncDone)
 
 			if e, a := expectedPodName, name; e != a {
@@ -1537,7 +1537,7 @@ func TestServePortForward(t *testing.T) {
 
 			if test.clientData != "" {
 				fromClient := make([]byte, 32)
-				n, err := stream.Read(fromClient)
+				n, err := streamOut.Read(fromClient)
 				if err != nil {
 					t.Fatalf("%d: error reading client data: %v", i, err)
 				}
@@ -1547,7 +1547,7 @@ func TestServePortForward(t *testing.T) {
 			}
 
 			if test.containerData != "" {
-				_, err := stream.Write([]byte(test.containerData))
+				_, err := streamIn.Write([]byte(test.containerData))
 				if err != nil {
 					t.Fatalf("%d: error writing container data: %v", i, err)
 				}

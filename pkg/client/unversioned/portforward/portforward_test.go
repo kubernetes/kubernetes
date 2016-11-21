@@ -146,13 +146,13 @@ func TestGetListener(t *testing.T) {
 			ExpectedListenerAddress: "127.0.0.1",
 		},
 		{
-			Hostname:                "[::1]",
+			Hostname:                "::1",
 			Protocol:                "tcp6",
 			ShouldRaiseError:        false,
 			ExpectedListenerAddress: "::1",
 		},
 		{
-			Hostname:         "[::1]",
+			Hostname:         "::1",
 			Protocol:         "tcp4",
 			ShouldRaiseError: true,
 		},
@@ -163,7 +163,7 @@ func TestGetListener(t *testing.T) {
 		},
 		{
 			// IPv6 address must be put into brackets. This test reveals this.
-			Hostname:         "::1",
+			Hostname:         "[::1]",
 			Protocol:         "tcp6",
 			ShouldRaiseError: true,
 		},
@@ -219,12 +219,13 @@ type fakePortForwarder struct {
 
 var _ portforward.PortForwarder = &fakePortForwarder{}
 
-func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
-	defer stream.Close()
+func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
+	defer streamIn.Close()
+	defer streamOut.Close()
 
 	// read from the client
 	received := make([]byte, len(pf.expected[port]))
-	n, err := stream.Read(received)
+	n, err := streamOut.Read(received)
 	if err != nil {
 		return fmt.Errorf("error reading from client for port %d: %v", port, err)
 	}
@@ -238,7 +239,7 @@ func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16
 	pf.lock.Unlock()
 
 	// send the hardcoded data to the client
-	io.Copy(stream, strings.NewReader(pf.send[port]))
+	io.Copy(streamIn, strings.NewReader(pf.send[port]))
 
 	return nil
 }
