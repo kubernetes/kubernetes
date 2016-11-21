@@ -1401,7 +1401,7 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 			yyq153[55] = x.CloudProvider != ""
 			yyq153[56] = x.CloudConfigFile != ""
 			yyq153[57] = x.KubeletCgroups != ""
-			yyq153[58] = x.CgroupsPerQOS != false
+			yyq153[58] = x.ExperimentalCgroupsPerQOS != false
 			yyq153[59] = x.CgroupDriver != ""
 			yyq153[60] = x.RuntimeCgroups != ""
 			yyq153[61] = x.SystemCgroups != ""
@@ -2647,7 +2647,7 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym345
 					if false {
 					} else {
-						r.EncodeBool(bool(x.CgroupsPerQOS))
+						r.EncodeBool(bool(x.ExperimentalCgroupsPerQOS))
 					}
 				} else {
 					r.EncodeBool(false)
@@ -2655,13 +2655,13 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq153[58] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("cgroupsPerQOS"))
+					r.EncodeString(codecSelferC_UTF81234, string("experimentalCgroupsPerQOS"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yym346 := z.EncBinary()
 					_ = yym346
 					if false {
 					} else {
-						r.EncodeBool(bool(x.CgroupsPerQOS))
+						r.EncodeBool(bool(x.ExperimentalCgroupsPerQOS))
 					}
 				}
 			}
@@ -4378,11 +4378,11 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			} else {
 				x.KubeletCgroups = string(r.DecodeString())
 			}
-		case "cgroupsPerQOS":
+		case "experimentalCgroupsPerQOS":
 			if r.TryDecodeAsNil() {
-				x.CgroupsPerQOS = false
+				x.ExperimentalCgroupsPerQOS = false
 			} else {
-				x.CgroupsPerQOS = bool(r.DecodeBool())
+				x.ExperimentalCgroupsPerQOS = bool(r.DecodeBool())
 			}
 		case "cgroupDriver":
 			if r.TryDecodeAsNil() {
@@ -5807,9 +5807,9 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CgroupsPerQOS = false
+		x.ExperimentalCgroupsPerQOS = false
 	} else {
-		x.CgroupsPerQOS = bool(r.DecodeBool())
+		x.ExperimentalCgroupsPerQOS = bool(r.DecodeBool())
 	}
 	yyj649++
 	if yyhl649 {

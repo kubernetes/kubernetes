@@ -20,17 +20,17 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 // GroupMeta stores the metadata of a group.
 type GroupMeta struct {
 	// GroupVersion represents the preferred version of the group.
-	GroupVersion unversioned.GroupVersion
+	GroupVersion schema.GroupVersion
 
 	// GroupVersions is Group + all versions in that group.
-	GroupVersions []unversioned.GroupVersion
+	GroupVersions []schema.GroupVersion
 
 	// Codec is the default codec for serializing output that should use
 	// the preferred version.  Use this Codec when writing to
@@ -52,16 +52,16 @@ type GroupMeta struct {
 	// string, or an error if the version is not known.
 	// TODO: make this stop being a func pointer and always use the default
 	// function provided below once every place that populates this field has been changed.
-	InterfacesFor func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error)
+	InterfacesFor func(version schema.GroupVersion) (*meta.VersionInterfaces, error)
 
 	// InterfacesByVersion stores the per-version interfaces.
-	InterfacesByVersion map[unversioned.GroupVersion]*meta.VersionInterfaces
+	InterfacesByVersion map[schema.GroupVersion]*meta.VersionInterfaces
 }
 
 // DefaultInterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
 // TODO: Remove the "Default" prefix.
-func (gm *GroupMeta) DefaultInterfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+func (gm *GroupMeta) DefaultInterfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 	if v, ok := gm.InterfacesByVersion[version]; ok {
 		return v, nil
 	}
@@ -73,12 +73,12 @@ func (gm *GroupMeta) DefaultInterfacesFor(version unversioned.GroupVersion) (*me
 // (If you use this, be sure to set .InterfacesFor = .DefaultInterfacesFor)
 // TODO: remove the "Interfaces" suffix and make this also maintain the
 // .GroupVersions member.
-func (gm *GroupMeta) AddVersionInterfaces(version unversioned.GroupVersion, interfaces *meta.VersionInterfaces) error {
+func (gm *GroupMeta) AddVersionInterfaces(version schema.GroupVersion, interfaces *meta.VersionInterfaces) error {
 	if e, a := gm.GroupVersion.Group, version.Group; a != e {
 		return fmt.Errorf("got a version in group %v, but am in group %v", a, e)
 	}
 	if gm.InterfacesByVersion == nil {
-		gm.InterfacesByVersion = make(map[unversioned.GroupVersion]*meta.VersionInterfaces)
+		gm.InterfacesByVersion = make(map[schema.GroupVersion]*meta.VersionInterfaces)
 	}
 	gm.InterfacesByVersion[version] = interfaces
 

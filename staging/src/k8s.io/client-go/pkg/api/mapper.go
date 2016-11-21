@@ -20,19 +20,19 @@ import (
 	"strings"
 
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/util/sets"
 )
 
 // Instantiates a DefaultRESTMapper based on types registered in api.Scheme
-func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
+func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
 	importPathPrefix string, ignoredKinds, rootScoped sets.String) *meta.DefaultRESTMapper {
 	return NewDefaultRESTMapperFromScheme(defaultGroupVersions, interfacesFunc, importPathPrefix, ignoredKinds, rootScoped, Scheme)
 }
 
 // Instantiates a DefaultRESTMapper based on types registered in the given scheme.
-func NewDefaultRESTMapperFromScheme(defaultGroupVersions []unversioned.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
+func NewDefaultRESTMapperFromScheme(defaultGroupVersions []schema.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
 	importPathPrefix string, ignoredKinds, rootScoped sets.String, scheme *runtime.Scheme) *meta.DefaultRESTMapper {
 
 	mapper := meta.NewDefaultRESTMapper(defaultGroupVersions, interfacesFunc)

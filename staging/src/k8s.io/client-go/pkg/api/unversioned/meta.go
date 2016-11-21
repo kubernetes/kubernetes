@@ -16,6 +16,10 @@ limitations under the License.
 
 package unversioned
 
+import (
+	"k8s.io/client-go/pkg/runtime/schema"
+)
+
 // ListMetaAccessor retrieves the list interface from an object
 // TODO: move this, and TypeMeta and ListMeta, to a different package
 type ListMetaAccessor interface {
@@ -47,16 +51,16 @@ func (meta *ListMeta) SetResourceVersion(version string) { meta.ResourceVersion 
 func (meta *ListMeta) GetSelfLink() string               { return meta.SelfLink }
 func (meta *ListMeta) SetSelfLink(selfLink string)       { meta.SelfLink = selfLink }
 
-func (obj *TypeMeta) GetObjectKind() ObjectKind { return obj }
+func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 
 // SetGroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
-func (obj *TypeMeta) SetGroupVersionKind(gvk GroupVersionKind) {
+func (obj *TypeMeta) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
 
 // GroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
-func (obj *TypeMeta) GroupVersionKind() GroupVersionKind {
-	return FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
 func (obj *ListMeta) GetListMeta() List { return obj }

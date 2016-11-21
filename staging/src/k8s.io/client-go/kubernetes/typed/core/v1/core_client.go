@@ -19,8 +19,8 @@ package v1
 import (
 	fmt "fmt"
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	registered "k8s.io/client-go/pkg/apimachinery/registered"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	serializer "k8s.io/client-go/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 )
@@ -143,7 +143,7 @@ func New(c rest.Interface) *CoreV1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := unversioned.ParseGroupVersion("/v1")
+	gv, err := schema.ParseGroupVersion("/v1")
 	if err != nil {
 		return err
 	}

@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/conversion"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/types"
 
 	"github.com/golang/glog"
@@ -140,9 +141,9 @@ func (obj objectAccessor) GetAPIVersion() string {
 
 func (obj objectAccessor) SetAPIVersion(version string) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
-	gv, err := unversioned.ParseGroupVersion(version)
+	gv, err := schema.ParseGroupVersion(version)
 	if err != nil {
-		gv = unversioned.GroupVersion{Version: version}
+		gv = schema.GroupVersion{Version: version}
 	}
 	gvk.Group, gvk.Version = gv.Group, gv.Version
 	obj.GetObjectKind().SetGroupVersionKind(gvk)
