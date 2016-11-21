@@ -96,6 +96,9 @@ type testCase struct {
 
 	// Target resource information.
 	resource *fakeResource
+
+	// Last scale time
+	lastScaleTime *unversioned.Time
 }
 
 // Needs to be called under a lock.
@@ -1040,6 +1043,38 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 	tc.CPUTarget = finalCpuPercentTarget
 	tc.initialReplicas = startPods
 	tc.desiredReplicas = startPods
+	tc.runTest(t)
+}
+
+func TestScaleUpRCImmediately(t *testing.T) {
+	time := unversioned.Time{Time: time.Now()}
+	tc := testCase{
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     1,
+		desiredReplicas:     2,
+		verifyCPUCurrent:    true,
+		reportedLevels:      []uint64{0, 0, 0, 0},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
+		lastScaleTime:       &time,
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownRCImmediately(t *testing.T) {
+	time := unversioned.Time{Time: time.Now()}
+	tc := testCase{
+		minReplicas:         2,
+		maxReplicas:         5,
+		initialReplicas:     6,
+		desiredReplicas:     5,
+		CPUTarget:           50,
+		reportedLevels:      []uint64{8000, 9500, 1000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+		useMetricsApi:       true,
+		lastScaleTime:       &time,
+	}
 	tc.runTest(t)
 }
 
