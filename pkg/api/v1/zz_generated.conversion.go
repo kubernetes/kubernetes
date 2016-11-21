@@ -303,6 +303,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_ResourceRequirements_To_v1_ResourceRequirements,
 		Convert_v1_SELinuxOptions_To_api_SELinuxOptions,
 		Convert_api_SELinuxOptions_To_v1_SELinuxOptions,
+		Convert_v1_ScaleIOVolumeSource_To_api_ScaleIOVolumeSource,
+		Convert_api_ScaleIOVolumeSource_To_v1_ScaleIOVolumeSource,
 		Convert_v1_Secret_To_api_Secret,
 		Convert_api_Secret_To_v1_Secret,
 		Convert_v1_SecretKeySelector_To_api_SecretKeySelector,
@@ -2624,6 +2626,7 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.ScaleIO = (*api.ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
 	return nil
 }
 
@@ -2649,6 +2652,7 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.ScaleIO = (*ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
 	return nil
 }
 
@@ -3759,6 +3763,44 @@ func Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in *api.SELinuxOptions, out
 	return autoConvert_api_SELinuxOptions_To_v1_SELinuxOptions(in, out, s)
 }
 
+func autoConvert_v1_ScaleIOVolumeSource_To_api_ScaleIOVolumeSource(in *ScaleIOVolumeSource, out *api.ScaleIOVolumeSource, s conversion.Scope) error {
+	out.Gateway = in.Gateway
+	out.SSLEnabled = in.SSLEnabled
+	out.System = in.System
+	out.SecretRef = (*api.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
+	out.ProtectionDomain = in.ProtectionDomain
+	out.StoragePool = in.StoragePool
+	out.StorageMode = in.StorageMode
+	out.VolumeName = in.VolumeName
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	out.SDCRootPath = in.SDCRootPath
+	return nil
+}
+
+func Convert_v1_ScaleIOVolumeSource_To_api_ScaleIOVolumeSource(in *ScaleIOVolumeSource, out *api.ScaleIOVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_ScaleIOVolumeSource_To_api_ScaleIOVolumeSource(in, out, s)
+}
+
+func autoConvert_api_ScaleIOVolumeSource_To_v1_ScaleIOVolumeSource(in *api.ScaleIOVolumeSource, out *ScaleIOVolumeSource, s conversion.Scope) error {
+	out.Gateway = in.Gateway
+	out.SSLEnabled = in.SSLEnabled
+	out.System = in.System
+	out.SecretRef = (*LocalObjectReference)(unsafe.Pointer(in.SecretRef))
+	out.ProtectionDomain = in.ProtectionDomain
+	out.StoragePool = in.StoragePool
+	out.StorageMode = in.StorageMode
+	out.VolumeName = in.VolumeName
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	out.SDCRootPath = in.SDCRootPath
+	return nil
+}
+
+func Convert_api_ScaleIOVolumeSource_To_v1_ScaleIOVolumeSource(in *api.ScaleIOVolumeSource, out *ScaleIOVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_ScaleIOVolumeSource_To_v1_ScaleIOVolumeSource(in, out, s)
+}
+
 func autoConvert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.Scope) error {
 	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
 		return err
@@ -4287,6 +4329,7 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.ScaleIO = (*api.ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
 	return nil
 }
 
@@ -4318,6 +4361,7 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.ScaleIO = (*ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
 	return nil
 }
 
