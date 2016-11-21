@@ -308,6 +308,7 @@ junit-file-number
 k8s-bin-dir
 k8s-build-output
 keep-gogoproto
+keep-terminated-pod-volumes
 km-path
 kops-admin-access
 kops-cluster

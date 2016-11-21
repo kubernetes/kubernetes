@@ -157,7 +157,8 @@ func NewVolumeManager(
 	mounter mount.Interface,
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
-	checkNodeCapabilitiesBeforeMount bool) (VolumeManager, error) {
+	checkNodeCapabilitiesBeforeMount bool,
+	keepTerminatedPodVolumes bool) (VolumeManager, error) {
 
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
@@ -191,7 +192,8 @@ func NewVolumeManager(
 		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
 		podManager,
 		vm.desiredStateOfWorld,
-		kubeContainerRuntime)
+		kubeContainerRuntime,
+		keepTerminatedPodVolumes)
 
 	return vm, nil
 }
