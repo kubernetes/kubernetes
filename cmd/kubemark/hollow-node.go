@@ -76,6 +76,7 @@ func (c *HollowNodeConfig) createClientConfigFromFile() (*restclient.Config, err
 		return nil, fmt.Errorf("error while creating kubeconfig: %v", err)
 	}
 	config.ContentType = c.ContentType
+	config.QPS = 10
 	return config, nil
 }
 
