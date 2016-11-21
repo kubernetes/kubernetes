@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG = 1.2
-PREFIX = gcr.io/google_containers
+PREFIX = sttts
 
 all: push
 
