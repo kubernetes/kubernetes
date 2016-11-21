@@ -404,7 +404,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
-	secretManager, err := newSimpleSecretManager(kubeClient)
+	secretManager, err := newCachingSecretManager(kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secret manager: %v", err)
 	}
@@ -1921,6 +1921,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
 		if kubepod.IsMirrorPod(pod) {
+			kl.secretManager.RegisterPod(pod)
 			kl.podManager.AddPod(pod)
 			kl.handleMirrorPod(pod, start)
 			continue
@@ -1935,6 +1936,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			kl.rejectPod(pod, reason, message)
 			continue
 		}
+		kl.secretManager.RegisterPod(pod)
 		kl.podManager.AddPod(pod)
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
@@ -1947,6 +1949,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
+		kl.secretManager.RegisterPod(pod)
 		kl.podManager.UpdatePod(pod)
 		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
@@ -1964,6 +1967,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
+		kl.secretManager.UnregisterPod(pod)
 		kl.podManager.DeletePod(pod)
 		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)

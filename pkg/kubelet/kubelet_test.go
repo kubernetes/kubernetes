@@ -163,6 +163,11 @@ func newTestKubeletWithImageList(
 		t.Fatalf("can't initialize disk space manager: %v", err)
 	}
 	kubelet.diskSpaceManager = diskSpaceManager
+	secretManager, err := newSimpleSecretManager(fakeKubeClient)
+	if err != nil {
+		t.Fatalf("can't initialize secret manager: %v", err)
+	}
+	kubelet.secretManager = secretManager
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
