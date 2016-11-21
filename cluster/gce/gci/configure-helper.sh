@@ -1096,6 +1096,9 @@ function start-kube-addons {
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
   fi
+  if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "storage-class/gce"
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests

@@ -937,6 +937,9 @@ start_kube_addons() {
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup_addon_manifests "admission-controls" "limit-range"
   fi
+  if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "storage-class/gce"
+  fi
 
   # Place addon manager pod manifest
   cp "${addon_src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
