@@ -283,7 +283,7 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 	return x509.New(opts, x509.CommonNameUserConversion), nil
 }
 
-// newAuthenticatorFromTokenFile returns an authenticator.Request or an error
+// newAuthenticatorFromKeystoneURL returns an authenticator.Request or an error
 func newAuthenticatorFromKeystoneURL(keystoneURL string, keystoneCAFile string) (authenticator.Request, error) {
 	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneURL, keystoneCAFile)
 	if err != nil {
