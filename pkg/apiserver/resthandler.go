@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
@@ -79,8 +80,8 @@ type RequestScope struct {
 	Convertor runtime.ObjectConvertor
 	Copier    runtime.ObjectCopier
 
-	Resource    unversioned.GroupVersionResource
-	Kind        unversioned.GroupVersionKind
+	Resource    schema.GroupVersionResource
+	Kind        schema.GroupVersionKind
 	Subresource string
 }
 
@@ -133,7 +134,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 			if values := req.Request.URL.Query(); len(values) > 0 {
 				// TODO: this is internal version, not unversioned
 				exports := unversioned.ExportOptions{}
-				if err := scope.ParameterCodec.DecodeParameters(values, unversioned.GroupVersion{Version: "v1"}, &exports); err != nil {
+				if err := scope.ParameterCodec.DecodeParameters(values, schema.GroupVersion{Version: "v1"}, &exports); err != nil {
 					return nil, err
 				}
 				if exports.Export {
@@ -365,7 +366,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		decoder := scope.Serializer.DecoderToVersion(s.Serializer, unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal})
+		decoder := scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal})
 
 		body, err := readBody(req.Request)
 		if err != nil {
@@ -489,7 +490,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		gv := scope.Kind.GroupVersion()
 		codec := runtime.NewCodec(
 			scope.Serializer.EncoderForVersion(s.Serializer, gv),
-			scope.Serializer.DecoderToVersion(s.Serializer, unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
+			scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
 		)
 
 		updateAdmit := func(updatedObject runtime.Object, currentObject runtime.Object) error {
@@ -531,7 +532,7 @@ func patchResource(
 	patchJS []byte,
 	namer ScopeNamer,
 	copier runtime.ObjectCopier,
-	resource unversioned.GroupVersionResource,
+	resource schema.GroupVersionResource,
 	codec runtime.Codec,
 ) (runtime.Object, error) {
 
@@ -981,7 +982,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 }
 
 // transformDecodeError adds additional information when a decode fails.
-func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, gvk *unversioned.GroupVersionKind, body []byte) error {
+func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, gvk *schema.GroupVersionKind, body []byte) error {
 	objGVKs, _, err := typer.ObjectKinds(into)
 	if err != nil {
 		return err

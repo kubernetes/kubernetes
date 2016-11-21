@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/homedir"
@@ -137,7 +138,7 @@ type Factory interface {
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
-	SwaggerSchema(unversioned.GroupVersionKind) (*swagger.ApiDeclaration, error)
+	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overridden.
@@ -145,9 +146,9 @@ type Factory interface {
 	// Generators returns the generators for the provided command
 	Generators(cmdName string) map[string]kubectl.Generator
 	// Check whether the kind of resources could be exposed
-	CanBeExposed(kind unversioned.GroupKind) error
+	CanBeExposed(kind schema.GroupKind) error
 	// Check whether the kind of resources could be autoscaled
-	CanBeAutoscaled(kind unversioned.GroupKind) error
+	CanBeAutoscaled(kind schema.GroupKind) error
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject(object runtime.Object) (*api.Pod, error)
 	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
@@ -181,7 +182,7 @@ type Factory interface {
 	NewBuilder() *resource.Builder
 
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
-	SuggestedPodTemplateResources() []unversioned.GroupResource
+	SuggestedPodTemplateResources() []schema.GroupResource
 }
 
 const (
@@ -275,8 +276,8 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 	return generator
 }
 
-func getGroupVersionKinds(gvks []unversioned.GroupVersionKind, group string) []unversioned.GroupVersionKind {
-	result := []unversioned.GroupVersionKind{}
+func getGroupVersionKinds(gvks []schema.GroupVersionKind, group string) []schema.GroupVersionKind {
+	result := []schema.GroupVersionKind{}
 	for ix := range gvks {
 		if gvks[ix].Group == group {
 			result = append(result, gvks[ix])
@@ -285,9 +286,9 @@ func getGroupVersionKinds(gvks []unversioned.GroupVersionKind, group string) []u
 	return result
 }
 
-func makeInterfacesFor(versionList []unversioned.GroupVersion) func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+func makeInterfacesFor(versionList []schema.GroupVersion) func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 	accessor := meta.NewAccessor()
-	return func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+	return func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 		for ix := range versionList {
 			if versionList[ix].String() == version.String() {
 				return &meta.VersionInterfaces{
@@ -365,11 +366,11 @@ func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	// wrap with output preferences
 	cfg, err := f.clients.ClientConfigForVersion(nil)
 	checkErrWithPrefix("failed to get client config: ", err)
-	cmdApiVersion := unversioned.GroupVersion{}
+	cmdApiVersion := schema.GroupVersion{}
 	if cfg.GroupVersion != nil {
 		cmdApiVersion = *cfg.GroupVersion
 	}
-	mapper = kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
+	mapper = kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []schema.GroupVersion{cmdApiVersion}}
 	return mapper, api.Scheme
 }
 
@@ -753,7 +754,7 @@ func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, 
 	return validation.NullSchema{}, nil
 }
 
-func (f *factory) SwaggerSchema(gvk unversioned.GroupVersionKind) (*swagger.ApiDeclaration, error) {
+func (f *factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
 	version := gvk.GroupVersion()
 	clientset, err := f.clients.ClientSetForVersion(&version)
 	if err != nil {
@@ -770,7 +771,7 @@ func (f *factory) Generators(cmdName string) map[string]kubectl.Generator {
 	return DefaultGenerators(cmdName)
 }
 
-func (f *factory) CanBeExposed(kind unversioned.GroupKind) error {
+func (f *factory) CanBeExposed(kind schema.GroupKind) error {
 	switch kind {
 	case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"), extensions.Kind("Deployment"), extensions.Kind("ReplicaSet"):
 		// nothing to do here
@@ -780,7 +781,7 @@ func (f *factory) CanBeExposed(kind unversioned.GroupKind) error {
 	return nil
 }
 
-func (f *factory) CanBeAutoscaled(kind unversioned.GroupKind) error {
+func (f *factory) CanBeAutoscaled(kind schema.GroupKind) error {
 	switch kind {
 	case api.Kind("ReplicationController"), extensions.Kind("Deployment"), extensions.Kind("ReplicaSet"):
 		// nothing to do here
@@ -1315,8 +1316,8 @@ func (f *factory) NewBuilder() *resource.Builder {
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
-func (f *factory) SuggestedPodTemplateResources() []unversioned.GroupResource {
-	return []unversioned.GroupResource{
+func (f *factory) SuggestedPodTemplateResources() []schema.GroupResource {
+	return []schema.GroupResource{
 		{Resource: "replicationcontroller"},
 		{Resource: "deployment"},
 		{Resource: "daemonset"},

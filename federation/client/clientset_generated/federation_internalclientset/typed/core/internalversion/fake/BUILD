@@ -26,10 +26,10 @@ go_library(
     deps = [
         "//federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/labels:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/watch:go_default_library",
     ],
 )

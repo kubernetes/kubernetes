@@ -25,10 +25,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -477,8 +477,8 @@ func (b *Builder) SingleResourceType() *Builder {
 // mappingFor returns the RESTMapping for the Kind referenced by the resource.
 // prefers a fully specified GroupVersionResource match.  If we don't have one match on GroupResource
 func (b *Builder) mappingFor(resourceArg string) (*meta.RESTMapping, error) {
-	fullySpecifiedGVR, groupResource := unversioned.ParseResourceArg(resourceArg)
-	gvk := unversioned.GroupVersionKind{}
+	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceArg)
+	gvk := schema.GroupVersionKind{}
 	if fullySpecifiedGVR != nil {
 		gvk, _ = b.mapper.KindFor(*fullySpecifiedGVR)
 	}

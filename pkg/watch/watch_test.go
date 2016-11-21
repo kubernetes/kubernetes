@@ -19,12 +19,12 @@ package watch
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type testType string
 
-func (obj testType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj testType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 func TestFake(t *testing.T) {
 	f := NewFake()

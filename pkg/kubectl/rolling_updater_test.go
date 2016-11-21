@@ -38,6 +38,7 @@ import (
 	manualfake "k8s.io/kubernetes/pkg/client/restclient/fake"
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -1208,7 +1209,7 @@ func TestRollingUpdater_cleanupWithClients_Rename(t *testing.T) {
 		case testcore.CreateAction:
 			return true, nil, nil
 		case testcore.GetAction:
-			return true, nil, errors.NewNotFound(unversioned.GroupResource{}, "")
+			return true, nil, errors.NewNotFound(schema.GroupResource{}, "")
 		case testcore.DeleteAction:
 			return true, nil, nil
 		}

@@ -30,10 +30,11 @@ import (
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
-type orderedGroupVersionKinds []unversioned.GroupVersionKind
+type orderedGroupVersionKinds []schema.GroupVersionKind
 
 func (o orderedGroupVersionKinds) Len() int      { return len(o) }
 func (o orderedGroupVersionKinds) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
@@ -52,7 +53,7 @@ func TestVerifyDefaulting(t *testing.T) {
 // TODO: add a reflexive test that verifies that all SetDefaults functions are registered
 func TestDefaulting(t *testing.T) {
 	// these are the known types with defaulters - you must add to this list if you add a top level defaulter
-	typesWithDefaulting := map[unversioned.GroupVersionKind]struct{}{
+	typesWithDefaulting := map[schema.GroupVersionKind]struct{}{
 		{Group: "", Version: "v1", Kind: "ConfigMap"}:                                       {},
 		{Group: "", Version: "v1", Kind: "ConfigMapList"}:                                   {},
 		{Group: "", Version: "v1", Kind: "Endpoints"}:                                       {},
@@ -165,7 +166,7 @@ func TestDefaulting(t *testing.T) {
 			}
 			f.Fuzz(src)
 
-			src.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+			src.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 
 			original, err := scheme.DeepCopy(src)
 			if err != nil {

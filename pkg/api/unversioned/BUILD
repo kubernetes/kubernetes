@@ -32,6 +32,7 @@ go_library(
         "//pkg/conversion:go_default_library",
         "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/labels:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/selection:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/gogo/protobuf/proto",

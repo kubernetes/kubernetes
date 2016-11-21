@@ -19,18 +19,18 @@ package admission
 import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
-func extractResourceName(a Attributes) (name string, resource unversioned.GroupResource, err error) {
+func extractResourceName(a Attributes) (name string, resource schema.GroupResource, err error) {
 	name = "Unknown"
 	resource = a.GetResource().GroupResource()
 	obj := a.GetObject()
 	if obj != nil {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
-			return "", unversioned.GroupResource{}, err
+			return "", schema.GroupResource{}, err
 		}
 
 		// this is necessary because name object name generation has not occurred yet

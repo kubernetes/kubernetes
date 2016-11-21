@@ -41,6 +41,7 @@ go_library(
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer:go_default_library",
         "//pkg/selection:go_default_library",
         "//pkg/types:go_default_library",
@@ -72,6 +73,7 @@ go_test(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
     ],
 )
 
@@ -102,6 +104,7 @@ go_test(
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/protobuf:go_default_library",
         "//pkg/runtime/serializer/streaming:go_default_library",
         "//pkg/types:go_default_library",

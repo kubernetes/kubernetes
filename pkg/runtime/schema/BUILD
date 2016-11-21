@@ -13,24 +13,18 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "helpers.go",
-        "register.go",
-        "types.go",
+        "generated.pb.go",
+        "group_version.go",
+        "interfaces.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-    ],
+    deps = ["//vendor:github.com/gogo/protobuf/proto"],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "helpers_test.go",
-        "types_test.go",
-    ],
+    srcs = ["group_version_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/ghodss/yaml"],
+    deps = [],
 )

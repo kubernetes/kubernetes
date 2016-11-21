@@ -27,6 +27,7 @@ go_library(
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/sets:go_default_library",
@@ -54,6 +55,7 @@ go_test(
         "//pkg/client/testing/core:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/sets:go_default_library",
     ],
 )

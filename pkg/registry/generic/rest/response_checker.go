@@ -23,7 +23,7 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // Check the http error status from a location URL.
@@ -40,7 +40,7 @@ const (
 
 // A generic http response checker to transform the error.
 type GenericHttpResponseChecker struct {
-	QualifiedResource unversioned.GroupResource
+	QualifiedResource schema.GroupResource
 	Name              string
 }
 
@@ -66,6 +66,6 @@ func (checker GenericHttpResponseChecker) Check(resp *http.Response) error {
 	return nil
 }
 
-func NewGenericHttpResponseChecker(qualifiedResource unversioned.GroupResource, name string) GenericHttpResponseChecker {
+func NewGenericHttpResponseChecker(qualifiedResource schema.GroupResource, name string) GenericHttpResponseChecker {
 	return GenericHttpResponseChecker{QualifiedResource: qualifiedResource, Name: name}
 }

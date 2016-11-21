@@ -21,9 +21,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -68,7 +68,7 @@ func isNamespacedKind(kind, groupVersion string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	restMapping, err := g.RESTMapper.RESTMapping(unversioned.GroupKind{Group: group, Kind: kind}, apiutil.GetVersion(groupVersion))
+	restMapping, err := g.RESTMapper.RESTMapping(schema.GroupKind{Group: group, Kind: kind}, apiutil.GetVersion(groupVersion))
 	if err != nil {
 		return false, err
 	}

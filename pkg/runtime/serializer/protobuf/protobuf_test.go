@@ -26,20 +26,20 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/protobuf"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type testObject struct {
-	gvk unversioned.GroupVersionKind
+	gvk schema.GroupVersionKind
 }
 
-func (d *testObject) GetObjectKind() unversioned.ObjectKind                { return d }
-func (d *testObject) SetGroupVersionKind(gvk unversioned.GroupVersionKind) { d.gvk = gvk }
-func (d *testObject) GroupVersionKind() unversioned.GroupVersionKind       { return d.gvk }
+func (d *testObject) GetObjectKind() schema.ObjectKind                { return d }
+func (d *testObject) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
+func (d *testObject) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
 
 type testMarshalable struct {
 	testObject
@@ -106,7 +106,7 @@ func TestEncode(t *testing.T) {
 		0x22, 0x00, // content-encoding
 	}
 	obj2 := &testMarshalable{
-		testObject: testObject{gvk: unversioned.GroupVersionKind{Kind: "test", Group: "other", Version: "version"}},
+		testObject: testObject{gvk: schema.GroupVersionKind{Kind: "test", Group: "other", Version: "version"}},
 		data:       []byte{0x01, 0x02, 0x03},
 	}
 	wire2 := []byte{

@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/config"
 )
@@ -32,7 +32,7 @@ import (
 // Merges defaultResourceConfig with the user specified overrides and merges
 // defaultAPIResourceConfig with the corresponding user specified overrides as well.
 func BuildDefaultStorageFactory(storageConfig storagebackend.Config, defaultMediaType string, serializer runtime.StorageSerializer,
-	defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]unversioned.GroupVersion, resourceEncodingOverrides []unversioned.GroupVersionResource,
+	defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion, resourceEncodingOverrides []schema.GroupVersionResource,
 	defaultAPIResourceConfig *ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*DefaultStorageFactory, error) {
 
 	resourceEncodingConfig := mergeGroupEncodingConfigs(defaultResourceEncoding, storageEncodingOverrides)
@@ -45,20 +45,20 @@ func BuildDefaultStorageFactory(storageConfig storagebackend.Config, defaultMedi
 }
 
 // Merges the given defaultResourceConfig with specifc GroupvVersionResource overrides.
-func mergeResourceEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, resourceEncodingOverrides []unversioned.GroupVersionResource) *DefaultResourceEncodingConfig {
+func mergeResourceEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, resourceEncodingOverrides []schema.GroupVersionResource) *DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for _, gvr := range resourceEncodingOverrides {
 		resourceEncodingConfig.SetResourceEncoding(gvr.GroupResource(), gvr.GroupVersion(),
-			unversioned.GroupVersion{Group: gvr.Group, Version: runtime.APIVersionInternal})
+			schema.GroupVersion{Group: gvr.Group, Version: runtime.APIVersionInternal})
 	}
 	return resourceEncodingConfig
 }
 
 // Merges the given defaultResourceConfig with specifc GroupVersion overrides.
-func mergeGroupEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]unversioned.GroupVersion) *DefaultResourceEncodingConfig {
+func mergeGroupEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion) *DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for group, storageEncodingVersion := range storageEncodingOverrides {
-		resourceEncodingConfig.SetVersionEncoding(group, storageEncodingVersion, unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
+		resourceEncodingConfig.SetVersionEncoding(group, storageEncodingVersion, schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
 	}
 	return resourceEncodingConfig
 }
@@ -105,7 +105,7 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *ResourceConfig, resourceC
 		if groupVersionString == "api/v1" {
 			groupVersionString = "v1"
 		}
-		groupVersion, err := unversioned.ParseGroupVersion(groupVersionString)
+		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
 		}
@@ -136,7 +136,7 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *ResourceConfig, resourceC
 		if groupVersionString == "api/v1" {
 			groupVersionString = "v1"
 		}
-		groupVersion, err := unversioned.ParseGroupVersion(groupVersionString)
+		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
 		}

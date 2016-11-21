@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -38,14 +38,14 @@ import (
 
 // ReplenishmentFunc is a function that is invoked when controller sees a change
 // that may require a quota to be replenished (i.e. object deletion, or object moved to terminal state)
-type ReplenishmentFunc func(groupKind unversioned.GroupKind, namespace string, object runtime.Object)
+type ReplenishmentFunc func(groupKind schema.GroupKind, namespace string, object runtime.Object)
 
 // ReplenishmentControllerOptions is an options struct that tells a factory
 // how to configure a controller that can inform the quota system it should
 // replenish quota
 type ReplenishmentControllerOptions struct {
 	// The kind monitored for replenishment
-	GroupKind unversioned.GroupKind
+	GroupKind schema.GroupKind
 	// The period that should be used to re-sync the monitored resource
 	ResyncPeriod controller.ResyncPeriodFunc
 	// The function to invoke when a change is observed that should trigger
@@ -116,7 +116,7 @@ func NewReplenishmentControllerFactoryFromClient(kubeClient clientset.Interface)
 
 // controllerFor returns a replenishment controller for the specified group resource.
 func controllerFor(
-	groupResource unversioned.GroupResource,
+	groupResource schema.GroupResource,
 	f informers.SharedInformerFactory,
 	handlerFuncs cache.ResourceEventHandlerFuncs) (cache.ControllerInterface, error) {
 	genericInformer, err := f.ForResource(groupResource)
@@ -253,14 +253,14 @@ func ServiceReplenishmentUpdateFunc(options *ReplenishmentControllerOptions) fun
 }
 
 type unhandledKindErr struct {
-	kind unversioned.GroupKind
+	kind schema.GroupKind
 }
 
 func (e unhandledKindErr) Error() string {
 	return fmt.Sprintf("no replenishment controller available for %s", e.kind)
 }
 
-func NewUnhandledGroupKindError(kind unversioned.GroupKind) error {
+func NewUnhandledGroupKindError(kind schema.GroupKind) error {
 	return unhandledKindErr{kind: kind}
 }
 

@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -312,7 +313,7 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	defer server.Close()
 
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
+	got, err := client.SwaggerSchema(schema.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)
 	}
@@ -574,7 +575,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 	}
 	tests := []struct {
 		response func(w http.ResponseWriter, req *http.Request)
-		expected []unversioned.GroupVersionResource
+		expected []schema.GroupVersionResource
 	}{
 		{
 			response: func(w http.ResponseWriter, req *http.Request) {
@@ -602,7 +603,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: []unversioned.GroupVersionResource{
+			expected: []schema.GroupVersionResource{
 				{Group: "", Version: "v1", Resource: "pods"},
 				{Group: "", Version: "v1", Resource: "services"},
 			},
@@ -645,7 +646,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: []unversioned.GroupVersionResource{
+			expected: []schema.GroupVersionResource{
 				{Group: "batch", Version: "v1", Resource: "jobs"},
 				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"},
 			},
@@ -688,7 +689,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(output)
 			},
-			expected: []unversioned.GroupVersionResource{
+			expected: []schema.GroupVersionResource{
 				{Group: "batch", Version: "v2alpha1", Resource: "jobs"},
 				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"},
 			},

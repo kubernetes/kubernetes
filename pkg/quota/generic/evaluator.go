@@ -22,16 +22,16 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // ListResourceUsingInformerFunc returns a listing function based on the shared informer factory for the specified resource.
-func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, groupResource unversioned.GroupResource) ListFuncByNamespace {
+func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, groupResource schema.GroupResource) ListFuncByNamespace {
 	return func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 		labelSelector, err := labels.Parse(options.LabelSelector)
 		if err != nil {
@@ -91,7 +91,7 @@ type GenericEvaluator struct {
 	// Name used for logging
 	Name string
 	// The GroupKind that this evaluator tracks
-	InternalGroupKind unversioned.GroupKind
+	InternalGroupKind schema.GroupKind
 	// The set of resources that are pertinent to the mapped operation
 	InternalOperationResources map[admission.Operation][]api.ResourceName
 	// The set of resource names this evaluator matches
@@ -130,7 +130,7 @@ func (g *GenericEvaluator) OperationResources(operation admission.Operation) []a
 }
 
 // GroupKind that this evaluator tracks
-func (g *GenericEvaluator) GroupKind() unversioned.GroupKind {
+func (g *GenericEvaluator) GroupKind() schema.GroupKind {
 	return g.InternalGroupKind
 }
 

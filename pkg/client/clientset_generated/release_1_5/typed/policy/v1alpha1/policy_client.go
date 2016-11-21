@@ -18,10 +18,11 @@ package v1alpha1
 
 import (
 	fmt "fmt"
+
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
@@ -68,7 +69,7 @@ func New(c restclient.Interface) *PolicyV1alpha1Client {
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	gv, err := unversioned.ParseGroupVersion("policy/v1alpha1")
+	gv, err := schema.ParseGroupVersion("policy/v1alpha1")
 	if err != nil {
 		return err
 	}

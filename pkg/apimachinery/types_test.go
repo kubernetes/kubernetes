@@ -19,19 +19,19 @@ package apimachinery
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestAdd(t *testing.T) {
 	gm := GroupMeta{
-		GroupVersion: unversioned.GroupVersion{
+		GroupVersion: schema.GroupVersion{
 			Group:   "test",
 			Version: "v1",
 		},
-		GroupVersions: []unversioned.GroupVersion{{Group: "test", Version: "v1"}},
+		GroupVersions: []schema.GroupVersion{{Group: "test", Version: "v1"}},
 	}
 
-	gm.AddVersionInterfaces(unversioned.GroupVersion{Group: "test", Version: "v1"}, nil)
+	gm.AddVersionInterfaces(schema.GroupVersion{Group: "test", Version: "v1"}, nil)
 	if e, a := 1, len(gm.InterfacesByVersion); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}

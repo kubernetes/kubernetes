@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -51,14 +52,14 @@ import (
 
 var fuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
 
-var codecsToTest = []func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, bool, error){
-	func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, bool, error) {
+var codecsToTest = []func(version schema.GroupVersion, item runtime.Object) (runtime.Codec, bool, error){
+	func(version schema.GroupVersion, item runtime.Object) (runtime.Codec, bool, error) {
 		c, err := testapi.GetCodecForObject(item)
 		return c, true, err
 	},
 }
 
-func fuzzInternalObject(t *testing.T, forVersion unversioned.GroupVersion, item runtime.Object, seed int64) runtime.Object {
+func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runtime.Object, seed int64) runtime.Object {
 	apitesting.FuzzerFor(t, forVersion, rand.NewSource(seed)).Fuzz(item)
 
 	j, err := meta.TypeAccessor(item)
@@ -192,8 +193,8 @@ func TestSetControllerConversion(t *testing.T) {
 		api.Codecs.UniversalDeserializer(),
 		runtime.NewMultiGroupVersioner(
 			*defaultGroup.GroupVersion(),
-			unversioned.GroupKind{Group: defaultGroup.GroupVersion().Group},
-			unversioned.GroupKind{Group: extGroup.GroupVersion().Group},
+			schema.GroupKind{Group: defaultGroup.GroupVersion().Group},
+			schema.GroupKind{Group: extGroup.GroupVersion().Group},
 		),
 	)
 

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -135,7 +136,7 @@ func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string
 		return &unversioned.APIResourceList{}, nil
 	}
 
-	return nil, errors.NewNotFound(unversioned.GroupResource{}, "")
+	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
 func (c *fakeDiscoveryClient) ServerResources() (map[string]*unversioned.APIResourceList, error) {
@@ -143,14 +144,14 @@ func (c *fakeDiscoveryClient) ServerResources() (map[string]*unversioned.APIReso
 	return map[string]*unversioned.APIResourceList{}, nil
 }
 
-func (c *fakeDiscoveryClient) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+func (c *fakeDiscoveryClient) ServerPreferredResources() ([]schema.GroupVersionResource, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return []unversioned.GroupVersionResource{}, nil
+	return []schema.GroupVersionResource{}, nil
 }
 
-func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]schema.GroupVersionResource, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return []unversioned.GroupVersionResource{}, nil
+	return []schema.GroupVersionResource{}, nil
 }
 
 func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
@@ -158,7 +159,7 @@ func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
 	return &version.Info{}, nil
 }
 
-func (c *fakeDiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+func (c *fakeDiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	c.swaggerCalls = c.swaggerCalls + 1
 	return &swagger.ApiDeclaration{}, nil
 }
