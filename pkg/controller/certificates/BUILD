@@ -13,8 +13,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "controller.go",
-        "controller_utils.go",
+        "certificate_controller.go",
+        "certificate_controller_utils.go",
         "doc.go",
         "groupapprove.go",
     ],
