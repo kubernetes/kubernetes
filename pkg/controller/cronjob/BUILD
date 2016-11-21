@@ -13,7 +13,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "controller.go",
+        "cronjob_controller.go",
         "doc.go",
         "injection.go",
         "utils.go",
@@ -43,7 +43,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "controller_test.go",
+        "cronjob_controller_test.go",
         "utils_test.go",
     ],
     library = "go_default_library",
