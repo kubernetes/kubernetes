@@ -598,17 +598,25 @@ func podUsesHostNetwork(pod *api.Pod) bool {
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
-// TODO: duplicate secrets are being retrieved multiple times and there
-// is no cache.  Creating and using a secret manager interface will make this
-// easier to address.
+// TODO: Long term, we should have an endpoint that exposes secrets used by pods bound to a node.
+// Creating and using a secret manager interface watches the secrets, then could reduce times of
+// retrieving pull secrets.
 func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	pullSecrets := []api.Secret{}
-
+	var secrets = make(map[string]*api.Secret)
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
-		secret, err := kl.kubeClient.Core().Secrets(pod.Namespace).Get(secretRef.Name)
-		if err != nil {
-			glog.Warningf("Unable to retrieve pull secret %s/%s for %s/%s due to %v.  The image pull may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
-			continue
+		secret, ok := secrets[secretRef.Name]
+		if !ok {
+			if kl.kubeClient == nil {
+				glog.Warningf("Unable to retrieve pull secret %s/%s for pod %s, no kubeClient defined.", pod.Namespace, secretRef.Name, format.Pod(pod))
+				continue
+			}
+			secret, err := kl.kubeClient.Core().Secrets(pod.Namespace).Get(secretRef.Name)
+			if err != nil {
+				glog.Warningf("Unable to retrieve pull secret %s/%s for pod %s due to %v. The image pull may not succeed.", pod.Namespace, secretRef.Name, format.Pod(pod), err)
+				continue
+			}
+			secrets[secretRef.Name] = secret
 		}
 
 		pullSecrets = append(pullSecrets, *secret)
