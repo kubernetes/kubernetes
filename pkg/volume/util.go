@@ -439,3 +439,30 @@ func GetPVCMatchExpression(pvc *v1.PersistentVolumeClaim, key string, operator u
 	}
 	return make(sets.String), fmt.Errorf("Persistent volume claim (%v): %v operator for %v key not found in the matchExpressions part", pvc.Name, key, operator)
 }
+
+// Regions2ZonesParams are parameters for the func Regions2Zones
+type Regions2ZonesParams struct {
+	// set of regions to be converted to a set of zones
+	Regions sets.String
+	// all currently available zones
+	AllAvailableZones sets.String
+	// a func that converts a zone to a region
+	Zone2region func(string) (string, error)
+}
+
+// Regions2Zones converts a set of regions to a set of zones
+func Regions2Zones(in Regions2ZonesParams) sets.String {
+	ret := make(sets.String)
+	for zone := range in.AllAvailableZones {
+		for region := range in.Regions {
+			if regionOfZone, err := in.Zone2region(zone); err != nil {
+				glog.Warningf("Failed to convert zone (%v) to a region", zone)
+				break
+			} else if strings.Compare(regionOfZone, region) == 0 {
+				ret.Insert(zone)
+				break
+			}
+		}
+	}
+	return ret
+}

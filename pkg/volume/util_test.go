@@ -695,3 +695,87 @@ func TestGetPVCMatchExpression(t *testing.T) {
 	}
 
 }
+
+func mockZone2Region(zone string) (string, error) {
+	if len(zone) < 1 {
+		return "", fmt.Errorf("Zone must not be an empty string")
+	}
+	return zone[:len(zone)-1], nil
+}
+
+func TestRegions2Zones(t *testing.T) {
+	tests := []struct {
+		input Regions2ZonesParams
+		want  sets.String
+	}{
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{},
+				AllAvailableZones: sets.String{},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}},
+				AllAvailableZones: sets.String{"": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}, "us-east-2a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1a": sets.Empty{}},
+				AllAvailableZones: sets.String{},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}, "us-east-3": sets.Empty{}},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}, "us-east-2a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}, "us-east-3": sets.Empty{}},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-1c": sets.Empty{}, "us-east-2a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-1c": sets.Empty{}},
+		},
+	}
+	for _, tt := range tests {
+		if got := Regions2Zones(tt.input); !got.Equal(tt.want) {
+			t.Errorf("Regions2Zones(%v) returned (%v) want (%v)", tt.input, got, tt.want)
+		}
+	}
+}
