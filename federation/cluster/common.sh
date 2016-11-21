@@ -65,11 +65,11 @@ function create-federation-api-objects {
     : "${FEDERATION_IMAGE_TAG?Must set FEDERATION_IMAGE_TAG env var}"
 
     export FEDERATION_APISERVER_DEPLOYMENT_NAME="federation-apiserver"
-    export FEDERATION_APISERVER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/hyperkube"
+    export FEDERATION_APISERVER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/hyperkube-amd64"
     export FEDERATION_APISERVER_IMAGE_TAG="${FEDERATION_IMAGE_TAG}"
 
     export FEDERATION_CONTROLLER_MANAGER_DEPLOYMENT_NAME="federation-controller-manager"
-    export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/hyperkube"
+    export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/hyperkube-amd64"
     export FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG="${FEDERATION_IMAGE_TAG}"
 
     if [[ -z "${FEDERATION_DNS_PROVIDER:-}" ]]; then
@@ -165,7 +165,7 @@ function create-federation-api-objects {
     # controller manager can use to talk to the federation-apiserver.
     # Note that the file name should be "kubeconfig" so that the secret key gets the same name.
     KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
-    CONTEXT=federation-cluster \
+    CONTEXT=${FEDERATION_KUBE_CONTEXT} \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
            KUBE_USER="${KUBE_USER}" \
            KUBE_PASSWORD="${KUBE_PASSWORD}" \
@@ -207,7 +207,7 @@ function create-federation-api-objects {
     done
 
     # Update the users kubeconfig to include federation-apiserver credentials.
-    CONTEXT=federation-cluster \
+    CONTEXT=${FEDERATION_KUBE_CONTEXT} \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
            KUBE_USER="${KUBE_USER}" \
            KUBE_PASSWORD="${KUBE_PASSWORD}" \
@@ -296,7 +296,7 @@ function push-federation-images {
     source "${KUBE_ROOT}/build/common.sh"
     source "${KUBE_ROOT}/hack/lib/util.sh"
 
-    local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"hyperkube"}
+    local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"hyperkube-amd64"}
 
     local bin_dir="${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin"
 
