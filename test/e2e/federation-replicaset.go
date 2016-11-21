@@ -144,6 +144,27 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			createAndUpdateFn(generageFedRsPrefsWithWeight(clusters))
 			createAndUpdateFn(generageFedRsPrefsWithMin(clusters))
 			createAndUpdateFn(generageFedRsPrefsWithMax(clusters))
+
+			// test for rebalancing
+			func() {
+				pref1, pref2, replicas, expect1, expect2 := generageFedRsPrefsForRebalancing(clusters)
+				rs := newReplicaSet(nsName, FederationReplicaSetName, replicas, pref1)
+				rs = createReplicaSetOrFail(f.FederationClientset_1_5, rs)
+				defer cleanupFn(rs)
+				waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters, expect1)
+				By(fmt.Sprintf("Successfuly created and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
+
+				rs = newReplicaSet(nsName, FederationReplicaSetName, replicas, pref2)
+				updateReplicaSetOrFail(f.FederationClientset_1_5, rs)
+				waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters, expect1)
+				By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
+
+				pref2 = updateFedRePrefsRebalance(pref2, true)
+				rs = newReplicaSet(nsName, FederationReplicaSetName, replicas, pref2)
+				updateReplicaSetOrFail(f.FederationClientset_1_5, rs)
+				waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters, expect2)
+				By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
+			}()
 		})
 
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
@@ -260,7 +281,7 @@ func generageFedRsPrefsWithMin(clusters map[string]*cluster) (pref *federation.F
 	expect = map[string]int32{}
 
 	for i, clusterName := range clusterNames {
-		if i != 0 {
+		if i != 0 { // do not set weight and minReplicas for cluster[0] thus it should have no replicas scheduled
 			clusterRsPref := pref.Clusters[clusterName]
 			clusterRsPref.Weight = int64(1)
 			clusterRsPref.MinReplicas = int64(i + 2)
@@ -289,7 +310,7 @@ func generageFedRsPrefsWithMax(clusters map[string]*cluster) (pref *federation.F
 	expect = map[string]int32{}
 
 	for i, clusterName := range clusterNames {
-		if i != 0 {
+		if i != 0 { // do not set maxReplicas for cluster[0] thus replicas exceeds the total maxReplicas turned to cluster[0]
 			clusterRsPref := pref.Clusters[clusterName]
 			clusterRsPref.Weight = int64(100)
 			maxReplicas := int64(i)
@@ -301,6 +322,42 @@ func generageFedRsPrefsWithMax(clusters map[string]*cluster) (pref *federation.F
 	// extra replicas go to cluster[0] although it has the lowest weight as others hit the MaxReplicas
 	replicas += 5
 	expect[clusterNames[0]] = 5
+	return
+}
+
+func updateFedRePrefsRebalance(pref *federation.FederatedReplicaSetPreferences, rebalance bool) *federation.FederatedReplicaSetPreferences {
+	pref.Rebalance = rebalance
+	return pref
+}
+
+func generageFedRsPrefsForRebalancing(clusters map[string]*cluster) (pref1, pref2 *federation.FederatedReplicaSetPreferences, replicas int32, expect1, expect2 map[string]int32) {
+	clusterNames := make([]string, 0, len(clusters))
+	for clusterName := range clusters {
+		clusterNames = append(clusterNames, clusterName)
+	}
+
+	replicas = 3
+
+	pref1 = &federation.FederatedReplicaSetPreferences{
+		Clusters: map[string]federation.ClusterReplicaSetPreferences{
+			clusterNames[0]: {Weight: 1},
+			clusterNames[1]: {Weight: 2},
+		},
+	}
+	expect1 = map[string]int32{
+		clusterNames[0]: 1,
+		clusterNames[1]: 2,
+	}
+	pref2 = &federation.FederatedReplicaSetPreferences{
+		Clusters: map[string]federation.ClusterReplicaSetPreferences{
+			clusterNames[0]: {Weight: 2},
+			clusterNames[1]: {Weight: 1},
+		},
+	}
+	expect2 = map[string]int32{
+		clusterNames[0]: 2,
+		clusterNames[1]: 1,
+	}
 	return
 }
 
