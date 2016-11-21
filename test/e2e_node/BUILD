@@ -91,6 +91,7 @@ go_test(
         "//pkg/labels:go_default_library",
         "//pkg/metrics:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/intstr:go_default_library",
@@ -111,7 +112,5 @@ go_test(
         "//vendor:github.com/onsi/gomega/gstruct",
         "//vendor:github.com/onsi/gomega/types",
         "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
-        "//vendor:k8s.io/client-go/pkg/api/unversioned",
     ],
 )

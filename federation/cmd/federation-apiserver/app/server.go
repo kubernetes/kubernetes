@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
@@ -91,7 +91,7 @@ func Run(s *options.ServerRunOptions) error {
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
 		s.GenericServerRunOptions.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
-		[]unversioned.GroupVersionResource{}, resourceConfig, s.GenericServerRunOptions.RuntimeConfig)
+		[]schema.GroupVersionResource{}, resourceConfig, s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
 		glog.Fatalf("error in initializing storage factory: %s", err)
 	}
@@ -110,7 +110,7 @@ func Run(s *options.ServerRunOptions) error {
 		}
 		group := apiresource[0]
 		resource := apiresource[1]
-		groupResource := unversioned.GroupResource{Group: group, Resource: resource}
+		groupResource := schema.GroupResource{Group: group, Resource: resource}
 
 		servers := strings.Split(tokens[1], ";")
 		storageFactory.SetEtcdLocation(groupResource, servers)
@@ -238,7 +238,7 @@ type restOptionsFactory struct {
 	enableGarbageCollection bool
 }
 
-func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.RESTOptions {
+func (f restOptionsFactory) NewFor(resource schema.GroupResource) generic.RESTOptions {
 	config, err := f.storageFactory.NewConfig(resource)
 	if err != nil {
 		glog.Fatalf("Unable to find storage config for %v, due to %v", resource, err.Error())

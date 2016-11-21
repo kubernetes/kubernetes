@@ -42,6 +42,7 @@ go_library(
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/selection:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util:go_default_library",

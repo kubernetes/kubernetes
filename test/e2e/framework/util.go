@@ -69,6 +69,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/types"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
@@ -356,7 +357,7 @@ func SkipUnlessFederated(c clientset.Interface) {
 	}
 }
 
-func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr unversioned.GroupVersionResource, namespace string) {
+func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr schema.GroupVersionResource, namespace string) {
 	dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
 	if err != nil {
 		Failf("Unexpected error getting dynamic client for %v: %v", gvr.GroupVersion(), err)
@@ -1410,7 +1411,7 @@ func WaitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.D
 	_, err = watch.Until(timeout, w, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Deleted:
-			return false, apierrs.NewNotFound(unversioned.GroupResource{Resource: "replicationcontrollers"}, "")
+			return false, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
 		}
 		switch rc := event.Object.(type) {
 		case *v1.ReplicationController:

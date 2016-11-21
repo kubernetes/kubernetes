@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -63,18 +64,18 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
 var testAPIGroup2 = "test.group2"
-var testInternalGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: runtime.APIVersionInternal}
-var testGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version"}
-var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version2"}
-var testGroup2Version = unversioned.GroupVersion{Group: testAPIGroup2, Version: "version"}
-var testInternalGroup2Version = unversioned.GroupVersion{Group: testAPIGroup2, Version: runtime.APIVersionInternal}
+var testInternalGroupVersion = schema.GroupVersion{Group: testAPIGroup, Version: runtime.APIVersionInternal}
+var testGroupVersion = schema.GroupVersion{Group: testAPIGroup, Version: "version"}
+var newGroupVersion = schema.GroupVersion{Group: testAPIGroup, Version: "version2"}
+var testGroup2Version = schema.GroupVersion{Group: testAPIGroup2, Version: "version"}
+var testInternalGroup2Version = schema.GroupVersion{Group: testAPIGroup2, Version: runtime.APIVersionInternal}
 var prefix = "apis"
 
-var grouplessGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
-var grouplessInternalGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
+var grouplessGroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
+var grouplessInternalGroupVersion = schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 var grouplessPrefix = "api"
 
-var groupVersions = []unversioned.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
+var groupVersions = []schema.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
 
 var codec = api.Codecs.LegacyCodec(groupVersions...)
 var grouplessCodec = api.Codecs.LegacyCodec(grouplessGroupVersion)
@@ -88,7 +89,7 @@ var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and wi
 var admissionControl admission.Interface
 var requestContextMapper api.RequestContextMapper
 
-func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 	switch version {
 	case testGroupVersion:
 		return &meta.VersionInterfaces{
@@ -116,7 +117,7 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 }
 
 func newMapper() *meta.DefaultRESTMapper {
-	return meta.NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
+	return meta.NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
 }
 
 func addGrouplessTypes() {
@@ -427,7 +428,7 @@ func (s *SimpleStream) Close() error {
 	return nil
 }
 
-func (obj *SimpleStream) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool, string, error) {
 	s.version = version
@@ -1983,7 +1984,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
-	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
@@ -2020,7 +2021,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
-	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
@@ -2060,7 +2061,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
-	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
@@ -2847,7 +2848,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
-	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -2917,7 +2918,7 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
-	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -2976,7 +2977,7 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
 	}
 
-	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -3077,8 +3078,8 @@ type UnregisteredAPIObject struct {
 	Value string
 }
 
-func (obj *UnregisteredAPIObject) GetObjectKind() unversioned.ObjectKind {
-	return unversioned.EmptyObjectKind
+func (obj *UnregisteredAPIObject) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
 }
 
 func TestWriteJSONDecodeError(t *testing.T) {
@@ -3254,7 +3255,7 @@ type SimpleXGSubresource struct {
 	Labels               map[string]string `json:"labels,omitempty"`
 }
 
-func (obj *SimpleXGSubresource) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *SimpleXGSubresource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleXGSubresourceRESTStorage struct {
 	item SimpleXGSubresource
@@ -3308,7 +3309,7 @@ func TestXGSubresource(t *testing.T) {
 		OptionsExternalVersion: &testGroupVersion,
 		Serializer:             api.Codecs,
 
-		SubresourceGroupVersionKind: map[string]unversioned.GroupVersionKind{
+		SubresourceGroupVersionKind: map[string]schema.GroupVersionKind{
 			"simple/subsimple": testGroup2Version.WithKind("SimpleXGSubresource"),
 		},
 	}

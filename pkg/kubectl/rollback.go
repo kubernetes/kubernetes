@@ -24,13 +24,13 @@ import (
 	"syscall"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	externalextensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -40,7 +40,7 @@ type Rollbacker interface {
 	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error)
 }
 
-func RollbackerFor(kind unversioned.GroupKind, c clientset.Interface) (Rollbacker, error) {
+func RollbackerFor(kind schema.GroupKind, c clientset.Interface) (Rollbacker, error) {
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentRollbacker{c}, nil

@@ -22,16 +22,16 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type PodControllerRefManager struct {
 	podControl         PodControlInterface
 	controllerObject   v1.ObjectMeta
 	controllerSelector labels.Selector
-	controllerKind     unversioned.GroupVersionKind
+	controllerKind     schema.GroupVersionKind
 }
 
 // NewPodControllerRefManager returns a PodControllerRefManager that exposes
@@ -40,7 +40,7 @@ func NewPodControllerRefManager(
 	podControl PodControlInterface,
 	controllerObject v1.ObjectMeta,
 	controllerSelector labels.Selector,
-	controllerKind unversioned.GroupVersionKind,
+	controllerKind schema.GroupVersionKind,
 ) *PodControllerRefManager {
 	return &PodControllerRefManager{podControl, controllerObject, controllerSelector, controllerKind}
 }

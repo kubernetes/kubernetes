@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -521,7 +522,7 @@ func encodePods(pods []*v1.Pod) (data []byte, err error) {
 	// TODO: this needs to be parameterized to the kubelet, not hardcoded. Depends on Kubelet
 	//   as API server refactor.
 	// TODO: Locked to v1, needs to be made generic
-	codec := api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: v1.GroupName, Version: "v1"})
+	codec := api.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
 	return runtime.Encode(codec, podList)
 }
 

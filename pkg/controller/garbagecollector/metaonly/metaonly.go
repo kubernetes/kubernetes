@@ -23,18 +23,19 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-func (obj *MetadataOnlyObject) GetObjectKind() unversioned.ObjectKind     { return obj }
-func (obj *MetadataOnlyObjectList) GetObjectKind() unversioned.ObjectKind { return obj }
+func (obj *MetadataOnlyObject) GetObjectKind() schema.ObjectKind     { return obj }
+func (obj *MetadataOnlyObjectList) GetObjectKind() schema.ObjectKind { return obj }
 
 type metaOnlyJSONScheme struct{}
 
 // This function can be extended to mapping different gvk to different MetadataOnlyObject,
 // which embedded with different version of ObjectMeta. Currently the system
 // only supports v1.ObjectMeta.
-func gvkToMetadataOnlyObject(gvk unversioned.GroupVersionKind) runtime.Object {
+func gvkToMetadataOnlyObject(gvk schema.GroupVersionKind) runtime.Object {
 	if strings.HasSuffix(gvk.Kind, "List") {
 		return &MetadataOnlyObjectList{}
 	} else {

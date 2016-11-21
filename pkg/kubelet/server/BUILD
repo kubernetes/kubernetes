@@ -36,6 +36,7 @@ go_library(
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/flushwriter:go_default_library",

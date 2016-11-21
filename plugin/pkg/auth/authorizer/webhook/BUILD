@@ -15,11 +15,11 @@ go_library(
     srcs = ["webhook.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
         "//pkg/apis/authorization/v1beta1:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/cache:go_default_library",
         "//plugin/pkg/webhook:go_default_library",
         "//vendor:github.com/golang/glog",

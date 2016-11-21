@@ -23,10 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"net/url"
+
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"net/url"
 )
 
 func TestTopPodAllNamespacesMetrics(t *testing.T) {

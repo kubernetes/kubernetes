@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
@@ -41,8 +42,8 @@ type Foo struct {
 	OtherField int    `json:"otherField"`
 }
 
-func (*Foo) GetObjectKind() unversioned.ObjectKind {
-	return unversioned.EmptyObjectKind
+func (*Foo) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
 }
 
 type FooList struct {
@@ -121,10 +122,10 @@ func TestCodec(t *testing.T) {
 			name: "labels",
 		},
 	}
-	registered.AddThirdPartyAPIGroupVersions(unversioned.GroupVersion{Group: "company.com", Version: "v1"})
+	registered.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: "company.com", Version: "v1"})
 	for _, test := range tests {
 		d := &thirdPartyResourceDataDecoder{kind: "Foo", delegate: testapi.Extensions.Codec()}
-		e := &thirdPartyResourceDataEncoder{gvk: unversioned.GroupVersionKind{
+		e := &thirdPartyResourceDataEncoder{gvk: schema.GroupVersionKind{
 			Group:   "company.com",
 			Version: "v1",
 			Kind:    "Foo",
@@ -193,25 +194,25 @@ func TestCreater(t *testing.T) {
 	creater := NewObjectCreator("creater group", "creater version", api.Scheme)
 	tests := []struct {
 		name        string
-		kind        unversioned.GroupVersionKind
+		kind        schema.GroupVersionKind
 		expectedObj runtime.Object
 		expectErr   bool
 	}{
 		{
 			name:        "valid ThirdPartyResourceData creation",
-			kind:        unversioned.GroupVersionKind{Group: "creater group", Version: "creater version", Kind: "ThirdPartyResourceData"},
+			kind:        schema.GroupVersionKind{Group: "creater group", Version: "creater version", Kind: "ThirdPartyResourceData"},
 			expectedObj: &extensions.ThirdPartyResourceData{},
 			expectErr:   false,
 		},
 		{
 			name:        "invalid ThirdPartyResourceData creation",
-			kind:        unversioned.GroupVersionKind{Version: "invalid version", Kind: "ThirdPartyResourceData"},
+			kind:        schema.GroupVersionKind{Version: "invalid version", Kind: "ThirdPartyResourceData"},
 			expectedObj: nil,
 			expectErr:   true,
 		},
 		{
 			name:        "valid ListOptions creation",
-			kind:        unversioned.GroupVersionKind{Version: "v1", Kind: "ListOptions"},
+			kind:        schema.GroupVersionKind{Version: "v1", Kind: "ListOptions"},
 			expectedObj: &v1.ListOptions{},
 			expectErr:   false,
 		},
@@ -232,7 +233,7 @@ func TestCreater(t *testing.T) {
 }
 
 func TestEncodeToStreamForInternalEvent(t *testing.T) {
-	e := &thirdPartyResourceDataEncoder{gvk: unversioned.GroupVersionKind{
+	e := &thirdPartyResourceDataEncoder{gvk: schema.GroupVersionKind{
 		Group:   "company.com",
 		Version: "v1",
 		Kind:    "Foo",
@@ -257,7 +258,7 @@ func TestEncodeToStreamForInternalEvent(t *testing.T) {
 }
 
 func TestThirdPartyResourceDataListEncoding(t *testing.T) {
-	gv := unversioned.GroupVersion{Group: "stable.foo.faz", Version: "v1"}
+	gv := schema.GroupVersion{Group: "stable.foo.faz", Version: "v1"}
 	gvk := gv.WithKind("Bar")
 	e := &thirdPartyResourceDataEncoder{delegate: testapi.Extensions.Codec(), gvk: gvk}
 	subject := &extensions.ThirdPartyResourceDataList{}

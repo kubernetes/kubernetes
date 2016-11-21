@@ -49,6 +49,7 @@ go_library(
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/types:go_default_library",

@@ -18,8 +18,8 @@ package internalversion
 
 import (
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // The ScaleExpansion interface allows manually adding extra methods to the ScaleInterface.
@@ -33,7 +33,7 @@ func (c *scales) Get(kind string, name string) (result *extensions.Scale, err er
 	result = &extensions.Scale{}
 
 	// TODO this method needs to take a proper unambiguous kind
-	fullyQualifiedKind := unversioned.GroupVersionKind{Kind: kind}
+	fullyQualifiedKind := schema.GroupVersionKind{Kind: kind}
 	resource, _ := meta.KindToResource(fullyQualifiedKind)
 
 	err = c.client.Get().
@@ -50,7 +50,7 @@ func (c *scales) Update(kind string, scale *extensions.Scale) (result *extension
 	result = &extensions.Scale{}
 
 	// TODO this method needs to take a proper unambiguous kind
-	fullyQualifiedKind := unversioned.GroupVersionKind{Kind: kind}
+	fullyQualifiedKind := schema.GroupVersionKind{Kind: kind}
 	resource, _ := meta.KindToResource(fullyQualifiedKind)
 
 	err = c.client.Put().

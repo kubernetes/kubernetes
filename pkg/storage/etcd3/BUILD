@@ -53,6 +53,7 @@ go_test(
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/watch:go_default_library",

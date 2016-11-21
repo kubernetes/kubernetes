@@ -33,6 +33,7 @@ import (
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -579,7 +580,7 @@ func service() *api.Service {
 func TestSimpleStop(t *testing.T) {
 	tests := []struct {
 		fake        *reaperFake
-		kind        unversioned.GroupKind
+		kind        schema.GroupKind
 		actions     []testcore.Action
 		expectError bool
 		test        string

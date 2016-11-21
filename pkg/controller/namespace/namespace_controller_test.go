@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -115,7 +116,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	groupVersionResources := testGroupVersionResources()
 	for _, groupVersionResource := range groupVersionResources {
 		urlPath := path.Join([]string{
-			dynamic.LegacyAPIPathResolverFunc(unversioned.GroupVersionKind{Group: groupVersionResource.Group, Version: groupVersionResource.Version}),
+			dynamic.LegacyAPIPathResolverFunc(schema.GroupVersionKind{Group: groupVersionResource.Group, Version: groupVersionResource.Version}),
 			groupVersionResource.Group,
 			groupVersionResource.Version,
 			"namespaces",
@@ -169,7 +170,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
 		clientPool := dynamic.NewClientPool(clientConfig, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 
-		fn := func() ([]unversioned.GroupVersionResource, error) {
+		fn := func() ([]schema.GroupVersionResource, error) {
 			return groupVersionResources, nil
 		}
 
@@ -242,7 +243,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: v1.NamespaceActive,
 		},
 	}
-	fn := func() ([]unversioned.GroupVersionResource, error) {
+	fn := func() ([]schema.GroupVersionResource, error) {
 		return testGroupVersionResources(), nil
 	}
 	err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testNamespace, v1.FinalizerKubernetes)
@@ -295,10 +296,10 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 }
 
 // testGroupVersionResources returns a mocked up set of resources across different api groups for testing namespace controller.
-func testGroupVersionResources() []unversioned.GroupVersionResource {
-	results := []unversioned.GroupVersionResource{}
-	results = append(results, unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
-	results = append(results, unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "services"})
-	results = append(results, unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
+func testGroupVersionResources() []schema.GroupVersionResource {
+	results := []schema.GroupVersionResource{}
+	results = append(results, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
+	results = append(results, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"})
+	results = append(results, schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
 	return results
 }

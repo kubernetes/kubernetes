@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -203,7 +204,7 @@ func TestLabelsForObject(t *testing.T) {
 func TestCanBeExposed(t *testing.T) {
 	factory := NewFactory(nil)
 	tests := []struct {
-		kind      unversioned.GroupKind
+		kind      schema.GroupKind
 		expectErr bool
 	}{
 		{

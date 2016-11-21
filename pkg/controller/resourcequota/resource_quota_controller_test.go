@@ -22,13 +22,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -109,7 +109,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
@@ -194,7 +194,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
@@ -282,7 +282,7 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
@@ -370,7 +370,7 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
@@ -402,7 +402,7 @@ func TestAddQuota(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),

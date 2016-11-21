@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -76,7 +77,7 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	gv := unversioned.GroupVersion{Group: "", Version: "v1"}
+	gv := schema.GroupVersion{Group: "", Version: "v1"}
 	rcGVK := gv.WithKind("ReplicationController")
 	podTemplateGVK := gv.WithKind("PodTemplate")
 

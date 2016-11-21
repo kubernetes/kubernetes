@@ -19,8 +19,8 @@ package quota
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // UsageStatsOptions is an options structs that describes how stats should be calculated
@@ -44,7 +44,7 @@ type Evaluator interface {
 	// Get returns the object with specified namespace and name
 	Get(namespace, name string) (runtime.Object, error)
 	// GroupKind returns the groupKind that this object knows how to evaluate
-	GroupKind() unversioned.GroupKind
+	GroupKind() schema.GroupKind
 	// MatchesResources is the list of resources that this evaluator matches
 	MatchesResources() []api.ResourceName
 	// Matches returns true if the specified quota matches the input item
@@ -62,15 +62,15 @@ type Evaluator interface {
 // Registry holds the list of evaluators associated to a particular group kind
 type Registry interface {
 	// Evaluators returns the set Evaluator objects registered to a groupKind
-	Evaluators() map[unversioned.GroupKind]Evaluator
+	Evaluators() map[schema.GroupKind]Evaluator
 }
 
 // UnionRegistry combines multiple registries.  Order matters because first registry to claim a GroupKind
 // is the "winner"
 type UnionRegistry []Registry
 
-func (r UnionRegistry) Evaluators() map[unversioned.GroupKind]Evaluator {
-	ret := map[unversioned.GroupKind]Evaluator{}
+func (r UnionRegistry) Evaluators() map[schema.GroupKind]Evaluator {
+	ret := map[schema.GroupKind]Evaluator{}
 
 	for i := len(r) - 1; i >= 0; i-- {
 		for k, v := range r[i].Evaluators() {
