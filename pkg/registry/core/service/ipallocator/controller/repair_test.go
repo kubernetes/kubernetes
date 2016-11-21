@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
 type mockRangeRegistry struct {
@@ -49,12 +49,12 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 }
 
 func TestRepair(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
+	fakeClient := fake.NewSimpleClientset()
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{},
 	}
-	r := NewRepair(0, registry, cidr, ipregistry)
+	r := NewRepair(0, fakeClient.Core(), cidr, ipregistry)
 
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
@@ -67,7 +67,7 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, registry, cidr, ipregistry)
+	r = NewRepair(0, fakeClient.Core(), cidr, ipregistry)
 	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestRepairEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	registry := registrytest.NewServiceRegistry()
+	fakeClient := fake.NewSimpleClientset()
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
 			ObjectMeta: api.ObjectMeta{
@@ -94,7 +94,7 @@ func TestRepairEmpty(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, registry, cidr, ipregistry)
+	r := NewRepair(0, fakeClient.Core(), cidr, ipregistry)
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}
@@ -117,29 +117,32 @@ func TestRepairWithExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	registry := registrytest.NewServiceRegistry()
-	registry.List = api.ServiceList{
-		Items: []api.Service{
-			{
-				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
-			},
-			{
-				Spec: api.ServiceSpec{ClusterIP: "192.168.1.100"},
-			},
-			{ // outside CIDR, will be dropped
-				Spec: api.ServiceSpec{ClusterIP: "192.168.0.1"},
-			},
-			{ // empty, ignored
-				Spec: api.ServiceSpec{ClusterIP: ""},
-			},
-			{ // duplicate, dropped
-				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
-			},
-			{ // headless
-				Spec: api.ServiceSpec{ClusterIP: "None"},
-			},
+	fakeClient := fake.NewSimpleClientset(
+		&api.Service{
+			ObjectMeta: api.ObjectMeta{Namespace: "one", Name: "one"},
+			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.1"},
 		},
-	}
+		&api.Service{
+			ObjectMeta: api.ObjectMeta{Namespace: "two", Name: "two"},
+			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.100"},
+		},
+		&api.Service{ // outside CIDR, will be dropped
+			ObjectMeta: api.ObjectMeta{Namespace: "three", Name: "three"},
+			Spec:       api.ServiceSpec{ClusterIP: "192.168.0.1"},
+		},
+		&api.Service{ // empty, ignored
+			ObjectMeta: api.ObjectMeta{Namespace: "four", Name: "four"},
+			Spec:       api.ServiceSpec{ClusterIP: ""},
+		},
+		&api.Service{ // duplicate, dropped
+			ObjectMeta: api.ObjectMeta{Namespace: "five", Name: "five"},
+			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.1"},
+		},
+		&api.Service{ // headless
+			ObjectMeta: api.ObjectMeta{Namespace: "six", Name: "six"},
+			Spec:       api.ServiceSpec{ClusterIP: "None"},
+		},
+	)
 
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
@@ -150,7 +153,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, registry, cidr, ipregistry)
+	r := NewRepair(0, fakeClient.Core(), cidr, ipregistry)
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}

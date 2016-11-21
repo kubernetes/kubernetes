@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service"
@@ -33,20 +34,20 @@ import (
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
 type Repair struct {
-	interval  time.Duration
-	registry  service.Registry
-	portRange net.PortRange
-	alloc     rangeallocation.RangeRegistry
+	interval      time.Duration
+	serviceClient coreclient.ServicesGetter
+	portRange     net.PortRange
+	alloc         rangeallocation.RangeRegistry
 }
 
 // NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, registry service.Registry, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, serviceClient coreclient.ServicesGetter, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
 	return &Repair{
-		interval:  interval,
-		registry:  registry,
-		portRange: portRange,
-		alloc:     alloc,
+		interval:      interval,
+		serviceClient: serviceClient,
+		portRange:     portRange,
+		alloc:         alloc,
 	}
 }
 
@@ -88,13 +89,12 @@ func (c *Repair) runOnce() error {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
 
-	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
 	// We explicitly send no resource version, since the resource version
 	// of 'latest' is from a different collection, it's not comparable to
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.registry.ListServices(ctx, nil)
+	list, err := c.serviceClient.Services(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
