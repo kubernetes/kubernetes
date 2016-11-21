@@ -170,7 +170,7 @@ func (v *VolumeIdentityMapper) GetClaims(id string) map[string]api.PersistentVol
 		claim.Labels = v.ps.Spec.Selector.MatchLabels
 
 		// TODO: We're assuming that the claim template has a volume QoS key, eg:
-		// volume.alpha.kubernetes.io/storage-class: anything
+		// volume.beta.kubernetes.io/storage-class: anything
 		petClaims[pvc.Name] = claim
 	}
 	return petClaims
