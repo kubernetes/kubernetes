@@ -193,6 +193,16 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		fmt.Println("Skipping pre-flight checks")
 	}
 
+	// validate version argument
+	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
+	if err != nil {
+		return nil, err
+	}
+	if ver != cfg.KubernetesVersion {
+		fmt.Println("Using Kubernetes version:", ver)
+		cfg.KubernetesVersion = ver
+	}
+
 	// TODO(phase1+) create a custom flag
 	if cfg.CloudProvider != "" {
 		if cloudprovider.IsCloudProvider(cfg.CloudProvider) {
