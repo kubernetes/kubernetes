@@ -125,8 +125,8 @@ func (r *Mock) RemoveImage(image ImageSpec) error {
 	return args.Error(0)
 }
 
-func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error {
-	args := r.Called(pod, port, stream)
+func (r *Mock) PortForward(pod *Pod, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
+	args := r.Called(pod, port, streamIn, streamOut)
 	return args.Error(0)
 }
 

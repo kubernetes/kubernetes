@@ -138,8 +138,8 @@ func (fk *fakeKubelet) AttachContainer(name string, uid types.UID, container str
 	return fk.attachFunc(name, uid, container, in, out, err, tty)
 }
 
-func (fk *fakeKubelet) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
-	return fk.portForwardFunc(name, uid, port, stream)
+func (fk *fakeKubelet) PortForward(name string, uid types.UID, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
+	return fk.portForwardFunc(name, uid, port, streamIn, streamOut)
 }
 
 func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommand.Options) (*url.URL, error) {

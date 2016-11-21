@@ -130,7 +130,7 @@ type DirectStreamingRuntime interface {
 	// tty.
 	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
 	// Forward the specified port from the specified pod to the stream.
-	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
+	PortForward(pod *Pod, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error
 	// ContainerAttach encapsulates the attaching to containers for testability
 	ContainerAttacher
 }

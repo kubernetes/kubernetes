@@ -1025,6 +1025,26 @@ func (f *fakeReadWriteCloser) Close() error {
 	return nil
 }
 
+type fakeWriteCloser struct{}
+
+func (f *fakeWriteCloser) Write(data []byte) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeWriteCloser) Close() error {
+	return nil
+}
+
+type fakeReadCloser struct{}
+
+func (f *fakeReadCloser) Write(data []byte) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeReadCloser) Close() error {
+	return nil
+}
+
 func TestExec(t *testing.T) {
 	const (
 		podName                = "podFoo"
@@ -1136,7 +1156,8 @@ func TestPortForward(t *testing.T) {
 		port         uint16    = 5000
 	)
 	var (
-		stream = &fakeReadWriteCloser{}
+		streamIn  = &fakeWriteCloser{}
+		streamOut = &fakeReadCloser{}
 	)
 
 	testcases := []struct {
@@ -1175,7 +1196,7 @@ func TestPortForward(t *testing.T) {
 			assert.Error(t, err, description)
 			assert.Nil(t, redirect, description)
 
-			err = kubelet.PortForward(podFullName, podUID, port, stream)
+			err = kubelet.PortForward(podFullName, podUID, port, streamIn, streamOut)
 			assert.Error(t, err, description)
 		}
 		{ // Direct streaming case
@@ -1187,14 +1208,15 @@ func TestPortForward(t *testing.T) {
 			assert.NoError(t, err, description)
 			assert.Nil(t, redirect, description)
 
-			err = kubelet.PortForward(podFullName, podUID, port, stream)
+			err = kubelet.PortForward(podFullName, podUID, port, streamIn, streamOut)
 			if tc.expectError {
 				assert.Error(t, err, description)
 			} else {
 				assert.NoError(t, err, description)
 				require.Equal(t, fakeRuntime.Args.Pod.ID, podUID, description+": Pod UID")
 				require.Equal(t, fakeRuntime.Args.Port, port, description+": Port")
-				require.Equal(t, fakeRuntime.Args.Stream, stream, description+": stream")
+				require.Equal(t, fakeRuntime.Args.StreamIn, streamIn, description+": stream")
+				require.Equal(t, fakeRuntime.Args.StreamOut, streamOut, description+": stream")
 			}
 		}
 		{ // Indirect streaming case
@@ -1210,7 +1232,7 @@ func TestPortForward(t *testing.T) {
 				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
 			}
 
-			err = kubelet.PortForward(podFullName, podUID, port, stream)
+			err = kubelet.PortForward(podFullName, podUID, port, streamIn, streamOut)
 			assert.Error(t, err, description)
 		}
 	}
