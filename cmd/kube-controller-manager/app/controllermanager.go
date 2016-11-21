@@ -240,12 +240,12 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get api versions from server: %v", err)
+		return nil, fmt.Errorf("failed to get api versions from server: %v", err)
 	}
 
 	resourceMap, err := discoveryClient.ServerResources()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get supported resources from server: %v", err)
+		return nil, fmt.Errorf("failed to get supported resources from server: %v", err)
 	}
 
 	allResources := map[schema.GroupVersionResource]bool{}
@@ -272,7 +272,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	if len(s.ServiceAccountKeyFile) > 0 {
 		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
 		if err != nil {
-			return fmt.Errorf("Error reading key for service account token controller: %v", err)
+			return fmt.Errorf("error reading key for service account token controller: %v", err)
 		} else {
 			var rootCA []byte
 			if s.RootCAFile != "" {
@@ -323,7 +323,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {
-		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+		return fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
 
 	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
@@ -341,7 +341,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR,
 		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
 	if err != nil {
-		glog.Fatalf("Failed to initialize nodecontroller: %v", err)
+		return fmt.Errorf("failed to initialize nodecontroller: %v", err)
 	}
 	nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
@@ -399,7 +399,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	var gvrFn func() ([]schema.GroupVersionResource, error)
 	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
 	if err != nil {
-		glog.Fatalf("Failed to get group version resources: %v", err)
+		return fmt.Errorf("failed to get group version resources: %v", err)
 	}
 	for _, rsrcList := range rsrcs {
 		for ix := range rsrcList.APIResources {
@@ -412,7 +412,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	if gvrFn == nil {
 		gvr, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
 		if err != nil {
-			glog.Fatalf("Failed to get resources: %v", err)
+			return fmt.Errorf("failed to get resources: %v", err)
 		}
 		gvrFn = func() ([]schema.GroupVersionResource, error) {
 			return gvr, nil
@@ -493,7 +493,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 
 	alphaProvisioner, err := NewAlphaVolumeProvisioner(cloud, s.VolumeConfiguration)
 	if err != nil {
-		glog.Fatalf("An backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
+		return fmt.Errorf("an backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                client("persistent-volume-binder"),
@@ -518,7 +518,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 			cloud,
 			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
 	if attachDetachControllerErr != nil {
-		glog.Fatalf("Failed to start attach/detach controller: %v", attachDetachControllerErr)
+		return fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
 	go attachDetachController.Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
@@ -552,7 +552,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		gcClientset := client("generic-garbage-collector")
 		groupVersionResources, err := gcClientset.Discovery().ServerPreferredResources()
 		if err != nil {
-			glog.Fatalf("Failed to get supported resources from server: %v", err)
+			return fmt.Errorf("failed to get supported resources from server: %v", err)
 		}
 
 		config := rootClientBuilder.ConfigOrDie("generic-garbage-collector")
