@@ -297,12 +297,15 @@ func TestWatcherTimeout(t *testing.T) {
 	}
 	startVersion := strconv.Itoa(int(initialVersion))
 
-	// Create a watcher that will not be reading any result.
-	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	// Create a number of watchers that will not be reading any result.
+	nonReadingWatchers := 50
+	for i := 0; i < nonReadingWatchers; i++ {
+		watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		defer watcher.Stop()
 	}
-	defer watcher.Stop()
 
 	// Create a second watcher that will be reading result.
 	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
@@ -311,10 +314,14 @@ func TestWatcherTimeout(t *testing.T) {
 	}
 	defer readingWatcher.Stop()
 
+	startTime := time.Now()
 	for i := 1; i <= 22; i++ {
 		pod := makeTestPod(strconv.Itoa(i))
 		_ = updatePod(t, etcdStorage, pod, nil)
 		verifyWatchEvent(t, readingWatcher, watch.Added, pod)
+	}
+	if time.Since(startTime) > time.Duration(250*nonReadingWatchers)*time.Millisecond {
+		t.Errorf("waiting for events took too long: %v", time.Since(startTime))
 	}
 }
 
