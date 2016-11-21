@@ -179,7 +179,7 @@ func Run(s *options.CMServer) error {
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop)
+		err := StartControllers(s, rootClientBuilder, clientBuilder, stop)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
@@ -262,7 +262,7 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 	return allResources, nil
 }
 
-func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
+func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
 	client := func(serviceAccountName string) clientset.Interface {
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
@@ -284,7 +284,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 					return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
 				}
 			} else {
-				rootCA = kubeconfig.CAData
+				rootCA = rootClientBuilder.ConfigOrDie("tokens-controller").CAData
 			}
 
 			go serviceaccountcontroller.NewTokensController(
@@ -394,7 +394,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
 	namespaceKubeClient := client("namespace-controller")
-	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
+	namespaceClientPool := dynamic.NewClientPool(rootClientBuilder.ConfigOrDie("namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
 	var gvrFn func() ([]schema.GroupVersionResource, error)
 	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
@@ -485,8 +485,9 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	if availableResources[schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}] {
 		glog.Infof("Starting cronjob controller")
 		// TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
-		kubeconfig.ContentConfig.GroupVersion = &schema.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
-		go cronjob.NewCronJobController(client("cronjob-controller")).Run(stop)
+		cronjobConfig := rootClientBuilder.ConfigOrDie("cronjob-controller")
+		cronjobConfig.ContentConfig.GroupVersion = &schema.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
+		go cronjob.NewCronJobController(clientset.NewForConfigOrDie(cronjobConfig)).Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
@@ -554,7 +555,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 			glog.Fatalf("Failed to get supported resources from server: %v", err)
 		}
 
-		config := restclient.AddUserAgent(kubeconfig, "generic-garbage-collector")
+		config := rootClientBuilder.ConfigOrDie("generic-garbage-collector")
 		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 		metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 		config.ContentConfig = dynamic.ContentConfig()
