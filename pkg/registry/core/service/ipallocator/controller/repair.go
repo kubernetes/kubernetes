@@ -23,9 +23,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
-	"k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -47,20 +47,20 @@ import (
 // TODO: allocate new IPs if necessary
 // TODO: perform repair?
 type Repair struct {
-	interval time.Duration
-	registry service.Registry
-	network  *net.IPNet
-	alloc    rangeallocation.RangeRegistry
+	interval      time.Duration
+	serviceClient coreclient.ServicesGetter
+	network       *net.IPNet
+	alloc         rangeallocation.RangeRegistry
 }
 
 // NewRepair creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, registry service.Registry, network *net.IPNet, alloc rangeallocation.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, serviceClient coreclient.ServicesGetter, network *net.IPNet, alloc rangeallocation.RangeRegistry) *Repair {
 	return &Repair{
-		interval: interval,
-		registry: registry,
-		network:  network,
-		alloc:    alloc,
+		interval:      interval,
+		serviceClient: serviceClient,
+		network:       network,
+		alloc:         alloc,
 	}
 }
 
@@ -99,13 +99,12 @@ func (c *Repair) runOnce() error {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
 
-	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
 	// We explicitly send no resource version, since the resource version
 	// of 'latest' is from a different collection, it's not comparable to
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.registry.ListServices(ctx, nil)
+	list, err := c.serviceClient.Services(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}

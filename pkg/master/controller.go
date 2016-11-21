@@ -25,13 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/rest"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry/core/namespace"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
-	"k8s.io/kubernetes/pkg/registry/core/service"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -41,13 +38,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+const kubernetesServiceName = "kubernetes"
+
 // Controller is the controller manager for the core bootstrap Kubernetes controller
 // loops, which manage creating the "kubernetes" service, the "default" and "kube-system"
 // namespace, and provide the IP repair check on service IPs
 type Controller struct {
-	ServiceClient     coreclient.ServicesGetter
-	NamespaceRegistry namespace.Registry
-	ServiceRegistry   service.Registry
+	ServiceClient   coreclient.ServicesGetter
+	NamespaceClient coreclient.NamespacesGetter
 
 	ServiceClusterIPRegistry rangeallocation.RangeRegistry
 	ServiceClusterIPInterval time.Duration
@@ -65,6 +63,7 @@ type Controller struct {
 
 	PublicIP net.IP
 
+	// ServiceIP indicates where the kubernetes service will live.  It may not be nil.
 	ServiceIP                 net.IP
 	ServicePort               int
 	ExtraServicePorts         []api.ServicePort
@@ -76,11 +75,10 @@ type Controller struct {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter) *Controller {
+func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter, nsClient coreclient.NamespacesGetter) *Controller {
 	return &Controller{
-		ServiceClient:     serviceClient,
-		NamespaceRegistry: legacyRESTStorage.NamespaceRegistry,
-		ServiceRegistry:   legacyRESTStorage.ServiceRegistry,
+		ServiceClient:   serviceClient,
+		NamespaceClient: nsClient,
 
 		EndpointReconciler: c.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.EndpointReconcilerConfig.Interval,
@@ -119,8 +117,8 @@ func (c *Controller) Start() {
 		return
 	}
 
-	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceRegistry, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
-	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
+	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
+	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceClient, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.
 	if err := repairClusterIPs.RunOnce(); err != nil {
@@ -173,23 +171,21 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	if err := c.CreateNamespaceIfNeeded(api.NamespaceDefault); err != nil {
 		return err
 	}
-	if c.ServiceIP != nil {
-		servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
-		if err := c.CreateOrUpdateMasterServiceIfNeeded("kubernetes", c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
-			return err
-		}
-		endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-		if err := c.EndpointReconciler.ReconcileEndpoints("kubernetes", c.PublicIP, endpointPorts, reconcile); err != nil {
-			return err
-		}
+
+	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
+	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
+		return err
+	}
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
+		return err
 	}
 	return nil
 }
 
 // CreateNamespaceIfNeeded will create a namespace if it doesn't already exist
 func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
-	ctx := api.NewContext()
-	if _, err := c.NamespaceRegistry.GetNamespace(ctx, ns); err == nil {
+	if _, err := c.NamespaceClient.Namespaces().Get(ns); err == nil {
 		// the namespace already exists
 		return nil
 	}
@@ -199,7 +195,7 @@ func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 			Namespace: "",
 		},
 	}
-	err := c.NamespaceRegistry.CreateNamespace(ctx, newNs)
+	_, err := c.NamespaceClient.Namespaces().Create(newNs)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}
@@ -241,7 +237,6 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 // CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
 func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType, reconcile bool) error {
-	ctx := api.NewDefaultContext()
 	if s, err := c.ServiceClient.Services(api.NamespaceDefault).Get(serviceName); err == nil {
 		// The service already exists.
 		if reconcile {
@@ -267,9 +262,6 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			SessionAffinity: api.ServiceAffinityClientIP,
 			Type:            serviceType,
 		},
-	}
-	if err := rest.BeforeCreate(service.Strategy, ctx, svc); err != nil {
-		return err
 	}
 
 	_, err := c.ServiceClient.Services(api.NamespaceDefault).Create(svc)
