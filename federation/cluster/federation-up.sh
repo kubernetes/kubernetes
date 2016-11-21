@@ -40,7 +40,6 @@ source "${KUBE_ROOT}/federation/develop/develop.sh"
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
 HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
-
 readonly CLIENT_BIN_DIR="${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/client/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/client/bin"
 kubefed="${CLIENT_BIN_DIR}/kubefed"
 kubectl="${CLIENT_BIN_DIR}/kubectl"
@@ -79,5 +78,11 @@ function create_cluster_secrets() {
   done
 }
 
-init
-create_cluster_secrets
+USE_KUBEFED="${USE_KUBEFED:-}"
+if [[ "${USE_KUBEFED}" == "true" ]]; then
+  init
+  create_cluster_secrets
+else
+  export FEDERATION_IMAGE_TAG="$(get_version)"
+  create-federation-api-objects
+fi
