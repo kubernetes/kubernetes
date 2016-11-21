@@ -31,7 +31,7 @@ spec:
           mountPath: "/etc/federation/controller-manager"
         image: {{.FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO}}:{{.FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG}}
         command:
-        - /usr/local/bin/hyperkube
+        - /hyperkube
         - federation-controller-manager
         - --master=https://{{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}:443
         - --kubeconfig=/etc/federation/controller-manager/kubeconfig
