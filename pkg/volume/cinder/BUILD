@@ -36,6 +36,7 @@ go_library(
         "//pkg/util/exec:go_default_library",
         "//pkg/util/keymutex:go_default_library",
         "//pkg/util/mount:go_default_library",
+        "//pkg/util/net:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/cinder/drivers:go_default_library",

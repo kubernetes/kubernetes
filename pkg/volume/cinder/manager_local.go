@@ -17,8 +17,11 @@ limitations under the License.
 package cinder
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"go/build"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -31,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/cinder/drivers"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -395,22 +399,35 @@ func (cdl *cdManagerLocal) DeleteVolume(d *cinderVolumeDeleter) error {
 }
 
 func newCinderClientFromSecret(secretRef string, host volume.VolumeHost) (*gophercloud.ServiceClient, error) {
+	// Exrtact auth options from the specified secret.
 	secretNamespace, secretName := splitSecretRef(secretRef)
 	secretMap, err := util.GetSecretForPV(secretNamespace, secretName, cinderVolumePluginName, host.GetKubeClient())
 	if err != nil {
 		return nil, err
 	}
 
-	authOpts, err := newAuthOptionsFromSecret(secretMap)
+	authOpts, httpClient, err := newAuthOptionsFromSecret(secretMap)
 	if err != nil {
 		return nil, err
 	}
 
-	provider, err := openstack.AuthenticatedClient(authOpts)
+	// Create an OpenStack client and authenticate to Keystone using the extracted
+	// credentials and an optional http.Client that may carry TLS configuration
+	// (CA certificate, client certificate). Note that if provided, the specified
+	// TLS configuration will be used for both Keystone and Cinder.
+	provider, err := openstack.NewClient(authOpts.IdentityEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	if httpClient != nil {
+		provider.HTTPClient = *httpClient
+	}
+	err = openstack.Authenticate(provider, authOpts)
 	if err != nil {
 		return nil, err
 	}
 
+	// Create the Cinder v2 client from the authenticated OpenStack client.
 	client, err := openstack.NewBlockStorageV2(provider, gophercloud.EndpointOpts{})
 	if err != nil {
 		return nil, err
@@ -428,26 +445,62 @@ func splitSecretRef(secretRef string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func newAuthOptionsFromSecret(secretMap map[string]string) (gophercloud.AuthOptions, error) {
-	nilOptions := gophercloud.AuthOptions{}
+func newAuthOptionsFromSecret(secretMap map[string]string) (gophercloud.AuthOptions, *http.Client, error) {
+	var httpClient *http.Client
+	emptyOptions := gophercloud.AuthOptions{}
 
 	authURL, ok := secretMap["authURL"]
 	if !ok {
-		return nilOptions, fmt.Errorf("secret does not have the required 'authURL' key")
+		return emptyOptions, httpClient, fmt.Errorf("secret does not have the required 'authURL' key")
 	}
 
 	username, ok := secretMap["username"]
 	if !ok {
-		return nilOptions, fmt.Errorf("secret does not have the required 'username' key")
+		return emptyOptions, httpClient, fmt.Errorf("secret does not have the required 'username' key")
 	}
 
 	password, ok := secretMap["password"]
 	if !ok {
-		return nilOptions, fmt.Errorf("secret does not have the required 'password' key")
+		return emptyOptions, httpClient, fmt.Errorf("secret does not have the required 'password' key")
 	}
 
 	project := secretMap["project"]
 	domain := secretMap["domain"]
+
+	caCert := secretMap["caCert"]
+	cert := secretMap["cert"]
+	key := secretMap["key"]
+
+	if caCert != "" || (cert != "" && key != "") {
+		certificates := []tls.Certificate{}
+		caCertificates := x509.NewCertPool()
+
+		// Add CA certificate.
+		if caCert != "" {
+			ok := caCertificates.AppendCertsFromPEM([]byte(caCert))
+			if !ok {
+				return emptyOptions, httpClient, fmt.Errorf("secret has an invalid 'caCert' key")
+			}
+		}
+
+		// Add client certificate.
+		if cert != "" && key != "" {
+			certificate, err := tls.X509KeyPair([]byte(cert), []byte(key))
+			if err != nil {
+				return emptyOptions, httpClient, fmt.Errorf("secret has an invalid 'cert' or 'key' key")
+			}
+			certificates = append(certificates, certificate)
+		}
+
+		httpClient = &http.Client{
+			Transport: utilnet.SetTransportDefaults(&http.Transport{
+				TLSClientConfig: &tls.Config{
+					Certificates: certificates,
+					RootCAs:      caCertificates,
+				},
+			}),
+		}
+	}
 
 	return gophercloud.AuthOptions{
 		IdentityEndpoint: string(authURL),
@@ -455,7 +508,7 @@ func newAuthOptionsFromSecret(secretMap map[string]string) (gophercloud.AuthOpti
 		Password:         string(password),
 		TenantName:       string(project),
 		DomainName:       string(domain),
-	}, nil
+	}, httpClient, nil
 }
 
 func initializeConnection(client *gophercloud.ServiceClient, volumeID string) (drivers.ConnectionInfo, error) {
