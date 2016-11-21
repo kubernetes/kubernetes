@@ -168,15 +168,14 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	if err := c.CreateNamespaceIfNeeded(api.NamespaceDefault); err != nil {
 		return err
 	}
-	if c.ServiceIP != nil {
-		servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
-		if err := c.CreateOrUpdateMasterServiceIfNeeded("kubernetes", c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
-			return err
-		}
-		endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-		if err := c.EndpointReconciler.ReconcileEndpoints("kubernetes", c.PublicIP, endpointPorts, reconcile); err != nil {
-			return err
-		}
+
+	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
+	if err := c.CreateOrUpdateMasterServiceIfNeeded("kubernetes", c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
+		return err
+	}
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	if err := c.EndpointReconciler.ReconcileEndpoints("kubernetes", c.PublicIP, endpointPorts, reconcile); err != nil {
+		return err
 	}
 	return nil
 }
@@ -263,8 +262,8 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	}
 
 	_, err := c.ServiceClient.Services(api.NamespaceDefault).Create(svc)
-	if err != nil && errors.IsAlreadyExists(err) {
-		err = nil
+	if errors.IsAlreadyExists(err) {
+		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
 	}
 	return err
 }
