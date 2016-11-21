@@ -2404,49 +2404,71 @@ func makePod(name string, spec *api.PodSpec) *api.Pod {
 
 func TestMakeMountBindings(t *testing.T) {
 	tests := []struct {
-		mounts             []kubecontainer.Mount
-		selinux            bool
-		propagationSupport bool
-		bindings           []string
+		mounts      []kubecontainer.Mount
+		selinux     bool
+		propagation string
+		bindings    []string
 	}{
 		{
 			mounts: []kubecontainer.Mount{
 				{
-					HostPath:      "/tmp",
-					ContainerPath: "/tmp1",
-					ReadOnly:      true,
-					Propagation:   "shared",
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp1",
+					ReadOnly:        true,
+					NeedPropagation: true,
 				},
 				{
-					HostPath:       "/tmp",
-					ContainerPath:  "/tmp2",
-					ReadOnly:       false,
-					SELinuxRelabel: true,
-					Propagation:    "shared",
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp2",
+					ReadOnly:        false,
+					SELinuxRelabel:  true,
+					NeedPropagation: true,
 				},
 			},
-			selinux:            false,
-			propagationSupport: true,
+			selinux:     false,
+			propagation: "rshared",
 			bindings: []string{
-				"/tmp:/tmp1:ro,shared",
-				"/tmp:/tmp2:shared",
+				"/tmp:/tmp1:ro,rshared",
+				"/tmp:/tmp2:rshared",
 			},
 		},
 		{
 			mounts: []kubecontainer.Mount{
 				{
-					HostPath:       "/tmp",
-					ContainerPath:  "/tmp1",
-					ReadOnly:       true,
-					SELinuxRelabel: true,
-					Propagation:    "shared",
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp1",
+					ReadOnly:        true,
+					NeedPropagation: true,
+				},
+				{
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp2",
+					ReadOnly:        false,
+					SELinuxRelabel:  true,
+					NeedPropagation: true,
+				},
+			},
+			selinux:     false,
+			propagation: "rslave",
+			bindings: []string{
+				"/tmp:/tmp1:ro,rslave",
+				"/tmp:/tmp2:rslave",
+			},
+		},
+		{
+			mounts: []kubecontainer.Mount{
+				{
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp1",
+					ReadOnly:        true,
+					SELinuxRelabel:  true,
+					NeedPropagation: true,
 				},
 				{
 					HostPath:       "/tmp",
 					ContainerPath:  "/tmp2",
 					ReadOnly:       false,
 					SELinuxRelabel: true,
-					Propagation:    "shared",
 				},
 				{
 					HostPath:       "/tmp",
@@ -2455,8 +2477,8 @@ func TestMakeMountBindings(t *testing.T) {
 					SELinuxRelabel: false,
 				},
 			},
-			selinux:            true,
-			propagationSupport: false,
+			selinux:     true,
+			propagation: "",
 			bindings: []string{
 				"/tmp:/tmp1:ro,Z",
 				"/tmp:/tmp2:Z",
@@ -2465,7 +2487,7 @@ func TestMakeMountBindings(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		bindings := makeMountBindings(test.mounts, test.selinux, test.propagationSupport)
+		bindings := makeMountBindings(test.mounts, test.selinux, test.propagation)
 		if !reflect.DeepEqual(bindings, test.bindings) {
 			t.Errorf("Expected %v, got %v", test.bindings, bindings)
 		}

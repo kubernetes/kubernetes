@@ -519,7 +519,7 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
 // relabeling
-func makeMountBindings(mounts []kubecontainer.Mount, selinuxEnabled, dockerSupportPropagation bool) (result []string) {
+func makeMountBindings(mounts []kubecontainer.Mount, selinuxEnabled bool, propagation string) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		attr := make([]string, 0, 3)
@@ -531,8 +531,8 @@ func makeMountBindings(mounts []kubecontainer.Mount, selinuxEnabled, dockerSuppo
 			attr = append(attr, "Z")
 		}
 		// Propagation
-		if dockerSupportPropagation && len(m.Propagation) != 0 {
-			attr = append(attr, m.Propagation)
+		if len(propagation) > 0 && m.NeedPropagation {
+			attr = append(attr, propagation)
 		}
 		if len(attr) > 0 {
 			bind = fmt.Sprintf("%s:%s", bind, strings.Join(attr, ","))
@@ -662,7 +662,19 @@ func (dm *DockerManager) runContainer(
 		}
 	}
 
-	binds := makeMountBindings(opts.Mounts, selinux.SELinuxEnabled(), dockerNewerThanV110 >= 0)
+	// Propagation mode is set to:
+	// "" for non HostPath volumes
+	// "rshared" for HostPath volume mount in priviledged containers
+	// "rslave" for HostPath volume mount in non-priviledged containers
+	var propagation string
+	if dockerNewerThanV110 >= 0 {
+		if container.SecurityContext != nil && *container.SecurityContext.Privileged {
+			propagation = "rshared"
+		} else {
+			propagation = "rslave"
+		}
+	}
+	binds := makeMountBindings(opts.Mounts, selinux.SELinuxEnabled(), propagation)
 
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
