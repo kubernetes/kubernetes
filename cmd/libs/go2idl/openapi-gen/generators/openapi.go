@@ -57,9 +57,14 @@ func hasOpenAPITagValue(comments []string, value string) bool {
 	return false
 }
 
-func hasOptionalTag(comments []string) bool {
-	tagValues := types.ExtractCommentTags("+", comments)[tagOptional]
-	return tagValues != nil
+// hasOptionalTag returns true if the member has +optional in its comments or
+// omitempty in its json tags.
+func hasOptionalTag(m *types.Member) bool {
+	hasOptionalCommentTag := types.ExtractCommentTags(
+		"+", m.CommentLines)[tagOptional] != nil
+	hasOptionalJsonTag := strings.Contains(
+		reflect.StructTag(m.Tags).Get("json"), "omitempty")
+	return hasOptionalCommentTag || hasOptionalJsonTag
 }
 
 // NameSystems returns the name system used by the generators in this package.
@@ -288,7 +293,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			if name == "" {
 				continue
 			}
-			if !hasOptionalTag(m.CommentLines) {
+			if !hasOptionalTag(&m) {
 				required = append(required, name)
 			}
 			if err := g.generateProperty(&m); err != nil {
