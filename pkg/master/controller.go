@@ -265,8 +265,8 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	}
 
 	_, err := c.ServiceClient.Services(api.NamespaceDefault).Create(svc)
-	if err != nil && errors.IsAlreadyExists(err) {
-		err = nil
+	if errors.IsAlreadyExists(err) {
+		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
 	}
 	return err
 }
