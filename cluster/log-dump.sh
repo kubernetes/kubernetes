@@ -97,6 +97,8 @@ function copy-logs-from-node() {
     else
       case "${KUBERNETES_PROVIDER}" in
         gce|gke|kubemark)
+          # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
+          gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
           gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
           ;;
         aws)
