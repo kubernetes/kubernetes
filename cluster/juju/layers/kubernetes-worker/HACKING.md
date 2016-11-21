@@ -23,3 +23,6 @@ charm build -r
 TBD
 
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/juju/layers/kubernetes-worker/HACKING.md?pixel)]()

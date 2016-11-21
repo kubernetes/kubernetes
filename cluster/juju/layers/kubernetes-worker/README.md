@@ -50,3 +50,6 @@ re-render configuration and disrupt the worker services.
 External access to pods must be performed through a [Kubernetes
 Ingress Resource](http://kubernetes.io/docs/user-guide/ingress/). More
 information
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/juju/layers/kubernetes-worker/README.md?pixel)]()

@@ -94,3 +94,6 @@ by the containers team at Canonical.
 Canonical also offers enterprise support and customization services. Please
 refer to the [Kubernetes product page](https://www.ubuntu.com/cloud/kubernetes)
 for more details.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/juju/layers/kubernetes-master/README.md?pixel)]()

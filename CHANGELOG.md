@@ -1,4 +1,5 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [v1.5.2](#v152)
   - [Downloads for v1.5.2](#downloads-for-v152)
     - [Client Binaries](#client-binaries)
@@ -134,11 +135,10 @@
   - [Known Issues](#known-issues-1)
   - [Notable Changes to Existing Behavior](#notable-changes-to-existing-behavior-1)
     - [Deployments](#deployments)
-    - [kubectl rolling-update: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-rolling-update:-<-v140-client-vs->=v140-cluster)
-    - [kubectl delete: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-delete:-<-v140-client-vs->=v140-cluster)
+    - [kubectl rolling-update: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-rolling-update--v140-client-vs-v140-cluster)
+    - [kubectl delete: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-delete--v140-client-vs-v140-cluster)
     - [DELETE operation in REST API](#delete-operation-in-rest-api)
   - [Action Required Before Upgrading](#action-required-before-upgrading-1)
-- [optionally, remove the old secret](#optionally-remove-the-old-secret)
   - [Previous Releases Included in v1.4.0](#previous-releases-included-in-v140)
 - [v1.4.0-beta.11](#v140-beta11)
   - [Downloads](#downloads-9)
@@ -312,6 +312,7 @@
       - [Various](#various)
       - [AWS](#aws)
       - [GCE](#gce)
+
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->

@@ -42,10 +42,10 @@ This document shows how to configure Kubernetes resources to consume storage fro
 
 This document assumes you are familiar with ScaleIO and have a cluster ready to go.  If you are *not familiar* with ScaleIO, please review *Learn how to setup a 3-node* [ScaleIO cluster on Vagrant](https://github.com/codedellemc/labs/tree/master/setup-scaleio-vagrant) and see *General instructions on* [setting up ScaleIO](https://www.emc.com/products-solutions/trial-software-download/scaleio.htm)
 
-For this demonstration, ensure the followings: 
+For this demonstration, ensure the followings:
 
  - the ScaleIO `SDC` component is installed and properly configured on all Kubernetes nodes where deployed pods will consume ScaleIO-backed volumes.
- - You have a configured ScaleIO gateway that is accessible from the Kubernetes nodes. 
+ - You have a configured ScaleIO gateway that is accessible from the Kubernetes nodes.
 
 ## Deploy Kubernetes Secret for ScaleIO
 
@@ -57,6 +57,7 @@ c2lvdXNlcg==
 $> echo -n "sc@l3I0" | base64
 c2NAbDNJMA==
 ```
+
 The previous will generate `base64-encoded` values for the username and password.  Remember to generate the credentials for your own environment (not the username/password shown above) .  Next, create a secret file, with the encoded values from above, as shown in the following.
 
 File: [secret.yaml](secret.yaml)
@@ -117,8 +118,8 @@ spec:
 
 Notice the followings in the previous YAML:
 
-- Update the `gatewway` to point to your ScaleIO gateway endpoint.  
-- The `volumeName` attribute refers to the name of an existing volume in ScaleIO.  
+- Update the `gatewway` to point to your ScaleIO gateway endpoint.
+- The `volumeName` attribute refers to the name of an existing volume in ScaleIO.
 - The  `secretRef` attribute references the name of the secret object deployed earlier.
 
 Next, deploy the pod.
@@ -126,17 +127,23 @@ Next, deploy the pod.
 ```
 $> kubectl create -f examples/volumes/scaleio/pod.yaml
 ```
+
 You can verify the pod:
+
 ```
 $> kubectl get pod
 NAME      READY     STATUS    RESTARTS   AGE
 pod-0     1/1       Running   0          33s
 ```
-Or for more detail, use 
+
+Or for more detail, use
+
 ```
 kubectl describe pod pod-0
 ```
+
 You can see the attached/mapped volume on the node:
+
 ```
 $> lsblk
 NAME        MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
@@ -172,7 +179,7 @@ Note the followings:
 
 - The `name` attribute is set to `sio-small` . It will be referenced later.
 - The `provisioner` attribute is set to `kubernetes.io/scaleio` to trigger the ScaleIO plugin.
-- The use of the `parameters:` section in the yaml for configurations.  
+- The use of the `parameters:` section in the yaml for configurations.
 - The `secretRef` attribute matches the name of the Secret object created earlier.
 
 Next, deploy the storage class file.
@@ -208,18 +215,22 @@ spec:
 
 Note the `annotations:` entry which specifies annotation `volume.beta.kubernetes.io/storage-class: sio-small` which references the name of the storage class defined earlier.
 
-Next, we deploy PVC file for the storage class.  This step will cause the Kubernetes ScaleIO plugin to create the volume in the storage system.  
+Next, we deploy PVC file for the storage class.  This step will cause the Kubernetes ScaleIO plugin to create the volume in the storage system.
+
 ```
 $> kubectl create -f examples/volumes/scaleio/sc-pvc.yaml
 ```
+
 You verify that a new volume created in the ScaleIO dashboard.  You can also verify the newly created volume as follows.
+
 ```
  kubectl get pvc
 NAME            STATUS    VOLUME                                     CAPACITY   ACCESSMODES   AGE
 pvc-sio-small   Bound     pvc-5fc78518-dcae-11e6-a263-080027c990a7   10Gi       RWO           1h
 ```
 
-###Pod for PVC and SC
+### Pod for PVC and SC
+
 At this point, the volume is created (by the claim) in the storage system.  To use it, we must define a pod that references the volume as done in this YAML.
 
 File [pod-sc-pvc.yaml](pod-sc-pvc.yaml)
@@ -247,14 +258,18 @@ Notice that the `claimName:` attribute refers to the name of the PVC defined and
 ```
 $> kubectl create -f examples/volumes/scaleio/pod-sc-pvc.yaml
 ```
+
 We can now verify that the new pod is deployed OK.
+
 ```
 kubectl get pod
 NAME            READY     STATUS    RESTARTS   AGE
 pod-0           1/1       Running   0          23m
 pod-sio-small   1/1       Running   0          5s
 ```
+
 You can use the ScaleIO dashboard to verify that the new volume has one attachment.  You can verify the volume information for the pod:
+
 ```
 $> kubectl describe pod pod-sio-small
 ...
@@ -265,7 +280,9 @@ Volumes:
     ReadOnly:	false
 ...
 ```
+
 Lastly, you can see the volume's attachment on the Kubernetes node:
+
 ```
 $> lsblk
 ...
@@ -273,6 +290,7 @@ scinia      252:0    0    8G  0 disk /var/lib/kubelet/pods/135986c7-dcb7-11e6-9f
 scinib      252:16   0   16G  0 disk /var/lib/kubelet/pods/62db442e-dcba-11e6-9fbf-080027c990a7/volumes/kubernetes.io~scaleio/sio-5fc9154ddcae11e68db708002
 
 ```
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/scaleio/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

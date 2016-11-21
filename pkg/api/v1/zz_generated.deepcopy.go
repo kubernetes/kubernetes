@@ -172,6 +172,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceQuotaStatus, InType: reflect.TypeOf(&ResourceQuotaStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceRequirements, InType: reflect.TypeOf(&ResourceRequirements{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SELinuxOptions, InType: reflect.TypeOf(&SELinuxOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ScaleIOVolumeSource, InType: reflect.TypeOf(&ScaleIOVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Secret, InType: reflect.TypeOf(&Secret{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretEnvSource, InType: reflect.TypeOf(&SecretEnvSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretKeySelector, InType: reflect.TypeOf(&SecretKeySelector{})},
@@ -1945,6 +1946,13 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 			*out = new(PhotonPersistentDiskVolumeSource)
 			**out = **in
 		}
+		if in.ScaleIO != nil {
+			in, out := &in.ScaleIO, &out.ScaleIO
+			*out = new(ScaleIOVolumeSource)
+			if err := DeepCopy_v1_ScaleIOVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 }
@@ -2745,6 +2753,20 @@ func DeepCopy_v1_SELinuxOptions(in interface{}, out interface{}, c *conversion.C
 	}
 }
 
+func DeepCopy_v1_ScaleIOVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ScaleIOVolumeSource)
+		out := out.(*ScaleIOVolumeSource)
+		*out = *in
+		if in.SecretRef != nil {
+			in, out := &in.SecretRef, &out.SecretRef
+			*out = new(LocalObjectReference)
+			**out = **in
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1_Secret(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Secret)
@@ -3239,6 +3261,13 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
 			*out = new(PhotonPersistentDiskVolumeSource)
 			**out = **in
+		}
+		if in.ScaleIO != nil {
+			in, out := &in.ScaleIO, &out.ScaleIO
+			*out = new(ScaleIOVolumeSource)
+			if err := DeepCopy_v1_ScaleIOVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

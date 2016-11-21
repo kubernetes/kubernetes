@@ -1,1 +1,6 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/simple-rolling-update.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/simple-rolling-update.md)
+This file has moved to [/kubernetes/community/blob/master/contributors/design-proposals/simple-rolling-update.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/simple-rolling-update.md)
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/simple-rolling-update.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -139,3 +139,6 @@ More resources for help:
 - [Bug Tracker](https://github.com/juju-solutions/bundle-canonical-kubernetes/issues)
 - [Github Repository](https://github.com/kubernetes/kubernetes/)
 - [Mailing List](mailto:juju@lists.ubuntu.com)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/juju/layers/kubernetes-e2e/README.md?pixel)]()
