@@ -10,7 +10,6 @@ spec:
       labels:
         app: zk
       annotations:
-        pod.alpha.kubernetes.io/initialized: "true"
         pod.alpha.kubernetes.io/init-containers: '[
             {
                 "name": "install",
