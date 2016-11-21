@@ -469,3 +469,18 @@ func GetPVCMatchExpression(pvc *v1.PersistentVolumeClaim, key string, operator m
 	}
 	return ret, nil
 }
+
+// RegionsToZones converts a set of regions to a set of zones
+// Currently cloud providers do not provide a func RegionToZone that will return all zones that are available in a given region.
+// Thats why the func RegionsToZones goes through allAvailableZones and checks if the zone is in any of the being converted regions.
+func RegionsToZones(regions, allAvailableZones sets.String, zoneToRegion func(string) (string, error)) (sets.String, error) {
+	zones := make(sets.String)
+	for candidate := range allAvailableZones {
+		if candidatesRegion, err := zoneToRegion(candidate); err != nil {
+			return make(sets.String), fmt.Errorf("failed to convert zone (%v) to a region: %v", candidate, err)
+		} else if regions.Has(candidatesRegion) {
+			zones.Insert(candidate)
+		}
+	}
+	return zones, nil
+}
