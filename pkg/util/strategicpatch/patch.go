@@ -293,10 +293,46 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 
 	if !ignoreDeletions {
 		// Add nils for deleted values
-		for key := range original {
+		for key, originalValue := range original {
 			_, found := modified[key]
 			if !found {
-				patch[key] = nil
+				switch originalValueTyped := originalValue.(type) {
+				// If the user delete a field in a list with merge strategy, we only delete the data created by user and keep
+				// the other changes (that may be created by controller). So we create a list of deletion instead of a nil.
+				case []interface{}:
+					fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, key)
+					if err != nil {
+						return nil, err
+					}
+					if fieldPatchStrategy == mergeDirective {
+						elementType, err := sliceElementType(originalValueTyped)
+						if err != nil {
+							return nil, err
+						}
+
+						if elementType.Kind() == reflect.Map {
+							if fieldPatchStrategy == mergeDirective {
+								patchForListOfMaps, err := diffListsOfMaps(originalValueTyped, []interface{}{}, fieldType.Elem(), fieldPatchMergeKey, ignoreChangesAndAdditions, ignoreDeletions, smPatchVersion)
+								if err != nil {
+									return patch, err
+								}
+								patch[key] = patchForListOfMaps
+							}
+						} else if elementType.Kind() != reflect.Slice {
+							patchForListOfScalars, err := diffListsOfScalars(originalValueTyped, []interface{}{}, ignoreChangesAndAdditions, ignoreDeletions, smPatchVersion)
+							if err != nil {
+								return patch, err
+							}
+							patch[key] = patchForListOfScalars
+						} else {
+							patch[key] = nil
+						}
+					} else {
+						patch[key] = nil
+					}
+				default:
+					patch[key] = nil
+				}
 			}
 		}
 	}
@@ -692,13 +728,19 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 				continue
 			}
 
+			// For lists with merge strategy, we don't keep an empty list when there are no entries after merging.
 			if originalType.Kind() == reflect.Slice && fieldPatchStrategy == mergeDirective {
 				elemType := fieldType.Elem()
 				typedOriginal := original[k].([]interface{})
 				var err error
-				original[k], err = mergeSlice(typedOriginal, patchV, elemType, fieldPatchMergeKey)
+				mergedSlice, err := mergeSlice(typedOriginal, patchV, elemType, fieldPatchMergeKey)
 				if err != nil {
 					return nil, err
+				}
+				if len(mergedSlice) != 0 {
+					original[k] = mergedSlice
+				} else {
+					delete(original, k)
 				}
 
 				continue

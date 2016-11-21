@@ -325,7 +325,7 @@ mergingList:
   - $patch: replace
 `),
 				Modified: []byte(`
-mergingList: []
+{}
 `),
 			},
 		},
@@ -339,7 +339,7 @@ mergingList: []
 mergingList: []
 `),
 				Modified: []byte(`
-mergingList: []
+{}
 `),
 			},
 		},
@@ -835,6 +835,41 @@ mergingIntList:
   - 2
   - 3
   - 4
+`),
+			},
+		},
+		{
+			Description: "delete all entries of a list of scalars for list of primitives",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+				TwoWay: []byte(`
+mergingIntList:
+  $patch: mergeprimitiveslist
+  "1": null
+  "2": null
+`),
+				Modified: []byte(`
+{}
+`),
+				Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+				ThreeWay: []byte(`
+mergingIntList:
+  $patch: mergeprimitiveslist
+  "1": null
+  "2": null
+`),
+				Result: []byte(`
+mergingIntList:
+  - 3
 `),
 			},
 		},
@@ -1539,7 +1574,7 @@ mergingList:
     $patch: delete
 `),
 				Modified: []byte(`
-mergingList: []
+{}
 `),
 				Current: []byte(`
 mergingList:
@@ -1554,7 +1589,7 @@ mergingList:
     $patch: delete
 `),
 				Result: []byte(`
-mergingList: []
+{}
 `),
 			},
 		},
@@ -1574,7 +1609,7 @@ mergingList:
     $patch: delete
 `),
 				Modified: []byte(`
-mergingList: []
+{}
 `),
 				Current: []byte(`
 mergingList:
@@ -1591,7 +1626,44 @@ mergingList:
     $patch: delete
 `),
 				Result: []byte(`
-mergingList: []
+{}
+`),
+			},
+		},
+		{
+			Description: "delete all user created maps from merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+    $patch: delete
+`),
+				Modified: []byte(`
+{}
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+  - name: 3
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+    $patch: delete
+`),
+				Result: []byte(`
+mergingList:
+  - name: 3
 `),
 			},
 		},
@@ -1611,7 +1683,7 @@ mergingList:
     $patch: delete
 `),
 				Modified: []byte(`
-mergingList: []
+{}
 `),
 				Current: []byte(`
 mergingList: []
@@ -1624,7 +1696,7 @@ mergingList:
     $patch: delete
 `),
 				Result: []byte(`
-mergingList: []
+{}
 `),
 			},
 		},
