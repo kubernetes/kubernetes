@@ -891,7 +891,7 @@ func DeepCopy_v1beta1_NetworkPolicyIngressRule(in interface{}, out interface{}, 
 		out := out.(*NetworkPolicyIngressRule)
 		if in.Ports != nil {
 			in, out := &in.Ports, &out.Ports
-			*out = make([]NetworkPolicyPort, len(*in))
+			*out = make(NetworkPolicyPorts, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1beta1_NetworkPolicyPort(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
@@ -902,7 +902,7 @@ func DeepCopy_v1beta1_NetworkPolicyIngressRule(in interface{}, out interface{}, 
 		}
 		if in.From != nil {
 			in, out := &in.From, &out.From
-			*out = make([]NetworkPolicyPeer, len(*in))
+			*out = make(NetworkPolicyPeers, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1beta1_NetworkPolicyPeer(&(*in)[i], &(*out)[i], c); err != nil {
 					return err

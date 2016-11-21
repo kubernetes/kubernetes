@@ -1239,8 +1239,8 @@ func Convert_v1beta1_NetworkPolicyIngressRule_To_extensions_NetworkPolicyIngress
 }
 
 func autoConvert_extensions_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(in *extensions.NetworkPolicyIngressRule, out *NetworkPolicyIngressRule, s conversion.Scope) error {
-	out.Ports = *(*[]NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
-	out.From = *(*[]NetworkPolicyPeer)(unsafe.Pointer(&in.From))
+	out.Ports = *(*NetworkPolicyPorts)(unsafe.Pointer(&in.Ports))
+	out.From = *(*NetworkPolicyPeers)(unsafe.Pointer(&in.From))
 	return nil
 }
 

@@ -15653,13 +15653,11 @@ func (x *NetworkPolicyIngressRule) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq1318 [2]bool
 			_, _, _ = yysep1318, yyq1318, yy2arr1318
 			const yyr1318 bool = false
-			yyq1318[0] = len(x.Ports) != 0
-			yyq1318[1] = len(x.From) != 0
 			var yynn1318 int
 			if yyr1318 || yy2arr1318 {
 				r.EncodeArrayStart(2)
 			} else {
-				yynn1318 = 0
+				yynn1318 = 2
 				for _, b := range yyq1318 {
 					if b {
 						yynn1318++
@@ -15670,67 +15668,55 @@ func (x *NetworkPolicyIngressRule) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr1318 || yy2arr1318 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq1318[0] {
-					if x.Ports == nil {
-						r.EncodeNil()
-					} else {
-						yym1320 := z.EncBinary()
-						_ = yym1320
-						if false {
-						} else {
-							h.encSliceNetworkPolicyPort(([]NetworkPolicyPort)(x.Ports), e)
-						}
-					}
-				} else {
+				if x.Ports == nil {
 					r.EncodeNil()
+				} else {
+					yym1320 := z.EncBinary()
+					_ = yym1320
+					if false {
+					} else {
+						h.encSliceNetworkPolicyPort(([]NetworkPolicyPort)(x.Ports), e)
+					}
 				}
 			} else {
-				if yyq1318[0] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("ports"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.Ports == nil {
-						r.EncodeNil()
+				z.EncSendContainerState(codecSelfer_containerMapKey1234)
+				r.EncodeString(codecSelferC_UTF81234, string("ports"))
+				z.EncSendContainerState(codecSelfer_containerMapValue1234)
+				if x.Ports == nil {
+					r.EncodeNil()
+				} else {
+					yym1321 := z.EncBinary()
+					_ = yym1321
+					if false {
 					} else {
-						yym1321 := z.EncBinary()
-						_ = yym1321
-						if false {
-						} else {
-							h.encSliceNetworkPolicyPort(([]NetworkPolicyPort)(x.Ports), e)
-						}
+						h.encSliceNetworkPolicyPort(([]NetworkPolicyPort)(x.Ports), e)
 					}
 				}
 			}
 			if yyr1318 || yy2arr1318 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq1318[1] {
-					if x.From == nil {
-						r.EncodeNil()
-					} else {
-						yym1323 := z.EncBinary()
-						_ = yym1323
-						if false {
-						} else {
-							h.encSliceNetworkPolicyPeer(([]NetworkPolicyPeer)(x.From), e)
-						}
-					}
-				} else {
+				if x.From == nil {
 					r.EncodeNil()
+				} else {
+					yym1323 := z.EncBinary()
+					_ = yym1323
+					if false {
+					} else {
+						h.encSliceNetworkPolicyPeer(([]NetworkPolicyPeer)(x.From), e)
+					}
 				}
 			} else {
-				if yyq1318[1] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("from"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.From == nil {
-						r.EncodeNil()
+				z.EncSendContainerState(codecSelfer_containerMapKey1234)
+				r.EncodeString(codecSelferC_UTF81234, string("from"))
+				z.EncSendContainerState(codecSelfer_containerMapValue1234)
+				if x.From == nil {
+					r.EncodeNil()
+				} else {
+					yym1324 := z.EncBinary()
+					_ = yym1324
+					if false {
 					} else {
-						yym1324 := z.EncBinary()
-						_ = yym1324
-						if false {
-						} else {
-							h.encSliceNetworkPolicyPeer(([]NetworkPolicyPeer)(x.From), e)
-						}
+						h.encSliceNetworkPolicyPeer(([]NetworkPolicyPeer)(x.From), e)
 					}
 				}
 			}
