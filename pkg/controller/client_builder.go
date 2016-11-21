@@ -51,7 +51,7 @@ type SimpleControllerClientBuilder struct {
 
 func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	clientConfig := *b.ClientConfig
-	return &clientConfig, nil
+	return restclient.AddUserAgent(&clientConfig, name), nil
 }
 
 func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
@@ -67,7 +67,7 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 	if err != nil {
 		return nil, err
 	}
-	return clientset.NewForConfig(restclient.AddUserAgent(clientConfig, name))
+	return clientset.NewForConfig(clientConfig)
 }
 
 func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
