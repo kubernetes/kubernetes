@@ -717,3 +717,93 @@ func TestGetPVCMatchExpression(t *testing.T) {
 		}
 	}
 }
+
+func mockZone2Region(zone string) (string, error) {
+	if len(zone) < 1 {
+		return "", fmt.Errorf("Zone must not be an empty string")
+	}
+	return zone[:len(zone)-1], nil
+}
+
+func TestRegions2Zones(t *testing.T) {
+	functionUnderTest := "Regions2Zones"
+	// First part: want no error
+	tests := []struct {
+		input Regions2ZonesParams
+		want  sets.String
+	}{
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{},
+				AllAvailableZones: sets.String{},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}, "us-east-2a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}},
+				AllAvailableZones: sets.String{},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{},
+		},
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}, "us-east-3": sets.Empty{}},
+				AllAvailableZones: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-1c": sets.Empty{}, "us-east-2a": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-1c": sets.Empty{}},
+		},
+	}
+	for _, tt := range tests {
+		if got, err := Regions2Zones(tt.input); err != nil {
+			t.Errorf("%v(%v) returned (%v, %v) want (%v, %v)", functionUnderTest, tt.input, got, err.Error(), tt.want, nil)
+		} else if !got.Equal(tt.want) {
+			t.Errorf("%v(%v) returned (%v, %v) want (%v, %v)", functionUnderTest, tt.input, got, err, tt.want, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []struct {
+		input Regions2ZonesParams
+	}{
+		{
+			input: Regions2ZonesParams{
+				Regions:           sets.String{"us-east-1": sets.Empty{}},
+				AllAvailableZones: sets.String{"": sets.Empty{}},
+				Zone2region:       mockZone2Region,
+			},
+		},
+	}
+	for _, errCase := range errCases {
+		if got, err := Regions2Zones(errCase.input); err == nil {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase.input, got, err, "", "an error")
+		}
+	}
+}
