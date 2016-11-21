@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/watch"
 )
@@ -30,15 +30,15 @@ import (
 func TestMutationDetector(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	lw := &testLW{
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 			return fakeWatch, nil
 		},
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return &api.PodList{}, nil
+		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			return &v1.PodList{}, nil
 		},
 	}
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:   "anything",
 			Labels: map[string]string{"check": "foo"},
 		},
@@ -48,7 +48,7 @@ func TestMutationDetector(t *testing.T) {
 	addReceived := make(chan bool)
 	mutationFound := make(chan bool)
 
-	informer := NewSharedInformer(lw, &api.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 	informer.cacheMutationDetector = &defaultCacheMutationDetector{
 		name:   "name",
 		period: 1 * time.Second,

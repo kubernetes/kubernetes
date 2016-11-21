@@ -20,6 +20,7 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
@@ -32,7 +33,7 @@ type FakeDiscovery struct {
 func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
 	action := testing.ActionImpl{
 		Verb:     "get",
-		Resource: unversioned.GroupVersionResource{Resource: "resource"},
+		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
 	c.Invokes(action, nil)
 	return c.Resources[groupVersion], nil
@@ -41,17 +42,17 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*un
 func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceList, error) {
 	action := testing.ActionImpl{
 		Verb:     "get",
-		Resource: unversioned.GroupVersionResource{Resource: "resource"},
+		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
 	c.Invokes(action, nil)
 	return c.Resources, nil
 }
 
-func (c *FakeDiscovery) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+func (c *FakeDiscovery) ServerPreferredResources() ([]schema.GroupVersionResource, error) {
 	return nil, nil
 }
 
-func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]schema.GroupVersionResource, error) {
 	return nil, nil
 }
 
@@ -62,20 +63,20 @@ func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
 func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
-	action.Resource = unversioned.GroupVersionResource{Resource: "version"}
+	action.Resource = schema.GroupVersionResource{Resource: "version"}
 
 	c.Invokes(action, nil)
 	versionInfo := version.Get()
 	return &versionInfo, nil
 }
 
-func (c *FakeDiscovery) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
 	if version == v1.SchemeGroupVersion {
-		action.Resource = unversioned.GroupVersionResource{Resource: "/swaggerapi/api/" + version.Version}
+		action.Resource = schema.GroupVersionResource{Resource: "/swaggerapi/api/" + version.Version}
 	} else {
-		action.Resource = unversioned.GroupVersionResource{Resource: "/swaggerapi/apis/" + version.Group + "/" + version.Version}
+		action.Resource = schema.GroupVersionResource{Resource: "/swaggerapi/apis/" + version.Group + "/" + version.Version}
 	}
 
 	c.Invokes(action, nil)

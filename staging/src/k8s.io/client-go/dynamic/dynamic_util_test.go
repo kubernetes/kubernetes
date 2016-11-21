@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 func TestDiscoveryRESTMapper(t *testing.T) {
@@ -36,7 +37,7 @@ func TestDiscoveryRESTMapper(t *testing.T) {
 		},
 	}
 
-	gvk := unversioned.GroupVersionKind{
+	gvk := schema.GroupVersionKind{
 		Group:   "test",
 		Version: "beta1",
 		Kind:    "test_kind",
@@ -47,7 +48,7 @@ func TestDiscoveryRESTMapper(t *testing.T) {
 		t.Fatalf("unexpected error creating mapper: %s", err)
 	}
 
-	for _, res := range []unversioned.GroupVersionResource{
+	for _, res := range []schema.GroupVersionResource{
 		{
 			Group:    "test",
 			Version:  "beta1",

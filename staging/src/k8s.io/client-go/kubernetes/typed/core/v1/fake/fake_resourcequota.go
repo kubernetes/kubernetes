@@ -18,9 +18,9 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	labels "k8s.io/client-go/pkg/labels"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
@@ -31,7 +31,7 @@ type FakeResourceQuotas struct {
 	ns   string
 }
 
-var resourcequotasResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "resourcequotas"}
+var resourcequotasResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "resourcequotas"}
 
 func (c *FakeResourceQuotas) Create(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
 	obj, err := c.Fake.

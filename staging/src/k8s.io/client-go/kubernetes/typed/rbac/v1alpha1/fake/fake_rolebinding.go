@@ -18,10 +18,10 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	labels "k8s.io/client-go/pkg/labels"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
@@ -32,7 +32,7 @@ type FakeRoleBindings struct {
 	ns   string
 }
 
-var rolebindingsResource = unversioned.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "rolebindings"}
+var rolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "rolebindings"}
 
 func (c *FakeRoleBindings) Create(roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
 	obj, err := c.Fake.

@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/pkg/api/meta/metatypes"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/types"
 )
 
@@ -143,7 +144,7 @@ type RESTMapping struct {
 	// Resource is a string representing the name of this resource as a REST client would see it
 	Resource string
 
-	GroupVersionKind unversioned.GroupVersionKind
+	GroupVersionKind schema.GroupVersionKind
 
 	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
 	Scope RESTScope
@@ -163,21 +164,21 @@ type RESTMapping struct {
 // TODO: split into sub-interfaces
 type RESTMapper interface {
 	// KindFor takes a partial resource and returns the single match.  Returns an error if there are multiple matches
-	KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error)
+	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
 
 	// KindsFor takes a partial resource and returns the list of potential kinds in priority order
-	KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error)
+	KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error)
 
 	// ResourceFor takes a partial resource and returns the single match.  Returns an error if there are multiple matches
-	ResourceFor(input unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error)
+	ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error)
 
 	// ResourcesFor takes a partial resource and returns the list of potential resource in priority order
-	ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error)
+	ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error)
 
 	// RESTMapping identifies a preferred resource mapping for the provided group kind.
-	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
+	RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error)
 	// RESTMappings returns all resource mappings for the provided group kind.
-	RESTMappings(gk unversioned.GroupKind) ([]*RESTMapping, error)
+	RESTMappings(gk schema.GroupKind) ([]*RESTMapping, error)
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)

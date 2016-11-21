@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/pkg/apimachinery/registered"
 	"k8s.io/client-go/pkg/labels"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/runtime/serializer/streaming"
 	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/client-go/pkg/util/diff"
@@ -270,8 +271,8 @@ func TestRequestURI(t *testing.T) {
 
 type NotAnAPIObject struct{}
 
-func (obj NotAnAPIObject) GroupVersionKind() *unversioned.GroupVersionKind       { return nil }
-func (obj NotAnAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj NotAnAPIObject) GroupVersionKind() *schema.GroupVersionKind       { return nil }
+func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
 func defaultContentConfig() ContentConfig {
 	return ContentConfig{
@@ -327,7 +328,7 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
-	r := NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "test"}}, Serializers{}, nil, nil)
+	r := NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil)
 	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
 	full := r.URL()
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
@@ -1412,7 +1413,7 @@ func TestAbsPath(t *testing.T) {
 		{"/p1/api/p2", "/api/r1", "/api/", "/p1/api/p2/api/"},
 	} {
 		u, _ := url.Parse("http://localhost:123" + tc.configPrefix)
-		r := NewRequest(nil, "POST", u, "", ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
+		r := NewRequest(nil, "POST", u, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
 		if r.pathPrefix != tc.wantsAbsPath {
 			t.Errorf("test case %d failed, unexpected path: %q, expected %q", i, r.pathPrefix, tc.wantsAbsPath)
 		}
@@ -1432,7 +1433,7 @@ func TestUintParam(t *testing.T) {
 
 	for _, item := range table {
 		u, _ := url.Parse("http://localhost")
-		r := NewRequest(nil, "GET", u, "", ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).AbsPath("").UintParam(item.name, item.testVal)
+		r := NewRequest(nil, "GET", u, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).AbsPath("").UintParam(item.name, item.testVal)
 		if e, a := item.expectStr, r.URL().String(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
