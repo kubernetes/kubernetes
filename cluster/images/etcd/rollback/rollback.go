@@ -39,7 +39,6 @@ import (
 	"github.com/coreos/etcd/wal"
 	"github.com/coreos/etcd/wal/walpb"
 	"github.com/golang/glog"
-	wal237 "k8s.io/kubernetes/cluster/images/etcd/rollback/etcd/wal"
 )
 
 const rollbackVersion = "2.3.7"
@@ -116,7 +115,7 @@ func main() {
 	}
 	walDir := path.Join(*migrateDatadir, "member", "wal")
 
-	w, err := wal237.Create(walDir, metadata)
+	w, err := wal.Create(walDir, metadata)
 	if err != nil {
 		glog.Fatal(err)
 	}
