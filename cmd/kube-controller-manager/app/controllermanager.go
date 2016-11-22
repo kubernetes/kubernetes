@@ -221,6 +221,8 @@ func Run(s *options.CMServer) error {
 	panic("unreachable")
 }
 
+// TODO: In general, any controller checking this needs to be dynamic so
+//  users don't have to restart their controller manager if they change the apiserver.
 func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[unversioned.GroupVersionResource]bool, error) {
 	var discoveryClient discovery.DiscoveryInterface
 
@@ -246,12 +248,12 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 	}
 
 	allResources := map[unversioned.GroupVersionResource]bool{}
-	for _, apiResource := range resourceMap {
-		version, err := unversioned.ParseGroupVersion(apiResource.GroupVersion)
+	for _, apiResourceList := range resourceMap {
+		version, err := unversioned.ParseGroupVersion(apiResourceList.GroupVersion)
 		if err != nil {
 			return nil, err
 		}
-		for _, apiResource := range apiResource.APIResources {
+		for _, apiResource := range apiResourceList.APIResources {
 			allResources[version.WithResource(apiResource.Name)] = true
 		}
 	}
@@ -447,7 +449,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	}
 
 	if availableResources[unversioned.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
-		glog.Infof("Starting horizontal pod controller.")
+		glog.Infof("Starting horizontal pod autoscaler controller.")
 		hpaClient := client("horizontal-pod-autoscaler")
 		metricsClient := metrics.NewHeapsterMetricsClient(
 			hpaClient,
@@ -481,10 +483,9 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 	if availableResources[unversioned.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}] {
 		glog.Infof("Starting cronjob controller")
-		// // TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
+		// TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
 		kubeconfig.ContentConfig.GroupVersion = &unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
-		go cronjob.NewCronJobController(client("cronjob-controller")).
-			Run(stop)
+		go cronjob.NewCronJobController(client("cronjob-controller")).Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
