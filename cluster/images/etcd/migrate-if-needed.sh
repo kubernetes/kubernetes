@@ -232,12 +232,20 @@ if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
   mkdir -p "${ROLLBACK_BACKUP_DIR}"
   cp -r "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
   rm -rf "${DATA_DIRECTORY}"/member/snap/*.snap
+
+  ROLLBACK_TARGET_DIR="${DATA_DIRECTORY}.rollback"
+  rm -rf "${ROLLBACK_TARGET_DIR}"
+  mkdir -p "${ROLLBACK_TARGET_DIR}"
   echo "Performing etcd3 -> etcd2 rollback"
-  ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
+  ${ROLLBACK} "${ROLLBACK_TARGET_DIR}" --data-dir="${DATA_DIRECTORY}"
   if [ "$?" -ne "0" ]; then
     echo "Rollback to etcd2 failed"
     exit 1
   fi
+
+  rm -rf "${DATA_DIRECTORY}"
+  mv "${ROLLBACK_TARGET_DIR}" "${DATA_DIRECTORY}"
+
   CURRENT_STORAGE="etcd2"
   CURRENT_VERSION="2.3.7"
   echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
