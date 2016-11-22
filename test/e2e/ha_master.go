@@ -64,7 +64,7 @@ func createNewRC(c clientset.Interface, ns string, name string) {
 func verifyNumberOfMasterReplicas(expected int) {
 	output, err := exec.Command("gcloud", "compute", "instances", "list",
 		"--project="+framework.TestContext.CloudConfig.ProjectID,
-		"--regexp="+framework.TestContext.CloudConfig.MasterName+"(-...)?",
+		"--regexp="+framework.GenerateMasterRegexp(framework.TestContext.CloudConfig.MasterName),
 		"--filter=status=RUNNING",
 		"--format=[no-heading]").CombinedOutput()
 	framework.Logf("%s", output)

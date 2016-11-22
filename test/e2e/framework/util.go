@@ -4011,6 +4011,10 @@ func WaitForClusterSize(c clientset.Interface, size int, timeout time.Duration) 
 	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
 }
 
+func GenerateMasterRegexp(prefix string) string {
+	return prefix + "(-...)?"
+}
+
 // waitForMasters waits until the cluster has the desired number of ready masters in it.
 func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
@@ -4022,7 +4026,7 @@ func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 
 		// Filter out nodes that are not master replicas
 		FilterNodes(nodes, func(node api.Node) bool {
-			res, err := regexp.Match(masterPrefix+"(-...)?", ([]byte)(node.Name))
+			res, err := regexp.Match(GenerateMasterRegexp(masterPrefix), ([]byte)(node.Name))
 			if err != nil {
 				Logf("Failed to match regexp to node name: %v", err)
 				return false
