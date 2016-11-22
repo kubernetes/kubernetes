@@ -8680,7 +8680,7 @@ func newNodeNameEndpoint(nodeName string) *api.Endpoints {
 }
 
 func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
-	oldEndpoint := newNodeNameEndpoint("kubernetes-minion-setup-by-backend")
+	oldEndpoint := newNodeNameEndpoint("kubernetes-node-setup-by-backend")
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
 	// Check that NodeName cannot be changed during update (if already set)
 	errList := ValidateEndpoints(updatedEndpoint)

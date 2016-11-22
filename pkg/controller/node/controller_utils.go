@@ -179,7 +179,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	node := nodeObj.(*api.Node)
 	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
-		glog.V(0).Infof("couldn't parse verions %q of minion: %v", node.Status.NodeInfo.KubeletVersion, err)
+		glog.V(0).Infof("couldn't parse verions %q of node: %v", node.Status.NodeInfo.KubeletVersion, err)
 		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
