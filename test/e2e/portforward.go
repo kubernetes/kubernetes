@@ -325,6 +325,129 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			verifyLogMessage(logOutput, "Done")
 		})
 	})
+
+	framework.KubeDescribe("With a server that half-closes connections", func() {
+		readAllAndSend := func(steps, fromServer, toServer string) func() {
+			return func() {
+				// DEBUG DEBUG DEBUG
+				defer func() { time.Sleep(time.Second * 15) }()
+
+				pod, cmd, conn, err := startPodAndPortForward(steps, toServer, "", "", "")
+				if err != nil {
+					framework.Failf("Failed to launch test pod: %v", err)
+				}
+				defer printLogs(pod.Name)
+				defer conn.Close()
+				defer cmd.Stop()
+
+				By("Reading all data from the local port")
+				received, err := ioutil.ReadAll(conn)
+				if err != nil {
+					framework.Failf("Unexpected error reading data from the server: %v", err)
+				}
+				if got, expected := string(received), fromServer; got != expected {
+					framework.Failf("Unexpected data received: got=%q expected=%q", got, expected)
+				}
+
+				By(fmt.Sprintf("Sending %s to the local port", toServer))
+				n, err := conn.Write([]byte(toServer))
+				if err != nil {
+					framework.Failf("Failed to send %q: %v", toServer, err)
+				}
+				if n != len(toServer) {
+					framework.Failf("Failed to send %d bytes of %q, sent=%d", len(toServer), n)
+				}
+
+				By("Closing write channel")
+				conn.CloseWrite()
+
+				By("Waiting for the target pod to stop running")
+				if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
+					framework.Failf("Pod did not stop running: %v", err)
+				}
+				pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name)
+				if err != nil {
+					framework.Failf("Failed to get terminated pod: %v", err)
+				}
+				if pod.Status.Phase != api.PodSucceeded {
+					framework.Failf("Expected pod to succeed, got: %v", pod.Status.Phase)
+				}
+
+				By("Verifying logs")
+				logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+				if err != nil {
+					framework.Failf("Error retrieving pod logs: %v", err)
+				}
+				verifyLogMessage(logOutput, "Accepted client connection")
+				verifyLogMessage(logOutput, fmt.Sprintf("Received: %q", toServer))
+				verifyLogMessage(logOutput, "Done")
+			}
+		}
+
+		sendReadAllAndSendWithError := func(steps, fromServer, toServer1, toServer2 string) func() {
+			return func() {
+				pod, cmd, conn, err := startPodAndPortForward(steps, toServer1, "", "", "")
+				if err != nil {
+					framework.Failf("Failed to launch test pod: %v", err)
+				}
+				defer printLogs(pod.Name)
+				defer conn.Close()
+				defer cmd.Stop()
+
+				By("Sending data to the local port")
+				n, err := conn.Write([]byte(toServer1))
+				if err != nil {
+					framework.Failf("Failed to send %q: %v", toServer1, err)
+				}
+				if n != len(toServer1) {
+					framework.Failf("Failed to send %d bytes of %q, sent=%d", len(toServer1), n)
+				}
+
+				By("Reading all data from the local port")
+				received, err := ioutil.ReadAll(conn)
+				if err != nil {
+					framework.Failf("Unexpected error reading data from the server: %v", err)
+				}
+				if got, expected := string(received), fromServer; got != expected {
+					framework.Failf("Unexpected data received: got=%q expected=%q", got, expected)
+				}
+
+				By("Sending data to the local port")
+				n, err = conn.Write([]byte(toServer2))
+				if err == nil {
+					framework.Failf("Unexpected success sending data %q: %d bytes", toServer2, n)
+				}
+
+				By("Waiting for the target pod to stop running")
+				if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
+					framework.Failf("Pod did not stop running: %v", err)
+				}
+				pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name)
+				if err != nil {
+					framework.Failf("Failed to get terminated pod: %v", err)
+				}
+				if pod.Status.Phase != api.PodSucceeded {
+					framework.Failf("Expected pod to succeed, got: %v", pod.Status.Phase)
+				}
+
+				By("Verifying logs")
+				logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+				if err != nil {
+					framework.Failf("Error retrieving pod logs: %v", err)
+				}
+				verifyLogMessage(logOutput, "Accepted client connection")
+				verifyLogMessage(logOutput, fmt.Sprintf("Received: %q", toServer1))
+				verifyLogMessage(logOutput, "Done")
+			}
+		}
+
+		It("should support a client that connects, waits for hello, sends data, and half-closes channel", readAllAndSend("send-hello,close-write,receive-all", "hello", "abc"))
+		It("should support a client that connects, waits for half-closed channel, sends data, and half-closes channel", readAllAndSend("close-write,receive-all", "", "abc"))
+		It("should support a client that connects, waits for half-closed channel, sends nothing, and half-closes channel", readAllAndSend("close-write,receive-all", "", ""))
+
+		It("should support a client that connects, sends 1st string, waits for half-closed channel, sends 2nd string, and expects error", sendReadAllAndSendWithError("receive-expected,close-read,send-hello,close-write", "hello", "abc", "def"))
+		It("should support a client that connects, sends nothing, receives data, waits for half-closed channel, sends a string, and expects error", sendReadAllAndSendWithError("receive-expected,close-read,send-hello,close-write", "hello", "", "def"))
+	})
 })
 
 func verifyLogMessage(log, expected string) {
