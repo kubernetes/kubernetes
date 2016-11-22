@@ -65,6 +65,19 @@ const (
 
 	// Ingress class annotation defined in ingress repository.
 	ingressClass = "kubernetes.io/ingress.class"
+
+	// all cloud resources created by the ingress controller start with this
+	// prefix.
+	k8sPrefix = "k8s-"
+
+	// clusterDelimiter is the delimiter used by the ingress controller
+	// to split uid from other naming/metadata.
+	clusterDelimiter = "--"
+
+	// Cloud resources created by the ingress controller older than this
+	// are automatically purged to prevent running out of quota.
+	// TODO(37335): write soak tests and bump this up to a week.
+	maxAge = -48 * time.Hour
 )
 
 type testJig struct {
@@ -310,32 +323,40 @@ func describeIng(ns string) {
 }
 
 func cleanupGCE(gceController *GCEIngressController) {
-	if pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+	pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
 		if err := gceController.Cleanup(false); err != nil {
 			framework.Logf("Still waiting for glbc to cleanup:\n%v", err)
 			return false, nil
 		}
 		return true, nil
-	}); pollErr != nil {
-		warning := fmt.Sprintf("No reasources leaked.")
-		if cleanupErr := gceController.Cleanup(true); cleanupErr != nil {
-			warning = fmt.Sprintf("WARNING: Leaked resources: %v\n", cleanupErr)
-		}
-		framework.Failf("L7 controller failed to delete all cloud resources on time. %v", warning)
+	})
+	// Always try to cleanup even if pollErr == nil, because the cleanup
+	// routine also purges old leaked resources based on creation timestamp.
+	if cleanupErr := gceController.Cleanup(true); cleanupErr != nil {
+		By(fmt.Sprintf("WARNING: possibly leaked resources: %v\n", cleanupErr))
+	} else {
+		By("No resources leaked.")
+	}
+	if pollErr != nil {
+		framework.Failf("L7 controller failed to delete all cloud resources on time. %v", pollErr)
 	}
 }
 
 func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 	msg := ""
 	fwList := []compute.ForwardingRule{}
-	for _, regex := range []string{fmt.Sprintf("k8s-fw-.*--%v", cont.UID), fmt.Sprintf("k8s-fws-.*--%v", cont.UID)} {
+	for _, regex := range []string{fmt.Sprintf("%vfw-.*%v.*", k8sPrefix, clusterDelimiter), fmt.Sprintf("%vfws-.*%v.*", k8sPrefix, clusterDelimiter)} {
 		gcloudList("forwarding-rules", regex, cont.cloud.ProjectID, &fwList)
-		if len(fwList) != 0 {
-			for _, f := range fwList {
-				msg += fmt.Sprintf("%v (forwarding rule)\n", f.Name)
-				if del {
-					gcloudDelete("forwarding-rules", f.Name, cont.cloud.ProjectID, "--global")
-				}
+		if len(fwList) == 0 {
+			continue
+		}
+		for _, f := range fwList {
+			if !cont.canDelete(f.Name, f.CreationTimestamp, del) {
+				continue
+			}
+			msg += fmt.Sprintf("%v (forwarding rule)\n", f.Name)
+			if del {
+				gcloudDelete("forwarding-rules", f.Name, cont.cloud.ProjectID, "--global")
 			}
 		}
 	}
@@ -345,12 +366,16 @@ func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 func (cont *GCEIngressController) deleteAddresses(del bool) string {
 	msg := ""
 	ipList := []compute.Address{}
-	gcloudList("addresses", fmt.Sprintf("k8s-fw-.*--%v", cont.UID), cont.cloud.ProjectID, &ipList)
+	regex := fmt.Sprintf("%vfw-.*%v.*", k8sPrefix, clusterDelimiter)
+	gcloudList("addresses", regex, cont.cloud.ProjectID, &ipList)
 	if len(ipList) != 0 {
 		for _, ip := range ipList {
+			if !cont.canDelete(ip.Name, ip.CreationTimestamp, del) {
+				continue
+			}
 			msg += fmt.Sprintf("%v (static-ip)\n", ip.Name)
 			if del {
-				gcloudDelete("addresses", ip.Name, cont.cloud.ProjectID)
+				gcloudDelete("addresses", ip.Name, cont.cloud.ProjectID, "--global")
 			}
 		}
 	}
@@ -374,9 +399,13 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 	msg := ""
 	tpList := []compute.TargetHttpProxy{}
-	gcloudList("target-http-proxies", fmt.Sprintf("k8s-tp-.*--%v", cont.UID), cont.cloud.ProjectID, &tpList)
+	regex := fmt.Sprintf("%vtp-.*%v.*", k8sPrefix, clusterDelimiter)
+	gcloudList("target-http-proxies", regex, cont.cloud.ProjectID, &tpList)
 	if len(tpList) != 0 {
 		for _, t := range tpList {
+			if !cont.canDelete(t.Name, t.CreationTimestamp, del) {
+				continue
+			}
 			msg += fmt.Sprintf("%v (target-http-proxy)\n", t.Name)
 			if del {
 				gcloudDelete("target-http-proxies", t.Name, cont.cloud.ProjectID)
@@ -384,9 +413,13 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 		}
 	}
 	tpsList := []compute.TargetHttpsProxy{}
-	gcloudList("target-https-proxies", fmt.Sprintf("k8s-tps-.*--%v", cont.UID), cont.cloud.ProjectID, &tpsList)
+	regex = fmt.Sprintf("%vtps-.*%v.*", k8sPrefix, clusterDelimiter)
+	gcloudList("target-https-proxies", regex, cont.cloud.ProjectID, &tpsList)
 	if len(tpsList) != 0 {
 		for _, t := range tpsList {
+			if !cont.canDelete(t.Name, t.CreationTimestamp, del) {
+				continue
+			}
 			msg += fmt.Sprintf("%v (target-https-proxy)\n", t.Name)
 			if del {
 				gcloudDelete("target-https-proxies", t.Name, cont.cloud.ProjectID)
@@ -409,7 +442,7 @@ func (cont *GCEIngressController) deleteUrlMap(del bool) (msg string) {
 		return msg
 	}
 	for _, um := range umList.Items {
-		if !strings.HasSuffix(um.Name, cont.UID) {
+		if !cont.canDelete(um.Name, um.CreationTimestamp, del) {
 			continue
 		}
 		msg += fmt.Sprintf("%v (url-map)\n", um.Name)
@@ -433,10 +466,11 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 		return fmt.Sprintf("Failed to list backend services: %v", err)
 	}
 	if len(beList.Items) == 0 {
+		framework.Logf("No backend services found")
 		return msg
 	}
 	for _, be := range beList.Items {
-		if !strings.HasSuffix(be.Name, cont.UID) {
+		if !cont.canDelete(be.Name, be.CreationTimestamp, del) {
 			continue
 		}
 		msg += fmt.Sprintf("%v (backend-service)\n", be.Name)
@@ -463,12 +497,12 @@ func (cont *GCEIngressController) deleteHttpHealthCheck(del bool) (msg string) {
 		return msg
 	}
 	for _, hc := range hcList.Items {
-		if !strings.HasSuffix(hc.Name, cont.UID) {
+		if !cont.canDelete(hc.Name, hc.CreationTimestamp, del) {
 			continue
 		}
 		msg += fmt.Sprintf("%v (http-health-check)\n", hc.Name)
 		if del {
-			if err := gceCloud.DeleteBackendService(hc.Name); err != nil &&
+			if err := gceCloud.DeleteHttpHealthCheck(hc.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete HTTP health check %v\n", hc.Name)
 			}
@@ -488,7 +522,7 @@ func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
 	}
 	if len(sslList.Items) != 0 {
 		for _, s := range sslList.Items {
-			if !strings.HasSuffix(s.Name, cont.UID) {
+			if !cont.canDelete(s.Name, s.CreationTimestamp, del) {
 				continue
 			}
 			msg += fmt.Sprintf("%v (ssl-certificate)\n", s.Name)
@@ -518,7 +552,7 @@ func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 		return msg
 	}
 	for _, ig := range igList.Items {
-		if !strings.HasSuffix(ig.Name, cont.UID) {
+		if !cont.canDelete(ig.Name, ig.CreationTimestamp, del) {
 			continue
 		}
 		msg += fmt.Sprintf("%v (instance-group)\n", ig.Name)
@@ -530,6 +564,34 @@ func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 		}
 	}
 	return msg
+}
+
+// canDelete returns true if either the name ends in a suffix matching this
+// controller's UID, or the creationTimestamp exceeds the maxAge and del is set
+// to true. Always returns false if the name doesn't match that we expect for
+// Ingress cloud resources.
+func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp string, delOldResources bool) bool {
+	// ignore everything not created by an ingress controller.
+	if !strings.HasPrefix(resourceName, k8sPrefix) || len(strings.Split(resourceName, clusterDelimiter)) != 2 {
+		return false
+	}
+	// always delete things that are created by the current ingress controller.
+	if strings.HasSuffix(resourceName, cont.UID) {
+		return true
+	}
+	if !delOldResources {
+		return false
+	}
+	createdTime, err := time.Parse(time.RFC3339, creationTimestamp)
+	if err != nil {
+		framework.Logf("WARNING: Failed to parse creation timestamp %v for %v: %v", creationTimestamp, resourceName, err)
+		return false
+	}
+	if createdTime.Before(time.Now().Add(maxAge)) {
+		framework.Logf("%v created on %v IS too old", resourceName, creationTimestamp)
+		return true
+	}
+	return false
 }
 
 func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
@@ -594,7 +656,7 @@ func (cont *GCEIngressController) init() {
 	if len(testName) > nameLenLimit {
 		framework.Logf("WARNING: test name including cluster UID: %v is over the GCE limit of %v", testName, nameLenLimit)
 	} else {
-		framework.Logf("Deteced cluster UID %v", cont.UID)
+		framework.Logf("Detected cluster UID %v", cont.UID)
 	}
 }
 
