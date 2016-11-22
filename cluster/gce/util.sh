@@ -747,8 +747,9 @@ function get-master-disk-size() {
 #   KUBE_TEMP: temporary directory
 #
 # Args:
-#  $1: CA certificate
-#  $2: CA key
+#  $1: host name
+#  $2: CA certificate
+#  $3: CA key
 #
 # If CA cert/key is empty, the function will also generate certs for CA.
 #
@@ -759,8 +760,9 @@ function get-master-disk-size() {
 #   ETCD_PEER_CERT_BASE64
 #
 function create-etcd-certs {
-  local ca_cert=${1:-}
-  local ca_key=${2:-}
+  local host=${1}
+  local ca_cert=${2:-}
+  local ca_key=${3:-}
 
   mkdir -p "${KUBE_TEMP}/cfssl"
   pushd "${KUBE_TEMP}/cfssl"
@@ -810,8 +812,8 @@ EOF
     ./cfssl gencert -initca ca-csr.json | ./cfssljson -bare ca -
   fi
 
-  echo '{"CN":"'"${MASTER_NAME}"'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
-      | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client-server -hostname="${MASTER_NAME}" - \
+  echo '{"CN":"'"${host}"'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
+      | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client-server -hostname="${host}" - \
       | ./cfssljson -bare etcd
 
   ETCD_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
@@ -878,7 +880,7 @@ function create-master() {
   MASTER_ADVERTISE_ADDRESS="${MASTER_RESERVED_IP}"
 
   create-certs "${MASTER_RESERVED_IP}"
-  create-etcd-certs
+  create-etcd-certs ${MASTER_NAME}
 
   # Sets MASTER_ROOT_DISK_SIZE that is used by create-master-instance
   get-master-root-disk-size
@@ -904,7 +906,7 @@ function add-replica-to-etcd() {
     --project "${PROJECT}" \
     --zone "${EXISTING_MASTER_ZONE}" \
     --command \
-      "curl localhost:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}'"
+      "curl localhost:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}' -s"
   return $?
 }
 
@@ -1381,7 +1383,7 @@ function kube-down() {
   if [[ "${REMAINING_MASTER_COUNT}" == "1" ]]; then
     if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
       detect-master
-      local REMAINING_REPLICA_NAME="$(get-replica-name)"
+      local REMAINING_REPLICA_NAME="$(get-all-replica-names)"
       local REMAINING_REPLICA_ZONE=$(gcloud compute instances list "${REMAINING_REPLICA_NAME}" \
         --project "${PROJECT}" --format="value(zone)")
       gcloud compute forwarding-rules delete \
@@ -1476,6 +1478,21 @@ function kube-down() {
     # If there are no more remaining master replicas, we should update kubeconfig.
     export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
     clear-kubeconfig
+  else
+  # If some master replicas remain: cluster has been changed, we need to re-validate it.
+    echo "... calling validate-cluster" >&2
+    # Override errexit
+    (validate-cluster) && validate_result="$?" || validate_result="$?"
+
+    # We have two different failure modes from validate cluster:
+    # - 1: fatal error - cluster won't be working correctly
+    # - 2: weak error - something went wrong, but cluster probably will be working correctly
+    # We just print an error message in case 2).
+    if [[ "${validate_result}" == "1" ]]; then
+      exit 1
+    elif [[ "${validate_result}" == "2" ]]; then
+      echo "...ignoring non-fatal errors in validate-cluster" >&2
+    fi
   fi
   set -e
 }
@@ -1509,6 +1526,19 @@ function get-all-replica-names() {
     --project "${PROJECT}" \
     --regexp "$(get-replica-name-regexp)" \
     --format "value(name)" | tr "\n" "," | sed 's/,$//')
+}
+
+# Prints the number of all of the master replicas in all zones.
+#
+# Assumed vars:
+#   MASTER_NAME
+function get-master-replicas-count() {
+  detect-project
+  local num_masters=$(gcloud compute instances list \
+    --project "${PROJECT}" \
+    --regexp "$(get-replica-name-regexp)" \
+    --format "value(zone)" | wc -l)
+  echo -n "${num_masters}"
 }
 
 # Prints regexp for full master machine name. In a cluster with replicated master,
@@ -1786,7 +1816,7 @@ function test-setup() {
   # Detect the project into $PROJECT if it isn't set
   detect-project
 
-  if [[ ${MULTIZONE:-} == "true" ]]; then
+  if [[ ${MULTIZONE:-} == "true" && -n ${E2E_ZONES:-} ]]; then
     for KUBE_GCE_ZONE in ${E2E_ZONES}
     do
       KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_USE_EXISTING_MASTER="${KUBE_USE_EXISTING_MASTER:-}" "${KUBE_ROOT}/cluster/kube-up.sh"
@@ -1843,7 +1873,7 @@ function test-teardown() {
   delete-firewall-rules \
     "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" \
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports"
-  if [[ ${MULTIZONE:-} == "true" ]]; then
+  if [[ ${MULTIZONE:-} == "true" && -n ${E2E_ZONES:-} ]]; then
       local zones=( ${E2E_ZONES} )
       # tear them down in reverse order, finally tearing down the master too.
       for ((zone_num=${#zones[@]}-1; zone_num>0; zone_num--))
