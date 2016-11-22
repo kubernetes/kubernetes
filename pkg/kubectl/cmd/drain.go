@@ -140,6 +140,9 @@ var (
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
+		'drain' evicts the pods if the APIServer supports eviciton
+		(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal DELETE
+		to delete the pods.
 		The 'drain' deletes all pods except mirror pods (which cannot be deleted through
 		the API server).  If there are DaemonSet-managed pods, drain will not proceed
 		without --ignore-daemonsets, and regardless it will not delete any
@@ -148,6 +151,9 @@ var (
 		pods that are neither mirror pods nor managed by ReplicationController,
 		ReplicaSet, DaemonSet or Job, then drain will not delete any pods unless you
 		use --force.
+
+		'drain' waits for graceful termination. You should not operate on the machine until
+		the command completes.
 
 		When you are ready to put the node back into service, use kubectl uncordon, which
 		will make the node schedulable again.
