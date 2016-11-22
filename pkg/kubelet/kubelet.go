@@ -152,7 +152,7 @@ const (
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
-	HandlePodAdditions(pods []*api.Pod)
+	HandlePodAdditions(pods []*api.Pod) ([]*api.Pod)
 	HandlePodUpdates(pods []*api.Pod)
 	HandlePodRemoves(pods []*api.Pod)
 	HandlePodReconcile(pods []*api.Pod)
@@ -1766,6 +1766,9 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
 	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
 	kl.syncLoopMonitor.Store(kl.clock.Now())
+
+	var rejected []*api.Pod
+
 	select {
 	case u, open := <-configCh:
 		// Update from a config source; dispatch it to the right handler
@@ -1782,7 +1785,8 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			// ADD as if they are new pods. These pods will then go through the
 			// admission process and *may* be rejected. This can be resolved
 			// once we have checkpointing.
-			handler.HandlePodAdditions(u.Pods)
+			rejectedAdditions := handler.HandlePodAdditions(u.Pods)
+			rejected = append(rejected, rejectedAdditions...)
 		case kubetypes.UPDATE:
 			glog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, format.PodsWithDeletiontimestamps(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
@@ -1859,6 +1863,11 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 				glog.Errorf("Failed cleaning pods: %v", err)
 			}
 		}
+
+		if len(rejected) != 0 {
+			glog.V(4).Infof("housekeeping: reattempting rejected pods")
+			rejected = handler.HandlePodAdditions(rejected)
+		}
 	}
 	kl.syncLoopMonitor.Store(kl.clock.Now())
 	return true
@@ -1905,8 +1914,11 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *api.Pod, start time.Time) {
 }
 
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
-// a config source.
-func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
+// a config source.  It returns any pods that could not be accepted; these should
+// be retried periodically.
+func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) ([]*api.Pod) {
+	var rejected []*api.Pod
+
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
@@ -1922,6 +1934,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 		activePods := kl.filterOutTerminatedPods(allPods)
 		// Check if we can admit the pod; if not, reject it.
 		if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+			rejected = append(rejected, pod)
 			kl.rejectPod(pod, reason, message)
 			continue
 		}
@@ -1930,6 +1943,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
 		kl.probeManager.AddPod(pod)
 	}
+
+	return rejected
 }
 
 // HandlePodUpdates is the callback in the SyncHandler interface for pods
