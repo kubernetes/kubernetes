@@ -31,6 +31,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 var (
@@ -88,7 +89,7 @@ var (
 		kubectl delete pods --all`)
 )
 
-func NewCmdDelete(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -109,7 +110,7 @@ func NewCmdDelete(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			err := RunDelete(f, out, cmd, args, options)
+			err := RunDelete(f, out, errOut, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 		SuggestFor: []string{"rm"},
@@ -131,7 +132,7 @@ func NewCmdDelete(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunDelete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func RunDelete(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -169,25 +170,35 @@ func RunDelete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	gracePeriod := cmdutil.GetFlagInt(cmd, "grace-period")
+	force := cmdutil.GetFlagBool(cmd, "force")
 	if cmdutil.GetFlagBool(cmd, "now") {
 		if gracePeriod != -1 {
 			return fmt.Errorf("--now and --grace-period cannot be specified together")
 		}
 		gracePeriod = 1
 	}
-	if gracePeriod == 0 && !cmdutil.GetFlagBool(cmd, "force") {
-		return fmt.Errorf("Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely. You must pass --force to delete with grace period 0.")
+	wait := false
+	if gracePeriod == 0 {
+		if force {
+			fmt.Fprintf(errOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n")
+		} else {
+			// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
+			// into --grace-period=1 and wait until the object is successfully deleted. Users may provide --force
+			// to bypass this wait.
+			wait = true
+			gracePeriod = 1
+		}
 	}
 
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
-		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), gracePeriod, shortOutput, mapper, false)
+		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), gracePeriod, wait, shortOutput, mapper, false)
 	}
 	return DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
 }
 
-func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
+func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, waitForDeletion, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -211,6 +222,11 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 		}
 		if err := reaper.Stop(info.Namespace, info.Name, timeout, options); err != nil {
 			return cmdutil.AddSourceToErr("stopping", info.Source, err)
+		}
+		if waitForDeletion {
+			if err := waitForObjectDeletion(info, timeout); err != nil {
+				return cmdutil.AddSourceToErr("stopping", info.Source, err)
+			}
 		}
 		if !quiet {
 			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
@@ -253,4 +269,25 @@ func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper
 	}
 	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
 	return nil
+}
+
+// objectDeletionWaitInterval is the interval to wait between checks for deletion. Exposed for testing.
+var objectDeletionWaitInterval = time.Second
+
+// waitForObjectDeletion refreshes the object, waiting until it is deleted, a timeout is reached, or
+// an error is encountered. It checks once a second.
+func waitForObjectDeletion(info *resource.Info, timeout time.Duration) error {
+	copied := *info
+	info = &copied
+	// TODO: refactor Reaper so that we can pass the "wait" option into it, and then check for UID change.
+	return wait.PollImmediate(objectDeletionWaitInterval, timeout, func() (bool, error) {
+		switch err := info.Get(); {
+		case err == nil:
+			return false, nil
+		case errors.IsNotFound(err):
+			return true, nil
+		default:
+			return false, err
+		}
+	})
 }
