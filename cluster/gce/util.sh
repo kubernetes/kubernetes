@@ -1008,17 +1008,20 @@ function create-loadbalancer() {
     echo "Load balancer already exists"
     return
   fi
-  local EXISTING_MASTER_ZONE=$(gcloud compute instances list "${MASTER_NAME}" \
+
+  local EXISTING_MASTER_NAME="$(get-all-replica-names)"
+  local EXISTING_MASTER_ZONE=$(gcloud compute instances list "${EXISTING_MASTER_NAME}" \
     --project "${PROJECT}" --format="value(zone)")
+
   echo "Creating load balancer in front of an already existing master in ${EXISTING_MASTER_ZONE}"
 
   # Step 1: Detach master IP address and attach ephemeral address to the existing master
-  attach-external-ip ${MASTER_NAME} ${EXISTING_MASTER_ZONE}
+  attach-external-ip "${EXISTING_MASTER_NAME}" "${EXISTING_MASTER_ZONE}"
 
   # Step 2: Create target pool.
   gcloud compute target-pools create "${MASTER_NAME}" --region "${REGION}"
   # TODO: We should also add master instances with suffixes
-  gcloud compute target-pools add-instances ${MASTER_NAME} --instances ${MASTER_NAME} --zone ${EXISTING_MASTER_ZONE}
+  gcloud compute target-pools add-instances "${MASTER_NAME}" --instances "${EXISTING_MASTER_NAME}" --zone "${EXISTING_MASTER_ZONE}"
 
   # Step 3: Create forwarding rule.
   # TODO: This step can take up to 20 min. We need to speed this up...
