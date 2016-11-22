@@ -333,6 +333,6 @@ func MetaAndSpecCheckingFunction(expected runtime.Object) CheckingFunction {
 		if util.ObjectMetaAndSpecEquivalent(obj, expected) {
 			return nil
 		}
-		return fmt.Errorf("Object different expected=%#v  received=%#v", expected, obj)
+		return fmt.Errorf("Object different expected=%#v received=%#v", expected, obj)
 	}
 }
