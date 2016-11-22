@@ -158,7 +158,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 			return "", fmt.Errorf("unable to find specified revision")
 		}
 		buf := bytes.NewBuffer([]byte{})
-		DescribePodTemplate(template, &PrefixWriter{buf})
+		DescribePodTemplate(template, buf)
 		return buf.String(), nil
 	}
 
@@ -172,6 +172,6 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	template, _ := revisionToSpec[revisions[len(revisions)-1]]
 	buf := bytes.NewBuffer([]byte{})
 	buf.WriteString("\n")
-	DescribePodTemplate(template, &PrefixWriter{buf})
+	DescribePodTemplate(template, buf)
 	return buf.String(), nil
 }

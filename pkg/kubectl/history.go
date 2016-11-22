@@ -19,6 +19,7 @@ package kubectl
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -93,7 +94,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
 		buf := bytes.NewBuffer([]byte{})
-		DescribePodTemplate(template, &PrefixWriter{buf})
+		DescribePodTemplate(template, buf)
 		return buf.String(), nil
 	}
 
@@ -104,15 +105,15 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	}
 	sliceutil.SortInts64(revisions)
 
-	return tabbedString(func(w *PrefixWriter) error {
-		w.Write(LEVEL_0, "REVISION\tCHANGE-CAUSE\n")
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
 		for _, r := range revisions {
 			// Find the change-cause of revision r
 			changeCause := historyInfo[r].Annotations[ChangeCauseAnnotation]
 			if len(changeCause) == 0 {
 				changeCause = "<none>"
 			}
-			w.Write(LEVEL_0, "%d\t%s\n", r, changeCause)
+			fmt.Fprintf(out, "%d\t%s\n", r, changeCause)
 		}
 		return nil
 	})
