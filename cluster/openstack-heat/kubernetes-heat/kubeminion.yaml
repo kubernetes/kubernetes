@@ -247,6 +247,7 @@ resources:
   server_name_post_fix:
     type: OS::Heat::RandomString
     properties:
+      character_classes: [{'class': 'lowercase', 'min': 1}]
       length: 8
 
   kube_minion:
