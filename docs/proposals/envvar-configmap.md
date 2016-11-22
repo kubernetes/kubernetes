@@ -7,7 +7,7 @@ A proposal for populating environment variables of a container from an entire Co
 ## Proposed Design
 
 Containers can specify the ConfigMaps that are consumed as environment variables.
-Each key defined in the ConfigMap's `Data` object must be a "C" identifier.
+Each key defined in the ConfigMap's `Data` object must be a "C" identifier. If an invalid key is present, the container will fail to start.
 
 Environment variables are currently defined by servies or the `Env` object in a container, where the `Env` takes precedence.
 The introduction of ConfigMaps adds a third possibility. To prevent any change in behavior, the `Env` object will still override any environment variable introduced by a ConfigMap. A ConfigMap is allowed to override variables defined by services.
@@ -35,9 +35,8 @@ type EnvFromSource struct {
 
 type Container struct {
   // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a C_IDENTIFIER.
-  // When a key exists in multiple sources, the value associated with the last
-  // source will take precedence.
+  // The keys defined within a source must be a "C" identifier. An invalid key
+  // will prevent the container from starting.
   // All env values will take precedence over any listed source.
   // Cannot be updated.
   // +optional
@@ -56,12 +55,12 @@ kind: ConfigMap
 metadata:
   name: etcd-env-config
 data:
-  number-of-members: "1"
-  initial-cluster-state: new
-  initial-cluster-token: DUMMY_ETCD_INITIAL_CLUSTER_TOKEN
-  discovery-token: DUMMY_ETCD_DISCOVERY_TOKEN
-  discovery-url: http://etcd-discovery:2379
-  etcdctl-peers: http://etcd:2379
+  number_of_members: "1"
+  initial_cluster_state: new
+  initial_cluster_token: DUMMY_ETCD_INITIAL_CLUSTER_TOKEN
+  discovery_token: DUMMY_ETCD_DISCOVERY_TOKEN
+  discovery_url: http://etcd_discovery:2379
+  etcdctl_peers: http://etcd:2379
   duplicate_key: FROM_CONFIG_MAP
   REPLACE_ME: "a value"
 ```
@@ -95,12 +94,12 @@ spec:
 The resulting environment variables will be:
 
 ```
-number-of-members="1"
-initial-cluster-state="new"
-initial-cluster-token="DUMMY_ETCD_INITIAL_CLUSTER_TOKEN"
-discovery-token="DUMMY_ETCD_DISCOVERY_TOKEN"
-discovery-url="http://etcd-discovery:2379"
-etcdctl-peers="http://etcd:2379"
+number_of_members="1"
+initial_cluster_state="new"
+initial_cluster_token="DUMMY_ETCD_INITIAL_CLUSTER_TOKEN"
+discovery_token="DUMMY_ETCD_DISCOVERY_TOKEN"
+discovery_url="http://etcd_discovery:2379"
+etcdctl_peers="http://etcd:2379"
 duplicate_key="FROM_ENV"
 expansion="a value"
 REPLACE_ME="a value"
@@ -135,10 +134,10 @@ spec:
     - containerPort: 2380
       protocol: TCP
     envFrom:
-    - prefix: cm1.
+    - prefix: cm1_
       configMapRef:
         name: env-config
-    - prefix: cm2.
+    - prefix: cm2_
       configMapRef:
         name: env-config
 ```
@@ -146,10 +145,10 @@ spec:
 The resulting environment variables will be:
 
 ```
-cm1.key1="a"
-cm1.key2="b"
-cm2.key1="a"
-cm2.key2="b"
+cm1_key1="a"
+cm1_key2="b"
+cm2_key1="a"
+cm2_key2="b"
 ```
 
 ### Future
