@@ -15,7 +15,7 @@ To work around either of these scenarios kubernetes will need to delete the part
 
 Additionally, delete/create is an admin control plane operation and the node hosting the recycle POD will need network access to the storage control plane and the admin credentials.  Its desirable to isolate storage control plan from the user network for security.
 
-## Rational
+## Rationale
 With the inclusion of configurable dynamic provisioning and storage service classes its expected that most storage volumes will be created dynamically.  In situations where the volumes can be created dynamically its more reliable and secure to "recycle" by deleting a volume and recreating it.
 
 Additionally most filesystems do not remove block data when a user space delete operation occurs.  The next user of a recycled volume could gain access to the previous users data.
@@ -30,3 +30,6 @@ As of Kubernetes 1.2 if a volume is marked for recycle when it is deleted a spec
 
 * Kube 1.5 : Notice of deprecation
 * Kube 1.5 + 1 year : Remove old recycler API
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/pkg/controller/volume/persistentvolume/deprecated-recycle-api.md?pixel)]()
