@@ -1,5 +1,5 @@
 ## Deprecation of Persistent Volume Recycler Behavior
-The function of the persistent volume recycler will change in future kubernetes releases.  The current implementation will remain and function as is for the short term but is expected to be removed or replaced in future releases.  
+The function of the persistent volume recycler will change in future kubernetes releases.  The current implementation will remain and function as is for the short term but is expected to be disabled or significantly changed in future releases.  
 
 ## Summary
 The current recycler design only allows for user space volume erasure operations.  This is inadequate for control plane or erasure that requires elevated privileges.  Future redesign is anticipated and this document serves as warning of future API change. 
