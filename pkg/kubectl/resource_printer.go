@@ -2498,12 +2498,12 @@ func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
 	return retErr
 }
 
-func tabbedString(f func(writer *PrefixWriter) error) (string, error) {
+func tabbedString(f func(io.Writer) error) (string, error) {
 	out := new(tabwriter.Writer)
 	buf := &bytes.Buffer{}
 	out.Init(buf, 0, 8, 1, '\t', 0)
-	writer := &PrefixWriter{out}
-	err := f(writer)
+
+	err := f(out)
 	if err != nil {
 		return "", err
 	}
