@@ -51,7 +51,9 @@ import (
 type kubeDockerClient struct {
 	// timeout is the timeout of short running docker operations.
 	timeout time.Duration
-	client  *dockerapi.Client
+	// imagePullingStuckTimeout is the stuck timeout for pulling image
+	imagePullingStuckTimeout time.Duration
+	client                   *dockerapi.Client
 }
 
 // Make sure that kubeDockerClient implemented the DockerInterface.
@@ -77,20 +79,24 @@ const (
 	// is made for defaultImagePullingStuckTimeout, the image pulling will be cancelled.
 	// Docker reports image progress for every 512kB block, so normally there shouldn't be too long interval
 	// between progress updates.
-	// TODO(random-liu): Make this configurable
 	defaultImagePullingStuckTimeout = 1 * time.Minute
 )
 
 // newKubeDockerClient creates an kubeDockerClient from an existing docker client. If requestTimeout is 0,
 // defaultTimeout will be applied.
-func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout time.Duration) DockerInterface {
+func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePullingStuckTimeout time.Duration) DockerInterface {
 	if requestTimeout == 0 {
 		requestTimeout = defaultTimeout
 	}
 
+	if imagePullingStuckTimeout == 0 {
+		imagePullingStuckTimeout = defaultImagePullingStuckTimeout
+	}
+
 	k := &kubeDockerClient{
-		client:  dockerClient,
-		timeout: requestTimeout,
+		client:                   dockerClient,
+		timeout:                  requestTimeout,
+		imagePullingStuckTimeout: imagePullingStuckTimeout,
 	}
 	// Notice that this assumes that docker is running before kubelet is started.
 	v, err := k.Version()
@@ -294,18 +300,20 @@ func (p *progress) get() (string, time.Time) {
 // progressReporter keeps the newest image pulling progress and periodically report the newest progress.
 type progressReporter struct {
 	*progress
-	image  string
-	cancel context.CancelFunc
-	stopCh chan struct{}
+	image                    string
+	cancel                   context.CancelFunc
+	stopCh                   chan struct{}
+	imagePullingStuckTimeout time.Duration
 }
 
 // newProgressReporter creates a new progressReporter for specific image with specified reporting interval
-func newProgressReporter(image string, cancel context.CancelFunc) *progressReporter {
+func newProgressReporter(image string, cancel context.CancelFunc, imagePullingStuckTimeout time.Duration) *progressReporter {
 	return &progressReporter{
 		progress: newProgress(),
 		image:    image,
 		cancel:   cancel,
 		stopCh:   make(chan struct{}),
+		imagePullingStuckTimeout: imagePullingStuckTimeout,
 	}
 }
 
@@ -320,7 +328,7 @@ func (p *progressReporter) start() {
 			case <-ticker.C:
 				progress, timestamp := p.progress.get()
 				// If there is no progress for defaultImagePullingStuckTimeout, cancel the operation.
-				if time.Now().Sub(timestamp) > defaultImagePullingStuckTimeout {
+				if time.Now().Sub(timestamp) > p.imagePullingStuckTimeout {
 					glog.Errorf("Cancel pulling image %q because of no progress for %v, latest progress: %q", p.image, defaultImagePullingStuckTimeout, progress)
 					p.cancel()
 					return
@@ -354,7 +362,7 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 		return err
 	}
 	defer resp.Close()
-	reporter := newProgressReporter(image, cancel)
+	reporter := newProgressReporter(image, cancel, d.imagePullingStuckTimeout)
 	reporter.start()
 	defer reporter.stop()
 	decoder := json.NewDecoder(resp)

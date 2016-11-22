@@ -2662,6 +2662,12 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
+					"imagePullingStuckTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "imagePullingStuckTimeout is the stuck timeout for pulling image",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
 					"rktPath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "rktPath is the path of rkt binary. Leave empty to use the first rkt in $PATH.",
@@ -14456,6 +14462,12 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"runtimeRequestTimeout": {
 						SchemaProps: spec.SchemaProps{
 							Description: "runtimeRequestTimeout is the timeout for all runtime requests except long running requests - pull, logs, exec and attach.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+					"imagePullingStuckTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "imagePullingStuckTimeout is the stuck timeout for pulling image",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
