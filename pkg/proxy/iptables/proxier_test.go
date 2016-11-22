@@ -260,7 +260,7 @@ func TestExecConntrackTool(t *testing.T) {
 func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, protocol api.Protocol, onlyNodeLocalEndpoints bool) *serviceInfo {
 	return &serviceInfo{
 		sessionAffinityType:    api.ServiceAffinityNone, // default
-		stickyMaxAgeSeconds:    180,                     // TODO: paramaterize this in the API.
+		stickyMaxAgeMinutes:    180,                     // TODO: paramaterize this in the API.
 		clusterIP:              ip,
 		protocol:               protocol,
 		onlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
