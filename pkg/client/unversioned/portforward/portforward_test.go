@@ -124,7 +124,7 @@ func TestParsePortsAndNew(t *testing.T) {
 }
 
 type GetListenerTestCase struct {
-	Hostname                string
+	Host                    string
 	Protocol                string
 	ShouldRaiseError        bool
 	ExpectedListenerAddress string
@@ -134,36 +134,36 @@ func TestGetListener(t *testing.T) {
 	var pf PortForwarder
 	testCases := []GetListenerTestCase{
 		{
-			Hostname:                "localhost",
+			Host:                    "localhost",
 			Protocol:                "tcp4",
 			ShouldRaiseError:        false,
 			ExpectedListenerAddress: "127.0.0.1",
 		},
 		{
-			Hostname:                "127.0.0.1",
+			Host:                    "127.0.0.1",
 			Protocol:                "tcp4",
 			ShouldRaiseError:        false,
 			ExpectedListenerAddress: "127.0.0.1",
 		},
 		{
-			Hostname:                "::1",
+			Host:                    "::1",
 			Protocol:                "tcp6",
 			ShouldRaiseError:        false,
 			ExpectedListenerAddress: "::1",
 		},
 		{
-			Hostname:         "::1",
+			Host:             "::1",
 			Protocol:         "tcp4",
 			ShouldRaiseError: true,
 		},
 		{
-			Hostname:         "127.0.0.1",
+			Host:             "127.0.0.1",
 			Protocol:         "tcp6",
 			ShouldRaiseError: true,
 		},
 		{
-			// IPv6 address must be put into brackets. This test reveals this.
-			Hostname:         "[::1]",
+			// IPv6 address must not be put into brackets. This test reveals this.
+			Host:             "[::1]",
 			Protocol:         "tcp6",
 			ShouldRaiseError: true,
 		},
@@ -171,7 +171,7 @@ func TestGetListener(t *testing.T) {
 
 	for i, testCase := range testCases {
 		expectedListenerPort := "12345"
-		listener, err := pf.getListener(testCase.Protocol, testCase.Hostname, &ForwardedPort{12345, 12345})
+		listener, err := pf.getListener(testCase.Protocol, testCase.Host, &ForwardedPort{12345, 12345})
 		if err != nil && strings.Contains(err.Error(), "cannot assign requested address") {
 			t.Logf("Can't test #%d: %v", i, err)
 			continue
@@ -192,7 +192,7 @@ func TestGetListener(t *testing.T) {
 		}
 
 		host, port, _ := net.SplitHostPort(listener.Addr().String())
-		t.Logf("Asked a %s forward for: %s:%v, got listener %s:%s, expected: %s", testCase.Protocol, testCase.Hostname, 12345, host, port, expectedListenerPort)
+		t.Logf("Asked a %s forward for: %s:%v, got listener %s:%s, expected: %s", testCase.Protocol, testCase.Host, 12345, host, port, expectedListenerPort)
 		if host != testCase.ExpectedListenerAddress {
 			t.Errorf("Test case #%d failed: Listener does not listen on exepected address: asked %v got %v", i, testCase.ExpectedListenerAddress, host)
 		}

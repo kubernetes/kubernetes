@@ -181,18 +181,18 @@ func (pf *PortForwarder) forward() error {
 // listenOnPort delegates tcp4 and tcp6 listener creation and waits for connections on both of these addresses.
 // If both listener creation fail, an error is raised.
 func (pf *PortForwarder) listenOnPort(port *ForwardedPort) error {
-	errTcp4 := pf.listenOnPortAndAddress(port, "tcp4", "127.0.0.1")
-	errTcp6 := pf.listenOnPortAndAddress(port, "tcp6", "::1")
+	errTcp4 := pf.listenOnPortAndHost(port, "tcp4", "127.0.0.1")
+	errTcp6 := pf.listenOnPortAndHost(port, "tcp6", "::1")
 	if errTcp4 != nil && errTcp6 != nil {
 		return fmt.Errorf("All listeners failed to create with the following errors: %s, %s", errTcp4, errTcp6)
 	}
 	return nil
 }
 
-// listenOnPortAndAddress delegates listener creation and waits for new connections
+// listenOnPortAndHost delegates listener creation and waits for new connections
 // in the background f
-func (pf *PortForwarder) listenOnPortAndAddress(port *ForwardedPort, protocol string, address string) error {
-	listener, err := pf.getListener(protocol, address, port)
+func (pf *PortForwarder) listenOnPortAndHost(port *ForwardedPort, protocol string, host string) error {
+	listener, err := pf.getListener(protocol, host, port)
 	if err != nil {
 		return err
 	}
@@ -203,8 +203,8 @@ func (pf *PortForwarder) listenOnPortAndAddress(port *ForwardedPort, protocol st
 
 // getListener creates a listener on the interface targeted by the given hostname on the given port with
 // the given protocol. protocol is in net.Listen style which basically admits values like tcp, tcp4, tcp6
-func (pf *PortForwarder) getListener(protocol string, hostname string, port *ForwardedPort) (*net.TCPListener, error) {
-	addr, err := net.ResolveTCPAddr(protocol, net.JoinHostPort(hostname, fmt.Sprintf("%d", port.Local)))
+func (pf *PortForwarder) getListener(protocol string, host string, port *ForwardedPort) (*net.TCPListener, error) {
+	addr, err := net.ResolveTCPAddr(protocol, net.JoinHostPort(host, fmt.Sprintf("%d", port.Local)))
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("Unable to resolve address: Error %s", err))
 		return nil, err
@@ -223,7 +223,7 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 	}
 	port.Local = uint16(localPortUInt)
 	if pf.out != nil {
-		fmt.Fprintf(pf.out, "Forwarding from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)
+		fmt.Fprintf(pf.out, "Forwarding from %s:%d -> %d\n", host, localPortUInt, port.Remote)
 	}
 
 	return listener, nil
