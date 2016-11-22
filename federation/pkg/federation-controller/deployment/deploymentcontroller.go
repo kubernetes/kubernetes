@@ -562,10 +562,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		}
 
 		// The object can be modified.
-		ld := &extensionsv1.Deployment{
-			ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(fd.ObjectMeta),
-			Spec:       fedutil.DeepCopyApiTypeOrPanic(fd.Spec).(extensionsv1.DeploymentSpec),
-		}
+		ld := fedutil.DeepCopyDeployment(fd)
 		specReplicas := int32(replicas)
 		ld.Spec.Replicas = &specReplicas
 
@@ -585,7 +582,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 
 			currentLd := ldObj.(*extensionsv1.Deployment)
 			// Update existing replica set, if needed.
-			if !fedutil.ObjectMetaAndSpecEquivalent(ld, currentLd) {
+			if !fedutil.DeploymentEquivalent(ld, currentLd) {
 				fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "UpdateInCluster",
 					"Updating deployment in cluster %s", clusterName)
 
