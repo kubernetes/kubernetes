@@ -30,8 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"reflect"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -207,7 +205,7 @@ func waitForDeployment(c *fedclientset.Clientset, namespace string, deploymentNa
 				return false, err
 			}
 			if err == nil {
-				if !equivalentDeployment(fdep, dep) {
+				if !verifyDeployment(fdep, dep) {
 					By(fmt.Sprintf("Deployment meta or spec not match for cluster %q:\n    federation: %v\n    cluster: %v", cluster.name, fdep, dep))
 					return false, nil
 				}
@@ -225,11 +223,10 @@ func waitForDeployment(c *fedclientset.Clientset, namespace string, deploymentNa
 	return err
 }
 
-func equivalentDeployment(fedDeployment, localDeployment *v1beta1.Deployment) bool {
-	localDeploymentSpec := localDeployment.Spec
-	localDeploymentSpec.Replicas = fedDeployment.Spec.Replicas
-	return fedutil.ObjectMetaEquivalent(fedDeployment.ObjectMeta, localDeployment.ObjectMeta) &&
-		reflect.DeepEqual(fedDeployment.Spec, localDeploymentSpec)
+func verifyDeployment(fedDeployment, localDeployment *v1beta1.Deployment) bool {
+	localDeployment = fedutil.DeepCopyDeployment(localDeployment)
+	localDeployment.Spec.Replicas = fedDeployment.Spec.Replicas
+	return fedutil.DeploymentEquivalent(fedDeployment, localDeployment)
 }
 
 func createDeploymentOrFail(clientset *fedclientset.Clientset, namespace string) *v1beta1.Deployment {
