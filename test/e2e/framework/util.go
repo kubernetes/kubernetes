@@ -479,6 +479,8 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 	return nil
 }
 
+var ReadyReplicaVersion = version.MustParse("v1.4.0")
+
 // WaitForPodsRunningReady waits up to timeout to ensure that all pods in
 // namespace ns are either running and ready, or failed but controlled by a
 // controller. Also, it ensures that at least minPods are running and
@@ -493,6 +495,14 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
 func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
+
+	// This can be removed when we no longer have 1.3 servers running with upgrade tests.
+	hasReadyReplicas, err := ServerVersionGTE(ReadyReplicaVersion, c.Discovery())
+	if err != nil {
+		Logf("Error getting the server version: %v", err)
+		return err
+	}
+
 	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
@@ -514,24 +524,26 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 		// checked.
 		replicas, replicaOk := int32(0), int32(0)
 
-		rcList, err := c.Core().ReplicationControllers(ns).List(api.ListOptions{})
-		if err != nil {
-			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
-			return false, nil
-		}
-		for _, rc := range rcList.Items {
-			replicas += rc.Spec.Replicas
-			replicaOk += rc.Status.ReadyReplicas
-		}
+		if hasReadyReplicas {
+			rcList, err := c.Core().ReplicationControllers(ns).List(api.ListOptions{})
+			if err != nil {
+				Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
+				return false, nil
+			}
+			for _, rc := range rcList.Items {
+				replicas += rc.Spec.Replicas
+				replicaOk += rc.Status.ReadyReplicas
+			}
 
-		rsList, err := c.Extensions().ReplicaSets(ns).List(api.ListOptions{})
-		if err != nil {
-			Logf("Error getting replication sets in namespace %q: %v", ns, err)
-			return false, nil
-		}
-		for _, rs := range rsList.Items {
-			replicas += rs.Spec.Replicas
-			replicaOk += rs.Status.ReadyReplicas
+			rsList, err := c.Extensions().ReplicaSets(ns).List(api.ListOptions{})
+			if err != nil {
+				Logf("Error getting replication sets in namespace %q: %v", ns, err)
+				return false, nil
+			}
+			for _, rs := range rsList.Items {
+				replicas += rs.Spec.Replicas
+				replicaOk += rs.Status.ReadyReplicas
+			}
 		}
 
 		podList, err := c.Core().Pods(ns).List(api.ListOptions{})
@@ -563,7 +575,9 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 
 		Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
 			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
-		Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
+		if hasReadyReplicas {
+			Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
+		}
 
 		if replicaOk == replicas && nOk >= minPods && len(badPods) == 0 {
 			return true, nil
