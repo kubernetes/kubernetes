@@ -46,7 +46,7 @@ var (
 	portForwardPortToStdOutV = version.MustParse("v1.3.0-alpha.4")
 )
 
-func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *api.Pod {
+func pfPod(steps, expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   podName,
@@ -56,11 +56,15 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *a
 			Containers: []api.Container{
 				{
 					Name:  "portforwardtester",
-					Image: "sttts/portforwardtester:1.2",
+					Image: "sttts/portforwardtester:1.3",
 					Env: []api.EnvVar{
 						{
 							Name:  "BIND_PORT",
 							Value: "80",
+						},
+						{
+							Name:  "STEPS",
+							Value: steps,
 						},
 						{
 							Name:  "EXPECTED_CLIENT_DATA",
@@ -183,9 +187,9 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 		})
 	}
 
-	startPodAndPortForward := func(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) (*api.Pod, *portForwardCommand, *net.TCPConn, error) {
+	startPodAndPortForward := func(steps, expectedClientData, chunks, chunkSize, chunkIntervalMillis string) (*api.Pod, *portForwardCommand, *net.TCPConn, error) {
 		By(fmt.Sprintf("Creating the target pod with steps %s", steps))
-		pod := pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis)
+		pod := pfPod(steps, expectedClientData, chunks, chunkSize, chunkIntervalMillis)
 		if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
 			return nil, nil, nil, fmt.Errorf("Couldn't create pod: %v", err)
 		}
@@ -221,7 +225,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 	framework.KubeDescribe("With a server that expects a client request", func() {
 		steps := "receive-expected,send-chunks"
 		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
-			pod, cmd, conn, err := startPodAndPortForward("abc", "1", "1", "1")
+			pod, cmd, conn, err := startPodAndPortForward(steps, "abc", "1", "1", "1")
 			if err != nil {
 				framework.Failf("Failed to launch test pod: %v", err)
 			}
@@ -247,7 +251,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 		})
 
 		It("should support a client that connects, sends data, and disconnects [Conformance]", func() {
-			pod, cmd, conn, err := startPodAndPortForward("abc", "10", "10", "100")
+			pod, cmd, conn, err := startPodAndPortForward(steps, "abc", "10", "10", "100")
 			if err != nil {
 				framework.Failf("Failed to launch test pod: %v", err)
 			}
@@ -287,8 +291,9 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 		})
 	})
 	framework.KubeDescribe("With a server that expects no client request", func() {
+		steps := "receive-expected,send-chunks"
 		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
-			pod, cmd, conn, err := startPodAndPortForward("", "10", "10", "100")
+			pod, cmd, conn, err := startPodAndPortForward(steps, "", "10", "10", "100")
 			if err != nil {
 				framework.Failf("Failed to launch test pod: %v", err)
 			}

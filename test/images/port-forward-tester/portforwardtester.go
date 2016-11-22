@@ -30,6 +30,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -58,6 +59,42 @@ func getEnvInt(name string) int {
 // This timeout is somewhat arbitrary (~latency around the planet).
 const rstAvoidanceDelay = 500 * time.Millisecond
 
+func receiveExpectedData(conn *net.TCPConn, expectedClientData string) {
+	buf := make([]byte, len(expectedClientData))
+	read, err := conn.Read(buf)
+	if read != len(expectedClientData) {
+		fmt.Printf("Expected to read %d bytes from client, but got %d instead. err=%v\n", len(expectedClientData), read, err)
+		os.Exit(2)
+	}
+	if expectedClientData != string(buf) {
+		fmt.Printf("Expect to read %q, but got %q. err=%v\n", expectedClientData, string(buf), err)
+		os.Exit(3)
+	}
+	if err != nil {
+		fmt.Printf("Read err: %v\n", err)
+	}
+	fmt.Println("Received expected client data")
+}
+
+func sendChunks(conn *net.TCPConn, chunks, chunkSize, chunkInterval int) {
+	stringData := strings.Repeat("x", chunkSize)
+	data := []byte(stringData)
+
+	for i := 0; i < chunks; i++ {
+		written, err := conn.Write(data)
+		if written != chunkSize {
+			fmt.Printf("Expected to write %d bytes from client, but wrote %d instead. err=%v\n", chunkSize, written, err)
+			os.Exit(4)
+		}
+		if err != nil {
+			fmt.Printf("Write err: %v\n", err)
+		}
+		if i+1 < chunks {
+			time.Sleep(time.Duration(chunkInterval) * time.Millisecond)
+		}
+	}
+}
+
 func main() {
 	bindAddress := os.Getenv("BIND_ADDRESS")
 	if bindAddress == "" {
@@ -85,42 +122,51 @@ func main() {
 
 	fmt.Println("Accepted client connection")
 
-	expectedClientData := os.Getenv("EXPECTED_CLIENT_DATA")
-	if len(expectedClientData) > 0 {
-		buf := make([]byte, len(expectedClientData))
-		read, err := conn.Read(buf)
-		if read != len(expectedClientData) {
-			fmt.Printf("Expected to read %d bytes from client, but got %d instead. err=%v\n", len(expectedClientData), read, err)
-			os.Exit(2)
-		}
-		if expectedClientData != string(buf) {
-			fmt.Printf("Expect to read %q, but got %q. err=%v\n", expectedClientData, string(buf), err)
-			os.Exit(3)
-		}
-		if err != nil {
-			fmt.Printf("Read err: %v\n", err)
-		}
-		fmt.Println("Received expected client data")
+	stepEnv := os.Getenv("STEPS")
+	if len(stepEnv) == 0 {
+		stepEnv = "receive-expected,send-chunks"
 	}
 
-	chunks := getEnvInt("CHUNKS")
-	chunkSize := getEnvInt("CHUNK_SIZE")
-	chunkInterval := getEnvInt("CHUNK_INTERVAL")
-
-	stringData := strings.Repeat("x", chunkSize)
-	data := []byte(stringData)
-
-	for i := 0; i < chunks; i++ {
-		written, err := conn.Write(data)
-		if written != chunkSize {
-			fmt.Printf("Expected to write %d bytes from client, but wrote %d instead. err=%v\n", chunkSize, written, err)
-			os.Exit(4)
-		}
-		if err != nil {
-			fmt.Printf("Write err: %v\n", err)
-		}
-		if i+1 < chunks {
-			time.Sleep(time.Duration(chunkInterval) * time.Millisecond)
+	for _, step := range strings.Split(stepEnv, ",") {
+		fmt.Printf("=== Step %s ===\n", step)
+		switch step {
+		case "receive-expected":
+			expectedData := os.Getenv("EXPECTED_CLIENT_DATA")
+			if len(expectedData) > 0 {
+				receiveExpectedData(conn, expectedData)
+			}
+		case "send-chunks":
+			chunks := getEnvInt("CHUNKS")
+			chunkSize := getEnvInt("CHUNK_SIZE")
+			chunkInterval := getEnvInt("CHUNK_INTERVAL")
+			if chunks > 0 {
+				sendChunks(conn, chunks, chunkSize, chunkInterval)
+			}
+		case "send-hello":
+			msg := "hello"
+			n, err := conn.Write([]byte(msg))
+			if err != nil {
+				fmt.Printf("Write error: %v\n", err)
+				os.Exit(2)
+			}
+			if n != len(msg) {
+				fmt.Printf("Written only %d bytes, expected %d\n", n, len(msg))
+				os.Exit(2)
+			}
+		case "receive-all":
+			data, err := ioutil.ReadAll(conn)
+			if err != nil {
+				fmt.Printf("Read error: %v\n", err)
+				os.Exit(2)
+			}
+			fmt.Printf("Received: %q\n", string(data))
+		case "close-write":
+			conn.CloseWrite()
+		case "close-read":
+			conn.CloseRead()
+		default:
+			fmt.Printf("Invalid step %q\n", step)
+			os.Exit(1)
 		}
 	}
 
