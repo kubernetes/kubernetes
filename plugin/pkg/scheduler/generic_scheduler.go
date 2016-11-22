@@ -86,7 +86,7 @@ type genericScheduler struct {
 	equivalenceCache *EquivalenceCache
 }
 
-// Schedule tries to schedule the given pod to one of node in the node list.
+// Schedule tries to schedule the given pod to one node in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.
 func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeLister) (string, error) {

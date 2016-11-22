@@ -90,6 +90,7 @@ func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*
 	return nil
 }
 
+// List returns all the pods with specified labels in cache 
 func (cache *schedulerCache) List(selector labels.Selector) ([]*api.Pod, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
@@ -157,6 +158,7 @@ func (cache *schedulerCache) ForgetPod(pod *api.Pod) error {
 	return nil
 }
 
+// AddPod add a pod into cache
 func (cache *schedulerCache) AddPod(pod *api.Pod) error {
 	key, err := getPodKey(pod)
 	if err != nil {
