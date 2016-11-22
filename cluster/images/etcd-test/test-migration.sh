@@ -103,11 +103,6 @@ kill_em_all
 
 snapshot_member before-rollback-2.3.7
 
-start_etcd
-start_apiserver
-try_dump once_more
-sleep 10000
-
 # TODO(mml): Currently busted: https://github.com/kubernetes/kubernetes/issues/36555
 migrate_if_needed etcd2 2.3.7
 
