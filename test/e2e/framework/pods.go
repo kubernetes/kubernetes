@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"regexp"
 	"sync"
 	"time"
 
@@ -172,4 +173,21 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 			}
 		},
 	)).To(Succeed(), "wait for pod %q to success", name)
+}
+
+// MatchContainerOutput gest output of a container and match expected regexp in the output.
+func (c *PodClient) MatchContainerOutput(name string, containerName string, expectedRegexp string) error {
+	f := c.f
+	output, err := GetPodLogs(f.ClientSet, f.Namespace.Name, name, containerName)
+	if err != nil {
+		return fmt.Errorf("failed to get output for container %q of pod %q", containerName, name)
+	}
+	regex, err := regexp.Compile(expectedRegexp)
+	if err != nil {
+		return fmt.Errorf("failed to compile regexp %q: %v", expectedRegexp, err)
+	}
+	if !regex.MatchString(output) {
+		return fmt.Errorf("failed to match regexp %q in output %q", expectedRegexp, output)
+	}
+	return nil
 }
