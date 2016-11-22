@@ -1410,7 +1410,7 @@ func PortForward(client DockerInterface, podInfraContainerID string, port uint16
 	// wait for stdout/stdin processing, because if StdoutPipe() is used, Wait() must not be called before that
 	err = <-copyErr
 
-	if commandErr := command.Wait(); err != nil {
+	if commandErr := command.Wait(); commandErr != nil {
 		return fmt.Errorf("%v: %s", commandErr, stderr.String())
 	}
 
