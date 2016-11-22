@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -1299,27 +1301,43 @@ type NetworkPolicySpec struct {
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 }
 
+// NetworkPolicyPorts is a dummy type to let the protobuf code handle null and [] differently
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type NetworkPolicyPorts []NetworkPolicyPort
+
+func (t NetworkPolicyPorts) String() string {
+	return fmt.Sprintf("%v", []NetworkPolicyPort(t))
+}
+
+// NetworkPolicyPeers is a dummy type to let the protobuf code handle null and [] differently
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type NetworkPolicyPeers []NetworkPolicyPeer
+
+func (t NetworkPolicyPeers) String() string {
+	return fmt.Sprintf("%v", []NetworkPolicyPeer(t))
+}
+
 // This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.
 type NetworkPolicyIngressRule struct {
 	// List of ports which should be made accessible on the pods selected for this rule.
 	// Each item in this list is combined using a logical OR.
-	// If this field is not provided, this rule matches all ports (traffic not restricted by port).
-	// If this field is empty, this rule matches no ports (no traffic matches).
+	// If this field is not provided (nil), this rule matches all ports (traffic not restricted by port).
+	// If this field is present but 0-length, this rule matches no ports (no traffic matches).
 	// If this field is present and contains at least one item, then this rule allows traffic
-	// only if the traffic matches at least one port in the list.
-	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
+	// only if the traffic matches at least one port in the ports list.
 	// +optional
-	Ports []NetworkPolicyPort `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
+	Ports NetworkPolicyPorts `json:"ports" protobuf:"bytes,1,rep,name=ports"`
 
 	// List of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation.
-	// If this field is not provided, this rule matches all sources (traffic not restricted by source).
-	// If this field is empty, this rule matches no sources (no traffic matches).
-	// If this field is present and contains at least on item, this rule allows traffic only if the
+	// If this field is not provided (nil), this rule matches all sources (traffic not restricted by source).
+	// If this field is present but 0-length, this rule matches no sources (no traffic matches).
+	// If this field is present and contains at least one item, this rule allows traffic only if the
 	// traffic matches at least one item in the from list.
-	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
 	// +optional
-	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
+	From NetworkPolicyPeers `json:"from" protobuf:"bytes,2,rep,name=from"`
 }
 
 type NetworkPolicyPort struct {
