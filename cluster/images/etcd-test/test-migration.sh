@@ -25,6 +25,11 @@ migrate_if_needed() {
   echo "Took $(( t - t0 )) seconds."
 }
 
+snapshot_member() {
+  tag="$1"
+  tar cvfz /var/log/snapshot-"$tag".tar.gz /var/etcd/data/member
+}
+
 start_etcd() {
   echo "Starting etcd..."
   /usr/local/bin/etcd --debug --name etcd-master --listen-peer-urls http://127.0.0.1:2380 --initial-advertise-peer-urls http://127.0.0.1:2380 --advertise-client-urls http://127.0.0.1:2379 --listen-client-urls http://127.0.0.1:2379 --data-dir /var/etcd/data --initial-cluster-state new --initial-cluster etcd-master=http://127.0.0.1:2380 1>>/var/log/etcd.log 2>&1 &
@@ -63,30 +68,53 @@ try_dump() {
   done
 }
 
+snapshot_member initial
+
 migrate_if_needed etcd2 2.2.1
+
+snapshot_member post-migrate-2.2.1
+
 start_etcd
 start_apiserver
 try_dump start
 kill_em_all
 
+snapshot_member before-migrate-2.3.7
+
 migrate_if_needed etcd2 2.3.7
+
+snapshot_member post-migrate-2.3.7
+
 start_etcd
 start_apiserver
 try_dump 237
 kill_em_all
 
+snapshot_member before-migrate-3.0.14
+
 migrate_if_needed etcd3 3.0.14
+
+snapshot_member after-migrate-3.0.14
+
 start_etcd
 start_apiserver
 try_dump upgraded
 kill_em_all
 
+snapshot_member before-rollback-2.3.7
+
 # TODO(mml): Currently busted: https://github.com/kubernetes/kubernetes/issues/36555
 migrate_if_needed etcd2 2.3.7
+
+snapshot_member post-rollback-2.3.7
+
 start_etcd
 start_apiserver
 try_dump rollback
 kill_em_all
+
+
+snapshot_member final
 
 for what in nodes pods; do
   echo "Checking ${what}..."
