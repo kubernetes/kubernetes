@@ -818,10 +818,12 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			// connection.
 			defer func() {
 				const maxBodySlurpSize = 2 << 10
-				if resp.ContentLength <= maxBodySlurpSize {
-					io.Copy(ioutil.Discard, &io.LimitedReader{R: resp.Body, N: maxBodySlurpSize})
+				if resp.Body != nil {
+					if resp.ContentLength <= maxBodySlurpSize {
+						io.Copy(ioutil.Discard, &io.LimitedReader{R: resp.Body, N: maxBodySlurpSize})
+					}
+					resp.Body.Close()
 				}
-				resp.Body.Close()
 			}()
 
 			retries++
