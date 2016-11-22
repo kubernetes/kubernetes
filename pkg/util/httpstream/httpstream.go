@@ -197,10 +197,25 @@ func SplitStream(stream Stream) (io.WriteCloser, io.ReadCloser) {
 	return streadReadCloser{stream}, streamWriteCloser{stream}
 }
 
+type tee struct {
+	io.ReadCloser
+	id string
+}
+
+func (t tee) Read(p []byte) (n int, err error) {
+	n, err = t.ReadCloser.Read(p)
+	if err != nil {
+		fmt.Printf("portforward %s read error: %v\n", t.id, err)
+	} else {
+		fmt.Printf("portforward %s read %d bytes: %q\n", t.id, n, p[0:n])
+	}
+	return
+}
+
 // CopyBothWays copies data from conn to dataStream and the other way around. An EOF on either side is passed along
 // as a one-sided Close call. On error the connection state is undefined and must be cleaned up by the caller.
 // If no error occurs, both connections are kept half-open.
-func CopyBothWays(remoteIn io.WriteCloser, remoteOut io.ReadCloser, localIn io.WriteCloser, localOut io.ReadCloser) error {
+func CopyBothWays(remoteIn io.WriteCloser, remoteOut io.ReadCloser, localIn io.WriteCloser, localOut io.ReadCloser, okishErrorPatterns []string) error {
 	localError := make(chan error, 2)
 	copiesDone := make(chan struct{})
 
@@ -211,7 +226,12 @@ func CopyBothWays(remoteIn io.WriteCloser, remoteOut io.ReadCloser, localIn io.W
 	go func() {
 		defer copiesGroup.Done()
 		defer remoteIn.Close()
-		if _, err := io.Copy(remoteIn, localOut); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		if _, err := io.Copy(remoteIn, tee{ReadCloser: localOut, id: "remote"}); err != nil {
+			for _, s := range okishErrorPatterns {
+				if strings.Contains(err.Error(), s) {
+					return
+				}
+			}
 			localError <- err
 		}
 	}()
@@ -220,7 +240,12 @@ func CopyBothWays(remoteIn io.WriteCloser, remoteOut io.ReadCloser, localIn io.W
 	go func() {
 		defer copiesGroup.Done()
 		defer localIn.Close()
-		if _, err := io.Copy(localIn, remoteOut); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		if _, err := io.Copy(localIn, tee{ReadCloser: remoteOut, id: "local"}); err != nil {
+			for _, s := range okishErrorPatterns {
+				if strings.Contains(err.Error(), s) {
+					return
+				}
+			}
 			localError <- err
 		}
 	}()

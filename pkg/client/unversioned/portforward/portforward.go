@@ -300,7 +300,7 @@ func (pf *PortForwarder) handleConnection(conn *net.TCPConn, port ForwardedPort)
 
 	connIn, connOut := httpstream.SplitTCPConn(conn)
 	streamIn, streamOut := httpstream.SplitStream(dataStream)
-	err = httpstream.CopyBothWays(connIn, connOut, streamIn, streamOut)
+	err = httpstream.CopyBothWays(connIn, connOut, streamIn, streamOut, []string{"use of closed network connection"})
 
 	// always expect something on errorChan.
 	if errChan := <-errorChan; errChan != nil {

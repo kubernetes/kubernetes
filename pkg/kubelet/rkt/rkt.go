@@ -2187,7 +2187,7 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, streamIn io.W
 
 	copyErr := make(chan error)
 	go func() {
-		copyErr <- httpstream.CopyBothWays(inPipe, outPipe, streamIn, streamOut)
+		copyErr <- httpstream.CopyBothWays(inPipe, outPipe, streamIn, streamOut, []string{"broken pipe"})
 	}()
 
 	if err := command.Start(); err != nil {
