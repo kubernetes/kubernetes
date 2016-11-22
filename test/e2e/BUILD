@@ -14,6 +14,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "addon_update.go",
+        "apparmor.go",
         "autoscaling_utils.go",
         "batch_v1_jobs.go",
         "cadvisor.go",
@@ -160,6 +161,7 @@ go_library(
         "//pkg/metrics:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/security/apparmor:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/exec:go_default_library",
