@@ -41,6 +41,48 @@ func init() {
 	}
 }
 
+// gcpAuthProvider is an auth provider plugin that uses GCP credentials to provide
+// tokens for kubectl to authenticate itself to the apiserver. A sample json config
+// is provided below with all recognized options described.
+//
+// {
+//   'auth-provider': {
+//     # Required
+//     "name": "gcp",
+//
+//     'config': {
+//       # Caching options
+//
+//       # Raw string data representing cached access token.
+//       "access-token": "ya29.CjWdA4GiBPTt",
+//       # RFC3339Nano expiration timestamp for cached access token.
+//       "expiry": "2016-10-31 22:31:9.123",
+//
+//       # Command execution options
+//       # These options direct the plugin to execute a specified command and parse
+//       # token and expiry time from the output of the command.
+//
+//       # Command to execute for access token. String is split on whitespace
+//       # with first field treated as the executable, remaining fields as args.
+//       # Command output will be parsed as JSON.
+//       "cmd-path": "/usr/bin/gcloud config config-helper --output=json",
+//
+//       # JSONPath to the string field that represents the access token in
+//       # command output. If omitted, defaults to "{.access_token}".
+//       "token-key": "{.credential.access_token}",
+//
+//       # JSONPath to the string field that represents expiration timestamp
+//       # of the access token in the command output. If omitted, defaults to
+//       # "{.token_expiry}"
+//       "expiry-key": ""{.credential.token_expiry}",
+//
+//       # golang reference time in the format that the expiration timestamp uses.
+//       # If omitted, defaults to time.RFC3339Nano
+//       "time-fmt": "2006-01-02 15:04:05.999999999"
+//     }
+//   }
+// }
+//
 type gcpAuthProvider struct {
 	tokenSource oauth2.TokenSource
 	persister   restclient.AuthProviderConfigPersister
