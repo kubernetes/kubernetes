@@ -1511,6 +1511,19 @@ function get-all-replica-names() {
     --format "value(name)" | tr "\n" "," | sed 's/,$//')
 }
 
+# Returns the number of all of the master replicas in all zones.
+#
+# Assumed vars:
+#   MASTER_NAME
+function get-master-replicas-count() {
+  detect-project
+  local num_masters=$(gcloud compute instances list \
+    --project "${PROJECT}" \
+    --regexp "$(get-replica-name-regexp)" \
+    --format "value(zone)" | wc -l)
+  return "${num_masters}"
+}
+
 # Prints regexp for full master machine name. In a cluster with replicated master,
 # VM names may either be MASTER_NAME or MASTER_NAME with a suffix for a replica.
 function get-replica-name-regexp() {
