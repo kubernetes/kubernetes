@@ -85,7 +85,7 @@ echo "generating vendor/"
 GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
 
-echo "moving vendor/k8s.io/kuberentes"
+echo "moving vendor/k8s.io/kubernetes"
 cp -rn "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes/. "${CLIENT_REPO_TEMP}"/
 rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go
