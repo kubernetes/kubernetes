@@ -75,6 +75,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Printf("Listening on %s\n", net.JoinHostPort(bindAddress, bindPort))
+
 	conn, err := listener.AcceptTCP()
 	if err != nil {
 		fmt.Printf("Error accepting connection: %v\n", err)
