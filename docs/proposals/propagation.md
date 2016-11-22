@@ -30,9 +30,9 @@ there are several such services on each node (about a dozen, actually), I assemb
 volume.
 Swift is designed such that drives can be mounted and unmounted at any time (most
 importantly to hot-swap failed drives) and the services can keep running, but if
-the services run in a slave mount namespace, they won't see the mounts/unmounts
+the services run in a private mount namespace, they won't see the mounts/unmounts
 performed on the host mount namespace until the containers are restarted.
-The shared mount namespace is the correct solution for this AFAICS. Until this
+The slave mount namespace is the correct solution for this AFAICS. Until this
 becomes available in k8s, we will have to have operations restart containers manually
 based on monitoring alerts.
 
