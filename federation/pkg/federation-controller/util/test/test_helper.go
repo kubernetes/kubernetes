@@ -236,7 +236,7 @@ func CheckObjectFromChan(c chan runtime.Object, checkFunction CheckingFunction) 
 			if lastError = checkFunction(obj); lastError == nil {
 				return nil
 			}
-			glog.Infof("Check function failed with %v", lastError)
+			glog.Errorf("Check function failed with %v", lastError)
 			delay = 5 * time.Second
 		case <-time.After(delay):
 			pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
@@ -319,6 +319,6 @@ func MetaAndSpecCheckingFunction(expected runtime.Object) CheckingFunction {
 		if util.ObjectMetaAndSpecEquivalent(obj, expected) {
 			return nil
 		}
-		return fmt.Errorf("Object different expected=%#v  received=%#v", expected, obj)
+		return fmt.Errorf("Object different expected=%#v received=%#v", expected, obj)
 	}
 }
