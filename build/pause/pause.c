@@ -22,28 +22,31 @@ limitations under the License.
 #include <unistd.h>
 
 static void sigdown(int signo) {
-	psignal(signo, "shutting down, got signal");
-	exit(0);
+  psignal(signo, "Shutting down, got signal");
+  exit(0);
 }
 
 static void sigreap(int signo) {
-	while (waitpid(-1, NULL, WNOHANG) > 0);
+  while (waitpid(-1, NULL, WNOHANG) > 0)
+    ;
 }
 
 int main() {
-	if (getpid() != 1) {
-		fprintf(stderr, "Warning: pause should be the first process in a pod\n");
-	}
+  if (getpid() != 1)
+    fprintf(stderr, "Warning: pause should be the first process in a pod\n");
 
-	if (sigaction(SIGINT, &(struct sigaction){.sa_handler = sigdown}, NULL) < 0)
-		return 1;
-	if (sigaction(SIGTERM, &(struct sigaction){.sa_handler = sigdown}, NULL) < 0)
-		return 2;
-	if (sigaction(SIGCHLD, &(struct sigaction){.sa_handler = sigreap, .sa_flags = SA_NOCLDSTOP}, NULL) < 0)
-		return 3;
-	sigaction(SIGKILL, &(struct sigaction){.sa_handler = sigdown}, NULL);
+  if (sigaction(SIGINT, &(struct sigaction){.sa_handler = sigdown}, NULL) < 0)
+    return 1;
+  if (sigaction(SIGTERM, &(struct sigaction){.sa_handler = sigdown}, NULL) < 0)
+    return 2;
+  if (sigaction(SIGCHLD, &(struct sigaction){.sa_handler = sigreap,
+                                             .sa_flags = SA_NOCLDSTOP},
+                NULL) < 0)
+    return 3;
+  sigaction(SIGKILL, &(struct sigaction){.sa_handler = sigdown}, NULL);
 
-	for (;;) pause();
-	fprintf(stderr, "error: infinite loop terminated\n");
-	return 42;
+  for (;;)
+    pause();
+  fprintf(stderr, "Error: infinite loop terminated\n");
+  return 42;
 }
