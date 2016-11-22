@@ -48,7 +48,7 @@ const (
 	allClustersKey = ".ALL_CLUSTERS"
 	// TODO: Get the constants below directly from the Kubernetes Ingress Controller constants - but thats in a separate repo
 	staticIPNameKeyWritable = "kubernetes.io/ingress.global-static-ip-name" // The writable annotation on Ingress to tell the controller to use a specific, named, static IP
-	staticIPNameKeyReadonly = "static-ip"                                   // The readonly key via which the cluster's Ingress Controller communicates which static IP it used.  If staticIPNameKeyWritable above is specified, it is used.
+	staticIPNameKeyReadonly = "ingress.kubernetes.io/static-ip"             // The readonly key via which the cluster's Ingress Controller communicates which static IP it used.  If staticIPNameKeyWritable above is specified, it is used.
 	uidAnnotationKey        = "kubernetes.io/ingress.uid"                   // The annotation on federation clusters, where we store the ingress UID
 	uidConfigMapName        = "ingress-uid"                                 // Name of the config-map and key the ingress controller stores its uid in.
 	uidConfigMapNamespace   = "kube-system"
@@ -766,6 +766,9 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			if (!baseIPAnnotationExists && clusterIPNameExists) || (!baseLBStatusExists && clusterLBStatusExists) { // copy the IP name from the readonly annotation on the cluster ingress, to the writable annotation on the federated ingress
 				glog.V(4).Infof(logStr, "Transferring")
 				if !baseIPAnnotationExists && clusterIPNameExists {
+					if baseIngress.ObjectMeta.Annotations == nil {
+						baseIngress.ObjectMeta.Annotations = make(map[string]string)
+					}
 					baseIngress.ObjectMeta.Annotations[staticIPNameKeyWritable] = clusterIPName
 					glog.V(4).Infof("Attempting to update base federated ingress annotations: %v", baseIngress)
 					if updatedFedIngress, err := ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Update(baseIngress); err != nil {
