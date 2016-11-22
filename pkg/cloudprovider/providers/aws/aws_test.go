@@ -345,6 +345,8 @@ func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 		return aws.StringValue(i.InstanceId), nil
 	} else if key == "local-hostname" {
 		return aws.StringValue(i.PrivateDnsName), nil
+	} else if key == "public-hostname" {
+		return aws.StringValue(i.PublicDnsName), nil
 	} else if key == "local-ipv4" {
 		return aws.StringValue(i.PrivateIpAddress), nil
 	} else if key == "public-ipv4" {
@@ -553,6 +555,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance0.InstanceId = aws.String("i-0")
 	instance0.PrivateDnsName = aws.String("instance-same.ec2.internal")
 	instance0.PrivateIpAddress = aws.String("192.168.0.1")
+	instance0.PublicDnsName = aws.String("instance-same.ec2.external")
 	instance0.PublicIpAddress = aws.String("1.2.3.4")
 	instance0.InstanceType = aws.String("c3.large")
 	instance0.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
@@ -603,12 +606,14 @@ func TestNodeAddresses(t *testing.T) {
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
-	if len(addrs3) != 3 {
-		t.Errorf("Should return exactly 3 NodeAddresses")
+	if len(addrs3) != 5 {
+		t.Errorf("Should return exactly 5 NodeAddresses")
 	}
 	testHasNodeAddress(t, addrs3, v1.NodeInternalIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs3, v1.NodeLegacyHostIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs3, v1.NodeExternalIP, "1.2.3.4")
+	testHasNodeAddress(t, addrs3, v1.NodeExternalDNS, "instance-same.ec2.external")
+	testHasNodeAddress(t, addrs3, v1.NodeInternalDNS, "instance-same.ec2.internal")
 
 	// Fetch from metadata
 	aws4, fakeServices := mockInstancesResp(&instance0, []*ec2.Instance{&instance0})
