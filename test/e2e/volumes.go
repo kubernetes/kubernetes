@@ -406,6 +406,10 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 				prefix:      "gluster",
 				serverImage: "gcr.io/google_containers/volume-gluster:0.2",
 				serverPorts: []int{24007, 24008, 49152},
+				volumes: map[string]string{
+					// Gluster server needs tmpfs on /tmp
+					"/tmp": "/tmp",
+				},
 			}
 
 			defer func() {

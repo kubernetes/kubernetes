@@ -14,10 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+DIR=`mktemp -d`
+
 function start()
 {
+    chmod 755 $DIR
+    cp /vol/* $DIR/
     /usr/sbin/glusterd -p /run/glusterd.pid
-    gluster volume create test_vol `hostname -i`:/vol force
+    gluster volume create test_vol `hostname -i`:$DIR force
     gluster volume start test_vol
 }
 
@@ -25,6 +29,7 @@ function stop()
 {
     gluster --mode=script volume stop test_vol force
     kill $(cat /run/glusterd.pid)
+    rm -rf $DIR
     exit 0
 }
 
