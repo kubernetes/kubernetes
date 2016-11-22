@@ -38,11 +38,11 @@ if [[ $parallelism > 1 ]]; then
 fi
 
 if [[ $focus != "" ]]; then
-  ginkgoflags="$ginkgoflags -focus='$focus' "
+  ginkgoflags="$ginkgoflags -focus=\"$focus\" "
 fi
 
 if [[ $skip != "" ]]; then
-  ginkgoflags="$ginkgoflags -skip='$skip' "
+  ginkgoflags="$ginkgoflags -skip=\"$skip\" "
 fi
 
 if [[ $run_until_failure != "" ]]; then
