@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/interrupt"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -392,6 +393,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	allErrs := []error{}
+	errs := sets.NewString()
 	infos, err := r.Infos()
 	if err != nil {
 		allErrs = append(allErrs, err)
@@ -444,6 +446,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
+				if errs.Has(err.Error()) {
+					continue
+				}
+				errs.Insert(err.Error())
 				allErrs = append(allErrs, err)
 				continue
 			}
@@ -464,6 +470,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				filteredResourceCount++
 				continue
 			}
+			if errs.Has(err.Error()) {
+				continue
+			}
+			errs.Insert(err.Error())
 			allErrs = append(allErrs, err)
 		}
 
@@ -487,11 +497,19 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 
 			if err := printer.PrintObj(original, w); err != nil {
+				if errs.Has(err.Error()) {
+					continue
+				}
+				errs.Insert(err.Error())
 				allErrs = append(allErrs, err)
 			}
 			continue
 		}
 		if err := printer.PrintObj(original, w); err != nil {
+			if errs.Has(err.Error()) {
+				continue
+			}
+			errs.Insert(err.Error())
 			allErrs = append(allErrs, err)
 			continue
 		}
