@@ -84,10 +84,9 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.P
 		}
 	}
 	defer func(pod *api.Pod) {
+		glog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
 		if err := recyclerClient.DeletePod(pod.Name, pod.Namespace); err != nil {
 			glog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
-		} else {
-			glog.V(4).Infof("deleted recycler pod %s/%s", pod.Namespace, pod.Name)
 		}
 	}(pod)
 
