@@ -8,10 +8,8 @@ creation visible to containers.
 
 Several existing issues and PRs were already created regarding that particular
 subject:
-* Capability to specify mount propagation mode of per volume with docker [#20698]
-(https://github.com/kubernetes/kubernetes/pull/20698)
-* Set propagation to "shared" for hostPath volume [#31504]
-(https://github.com/kubernetes/kubernetes/pull/31504)
+* Capability to specify mount propagation mode of per volume with docker [#20698] (https://github.com/kubernetes/kubernetes/pull/20698)
+* Set propagation to "shared" for hostPath volume [#31504] (https://github.com/kubernetes/kubernetes/pull/31504)
 
 ## Use Cases
 
@@ -23,7 +21,7 @@ the volume mount of each container would be isolated from each other.
 This use case is also referenced by Containerized Volume Client Drivers - Design
 Proposal [#22216] (https://github.com/kubernetes/kubernetes/pull/22216)
 
-1. (From @majewsky) I'm currently putting the OpenStack Swift object storage (https://github.com/openstack/swift) into
+1. (From @majewsky) I'm currently putting the [OpenStack Swift object storage] (https://github.com/openstack/swift) into
 k8s on CoreOS. Swift's storage services expect storage drives to be mounted at
 /srv/node/{drive-id} (where {drive-id} is defined by the cluster's ring, the topology
 description data structure which is shared between all cluster members). Because
@@ -85,7 +83,7 @@ Opinion against this:
 
 ### Add an option in HostPathVolumeSource
 
-The new `HostPathVolumeSource` will looks:
+The new `HostPathVolumeSource` will look like:
 ```go
 const (
 	PropagationShared  PropagationMode = "Shared"
