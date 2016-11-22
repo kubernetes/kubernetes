@@ -201,7 +201,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		if admit.Handles(admission.Connect) {
+		if admit != nil && admit.Handles(admission.Connect) {
 			connectRequest := &rest.ConnectRequest{
 				Name:         name,
 				Options:      opts,
