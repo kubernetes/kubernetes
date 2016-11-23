@@ -104,7 +104,7 @@ Opinion against this:
 
 1. All containers use this volume will share the same propagation mode.
 
-### Make shared default for HostPath
+### Make HostPath shared for privileged containers, slave for non-privileged.
 
 Given only HostPath needs this feature, and privileged access is needed when
 making mounts inside container, we can bind propagation mode with existing option
@@ -138,5 +138,6 @@ distros.
 
 ## Decision
 
-We will take 'Make shared default for HostPath', an environment check and an
-WARNING log will be emitted about whether propagation mode is supported.
+We will take 'Make HostPath shared for privileged containers, slave for
+non-privileged', an environment check and an WARNING log will be emitted about
+whether propagation mode is supported.
