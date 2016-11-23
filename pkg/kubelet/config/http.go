@@ -96,7 +96,7 @@ func (s *sourceURL) extractFromURL() error {
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%v: %v", s.url, resp.Status)
 	}
 	if len(data) == 0 {
