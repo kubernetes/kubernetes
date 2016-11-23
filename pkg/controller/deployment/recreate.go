@@ -122,7 +122,7 @@ func (dc *DeploymentController) waitForInactiveReplicaSets(oldRSs []*extensions.
 			return observedGeneration >= desiredGeneration && replicaSet.Spec.Replicas == 0 && replicaSet.Status.Replicas == 0, nil
 		}); err != nil {
 			if err == wait.ErrWaitTimeout {
-				err = fmt.Errorf("replica set %q never became inactive: synced=%t, spec.replicas=%d, status.replicas=%d",
+				err = fmt.Errorf("ReplicaSet %q never became inactive: synced=%t, spec.replicas=%d, status.replicas=%d",
 					rs.Name, observedGeneration >= desiredGeneration, specReplicas, statusReplicas)
 			}
 			return err

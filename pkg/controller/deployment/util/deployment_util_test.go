@@ -58,7 +58,7 @@ func addGetRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clien
 				}
 			}
 		}
-		return false, nil, fmt.Errorf("could not find the requested replica set: %s", name)
+		return false, nil, fmt.Errorf("could not find the requested ReplicaSet: %s", name)
 
 	})
 	return fakeClient
