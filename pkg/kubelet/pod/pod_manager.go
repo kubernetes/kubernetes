@@ -64,11 +64,11 @@ type Manager interface {
 	SetPods(pods []*v1.Pod)
 	// AddPod adds the given pod to the manager.
 	AddPod(pod *v1.Pod)
-	// UpdatePod updates the given pod in the manager.
-	UpdatePod(pod *v1.Pod)
+	// UpdatePodSpec updates the given pod's spec in the manager.
+	UpdatePodSpec(pod *v1.Pod)
 	// UpdatePodStatus applies the updateFunction passed in to update the pod's status
 	// It performs the update while holding the lock so that concurrent status updates do not race
-	UpdatePodSafe(podUID types.UID, updateFn func(*v1.Pod))
+	UpdatePodStatus(podUID types.UID, updateFn func(*v1.Pod))
 	// DeletePod deletes the given pod from the manager.  For mirror pods,
 	// this means deleting the mappings related to mirror pods.  For non-
 	// mirror pods, this means deleting from indexes for all non-mirror pods.
@@ -142,16 +142,21 @@ func (pm *basicManager) SetPods(newPods []*v1.Pod) {
 }
 
 func (pm *basicManager) AddPod(pod *v1.Pod) {
-	pm.UpdatePod(pod)
+	pm.UpdatePodSpec(pod)
 }
 
-func (pm *basicManager) UpdatePod(pod *v1.Pod) {
+func (pm *basicManager) UpdatePodSpec(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
+	oldPod, ok := pm.podByUID[pod.UID]
+	if ok {
+		// Leave the status intact if possible
+		pod.Status = oldPod.Status
+	}
 	pm.updatePodsInternal(pod)
 }
 
-func (pm *basicManager) UpdatePodSafe(podUID types.UID, updateFn func(*v1.Pod)) {
+func (pm *basicManager) UpdatePodStatus(podUID types.UID, updateFn func(*v1.Pod)) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pod, ok := pm.podByUID[podUID]

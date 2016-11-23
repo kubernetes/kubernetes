@@ -206,7 +206,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 
 		for _, pod := range test.pods {
 			testKube.kubelet.statusManager.AddPod(pod)
-			testKube.kubelet.statusManager.SetPodStatus(pod, *test.status)
+			testKube.kubelet.statusManager.SetPodStatus(pod.UID, *test.status)
 		}
 
 		err := testKube.kubelet.cleanupBandwidthLimits(test.pods)

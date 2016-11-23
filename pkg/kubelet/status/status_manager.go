@@ -68,16 +68,21 @@ type Manager interface {
 	// AddPod adds a pod
 	AddPod(pod *v1.Pod)
 
-	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
-	SetPodStatus(pod *v1.Pod, status v1.PodStatus)
+	// SetPodStatus updates the pod with the given uid's status to match the provided status.
+	// Triggers a status update.
+	SetPodStatus(uid types.UID, status v1.PodStatus)
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
 	SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
 
+	// ReconcilePod updates the api server with the latest status for that pod in order to reconcile differences between
+	// the kubelet and the api server
+	ReconcilePod(uid types.UID)
+
 	// TerminatePod resets the container status for the provided pod to terminated and triggers
 	// a status update.
-	TerminatePod(pod *v1.Pod)
+	TerminatePod(uid types.UID)
 }
 
 const (
@@ -138,8 +143,8 @@ func (m *manager) GetPod(uid types.UID) (*v1.Pod, bool) {
 	return m.podManager.GetPodByUID(m.podManager.TranslatePodUID(uid))
 }
 
-func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
-	m.podManager.UpdatePodSafe(pod.UID, func(inputPod *v1.Pod) {
+func (m *manager) SetPodStatus(uid types.UID, status v1.PodStatus) {
+	m.podManager.UpdatePodStatus(uid, func(inputPod *v1.Pod) {
 		// Make sure we're caching a deep copy.
 		status, err := copyStatus(&status)
 		if err != nil {
@@ -148,12 +153,12 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 		// Force a status update if deletion timestamp is set. This is necessary
 		// because if the pod is in the non-running state, the pod worker still
 		// needs to be able to trigger an update and/or deletion.
-		m.updateStatusInternal(inputPod, status, pod.DeletionTimestamp != nil)
+		m.updateStatusInternal(inputPod, status, inputPod.DeletionTimestamp != nil)
 	})
 }
 
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
-	m.podManager.UpdatePodSafe(podUID, func(pod *v1.Pod) {
+	m.podManager.UpdatePodStatus(podUID, func(pod *v1.Pod) {
 		// Find the container to update.
 		containerStatus, _, ok := findContainerStatus(&pod.Status, containerID.String())
 		if !ok {
@@ -213,8 +218,13 @@ func findContainerStatus(status *v1.PodStatus, containerID string) (containerSta
 
 }
 
-func (m *manager) TerminatePod(pod *v1.Pod) {
-	m.podManager.UpdatePodSafe(pod.UID, func(inputPod *v1.Pod) {
+func (m *manager) ReconcilePod(uid types.UID) {
+	// Simply queue the uid for an update to update the api server
+	m.enqueueUpdate(uid, nil)
+}
+
+func (m *manager) TerminatePod(uid types.UID) {
+	m.podManager.UpdatePodStatus(uid, func(inputPod *v1.Pod) {
 		newStatus, err := copyStatus(&inputPod.Status)
 		if err != nil {
 			return

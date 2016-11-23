@@ -1361,7 +1361,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			return fmt.Errorf("kill pod options are required if update type is kill")
 		}
 		apiPodStatus := killPodOptions.PodStatusFunc(pod, podStatus)
-		kl.statusManager.SetPodStatus(pod, apiPodStatus)
+		kl.statusManager.SetPodStatus(pod.UID, apiPodStatus)
 		// we kill the pod with the specified grace period since this is a termination
 		if err := kl.killPod(pod, nil, podStatus, killPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
 			// there was an error killing the pod, so we return that error directly
@@ -1424,7 +1424,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Update status in the status manager
-	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	kl.statusManager.SetPodStatus(pod.UID, apiPodStatus)
 
 	// Kill pod if it should not be running
 	if !runnable.Admit || pod.DeletionTimestamp != nil || apiPodStatus.Phase == v1.PodFailed {
@@ -1651,7 +1651,7 @@ func (kl *Kubelet) isOutOfDisk() bool {
 func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 	kl.recorder.Eventf(pod, v1.EventTypeWarning, reason, message)
 	kl.statusManager.AddPod(pod)
-	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
+	kl.statusManager.SetPodStatus(pod.UID, v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Reason:  reason,
 		Message: "Pod " + message})
@@ -1875,7 +1875,7 @@ func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mir
 			// handle the work item. Check if the DeletionTimestamp has been
 			// set, and force a status update to trigger a pod deletion request
 			// to the apiserver.
-			kl.statusManager.TerminatePod(pod)
+			kl.statusManager.TerminatePod(pod.UID)
 		}
 		return
 	}
@@ -1939,7 +1939,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
-		kl.podManager.UpdatePod(pod)
+		kl.podManager.UpdatePodSpec(pod)
 		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
@@ -1974,9 +1974,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 // that should be reconciled.
 func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 	for _, pod := range pods {
-		// Update the pod in pod manager, status manager will do periodically reconcile according
-		// to the pod manager.
-		kl.podManager.UpdatePod(pod)
+		kl.statusManager.ReconcilePod(pod.UID)
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
 		if eviction.PodIsEvicted(pod.Status) {

@@ -104,7 +104,7 @@ func TestDoProbe(t *testing.T) {
 			w := newTestWorker(m, probeType, test.probe)
 			if test.podStatus != nil {
 				m.statusManager.AddPod(w.pod)
-				m.statusManager.SetPodStatus(w.pod, *test.podStatus)
+				m.statusManager.SetPodStatus(w.pod.UID, *test.podStatus)
 			}
 			if c := w.doProbe(); c != test.expectContinue {
 				t.Errorf("[%s-%d] Expected continue to be %v but got %v", probeType, i, test.expectContinue, c)
@@ -131,7 +131,7 @@ func TestInitialDelay(t *testing.T) {
 		w := newTestWorker(m, probeType, v1.Probe{
 			InitialDelaySeconds: 10,
 		})
-		m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+		m.statusManager.SetPodStatus(w.pod.UID, getTestRunningStatus())
 
 		expectContinue(t, w, w.doProbe(), "during initial delay")
 		expectResult(t, w, results.Result(probeType == liveness), "during initial delay")
@@ -140,7 +140,7 @@ func TestInitialDelay(t *testing.T) {
 		laterStatus := getTestRunningStatus()
 		laterStatus.ContainerStatuses[0].State.Running.StartedAt.Time =
 			time.Now().Add(-100 * time.Second)
-		m.statusManager.SetPodStatus(w.pod, laterStatus)
+		m.statusManager.SetPodStatus(w.pod.UID, laterStatus)
 
 		// Second call should succeed (already waited).
 		expectContinue(t, w, w.doProbe(), "after initial delay")
@@ -151,7 +151,7 @@ func TestInitialDelay(t *testing.T) {
 func TestFailureThreshold(t *testing.T) {
 	m := newTestManager()
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(w.pod.UID, getTestRunningStatus())
 
 	for i := 0; i < 2; i++ {
 		// First probe should succeed.
@@ -185,7 +185,7 @@ func TestFailureThreshold(t *testing.T) {
 func TestSuccessThreshold(t *testing.T) {
 	m := newTestManager()
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 3, FailureThreshold: 1})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(w.pod.UID, getTestRunningStatus())
 
 	// Start out failure.
 	w.resultsManager.Set(testContainerID, results.Failure, &v1.Pod{})
@@ -222,7 +222,7 @@ func TestCleanUp(t *testing.T) {
 	for _, probeType := range [...]probeType{liveness, readiness} {
 		key := probeKey{testPodUID, testContainerName, probeType}
 		w := newTestWorker(m, probeType, v1.Probe{})
-		m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+		m.statusManager.SetPodStatus(w.pod.UID, getTestRunningStatus())
 		go w.run()
 		m.workers[key] = w
 
@@ -258,7 +258,7 @@ func TestHandleCrash(t *testing.T) {
 
 	m := newTestManager()
 	w := newTestWorker(m, readiness, v1.Probe{})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(w.pod.UID, getTestRunningStatus())
 
 	expectContinue(t, w, w.doProbe(), "Initial successful probe.")
 	expectResult(t, w, results.Success, "Initial successful probe.")
@@ -311,7 +311,7 @@ func TestOnHoldOnLivenessCheckFailure(t *testing.T) {
 	m := newTestManager()
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
 	status := getTestRunningStatus()
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(w.pod.UID, getTestRunningStatus())
 
 	// First probe should fail.
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
@@ -333,7 +333,7 @@ func TestOnHoldOnLivenessCheckFailure(t *testing.T) {
 
 	// Set a new container ID to lift the hold. The next probe will succeed.
 	status.ContainerStatuses[0].ContainerID = "test://newCont_ID"
-	m.statusManager.SetPodStatus(w.pod, status)
+	m.statusManager.SetPodStatus(w.pod.UID, status)
 	msg = "hold lifted"
 	expectContinue(t, w, w.doProbe(), msg)
 	expectResult(t, w, results.Success, msg)
