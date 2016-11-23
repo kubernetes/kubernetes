@@ -62,11 +62,6 @@ const (
 	replicaCount                = 3
 	durabilityType              = "replicate"
 	secretKeyName               = "key" // key name used in secret
-	annGlusterURL               = "glusterfs.kubernetes.io/url"
-	annGlusterSecretName        = "glusterfs.kubernetes.io/secretname"
-	annGlusterSecretNamespace   = "glusterfs.kubernetes.io/secretnamespace"
-	annGlusterUserKey           = "glusterfs.kubernetes.io/userkey"
-	annGlusterUser              = "glusterfs.kubernetes.io/userid"
 	gciGlusterMountBinariesPath = "/sbin/mount.glusterfs"
 )
 
@@ -385,6 +380,7 @@ type provisioningConfig struct {
 	secretNamespace string
 	secretName      string
 	secretValue     string
+	clusterId       string
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -526,7 +522,8 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 		glog.Errorf("glusterfs: failed to create glusterfs rest client")
 		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
 	}
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Durability: gapi.VolumeDurabilityInfo{Type: durabilityType, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}}
+	clusterIds := dstrings.Split(p.clusterId, ",")
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIds, Durability: gapi.VolumeDurabilityInfo{Type: durabilityType, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("glusterfs: error creating volume %v ", err)
@@ -680,6 +677,8 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			cfg.secretName = v
 		case "secretnamespace":
 			cfg.secretNamespace = v
+		case "clusterid":
+			cfg.clusterId = v
 		case "restauthenabled":
 			authEnabled = dstrings.ToLower(v) == "true"
 		default:
