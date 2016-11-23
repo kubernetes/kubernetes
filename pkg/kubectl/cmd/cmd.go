@@ -171,6 +171,8 @@ __custom_func() {
 	valid_resources = `Valid resource types include:
 
     * clusters (valid only for federation apiservers)
+    * clusterrolebindings
+    * clusterroles
     * componentstatuses (aka 'cs')
     * configmaps (aka 'cm')
     * daemonsets (aka 'ds')
@@ -192,6 +194,8 @@ __custom_func() {
     * replicasets (aka 'rs')
     * replicationcontrollers (aka 'rc')
     * resourcequotas (aka 'quota')
+    * rolebindings
+    * roles
     * secrets
     * serviceaccounts (aka 'sa')
     * services (aka 'svc')
