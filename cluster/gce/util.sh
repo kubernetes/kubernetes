@@ -1328,7 +1328,7 @@ function kube-down() {
     done
   fi
 
-  local -r REPLICA_NAME="$(get-replica-name)"
+  local -r REPLICA_NAME="${KUBE_REPLICA_NAME:-$(get-replica-name)}"
 
   set-existing-master
 
