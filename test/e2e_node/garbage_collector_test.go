@@ -257,7 +257,10 @@ func containerGCTest(f *framework.Framework, test testRun) {
 
 // Runs containerGCTest using the docker runtime.
 func dockerContainerGCTest(f *framework.Framework, test testRun) {
-	runtime := docker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration)
+	var runtime docker.DockerInterface
+	BeforeEach(func() {
+		runtime = docker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration)
+	})
 	for _, pod := range test.testPods {
 		// Initialize the getContainerNames function to use the dockertools api
 		thisPrefix := pod.containerPrefix
