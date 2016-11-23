@@ -11,7 +11,6 @@ for container runtimes to integrate with kubelet on a node. CRI is currently in 
 In the future, we plan to add more developer tools such as the CRI validation
 tests.
 
-
 ## Why develop CRI?
 
 Prior to the existence of CRI, container runtimes (e.g., `docker`, `rkt`) were
@@ -32,7 +31,7 @@ pluggable container runtimes and build a healthier ecosystem.
 2. Set the kubelet flags
    - Pass the unix socket(s) to which your services listen to kubelet:
      `--container-runtime-endpoint` and `--image-service-endpoint`.
-   - Enable CRI in kubelet by`--experimental-cri=true`).
+   - Enable CRI in kubelet by`--experimental-cri=true`.
    - Use the "remote" runtime by `--container-runtime=remote`.
 
 Please see the [Status Update](#status-update) section for known issues for
@@ -66,7 +65,6 @@ Start kubelet with the following flags:
 Please also see the [known issues](#docker-cri-1.5-known-issues) before trying
 out.
 
-
 ## Design docs and proposals
 
 We plan to add CRI specifications/requirements in the near future. For now,
@@ -79,13 +77,11 @@ besides discussions on Github issues.
   - Networking: The CRI runtime handles network plugins and the
     setup/teardown of the pod sandbox.
 
-
 ## Work-In-Progress CRI runtimes
 
  - [cri-o](https://github.com/kubernetes-incubator/cri-o)
  - [rktlet](https://github.com/kubernetes-incubator/rktlet)
  - [frakti](https://github.com/kubernetes/frakti)
-
 
 ## [Status update](#status-update)
 
@@ -93,24 +89,32 @@ besides discussions on Github issues.
 
   - [v1alpha1 version](https://github.com/kubernetes/kubernetes/blob/release-1.5/pkg/kubelet/api/v1alpha1/runtime/api.proto) of CRI is released.
 
-
 #### [CRI known issues](#cri-1.5-known-issues):
 
-  - Container metrics are not defined yet in CRI ([#27097](https://github.com/kubernetes/kubernetes/issues/27097)).
-  - CRI may not be compatible with other experimental features (e.g., Seccomp)
-  - Streaming server needs to be further productionized:
-     - Authentication: [#36666](https://github.com/kubernetes/kubernetes/issues/36666)
-     - Avoid including user data in the redirect URL: [#36187](https://github.com/kubernetes/kubernetes/issues/36187)
-
+  - [#27097](https://github.com/kubernetes/kubernetes/issues/27097): Container
+    metrics are not yet defined in CRI.
+  - [#36401](https://github.com/kubernetes/kubernetes/issues/36401): The new
+     container log path/format is not yet supported by the logging pipeline
+    (e.g., fluentd, GCL).
+  - CRI may not be compatible with other experimental features (e.g., Seccomp).
+  - Streaming server needs to be hardened.
+     - [#36666](https://github.com/kubernetes/kubernetes/issues/36666):
+       Authentication.
+     - [#36187](https://github.com/kubernetes/kubernetes/issues/36187): Avoid
+       including user data in the redirect URL.
 
 #### [Docker CRI integration known issues](#docker-cri-1.5-known-issues)
 
   - Docker compatibility: Support only Docker v1.11 and v1.12.
-  - Network: Does not support host port and bandwidth shaping
-    [#35457](https://github.com/kubernetes/kubernetes/issues/35457)
-  - Exec/attach/port-forward (streaming requests): Does not support `nsenter`
-    as the exec handler (`--exec-handler=nsenter`). Also see
-    (#cri-1.5-known-issues) for limitations on CRI streaming.
+  - Network:
+     - [#35457](https://github.com/kubernetes/kubernetes/issues/35457): Does
+       not support host ports.
+     - [#37315](https://github.com/kubernetes/kubernetes/issues/37315): Does
+       not support bandwidth shaping.
+  - Exec/attach/port-forward (streaming requests):
+     - [#35747](https://github.com/kubernetes/kubernetes/issues/35747): Does
+       not support `nsenter` as the exec handler (`--exec-handler=nsenter`).
+     - Also see (#cri-1.5-known-issues) for limitations on CRI streaming.
 
 ## Contacts
 
