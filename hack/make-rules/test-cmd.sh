@@ -1163,7 +1163,7 @@ __EOF__
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl delete pvc b-pvc 2>&1 "${kube_flags[@]}"
 
-  ## kubectl apply --prune --prune-whitelist(-w)
+  ## kubectl apply --prune --prune-whitelist
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # apply pod a
@@ -1171,7 +1171,7 @@ __EOF__
   # check right pod exists
   kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
   # apply svc and don't prune pod a by overwriting whitelist
-  kubectl apply --prune -l prune-group=true -f hack/testdata/prune/svc.yaml -w core/v1/Service 2>&1 "${kube_flags[@]}"
+  kubectl apply --prune -l prune-group=true -f hack/testdata/prune/svc.yaml --prune-whitelist core/v1/Service 2>&1 "${kube_flags[@]}"
   kube::test::get_object_assert 'service prune-svc' "{{${id_field}}}" 'prune-svc'
   kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
   # apply svc and prune pod a with default whitelist
