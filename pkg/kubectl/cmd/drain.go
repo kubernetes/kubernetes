@@ -397,13 +397,13 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 	}
 
 	getPodFn := func(namespace, name string) (*api.Pod, error) {
-		return o.client.Core().Pods(namespace).Get(name)
+		return o.client.Pods(namespace).Get(name)
 	}
 	pendingPods, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
 	if err != nil {
 		fmt.Fprintf(o.out, "There are pending pods when an error occured:\n")
 		for _, pendindPod := range pendingPods {
-			cmdutil.PrintSuccess(o.mapper, true, o.out, "pod", pendindPod.Name, false, "")
+			cmdutil.PrintSuccess(o.mapper, true, o.out, "pod", pendindPod.Name, "")
 		}
 	}
 	return err
@@ -416,7 +416,7 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
 				if o.ifPrint {
-					cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, "deleted")
+					cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, "deleted")
 				}
 				continue
 			} else if err != nil {
