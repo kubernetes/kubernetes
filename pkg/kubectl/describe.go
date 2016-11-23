@@ -836,140 +836,76 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	})
 }
 
+type PrefixWriter struct {
+	out io.Writer
+}
+
+func (this *PrefixWriter) Write(level int, format string, a ...interface{}) {
+	levelSpace := "  "
+	prefix := ""
+	for i := 0; i < level; i++ {
+		prefix += levelSpace
+	}
+	fmt.Fprintf(this.out, prefix+format, a)
+}
+
+const (
+	LEVEL_0 = iota
+	LEVEL_1
+	LEVEL_2
+	LEVEL_3
+)
+
 // TODO: Do a better job at indenting, maybe by using a prefix writer
 func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus, resolverFn EnvVarResolverFunc, out io.Writer, space string) {
 	statuses := map[string]api.ContainerStatus{}
 	for _, status := range containerStatuses {
 		statuses[status.Name] = status
 	}
-	if len(containers) == 0 {
-		fmt.Fprintf(out, "%s%s: <none>\n", space, label)
-	} else {
-		fmt.Fprintf(out, "%s%s:\n", space, label)
-	}
+
+	writer := &PrefixWriter{out}
+	describeContainersLabel(containers, label, space, writer)
+
 	for _, container := range containers {
 		status, ok := statuses[container.Name]
-		nameIndent := ""
-		if len(space) > 0 {
-			nameIndent = " "
-		}
-		fmt.Fprintf(out, "  %s%v:\n", nameIndent, container.Name)
+		describeContainerBasicInfo(container, status, ok, space, writer)
+		describeContainerCommand(container, writer)
+		describeContainerResource(container, writer)
 		if ok {
-			fmt.Fprintf(out, "    Container ID:\t%s\n", status.ContainerID)
+			describeContainerState(status, out, writer)
 		}
-		fmt.Fprintf(out, "    Image:\t%s\n", container.Image)
-		if ok {
-			fmt.Fprintf(out, "    Image ID:\t%s\n", status.ImageID)
-		}
-		portString := describeContainerPorts(container.Ports)
-		if strings.Contains(portString, ",") {
-			fmt.Fprintf(out, "    Ports:\t%s\n", portString)
-		} else {
-			fmt.Fprintf(out, "    Port:\t%s\n", portString)
-		}
+		describeContainerProbe(container, writer)
+		describeContainerVolumes(container, writer)
+		describeContainerEnvVars(container, resolverFn, writer)
+	}
+}
 
-		if len(container.Command) > 0 {
-			fmt.Fprintf(out, "    Command:\n")
-			for _, c := range container.Command {
-				fmt.Fprintf(out, "      %s\n", c)
-			}
-		}
-		if len(container.Args) > 0 {
-			fmt.Fprintf(out, "    Args:\n")
-			for _, arg := range container.Args {
-				fmt.Fprintf(out, "      %s\n", arg)
-			}
-		}
+func describeContainersLabel(containers []api.Container, label, space string, writer *PrefixWriter) {
+	none := ""
+	if len(containers) == 0 {
+		none = "<none>"
+	}
+	writer.Write(LEVEL_0, "%s%s: %s\n", space, label, none)
+}
 
-		resources := container.Resources
-		if len(resources.Limits) > 0 {
-			fmt.Fprintf(out, "    Limits:\n")
-		}
-		for _, name := range SortedResourceNames(resources.Limits) {
-			quantity := resources.Limits[name]
-			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
-		}
-
-		if len(resources.Requests) > 0 {
-			fmt.Fprintf(out, "    Requests:\n")
-		}
-		for _, name := range SortedResourceNames(resources.Requests) {
-			quantity := resources.Requests[name]
-			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
-		}
-
-		if ok {
-			describeStatus("State", status.State, out)
-			if status.LastTerminationState.Terminated != nil {
-				describeStatus("Last State", status.LastTerminationState, out)
-			}
-			fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
-			fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
-		}
-
-		if container.LivenessProbe != nil {
-			probe := DescribeProbe(container.LivenessProbe)
-			fmt.Fprintf(out, "    Liveness:\t%s\n", probe)
-		}
-		if container.ReadinessProbe != nil {
-			probe := DescribeProbe(container.ReadinessProbe)
-			fmt.Fprintf(out, "    Readiness:\t%s\n", probe)
-		}
-
-		none := ""
-		if len(container.VolumeMounts) == 0 {
-			none = "\t<none>"
-		}
-
-		fmt.Fprintf(out, "    Volume Mounts:%s\n", none)
-		sort.Sort(SortableVolumeMounts(container.VolumeMounts))
-		for _, mount := range container.VolumeMounts {
-			flags := []string{}
-			switch {
-			case mount.ReadOnly:
-				flags = append(flags, "ro")
-			case !mount.ReadOnly:
-				flags = append(flags, "rw")
-			case len(mount.SubPath) > 0:
-				flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
-			}
-			fmt.Fprintf(out, "      %s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
-		}
-
-		none = ""
-		if len(container.Env) == 0 {
-			none = "\t<none>"
-		}
-		fmt.Fprintf(out, "    Environment Variables:%s\n", none)
-		for _, e := range container.Env {
-			if e.ValueFrom == nil {
-				fmt.Fprintf(out, "      %s:\t%s\n", e.Name, e.Value)
-				continue
-			}
-
-			switch {
-			case e.ValueFrom.FieldRef != nil:
-				var valueFrom string
-				if resolverFn != nil {
-					valueFrom = resolverFn(e)
-				}
-				fmt.Fprintf(out, "      %s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
-			case e.ValueFrom.ResourceFieldRef != nil:
-				valueFrom, err := fieldpath.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
-				if err != nil {
-					valueFrom = ""
-				}
-				resource := e.ValueFrom.ResourceFieldRef.Resource
-				if valueFrom == "0" && (resource == "limits.cpu" || resource == "limits.memory") {
-					valueFrom = "node allocatable"
-				}
-				fmt.Fprintf(out, "      %s:\t%s (%s)\n", e.Name, valueFrom, resource)
-			case e.ValueFrom.SecretKeyRef != nil:
-				fmt.Fprintf(out, "      %s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
-			case e.ValueFrom.ConfigMapKeyRef != nil:
-				fmt.Fprintf(out, "      %s:\t<set to the key '%s' of config map '%s'>\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name)
-			}
-		}
+func describeContainerBasicInfo(container api.Container, status api.ContainerStatus, ok bool, space string, writer *PrefixWriter) {
+	nameIndent := ""
+	if len(space) > 0 {
+		nameIndent = " "
+	}
+	writer.Write(LEVEL_1, "%s%v:\n", nameIndent, container.Name)
+	if ok {
+		writer.Write(LEVEL_2, "Container ID:\t%s\n", status.ContainerID)
+	}
+	writer.Write(LEVEL_2, "Image:\t%s\n", container.Image)
+	if ok {
+		writer.Write(LEVEL_2, "Image ID:\t%s\n", status.ImageID)
+	}
+	portString := describeContainerPorts(container.Ports)
+	if strings.Contains(portString, ",") {
+		writer.Write(LEVEL_2, "Ports:\t%s\n", portString)
+	} else {
+		writer.Write(LEVEL_2, "Port:\t%s\n", portString)
 	}
 }
 
@@ -979,6 +915,119 @@ func describeContainerPorts(cPorts []api.ContainerPort) string {
 		ports = append(ports, fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol))
 	}
 	return strings.Join(ports, ", ")
+}
+
+func describeContainerCommand(container api.Container, writer *PrefixWriter) {
+	if len(container.Command) > 0 {
+		writer.Write(LEVEL_2, "Command:\n")
+		for _, c := range container.Command {
+			writer.Write(LEVEL_3, "%s\n", c)
+		}
+	}
+	if len(container.Args) > 0 {
+		writer.Write(LEVEL_2, "Args:\n")
+		for _, arg := range container.Args {
+			writer.Write(LEVEL_3, "%s\n", arg)
+		}
+	}
+}
+
+func describeContainerResource(container api.Container, writer *PrefixWriter) {
+	resources := container.Resources
+	if len(resources.Limits) > 0 {
+		writer.Write(LEVEL_2, "Limits:\n")
+	}
+	for _, name := range SortedResourceNames(resources.Limits) {
+		quantity := resources.Limits[name]
+		writer.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+	}
+
+	if len(resources.Requests) > 0 {
+		writer.Write(LEVEL_2, "Requests:\n")
+	}
+	for _, name := range SortedResourceNames(resources.Requests) {
+		quantity := resources.Requests[name]
+		writer.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+	}
+}
+
+func describeContainerState(status api.ContainerStatus, out io.Writer, writer *PrefixWriter) {
+	describeStatus("State", status.State, out)
+	if status.LastTerminationState.Terminated != nil {
+		describeStatus("Last State", status.LastTerminationState, out)
+	}
+	writer.Write(LEVEL_2, "Ready:\t%v\n", printBool(status.Ready))
+	writer.Write(LEVEL_2, "Restart Count:\t%d\n", status.RestartCount)
+}
+
+func describeContainerProbe(container api.Container, writer *PrefixWriter) {
+	if container.LivenessProbe != nil {
+		probe := DescribeProbe(container.LivenessProbe)
+		writer.Write(LEVEL_2, "Liveness:\t%s\n", probe)
+	}
+	if container.ReadinessProbe != nil {
+		probe := DescribeProbe(container.ReadinessProbe)
+		writer.Write(LEVEL_2, "Readiness:\t%s\n", probe)
+	}
+}
+
+func describeContainerVolumes(container api.Container, writer *PrefixWriter) {
+	none := ""
+	if len(container.VolumeMounts) == 0 {
+		none = "\t<none>"
+	}
+
+	writer.Write(LEVEL_2, "Volume Mounts:%s\n", none)
+	sort.Sort(SortableVolumeMounts(container.VolumeMounts))
+	for _, mount := range container.VolumeMounts {
+		flags := []string{}
+		switch {
+		case mount.ReadOnly:
+			flags = append(flags, "ro")
+		case !mount.ReadOnly:
+			flags = append(flags, "rw")
+		case len(mount.SubPath) > 0:
+			flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
+		}
+		writer.Write(LEVEL_3, "%s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
+	}
+}
+
+func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolverFunc, writer *PrefixWriter) {
+	none := ""
+	if len(container.Env) == 0 {
+		none = "\t<none>"
+	}
+	writer.Write(LEVEL_2, "Environment Variables:%s\n", none)
+	for _, e := range container.Env {
+		if e.ValueFrom == nil {
+			writer.Write(LEVEL_3, "%s:\t%s\n", e.Name, e.Value)
+			continue
+		}
+
+		switch {
+		case e.ValueFrom.FieldRef != nil:
+			var valueFrom string
+			if resolverFn != nil {
+				valueFrom = resolverFn(e)
+			}
+			writer.Write(LEVEL_3, "%s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
+		case e.ValueFrom.ResourceFieldRef != nil:
+			valueFrom, err := fieldpath.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+			if err != nil {
+				valueFrom = ""
+			}
+			resource := e.ValueFrom.ResourceFieldRef.Resource
+			if valueFrom == "0" && (resource == "limits.cpu" || resource == "limits.memory") {
+				valueFrom = "node allocatable"
+			}
+			writer.Write(LEVEL_3, "%s:\t%s (%s)\n", e.Name, valueFrom, resource)
+		case e.ValueFrom.SecretKeyRef != nil:
+			writer.Write(LEVEL_3, "%s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
+		case e.ValueFrom.ConfigMapKeyRef != nil:
+			writer.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name)
+		}
+	}
 }
 
 // DescribeProbe is exported for consumers in other API groups that have probes
