@@ -466,3 +466,81 @@ func Regions2Zones(in Regions2ZonesParams) sets.String {
 	}
 	return ret
 }
+
+// CalculateSetOfZonesParams are parameters for the func CalculateSetOfZones
+type CalculateSetOfZonesParams struct {
+	// PVC data structure that is used for the set of zones calculation
+	PVC *v1.PersistentVolumeClaim
+	// is parameter zone specified in the Storage Class?
+	IsSCZoneSpecified bool
+	// in case the parameter zone is specified StorageClassZone contains the value of this parameter, otherwise it is ""
+	StorageClassZones string
+	// a func that returns a set of all available zones
+	GetAllZones func() (sets.String, error)
+	// a func that converts a zone to a region
+	Zone2region func(string) (string, error)
+}
+
+// CalculateSetOfZones returns:
+// - either a set of zones resulting from currently available zones, allowed zones by an admin in the corresponding storage class and zones preferred by the user in the selector part of the PVC
+// - or an error in case the resulting set of zones is empty or another error occurred
+func CalculateSetOfZones(input CalculateSetOfZonesParams) (sets.String, error) {
+	var ret, allAvailableZones sets.String
+	var funcWideErr error
+	emptySet := make(sets.String)
+	if allAvailableZones, funcWideErr = input.GetAllZones(); funcWideErr != nil {
+		return emptySet, funcWideErr
+	}
+	if !input.IsSCZoneSpecified {
+		ret = allAvailableZones
+	} else {
+		if ret, funcWideErr = Zones2Set(input.StorageClassZones); funcWideErr != nil {
+			return emptySet, funcWideErr
+		}
+	}
+	if emptySelector, err := ValidatePVCSelector(input.PVC); err != nil {
+		return emptySet, err
+	} else if emptySelector {
+		return ret, nil
+	}
+	if matchLabelZone, err := GetPVCMatchLabel(input.PVC, unversioned.LabelZoneFailureDomain); err == nil {
+		matchLabelZoneSet := make(sets.String)
+		matchLabelZoneSet.Insert(matchLabelZone)
+		ret = ret.Intersection(matchLabelZoneSet)
+	}
+	if matchLabelRegion, err := GetPVCMatchLabel(input.PVC, unversioned.LabelZoneRegion); err == nil {
+		var matchLabelRegionParams Regions2ZonesParams
+		matchLabelRegionParams.Regions = make(sets.String)
+		matchLabelRegionParams.Regions.Insert(matchLabelRegion)
+		matchLabelRegionParams.AllAvailableZones = allAvailableZones
+		matchLabelRegionParams.Zone2region = input.Zone2region
+		matchLabelRegionSet := Regions2Zones(matchLabelRegionParams)
+		ret = ret.Intersection(matchLabelRegionSet)
+	}
+	if matchExpressionZoneSet, err := GetPVCMatchExpression(input.PVC, unversioned.LabelZoneFailureDomain, unversioned.LabelSelectorOpIn); err == nil {
+		ret = ret.Intersection(matchExpressionZoneSet)
+	}
+	if matchExpressionRegionSet, err := GetPVCMatchExpression(input.PVC, unversioned.LabelZoneRegion, unversioned.LabelSelectorOpIn); err == nil {
+		var matchExpressionRegionParams Regions2ZonesParams
+		matchExpressionRegionParams.Regions = matchExpressionRegionSet
+		matchExpressionRegionParams.AllAvailableZones = allAvailableZones
+		matchExpressionRegionParams.Zone2region = input.Zone2region
+		matchExpressionZonesSet := Regions2Zones(matchExpressionRegionParams)
+		ret = ret.Intersection(matchExpressionZonesSet)
+	}
+	if matchExpressionZoneSet, err := GetPVCMatchExpression(input.PVC, unversioned.LabelZoneFailureDomain, unversioned.LabelSelectorOpNotIn); err == nil {
+		ret = ret.Difference(matchExpressionZoneSet)
+	}
+	if matchExpressionRegionSet, err := GetPVCMatchExpression(input.PVC, unversioned.LabelZoneRegion, unversioned.LabelSelectorOpNotIn); err == nil {
+		var matchExpressionRegionParams Regions2ZonesParams
+		matchExpressionRegionParams.Regions = matchExpressionRegionSet
+		matchExpressionRegionParams.AllAvailableZones = allAvailableZones
+		matchExpressionRegionParams.Zone2region = input.Zone2region
+		matchExpressionZonesSet := Regions2Zones(matchExpressionRegionParams)
+		ret = ret.Difference(matchExpressionZonesSet)
+	}
+	if len(ret) < 1 {
+		return emptySet, fmt.Errorf("Currently available zones and admin and user configuration resulted in an empty set of zones that is incorrect")
+	}
+	return ret, nil
+}
