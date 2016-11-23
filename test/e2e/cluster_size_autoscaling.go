@@ -465,7 +465,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 		Image:        framework.GetPauseImageName(f.ClientSet),
 		Replicas:     replicas,
 		HostPorts:    map[string]int{"port1": 4321},
-		NodeSelector: map[string]string{"cluster-autoscaling-test.special-node": "true"},
+		NodeSelector: nodeSelector,
 	}
 	err := framework.RunRC(*config)
 	if expectRunning {
