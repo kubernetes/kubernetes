@@ -566,3 +566,45 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
+
+func TestSyncEndpointsHeadlessService(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns,
+		serverResponse{http.StatusOK, &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				Namespace:       ns,
+				ResourceVersion: "1",
+			},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "TCP"}},
+			}},
+		}})
+	defer testServer.Close()
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
+	endpoints.serviceStore.Store.Add(&api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{},
+			Ports:    []api.ServicePort{},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+	endpointsHandler.ValidateRequestCount(t, 2)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []api.EndpointPort{{Port: 0, Protocol: "TCP"}, {Port: 0, Protocol: "UDP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+}

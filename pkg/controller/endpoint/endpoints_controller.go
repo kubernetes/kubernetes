@@ -384,66 +384,76 @@ func (e *EndpointController) syncService(key string) error {
 
 	readyEps := 0
 	notReadyEps := 0
+	addEndpointSubset := func(pod *api.Pod, epa api.EndpointAddress, epp api.EndpointPort) {
+		if tolerateUnreadyEndpoints || api.IsPodReady(pod) {
+			subsets = append(subsets, api.EndpointSubset{
+				Addresses: []api.EndpointAddress{epa},
+				Ports:     []api.EndpointPort{epp},
+			})
+			readyEps++
+		} else {
+			glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
+			subsets = append(subsets, api.EndpointSubset{
+				NotReadyAddresses: []api.EndpointAddress{epa},
+				Ports:             []api.EndpointPort{epp},
+			})
+			notReadyEps++
+		}
+	}
+
 	for i := range pods {
 		// TODO: Do we need to copy here?
 		pod := &(*pods[i])
 
-		for i := range service.Spec.Ports {
-			servicePort := &service.Spec.Ports[i]
+		if len(pod.Status.PodIP) == 0 {
+			glog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
+			continue
+		}
+		if pod.DeletionTimestamp != nil {
+			glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
+			continue
+		}
 
-			portName := servicePort.Name
-			portProto := servicePort.Protocol
-			portNum, err := podutil.FindPort(pod, servicePort)
-			if err != nil {
-				glog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
-				continue
-			}
-			if len(pod.Status.PodIP) == 0 {
-				glog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
-				continue
-			}
-			if pod.DeletionTimestamp != nil {
-				glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
-				continue
-			}
+		epa := api.EndpointAddress{
+			IP:       pod.Status.PodIP,
+			NodeName: &pod.Spec.NodeName,
+			TargetRef: &api.ObjectReference{
+				Kind:            "Pod",
+				Namespace:       pod.ObjectMeta.Namespace,
+				Name:            pod.ObjectMeta.Name,
+				UID:             pod.ObjectMeta.UID,
+				ResourceVersion: pod.ObjectMeta.ResourceVersion,
+			}}
 
-			epp := api.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
-			epa := api.EndpointAddress{
-				IP:       pod.Status.PodIP,
-				NodeName: &pod.Spec.NodeName,
-				TargetRef: &api.ObjectReference{
-					Kind:            "Pod",
-					Namespace:       pod.ObjectMeta.Namespace,
-					Name:            pod.ObjectMeta.Name,
-					UID:             pod.ObjectMeta.UID,
-					ResourceVersion: pod.ObjectMeta.ResourceVersion,
-				}}
+		hostname := getHostname(pod)
+		if len(hostname) > 0 &&
+			getSubdomain(pod) == service.Name &&
+			service.Namespace == pod.Namespace {
+			hostRecord := endpoints.HostRecord{
+				HostName: hostname,
+			}
+			// TODO: stop populating podHostNames annotation in 1.4
+			podHostNames[string(pod.Status.PodIP)] = hostRecord
+			epa.Hostname = hostname
+		}
 
-			hostname := getHostname(pod)
-			if len(hostname) > 0 &&
-				getSubdomain(pod) == service.Name &&
-				service.Namespace == pod.Namespace {
-				hostRecord := endpoints.HostRecord{
-					HostName: hostname,
+		if len(service.Spec.Ports) == 0 {
+			addEndpointSubset(pod, epa, api.EndpointPort{Port: 0, Protocol: api.ProtocolTCP})
+			addEndpointSubset(pod, epa, api.EndpointPort{Port: 0, Protocol: api.ProtocolUDP})
+		} else {
+			for i := range service.Spec.Ports {
+				servicePort := &service.Spec.Ports[i]
+
+				portName := servicePort.Name
+				portProto := servicePort.Protocol
+				portNum, err := podutil.FindPort(pod, servicePort)
+				if err != nil {
+					glog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
+					continue
 				}
-				// TODO: stop populating podHostNames annotation in 1.4
-				podHostNames[string(pod.Status.PodIP)] = hostRecord
-				epa.Hostname = hostname
-			}
 
-			if tolerateUnreadyEndpoints || api.IsPodReady(pod) {
-				subsets = append(subsets, api.EndpointSubset{
-					Addresses: []api.EndpointAddress{epa},
-					Ports:     []api.EndpointPort{epp},
-				})
-				readyEps++
-			} else {
-				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
-				subsets = append(subsets, api.EndpointSubset{
-					NotReadyAddresses: []api.EndpointAddress{epa},
-					Ports:             []api.EndpointPort{epp},
-				})
-				notReadyEps++
+				epp := api.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
+				addEndpointSubset(pod, epa, epp)
 			}
 		}
 	}
