@@ -59,7 +59,7 @@ type Server interface {
 type Runtime interface {
 	Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error
 	Attach(containerID string, in io.Reader, out, err io.WriteCloser, resize <-chan term.Size) error
-	PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error
+	PortForward(podSandboxID string, port int32, streamIn io.WriteCloser, streamOut io.ReadCloser) error
 }
 
 // Config defines the options used for running the stream server.
@@ -317,6 +317,6 @@ func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container
 	return a.Attach(container, in, out, err, resize)
 }
 
-func (a *criAdapter) PortForward(podName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
-	return a.Runtime.PortForward(podName, int32(port), stream)
+func (a *criAdapter) PortForward(podName string, podUID types.UID, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
+	return a.Runtime.PortForward(podName, int32(port), streamIn, streamOut)
 }

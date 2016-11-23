@@ -64,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -1328,13 +1329,13 @@ func noPodInfraContainerError(podName, podNamespace string) error {
 //  - match cgroups of container
 //  - should we support nsenter + socat on the host? (current impl)
 //  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
-func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
 	podInfraContainer := pod.FindContainerByName(PodInfraContainerName)
 	if podInfraContainer == nil {
 		return noPodInfraContainerError(pod.Name, pod.Namespace)
 	}
 
-	return PortForward(dm.client, podInfraContainer.ID.ID, port, stream)
+	return PortForward(dm.client, podInfraContainer.ID.ID, port, streamIn, streamOut)
 }
 
 // UpdatePodCIDR updates the podCIDR for the runtime.
@@ -1344,7 +1345,10 @@ func (dm *DockerManager) UpdatePodCIDR(podCIDR string) error {
 }
 
 // Temporarily export this function to share with dockershim.
-func PortForward(client DockerInterface, podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
+func PortForward(client DockerInterface, podInfraContainerID string, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
+	defer streamIn.Close()
+	defer streamOut.Close()
+
 	container, err := client.InspectContainer(podInfraContainerID)
 	if err != nil {
 		return err
@@ -1371,10 +1375,6 @@ func PortForward(client DockerInterface, podInfraContainerID string, port uint16
 	glog.V(4).Infof("executing port forwarding command: %s", commandString)
 
 	command := exec.Command(nsenterPath, args...)
-	command.Stdout = stream
-
-	stderr := new(bytes.Buffer)
-	command.Stderr = stderr
 
 	// If we use Stdin, command.Run() won't return until the goroutine that's copying
 	// from stream finishes. Unfortunately, if you have a client like telnet connected
@@ -1389,16 +1389,32 @@ func PortForward(client DockerInterface, podInfraContainerID string, port uint16
 	if err != nil {
 		return fmt.Errorf("unable to do port forwarding: error creating stdin pipe: %v", err)
 	}
+
+	outPipe, err := command.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("unable to do port forwarding: error creating stdout pipe: %v", err)
+	}
+
+	stderr := new(bytes.Buffer)
+	command.Stderr = stderr
+
+	copyErr := make(chan error)
 	go func() {
-		io.Copy(inPipe, stream)
-		inPipe.Close()
+		copyErr <- httpstream.CopyBothWays(inPipe, outPipe, streamIn, streamOut, []string{"broken pipe"})
 	}()
 
-	if err := command.Run(); err != nil {
+	if err := command.Start(); err != nil {
 		return fmt.Errorf("%v: %s", err, stderr.String())
 	}
 
-	return nil
+	// wait for stdout/stdin processing, because if StdoutPipe() is used, Wait() must not be called before that
+	err = <-copyErr
+
+	if commandErr := command.Wait(); commandErr != nil {
+		return fmt.Errorf("%v: %s", commandErr, stderr.String())
+	}
+
+	return err
 }
 
 // TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.

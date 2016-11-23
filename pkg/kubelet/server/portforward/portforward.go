@@ -38,7 +38,7 @@ import (
 // in a pod.
 type PortForwarder interface {
 	// PortForwarder copies data between a data stream and a port in a pod.
-	PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
+	PortForward(name string, uid types.UID, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error
 }
 
 // ServePortForward handles a port forwarding request.  A single request is
@@ -257,7 +257,8 @@ func (h *portForwardStreamHandler) portForward(p *portForwardStreamPair) {
 	port, _ := strconv.ParseUint(portString, 10, 16)
 
 	glog.V(5).Infof("(conn=%p, request=%s) invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
-	err := h.forwarder.PortForward(h.pod, h.uid, uint16(port), p.dataStream)
+	streamIn, streamOut := httpstream.SplitStream(p.dataStream)
+	err := h.forwarder.PortForward(h.pod, h.uid, uint16(port), streamIn, streamOut)
 	glog.V(5).Infof("(conn=%p, request=%s) done invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
 
 	if err != nil {

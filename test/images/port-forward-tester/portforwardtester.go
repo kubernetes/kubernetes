@@ -30,6 +30,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -47,48 +48,35 @@ func getEnvInt(name string) int {
 	return value
 }
 
-func main() {
-	bindAddress := os.Getenv("BIND_ADDRESS")
-	if bindAddress == "" {
-		bindAddress = "localhost"
+// taken from net/http/server.go:
+//
+// rstAvoidanceDelay is the amount of time we sleep after closing the
+// write side of a TCP connection before closing the entire socket.
+// By sleeping, we increase the chances that the client sees our FIN
+// and processes its final data before they process the subsequent RST
+// from closing a connection with known unread data.
+// This RST seems to occur mostly on BSD systems. (And Windows?)
+// This timeout is somewhat arbitrary (~latency around the planet).
+const rstAvoidanceDelay = 500 * time.Millisecond
+
+func receiveExpectedData(conn *net.TCPConn, expectedClientData string) {
+	buf := make([]byte, len(expectedClientData))
+	read, err := conn.Read(buf)
+	if read != len(expectedClientData) {
+		fmt.Printf("Expected to read %d bytes from client, but got %d instead. err=%v\n", len(expectedClientData), read, err)
+		os.Exit(2)
 	}
-	bindPort := os.Getenv("BIND_PORT")
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", bindAddress, bindPort))
+	if expectedClientData != string(buf) {
+		fmt.Printf("Expect to read %q, but got %q. err=%v\n", expectedClientData, string(buf), err)
+		os.Exit(3)
+	}
 	if err != nil {
-		fmt.Printf("Error listening: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("Read err: %v\n", err)
 	}
+	fmt.Println("Received expected client data")
+}
 
-	conn, err := listener.Accept()
-	if err != nil {
-		fmt.Printf("Error accepting connection: %v\n", err)
-		os.Exit(1)
-	}
-	defer conn.Close()
-	fmt.Println("Accepted client connection")
-
-	expectedClientData := os.Getenv("EXPECTED_CLIENT_DATA")
-	if len(expectedClientData) > 0 {
-		buf := make([]byte, len(expectedClientData))
-		read, err := conn.Read(buf)
-		if read != len(expectedClientData) {
-			fmt.Printf("Expected to read %d bytes from client, but got %d instead. err=%v\n", len(expectedClientData), read, err)
-			os.Exit(2)
-		}
-		if expectedClientData != string(buf) {
-			fmt.Printf("Expect to read %q, but got %q. err=%v\n", expectedClientData, string(buf), err)
-			os.Exit(3)
-		}
-		if err != nil {
-			fmt.Printf("Read err: %v\n", err)
-		}
-		fmt.Println("Received expected client data")
-	}
-
-	chunks := getEnvInt("CHUNKS")
-	chunkSize := getEnvInt("CHUNK_SIZE")
-	chunkInterval := getEnvInt("CHUNK_INTERVAL")
-
+func sendChunks(conn *net.TCPConn, chunks, chunkSize, chunkInterval int) {
 	stringData := strings.Repeat("x", chunkSize)
 	data := []byte(stringData)
 
@@ -105,6 +93,97 @@ func main() {
 			time.Sleep(time.Duration(chunkInterval) * time.Millisecond)
 		}
 	}
+}
+
+func main() {
+	bindAddress := os.Getenv("BIND_ADDRESS")
+	if bindAddress == "" {
+		bindAddress = "localhost"
+	}
+	bindPort := os.Getenv("BIND_PORT")
+	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(bindAddress, bindPort))
+	if err != nil {
+		fmt.Printf("Error resolving: %v\n", err)
+		os.Exit(1)
+	}
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		fmt.Printf("Error listening: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Listening on %s\n", net.JoinHostPort(bindAddress, bindPort))
+
+	conn, err := listener.AcceptTCP()
+	if err != nil {
+		fmt.Printf("Error accepting connection: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Accepted client connection")
+
+	stepEnv := os.Getenv("STEPS")
+	if len(stepEnv) == 0 {
+		stepEnv = "receive-expected,send-chunks"
+	}
+
+	for _, step := range strings.Split(stepEnv, ",") {
+		fmt.Printf("=== Step %s ===\n", step)
+		switch step {
+		case "receive-expected":
+			expectedData := os.Getenv("EXPECTED_CLIENT_DATA")
+			if len(expectedData) > 0 {
+				receiveExpectedData(conn, expectedData)
+			}
+		case "send-chunks":
+			chunks := getEnvInt("CHUNKS")
+			chunkSize := getEnvInt("CHUNK_SIZE")
+			chunkInterval := getEnvInt("CHUNK_INTERVAL")
+			if chunks > 0 {
+				sendChunks(conn, chunks, chunkSize, chunkInterval)
+			}
+		case "send-hello":
+			msg := "hello"
+			n, err := conn.Write([]byte(msg))
+			if err != nil {
+				fmt.Printf("Write error: %v\n", err)
+				os.Exit(2)
+			}
+			if n != len(msg) {
+				fmt.Printf("Written only %d bytes, expected %d\n", n, len(msg))
+				os.Exit(2)
+			}
+		case "receive-all":
+			data, err := ioutil.ReadAll(conn)
+			if err != nil {
+				fmt.Printf("Read error: %v\n", err)
+				os.Exit(2)
+			}
+			fmt.Printf("Received: %q\n", string(data))
+		case "close-write":
+			conn.CloseWrite()
+		case "close-read":
+			conn.CloseRead()
+		default:
+			fmt.Printf("Invalid step %q\n", step)
+			os.Exit(1)
+		}
+	}
+
+	fmt.Println("Shutting down connection")
+
+	// set linger timeout to flush buffers. This is the official way according to the go api docs. But
+	// there are controversial discussions whether this value has any impact on most platforms
+	// (compare https://codereview.appspot.com/95320043).
+	conn.SetLinger(-1)
+
+	// Flush the connection cleanly, following https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable:
+	// 1. close write half of connection which sends a FIN packet
+	// 2. give client some time to receive the FIN
+	// 3. close the complete connection
+	conn.CloseWrite()
+	time.Sleep(rstAvoidanceDelay)
+	conn.Close()
 
 	fmt.Println("Done")
 }

@@ -61,11 +61,11 @@ func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io
 	return dockertools.AttachContainer(r.client, containerID, in, out, errw, tty, resize)
 }
 
-func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (r *streamingRuntime) PortForward(podSandboxID string, port int32, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
 	if port < 0 || port > math.MaxUint16 {
 		return fmt.Errorf("invalid port %d", port)
 	}
-	return dockertools.PortForward(r.client, podSandboxID, uint16(port), stream)
+	return dockertools.PortForward(r.client, podSandboxID, uint16(port), streamIn, streamOut)
 }
 
 // ExecSync executes a command in the container, and returns the stdout output.

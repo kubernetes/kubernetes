@@ -72,9 +72,10 @@ type FakeDirectStreamingRuntime struct {
 		Stderr      io.WriteCloser
 		TTY         bool
 		// Port-forward args
-		Pod    *Pod
-		Port   uint16
-		Stream io.ReadWriteCloser
+		Pod       *Pod
+		Port      uint16
+		StreamIn  io.WriteCloser
+		StreamOut io.ReadCloser
 	}
 }
 
@@ -390,14 +391,15 @@ func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
 	return f.Err
 }
 
-func (f *FakeDirectStreamingRuntime) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error {
+func (f *FakeDirectStreamingRuntime) PortForward(pod *Pod, port uint16, streamIn io.WriteCloser, streamOut io.ReadCloser) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "PortForward")
 	f.Args.Pod = pod
 	f.Args.Port = port
-	f.Args.Stream = stream
+	f.Args.StreamIn = streamIn
+	f.Args.StreamOut = streamOut
 
 	return f.Err
 }
