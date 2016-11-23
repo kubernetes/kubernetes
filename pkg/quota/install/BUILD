@@ -19,5 +19,6 @@ go_library(
         "//pkg/controller/informers:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
+        "//pkg/quota/evaluator/extensions:go_default_library",
     ],
 )

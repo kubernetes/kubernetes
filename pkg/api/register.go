@@ -78,6 +78,55 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	if err := scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
 		return err
 	}
+
+	AddStandardQuotaResourceNames(
+		ResourceCPU,
+		ResourceMemory,
+		ResourceRequestsCPU,
+		ResourceRequestsMemory,
+		ResourceRequestsStorage,
+		ResourceLimitsCPU,
+		ResourceLimitsMemory,
+		ResourcePods,
+		ResourceQuotas,
+		ResourceServices,
+		ResourceReplicationControllers,
+		ResourceSecrets,
+		ResourcePersistentVolumeClaims,
+		ResourceConfigMaps,
+		ResourceServicesNodePorts,
+		ResourceServicesLoadBalancers,
+	)
+
+	AddStandardResourceNames(
+		ResourceCPU,
+		ResourceMemory,
+		ResourceRequestsCPU,
+		ResourceRequestsMemory,
+		ResourceLimitsCPU,
+		ResourceLimitsMemory,
+		ResourcePods,
+		ResourceQuotas,
+		ResourceServices,
+		ResourceReplicationControllers,
+		ResourceSecrets,
+		ResourceConfigMaps,
+		ResourcePersistentVolumeClaims,
+		ResourceStorage,
+	)
+
+	AddIntegerResourceNames(
+		ResourcePods,
+		ResourceQuotas,
+		ResourceServices,
+		ResourceReplicationControllers,
+		ResourceSecrets,
+		ResourceConfigMaps,
+		ResourcePersistentVolumeClaims,
+		ResourceServicesNodePorts,
+		ResourceServicesLoadBalancers,
+	)
+
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},

@@ -147,24 +147,8 @@ func IsStandardLimitRangeType(str string) bool {
 	return standardLimitRangeTypes.Has(str)
 }
 
-var standardQuotaResources = sets.NewString(
-	string(ResourceCPU),
-	string(ResourceMemory),
-	string(ResourceRequestsCPU),
-	string(ResourceRequestsMemory),
-	string(ResourceRequestsStorage),
-	string(ResourceLimitsCPU),
-	string(ResourceLimitsMemory),
-	string(ResourcePods),
-	string(ResourceQuotas),
-	string(ResourceServices),
-	string(ResourceReplicationControllers),
-	string(ResourceSecrets),
-	string(ResourcePersistentVolumeClaims),
-	string(ResourceConfigMaps),
-	string(ResourceServicesNodePorts),
-	string(ResourceServicesLoadBalancers),
-)
+// standardQuotaResources is populated in addKnownTypes
+var standardQuotaResources = sets.NewString()
 
 // IsStandardQuotaResourceName returns true if the resource is known to
 // the quota tracking system
@@ -190,26 +174,42 @@ var standardResources = sets.NewString(
 	string(ResourceRequestsStorage),
 )
 
+// AddStandardQuotaResourceNames add the resource names into the list of
+// resources known to the quota tracking system
+func AddStandardQuotaResourceNames(names ...ResourceName) {
+	for _, name := range names {
+		standardQuotaResources.Insert(string(name))
+	}
+}
+
 // IsStandardResourceName returns true if the resource is known to the system
 func IsStandardResourceName(str string) bool {
 	return standardResources.Has(str)
 }
 
-var integerResources = sets.NewString(
-	string(ResourcePods),
-	string(ResourceQuotas),
-	string(ResourceServices),
-	string(ResourceReplicationControllers),
-	string(ResourceSecrets),
-	string(ResourceConfigMaps),
-	string(ResourcePersistentVolumeClaims),
-	string(ResourceServicesNodePorts),
-	string(ResourceServicesLoadBalancers),
-)
+// AddStandardResourceNames add the resource names into the list of resources
+// known to the system.
+// External resource names must be in "groupname/resourcename" format.
+func AddStandardResourceNames(names ...ResourceName) {
+	for _, name := range names {
+		standardResources.Insert(string(name))
+	}
+}
+
+// integerResources is populated in addKnownTypes
+var integerResources = sets.NewString()
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
 	return integerResources.Has(str) || IsOpaqueIntResourceName(ResourceName(str))
+}
+
+// AddIntegerResourceNames add the resource names into the list of resources
+// measured in integer values
+func AddIntegerResourceNames(names ...ResourceName) {
+	for _, name := range names {
+		integerResources.Insert(string(name))
+	}
 }
 
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
