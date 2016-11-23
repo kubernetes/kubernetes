@@ -179,7 +179,7 @@ func verifyCascadingDeletionForDeployment(clientset *fedclientset.Clientset, clu
 		_, err := clusterClientset.Extensions().Deployments(nsName).Get(deploymentName)
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for deployment %s in cluster %s, expected deployment to exist", deploymentName, clusterName))
-		} else if shouldExist && !errors.IsNotFound(err) {
+		} else if !shouldExist && !errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for deployment %s in cluster %s, got error: %v", deploymentName, clusterName, err))
 		}
 	}
