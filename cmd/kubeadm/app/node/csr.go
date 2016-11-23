@@ -19,7 +19,7 @@ package node
 import (
 	"fmt"
 
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	// TODO: replace deps below with ones from k8s.io/client-go when csr.RequestNodeCertificate() is fixed
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
@@ -36,6 +36,8 @@ func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, e
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to generating private key [%v]", err)
 	}
+	// TODO: fix csr.RequestNodeCertificate() to use a versioned client from k8s.io/client-go and such a client here,
+	// changing the client creation in kubeadm/app/node/bootstrap.go
 	cert, err := csr.RequestNodeCertificate(csrClient, key, connection.NodeName)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%v]", err)
@@ -47,8 +49,10 @@ func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, e
 	fmt.Printf("<node/csr> received signed certificate from the API server:\n%s\n", fmtCert)
 	fmt.Println("<node/csr> generating kubelet configuration")
 
-	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", connection.Endpoint, connection.CACert)
-	finalConfig := kubeadmutil.MakeClientConfigWithCerts(
+	// TODO: use kubeadmutil.CreateBasicClientConfig() instead when csr.RequestNodeCertificate() is fixed
+	bareClientConfig := createBasicClientConfig("kubernetes", connection.Endpoint, connection.CACert)
+	// TODO: use kubeadmutil.MakeClientConfigWithCerts() instead when csr.RequestNodeCertificate() is fixed
+	finalConfig := makeClientConfigWithCerts(
 		bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", connection.NodeName),
 		key, cert,
 	)

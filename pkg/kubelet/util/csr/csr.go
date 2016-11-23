@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+// TODO: use a versioned client from k8s.io/client-go in this function, `kubeadm` depends on it
 // RequestNodeCertificate will create a certificate signing request and send it to API server,
 // then it will watch the object's status, once approved by API server, it will return the API
 // server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,

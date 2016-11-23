@@ -21,11 +21,10 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	// TODO: "k8s.io/client-go/client/tools/clientcmd/api"
+	certutil "k8s.io/client-go/pkg/util/cert"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 func CreateCertsAndConfigForClients(cfg kubeadmapi.API, clientNames []string, caKey *rsa.PrivateKey, caCert *x509.Certificate) (map[string]*clientcmdapi.Config, error) {

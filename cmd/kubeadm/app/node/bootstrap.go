@@ -22,14 +22,15 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/client-go/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
+	// TODO: replace the dependencies below with ones from k8s.io/client-go when csr.RequestNodeCertificate() is fixed
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // ConnectionDetails represents a master API endpoint connection
@@ -107,9 +108,11 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 
 // creates a set of clients for this endpoint
 func createClients(caCert []byte, endpoint, token string, nodeName types.NodeName) (*clientset.Clientset, error) {
-	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", endpoint, caCert)
+	// TODO: use kubeadmutil.CreateBasicClientConfig() instead when when csr.RequestNodeCertificate() is fixed
+	bareClientConfig := createBasicClientConfig("kubernetes", endpoint, caCert)
 	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
-		*kubeadmutil.MakeClientConfigWithToken(
+		// TODO: use kubeadmutil.MakeClientConfigWithToken() instead when when csr.RequestNodeCertificate() is fixed
+		*makeClientConfigWithToken(
 			bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName), token,
 		),
 		&clientcmd.ConfigOverrides{},

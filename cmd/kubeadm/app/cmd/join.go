@@ -150,7 +150,8 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	err = kubeadmutil.WriteKubeconfigIfNotExists("kubelet", kubeconfig)
+	// TODO: use kubeadmutil.WriteKubeconfigIfNotExist() instead when csr.RequestNodeCertificate() is fixed
+	err = kubenode.WriteKubeconfigIfNotExists("kubelet", kubeconfig)
 	if err != nil {
 		return err
 	}

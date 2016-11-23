@@ -22,10 +22,10 @@ import (
 	"os"
 	"path"
 
+	"k8s.io/client-go/pkg/util/uuid"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 func generateTokenIfNeeded(s *kubeadmapi.Secrets) error {

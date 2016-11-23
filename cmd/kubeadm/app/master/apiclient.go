@@ -22,14 +22,15 @@ import (
 	"runtime"
 	"time"
 
+	clientset "k8s.io/client-go/kubernetes"
+	internal_api "k8s.io/client-go/pkg/api"
+	apierrs "k8s.io/client-go/pkg/api/errors"
+	unversionedapi "k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -89,7 +90,8 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 			return false, nil
 		}
 		n := &nodeList.Items[0]
-		if !api.IsNodeReady(n) {
+		// TODO: use api.IsNodeReady() once it is available in a versioned API
+		if !isNodeReady(n) {
 			fmt.Println("<master/apiclient> first node has registered, but is not ready yet")
 			return false, nil
 		}
@@ -101,6 +103,16 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	createDummyDeployment(client)
 
 	return client, nil
+}
+
+// TODO: remove this once api.IsNodeReady is available in a versioned API
+func isNodeReady(node *api.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == api.NodeReady {
+			return c.Status == api.ConditionTrue
+		}
+	}
+	return false
 }
 
 func standardLabels(n string) map[string]string {
@@ -140,7 +152,7 @@ func NewDeployment(deploymentName string, replicas int32, podSpec api.PodSpec) *
 	return &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{Name: deploymentName},
 		Spec: extensions.DeploymentSpec{
-			Replicas: replicas,
+			Replicas: &replicas,
 			Selector: &unversionedapi.LabelSelector{MatchLabels: l},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{Labels: l},
@@ -169,12 +181,14 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 	if err != nil {
 		return err
 	}
-
+	// TODO: use a versioned api in place of unversionedapi once NodeLabelKubeadmAlphaRole and NodeLabelRoleMaster
+	// are available
 	n.ObjectMeta.Labels[unversionedapi.NodeLabelKubeadmAlphaRole] = unversionedapi.NodeLabelRoleMaster
 
 	if !schedulable {
 		taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
-		n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
+		// TODO: use a versioned API in place of internal_api once the TaintsAnnotationKey constant is available
+		n.ObjectMeta.Annotations[internal_api.TaintsAnnotationKey] = string(taintsAnnotation)
 	}
 
 	if _, err := client.Nodes().Update(n); err != nil {
@@ -204,7 +218,8 @@ func SetMasterTaintTolerations(meta *api.ObjectMeta) {
 	if meta.Annotations == nil {
 		meta.Annotations = map[string]string{}
 	}
-	meta.Annotations[api.TolerationsAnnotationKey] = string(tolerationsAnnotation)
+	// TODO: use a versioned API in place of internal_api once the TolerationsAnnotationKey constant is available
+	meta.Annotations[internal_api.TolerationsAnnotationKey] = string(tolerationsAnnotation)
 }
 
 // SetNodeAffinity is a basic helper to set meta.Annotations[api.AffinityAnnotationKey] for one or more api.NodeSelectorRequirement(s)
@@ -218,12 +233,14 @@ func SetNodeAffinity(meta *api.ObjectMeta, expr ...api.NodeSelectorRequirement) 
 	if meta.Annotations == nil {
 		meta.Annotations = map[string]string{}
 	}
-	meta.Annotations[api.AffinityAnnotationKey] = string(affinityAnnotation)
+	// TODO: use a versioned API in place of internal_api once the AffinityAnnotationKey constant is available
+	meta.Annotations[internal_api.AffinityAnnotationKey] = string(affinityAnnotation)
 }
 
 // MasterNodeAffinity returns api.NodeSelectorRequirement to be used with SetNodeAffinity to set affinity to master node
 func MasterNodeAffinity() api.NodeSelectorRequirement {
 	return api.NodeSelectorRequirement{
+		// TODO: use a versioned API instead of unversionedapi when the NodeLabel constants are available
 		Key:      unversionedapi.NodeLabelKubeadmAlphaRole,
 		Operator: api.NodeSelectorOpIn,
 		Values:   []string{unversionedapi.NodeLabelRoleMaster},
@@ -241,7 +258,7 @@ func NativeArchitectureNodeAffinity() api.NodeSelectorRequirement {
 func createDummyDeployment(client *clientset.Clientset) {
 	fmt.Println("<master/apiclient> attempting a test deployment")
 	dummyDeployment := NewDeployment("dummy", 1, api.PodSpec{
-		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
+		HostNetwork: true,
 		Containers: []api.Container{{
 			Name:  "dummy",
 			Image: images.GetAddonImage("pause"),
@@ -250,7 +267,8 @@ func createDummyDeployment(client *clientset.Clientset) {
 
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		// TODO: we should check the error, as some cases may be fatal
-		if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(dummyDeployment); err != nil {
+		// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
+		if _, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Create(dummyDeployment); err != nil {
 			fmt.Printf("<master/apiclient> failed to create test deployment [%v] (will retry)", err)
 			return false, nil
 		}
@@ -258,7 +276,8 @@ func createDummyDeployment(client *clientset.Clientset) {
 	})
 
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get("dummy")
+		// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
+		d, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Get("dummy")
 		if err != nil {
 			fmt.Printf("<master/apiclient> failed to get test deployment [%v] (will retry)", err)
 			return false, nil
@@ -271,7 +290,8 @@ func createDummyDeployment(client *clientset.Clientset) {
 
 	fmt.Println("<master/apiclient> test deployment succeeded")
 
-	if err := client.Extensions().Deployments(api.NamespaceSystem).Delete("dummy", &api.DeleteOptions{}); err != nil {
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
+	if err := client.Extensions().Deployments(internal_api.NamespaceSystem).Delete("dummy", &api.DeleteOptions{}); err != nil {
 		fmt.Printf("<master/apiclient> failed to delete test deployment [%v] (will ignore)", err)
 	}
 }

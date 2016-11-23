@@ -21,19 +21,20 @@ import (
 	"net"
 	"path"
 
+	clientset "k8s.io/client-go/kubernetes"
+	internal_api "k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/resource"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
 func createKubeProxyPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
 	privilegedTrue := true
 	return api.PodSpec{
-		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
+		HostNetwork: true,
 		Containers: []api.Container{{
 			Name:            kubeProxy,
 			Image:           images.GetCoreImage(images.KubeProxyImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
@@ -232,7 +233,8 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
 	SetNodeAffinity(&kubeProxyDaemonSet.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
-	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
+	if _, err := client.Extensions().DaemonSets(internal_api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%v]", err)
 	}
 
@@ -242,7 +244,8 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 	SetNodeAffinity(&kubeDNSDeployment.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
+	if _, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
 	}
 
@@ -252,7 +255,8 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	}
 
 	kubeDNSService := NewService("kube-dns", *kubeDNSServiceSpec)
-	if _, err := client.Services(api.NamespaceSystem).Create(kubeDNSService); err != nil {
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
+	if _, err := client.Services(internal_api.NamespaceSystem).Create(kubeDNSService); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
 	}
 
