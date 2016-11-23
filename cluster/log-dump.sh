@@ -132,6 +132,8 @@ function save-logs() {
     fi
 
     if log-dump-ssh "${node_name}" "sudo systemctl status kubelet.service" &> /dev/null; then
+        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
+        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" > "${dir}/kube-node-configuration.log" || true
         log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u kubelet.service" > "${dir}/kubelet.log" || true
         log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u docker.service" > "${dir}/docker.log" || true
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -k" > "${dir}/kern.log" || true
