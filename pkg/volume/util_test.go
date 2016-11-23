@@ -797,3 +797,280 @@ func TestRegionsToZones(t *testing.T) {
 		}
 	}
 }
+
+func mockGetAllZones() (sets.String, error) {
+	ret := sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-1c": sets.Empty{}, "us-east-2a": sets.Empty{}, "us-east-2b": sets.Empty{}, "us-east-3a": sets.Empty{}, "us-east-3b": sets.Empty{}}
+	return ret, nil
+}
+
+func TestPutAdminAndUserRequestsTogether(t *testing.T) {
+	functionUnderTest := "PutAdminAndUserRequestsTogether"
+	emptySet := make(sets.String)
+	// First part: want no error
+	succTests := map[string]struct {
+		input PutAdminAndUserRequestsTogetherParams
+		want  sets.String
+	}{
+		"Test case 1:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				},
+				IsSCZoneSpecified:  false,
+				SCZone:             "",
+				IsSCZonesSpecified: false,
+				SCZones:            "",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-1c": sets.Empty{}, "us-east-2a": sets.Empty{}, "us-east-2b": sets.Empty{}, "us-east-3a": sets.Empty{}, "us-east-3b": sets.Empty{}},
+		},
+		"Test case 2:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				},
+				IsSCZoneSpecified:  true,
+				SCZone:             "us-east-1a",
+				IsSCZonesSpecified: false,
+				SCZones:            "",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}},
+		},
+		"Test case 3:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				},
+				IsSCZoneSpecified:  false,
+				SCZone:             "",
+				IsSCZonesSpecified: true,
+				SCZones:            "us-east-1a, us-east-1b, us-east-2a",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-2a": sets.Empty{}},
+		},
+		"Test case 4:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{metav1.LabelZoneFailureDomain: "us-east-1a"},
+						},
+					},
+				},
+				IsSCZoneSpecified:  false,
+				SCZone:             "",
+				IsSCZonesSpecified: true,
+				SCZones:            "us-east-1a, us-east-1b, us-east-2a",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}},
+		},
+		"Test case 5:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{metav1.LabelZoneRegion: "us-east-1"},
+						},
+					},
+				},
+				IsSCZoneSpecified:  false,
+				SCZone:             "",
+				IsSCZonesSpecified: true,
+				SCZones:            "us-east-1a, us-east-1b, us-east-2a",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}},
+		},
+		"Test case 6:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      metav1.LabelZoneFailureDomain,
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"us-east-1a", "us-east-1b"},
+								},
+							},
+						},
+					},
+				},
+				IsSCZoneSpecified:  false,
+				SCZone:             "",
+				IsSCZonesSpecified: true,
+				SCZones:            "us-east-1a, us-east-1b, us-east-2a",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}},
+		},
+		"Test case 7:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      metav1.LabelZoneRegion,
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"us-east-1", "us-east-3"},
+								},
+							},
+						},
+					},
+				},
+				IsSCZoneSpecified:  false,
+				SCZone:             "",
+				IsSCZonesSpecified: true,
+				SCZones:            "us-east-1a, us-east-1b, us-east-2a, us-east-3b",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-3b": sets.Empty{}},
+		},
+		"Test case 8:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      metav1.LabelZoneFailureDomain,
+									Operator: metav1.LabelSelectorOpNotIn,
+									Values:   []string{"us-east-1a", "us-east-1b"},
+								},
+							},
+						},
+					},
+				},
+				IsSCZoneSpecified:  false,
+				SCZone:             "",
+				IsSCZonesSpecified: true,
+				SCZones:            "us-east-1a, us-east-1b, us-east-2a",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-2a": sets.Empty{}},
+		},
+		"Test case 9:": {
+			input: PutAdminAndUserRequestsTogetherParams{
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      metav1.LabelZoneRegion,
+									Operator: metav1.LabelSelectorOpNotIn,
+									Values:   []string{"us-east-1", "us-east-3"},
+								},
+							},
+						},
+					},
+				},
+				IsSCZoneSpecified:  false,
+				SCZone:             "",
+				IsSCZonesSpecified: true,
+				SCZones:            "us-east-1a, us-east-1b, us-east-2a, us-east-3b",
+				GetAllZones:        mockGetAllZones,
+				ZoneToRegion:       mockZoneToRegion,
+			},
+			want: sets.String{"us-east-2a": sets.Empty{}},
+		},
+	}
+	for key, succTest := range succTests {
+		if got, err := PutAdminAndUserRequestsTogether(succTest.input); err != nil {
+			t.Errorf("%v %v(%v) returned (%v, %v), want (%v, %v)", key, functionUnderTest, succTest.input, got, err.Error(), succTest.want, nil)
+		} else if !succTest.want.Equal(got) {
+			t.Errorf("%v %v(%v) returned (%v, %v), want (%v, %v)", key, functionUnderTest, succTest.input, got, err, succTest.want, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []PutAdminAndUserRequestsTogetherParams{
+		{
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			IsSCZoneSpecified:  true,
+			SCZone:             "us-east-1a",
+			IsSCZonesSpecified: true,
+			SCZones:            "us-east-1a, us-east-1b, us-east-1c",
+			GetAllZones:        mockGetAllZones,
+			ZoneToRegion:       mockZoneToRegion,
+		},
+		{
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"foo": "bar"},
+					},
+				},
+			},
+			IsSCZoneSpecified:  false,
+			SCZone:             "",
+			IsSCZonesSpecified: false,
+			SCZones:            "",
+			GetAllZones:        mockGetAllZones,
+			ZoneToRegion:       mockZoneToRegion,
+		},
+		{
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      metav1.LabelZoneRegion,
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"us-east-1", "us-east-2", "us-east-3"},
+							},
+						},
+					},
+				},
+			},
+			IsSCZoneSpecified:  false,
+			SCZone:             "",
+			IsSCZonesSpecified: true,
+			SCZones:            "us-east-1a, us-east-1b, us-east-2a, us-east-3b",
+			GetAllZones:        mockGetAllZones,
+			ZoneToRegion:       mockZoneToRegion,
+		},
+		{
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: v1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{metav1.LabelZoneRegion: "us-east-1"},
+					},
+				},
+			},
+			IsSCZoneSpecified:  false,
+			SCZone:             "",
+			IsSCZonesSpecified: true,
+			SCZones:            "us-east-1a, , us-east-2a",
+			GetAllZones:        mockGetAllZones,
+			ZoneToRegion:       mockZoneToRegion,
+		},
+	}
+	for _, errCase := range errCases {
+		if got, err := PutAdminAndUserRequestsTogether(errCase); err == nil {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase, got, err, emptySet, "an error")
+		}
+	}
+}

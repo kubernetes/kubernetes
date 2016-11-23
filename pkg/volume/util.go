@@ -484,3 +484,121 @@ func RegionsToZones(regions, allAvailableZones sets.String, zoneToRegion func(st
 	}
 	return zones, nil
 }
+
+// PutAdminAndUserRequestsTogetherParams are input parameters for the func PutAdminAndUserRequestsTogether
+type PutAdminAndUserRequestsTogetherParams struct {
+	// PVC data structure that is used for the set of zones calculation
+	PVC *v1.PersistentVolumeClaim
+	// is the parameter zone specified in the Storage Class by an admin?
+	IsSCZoneSpecified bool
+	// in case the parameter zone is specified SCZone contains the value of this parameter, otherwise it is ""
+	SCZone string
+	// is the parameter zones specified in the Storage Class by an admin?
+	IsSCZonesSpecified bool
+	// in case the parameter zones is specified SCZones contains the value of this parameter, otherwise it is ""
+	SCZones string
+	// a func that returns a set of all available zones
+	GetAllZones func() (sets.String, error)
+	// a func that converts a zone to a region
+	ZoneToRegion func(string) (string, error)
+}
+
+// PutAdminAndUserRequestsTogether returns:
+// - either a set of zones resulting from currently available zones, allowed zone(s) by an admin in the corresponding storage class and zones preferred by the user in the selector part of the PVC
+// - or an error in case the resulting set of zones is empty or another error occurred
+func PutAdminAndUserRequestsTogether(input PutAdminAndUserRequestsTogetherParams) (sets.String, error) {
+	var zones, allAvailableZones sets.String
+	var err error
+	gotAllAvailableZones := false
+	emptySet := make(sets.String)
+	if input.IsSCZoneSpecified && input.IsSCZonesSpecified {
+		return emptySet, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
+	}
+	if !input.IsSCZoneSpecified && !input.IsSCZonesSpecified {
+		if !gotAllAvailableZones {
+			if allAvailableZones, err = input.GetAllZones(); err != nil {
+				return emptySet, err
+			}
+			gotAllAvailableZones = true
+		}
+		zones = allAvailableZones
+	}
+	if input.IsSCZoneSpecified && !input.IsSCZonesSpecified {
+		zones = emptySet
+		zones.Insert(input.SCZone)
+	}
+	if !input.IsSCZoneSpecified && input.IsSCZonesSpecified {
+		if zones, err = ZonesToSet(input.SCZones); err != nil {
+			return emptySet, fmt.Errorf("corresponding storage class error: %v", err.Error())
+		}
+	}
+	if emptySelector, err := ValidatePVCSelector(input.PVC); err != nil {
+		return emptySet, err
+	} else if emptySelector {
+		return zones, nil
+	}
+	if matchLabelZone, err := GetPVCMatchLabel(input.PVC, metav1.LabelZoneFailureDomain); err == nil {
+		matchLabelZoneSet := make(sets.String)
+		matchLabelZoneSet.Insert(matchLabelZone)
+		zones = zones.Intersection(matchLabelZoneSet)
+	}
+	if matchLabelRegion, err := GetPVCMatchLabel(input.PVC, metav1.LabelZoneRegion); err == nil {
+		if !gotAllAvailableZones {
+			if allAvailableZones, err = input.GetAllZones(); err != nil {
+				return emptySet, err
+			}
+			gotAllAvailableZones = true
+		}
+		regions := make(sets.String)
+		regions.Insert(matchLabelRegion)
+		if matchLabelRegionSet, err := RegionsToZones(regions, allAvailableZones, input.ZoneToRegion); err != nil {
+			return emptySet, err
+		} else {
+			zones = zones.Intersection(matchLabelRegionSet)
+		}
+	}
+	if matchExpressionZoneSets, err := GetPVCMatchExpression(input.PVC, metav1.LabelZoneFailureDomain, metav1.LabelSelectorOpIn); err == nil {
+		for _, matchExpressionZoneSet := range matchExpressionZoneSets {
+			zones = zones.Intersection(matchExpressionZoneSet)
+		}
+	}
+	if matchExpressionRegionSets, err := GetPVCMatchExpression(input.PVC, metav1.LabelZoneRegion, metav1.LabelSelectorOpIn); err == nil {
+		if !gotAllAvailableZones {
+			if allAvailableZones, err = input.GetAllZones(); err != nil {
+				return emptySet, err
+			}
+			gotAllAvailableZones = true
+		}
+		for _, matchExpressionRegionSet := range matchExpressionRegionSets {
+			if matchExpressionZonesSet, err := RegionsToZones(matchExpressionRegionSet, allAvailableZones, input.ZoneToRegion); err != nil {
+				return emptySet, err
+			} else {
+				zones = zones.Intersection(matchExpressionZonesSet)
+			}
+		}
+	}
+	if matchExpressionZoneSets, err := GetPVCMatchExpression(input.PVC, metav1.LabelZoneFailureDomain, metav1.LabelSelectorOpNotIn); err == nil {
+		for _, matchExpressionZoneSet := range matchExpressionZoneSets {
+			zones = zones.Difference(matchExpressionZoneSet)
+		}
+	}
+	if matchExpressionRegionSets, err := GetPVCMatchExpression(input.PVC, metav1.LabelZoneRegion, metav1.LabelSelectorOpNotIn); err == nil {
+		if !gotAllAvailableZones {
+			if allAvailableZones, err = input.GetAllZones(); err != nil {
+				return emptySet, err
+			}
+			gotAllAvailableZones = true
+		}
+		for _, matchExpressionRegionSet := range matchExpressionRegionSets {
+			if matchExpressionZonesSet, err := RegionsToZones(matchExpressionRegionSet, allAvailableZones, input.ZoneToRegion); err != nil {
+				return emptySet, err
+			} else {
+				zones = zones.Difference(matchExpressionZonesSet)
+			}
+		}
+	}
+	if len(zones) < 1 {
+		return emptySet, fmt.Errorf("Could not find availability zone: combination of StorageClass parameters and selector of this claim cannot be satisfied by this cluster")
+	}
+	return zones, nil
+}
