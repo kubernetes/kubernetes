@@ -532,15 +532,13 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 
 	// Compute a three way strategic merge patch to send to server.
 	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite, strategicpatch.SMPatchVersion_1_5)
-	// If creating a patch fails, retrying with SMPatchVersion_1_0 is not helpful. So we return the error.
 	if err != nil {
 		format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
 	}
 	_, err = p.helper.Patch(namespace, name, api.StrategicMergePatchType, patch)
-	if errors.IsInternalError(err) {
-		// Retry SMPatchVersion_1_0 when applying the SMPatchVersion_1_5 patch returns an Internal Error (500).
-		// Because the failure may be due to the server not supporting the SMPatchVersion_1_5 patch.
+	if err != nil {
+		// Retry SMPatchVersion_1_0 when applying the SMPatchVersion_1_5 patch
 		patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite, strategicpatch.SMPatchVersion_1_0)
 		if err != nil {
 			format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
