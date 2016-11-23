@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package testutil
 
 import (
 	"errors"
@@ -56,7 +56,7 @@ type FakeNodeHandler struct {
 
 	// Synchronization
 	lock           sync.Mutex
-	deleteWaitChan chan struct{}
+	DeleteWaitChan chan struct{}
 }
 
 type FakeLegacyHandler struct {
@@ -64,7 +64,8 @@ type FakeLegacyHandler struct {
 	n *FakeNodeHandler
 }
 
-func (c *FakeNodeHandler) getUpdatedNodesCopy() []*v1.Node {
+// GetUpdatedNodesCopy returns a slice of Nodes with updates applied.
+func (c *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	updatedNodesCopy := make([]*v1.Node, len(c.UpdatedNodes), len(c.UpdatedNodes))
@@ -74,14 +75,17 @@ func (c *FakeNodeHandler) getUpdatedNodesCopy() []*v1.Node {
 	return updatedNodesCopy
 }
 
+// Core returns fake CoreInterface.
 func (c *FakeNodeHandler) Core() v1core.CoreV1Interface {
 	return &FakeLegacyHandler{c.Clientset.Core(), c}
 }
 
+// Nodes return fake NodeInterfaces.
 func (m *FakeLegacyHandler) Nodes() v1core.NodeInterface {
 	return m.n
 }
 
+// Create adds a new Node to the fake store.
 func (m *FakeNodeHandler) Create(node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
@@ -102,6 +106,7 @@ func (m *FakeNodeHandler) Create(node *v1.Node) (*v1.Node, error) {
 	}
 }
 
+// Get returns a Node from the fake store.
 func (m *FakeNodeHandler) Get(name string) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
@@ -123,6 +128,7 @@ func (m *FakeNodeHandler) Get(name string) (*v1.Node, error) {
 	return nil, nil
 }
 
+// List returns a list of Nodes from the fake store.
 func (m *FakeNodeHandler) List(opts v1.ListOptions) (*v1.NodeList, error) {
 	m.lock.Lock()
 	defer func() {
@@ -152,23 +158,26 @@ func (m *FakeNodeHandler) List(opts v1.ListOptions) (*v1.NodeList, error) {
 	return nodeList, nil
 }
 
+// Delete delets a Node from the fake store.
 func (m *FakeNodeHandler) Delete(id string, opt *v1.DeleteOptions) error {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
-		if m.deleteWaitChan != nil {
-			m.deleteWaitChan <- struct{}{}
+		if m.DeleteWaitChan != nil {
+			m.DeleteWaitChan <- struct{}{}
 		}
 		m.lock.Unlock()
 	}()
-	m.DeletedNodes = append(m.DeletedNodes, newNode(id))
+	m.DeletedNodes = append(m.DeletedNodes, NewNode(id))
 	return nil
 }
 
+// DeleteCollection deletes a collection of Nodes from the fake store.
 func (m *FakeNodeHandler) DeleteCollection(opt *v1.DeleteOptions, listOpts v1.ListOptions) error {
 	return nil
 }
 
+// Update updates a Node in the fake store.
 func (m *FakeNodeHandler) Update(node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
@@ -186,6 +195,7 @@ func (m *FakeNodeHandler) Update(node *v1.Node) (*v1.Node, error) {
 	return node, nil
 }
 
+// UpdateStatus updates a status of a Node in the fake store.
 func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
@@ -197,15 +207,18 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 	return node, nil
 }
 
+// PatchStatus patches a status of a Node in the fake store.
 func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
 	m.RequestCount++
 	return &v1.Node{}, nil
 }
 
+// Watch watches Nodes in a fake store.
 func (m *FakeNodeHandler) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return watch.NewFake(), nil
 }
 
+// Patch patches a Node in the fake store.
 func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
 	return nil, nil
 }
@@ -213,18 +226,21 @@ func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte, subr
 // FakeRecorder is used as a fake during testing.
 type FakeRecorder struct {
 	source v1.EventSource
-	events []*v1.Event
+	Events []*v1.Event
 	clock  clock.Clock
 }
 
+// Event emits a fake event to the fake recorder
 func (f *FakeRecorder) Event(obj runtime.Object, eventtype, reason, message string) {
 	f.generateEvent(obj, metav1.Now(), eventtype, reason, message)
 }
 
+// Eventf emits a fake formatted event to the fake recorder
 func (f *FakeRecorder) Eventf(obj runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	f.Event(obj, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
+// PastEventf is a no-op
 func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
 }
 
@@ -235,9 +251,9 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, 
 	}
 	event := f.makeEvent(ref, eventtype, reason, message)
 	event.Source = f.source
-	if f.events != nil {
+	if f.Events != nil {
 		fmt.Println("write event")
-		f.events = append(f.events, event)
+		f.Events = append(f.Events, event)
 	}
 }
 
@@ -263,15 +279,17 @@ func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, mes
 	}
 }
 
+// NewFakeRecorder returns a pointer to a newly constructed FakeRecorder.
 func NewFakeRecorder() *FakeRecorder {
 	return &FakeRecorder{
 		source: v1.EventSource{Component: "nodeControllerTest"},
-		events: []*v1.Event{},
+		Events: []*v1.Event{},
 		clock:  clock.NewFakeClock(time.Now()),
 	}
 }
 
-func newNode(name string) *v1.Node {
+// NewNode is a helper function for creating Nodes for testing.
+func NewNode(name string) *v1.Node {
 	return &v1.Node{
 		ObjectMeta: v1.ObjectMeta{Name: name},
 		Spec: v1.NodeSpec{
@@ -286,7 +304,8 @@ func newNode(name string) *v1.Node {
 	}
 }
 
-func newPod(name, host string) *v1.Pod {
+// NewPod is a helper function for creating Pods for testing.
+func NewPod(name, host string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Namespace: "default",
@@ -317,8 +336,8 @@ func contains(node *v1.Node, nodes []*v1.Node) bool {
 	return false
 }
 
-// Returns list of zones for all Nodes stored in FakeNodeHandler
-func getZones(nodeHandler *FakeNodeHandler) []string {
+// GetZones returns list of zones for all Nodes stored in FakeNodeHandler
+func GetZones(nodeHandler *FakeNodeHandler) []string {
 	nodes, _ := nodeHandler.List(v1.ListOptions{})
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
@@ -327,6 +346,7 @@ func getZones(nodeHandler *FakeNodeHandler) []string {
 	return zones.List()
 }
 
-func createZoneID(region, zone string) string {
+// CreateZoneID returns a single zoneID for a given region and zone.
+func CreateZoneID(region, zone string) string {
 	return region + ":\x00:" + zone
 }
