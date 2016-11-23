@@ -177,6 +177,7 @@ experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
 experimental-flannel-overlay
 experimental-keystone-url
+experimental-mounter-path
 experimental-nvidia-gpus
 experimental-prefix
 external-hostname

@@ -370,7 +370,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs:0.6",
+				serverImage: "gcr.io/google_containers/volume-nfs:0.8",
 				serverPorts: []int{2049},
 			}
 

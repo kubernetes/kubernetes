@@ -72,7 +72,7 @@ func NewHollowKubelet(
 		TLSOptions:        nil,
 		OOMAdjuster:       oom.NewFakeOOMAdjuster(),
 		Writer:            &kubeio.StdWriter{},
-		Mounter:           mount.New(),
+		Mounter:           mount.New("" /* default mount path */),
 	}
 
 	return &HollowKubelet{
