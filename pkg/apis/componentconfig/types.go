@@ -135,7 +135,9 @@ type KubeletConfiguration struct {
 	// manifestURL is the URL for accessing the container manifest
 	ManifestURL string `json:"manifestURL"`
 	// manifestURLHeader is the HTTP header to use when accessing the manifest
-	// URL, with the key separated from the value with a ':', as in 'key:value'
+	// URL, with the key separated from the value with a ':', and the different
+	// header seperated with a ',' when more than one exist,
+	// as in 'key1:value1,kye2:value2'
 	ManifestURLHeader string `json:"manifestURLHeader"`
 	// enableServer enables the Kubelet's server
 	EnableServer bool `json:"enableServer"`
