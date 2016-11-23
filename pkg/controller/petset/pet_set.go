@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -215,7 +217,6 @@ func (psc *StatefulSetController) deletePod(obj interface{}) {
 
 // getPodsForStatefulSets returns the pods that match the selectors of the given statefulset.
 func (psc *StatefulSetController) getPodsForStatefulSet(ps *apps.StatefulSet) ([]*api.Pod, error) {
-	// TODO: Do we want the statefulset to fight with RCs? check parent statefulset annoation, or name prefix?
 	sel, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
 		return []*api.Pod{}, err
@@ -226,10 +227,30 @@ func (psc *StatefulSetController) getPodsForStatefulSet(ps *apps.StatefulSet) ([
 	}
 	// TODO: Do we need to copy?
 	result := make([]*api.Pod, 0, len(pods))
+	// Check pod names to make sure they belong to current statefulset
+	// We don't check pod's parent UID to allow adoption (such as upgrading from PetSet to StatefulSet)
+	// TODO: Avoid fighting controllers using Controller Reference instead
 	for i := range pods {
-		result = append(result, &(*pods[i]))
+		if expectedPodName(pods[i].Name, ps) {
+			result = append(result, &(*pods[i]))
+		}
 	}
 	return result, nil
+}
+
+// expectedPodName checks if a given pod's name comes from the given statefulset:
+// we expect it to be <statefulset-name>-<index>, where index = 0 ~ size-1
+func expectedPodName(podName string, ps *apps.StatefulSet) bool {
+	prefix := ps.Name + "-"
+	if !strings.HasPrefix(podName, prefix) {
+		return false
+	}
+	suffix := strings.TrimPrefix(podName, prefix)
+	index, err := strconv.Atoi(suffix)
+	if err != nil {
+		return false
+	}
+	return index >= 0 && index < int(ps.Spec.Replicas)
 }
 
 // getStatefulSetForPod returns the pet set managing the given pod.
