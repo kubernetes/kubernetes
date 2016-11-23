@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -95,6 +96,11 @@ func TestPetQueueScaleUp(t *testing.T) {
 		expectedName := fmt.Sprintf("%v-%d", ps.Name, i)
 		if pet.event != syncPet || pet.pod.Name != expectedName {
 			t.Errorf("Unexpected pod %+v, expected %v", pet.pod.Name, expectedName)
+		}
+		expectedIndex := fmt.Sprintf("%d", i)
+		indexAnnotation := pet.pod.Annotations[utilpod.PodPetSetIndexAnnotation]
+		if indexAnnotation != expectedIndex {
+			t.Errorf("Expected PetSet index %s in pod %v, got %s", expectedIndex, pet.pod.ObjectMeta.UID, indexAnnotation)
 		}
 	}
 }

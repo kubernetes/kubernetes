@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -32,6 +33,7 @@ func newPCB(id string, ps *apps.StatefulSet) (*pcb, error) {
 	if err != nil {
 		return nil, err
 	}
+	petPod.Annotations[utilpod.PodPetSetIndexAnnotation] = id
 	for _, im := range newIdentityMappers(ps) {
 		im.SetIdentity(id, petPod)
 	}
