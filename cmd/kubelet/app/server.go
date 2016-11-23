@@ -192,7 +192,7 @@ func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletD
 			}
 			return configmap, nil
 		}
-		// No cloud provider yet, so can't get the nodename via Cloud.Instances().CurrentNodeName(hostname), try just using the hostname
+		// No cloud provider yet, so can't get the nodename via Cloud.Instances().CurrentNodeName(hostname), try just using the hostname.
 		configmap, err := kubeClient.CoreClient.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", hostname))
 		if err != nil {
 			return nil, fmt.Errorf("cloud provider was nil, and attempt to use hostname to find config resulted in: %v", err)
