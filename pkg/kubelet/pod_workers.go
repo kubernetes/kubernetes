@@ -171,10 +171,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 				updateType:     update.UpdateType,
 			})
 			lastSyncTime = time.Now()
-			if err != nil {
-				return err
-			}
-			return nil
+			return err
 		}()
 		// notify the call-back function if the operation succeeded or not
 		if update.OnCompleteFunc != nil {
