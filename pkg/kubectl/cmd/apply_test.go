@@ -188,12 +188,6 @@ func TestApplyObject(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/version" && m == "GET":
-				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-				if err != nil {
-					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-				}
-				return resp, nil
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
@@ -208,7 +202,6 @@ func TestApplyObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -237,12 +230,6 @@ func TestApplyRetry(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/version" && m == "GET":
-				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-				if err != nil {
-					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-				}
-				return resp, nil
 			case p == pathRC && m == "GET":
 				getCount++
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
@@ -266,7 +253,6 @@ func TestApplyRetry(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -296,12 +282,6 @@ func TestApplyNonExistObject(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/version" && m == "GET":
-				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-				if err != nil {
-					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-				}
-				return resp, nil
 			case p == "/api/v1/namespaces/test" && m == "GET":
 				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathNameRC && m == "GET":
@@ -316,7 +296,6 @@ func TestApplyNonExistObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -352,12 +331,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/version" && m == "GET":
-				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-				if err != nil {
-					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-				}
-				return resp, nil
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
@@ -379,7 +352,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)

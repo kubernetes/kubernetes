@@ -521,7 +521,7 @@ func RecordChangeCause(obj runtime.Object, changeCause string) error {
 
 // ChangeResourcePatch creates a strategic merge patch between the origin input resource info
 // and the annotated with change-cause input resource info.
-func ChangeResourcePatch(info *resource.Info, changeCause string, smPatchVersion strategicpatch.StrategicMergePatchVersion) ([]byte, error) {
+func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
 	oldData, err := json.Marshal(info.Object)
 	if err != nil {
 		return nil, err
@@ -533,7 +533,7 @@ func ChangeResourcePatch(info *resource.Info, changeCause string, smPatchVersion
 	if err != nil {
 		return nil, err
 	}
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object, smPatchVersion)
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object)
 }
 
 // containsChangeCause checks if input resource info contains change-cause annotation.
@@ -724,14 +724,4 @@ func RequireNoArguments(c *cobra.Command, args []string) {
 	if len(args) > 0 {
 		CheckErr(UsageError(c, fmt.Sprintf(`unknown command %q`, strings.Join(args, " "))))
 	}
-}
-
-// GetServerSupportedSMPatchVersionFromFactory is a wrapper of GetServerSupportedSMPatchVersion(),
-// It takes a Factory, returns the max version the server supports.
-func GetServerSupportedSMPatchVersionFromFactory(f Factory) (strategicpatch.StrategicMergePatchVersion, error) {
-	clientSet, err := f.ClientSet()
-	if err != nil {
-		return strategicpatch.Unknown, err
-	}
-	return strategicpatch.GetServerSupportedSMPatchVersion(clientSet.Discovery())
 }

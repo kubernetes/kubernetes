@@ -60,7 +60,6 @@ var (
 type ResourcesOptions struct {
 	resource.FilenameOptions
 
-	f                 cmdutil.Factory
 	Mapper            meta.RESTMapper
 	Typer             runtime.ObjectTyper
 	Infos             []*resource.Info
@@ -125,7 +124,6 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 }
 
 func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.f = f
 	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
@@ -176,7 +174,7 @@ func (o *ResourcesOptions) Validate() error {
 
 func (o *ResourcesOptions) Run() error {
 	allErrs := []error{}
-	patches := CalculatePatches(o.f, o.Infos, o.Encoder, cmdutil.GetDryRunFlag(o.Cmd), func(info *resource.Info) (bool, error) {
+	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) (bool, error) {
 		transformed := false
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
