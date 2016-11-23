@@ -62,6 +62,7 @@ and references to network namespaces persist.
 ### Add an option in VolumeMount API
 
 The new `VolumeMount` will look like:
+
 ```go
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
@@ -84,6 +85,7 @@ Opinion against this:
 ### Add an option in HostPathVolumeSource
 
 The new `HostPathVolumeSource` will look like:
+
 ```go
 const (
 	PropagationShared  PropagationMode = "Shared"
@@ -111,6 +113,7 @@ making mounts inside container, we can bind propagation mode with existing optio
 privileged.
 
 The propagation mode could be determined by the following logic:
+
 ```go
 // Environment check to ensure "rshared" is supported.
 if !dockerNewerThanV110 || !mountPathIsShared {
@@ -141,3 +144,8 @@ distros.
 We will take 'Make HostPath shared for privileged containers, slave for
 non-privileged', an environment check and an WARNING log will be emitted about
 whether propagation mode is supported.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/propagation.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
