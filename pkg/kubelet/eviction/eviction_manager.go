@@ -24,7 +24,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -33,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-// managerImpl implements NodeStabilityManager
+// managerImpl implements Manager
 type managerImpl struct {
 	//  used to track time
 	clock clock.Clock
@@ -65,6 +67,8 @@ type managerImpl struct {
 	resourceToNodeReclaimFuncs map[api.ResourceName]nodeReclaimFuncs
 	// last observations from synchronize
 	lastObservations signalObservations
+	// notifiersInitialized indicates if the threshold notifiers have been initialized (i.e. synchronize() has been called once)
+	notifiersInitialized bool
 }
 
 // ensure it implements the required interface
@@ -139,6 +143,39 @@ func (m *managerImpl) IsUnderDiskPressure() bool {
 	return hasNodeCondition(m.nodeConditions, api.NodeDiskPressure)
 }
 
+func startMemoryThresholdNotifier(thresholds []Threshold, observations signalObservations, hard bool, handler thresholdNotifierHandlerFunc) error {
+	for _, threshold := range thresholds {
+		if threshold.Signal != SignalMemoryAvailable || hard != isHardEvictionThreshold(threshold) {
+			continue
+		}
+		observed, found := observations[SignalMemoryAvailable]
+		if !found {
+			continue
+		}
+		cgroups, err := cm.GetCgroupSubsystems()
+		if err != nil {
+			return err
+		}
+		// TODO add support for eviction from --cgroup-root
+		cgpath, found := cgroups.MountPoints["memory"]
+		if !found || len(cgpath) == 0 {
+			return fmt.Errorf("memory cgroup mount point not found")
+		}
+		attribute := "memory.usage_in_bytes"
+		quantity := getThresholdQuantity(threshold.Value, observed.capacity)
+		usageThreshold := resource.NewQuantity(observed.capacity.Value(), resource.DecimalSI)
+		usageThreshold.Sub(*quantity)
+		description := fmt.Sprintf("<%s available", formatThresholdValue(threshold.Value))
+		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, usageThreshold.String(), description, handler)
+		if err != nil {
+			return err
+		}
+		go memcgThresholdNotifier.Start(wait.NeverStop)
+		return nil
+	}
+	return nil
+}
+
 // synchronize is the main control loop that enforces eviction thresholds.
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) {
 	// if we have nothing to do, just return
@@ -166,8 +203,27 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return
 	}
 
-	// find the list of thresholds that are met independent of grace period
-	now := m.clock.Now()
+	// attempt to create a threshold notifier to improve eviction response time
+	if !m.notifiersInitialized {
+		m.notifiersInitialized = true
+		// start soft memory notification
+		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, false, func(desc string) {
+			glog.Infof("soft memory eviction threshold crossed at %s", desc)
+			// TODO wait grace period for soft memory limit
+			m.synchronize(diskInfoProvider, podFunc)
+		})
+		if err != nil {
+			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
+		}
+		// start hard memory notification
+		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, true, func(desc string) {
+			glog.Infof("hard memory eviction threshold crossed at %s", desc)
+			m.synchronize(diskInfoProvider, podFunc)
+		})
+		if err != nil {
+			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
+		}
+	}
 
 	// determine the set of thresholds met independent of grace period
 	thresholds = thresholdsMet(thresholds, observations, false)
@@ -182,6 +238,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	thresholds = thresholdsUpdatedStats(thresholds, observations, m.lastObservations)
 
 	// track when a threshold was first observed
+	now := m.clock.Now()
 	thresholdsFirstObservedAt := thresholdsFirstObservedAt(thresholds, m.thresholdsFirstObservedAt, now)
 
 	// the set of node conditions that are triggered by currently observed thresholds
@@ -218,7 +275,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	glog.Warningf("eviction manager: attempting to reclaim %v", resourceToReclaim)
 
 	// determine if this is a soft or hard eviction associated with the resource
-	softEviction := isSoftEviction(thresholds, resourceToReclaim)
+	softEviction := isSoftEvictionThresholds(thresholds, resourceToReclaim)
 
 	// record an event about the resources we are now attempting to reclaim via eviction
 	m.recorder.Eventf(m.nodeRef, api.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
