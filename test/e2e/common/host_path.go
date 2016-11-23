@@ -19,8 +19,11 @@ package common
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 
+	"github.com/opencontainers/runc/libcontainer/selinux"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -58,10 +61,19 @@ var _ = framework.KubeDescribe("HostPath", func() {
 	// This test requires mounting a folder into a container with write privileges.
 	It("should support r/w", func() {
 		volumePath := "/test-volume"
+		hostPath := "/tmp"
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
+
+		if selinux.SelinuxEnabled() {
+			filePath := path.Join(hostPath, "test-file")
+			if err := relabelPathByChcon(filePath, false); err != nil {
+				framework.Logf("%v", err)
+			}
+		}
+
 		source := &api.HostPathVolumeSource{
-			Path: "/tmp",
+			Path: hostPath,
 		}
 		pod := testPodWithHostVol(volumePath, source)
 
@@ -86,12 +98,20 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180
+		hostPath := "/tmp"
 
 		filePathInWriter := path.Join(volumePath, fileName)
 		filePathInReader := path.Join(volumePath, subPath, fileName)
 
+		if selinux.SelinuxEnabled() {
+			dirPath := path.Join(hostPath, subPath)
+			if err := relabelPathByChcon(dirPath, true); err != nil {
+				framework.Logf("%v", err)
+			}
+		}
+
 		source := &api.HostPathVolumeSource{
-			Path: "/tmp",
+			Path: hostPath,
 		}
 		pod := testPodWithHostVol(volumePath, source)
 		// Write the file in the subPath from container 0
@@ -168,4 +188,36 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 			Volumes:       mount(source),
 		},
 	}
+}
+
+// relabelPathByChcon relabels selinux context of the provided path
+func relabelPathByChcon(path string, isDir bool) error {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("error converting directory %q to an absolute path: %v", path, err)
+	}
+
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		if isDir {
+			if err := os.MkdirAll(absPath, 0755); err != nil {
+				return fmt.Errorf("couldn't create directory %q on host: %q", absPath, err)
+			}
+		} else {
+			if _, err := os.Create(absPath); err != nil {
+				return fmt.Errorf("couldn't create file %q on host: %q", absPath, err)
+			}
+		}
+	}
+
+	chconPath, err := exec.LookPath("chcon")
+	if err != nil {
+		return fmt.Errorf("couldn't locate the command chcon on host: %v", err)
+	}
+
+	c := exec.Command(chconPath, "-Rt", "svirt_sandbox_file_t", absPath)
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("error relabelling path %s: %v", absPath, err)
+	}
+
+	return nil
 }
