@@ -370,18 +370,18 @@ func waitForWorkerExit(m *manager, workerPaths []probeKey) error {
 // Wait for the given workers to exit & clean up.
 func waitForReadyStatus(m *manager, ready bool) error {
 	condition := func() (bool, error) {
-		status, ok := m.statusManager.GetPodStatus(testPodUID)
+		updatedPod, ok := m.statusManager.GetPod(testPodUID)
 		if !ok {
 			return false, fmt.Errorf("status not found: %q", testPodUID)
 		}
-		if len(status.ContainerStatuses) != 1 {
-			return false, fmt.Errorf("expected single container, found %d", len(status.ContainerStatuses))
+		if len(updatedPod.Status.ContainerStatuses) != 1 {
+			return false, fmt.Errorf("expected single container, found %d", len(updatedPod.Status.ContainerStatuses))
 		}
-		if status.ContainerStatuses[0].ContainerID != testContainerID.String() {
+		if updatedPod.Status.ContainerStatuses[0].ContainerID != testContainerID.String() {
 			return false, fmt.Errorf("expected container %q, found %q",
-				testContainerID, status.ContainerStatuses[0].ContainerID)
+				testContainerID, updatedPod.Status.ContainerStatuses[0].ContainerID)
 		}
-		return status.ContainerStatuses[0].Ready == ready, nil
+		return updatedPod.Status.ContainerStatuses[0].Ready == ready, nil
 	}
 	glog.Infof("Polling for ready state %v", ready)
 	if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {

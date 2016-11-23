@@ -165,8 +165,11 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*v1.Pod) error {
 			glog.V(8).Infof("Not a bandwidth limited container...")
 			continue
 		}
-		status, found := kl.statusManager.GetPodStatus(pod.UID)
-		if !found {
+		var status v1.PodStatus
+		updatedPod, found := kl.statusManager.GetPod(pod.UID)
+		if found {
+			status = updatedPod.Status
+		} else {
 			// TODO(random-liu): Cleanup status get functions. (issue #20477)
 			s, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 			if err != nil {

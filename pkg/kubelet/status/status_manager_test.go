@@ -487,8 +487,8 @@ func TestStaticPod(t *testing.T) {
 	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
 
 	t.Log("Should be able to get the mirror pod status from status manager")
-	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
-	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
+	retrievedPod, _ := m.GetPod(mirrorPod.UID)
+	assert.True(t, isStatusEqual(&status, &retrievedPod.Status), "Expected: %+v, Got: %+v", status, retrievedStatus)
 
 	t.Log("Should sync pod because the corresponding mirror pod is created")
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
@@ -594,11 +594,11 @@ func TestSetContainerReadiness(t *testing.T) {
 }
 
 func expectPodStatus(t *testing.T, m *manager, pod *v1.Pod) v1.PodStatus {
-	status, ok := m.GetPodStatus(pod.UID)
+	updatedPod, ok := m.GetPod(pod.UID)
 	if !ok {
 		t.Fatalf("Expected PodStatus for %q not found", pod.UID)
 	}
-	return status
+	return updatedPod.Status
 }
 
 func TestDeletePods(t *testing.T) {

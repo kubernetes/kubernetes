@@ -32,14 +32,14 @@ type mockPodStatusProvider struct {
 	pods []*v1.Pod
 }
 
-// GetPodStatus returns the status on the associated pod with matching uid (if found)
-func (m *mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
+// GetPod returns the status on the associated pod with matching uid (if found)
+func (m *mockPodStatusProvider) GetPod(uid types.UID) (*v1.Pod, bool) {
 	for _, pod := range m.pods {
 		if pod.UID == uid {
-			return pod.Status, true
+			return pod, true
 		}
 	}
-	return v1.PodStatus{}, false
+	return &v1.Pod{}, false
 }
 
 // TestActiveDeadlineHandler verifies the active deadline handler functions as expected.

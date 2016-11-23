@@ -81,9 +81,12 @@ func (m *activeDeadlineHandler) pastActiveDeadline(pod *v1.Pod) bool {
 	if pod.Spec.ActiveDeadlineSeconds == nil {
 		return false
 	}
+	var podStatus v1.PodStatus
 	// get the latest status to determine if it was started
-	podStatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
-	if !ok {
+	updatedPod, ok := m.podStatusProvider.GetPod(pod.UID)
+	if ok {
+		podStatus = updatedPod.Status
+	} else {
 		podStatus = pod.Status
 	}
 	// we have no start time so just return

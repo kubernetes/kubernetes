@@ -435,14 +435,14 @@ func TestHandlePortConflicts(t *testing.T) {
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
 	// notfittingPod should be Failed
-	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
+	updatedPod, found := kl.statusManager.GetPod(notfittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
-	require.Equal(t, v1.PodFailed, status.Phase)
+	require.Equal(t, v1.PodFailed, updatedPod.Status.Phase)
 
 	// fittingPod should be Pending
-	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	updatedPod, found = kl.statusManager.GetPod(fittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
-	require.Equal(t, v1.PodPending, status.Phase)
+	require.Equal(t, v1.PodPending, updatedPod.Status.Phase)
 }
 
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
@@ -486,14 +486,14 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
 	// notfittingPod should be Failed
-	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
+	updatedPod, found := kl.statusManager.GetPod(notfittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
-	require.Equal(t, v1.PodFailed, status.Phase)
+	require.Equal(t, v1.PodFailed, updatedPod.Status.Phase)
 
 	// fittingPod should be Pending
-	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	updatedPod, found = kl.statusManager.GetPod(fittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
-	require.Equal(t, v1.PodPending, status.Phase)
+	require.Equal(t, v1.PodPending, updatedPod.Status.Phase)
 }
 
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
@@ -526,14 +526,14 @@ func TestHandleNodeSelector(t *testing.T) {
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
 	// notfittingPod should be Failed
-	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
+	updatedPod, found := kl.statusManager.GetPod(notfittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
-	require.Equal(t, v1.PodFailed, status.Phase)
+	require.Equal(t, v1.PodFailed, updatedPod.Status.Phase)
 
 	// fittingPod should be Pending
-	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	updatedPod, found = kl.statusManager.GetPod(fittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
-	require.Equal(t, v1.PodPending, status.Phase)
+	require.Equal(t, v1.PodPending, updatedPod.Status.Phase)
 }
 
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
@@ -574,14 +574,14 @@ func TestHandleMemExceeded(t *testing.T) {
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
 	// notfittingPod should be Failed
-	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
+	updatedPod, found := kl.statusManager.GetPod(notfittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
-	require.Equal(t, v1.PodFailed, status.Phase)
+	require.Equal(t, v1.PodFailed, updatedPod.Status.Phase)
 
 	// fittingPod should be Pending
-	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	updatedPod, found = kl.statusManager.GetPod(fittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
-	require.Equal(t, v1.PodPending, status.Phase)
+	require.Equal(t, v1.PodPending, updatedPod.Status.Phase)
 }
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
@@ -605,13 +605,13 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	podToTest := pods[1]
 	// Run once to populate the status map.
 	kl.HandlePodAdditions(pods)
-	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); !found {
+	if _, found := kl.statusManager.GetPod(podToTest.UID); !found {
 		t.Fatalf("expected to have status cached for pod2")
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.podManager.SetPods([]*v1.Pod{})
 	kl.HandlePodCleanups()
-	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
+	if _, found := kl.statusManager.GetPod(podToTest.UID); found {
 		t.Fatalf("expected to not have status cached for pod2")
 	}
 }
@@ -1198,9 +1198,9 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 
 	// Let the pod worker sets the status to fail after this sync.
 	kubelet.HandlePodUpdates(pods)
-	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
+	updatedPod, found := kubelet.statusManager.GetPod(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
-	assert.Equal(t, v1.PodFailed, status.Phase)
+	assert.Equal(t, v1.PodFailed, updatedPod.Status.Phase)
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
@@ -1250,9 +1250,9 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 
 	kubelet.podManager.SetPods(pods)
 	kubelet.HandlePodUpdates(pods)
-	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
+	updatedPod, found := kubelet.statusManager.GetPod(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
-	assert.NotEqual(t, v1.PodFailed, status.Phase)
+	assert.NotEqual(t, v1.PodFailed, updatedPod.Status.Phase)
 }
 
 func podWithUidNameNs(uid types.UID, name, namespace string) *v1.Pod {
@@ -1864,14 +1864,14 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
 	// podToReject should be Failed
-	status, found := kl.statusManager.GetPodStatus(podToReject.UID)
+	updatedPod, found := kl.statusManager.GetPod(podToReject.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", podToAdmit.UID)
-	require.Equal(t, v1.PodFailed, status.Phase)
+	require.Equal(t, v1.PodFailed, updatedPod.Status.Phase)
 
 	// podToAdmit should be Pending
-	status, found = kl.statusManager.GetPodStatus(podToAdmit.UID)
+	updatedPod, found = kl.statusManager.GetPod(podToAdmit.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", podToAdmit.UID)
-	require.Equal(t, v1.PodPending, status.Phase)
+	require.Equal(t, v1.PodPending, updatedPod.Status.Phase)
 }
 
 // testPodSyncLoopHandler is a lifecycle.PodSyncLoopHandler that is used for testing.
@@ -1973,9 +1973,9 @@ func TestSyncPodKillPod(t *testing.T) {
 	})
 	require.NoError(t, err)
 	// Check pod status stored in the status map.
-	status, found := kl.statusManager.GetPodStatus(pod.UID)
+	updatedPod, found := kl.statusManager.GetPod(pod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", pod.UID)
-	require.Equal(t, v1.PodFailed, status.Phase)
+	require.Equal(t, v1.PodFailed, updatedPod.Status.Phase)
 }
 
 func waitForVolumeUnmount(

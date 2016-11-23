@@ -622,8 +622,10 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) ([]v1.Secret, error) {
 func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	var status v1.PodStatus
 	// Check the cached pod status which was set after the last sync.
-	status, ok := kl.statusManager.GetPodStatus(pod.UID)
-	if !ok {
+	updatedPod, ok := kl.statusManager.GetPod(pod.UID)
+	if ok {
+		status = updatedPod.Status
+	} else {
 		// If there is no cached status, use the status from the
 		// apiserver. This is useful if kubelet has recently been
 		// restarted.
@@ -871,8 +873,11 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 	if mirrorPod, ok := kl.podManager.GetMirrorPodByPod(pod); ok {
 		podUID = mirrorPod.UID
 	}
-	podStatus, found := kl.statusManager.GetPodStatus(podUID)
-	if !found {
+	updatedPod, found := kl.statusManager.GetPod(podUID)
+	var podStatus v1.PodStatus
+	if found {
+		podStatus = updatedPod.Status
+	} else {
 		// If there is no cached status, use the status from the
 		// apiserver. This is useful if kubelet has recently been
 		// restarted.

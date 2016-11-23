@@ -54,7 +54,7 @@ type manager struct {
 type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
 	// was a cache hit.
-	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
+	GetPod(uid types.UID) (*v1.Pod, bool)
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -134,12 +134,8 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	}
 }
 
-func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
-	pod, ok := m.podManager.GetPodByUID(m.podManager.TranslatePodUID(uid))
-	if ok {
-		return pod.Status, true
-	}
-	return v1.PodStatus{}, false
+func (m *manager) GetPod(uid types.UID) (*v1.Pod, bool) {
+	return m.podManager.GetPodByUID(m.podManager.TranslatePodUID(uid))
 }
 
 func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
@@ -243,7 +239,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	if _, readyCondition := v1.GetPodCondition(&status, v1.PodReady); readyCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := unversioned.Now()
-		_, oldReadyCondition := v1.GetPodCondition(&status, v1.PodReady)
+		_, oldReadyCondition := v1.GetPodCondition(&pod.Status, v1.PodReady)
 		if oldReadyCondition != nil && readyCondition.Status == oldReadyCondition.Status {
 			lastTransitionTime = oldReadyCondition.LastTransitionTime
 		}
@@ -254,7 +250,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	if _, initCondition := v1.GetPodCondition(&status, v1.PodInitialized); initCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := unversioned.Now()
-		_, oldInitCondition := v1.GetPodCondition(&status, v1.PodInitialized)
+		_, oldInitCondition := v1.GetPodCondition(&pod.Status, v1.PodInitialized)
 		if oldInitCondition != nil && initCondition.Status == oldInitCondition.Status {
 			lastTransitionTime = oldInitCondition.LastTransitionTime
 		}

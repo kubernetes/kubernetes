@@ -141,7 +141,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
 
-	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
+	updatedPod, ok := w.probeManager.statusManager.GetPod(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
 		glog.V(3).Infof("No status for pod: %v", format.Pod(w.pod))
@@ -149,13 +149,12 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	// Worker should terminate if pod is terminated.
-	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
+	if updatedPod.Status.Phase == v1.PodFailed || updatedPod.Status.Phase == v1.PodSucceeded {
 		glog.V(3).Infof("Pod %v %v, exiting probe worker",
-			format.Pod(w.pod), status.Phase)
+			format.Pod(w.pod), updatedPod.Status.Phase)
 		return false
 	}
-
-	c, ok := v1.GetContainerStatus(status.ContainerStatuses, w.container.Name)
+	c, ok := v1.GetContainerStatus(updatedPod.Status.ContainerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.
 		glog.V(3).Infof("Probe target container not found: %v - %v",
@@ -193,7 +192,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return true
 	}
 
-	result, err := w.probeManager.prober.probe(w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(w.probeType, w.pod, updatedPod.Status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
