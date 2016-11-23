@@ -119,11 +119,14 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 }
 
 func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	volumePath, _ := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
 	vsphereVolume := &api.Volume{
 		Name: volumeName,
 		VolumeSource: api.VolumeSource{
 			VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-				VolumePath: volumeName,
+				VolumePath: volumePath,
 			},
 		},
 	}
