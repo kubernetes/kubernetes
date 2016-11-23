@@ -593,14 +593,57 @@ func hostsFromNodeSlice(nodes []*api.Node) []string {
 	return result
 }
 
+// findNodeRole returns the role of a given node, or "" if none found.
+// The role is determined by looking in order for:
+// * a kubernetes.io/role label
+// * a kubeadm.alpha.kubernetes.io/role label
+// * a taint with Key 'dedicated'
+// If no role is found, ("") is returned
+// TODO: promote this function into utils in api.  kubectl needs a similar function.
+func findNodeRole(node *api.Node) string {
+	if role := node.Labels["kubernetes.io/role"]; role != "" {
+		return role
+	}
+	if role := node.Labels["kubeadm.alpha.kubernetes.io/role"]; role != "" {
+		return role
+	}
+
+	taints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	if err != nil {
+		glog.Warningf("error parsing node taints for node %q: %v", node.Name, err)
+	} else {
+		for _, taint := range taints {
+			if taint.Key == "dedicated" {
+				return taint.Value
+			}
+		}
+	}
+	// No role found
+	return ""
+}
+
+// isDedicatedMaster returns true iff the node is marked as a dedicated master node.
+// We don't want to send general traffic through the master in the general case,
+// but if the user is running a single-node cluster we do want to allow it.
+func isDedicatedMaster(node *api.Node) bool {
+	role := findNodeRole(node)
+	// TODO: Promote this constant into api once #35211 merges
+	return role == "master"
+}
+
 func getNodeConditionPredicate() cache.NodeConditionPredicate {
 	return func(node *api.Node) bool {
-		// We add the master to the node list, but its unschedulable.  So we use this to filter
-		// the master.
-		// TODO: Use a node annotation to indicate the master
+		// We want to remove nodes that the administrator has cordoned, because they are
+		// likely to be undergoing maintenance.
 		if node.Spec.Unschedulable {
 			return false
 		}
+
+		// We add the master to the node list, but we don't want to send general traffic through it.
+		if isDedicatedMaster(node) {
+			return false
+		}
+
 		// If we have no info, don't accept
 		if len(node.Status.Conditions) == 0 {
 			return false
