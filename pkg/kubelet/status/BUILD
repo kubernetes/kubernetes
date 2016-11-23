@@ -29,8 +29,6 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/types:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )

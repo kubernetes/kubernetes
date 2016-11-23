@@ -103,6 +103,7 @@ func TestDoProbe(t *testing.T) {
 		for i, test := range tests {
 			w := newTestWorker(m, probeType, test.probe)
 			if test.podStatus != nil {
+				m.statusManager.AddPod(w.pod)
 				m.statusManager.SetPodStatus(w.pod, *test.podStatus)
 			}
 			if c := w.doProbe(); c != test.expectContinue {

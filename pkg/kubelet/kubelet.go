@@ -1650,6 +1650,7 @@ func (kl *Kubelet) isOutOfDisk() bool {
 // and updates the pod to the failed phase in the status manage.
 func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 	kl.recorder.Eventf(pod, v1.EventTypeWarning, reason, message)
+	kl.statusManager.AddPod(pod)
 	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Reason:  reason,
@@ -1912,7 +1913,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
 		if kubepod.IsMirrorPod(pod) {
-			kl.podManager.AddPod(pod)
+			kl.statusManager.AddPod(pod)
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -1926,7 +1927,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			kl.rejectPod(pod, reason, message)
 			continue
 		}
-		kl.podManager.AddPod(pod)
+		kl.statusManager.AddPod(pod)
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
 		kl.probeManager.AddPod(pod)

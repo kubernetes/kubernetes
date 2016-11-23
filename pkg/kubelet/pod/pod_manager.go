@@ -66,6 +66,9 @@ type Manager interface {
 	AddPod(pod *v1.Pod)
 	// UpdatePod updates the given pod in the manager.
 	UpdatePod(pod *v1.Pod)
+	// UpdatePodStatus applies the updateFunction passed in to update the pod's status
+	// It performs the update while holding the lock so that concurrent status updates do not race
+	UpdatePodSafe(podUID types.UID, updateFn func(*v1.Pod))
 	// DeletePod deletes the given pod from the manager.  For mirror pods,
 	// this means deleting the mappings related to mirror pods.  For non-
 	// mirror pods, this means deleting from indexes for all non-mirror pods.
@@ -146,6 +149,16 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.updatePodsInternal(pod)
+}
+
+func (pm *basicManager) UpdatePodSafe(podUID types.UID, updateFn func(*v1.Pod)) {
+	pm.lock.Lock()
+	defer pm.lock.Unlock()
+	pod, ok := pm.podByUID[podUID]
+	if ok {
+		updateFn(pod)
+		pm.updatePodsInternal(pod)
+	}
 }
 
 // updatePodsInternal replaces the given pods in the current state of the
