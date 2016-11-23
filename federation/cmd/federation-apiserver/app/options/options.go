@@ -45,7 +45,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
 	//Add etcd specific flags.
-	s.GenericServerRunOptions.AddEtcdStorageFlags(fs)
+	s.GenericServerRunOptions.Etcd.AddEtcdStorageFlags(fs)
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")
