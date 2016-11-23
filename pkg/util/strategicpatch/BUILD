@@ -15,6 +15,7 @@ go_library(
     srcs = ["patch.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/client/typed/discovery:go_default_library",
         "//pkg/util/json:go_default_library",
         "//third_party/forked/golang/json:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",

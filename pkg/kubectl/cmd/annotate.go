@@ -223,6 +223,12 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			}
 			outputObj = obj
 		} else {
+			// retrieves server version to determine which SMPatchVersion to use.
+			smPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
+			if err != nil {
+				return err
+			}
+
 			name, namespace := info.Name, info.Namespace
 			oldData, err := json.Marshal(obj)
 			if err != nil {
@@ -239,8 +245,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			if err != nil {
 				return err
 			}
-			// Defaulting to SMPatchVersion_1_5 is safe, since it just update the annotation which is a map[string]string
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, strategicpatch.SMPatchVersion_1_5)
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, smPatchVersion)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
