@@ -299,7 +299,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		// journald nodes. We should have a more robust way to collect logs.
 		var (
 			logName  = "system.log"
-			logPath  = filepath.Join(workspace, logName)
+			logPath  = fmt.Sprintf("/tmp/%s-%s", getTimestamp(), logName)
 			destPath = fmt.Sprintf("%s/%s-%s", *resultsDir, host, logName)
 		)
 		glog.Infof("Test failed unexpectedly. Attempting to retreiving system logs (only works for nodes with journald)")
