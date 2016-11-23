@@ -73,7 +73,8 @@ type ActualStateOfWorld interface {
 	// must unmounted prior to detach.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	SetVolumeGloballyMounted(volumeName api.UniqueVolumeName, globallyMounted bool) error
+	// If a non-empty device path is provided, use it to update the volume's device path
+	SetVolumeGloballyMounted(volumeName api.UniqueVolumeName, devicePath string, globallyMounted bool) error
 
 	// DeletePodFromVolume removes the given pod from the given volume in the
 	// cache indicating the volume has been successfully unmounted from the pod.
@@ -313,13 +314,13 @@ func (asw *actualStateOfWorld) MarkVolumeAsUnmounted(
 }
 
 func (asw *actualStateOfWorld) MarkDeviceAsMounted(
-	volumeName api.UniqueVolumeName) error {
-	return asw.SetVolumeGloballyMounted(volumeName, true /* globallyMounted */)
+	volumeName api.UniqueVolumeName, devicePath string) error {
+	return asw.SetVolumeGloballyMounted(volumeName, devicePath, true /* globallyMounted */)
 }
 
 func (asw *actualStateOfWorld) MarkDeviceAsUnmounted(
 	volumeName api.UniqueVolumeName) error {
-	return asw.SetVolumeGloballyMounted(volumeName, false /* globallyMounted */)
+	return asw.SetVolumeGloballyMounted(volumeName, "" /* device path */, false /* globallyMounted */)
 }
 
 // addVolume adds the given volume to the cache indicating the specified
@@ -447,7 +448,7 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 }
 
 func (asw *actualStateOfWorld) SetVolumeGloballyMounted(
-	volumeName api.UniqueVolumeName, globallyMounted bool) error {
+	volumeName api.UniqueVolumeName, devicePath string, globallyMounted bool) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -459,6 +460,9 @@ func (asw *actualStateOfWorld) SetVolumeGloballyMounted(
 	}
 
 	volumeObj.globallyMounted = globallyMounted
+	if len(devicePath) > 0 {
+		volumeObj.devicePath = devicePath
+	}
 	asw.attachedVolumes[volumeName] = volumeObj
 	return nil
 }

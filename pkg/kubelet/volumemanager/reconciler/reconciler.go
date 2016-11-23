@@ -592,7 +592,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[api.UniqueVolumeName]*r
 			continue
 		}
 		if volume.pluginIsAttachable {
-			err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName)
+			err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName, volume.devicePath)
 			if err != nil {
 				glog.Errorf("Could not mark device is mounted to actual state of world: %v", err)
 				continue

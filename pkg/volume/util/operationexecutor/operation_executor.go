@@ -141,8 +141,8 @@ type ActualStateOfWorldMounterUpdater interface {
 	// Marks the specified volume as unmounted from the specified pod
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) error
 
-	// Marks the specified volume as having been globally mounted.
-	MarkDeviceAsMounted(volumeName api.UniqueVolumeName) error
+	// Marks the specified volume as having been globally mounted and update the volume's devicePath.
+	MarkDeviceAsMounted(volumeName api.UniqueVolumeName, devicePath string) error
 
 	// Marks the specified volume as having its global mount unmounted.
 	MarkDeviceAsUnmounted(volumeName api.UniqueVolumeName) error
@@ -828,7 +828,8 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 				volumeToMount.VolumeName,
 				volumeToMount.VolumeSpec.Name(),
 				volumeToMount.PodName,
-				volumeToMount.Pod.UID)
+				volumeToMount.Pod.UID,
+				devicePath)
 
 			deviceMountPath, err :=
 				volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
@@ -871,7 +872,7 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(
-				volumeToMount.VolumeName)
+				volumeToMount.VolumeName, devicePath)
 			if markDeviceMountedErr != nil {
 				// On failure, return error. Caller will log and retry.
 				return fmt.Errorf(
