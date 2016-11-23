@@ -1442,7 +1442,7 @@ func GetServerSupportedSMPatchVersion(discoveryClient discovery.DiscoveryInterfa
 	if serverGitVersion >= string(SMPatchVersion_1_5) {
 		return SMPatchVersion_1_5, nil
 	}
-	if serverGitVersion >= string(SMPatchVersion_1_0) {
+	if serverGitVersion >= string(SMPatchVersion_1_5) {
 		return SMPatchVersion_1_0, nil
 	}
 	return Unknown, fmt.Errorf("The version is too old: %v\n", serverVersion)
