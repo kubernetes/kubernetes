@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	"k8s.io/kubernetes/pkg/controller/node/testutil"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -94,7 +94,7 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		client := fake.NewSimpleClientset()
+		client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
 		gcc := NewFromClient(client, test.threshold)
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
@@ -115,13 +115,7 @@ func TestGCTerminated(t *testing.T) {
 			})
 		}
 
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-		store.Add(&v1.Node{
-			ObjectMeta: v1.ObjectMeta{Name: "node"},
-		})
-		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
 		gcc.podController = &FakeController{}
-		gcc.nodeController = &FakeController{}
 
 		gcc.gc()
 
@@ -190,10 +184,7 @@ func TestGCOrphaned(t *testing.T) {
 			})
 		}
 
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
 		gcc.podController = &FakeController{}
-		gcc.nodeController = &FakeController{}
 
 		pods, err := gcc.podStore.List(labels.Everything())
 		if err != nil {
@@ -273,10 +264,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			})
 		}
 
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
 		gcc.podController = &FakeController{}
-		gcc.nodeController = &FakeController{}
 
 		pods, err := gcc.podStore.List(labels.Everything())
 		if err != nil {
