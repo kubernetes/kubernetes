@@ -44,6 +44,7 @@ CronJob should not schedule jobs when suspended,soltysh,1
 CronJob should not schedule new jobs when ForbidConcurrent,soltysh,1
 CronJob should replace jobs when ReplaceConcurrent,soltysh,1
 CronJob should schedule multiple jobs concurrently,soltysh,1
+DNS config map should be able to change configuration,derekwaynecarr,0
 DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios,MrHohn,0
 DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods when cluster size changed,MrHohn,0
 DNS should provide DNS for ExternalName services,rmmh,1
@@ -175,21 +176,18 @@ Federation secrets Secret objects should be created and deleted successfully,pmo
 Federation secrets Secret objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
-GCP Volumes GlusterFS should be mountable,rkouj,0
-GCP Volumes NFSv4 should be mountable for NFSv4,rkouj,0
 GCP Volumes GlusterFS should be mountable,nikhiljindal,0
 GCP Volumes NFSv4 should be mountable for NFSv4,nikhiljindal,0
 GKE local SSD should write and read from node local SSD,fabioy,0
 GKE node pools should create a cluster with multiple node pools,fabioy,1
+Garbage Collection Test: * Should eventually garbage collect containers when we exceed the number of dead containers per container,Random-Liu,0
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1
 Garbage collector should orphan pods created by rc if delete options say so,fabioy,1
 Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1
 "Generated release_1_5 clientset should create pods, delete pods, watch pods",ghodss,1
 "Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1
-HA-master pods survive addition/removal different zones,rkouj,0
-HA-master pods survive addition/removal same zone,rkouj,0
-HA-master pods survive addition/removal different zones,nikhiljindal,0
-HA-master pods survive addition/removal same zone,nikhiljindal,0
+HA-master survive addition/removal replicas different zones,derekwaynecarr,0
+HA-master survive addition/removal replicas same zone,derekwaynecarr,0
 Hazelcast should create and scale hazelcast,mikedanese,1
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
@@ -262,6 +260,7 @@ Kubelet Container Manager Validate OOM score adjustments once the node is setup 
 Kubelet Container Manager Validate OOM score adjustments once the node is setup guaranteed container's oom-score-adj should be -998,kargakis,1
 Kubelet Container Manager Validate OOM score adjustments once the node is setup pod infra containers oom-score-adj should be -998 and best effort container's should be 1000,timothysc,1
 Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,karlkfi,1
+Kubelet Volume Manager Volume Manager On terminatation of pod with memory backed volume should remove the volume from the node,derekwaynecarr,0
 Kubelet experimental resource usage tracking resource tracking for * pods per node,yujuhong,0
 Kubelet regular resource usage tracking resource tracking for * pods per node,yujuhong,0
 Kubelet when scheduling a busybox command in a pod it should print the output to logs,ixdy,1
@@ -336,7 +335,6 @@ PersistentVolumes with multiple PVs and PVCs all in same ns should create 2 PVs 
 PersistentVolumes with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,caesarxuchao,1
 PersistentVolumes with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,caesarxuchao,1
 Pet Store should scale to persist a nominal number ( * ) of transactions in * seconds,xiang90,1
-Pet set recreate should recreate evicted statefulset,roberthbailey,1
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",alex-mohr,1
 "Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",ghodss,1
 "Pod Disks should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession",saad-ali,0
@@ -458,8 +456,13 @@ Services should work after restarting kube-proxy,bprashanth,0
 SimpleMount should be able to mount an emptydir on a container,karlkfi,1
 "Spark should start spark master, driver and workers",girishkalele,1
 "Staging client repo client should create pods, delete pods, watch pods",jbeda,1
+Stateful Set recreate should recreate evicted statefulset,derekwaynecarr,0
+StatefulSet Basic StatefulSet functionality Scaling down before scale up is finished should wait until current pod will be running and ready before it will be removed,derekwaynecarr,0
+StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any pet is unhealthy,derekwaynecarr,0
+StatefulSet Basic StatefulSet functionality should allow template updates,derekwaynecarr,0
 StatefulSet Basic StatefulSet functionality should handle healthy pet restarts during scale,girishkalele,1
 StatefulSet Basic StatefulSet functionality should provide basic identity,bprashanth,1
+StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,derekwaynecarr,0
 StatefulSet Deploy clustered applications should creating a working mysql cluster,yujuhong,1
 StatefulSet Deploy clustered applications should creating a working redis cluster,yifan-gu,1
 StatefulSet Deploy clustered applications should creating a working zookeeper cluster,pmorie,1
@@ -636,6 +639,8 @@ k8s.io/kubernetes/pkg/credentialprovider,justinsb,1
 k8s.io/kubernetes/pkg/credentialprovider/aws,zmerlynn,1
 k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
 k8s.io/kubernetes/pkg/dns,jdef,1
+k8s.io/kubernetes/pkg/dns/config,derekwaynecarr,0
+k8s.io/kubernetes/pkg/dns/federation,derekwaynecarr,0
 k8s.io/kubernetes/pkg/dns/treecache,bowei,0
 k8s.io/kubernetes/pkg/fieldpath,childsb,1
 k8s.io/kubernetes/pkg/fields,jsafrane,1
@@ -956,4 +961,3 @@ k8s.io/kubernetes/test/integration/storageclasses,andyzheng0831,1
 k8s.io/kubernetes/test/integration/thirdparty,davidopp,1
 k8s.io/kubernetes/test/list,maisem,1
 kubelet Clean up pods on node kubelet should be able to delete * pods per node in *.,yujuhong,0
-Garbage Collection Test: * Should eventually garbage collect containers when we exceed the number of dead containers per container,Random-Liu,0
