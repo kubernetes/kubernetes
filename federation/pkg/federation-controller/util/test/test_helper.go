@@ -141,7 +141,7 @@ func RegisterFakeWatch(resource string, client *core.Fake) *WatcherDispatcher {
 	dispatcher := &WatcherDispatcher{
 		watchers:       make([]*watch.RaceFreeFakeWatcher, 0),
 		eventsSoFar:    make([]*watch.Event, 0),
-		orderExecution: make(chan func()),
+		orderExecution: make(chan func(), 100),
 		stopChan:       make(chan struct{}),
 	}
 	go func() {
