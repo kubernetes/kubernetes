@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sort"
 
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/json"
 	forkedjson "k8s.io/kubernetes/third_party/forked/golang/json"
 
@@ -1428,4 +1429,21 @@ func toYAML(v interface{}) (string, error) {
 	}
 
 	return string(y), nil
+}
+
+// GetServerSupportedSMPatchVersion takes a discoveryClient,
+// returns the max StrategicMergePatch version supported
+func GetServerSupportedSMPatchVersion(discoveryClient discovery.DiscoveryInterface) (StrategicMergePatchVersion, error) {
+	serverVersion, err := discoveryClient.ServerVersion()
+	if err != nil {
+		return Unknown, err
+	}
+	serverGitVersion := serverVersion.GitVersion
+	if serverGitVersion >= string(SMPatchVersion_1_5) {
+		return SMPatchVersion_1_5, nil
+	}
+	if serverGitVersion >= string(SMPatchVersion_1_0) {
+		return SMPatchVersion_1_0, nil
+	}
+	return Unknown, fmt.Errorf("The version is too old: %v\n", serverVersion)
 }
