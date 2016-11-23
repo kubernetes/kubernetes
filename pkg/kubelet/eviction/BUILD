@@ -16,6 +16,7 @@ go_library(
         "doc.go",
         "eviction_manager.go",
         "helpers.go",
+        "threshold_notifier_unsupported.go",
         "types.go",
     ],
     tags = ["automanaged"],

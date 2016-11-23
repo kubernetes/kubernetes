@@ -164,3 +164,8 @@ type nodeReclaimFuncs []nodeReclaimFunc
 
 // thresholdNotifierHandlerFunc is a function that takes action in response to a crossed threshold
 type thresholdNotifierHandlerFunc func(thresholdDescription string)
+
+// ThresholdNotifier notifies the user when an attribute crosses a threshold value
+type ThresholdNotifier interface {
+	Start(stopCh <-chan struct{})
+}
