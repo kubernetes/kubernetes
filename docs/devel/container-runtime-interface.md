@@ -85,6 +85,7 @@ besides discussions on Github issues.
  - [cri-o](https://github.com/kubernetes-incubator/cri-o)
  - [rktlet](https://github.com/kubernetes-incubator/rktlet)
  - [frakti](https://github.com/kubernetes/frakti)
+ - [virtlet](https://github.com/Mirantis/virtlet)
 
 
 ## [Status update](#status-update)
