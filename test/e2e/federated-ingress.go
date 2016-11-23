@@ -31,7 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	gceprovider "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -45,6 +47,14 @@ const (
 	FederatedIngressName           = "federated-ingress"
 	FederatedIngressServiceName    = "federated-ingress-service"
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
+	FederatedIngressFirewallPrefix = "f8n-ing-fw-e2e"
+	FederatedIngressFirewallDesc   = "Federated Ingress e2e GCE L7 firewall rule"
+
+	// The source subnet range from which GCE L7 load balancer sends
+	// its health check requests. See
+	// https://cloud.google.com/compute/docs/load-balancing/http/
+	// for details.
+	FederatedIngressGCLBSrcRange = "130.211.0.0/22"
 )
 
 var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func() {
@@ -135,16 +145,34 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 			var (
 				service *v1.Service
+				fwNames map[string]string
 			)
 
 			BeforeEach(func() {
 				framework.SkipUnlessFederated(f.ClientSet)
+
+				// This test as it is written now, is only applicable for
+				// GCE/GKE. See the comment for
+				// createFederatedIngressFirewallRulesOrFail() function below.
+				// TODO: This skipping might not be necessary when we remove
+				// the create firewall rule call below.
+				framework.SkipUnlessProviderIs("gce", "gke")
+
 				// create backend pod
 				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create backend service
 				service = createServiceOrFail(f.FederationClientset_1_5, ns, FederatedIngressServiceName)
+
 				// create ingress object
 				jig.ing = createIngressOrFail(f.FederationClientset_1_5, ns)
+				// Manually create a firewall rule for the backend pods as
+				// a temporary workaround. See
+				// https://github.com/kubernetes/kubernetes/issues/36327#issuecomment-262354506
+				// for details.
+				// TODO(madhusudancs): Remove this once
+				// https://github.com/kubernetes/kubernetes/issues/37306
+				// is implemented.
+				fwNames = createFederatedIngressFirewallRulesOrFail(ns, jig.ing.Name, clusters, service)
 				// wait for services objects sync
 				waitForServiceShardsOrFail(ns, service, clusters)
 				// wait for ingress objects sync
@@ -169,6 +197,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				} else {
 					By("No ingress to delete. Ingress is nil")
 				}
+				deleteFederatedIngressFirewallRulesOrFail(fwNames)
 			})
 
 			PIt("should be able to discover a federated ingress service via DNS", func() {
@@ -483,4 +512,120 @@ func getFederatedIngressAddress(client *fedclientset.Clientset, ns, name string)
 		}
 	}
 	return addresses, nil
+}
+
+// getNodeNames returns the names of nodes in a cluster.
+func getZoneNodesMap(clientset *kubeclientset.Clientset) (map[string][]string, error) {
+	zoneNodes := make(map[string][]string)
+	nodes, err := clientset.Core().Nodes().List(v1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	// Only consider schedulable nodes, because we won't
+	// have backends in non-schedulable nodes and don't
+	// want to open port to those nodes.
+	// Also, master node is unschedulable and contains
+	// a different tag than all other nodes, so there
+	// is no point in considering that.
+	for _, n := range nodes.Items {
+		if n.Spec.Unschedulable {
+			continue
+		}
+		zone, ok := n.Labels[metav1.LabelZoneFailureDomain]
+		if !ok {
+			framework.Logf("skipping node %q from ZoneNode map because no zone label was found", n.Name)
+			continue
+		}
+		nodes, ok := zoneNodes[zone]
+		if !ok {
+			nodes = make([]string, 0)
+		}
+		nodes = append(nodes, n.Name)
+		zoneNodes[zone] = nodes
+	}
+	return zoneNodes, nil
+}
+
+func updateMap(merged, src map[string][]string) {
+	for zone, nodes := range src {
+		mNodes, ok := merged[zone]
+		if !ok {
+			mNodes = make([]string, 0)
+		}
+		mNodes = append(mNodes, nodes...)
+		merged[zone] = mNodes
+	}
+}
+
+// createFederatedIngressFirewallRule creates a firewall rule for the
+// federated ingress allowing traffic to the service shards in all the
+// underlying clusters.
+// TODO(madhusudancs): Remove this once
+// https://github.com/kubernetes/kubernetes/issues/37306
+// is implemented.
+func createFederatedIngressFirewallRules(ns, ingressName string, clusters map[string]*cluster, svc *v1.Service) (map[string]string, error) {
+	mergedZoneNodes := make(map[string][]string)
+	for clusterName, cluster := range clusters {
+		zoneNodes, err := getZoneNodesMap(cluster.Clientset)
+		if err != nil {
+			return nil, err
+		}
+		framework.Logf("nodes to zones map for cluster %q: %#v", clusterName, mergedZoneNodes)
+		updateMap(mergedZoneNodes, zoneNodes)
+	}
+	framework.Logf("merged nodes to zones map: %#v", mergedZoneNodes)
+
+	if len(svc.Spec.Ports) < 1 {
+		return nil, fmt.Errorf("no NodePort specified for the service %q", svc.Name)
+	}
+	nodeport := int64(svc.Spec.Ports[0].NodePort)
+
+	gclbSubnet, err := sets.ParseIPNets(FederatedIngressGCLBSrcRange)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse the GCLB source subnet range %q: %v", FederatedIngressGCLBSrcRange, err)
+	}
+
+	fwNames := make(map[string]string)
+	for zone, nodes := range mergedZoneNodes {
+		fwName := fmt.Sprintf("%s-%s", FederatedIngressFirewallPrefix, zone)
+		By(fmt.Sprintf("Creating firewall rule %q for zone %q: src subnet: %s, nodePort: %d, nodeNames: %#v", fwName, zone, FederatedIngressGCLBSrcRange, nodeport, nodes))
+		provider, ok := framework.TestContext.CloudConfig.FederationProviders[zone]
+		if !ok {
+			return fwNames, fmt.Errorf("no cloud provider for zone %q", zone)
+		}
+		gce := provider.(*gceprovider.GCECloud)
+		err := gce.CreateFirewall(fwName, FederatedIngressFirewallDesc, gclbSubnet, []int64{nodeport}, nodes)
+		if err != nil {
+			return fwNames, err
+		}
+		fwNames[zone] = fwName
+	}
+	return fwNames, nil
+}
+
+func createFederatedIngressFirewallRulesOrFail(ns, ingressName string, clusters map[string]*cluster, svc *v1.Service) map[string]string {
+	fwNames, err := createFederatedIngressFirewallRules(ns, ingressName, clusters, svc)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error creating firewall rule for Ingress %q in %q", ingressName, ns))
+	return fwNames
+}
+
+func deleteFederatedIngressFirewallRules(fwNames map[string]string) error {
+	var errs []string
+	for zone, fwName := range fwNames {
+		By(fmt.Sprintf("Deleting firewall rule %q", fwName))
+		provider, ok := framework.TestContext.CloudConfig.FederationProviders[zone]
+		if !ok {
+			return fmt.Errorf("no cloud provider for zone %q", zone)
+		}
+		gce := provider.(*gceprovider.GCECloud)
+		err := gce.DeleteFirewall(fwName)
+		// Collect the erro and continue
+		errs = append(errs, err.Error())
+	}
+	return fmt.Errorf(strings.Join(errs, ", "))
+}
+
+func deleteFederatedIngressFirewallRulesOrFail(fwNames map[string]string) {
+	err := deleteFederatedIngressFirewallRules(fwNames)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error deleting firewall rules %q", fwNames))
 }
