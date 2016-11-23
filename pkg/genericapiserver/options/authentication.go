@@ -313,7 +313,7 @@ func (s *RequestHeaderAuthenticationOptions) AuthenticationRequestHeaderConfig()
 // the root kube API server
 type DelegatingAuthenticationOptions struct {
 	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
-	// TokenAcessReview.authentication.k8s.io endpoint for checking tokens.
+	// TokenAccessReview.authentication.k8s.io endpoint for checking tokens.
 	RemoteKubeConfigFile string
 
 	// CacheTTL is the length of time that a token authentication answer will be cached.
@@ -334,7 +334,7 @@ func (s *DelegatingAuthenticationOptions) Validate() []error {
 func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RemoteKubeConfigFile, "authentication-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
-		" tokenaccessreviews.authencation.k8s.io.")
+		" tokenaccessreviews.authentication.k8s.io.")
 }
 
 func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) (authenticator.DelegatingAuthenticatorConfig, error) {
@@ -357,14 +357,16 @@ func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authentication
 		return nil, nil
 	}
 
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	loadingRules.ExplicitPath = s.RemoteKubeConfigFile
+	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: s.RemoteKubeConfigFile}
 	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
 
 	clientConfig, err := loader.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
+	// set high qps/burst limits since this will effectively limit API server responsiveness
+	clientConfig.QPS = 200
+	clientConfig.Burst = 400
 
 	client, err := authenticationclient.NewForConfig(clientConfig)
 	if err != nil {

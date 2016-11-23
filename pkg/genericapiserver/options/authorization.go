@@ -79,8 +79,13 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory) authorizer.AuthorizationConfig {
+	modes := []string{}
+	if len(s.Mode) > 0 {
+		modes = strings.Split(s.Mode, ",")
+	}
+
 	return authorizer.AuthorizationConfig{
-		AuthorizationModes:          strings.Split(s.Mode, ","),
+		AuthorizationModes:          modes,
 		PolicyFile:                  s.PolicyFile,
 		WebhookConfigFile:           s.WebhookConfigFile,
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,
@@ -94,7 +99,7 @@ func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory info
 // the root kube API server
 type DelegatingAuthorizationOptions struct {
 	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
-	// TokenAcessReview.authentication.k8s.io endpoint for checking tokens.
+	// SubjectAccessReview.authorization.k8s.io endpoint for checking tokens.
 	RemoteKubeConfigFile string
 
 	// AllowCacheTTL is the length of time that a successful authorization response will be cached
@@ -124,13 +129,13 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizer.DelegatingAuthorizerConfig, error) {
-	tokenClient, err := s.newSubjectAccessReview()
+	sarClient, err := s.newSubjectAccessReview()
 	if err != nil {
 		return authorizer.DelegatingAuthorizerConfig{}, err
 	}
 
 	ret := authorizer.DelegatingAuthorizerConfig{
-		SubjectAccessReviewClient: tokenClient,
+		SubjectAccessReviewClient: sarClient,
 		AllowCacheTTL:             s.AllowCacheTTL,
 		DenyCacheTTL:              s.DenyCacheTTL,
 	}
@@ -142,14 +147,16 @@ func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorization
 		return nil, nil
 	}
 
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	loadingRules.ExplicitPath = s.RemoteKubeConfigFile
+	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: s.RemoteKubeConfigFile}
 	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
 
 	clientConfig, err := loader.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
+	// set high qps/burst limits since this will effectively limit API server responsiveness
+	clientConfig.QPS = 200
+	clientConfig.Burst = 400
 
 	client, err := authorizationclient.NewForConfig(clientConfig)
 	if err != nil {
