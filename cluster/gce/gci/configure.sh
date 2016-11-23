@@ -100,10 +100,10 @@ function split-commas {
 
 function install-gci-mounter-tools {
     local -r rkt_version="v1.18.0"
-    local -r gci_mounter_version="v3"
+    local -r gci_mounter_version="v2"
     local -r rkt_binary_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
     local -r rkt_stage1_fly_sha1="474df5a1f934960ba669b360ab713d0a54283091"
-    local -r gci_mounter_sha1="6ae71998bf9deba06468b036c2ba126626e0050d"
+    local -r gci_mounter_sha1="851e841d8640d6a05e64e22c493f5ac3c4cba561"
     download-or-bust "${rkt_binary_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/rkt"
     download-or-bust "${rkt_stage1_fly_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/stage1-fly.aci"
     download-or-bust "${gci_mounter_sha1}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-${gci_mounter_version}.aci"
