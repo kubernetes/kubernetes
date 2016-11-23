@@ -547,7 +547,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 				Logf("%v in state %v, ignoring", pod.Name, pod.Status.Phase)
 				continue
 			}
-			if res, err := testutils.PodRunningReady(&pod); res && err == nil {
+			if res, err := testutils.PodRunningReadyOrSucceeded(&pod); res && err == nil {
 				nOk++
 			} else {
 				if pod.Status.Phase != api.PodFailed {
