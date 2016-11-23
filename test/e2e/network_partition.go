@@ -383,7 +383,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			deleteAllStatefulSets(c, ns)
 		})
 
-		It("should come back up if node goes down [Slow] [Disruptive] [Feature:PetSet]", func() {
+		It("should come back up if node goes down [Slow] [Disruptive]", func() {
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
@@ -401,7 +401,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
 		})
 
-		It("should not reschedule pets if there is a network partition [Slow] [Disruptive] [Feature:PetSet]", func() {
+		It("should not reschedule pets if there is a network partition [Slow] [Disruptive]", func() {
 			ps := newStatefulSet(psName, ns, headlessSvcName, 3, []api.VolumeMount{}, []api.VolumeMount{}, labels)
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())

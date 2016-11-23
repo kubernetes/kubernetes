@@ -64,10 +64,9 @@ const (
 	readTimeout = 60 * time.Second
 )
 
-// Time: 25m, slow by design.
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
-var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
+var _ = framework.KubeDescribe("StatefulSet", func() {
 	f := framework.NewDefaultFramework("statefulset")
 	var ns string
 	var c clientset.Interface
@@ -106,7 +105,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			deleteAllStatefulSets(c, ns)
 		})
 
-		It("should provide basic identity [Feature:StatefulSet]", func() {
+		It("should provide basic identity", func() {
 			By("Creating statefulset " + psName + " in namespace " + ns)
 			ps.Spec.Replicas = 3
 			setInitializedAnnotation(ps, "false")
@@ -116,7 +115,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 
 			pst := statefulSetTester{c: c}
 
-			By("Saturating pet set " + ps.Name)
+			By("Saturating stateful set " + ps.Name)
 			pst.saturate(ps)
 
 			By("Verifying statefulset mounted data directory is usable")
@@ -141,7 +140,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			ExpectNoError(pst.execInPets(ps, cmd))
 		})
 
-		It("should handle healthy pet restarts during scale [Feature:PetSet]", func() {
+		It("should handle healthy pet restarts during scale", func() {
 			By("Creating statefulset " + psName + " in namespace " + ns)
 			ps.Spec.Replicas = 2
 			setInitializedAnnotation(ps, "false")
@@ -348,7 +347,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Deploy clustered applications [Slow] [Feature:PetSet]", func() {
+	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
 		var pst *statefulSetTester
 		var appTester *clusterAppTester
 
@@ -365,29 +364,29 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			deleteAllStatefulSets(c, ns)
 		})
 
-		It("should creating a working zookeeper cluster [Feature:PetSet]", func() {
+		It("should creating a working zookeeper cluster", func() {
 			appTester.pet = &zookeeperTester{tester: pst}
 			appTester.run()
 		})
 
-		It("should creating a working redis cluster [Feature:PetSet]", func() {
+		It("should creating a working redis cluster", func() {
 			appTester.pet = &redisTester{tester: pst}
 			appTester.run()
 		})
 
-		It("should creating a working mysql cluster [Feature:PetSet]", func() {
+		It("should creating a working mysql cluster", func() {
 			appTester.pet = &mysqlGaleraTester{tester: pst}
 			appTester.run()
 		})
 
-		It("should creating a working CockroachDB cluster [Feature:PetSet]", func() {
+		It("should creating a working CockroachDB cluster", func() {
 			appTester.pet = &cockroachDBTester{tester: pst}
 			appTester.run()
 		})
 	})
 })
 
-var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func() {
+var _ = framework.KubeDescribe("Stateful Set recreate", func() {
 	f := framework.NewDefaultFramework("pet-set-recreate")
 	var c clientset.Interface
 	var ns string
@@ -420,7 +419,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 	})
 
 	It("should recreate evicted statefulset", func() {
-		By("looking for a node to schedule pet set and pod")
+		By("looking for a node to schedule stateful set and pod")
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		node := nodes.Items[0]
 
@@ -461,7 +460,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		By("waiting until pet pod " + petPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
 		w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(api.SingleObject(api.ObjectMeta{Name: petPodName}))
 		framework.ExpectNoError(err)
-		// we need to get UID from pod in any state and wait until pet set controller will remove pod atleast once
+		// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
 		_, err = watch.Until(petPodTimeout, w, func(event watch.Event) (bool, error) {
 			pod := event.Object.(*api.Pod)
 			switch event.Type {
@@ -984,13 +983,13 @@ func (p *statefulSetTester) waitForStatus(ps *apps.StatefulSet, expectedReplicas
 				return false, err
 			}
 			if psGet.Status.Replicas != expectedReplicas {
-				framework.Logf("Waiting for pet set status to become %d, currently %d", expectedReplicas, psGet.Status.Replicas)
+				framework.Logf("Waiting for stateful set status to become %d, currently %d", expectedReplicas, psGet.Status.Replicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for pet set status.replicas updated to %d: %v", expectedReplicas, pollErr)
+		framework.Failf("Failed waiting for stateful set status.replicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 
