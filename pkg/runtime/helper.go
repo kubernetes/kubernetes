@@ -210,3 +210,23 @@ type defaultFramer struct{}
 
 func (defaultFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser { return r }
 func (defaultFramer) NewFrameWriter(w io.Writer) io.Writer         { return w }
+
+// NewFieldLabelConversionFunc returns a field label conversion func, which does the following:
+// * returns overrideLabels[label], value, nil if the specified label exists in the overrideLabels map
+// * returns label, value, nil if the specified field exists as a key in the supportedFields map.
+//   (values in this map are unused, it is intended to be a field/value map built from a prototypical object
+//   by the same function used by the match predicate)
+// * otherwise, returns an error
+//
+// This allows constructing a field selector conversion func that automatically supports all field names extracted from an object
+func NewFieldLabelConversionFunc(supportedFields map[string]string, overrideFields map[string]string) func(label, value string) (string, string, error) {
+	return func(label, value string) (string, string, error) {
+		if label, overridden := overrideFields[label]; overridden {
+			return label, value, nil
+		}
+		if _, supported := supportedFields[label]; supported {
+			return label, value, nil
+		}
+		return "", "", fmt.Errorf("field label not supported: %s", label)
+	}
+}
