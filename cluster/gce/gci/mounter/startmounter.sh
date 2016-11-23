@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,9 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:xenial
-MAINTAINER vishh@google.com
+# start rpcbind if it is not started yet
+s=`/etc/init.d/rpcbind status`
+if [[ $s == *"not running"* ]]; then
+   echo "Starting rpcbind: /sbin/rpcbind -w"
+   /sbin/rpcbind -w
+fi
+echo `/etc/init.d/rpcbind status`
 
-RUN apt-get update && apt-get install -y netbase nfs-common=1:1.2.8-9ubuntu12 glusterfs-client=3.7.6-1ubuntu1
-ADD startmounter.sh /startmounter.sh
-ENTRYPOINT ["/startmounter.sh"]
+# mount with passing paramaters
+/bin/mount "${@}"
