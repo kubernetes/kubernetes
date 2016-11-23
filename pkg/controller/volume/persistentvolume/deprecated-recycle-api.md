@@ -7,11 +7,11 @@ The current recycler design only allows for user space volume erasure operations
 **USE RECYCLE API AT YOUR OWN RISK AS IT MAY BE REMOVED OR SIGNIFICANTLY CHANGED IN FUTURE KUBERNETES RELEASES**.
 
 ## Problem Scenarios
-**Scenario 1**: User attaches a volume to their POD and is assigned a suplimental group but their default group is some other group.  New files are created as the default group and for the recycler to remove them it would have to run as the default group.  The scenario is similar and problimatic for chown'ed and chgroup'ed files.  The recycler has no way to determine at launch which group to run as to remove every file on a recycled volume.
+**Scenario 1**: User attaches a volume to their POD and is assigned a supplemental group but their default group is some other group.  New files are created as the default group and for the recycler to remove them it would have to run as the default group.  The scenario is similar and problimatic for chown'ed and chgroup'ed files.  The recycler has no way to determine at launch which group to run as to remove every file on a recycled volume.
 
 **Scenario 2**: Malicious user writes a POD that uses debugfs to inspect attached volumes for previously deleted files.  Malicious user would gain access to "recycled" files from other users.
 
-To work around either of these scenarios kubernetes will need to delete the partition on the storage volume and re-create.  In the current architecture the volume attached to the recycler is unavialble for deletion as its in use.  
+To work around either of these scenarios kubernetes will need to delete the partition on the storage volume and re-create.  In the current architecture the volume attached to the recycler is unavailable for deletion as its in use.  
 
 Additionally, delete/create is an admin control plane operation and the node hosting the recycle POD will need network access to the storage control plane and the admin credentials.  Its desirable to isolate storage control plan from the user network for security.
 
