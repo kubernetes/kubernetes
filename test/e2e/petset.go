@@ -66,10 +66,6 @@ const (
 	readTimeout = 60 * time.Second
 )
 
-var (
-	StatefulSetGroupVersionResource = schema.GroupVersionResource{Group: apps.GroupName, Version: "v1beta1", Resource: "statefulsets"}
-)
-
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = framework.KubeDescribe("StatefulSet", func() {
@@ -80,7 +76,6 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.SkipIfMissingResource(f.ClientPool, StatefulSetGroupVersionResource, f.Namespace.Name)
 	})
 
 	framework.KubeDescribe("Basic StatefulSet functionality", func() {
@@ -408,7 +403,7 @@ var _ = framework.KubeDescribe("Stateful Set recreate", func() {
 	petPodName := "web-0"
 
 	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.ClientPool, StatefulSetGroupVersionResource, f.Namespace.Name)
+		framework.SkipUnlessProviderIs("gce", "vagrant")
 		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
 		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
