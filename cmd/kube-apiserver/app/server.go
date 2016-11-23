@@ -45,16 +45,18 @@ import (
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -80,11 +82,19 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
-	genericvalidation.VerifyEtcdServersList(s.GenericServerRunOptions)
+	if errs := s.Etcd.Validate(); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	if err := s.GenericServerRunOptions.DefaultExternalAddress(s.SecureServing, s.InsecureServing); err != nil {
+		return err
+	}
+
 	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
 	genericConfig := genericapiserver.NewConfig(). // create the new config
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
-							Complete()                               // set default values based on the known values
+							ApplySecureServingOptions(s.SecureServing).
+							ApplyInsecureServingOptions(s.InsecureServing).
+							Complete() // set default values based on the known values
 
 	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
 	if err != nil {
@@ -142,7 +152,7 @@ func Run(s *options.ServerRunOptions) error {
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
 
-	if s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize == 0 {
+	if s.Etcd.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, estimate its size based on
 		// target memory usage.
 		glog.V(2).Infof("Initalizing deserialization cache size based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
@@ -158,9 +168,9 @@ func Run(s *options.ServerRunOptions) error {
 		// size to compute its size. We may even go further and measure
 		// collective sizes of the objects in the cache.
 		clusterSize := s.GenericServerRunOptions.TargetRAMMB / 60
-		s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize = 25 * clusterSize
-		if s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize < 1000 {
-			s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize = 1000
+		s.Etcd.StorageConfig.DeserializationCacheSize = 25 * clusterSize
+		if s.Etcd.StorageConfig.DeserializationCacheSize < 1000 {
+			s.Etcd.StorageConfig.DeserializationCacheSize = 1000
 		}
 	}
 
@@ -169,7 +179,7 @@ func Run(s *options.ServerRunOptions) error {
 		glog.Fatalf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
-		s.GenericServerRunOptions.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
+		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
 		[]unversioned.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
@@ -179,7 +189,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	storageFactory.AddCohabitatingResources(batch.Resource("jobs"), extensions.Resource("jobs"))
 	storageFactory.AddCohabitatingResources(autoscaling.Resource("horizontalpodautoscalers"), extensions.Resource("horizontalpodautoscalers"))
-	for _, override := range s.GenericServerRunOptions.EtcdServersOverrides {
+	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
 			glog.Errorf("invalid value of etcd server overrides: %s", override)
@@ -200,9 +210,9 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	// Default to the private server key for service account token signing
-	if len(s.ServiceAccountKeyFiles) == 0 && s.GenericServerRunOptions.TLSPrivateKeyFile != "" {
-		if authenticator.IsValidServiceAccountKeyFile(s.GenericServerRunOptions.TLSPrivateKeyFile) {
-			s.ServiceAccountKeyFiles = []string{s.GenericServerRunOptions.TLSPrivateKeyFile}
+	if len(s.ServiceAccountKeyFiles) == 0 && s.SecureServing.ServerCert.CertKey.KeyFile != "" {
+		if authenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
+			s.ServiceAccountKeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
 		} else {
 			glog.Warning("No TLS key provided, service account token authentication disabled")
 		}
@@ -223,7 +233,7 @@ func Run(s *options.ServerRunOptions) error {
 		Anonymous:                   s.GenericServerRunOptions.AnonymousAuth,
 		AnyToken:                    s.GenericServerRunOptions.EnableAnyToken,
 		BasicAuthFile:               s.GenericServerRunOptions.BasicAuthFile,
-		ClientCAFile:                s.GenericServerRunOptions.ClientCAFile,
+		ClientCAFile:                s.SecureServing.ClientCA,
 		TokenAuthFile:               s.GenericServerRunOptions.TokenAuthFile,
 		OIDCIssuerURL:               s.GenericServerRunOptions.OIDCIssuerURL,
 		OIDCClientID:                s.GenericServerRunOptions.OIDCClientID,
@@ -245,11 +255,11 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := s.GenericServerRunOptions.NewSelfClientConfig(privilegedLoopbackToken)
+	selfClientConfig, err := genericoptions.NewSelfClientConfig(s.SecureServing, s.InsecureServing, privilegedLoopbackToken)
 	if err != nil {
 		glog.Fatalf("Failed to create clientset: %v", err)
 	}
-	client, err := s.GenericServerRunOptions.NewSelfClient(privilegedLoopbackToken)
+	client, err := internalclientset.NewForConfig(selfClientConfig)
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}

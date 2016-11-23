@@ -17,9 +17,8 @@ limitations under the License.
 package options
 
 import (
-	"errors"
+	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,9 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
@@ -69,9 +65,6 @@ type ServerRunOptions struct {
 
 	AnonymousAuth                bool
 	BasicAuthFile                string
-	BindAddress                  net.IP
-	CertDirectory                string
-	ClientCAFile                 string
 	CloudConfigFile              string
 	CloudProvider                string
 	CorsAllowedOriginList        []string
@@ -86,11 +79,7 @@ type ServerRunOptions struct {
 	EnableContentionProfiling    bool
 	EnableSwaggerUI              bool
 	EnableWatchCache             bool
-	EtcdServersOverrides         []string
-	StorageConfig                storagebackend.Config
 	ExternalHost                 string
-	InsecureBindAddress          net.IP
-	InsecurePort                 int
 	KeystoneURL                  string
 	KeystoneCAFile               string
 	KubernetesServiceNodePort    int
@@ -108,7 +97,6 @@ type ServerRunOptions struct {
 	RequestHeaderClientCAFile    string
 	RequestHeaderAllowedNames    []string
 	RuntimeConfig                config.ConfigurationMap
-	SecurePort                   int
 	ServiceClusterIPRange        net.IPNet // TODO: make this a list
 	ServiceNodePortRange         utilnet.PortRange
 	StorageVersions              string
@@ -118,9 +106,6 @@ type ServerRunOptions struct {
 	DefaultStorageVersions string
 	TargetRAMMB            int
 	TLSCAFile              string
-	TLSCertFile            string
-	TLSPrivateKeyFile      string
-	SNICertKeys            []config.NamedCertKey
 	TokenAuthFile          string
 	EnableAnyToken         bool
 	WatchCacheSizes        []string
@@ -133,8 +118,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		AuthorizationMode:                        "AlwaysAllow",
 		AuthorizationWebhookCacheAuthorizedTTL:   5 * time.Minute,
 		AuthorizationWebhookCacheUnauthorizedTTL: 30 * time.Second,
-		BindAddress:                              net.ParseIP("0.0.0.0"),
-		CertDirectory:                            "/var/run/kubernetes",
 		DefaultStorageMediaType:                  "application/json",
 		DefaultStorageVersions:                   registered.AllPreferredGroupVersions(),
 		DeleteCollectionWorkers:                  1,
@@ -142,28 +125,39 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableProfiling:                          true,
 		EnableContentionProfiling:                false,
 		EnableWatchCache:                         true,
-		InsecureBindAddress:                      net.ParseIP("127.0.0.1"),
-		InsecurePort:                             8080,
 		LongRunningRequestRE:                     DefaultLongRunningRequestRE,
 		MasterCount:                              1,
 		MasterServiceNamespace:                   api.NamespaceDefault,
 		MaxRequestsInFlight:                      400,
 		MinRequestTimeout:                        1800,
 		RuntimeConfig:                            make(config.ConfigurationMap),
-		SecurePort:                               6443,
 		ServiceNodePortRange:                     DefaultServiceNodePortRange,
 		StorageVersions:                          registered.AllPreferredGroupVersions(),
 	}
 }
 
-func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
-	o.StorageConfig = storagebackend.Config{
-		Prefix: DefaultEtcdPathPrefix,
-		// Default cache size to 0 - if unset, its size will be set based on target
-		// memory usage.
-		DeserializationCacheSize: 0,
+func (s *ServerRunOptions) DefaultExternalAddress(secure *SecureServingOptions, insecure *ServingOptions) error {
+	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
+		switch {
+		case secure != nil:
+			hostIP, err := secure.ServingOptions.DefaultExternalAddress()
+			if err != nil {
+				return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
+					"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+			}
+			s.AdvertiseAddress = hostIP
+
+		case insecure != nil:
+			hostIP, err := insecure.DefaultExternalAddress()
+			if err != nil {
+				return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
+					"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+			}
+			s.AdvertiseAddress = hostIP
+		}
 	}
-	return o
+
+	return nil
 }
 
 // StorageGroupsToEncodingVersion returns a map from group name to group version,
@@ -210,43 +204,6 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVe
 	}
 
 	return nil
-}
-
-// Returns a clientset which can be used to talk to this apiserver.
-func (s *ServerRunOptions) NewSelfClient(token string) (clientset.Interface, error) {
-	clientConfig, err := s.NewSelfClientConfig(token)
-	if err != nil {
-		return nil, err
-	}
-	return clientset.NewForConfig(clientConfig)
-}
-
-// Returns a clientconfig which can be used to talk to this apiserver.
-func (s *ServerRunOptions) NewSelfClientConfig(token string) (*restclient.Config, error) {
-	clientConfig := &restclient.Config{
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}
-
-	// Use secure port if the TLSCAFile is specified
-	if s.SecurePort > 0 && len(s.TLSCAFile) > 0 {
-		host := s.BindAddress.String()
-		if host == "0.0.0.0" {
-			host = "localhost"
-		}
-		clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.SecurePort))
-		clientConfig.CAFile = s.TLSCAFile
-		clientConfig.BearerToken = token
-	} else if s.InsecurePort > 0 {
-		clientConfig.Host = net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort))
-	} else {
-		return nil, errors.New("Unable to set url for apiserver local client")
-	}
-
-	return clientConfig, nil
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
@@ -299,24 +256,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If set, the file that will be used to admit requests to the secure port of the API server "+
 		"via http basic authentication.")
 
-	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress,
-		"DEPRECATED: see --bind-address instead.")
-	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
-
-	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
-		"The IP address on which to listen for the --secure-port port. The "+
-		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
-		"clients. If blank, all interfaces will be used (0.0.0.0).")
-
-	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, ""+
-		"The directory where the TLS certs are located (by default /var/run/kubernetes). "+
-		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
-
-	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, ""+
-		"If set, any request presenting a client certificate signed by one of "+
-		"the authorities in the client-ca-file is authenticated with an identity "+
-		"corresponding to the CommonName of the client certificate.")
-
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider,
 		"The provider for cloud services. Empty string for no provider.")
 
@@ -364,22 +303,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")
-
-	fs.IPVar(&s.InsecureBindAddress, "insecure-bind-address", s.InsecureBindAddress, ""+
-		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
-		"Defaults to localhost.")
-	fs.IPVar(&s.InsecureBindAddress, "address", s.InsecureBindAddress,
-		"DEPRECATED: see --insecure-bind-address instead.")
-	fs.MarkDeprecated("address", "see --insecure-bind-address instead.")
-
-	fs.IntVar(&s.InsecurePort, "insecure-port", s.InsecurePort, ""+
-		"The port on which to serve unsecured, unauthenticated access. Default 8080. It is assumed "+
-		"that firewall rules are set up such that this port is not reachable from outside of "+
-		"the cluster and that port 443 on the cluster's public address is proxied to this "+
-		"port. This is performed by nginx in the default setup.")
-
-	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead.")
-	fs.MarkDeprecated("port", "see --insecure-port instead.")
 
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL,
 		"If passed, activates the keystone authentication plugin.")
@@ -454,10 +377,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and "+
 		"api/legacy are special keys to control all and legacy api versions respectively.")
 
-	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
-		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
-		"don't serve HTTPS at all.")
-
 	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
 		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
 		"overlap with any IP ranges assigned to nodes for pods.")
@@ -471,12 +390,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"Example: '30000-32767'. Inclusive at both ends of the range.")
 	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "DEPRECATED: see --service-node-port-range instead")
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead")
-
-	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
-		"The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
-
-	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize,
-		"Number of deserialized json objects to cache in memory.")
 
 	deprecatedStorageVersion := ""
 	fs.StringVar(&deprecatedStorageVersion, "storage-version", deprecatedStorageVersion,
@@ -492,28 +405,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all registered groups, "+
 		"which is derived from the KUBE_API_VERSIONS environment variable.")
-
-	fs.StringVar(&s.TLSCAFile, "tls-ca-file", s.TLSCAFile, "If set, this "+
-		"certificate authority will used for secure access from Admission "+
-		"Controllers. This must be a valid PEM-encoded CA bundle.")
-
-	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
-		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
-		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
-		"--tls-private-key-file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to /var/run/kubernetes.")
-
-	fs.StringVar(&s.TLSPrivateKeyFile, "tls-private-key-file", s.TLSPrivateKeyFile,
-		"File containing the default x509 private key matching --tls-cert-file.")
-
-	fs.Var(config.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
-		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
-		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
-		"segments. If no domain patterns are provided, the names of the certificate are "+
-		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
-		"trump over extracted names. For multiple key/certificate pairs, use the "+
-		"--tls-sni-cert-key multiple times. "+
-		"Examples: \"example.key,example.crt\" or \"*.foo.com,foo.com:foo.key,foo.crt\".")
 
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, ""+
 		"If set, the file that will be used to secure the secure port of the API server "+
