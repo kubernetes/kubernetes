@@ -35,6 +35,7 @@ import (
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	"k8s.io/kubernetes/pkg/controller/node/testutil"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -98,7 +99,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	table := []struct {
-		fakeNodeHandler     *FakeNodeHandler
+		fakeNodeHandler     *testutil.FakeNodeHandler
 		daemonSets          []extensions.DaemonSet
 		timeToPass          time.Duration
 		newNodeStatus       v1.NodeStatus
@@ -108,7 +109,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}{
 		// Node created recently, with no status (happens only at cluster startup).
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -141,7 +142,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			daemonSets:          nil,
 			timeToPass:          0,
@@ -152,7 +153,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		},
 		// Node created long time ago, and kubelet posted NotReady for a short period of time.
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -195,7 +196,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			daemonSets: nil,
 			timeToPass: evictionTimeout,
@@ -216,7 +217,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		},
 		// Pod is ds-managed, and kubelet posted NotReady for a long period of time.
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -307,7 +308,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		},
 		// Node created long time ago, and kubelet posted NotReady for a long period of time.
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -350,7 +351,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			daemonSets: nil,
 			timeToPass: time.Hour,
@@ -371,7 +372,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		},
 		// Node created long time ago, node controller posted Unknown for a short period of time.
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -414,7 +415,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			daemonSets: nil,
 			timeToPass: evictionTimeout - testNodeMonitorGracePeriod,
@@ -435,7 +436,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		},
 		// Node created long time ago, node controller posted Unknown for a long period of time.
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -478,7 +479,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			daemonSets: nil,
 			timeToPass: 60 * time.Minute,
@@ -518,7 +519,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		zones := getZones(item.fakeNodeHandler)
+		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
 				nodeUid, _ := value.UID.(string)
@@ -562,7 +563,7 @@ func TestPodStatusChange(t *testing.T) {
 
 	// Node created long time ago, node controller posted Unknown for a long period of time.
 	table := []struct {
-		fakeNodeHandler     *FakeNodeHandler
+		fakeNodeHandler     *testutil.FakeNodeHandler
 		daemonSets          []extensions.DaemonSet
 		timeToPass          time.Duration
 		newNodeStatus       v1.NodeStatus
@@ -572,7 +573,7 @@ func TestPodStatusChange(t *testing.T) {
 		description         string
 	}{
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -615,7 +616,7 @@ func TestPodStatusChange(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			timeToPass: 60 * time.Minute,
 			newNodeStatus: v1.NodeStatus{
@@ -653,7 +654,7 @@ func TestPodStatusChange(t *testing.T) {
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		zones := getZones(item.fakeNodeHandler)
+		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
 				nodeUid, _ := value.UID.(string)
@@ -764,13 +765,13 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 					},
 				},
 			},
-			podList: []v1.Pod{*newPod("pod0", "node0")},
+			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
 			updatedNodeStatuses: []v1.NodeStatus{
 				unhealthyNodeNewStatus,
 				unhealthyNodeNewStatus,
 			},
-			expectedInitialStates:   map[string]zoneState{createZoneID("region1", "zone1"): stateFullDisruption},
-			expectedFollowingStates: map[string]zoneState{createZoneID("region1", "zone1"): stateFullDisruption},
+			expectedInitialStates:   map[string]zoneState{testutil.CreateZoneID("region1", "zone1"): stateFullDisruption},
+			expectedFollowingStates: map[string]zoneState{testutil.CreateZoneID("region1", "zone1"): stateFullDisruption},
 			expectedEvictPods:       false,
 			description:             "Network Disruption: Only zone is down - eviction shouldn't take place.",
 		},
@@ -820,18 +821,18 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				},
 			},
 
-			podList: []v1.Pod{*newPod("pod0", "node0")},
+			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
 			updatedNodeStatuses: []v1.NodeStatus{
 				unhealthyNodeNewStatus,
 				unhealthyNodeNewStatus,
 			},
 			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region2", "zone2"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region2", "zone2"): stateFullDisruption,
 			},
 			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region2", "zone2"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region2", "zone2"): stateFullDisruption,
 			},
 			expectedEvictPods: false,
 			description:       "Network Disruption: Both zones down - eviction shouldn't take place.",
@@ -881,18 +882,18 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 					},
 				},
 			},
-			podList: []v1.Pod{*newPod("pod0", "node0")},
+			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
 			updatedNodeStatuses: []v1.NodeStatus{
 				unhealthyNodeNewStatus,
 				healthyNodeNewStatus,
 			},
 			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region1", "zone2"): stateNormal,
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone2"): stateNormal,
 			},
 			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region1", "zone2"): stateNormal,
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone2"): stateNormal,
 			},
 			expectedEvictPods: true,
 			description:       "Network Disruption: One zone is down - eviction should take place.",
@@ -942,16 +943,16 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 					},
 				},
 			},
-			podList: []v1.Pod{*newPod("pod0", "node0")},
+			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
 			updatedNodeStatuses: []v1.NodeStatus{
 				unhealthyNodeNewStatus,
 				healthyNodeNewStatus,
 			},
 			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 			},
 			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 			},
 			expectedEvictPods: false,
 			description:       "NetworkDisruption: eviction should stop, only -master Node is healthy",
@@ -1002,18 +1003,18 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				},
 			},
 
-			podList: []v1.Pod{*newPod("pod0", "node0")},
+			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
 			updatedNodeStatuses: []v1.NodeStatus{
 				unhealthyNodeNewStatus,
 				healthyNodeNewStatus,
 			},
 			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region1", "zone2"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone2"): stateFullDisruption,
 			},
 			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region1", "zone2"): stateNormal,
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone2"): stateNormal,
 			},
 			expectedEvictPods: true,
 			description:       "Initially both zones down, one comes back - eviction should take place",
@@ -1124,7 +1125,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				},
 			},
 
-			podList: []v1.Pod{*newPod("pod0", "node0")},
+			podList: []v1.Pod{*testutil.NewPod("pod0", "node0")},
 			updatedNodeStatuses: []v1.NodeStatus{
 				unhealthyNodeNewStatus,
 				unhealthyNodeNewStatus,
@@ -1133,10 +1134,10 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				healthyNodeNewStatus,
 			},
 			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): statePartialDisruption,
+				testutil.CreateZoneID("region1", "zone1"): statePartialDisruption,
 			},
 			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): statePartialDisruption,
+				testutil.CreateZoneID("region1", "zone1"): statePartialDisruption,
 			},
 			expectedEvictPods: true,
 			description:       "Zone is partially disrupted - eviction should take place.",
@@ -1144,7 +1145,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 	}
 
 	for _, item := range table {
-		fakeNodeHandler := &FakeNodeHandler{
+		fakeNodeHandler := &testutil.FakeNodeHandler{
 			Existing:  item.nodeList,
 			Clientset: fake.NewSimpleClientset(&v1.PodList{Items: item.podList}),
 		}
@@ -1184,7 +1185,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				t.Errorf("%v: Unexpected zone state: %v: %v instead %v", item.description, zone, nodeController.zoneStates[zone], state)
 			}
 		}
-		zones := getZones(fakeNodeHandler)
+		zones := testutil.GetZones(fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
 				uid, _ := value.UID.(string)
@@ -1211,7 +1212,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 // pods and the node when kubelet has not reported, and the cloudprovider says
 // the node is gone.
 func TestCloudProviderNoRateLimit(t *testing.T) {
-	fnh := &FakeNodeHandler{
+	fnh := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: v1.ObjectMeta{
@@ -1230,8 +1231,8 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 				},
 			},
 		},
-		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node0")}}),
-		deleteWaitChan: make(chan struct{}),
+		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0"), *testutil.NewPod("pod1", "node0")}}),
+		DeleteWaitChan: make(chan struct{}),
 	}
 	nodeController, _ := NewNodeControllerFromClient(nil, fnh, 10*time.Minute,
 		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
@@ -1247,7 +1248,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	select {
-	case <-fnh.deleteWaitChan:
+	case <-fnh.DeleteWaitChan:
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Timed out waiting %v for node to be deleted", wait.ForeverTestTimeout)
 	}
@@ -1262,7 +1263,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
-		fakeNodeHandler      *FakeNodeHandler
+		fakeNodeHandler      *testutil.FakeNodeHandler
 		timeToPass           time.Duration
 		newNodeStatus        v1.NodeStatus
 		expectedEvictPods    bool
@@ -1272,7 +1273,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		// Node created long time ago, without status:
 		// Expect Unknown status posted from node controller.
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -1281,7 +1282,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 2, // List+Update
 			expectedNodes: []*v1.Node{
@@ -1316,7 +1317,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		// Node created recently, without status.
 		// Expect no action from node controller (within startup grace period).
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -1325,7 +1326,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,
@@ -1333,7 +1334,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		// Node created long time ago, with status updated by kubelet exceeds grace period.
 		// Expect Unknown status posted from node controller.
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -1367,7 +1368,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 3, // (List+)List+Update
 			timeToPass:           time.Hour,
@@ -1432,7 +1433,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		// Node created long time ago, with status updated recently.
 		// Expect no action from node controller (within monitor grace period).
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -1459,7 +1460,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,
@@ -1496,7 +1497,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
-		fakeNodeHandler         *FakeNodeHandler
+		fakeNodeHandler         *testutil.FakeNodeHandler
 		timeToPass              time.Duration
 		newNodeStatus           v1.NodeStatus
 		expectedPodStatusUpdate bool
@@ -1504,7 +1505,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 		// Node created recently, without status.
 		// Expect no action from node controller (within startup grace period).
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -1513,14 +1514,14 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			expectedPodStatusUpdate: false,
 		},
 		// Node created long time ago, with status updated recently.
 		// Expect no action from node controller (within monitor grace period).
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -1547,14 +1548,14 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			expectedPodStatusUpdate: false,
 		},
 		// Node created long time ago, with status updated by kubelet exceeds grace period.
 		// Expect pods status updated and Unknown node status posted from node controller
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -1591,7 +1592,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			timeToPass: 1 * time.Minute,
 			newNodeStatus: v1.NodeStatus{
@@ -1624,7 +1625,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 		// Node created long time ago, with outdated kubelet version 1.1.0 and status
 		// updated by kubelet exceeds grace period. Expect no action from node controller.
 		{
-			fakeNodeHandler: &FakeNodeHandler{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: v1.ObjectMeta{
@@ -1661,7 +1662,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
 			timeToPass: 1 * time.Minute,
 			newNodeStatus: v1.NodeStatus{
@@ -1723,7 +1724,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 
 func TestNodeEventGeneration(t *testing.T) {
 	fakeNow := metav1.Date(2016, 9, 10, 12, 0, 0, 0, time.UTC)
-	fakeNodeHandler := &FakeNodeHandler{
+	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: v1.ObjectMeta{
@@ -1746,7 +1747,7 @@ func TestNodeEventGeneration(t *testing.T) {
 				},
 			},
 		},
-		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod("pod0", "node0")}}),
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
 
 	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler, 5*time.Minute,
@@ -1758,22 +1759,22 @@ func TestNodeEventGeneration(t *testing.T) {
 		return false, nil
 	}
 	nodeController.now = func() metav1.Time { return fakeNow }
-	fakeRecorder := NewFakeRecorder()
+	fakeRecorder := testutil.NewFakeRecorder()
 	nodeController.recorder = fakeRecorder
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(fakeRecorder.events) != 2 {
-		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.events), 2, fakeRecorder.events)
+	if len(fakeRecorder.Events) != 2 {
+		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.Events), 2, fakeRecorder.Events)
 	}
-	if fakeRecorder.events[0].Reason != "RegisteredNode" || fakeRecorder.events[1].Reason != "DeletingNode" {
+	if fakeRecorder.Events[0].Reason != "RegisteredNode" || fakeRecorder.Events[1].Reason != "DeletingNode" {
 		var reasons []string
-		for _, event := range fakeRecorder.events {
+		for _, event := range fakeRecorder.Events {
 			reasons = append(reasons, event.Reason)
 		}
 		t.Fatalf("unexpected events generation: %v", strings.Join(reasons, ","))
 	}
-	for _, event := range fakeRecorder.events {
+	for _, event := range fakeRecorder.Events {
 		involvedObject := event.InvolvedObject
 		actualUID := string(involvedObject.UID)
 		if actualUID != "1234567890" {
