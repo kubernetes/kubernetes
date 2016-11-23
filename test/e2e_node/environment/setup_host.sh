@@ -89,6 +89,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Allow jenkins access to docker
+id jenkins || sudo useradd jenkins -m
 sudo usermod -a -G docker jenkins
 
 # install lxc

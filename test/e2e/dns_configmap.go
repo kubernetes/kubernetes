@@ -200,10 +200,8 @@ func (t *dnsConfigMapTest) runDig(dnsName string) []string {
 		CaptureStderr: true,
 	})
 
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Running dig: %v, stdout: %q, stderr: %q",
-		cmd, stdout, stderr)
+	framework.Logf("Running dig: %v, stdout: %q, stderr: %q, err: %v",
+		cmd, stdout, stderr, err)
 
 	if stdout == "" {
 		return []string{}

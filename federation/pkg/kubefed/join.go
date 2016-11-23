@@ -49,8 +49,11 @@ var (
         server. Please use the --context flag otherwise.`)
 	join_example = templates.Examples(`
 		# Join a cluster to a federation by specifying the
-		# cluster context name and the context name of the
-		# federation control plane's host cluster.
+		# cluster name and the context name of the federation
+		# control plane's host cluster. Cluster name must be
+		# a valid RFC 1123 subdomain name. Cluster context
+		# must be specified if the cluster name is different
+		# than the cluster's context in the local kubeconfig.
 		kubectl join foo --host-cluster-context=bar`)
 )
 
@@ -58,7 +61,7 @@ var (
 // federation.
 func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "join CLUSTER_CONTEXT --host-cluster-context=HOST_CONTEXT",
+		Use:     "join CLUSTER_NAME --host-cluster-context=HOST_CONTEXT",
 		Short:   "Join a cluster to a federation",
 		Long:    join_long,
 		Example: join_example,
@@ -73,6 +76,8 @@ func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *c
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ClusterV1Beta1GeneratorName)
 	util.AddSubcommandFlags(cmd)
+	cmd.Flags().String("cluster-context", "", "Name of the cluster's context in the local kubeconfig. Defaults to cluster name if unspecified.")
+	cmd.Flags().String("secret-name", "", "Name of the secret where the cluster's credentials will be stored in the host cluster. This name should be a valid RFC 1035 label. Defaults to cluster name if unspecified.")
 	return cmd
 }
 
@@ -82,9 +87,18 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	if err != nil {
 		return err
 	}
+	clusterContext := cmdutil.GetFlagString(cmd, "cluster-context")
+	secretName := cmdutil.GetFlagString(cmd, "secret-name")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 
-	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, dry-run: %s", joinFlags.Name, joinFlags.Host, joinFlags.FederationSystemNamespace, joinFlags.Kubeconfig, dryRun)
+	if clusterContext == "" {
+		clusterContext = joinFlags.Name
+	}
+	if secretName == "" {
+		secretName = joinFlags.Name
+	}
+
+	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, cluster-context: %s, secret-name: %s, dry-run: %s", joinFlags.Name, joinFlags.Host, joinFlags.FederationSystemNamespace, joinFlags.Kubeconfig, clusterContext, secretName, dryRun)
 
 	po := config.PathOptions()
 	po.LoadingRules.ExplicitPath = joinFlags.Kubeconfig
@@ -92,7 +106,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	if err != nil {
 		return err
 	}
-	generator, err := clusterGenerator(clientConfig, joinFlags.Name)
+	generator, err := clusterGenerator(clientConfig, joinFlags.Name, clusterContext, secretName)
 	if err != nil {
 		glog.V(2).Infof("Failed creating cluster generator: %v", err)
 		return err
@@ -116,7 +130,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	//    don't have to print the created secret in the default case.
 	// Having said that, secret generation machinery could be altered to
 	// suit our needs, but it is far less invasive and readable this way.
-	_, err = createSecret(hostFactory, clientConfig, joinFlags.FederationSystemNamespace, joinFlags.Name, dryRun)
+	_, err = createSecret(hostFactory, clientConfig, joinFlags.FederationSystemNamespace, clusterContext, secretName, dryRun)
 	if err != nil {
 		glog.V(2).Infof("Failed creating the cluster credentials secret: %v", err)
 		return err
@@ -150,12 +164,12 @@ func minifyConfig(clientConfig *clientcmdapi.Config, context string) (*clientcmd
 
 // createSecret extracts the kubeconfig for a given cluster and populates
 // a secret with that kubeconfig.
-func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config, namespace, name string, dryRun bool) (runtime.Object, error) {
+func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config, namespace, contextName, secretName string, dryRun bool) (runtime.Object, error) {
 	// Minify the kubeconfig to ensure that there is only information
 	// relevant to the cluster we are registering.
-	newClientConfig, err := minifyConfig(clientConfig, name)
+	newClientConfig, err := minifyConfig(clientConfig, contextName)
 	if err != nil {
-		glog.V(2).Infof("Failed to minify the kubeconfig for the given context %q: %v", name, err)
+		glog.V(2).Infof("Failed to minify the kubeconfig for the given context %q: %v", contextName, err)
 		return nil, err
 	}
 
@@ -163,28 +177,28 @@ func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config
 	// contents are inlined.
 	err = clientcmdapi.FlattenConfig(newClientConfig)
 	if err != nil {
-		glog.V(2).Infof("Failed to flatten the kubeconfig for the given context %q: %v", name, err)
+		glog.V(2).Infof("Failed to flatten the kubeconfig for the given context %q: %v", contextName, err)
 		return nil, err
 	}
 
 	// Boilerplate to create the secret in the host cluster.
 	clientset, err := hostFactory.ClientSet()
 	if err != nil {
-		glog.V(2).Infof("Failed to serialize the kubeconfig for the given context %q: %v", name, err)
+		glog.V(2).Infof("Failed to serialize the kubeconfig for the given context %q: %v", contextName, err)
 		return nil, err
 	}
 
-	return util.CreateKubeconfigSecret(clientset, newClientConfig, namespace, name, dryRun)
+	return util.CreateKubeconfigSecret(clientset, newClientConfig, namespace, secretName, dryRun)
 }
 
 // clusterGenerator extracts the cluster information from the supplied
 // kubeconfig and builds a StructuredGenerator for the
 // `federation/cluster` API resource.
-func clusterGenerator(clientConfig *clientcmdapi.Config, name string) (kubectl.StructuredGenerator, error) {
+func clusterGenerator(clientConfig *clientcmdapi.Config, name, contextName, secretName string) (kubectl.StructuredGenerator, error) {
 	// Get the context from the config.
-	ctx, found := clientConfig.Contexts[name]
+	ctx, found := clientConfig.Contexts[contextName]
 	if !found {
-		return nil, fmt.Errorf("cluster context %q not found", name)
+		return nil, fmt.Errorf("cluster context %q not found", contextName)
 	}
 
 	// Get the cluster object corresponding to the supplied context.
@@ -207,7 +221,7 @@ func clusterGenerator(clientConfig *clientcmdapi.Config, name string) (kubectl.S
 		Name:          name,
 		ClientCIDR:    defaultClientCIDR,
 		ServerAddress: serverAddress,
-		SecretName:    name,
+		SecretName:    secretName,
 	}
 	return generator, nil
 }
