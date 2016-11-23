@@ -28,11 +28,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// ThresholdNotifier notifies the user when an attribute crosses a threshold value
-type ThresholdNotifier interface {
-	Start(stopCh <-chan struct{})
-}
-
 type memcgThresholdNotifier struct {
 	watchfd     int
 	controlfd   int
