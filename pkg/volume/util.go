@@ -473,3 +473,98 @@ func Regions2Zones(in Regions2ZonesParams) (sets.String, error) {
 	}
 	return ret, nil
 }
+
+// CalculateSetOfZonesParams are parameters for the func CalculateSetOfZones
+type CalculateSetOfZonesParams struct {
+	// PVC data structure that is used for the set of zones calculation
+	PVC *v1.PersistentVolumeClaim
+	// is parameter zone specified in the Storage Class?
+	IsSCZoneSpecified bool
+	// in case the parameter zone is specified StorageClassZone contains the value of this parameter, otherwise it is ""
+	StorageClassZones string
+	// a func that returns a set of all available zones
+	GetAllZones func() (sets.String, error)
+	// a func that converts a zone to a region
+	Zone2region func(string) (string, error)
+}
+
+// CalculateSetOfZones returns:
+// - either a set of zones resulting from currently available zones, allowed zones by an admin in the corresponding storage class and zones preferred by the user in the selector part of the PVC
+// - or an error in case the resulting set of zones is empty or another error occurred
+func CalculateSetOfZones(input CalculateSetOfZonesParams) (sets.String, error) {
+	var ret, allAvailableZones sets.String
+	var err error
+	emptySet := make(sets.String)
+	if allAvailableZones, err = input.GetAllZones(); err != nil {
+		return emptySet, err
+	}
+	if !input.IsSCZoneSpecified {
+		ret = allAvailableZones
+	} else {
+		if ret, err = Zones2Set(input.StorageClassZones); err != nil {
+			return emptySet, fmt.Errorf("corresponding storage class error: %v", err.Error())
+		}
+	}
+	if emptySelector, err := ValidatePVCSelector(input.PVC); err != nil {
+		return emptySet, err
+	} else if emptySelector {
+		return ret, nil
+	}
+	if matchLabelZone, err := GetPVCMatchLabel(input.PVC, metav1.LabelZoneFailureDomain); err == nil {
+		matchLabelZoneSet := make(sets.String)
+		matchLabelZoneSet.Insert(matchLabelZone)
+		ret = ret.Intersection(matchLabelZoneSet)
+	}
+	if matchLabelRegion, err := GetPVCMatchLabel(input.PVC, metav1.LabelZoneRegion); err == nil {
+		var matchLabelRegionParams Regions2ZonesParams
+		matchLabelRegionParams.Regions = make(sets.String)
+		matchLabelRegionParams.Regions.Insert(matchLabelRegion)
+		matchLabelRegionParams.AllAvailableZones = allAvailableZones
+		matchLabelRegionParams.Zone2region = input.Zone2region
+		if matchLabelRegionSet, err := Regions2Zones(matchLabelRegionParams); err != nil {
+			return emptySet, err
+		} else {
+			ret = ret.Intersection(matchLabelRegionSet)
+		}
+	}
+	if matchExpressionZoneSets, err := GetPVCMatchExpression(input.PVC, metav1.LabelZoneFailureDomain, metav1.LabelSelectorOpIn); err == nil {
+		for _, matchExpressionZoneSet := range matchExpressionZoneSets {
+			ret = ret.Intersection(matchExpressionZoneSet)
+		}
+	}
+	if matchExpressionRegionSets, err := GetPVCMatchExpression(input.PVC, metav1.LabelZoneRegion, metav1.LabelSelectorOpIn); err == nil {
+		var matchExpressionRegionParams Regions2ZonesParams
+		matchExpressionRegionParams.AllAvailableZones = allAvailableZones
+		matchExpressionRegionParams.Zone2region = input.Zone2region
+		for _, matchExpressionRegionSet := range matchExpressionRegionSets {
+			matchExpressionRegionParams.Regions = matchExpressionRegionSet
+			if matchExpressionZonesSet, err := Regions2Zones(matchExpressionRegionParams); err != nil {
+				return emptySet, err
+			} else {
+				ret = ret.Intersection(matchExpressionZonesSet)
+			}
+		}
+	}
+	if matchExpressionZoneSets, err := GetPVCMatchExpression(input.PVC, metav1.LabelZoneFailureDomain, metav1.LabelSelectorOpNotIn); err == nil {
+		for _, matchExpressionZoneSet := range matchExpressionZoneSets {
+			ret = ret.Difference(matchExpressionZoneSet)
+		}
+	}
+	if matchExpressionRegionSets, err := GetPVCMatchExpression(input.PVC, metav1.LabelZoneRegion, metav1.LabelSelectorOpNotIn); err == nil {
+		var matchExpressionRegionParams Regions2ZonesParams
+		matchExpressionRegionParams.AllAvailableZones = allAvailableZones
+		matchExpressionRegionParams.Zone2region = input.Zone2region
+		for _, matchExpressionRegionSet := range matchExpressionRegionSets {
+			matchExpressionRegionParams.Regions = matchExpressionRegionSet
+			if matchExpressionZonesSet, err := Regions2Zones(matchExpressionRegionParams); err != nil {
+				return emptySet, err
+			} else {
+				ret = ret.Difference(matchExpressionZonesSet)
+			}
+		}
+	}
+	if len(ret) < 1 {
+		return emptySet, fmt.Errorf("Could not find availability zone: combination of StorageClass parameters and selector of this claim cannot be satisfied by this cluster")
+	}
+	return ret, nil
+}
