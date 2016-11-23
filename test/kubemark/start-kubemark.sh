@@ -28,7 +28,7 @@ ${APISERVER_TEST_ARGS}
 --storage-backend=${STORAGE_BACKEND}
 --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}"
 EOF
-if [ -z "${CUSTOM_ADMISSION_PLUGINS:-}"]; then
+if [ -z "${CUSTOM_ADMISSION_PLUGINS:-}" ]; then
  cat >> "${RESOURCE_DIRECTORY}/apiserver_flags" <<EOF
 --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
 EOF
