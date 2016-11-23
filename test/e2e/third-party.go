@@ -161,7 +161,15 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 				framework.Failf("expected: %#v, saw in list: %#v", foo, list.Items[0])
 			}
 
-			if _, err := f.ClientSet.Extensions().RESTClient().Delete().AbsPath("/apis/company.com/v1/namespaces/default/foos/foo").DoRaw(); err != nil {
+			// Need to manually do the serialization because otherwise the
+			// Content-Type header is set to protobuf, the thirdparty codec in
+			// the API server side only accepts JSON.
+			deleteOptionsData, err := json.Marshal(v1.NewDeleteOptions(10))
+			framework.ExpectNoError(err)
+			if _, err := f.ClientSet.Core().RESTClient().Delete().
+				AbsPath("/apis/company.com/v1/namespaces/default/foos/foo").
+				Body(deleteOptionsData).
+				DoRaw(); err != nil {
 				framework.Failf("failed to delete: %v", err)
 			}
 
