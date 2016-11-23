@@ -367,7 +367,6 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
-			framework.SkipIfMissingResource(f.ClientPool, StatefulSetGroupVersionResource, f.Namespace.Name)
 			By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
 			_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
