@@ -46,6 +46,10 @@ var (
 	UserAgentName                 = "federation-e2e"
 	// We use this to decide how long to wait for our DNS probes to succeed.
 	DNSTTL = 180 * time.Second // TODO: make k8s.io/kubernetes/federation/pkg/federation-controller/service.minDnsTtl exported, and import it here.
+
+	// FederatedSvcNodePort is the node port on which the federated
+	// service shards are exposed in the underlying cluster.
+	FederatedSvcNodePort = int32(32256)
 )
 
 /*
@@ -267,6 +271,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 					Protocol:   v1.ProtocolTCP,
 					Port:       80,
 					TargetPort: intstr.FromInt(8080),
+					NodePort:   FederatedSvcNodePort,
 				},
 			},
 			SessionAffinity: v1.ServiceAffinityNone,
