@@ -201,8 +201,7 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 
 	secret, err := parsePVSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
 	if err != nil {
-		// log error but don't return yet
-		glog.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
+		return nil, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
 	return plugin.newDeleterInternal(spec, admin, secret, &RBDUtil{})
 }
@@ -282,8 +281,7 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		return nil, fmt.Errorf("missing Ceph admin secret name")
 	}
 	if secret, err = parsePVSecret(adminSecretNamespace, adminSecretName, r.plugin.host.GetKubeClient()); err != nil {
-		// log error but don't return yet
-		glog.Errorf("failed to get admin secret from [%q/%q]", adminSecretNamespace, adminSecretName)
+		return nil, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
 	r.adminSecret = secret
 	if len(r.Mon) < 1 {
@@ -308,7 +306,7 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	rbd, sizeMB, err := r.manager.CreateImage(r)
 	if err != nil {
 		glog.Errorf("rbd: create volume failed, err: %v", err)
-		return nil, fmt.Errorf("rbd: create volume failed, err: %v", err)
+		return nil, err
 	}
 	glog.Infof("successfully created rbd image %q", image)
 	pv := new(api.PersistentVolume)
