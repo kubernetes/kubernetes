@@ -541,6 +541,8 @@ type KubeSchedulerConfiguration struct {
 	PolicyConfigFile string `json:"policyConfigFile"`
 	// enableProfiling enables profiling via web interface.
 	EnableProfiling bool `json:"enableProfiling"`
+	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
+	EnableContentionProfiling bool `json:"enableContentionProfiling"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.

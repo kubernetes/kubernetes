@@ -105,6 +105,7 @@ func DeepCopy_v1alpha1_KubeSchedulerConfiguration(in interface{}, out interface{
 		} else {
 			out.EnableProfiling = nil
 		}
+		out.EnableContentionProfiling = in.EnableContentionProfiling
 		out.ContentType = in.ContentType
 		out.KubeAPIQPS = in.KubeAPIQPS
 		out.KubeAPIBurst = in.KubeAPIBurst
