@@ -76,10 +76,12 @@ function save-logs() {
         files="${files} ${aws_logfiles}"
     fi
 
-    if ssh-to-node "${node_name}" "sudo systemctl status kubelet.service" &> /dev/null; then
-        ssh-to-node "${node_name}" "sudo journalctl --output=cat -u kubelet.service" > "${dir}/kubelet.log" || true
-        ssh-to-node "${node_name}" "sudo journalctl --output=cat -u docker.service" > "${dir}/docker.log" || true
-        ssh-to-node "${node_name}" "sudo journalctl --output=cat -k" > "${dir}/kern.log" || true
+    if log-dump-ssh "${node_name}" "sudo systemctl status kubelet.service" &> /dev/null; then
+        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
+        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" > "${dir}/kube-node-configuration.log" || true
+        log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u kubelet.service" > "${dir}/kubelet.log" || true
+        log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u docker.service" > "${dir}/docker.log" || true
+        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -k" > "${dir}/kern.log" || true
     else
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
