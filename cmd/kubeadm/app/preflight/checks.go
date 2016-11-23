@@ -26,6 +26,7 @@ import (
 	"os/exec"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -213,11 +214,26 @@ func (hst HttpProxyCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+type ImagePrefixCheck struct {
+	imagePrefix string
+}
+
+func (ipc ImagePrefixCheck) Check() (warnings, errors []error) {
+	if ipc.imagePrefix == kubeadmapiV1.DefaultImagePrefix {
+		return
+	}
+	warnings = []error{
+		fmt.Errorf("custom image prefix(%s) detected, please confirm whether you need to modify the kubelet `pod-infra-container-image` flag", ipc.imagePrefix),
+	}
+	return
+}
+
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
 		IsRootCheck{root: true},
 		HostnameCheck{},
+		ImagePrefixCheck{imagePrefix: cfg.ImagePrefix},
 		ServiceCheck{Service: "kubelet"},
 		ServiceCheck{Service: "docker"},
 		PortOpenCheck{port: int(cfg.API.BindPort)},

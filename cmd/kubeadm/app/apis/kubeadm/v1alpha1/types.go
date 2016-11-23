@@ -28,6 +28,7 @@ type MasterConfiguration struct {
 	Networking        Networking `json:"networking"`
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
+	ImagePrefix       string     `json:"imagePrefix"`
 }
 
 type API struct {

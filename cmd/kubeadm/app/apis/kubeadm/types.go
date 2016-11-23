@@ -23,7 +23,6 @@ type EnvParams struct {
 	HostPKIPath       string
 	HostEtcdPath      string
 	HyperkubeImage    string
-	DiscoveryImage    string
 	EtcdImage         string
 	ComponentLoglevel string
 }
@@ -38,6 +37,8 @@ type MasterConfiguration struct {
 	Networking        Networking
 	KubernetesVersion string
 	CloudProvider     string
+	ImagePrefix       string
+	PrePullImages     bool
 }
 
 type API struct {

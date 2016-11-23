@@ -24,6 +24,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
+        "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/master:go_default_library",
         "//cmd/kubeadm/app/node:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
@@ -37,8 +38,12 @@ go_library(
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/net:go_default_library",
         "//pkg/version:go_default_library",
+        "//vendor:github.com/docker/docker/pkg/jsonmessage",
+        "//vendor:github.com/docker/engine-api/client",
+        "//vendor:github.com/docker/engine-api/types",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
+        "//vendor:golang.org/x/net/context",
     ],
 )
 
