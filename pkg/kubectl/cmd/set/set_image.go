@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -36,7 +35,6 @@ import (
 type ImageOptions struct {
 	resource.FilenameOptions
 
-	f           cmdutil.Factory
 	Mapper      meta.RESTMapper
 	Typer       runtime.ObjectTyper
 	Infos       []*resource.Info
@@ -110,7 +108,6 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 }
 
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.f = f
 	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
@@ -164,8 +161,8 @@ func (o *ImageOptions) Validate() error {
 
 func (o *ImageOptions) Run() error {
 	allErrs := []error{}
-	// Defauting to SMPatchVersion_1_5, since the func passed in doesn't update any lists of primitive
-	patches := CalculatePatches(o.f, o.Infos, o.Encoder, strategicpatch.SMPatchVersion_1_5, func(info *resource.Info) (bool, error) {
+
+	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) (bool, error) {
 		transformed := false
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			for name, image := range o.ContainerImages {

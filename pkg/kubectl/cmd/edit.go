@@ -291,7 +291,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 			switch editMode {
 			case NormalEditMode:
-				err = visitToPatch(originalObj, updates, f, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+				err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
 			case EditBeforeCreateMode:
 				err = visitToCreate(updates, mapper, resourceMapper, out, errOut, defaultVersion, &results, file)
 			default:
@@ -415,15 +415,7 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	return mapper, resourceMapper, r, cmdNamespace, err
 }
 
-func visitToPatch(originalObj runtime.Object, updates *resource.Info,
-	f cmdutil.Factory,
-	mapper meta.RESTMapper, resourceMapper *resource.Mapper,
-	encoder runtime.Encoder,
-	out, errOut io.Writer,
-	defaultVersion unversioned.GroupVersion,
-	results *editResults,
-	file string) error {
-
+func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, encoder runtime.Encoder, out, errOut io.Writer, defaultVersion unversioned.GroupVersion, results *editResults, file string) error {
 	patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		currOriginalObj := originalObj
@@ -486,8 +478,7 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info,
 
 		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
 			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, strategicpatch.SMPatchVersion_1_5, preconditions...)
-		// If creating a patch fails, retrying with SMPatchVersion_1_0 is not helpful. So we return the error.
+		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
 		if err != nil {
 			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 			if strategicpatch.IsPreconditionFailed(err) {
@@ -499,20 +490,8 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info,
 		results.version = defaultVersion
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 		if err != nil {
-			// Retry SMPatchVersion_1_0 when applying the SMPatchVersion_1_5 patch returns an Internal Error (500).
-			// Because the failure may be due to the server not supporting the SMPatchVersion_1_5 patch.
-			if errors.IsInternalError(err) {
-				patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, strategicpatch.SMPatchVersion_1_0)
-				if err != nil {
-					glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-					return err
-				}
-				patched, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
-			}
-			if err != nil {
-				fmt.Fprintln(out, results.addError(err, info))
-				return nil
-			}
+			fmt.Fprintln(out, results.addError(err, info))
+			return nil
 		}
 		info.Refresh(patched, true)
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")

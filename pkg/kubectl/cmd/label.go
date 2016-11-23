@@ -246,8 +246,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if !reflect.DeepEqual(oldData, newData) {
 				dataChangeMsg = "labeled"
 			}
-			// Defaulting to SMPatchVersion_1_5 is safe, since we only update labels and change cause, and none of them has list of primitives
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, strategicpatch.SMPatchVersion_1_5)
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
