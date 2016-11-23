@@ -164,37 +164,35 @@ func findMyself(client *clientset.Clientset) (*api.Node, error) {
 	return node, nil
 }
 
-func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
-	n, err := findMyself(client)
-	if err != nil {
-		return err
-	}
-
-	n.ObjectMeta.Labels[unversionedapi.NodeLabelKubeadmAlphaRole] = unversionedapi.NodeLabelRoleMaster
-
-	if !schedulable {
-		taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
-		n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
-	}
-
-	if _, err := client.Nodes().Update(n); err != nil {
-		if apierrs.IsConflict(err) {
-			fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
-			time.Sleep(apiCallRetryInterval)
-			attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
+func UpdateMasterRoleLabelsAndTaints(clientSet *clientset.Clientset, schedulable bool) error {
+	var err error
+	for {
+		if err = attemptToUpdateMasterRoleLabelsAndTaints(clientSet, schedulable); err != nil {
+			if apierrs.IsConflict(err) {
+				fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
+				time.Sleep(apiCallRetryInterval)
+			} else if !apierrs.IsConflict(err) {
+				return fmt.Errorf("<master/apiclient> failed to update master node - %v", err)
+			}
 		} else {
-			return err
+			break
 		}
 	}
-
 	return nil
 }
 
-func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
-	// TODO(phase1+) use iterate instead of recursion
-	err := attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
+func attemptToUpdateMasterRoleLabelsAndTaints(clientSet *clientset.Clientset, schedulable bool) error {
+	node, err := findMyself(clientSet)
 	if err != nil {
-		return fmt.Errorf("<master/apiclient> failed to update master node - %v", err)
+		return err
+	}
+	node.ObjectMeta.Labels[unversionedapi.NodeLabelKubeadmAlphaRole] = unversionedapi.NodeLabelRoleMaster
+	if !schedulable {
+		taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+		node.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
+	}
+	if _, err := clientSet.Nodes().Update(node); err != nil {
+		return err
 	}
 	return nil
 }
