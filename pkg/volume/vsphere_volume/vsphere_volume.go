@@ -122,6 +122,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	volumePath, _ := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	glog.V(5).Infof("vSphere volume path is %q", volumePath)
 	vsphereVolume := &api.Volume{
 		Name: volumeName,
 		VolumeSource: api.VolumeSource{
