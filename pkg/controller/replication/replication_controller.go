@@ -607,6 +607,10 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 
 }
 
+func (rm *ReplicationManager) isZeroReplicas(rc *api.ReplicationController) bool {
+	return int(rc.Spec.Replicas) == 0
+}
+
 // syncReplicationController will sync the rc with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
@@ -654,7 +658,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	// modify them, you need to copy it first.
 	// TODO: Do the List and Filter in a single pass, or use an index.
 	var filteredPods []*api.Pod
-	if rm.garbageCollectorEnabled {
+	if rm.garbageCollectorEnabled && !rm.isZeroReplicas(&rc) {
 		// list all pods to include the pods that don't match the rc's selector
 		// anymore but has the stale controller ref.
 		pods, err := rm.podStore.Pods(rc.Namespace).List(labels.Everything())
@@ -701,7 +705,11 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 			rm.queue.Add(key)
 			return err
 		}
-		filteredPods = controller.FilterActivePods(pods)
+		if rm.isZeroReplicas(&rc) {
+			filteredPods = controller.FilterDeletablePods(pods)
+		} else {
+			filteredPods = controller.FilterActivePods(pods)
+		}
 	}
 
 	var manageReplicasErr error

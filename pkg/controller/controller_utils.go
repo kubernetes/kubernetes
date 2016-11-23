@@ -727,6 +727,25 @@ func IsPodActive(p *api.Pod) bool {
 		p.DeletionTimestamp == nil
 }
 
+// FilterDeletablePods returns pods that can be deleted.
+func FilterDeletablePods(pods []*api.Pod) []*api.Pod {
+	var result []*api.Pod
+	for _, p := range pods {
+		if IsPodDeletable(p) {
+			result = append(result, p)
+		} else {
+			glog.V(4).Infof("Ignoring non-deletable pod %v/%v in state %v, deletion time %v",
+				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
+		}
+	}
+	return result
+}
+
+func IsPodDeletable(p *api.Pod) bool {
+	return api.PodSucceeded != p.Status.Phase &&
+		p.DeletionTimestamp == nil
+}
+
 // FilterActiveReplicaSets returns replica sets that have (or at least ought to have) pods.
 func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
 	active := []*extensions.ReplicaSet{}
