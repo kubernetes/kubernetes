@@ -576,6 +576,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, out)
+		case volume.VolumeSource.DigitalOceanVolume != nil:
+			printDigitalOceanVolumeSource(volume.VolumeSource.DigitalOceanVolume, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -725,6 +727,13 @@ func printCinderVolumeSource(cinder *api.CinderVolumeSource, out io.Writer) {
 		"    ReadOnly:\t%v\n",
 		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
 }
+func printDigitalOceanVolumeSource(do *api.DigitalOceanVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tDigitalOceanVolume (a Persistent Disk resource in DigitalOcean)\n"+
+		"    VolumeID:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		do.VolumeID, do.FSType, do.ReadOnly)
+}
 
 type PersistentVolumeDescriber struct {
 	clientset.Interface
@@ -786,6 +795,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, out)
 		case pv.Spec.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, out)
+		case pv.Spec.DigitalOceanVolume != nil:
+			printDigitalOceanVolumeSource(pv.Spec.DigitalOceanVolume, out)
 		}
 
 		if events != nil {

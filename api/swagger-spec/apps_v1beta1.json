@@ -1456,6 +1456,10 @@
      "photonPersistentDisk": {
       "$ref": "v1.PhotonPersistentDiskVolumeSource",
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
+     },
+     "digitaloceanVolume": {
+      "$ref": "v1.DigitalOceanVolumeSource",
+      "description": "DigitalOceanVolume represents an DigitalOcean Volume mount on the host and bind mount to the pod."
      }
     }
    },
@@ -2103,6 +2107,27 @@
      "fsType": {
       "type": "string",
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.DigitalOceanVolumeSource": {
+    "id": "v1.DigitalOceanVolumeSource",
+    "description": "Represents a digitalocean volume resource.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string",
+      "description": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      }
     }
    },

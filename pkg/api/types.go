@@ -291,6 +291,9 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty"`
+  // DigitalOceanVolume represents an DigitalOcean Volume mount on the host and bind mount to the pod.
+  // +optional
+  DigitalOceanVolume *DigitalOceanVolumeSource `json:"digitaloceanVolume,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -353,6 +356,9 @@ type PersistentVolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty"`
+  // digitaloceanVolume represents an Digital Ocean Volume mount on the host and bind mount to the pod.
+  // +optional
+  DigitalOceanVolume *DigitalOceanVolumeSource `json:"digitaloceanVolume,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -976,6 +982,21 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool `json:"readOnly,omitempty"`
+}
+
+// Represents a digitalocean volume resource.
+type DigitalOceanVolumeSource struct {
+  // volume id used to identify the volume in cinder
+  VolumeID string `json:"volumeID"`
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  FSType string `json:"fsType,omitempty"`
+  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // Adapts a ConfigMap into a volume.

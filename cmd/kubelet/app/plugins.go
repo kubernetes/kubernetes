@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
+	"k8s.io/kubernetes/pkg/volume/digitalocean_volume"
 	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 )
@@ -88,6 +89,7 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, digitalocean_volume.ProbeVolumePlugins()...)
 	return allPlugins
 }
 

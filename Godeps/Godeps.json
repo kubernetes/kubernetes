@@ -729,6 +729,10 @@
 			"Rev": "01aeca54ebda6e0fbfafd0a524d234159c05ec20"
 		},
 		{
+			"ImportPath": "github.com/digitalocean/godo",
+			"Rev": "c3a2aad75d576aed8f14dcaea896e40eff83dd18"
+		},
+		{
 			"ImportPath": "github.com/docker/distribution/digest",
 			"Comment": "v2.4.0-rc.1-38-gcd27f17",
 			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
@@ -1349,6 +1353,10 @@
 		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
+		},
+		{
+			"ImportPath": "github.com/google/go-querystring",
+			"Rev": "9235644dd9e52eeae6fa48efd539fdc351a0af53"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
@@ -2196,6 +2204,10 @@
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
 			"Rev": "e7cb7fa329f456b3855136a2642b197bad7366ba"
+		},
+		{
+			"ImportPath": "github.com/tent/http-link-go",
+			"Rev": "ac974c61c2f990f4115b119354b5e0b47550e888"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",

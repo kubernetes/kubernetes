@@ -324,6 +324,9 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
 	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
+	// DigitalOceanVolume represents an DigitalOcean Volume mount on the host and bind mount to the pod.
+	// +optional
+	DigitalOceanVolume *DigitalOceanVolumeSource `json:"digitaloceanVolume,omitempty" protobuf:"bytes,24,opt,name=digitaloceanVolume"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -409,6 +412,9 @@ type PersistentVolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
 	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,17,opt,name=photonPersistentDisk"`
+	// digitaloceanVolume represents an Digital Ocean Volume mount on the host and bind mount to the pod.
+	// +optional
+	DigitalOceanVolume *DigitalOceanVolumeSource `json:"digitaloceanVolume,omitempty" protobuf:"bytes,18,opt,name=digitaloceanVolume"`
 }
 
 // +genclient=true
@@ -1064,6 +1070,24 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
+}
+
+// Represents a digitalocean volume resource.
+type DigitalOceanVolumeSource struct {
+	// volume id used to identify the volume in cinder
+	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.
