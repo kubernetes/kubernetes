@@ -30,6 +30,7 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/metrics:go_default_library",

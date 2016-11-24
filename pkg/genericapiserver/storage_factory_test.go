@@ -21,27 +21,27 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
 func TestUpdateEtcdOverrides(t *testing.T) {
 	testCases := []struct {
-		resource unversioned.GroupResource
+		resource schema.GroupResource
 		servers  []string
 	}{
 		{
-			resource: unversioned.GroupResource{Group: api.GroupName, Resource: "resource"},
+			resource: schema.GroupResource{Group: api.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000"},
 		},
 		{
-			resource: unversioned.GroupResource{Group: api.GroupName, Resource: "resource"},
+			resource: schema.GroupResource{Group: api.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000", "http://127.0.0.1:20000"},
 		},
 		{
-			resource: unversioned.GroupResource{Group: extensions.GroupName, Resource: "resource"},
+			resource: schema.GroupResource{Group: extensions.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000"},
 		},
 	}
@@ -66,7 +66,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			continue
 		}
 
-		config, err = storageFactory.NewConfig(unversioned.GroupResource{Group: api.GroupName, Resource: "unlikely"})
+		config, err = storageFactory.NewConfig(schema.GroupResource{Group: api.GroupName, Resource: "unlikely"})
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue

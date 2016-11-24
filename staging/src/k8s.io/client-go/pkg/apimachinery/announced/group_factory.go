@@ -23,10 +23,10 @@ import (
 
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/apimachinery"
 	"k8s.io/client-go/pkg/apimachinery/registered"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/util/sets"
 )
 
@@ -107,7 +107,7 @@ type GroupMetaFactory struct {
 	VersionArgs map[string]*GroupVersionFactoryArgs
 
 	// assembled by Register()
-	prioritizedVersionList []unversioned.GroupVersion
+	prioritizedVersionList []schema.GroupVersion
 }
 
 // Register constructs the finalized prioritized version list and sanity checks
@@ -124,11 +124,11 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager) erro
 	if pvSet.Len() != len(gmf.GroupArgs.VersionPreferenceOrder) {
 		return fmt.Errorf("preference order for group %v has duplicates: %v", gmf.GroupArgs.GroupName, gmf.GroupArgs.VersionPreferenceOrder)
 	}
-	prioritizedVersions := []unversioned.GroupVersion{}
+	prioritizedVersions := []schema.GroupVersion{}
 	for _, v := range gmf.GroupArgs.VersionPreferenceOrder {
 		prioritizedVersions = append(
 			prioritizedVersions,
-			unversioned.GroupVersion{
+			schema.GroupVersion{
 				Group:   gmf.GroupArgs.GroupName,
 				Version: v,
 			},
@@ -136,7 +136,7 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager) erro
 	}
 
 	// Go through versions that weren't explicitly prioritized.
-	unprioritizedVersions := []unversioned.GroupVersion{}
+	unprioritizedVersions := []schema.GroupVersion{}
 	for _, v := range gmf.VersionArgs {
 		if v.GroupName != gmf.GroupArgs.GroupName {
 			return fmt.Errorf("found %v/%v in group %v?", v.GroupName, v.VersionName, gmf.GroupArgs.GroupName)
@@ -145,7 +145,7 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager) erro
 			pvSet.Delete(v.VersionName)
 			continue
 		}
-		unprioritizedVersions = append(unprioritizedVersions, unversioned.GroupVersion{Group: v.GroupName, Version: v.VersionName})
+		unprioritizedVersions = append(unprioritizedVersions, schema.GroupVersion{Group: v.GroupName, Version: v.VersionName})
 	}
 	if len(unprioritizedVersions) > 1 {
 		glog.Warningf("group %v has multiple unprioritized versions: %#v. They will have an arbitrary preference order!", gmf.GroupArgs.GroupName, unprioritizedVersions)
@@ -159,7 +159,7 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager) erro
 	return nil
 }
 
-func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersions []unversioned.GroupVersion, groupMeta *apimachinery.GroupMeta) meta.RESTMapper {
+func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersions []schema.GroupVersion, groupMeta *apimachinery.GroupMeta) meta.RESTMapper {
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	rootScoped := sets.NewString()
@@ -183,7 +183,7 @@ func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersi
 
 // Enable enables group versions that are allowed, adds methods to the scheme, etc.
 func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme *runtime.Scheme) error {
-	externalVersions := []unversioned.GroupVersion{}
+	externalVersions := []schema.GroupVersion{}
 	for _, v := range gmf.prioritizedVersionList {
 		if !m.IsAllowedVersion(v) {
 			continue
@@ -214,7 +214,7 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 	for _, v := range externalVersions {
 		gvf := gmf.VersionArgs[v.Version]
 		if err := groupMeta.AddVersionInterfaces(
-			unversioned.GroupVersion{Group: gvf.GroupName, Version: gvf.VersionName},
+			schema.GroupVersion{Group: gvf.GroupName, Version: gvf.VersionName},
 			&meta.VersionInterfaces{
 				ObjectConvertor:  scheme,
 				MetadataAccessor: accessor,

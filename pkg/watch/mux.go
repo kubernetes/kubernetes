@@ -19,8 +19,8 @@ package watch
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // FullChannelBehavior controls how the Broadcaster reacts if a watcher's watch
@@ -81,8 +81,8 @@ const internalRunFunctionMarker = "internal-do-function"
 // a function type we can shoehorn into the queue.
 type functionFakeRuntimeObject func()
 
-func (obj functionFakeRuntimeObject) GetObjectKind() unversioned.ObjectKind {
-	return unversioned.EmptyObjectKind
+func (obj functionFakeRuntimeObject) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
 }
 
 // Execute f, blocking the incoming queue (and waiting for it to drain first).

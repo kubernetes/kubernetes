@@ -20,11 +20,11 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	rbacinternal "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -36,7 +36,7 @@ type GenericInformer interface {
 
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
-func (f *sharedInformerFactory) ForResource(resource unversioned.GroupResource) (GenericInformer, error) {
+func (f *sharedInformerFactory) ForResource(resource schema.GroupResource) (GenericInformer, error) {
 	switch resource {
 	case api.Resource("pods"):
 		return &genericInformer{resource: resource, informer: f.Pods().Informer()}, nil
@@ -78,7 +78,7 @@ func (f *sharedInformerFactory) ForResource(resource unversioned.GroupResource) 
 
 type genericInformer struct {
 	informer cache.SharedIndexInformer
-	resource unversioned.GroupResource
+	resource schema.GroupResource
 }
 
 func (f *genericInformer) Informer() cache.SharedIndexInformer {

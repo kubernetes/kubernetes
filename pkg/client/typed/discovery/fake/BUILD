@@ -19,6 +19,7 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
     ],

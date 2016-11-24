@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -56,7 +57,7 @@ type APIGroupInfo struct {
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects.
 	// If nil, defaults to groupMeta.GroupVersion.
 	// TODO: Remove this when https://github.com/kubernetes/kubernetes/issues/19018 is fixed.
-	OptionsExternalVersion *unversioned.GroupVersion
+	OptionsExternalVersion *schema.GroupVersion
 
 	// Scheme includes all of the types used by this group and how to convert between them (or
 	// to convert objects from outside of this group that are accepted in this API).
@@ -71,7 +72,7 @@ type APIGroupInfo struct {
 	// accessible from this API group version. The GroupVersionKind is that of the external version of
 	// the subresource. The key of this map should be the path of the subresource. The keys here should
 	// match the keys in the Storage map above for subresources.
-	SubresourceGroupVersionKind map[string]unversioned.GroupVersionKind
+	SubresourceGroupVersionKind map[string]schema.GroupVersionKind
 }
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
@@ -317,7 +318,7 @@ func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 	delete(s.apiGroupsForDiscovery, groupName)
 }
 
-func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
+func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
 	storage := make(map[string]rest.Storage)
 	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
 		storage[strings.ToLower(k)] = v
@@ -328,7 +329,7 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	return version, err
 }
 
-func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion) (*apiserver.APIGroupVersion, error) {
+func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) (*apiserver.APIGroupVersion, error) {
 	return &apiserver.APIGroupVersion{
 		GroupVersion: groupVersion,
 

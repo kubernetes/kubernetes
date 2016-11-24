@@ -23,10 +23,10 @@ import (
 
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 const (
@@ -42,7 +42,7 @@ var (
 	metricsRoot  = fmt.Sprintf("%s/%s", prefix, groupVersion)
 
 	// TODO: get this from metrics api once it's finished
-	metricsGv = unversioned.GroupVersion{Group: "metrics", Version: "v1alpha1"}
+	metricsGv = schema.GroupVersion{Group: "metrics", Version: "v1alpha1"}
 )
 
 type HeapsterMetricsClient struct {

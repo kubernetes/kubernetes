@@ -25,10 +25,10 @@ import (
 	"github.com/robfig/cron"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -214,7 +214,7 @@ func makeCreatedByRefJson(object runtime.Object) (string, error) {
 	// TODO: this code was not safe previously - as soon as new code came along that switched to v2, old clients
 	//   would be broken upon reading it. This is explicitly hardcoded to v1 to guarantee predictable deployment.
 	//   We need to consistently handle this case of annotation versioning.
-	codec := api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: v1.GroupName, Version: "v1"})
+	codec := api.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
 
 	createdByRefJson, err := runtime.Encode(codec, &v1.SerializedReference{
 		Reference: *createdByRef,

@@ -19,13 +19,13 @@ package namespace
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -48,7 +48,7 @@ type NamespaceController struct {
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
 	// function to list of preferred group versions and their corresponding resource set for namespace deletion
-	groupVersionResourcesFn func() ([]unversioned.GroupVersionResource, error)
+	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error)
 	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
 	opCache *operationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
@@ -59,7 +59,7 @@ type NamespaceController struct {
 func NewNamespaceController(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
-	groupVersionResourcesFn func() ([]unversioned.GroupVersionResource, error),
+	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error),
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
@@ -73,7 +73,7 @@ func NewNamespaceController(
 	opCache := &operationNotSupportedCache{
 		m: make(map[operationKey]bool),
 	}
-	ignoredGroupVersionResources := []unversioned.GroupVersionResource{
+	ignoredGroupVersionResources := []schema.GroupVersionResource{
 		{Group: "", Version: "v1", Resource: "bindings"},
 	}
 	for _, ignoredGroupVersionResource := range ignoredGroupVersionResources {

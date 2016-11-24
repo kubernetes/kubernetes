@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
@@ -239,7 +240,7 @@ func TestPatch(t *testing.T) {
 		t.Fatalf("Failed creating patchpods: %v", err)
 	}
 
-	patchBodies := map[unversioned.GroupVersion]map[api.PatchType]struct {
+	patchBodies := map[schema.GroupVersion]map[api.PatchType]struct {
 		AddLabelBody        []byte
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte

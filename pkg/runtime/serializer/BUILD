@@ -19,8 +19,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/json:go_default_library",
         "//pkg/runtime/serializer/protobuf:go_default_library",
         "//pkg/runtime/serializer/recognizer:go_default_library",
@@ -37,6 +37,7 @@ go_test(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/diff:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/google/gofuzz",

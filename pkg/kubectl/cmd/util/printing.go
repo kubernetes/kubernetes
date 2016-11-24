@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 
 	"github.com/spf13/cobra"
 )
@@ -90,17 +90,17 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 
 // OutputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
 // defaultVersion is never mutated.  Nil simply allows clean passing in common usage from client.Config
-func OutputVersion(cmd *cobra.Command, defaultVersion *unversioned.GroupVersion) (unversioned.GroupVersion, error) {
+func OutputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (schema.GroupVersion, error) {
 	outputVersionString := GetFlagString(cmd, "output-version")
 	if len(outputVersionString) == 0 {
 		if defaultVersion == nil {
-			return unversioned.GroupVersion{}, nil
+			return schema.GroupVersion{}, nil
 		}
 
 		return *defaultVersion, nil
 	}
 
-	return unversioned.ParseGroupVersion(outputVersionString)
+	return schema.ParseGroupVersion(outputVersionString)
 }
 
 // PrinterForCommand returns the default printer for this command.

@@ -68,6 +68,7 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//pkg/metrics:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/ssh:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/errors:go_default_library",

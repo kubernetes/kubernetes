@@ -19,8 +19,8 @@ package versioning
 import (
 	"io"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	utilruntime "k8s.io/client-go/pkg/util/runtime"
 )
 
@@ -93,7 +93,7 @@ type codec struct {
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
 // successful, the returned runtime.Object will be the value passed as into. Note that this may bypass conversion if you pass an
 // into that matches the serialized version.
-func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	versioned, isVersioned := into.(*runtime.VersionedObjects)
 	if isVersioned {
 		into = versioned.Last()
@@ -254,12 +254,12 @@ type DirectDecoder struct {
 }
 
 // Decode does not do conversion. It removes the gvk during deserialization.
-func (d DirectDecoder) Decode(data []byte, defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (d DirectDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	obj, gvk, err := d.Decoder.Decode(data, defaults, into)
 	if obj != nil {
 		kind := obj.GetObjectKind()
 		// clearing the gvk is just a convention of a codec
-		kind.SetGroupVersionKind(unversioned.GroupVersionKind{})
+		kind.SetGroupVersionKind(schema.GroupVersionKind{})
 	}
 	return obj, gvk, err
 }

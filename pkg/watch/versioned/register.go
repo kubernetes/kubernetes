@@ -17,9 +17,9 @@ limitations under the License.
 package versioned
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -28,10 +28,10 @@ const WatchEventKind = "WatchEvent"
 
 // AddToGroupVersion registers the watch external and internal kinds with the scheme, and ensures the proper
 // conversions are in place.
-func AddToGroupVersion(scheme *runtime.Scheme, groupVersion unversioned.GroupVersion) {
+func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion) {
 	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &Event{})
 	scheme.AddKnownTypeWithName(
-		unversioned.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
+		schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
 		&InternalEvent{},
 	)
 	scheme.AddConversionFuncs(
@@ -80,5 +80,5 @@ func Convert_versioned_Event_to_versioned_InternalEvent(in *Event, out *Internal
 // InternalEvent makes watch.Event versioned
 type InternalEvent watch.Event
 
-func (e *InternalEvent) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
-func (e *Event) GetObjectKind() unversioned.ObjectKind         { return unversioned.EmptyObjectKind }
+func (e *InternalEvent) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (e *Event) GetObjectKind() schema.ObjectKind         { return schema.EmptyObjectKind }

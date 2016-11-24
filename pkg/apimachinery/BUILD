@@ -19,8 +19,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/meta:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
     ],
 )
 
@@ -29,5 +29,5 @@ go_test(
     srcs = ["types_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api/unversioned:go_default_library"],
+    deps = ["//pkg/runtime/schema:go_default_library"],
 )

@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -379,7 +379,7 @@ func getRESTMappings(pruneResources *[]pruneResource) (namespaced, nonNamespaced
 	}
 	registeredMapper := registered.RESTMapper()
 	for _, resource := range *pruneResources {
-		addedMapping, err := registeredMapper.RESTMapping(unversioned.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
+		addedMapping, err := registeredMapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid resource %v: %v", resource, err)
 		}

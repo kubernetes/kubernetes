@@ -21,22 +21,22 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // RegisteredRateLimiter records the registered RateLimters to avoid
 // duplication.
 type RegisteredRateLimiter struct {
-	rateLimiters map[unversioned.GroupVersion]*sync.Once
+	rateLimiters map[schema.GroupVersion]*sync.Once
 }
 
 // NewRegisteredRateLimiter returns a new RegisteredRateLimiater.
 // TODO: NewRegisteredRateLimiter is not dynamic. We need to find a better way
 // when GC dynamically change the resources it monitors.
-func NewRegisteredRateLimiter(resources []unversioned.GroupVersionResource) *RegisteredRateLimiter {
-	rateLimiters := make(map[unversioned.GroupVersion]*sync.Once)
+func NewRegisteredRateLimiter(resources []schema.GroupVersionResource) *RegisteredRateLimiter {
+	rateLimiters := make(map[schema.GroupVersion]*sync.Once)
 	for _, resource := range resources {
 		gv := resource.GroupVersion()
 		if _, found := rateLimiters[gv]; !found {
@@ -46,7 +46,7 @@ func NewRegisteredRateLimiter(resources []unversioned.GroupVersionResource) *Reg
 	return &RegisteredRateLimiter{rateLimiters: rateLimiters}
 }
 
-func (r *RegisteredRateLimiter) registerIfNotPresent(gv unversioned.GroupVersion, client *dynamic.Client, prefix string) {
+func (r *RegisteredRateLimiter) registerIfNotPresent(gv schema.GroupVersion, client *dynamic.Client, prefix string) {
 	once, found := r.rateLimiters[gv]
 	if !found {
 		return

@@ -19,9 +19,9 @@ package v2alpha1
 import (
 	fmt "fmt"
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
@@ -73,7 +73,7 @@ func New(c restclient.Interface) *BatchV2alpha1Client {
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	gv, err := unversioned.ParseGroupVersion("batch/v2alpha1")
+	gv, err := schema.ParseGroupVersion("batch/v2alpha1")
 	if err != nil {
 		return err
 	}

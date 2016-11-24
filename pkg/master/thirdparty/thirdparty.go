@@ -36,6 +36,7 @@ import (
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
@@ -104,7 +105,7 @@ func (m *ThirdPartyResourceServer) HasThirdPartyResource(rsrc *extensions.ThirdP
 	if entry == nil {
 		return false, nil
 	}
-	plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+	plural, _ := meta.KindToResource(schema.GroupVersionKind{
 		Group:   group,
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
@@ -249,7 +250,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	if len(rsrc.Versions) == 0 {
 		return fmt.Errorf("ThirdPartyResource %s has no defined versions", rsrc.Name)
 	}
-	plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+	plural, _ := meta.KindToResource(schema.GroupVersionKind{
 		Group:   group,
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
@@ -300,8 +301,8 @@ func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralRes
 	}
 
 	optionsExternalVersion := registered.GroupOrDie(api.GroupName).GroupVersion
-	internalVersion := unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
-	externalVersion := unversioned.GroupVersion{Group: group, Version: version}
+	internalVersion := schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
+	externalVersion := schema.GroupVersion{Group: group, Version: version}
 
 	apiRoot := extensionsrest.MakeThirdPartyPath("")
 	return &apiserver.APIGroupVersion{

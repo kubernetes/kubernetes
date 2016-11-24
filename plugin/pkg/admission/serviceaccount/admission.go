@@ -24,11 +24,11 @@ import (
 	"time"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/fields"
@@ -380,7 +380,7 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 		// We don't have an API token to mount, so return
 		if s.RequireAPIToken {
 			// If a token is required, this is considered an error
-			err := errors.NewServerTimeout(unversioned.GroupResource{Resource: "serviceaccounts"}, "create pod", 1)
+			err := errors.NewServerTimeout(schema.GroupResource{Resource: "serviceaccounts"}, "create pod", 1)
 			err.ErrStatus.Message = fmt.Sprintf("No API token found for service account %q, retry after the token is automatically created and added to the service account", serviceAccount.Name)
 			return err
 		}

@@ -24,8 +24,8 @@ import (
 
 	"bitbucket.org/ww/goautoneg"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // mediaTypesForSerializer returns a list of media and stream media types for the server.
@@ -136,7 +136,7 @@ func negotiate(header string, alternatives []string) (goautoneg.Accept, bool) {
 type endpointRestrictions interface {
 	// AllowsConversion should return true if the specified group version kind
 	// is an allowed target object.
-	AllowsConversion(unversioned.GroupVersionKind) bool
+	AllowsConversion(schema.GroupVersionKind) bool
 	// AllowsServerVersion should return true if the specified version is valid
 	// for the server group.
 	AllowsServerVersion(version string) bool
@@ -149,9 +149,9 @@ var defaultEndpointRestrictions = emptyEndpointRestrictions{}
 
 type emptyEndpointRestrictions struct{}
 
-func (emptyEndpointRestrictions) AllowsConversion(unversioned.GroupVersionKind) bool { return false }
-func (emptyEndpointRestrictions) AllowsServerVersion(string) bool                    { return false }
-func (emptyEndpointRestrictions) AllowsStreamSchema(s string) bool                   { return s == "watch" }
+func (emptyEndpointRestrictions) AllowsConversion(schema.GroupVersionKind) bool { return false }
+func (emptyEndpointRestrictions) AllowsServerVersion(string) bool               { return false }
+func (emptyEndpointRestrictions) AllowsStreamSchema(s string) bool              { return s == "watch" }
 
 // acceptedMediaType contains information about a valid media type that the
 // server can serialize.
@@ -178,7 +178,7 @@ type mediaTypeOptions struct {
 
 	// convert is a request to alter the type of object returned by the server from the
 	// normal response
-	convert *unversioned.GroupVersionKind
+	convert *schema.GroupVersionKind
 	// useServerVersion is an optional version for the server group
 	useServerVersion string
 
@@ -206,17 +206,17 @@ func acceptMediaTypeOptions(params map[string]string, accepts *acceptedMediaType
 		// controls transformation of the object when returned
 		case "as":
 			if options.convert == nil {
-				options.convert = &unversioned.GroupVersionKind{}
+				options.convert = &schema.GroupVersionKind{}
 			}
 			options.convert.Kind = v
 		case "g":
 			if options.convert == nil {
-				options.convert = &unversioned.GroupVersionKind{}
+				options.convert = &schema.GroupVersionKind{}
 			}
 			options.convert.Group = v
 		case "v":
 			if options.convert == nil {
-				options.convert = &unversioned.GroupVersionKind{}
+				options.convert = &schema.GroupVersionKind{}
 			}
 			options.convert.Version = v
 

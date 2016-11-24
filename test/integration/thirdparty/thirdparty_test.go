@@ -33,6 +33,7 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -87,7 +88,7 @@ func installThirdParty(t *testing.T, client clientset.Interface, clientConfig *r
 
 	fooClientConfig := *clientConfig
 	fooClientConfig.APIPath = "apis"
-	fooClientConfig.GroupVersion = &unversioned.GroupVersion{Group: group, Version: version}
+	fooClientConfig.GroupVersion = &schema.GroupVersion{Group: group, Version: version}
 	fooClient, err := restclient.RESTClientFor(&fooClientConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -162,7 +163,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, client clientset.Interf
 
 	fooClientConfig := *clientConfig
 	fooClientConfig.APIPath = "apis"
-	fooClientConfig.GroupVersion = &unversioned.GroupVersion{Group: group, Version: version}
+	fooClientConfig.GroupVersion = &schema.GroupVersion{Group: group, Version: version}
 	fooClient, err := restclient.RESTClientFor(&fooClientConfig)
 	if err != nil {
 		t.Fatal(err)

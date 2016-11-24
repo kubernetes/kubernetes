@@ -17,8 +17,8 @@ limitations under the License.
 package latest
 
 import (
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/runtime/serializer/json"
 	"k8s.io/client-go/pkg/runtime/serializer/versioning"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -28,7 +28,7 @@ import (
 // Version is the string that represents the current external default version.
 const Version = "v1"
 
-var ExternalVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
+var ExternalVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
 // OldestVersion is the string that represents the oldest server version supported,
 // for client code that wants to hardcode the lowest common denominator.
@@ -60,7 +60,7 @@ func init() {
 		Scheme,
 		yamlSerializer,
 		yamlSerializer,
-		unversioned.GroupVersion{Version: Version},
+		schema.GroupVersion{Version: Version},
 		runtime.InternalGroupVersioner,
 	)
 }

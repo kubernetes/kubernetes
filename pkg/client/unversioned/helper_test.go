@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestSetKubernetesDefaults(t *testing.T) {
@@ -51,7 +52,7 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		// Add this test back when we fixed config and SetKubernetesDefaults
 		// {
 		// 	restclient.Config{
-		// 		GroupVersion: &unversioned.GroupVersion{Group: "not.a.group", Version: "not_an_api"},
+		// 		GroupVersion: &schema.GroupVersion{Group: "not.a.group", Version: "not_an_api"},
 		// 	},
 		// 	restclient.Config{},
 		// 	true,
@@ -125,7 +126,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	got, err := restclient.ServerAPIVersions(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}})
+	got, err := restclient.ServerAPIVersions(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "invalid version", Version: "one"}, NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}})
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -152,7 +153,7 @@ func TestSetsCodec(t *testing.T) {
 		conf := &restclient.Config{
 			Host: "127.0.0.1",
 			ContentConfig: restclient.ContentConfig{
-				GroupVersion: &unversioned.GroupVersion{Version: version},
+				GroupVersion: &schema.GroupVersion{Version: version},
 			},
 		}
 

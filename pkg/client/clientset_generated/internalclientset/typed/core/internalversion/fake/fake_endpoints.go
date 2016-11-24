@@ -18,9 +18,9 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -30,7 +30,7 @@ type FakeEndpoints struct {
 	ns   string
 }
 
-var endpointsResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "endpoints"}
+var endpointsResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "endpoints"}
 
 func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
 	obj, err := c.Fake.

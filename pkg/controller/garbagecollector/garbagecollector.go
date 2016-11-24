@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -448,7 +449,7 @@ type GarbageCollector struct {
 	absentOwnerCache *UIDCache
 }
 
-func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
+func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 			// APIResource.Kind is not used by the dynamic client, so
@@ -473,7 +474,7 @@ func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionReso
 	}
 }
 
-func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource, kind unversioned.GroupVersionKind) (monitor, error) {
+func (gc *GarbageCollector) monitorFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (monitor, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
 	var monitor monitor
@@ -525,18 +526,18 @@ func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource
 	return monitor, nil
 }
 
-var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                             {},
-	unversioned.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
-	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
-	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
-	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
+var ignoredResources = map[schema.GroupVersionResource]struct{}{
+	schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
+	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
+	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
+	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                             {},
+	schema.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
 }
 
-func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
+func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, resources []schema.GroupVersionResource) (*GarbageCollector, error) {
 	gc := &GarbageCollector{
 		metaOnlyClientPool:               metaOnlyClientPool,
 		clientPool:                       clientPool,
@@ -593,7 +594,7 @@ func (gc *GarbageCollector) worker() {
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
 // namespace> tuple to a unversioned.APIResource struct.
 func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool) (*unversioned.APIResource, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(apiVersion, kind)
+	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get REST mapping for kind: %s, version: %s", kind, apiVersion)
@@ -608,7 +609,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool
 }
 
 func (gc *GarbageCollector) deleteObject(item objectReference) error {
-	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
+	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
@@ -622,7 +623,7 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 }
 
 func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
+	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
@@ -633,7 +634,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructur
 }
 
 func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unstructured) (*runtime.Unstructured, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
+	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
@@ -644,7 +645,7 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unst
 }
 
 func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*runtime.Unstructured, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
+	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
@@ -725,7 +726,7 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		// ii) should update the object to remove such references. This is to
 		// prevent objects having references to an old resource from being
 		// deleted during a cluster upgrade.
-		fqKind := unversioned.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
+		fqKind := schema.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
 		client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 		if err != nil {
 			return err

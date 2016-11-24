@@ -17,16 +17,16 @@ limitations under the License.
 package fake
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func (c *FakeScales) Get(kind string, name string) (result *v1beta1.Scale, err error) {
 	action := core.GetActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.ns
-	action.Resource = unversioned.GroupVersionResource{Resource: kind}
+	action.Resource = schema.GroupVersionResource{Resource: kind}
 	action.Subresource = "scale"
 	action.Name = name
 	obj, err := c.Fake.Invokes(action, &v1beta1.Scale{})
@@ -38,7 +38,7 @@ func (c *FakeScales) Update(kind string, scale *v1beta1.Scale) (result *v1beta1.
 	action := core.UpdateActionImpl{}
 	action.Verb = "update"
 	action.Namespace = c.ns
-	action.Resource = unversioned.GroupVersionResource{Resource: kind}
+	action.Resource = schema.GroupVersionResource{Resource: kind}
 	action.Subresource = "scale"
 	action.Object = scale
 	obj, err := c.Fake.Invokes(action, scale)

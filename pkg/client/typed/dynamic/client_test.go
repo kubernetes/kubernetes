@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/pkg/watch/versioned"
@@ -57,7 +58,7 @@ func getObject(version, kind, name string) *runtime.Unstructured {
 	}
 }
 
-func getClientServer(gv *unversioned.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
+func getClientServer(gv *schema.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	cl, err := NewClient(&restclient.Config{
 		Host:          srv.URL,
@@ -115,7 +116,7 @@ func TestList(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		gv := &schema.GroupVersion{Group: "gtest", Version: "vtest"}
 		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
 		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "GET" {
@@ -170,7 +171,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		gv := &schema.GroupVersion{Group: "gtest", Version: "vtest"}
 		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
 		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "GET" {
@@ -223,7 +224,7 @@ func TestDelete(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		gv := &schema.GroupVersion{Group: "gtest", Version: "vtest"}
 		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
 		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "DELETE" {
@@ -272,7 +273,7 @@ func TestDeleteCollection(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		gv := &schema.GroupVersion{Group: "gtest", Version: "vtest"}
 		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
 		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "DELETE" {
@@ -320,7 +321,7 @@ func TestCreate(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		gv := &schema.GroupVersion{Group: "gtest", Version: "vtest"}
 		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
 		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "POST" {
@@ -379,7 +380,7 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		gv := &schema.GroupVersion{Group: "gtest", Version: "vtest"}
 		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
 		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "PUT" {
@@ -446,7 +447,7 @@ func TestWatch(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		gv := &schema.GroupVersion{Group: "gtest", Version: "vtest"}
 		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
 		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "GET" {
@@ -506,7 +507,7 @@ func TestPatch(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		gv := &schema.GroupVersion{Group: "gtest", Version: "vtest"}
 		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
 		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "PATCH" {

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -211,7 +212,7 @@ func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
 // the objects as children, or if only a single Object is present, as that object. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupVersion, encoder runtime.Encoder) (runtime.Object, error) {
+func AsVersionedObject(infos []*Info, forceList bool, version schema.GroupVersion, encoder runtime.Encoder) (runtime.Object, error) {
 	objects, err := AsVersionedObjects(infos, version, encoder)
 	if err != nil {
 		return nil, err
@@ -234,7 +235,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupV
 // AsVersionedObjects converts a list of infos into versioned objects. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {
+func AsVersionedObjects(infos []*Info, version schema.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object == nil {
@@ -274,7 +275,7 @@ func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder
 
 // TryConvert attempts to convert the given object to the provided versions in order. This function assumes
 // the object is in internal version.
-func TryConvert(converter runtime.ObjectConvertor, object runtime.Object, versions ...unversioned.GroupVersion) (runtime.Object, error) {
+func TryConvert(converter runtime.ObjectConvertor, object runtime.Object, versions ...schema.GroupVersion) (runtime.Object, error) {
 	var last error
 	for _, version := range versions {
 		if version.Empty() {

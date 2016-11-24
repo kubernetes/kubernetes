@@ -68,6 +68,7 @@ go_library(
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/quota/install:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/cert:go_default_library",

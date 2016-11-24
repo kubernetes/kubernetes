@@ -20,16 +20,16 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type notRegisteredErr struct {
-	gvk unversioned.GroupVersionKind
+	gvk schema.GroupVersionKind
 	t   reflect.Type
 }
 
 // NewNotRegisteredErr is exposed for testing.
-func NewNotRegisteredErr(gvk unversioned.GroupVersionKind, t reflect.Type) error {
+func NewNotRegisteredErr(gvk schema.GroupVersionKind, t reflect.Type) error {
 	return &notRegisteredErr{gvk: gvk, t: t}
 }
 

@@ -70,6 +70,7 @@ go_test(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/uuid:go_default_library",
     ],

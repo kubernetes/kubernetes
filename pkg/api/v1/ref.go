@@ -19,12 +19,13 @@ package v1
 import (
 	"errors"
 	"fmt"
-	"k8s.io/kubernetes/pkg/api"
 	"net/url"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -123,11 +124,11 @@ func GetPartialReference(obj runtime.Object, fieldPath string) (*ObjectReference
 
 // IsAnAPIObject allows clients to preemptively get a reference to an API object and pass it to places that
 // intend only to get a reference to that object. This simplifies the event recording interface.
-func (obj *ObjectReference) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
+func (obj *ObjectReference) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
-func (obj *ObjectReference) GroupVersionKind() unversioned.GroupVersionKind {
-	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+func (obj *ObjectReference) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
-func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind { return obj }
+func (obj *ObjectReference) GetObjectKind() schema.ObjectKind { return obj }

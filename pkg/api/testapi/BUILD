@@ -22,7 +22,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/meta:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -47,6 +46,7 @@ go_library(
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/recognizer:go_default_library",
     ],
 )

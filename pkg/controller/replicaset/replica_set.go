@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -63,7 +64,7 @@ const (
 	statusUpdateRetries = 1
 )
 
-func getRSKind() unversioned.GroupVersionKind {
+func getRSKind() schema.GroupVersionKind {
 	return v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
 }
 

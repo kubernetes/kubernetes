@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // SharedInformerFactory provides interface which holds unique informers for pods, nodes, namespaces, persistent volume
@@ -33,7 +33,7 @@ type SharedInformerFactory interface {
 	// Start starts informers that can start AFTER the API server and controllers have started
 	Start(stopCh <-chan struct{})
 
-	ForResource(unversioned.GroupResource) (GenericInformer, error)
+	ForResource(schema.GroupResource) (GenericInformer, error)
 
 	// when you update these, update generic.go/ForResource, same package
 

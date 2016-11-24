@@ -161,6 +161,7 @@ go_library(
         "//pkg/metrics:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/exec:go_default_library",

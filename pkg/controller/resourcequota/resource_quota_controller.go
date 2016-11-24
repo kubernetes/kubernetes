@@ -22,13 +22,13 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -50,7 +50,7 @@ type ResourceQuotaControllerOptions struct {
 	ReplenishmentResyncPeriod controller.ResyncPeriodFunc
 	// List of GroupKind objects that should be monitored for replenishment at
 	// a faster frequency than the quota controller recalculation interval
-	GroupKindsToReplenish []unversioned.GroupKind
+	GroupKindsToReplenish []schema.GroupKind
 }
 
 // ResourceQuotaController is responsible for tracking quota usage status in the system
@@ -328,7 +328,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.Resource
 }
 
 // replenishQuota is a replenishment function invoked by a controller to notify that a quota should be recalculated
-func (rq *ResourceQuotaController) replenishQuota(groupKind unversioned.GroupKind, namespace string, object runtime.Object) {
+func (rq *ResourceQuotaController) replenishQuota(groupKind schema.GroupKind, namespace string, object runtime.Object) {
 	// check if the quota controller can evaluate this kind, if not, ignore it altogether...
 	evaluators := rq.registry.Evaluators()
 	evaluator, found := evaluators[groupKind]

@@ -21,11 +21,11 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
-func RoleRefGroupKind(roleRef RoleRef) unversioned.GroupKind {
-	return unversioned.GroupKind{Group: roleRef.APIGroup, Kind: roleRef.Kind}
+func RoleRefGroupKind(roleRef RoleRef) schema.GroupKind {
+	return schema.GroupKind{Group: roleRef.APIGroup, Kind: roleRef.Kind}
 }
 
 func VerbMatches(rule PolicyRule, requestedVerb string) bool {
