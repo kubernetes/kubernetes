@@ -516,6 +516,128 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 	}
 }
 
+func TestStoreToJobLister(t *testing.T) {
+	store := NewStore(MetaNamespaceKeyFunc)
+	lister := StoreToJobLister{store}
+	testCases := []struct {
+		inJobs      []*extensions.Job
+		list        func() ([]extensions.Job, error)
+		outJobNames sets.String
+		expectErr   bool
+	}{
+		// Basic listing
+		{
+			inJobs: []*extensions.Job{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			},
+			list: func() ([]extensions.Job, error) {
+				return lister.List()
+			},
+			outJobNames: sets.NewString("basic"),
+		},
+		// Listing multiple daemon sets
+		{
+			inJobs: []*extensions.Job{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: api.ObjectMeta{Name: "complex"}},
+				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
+			},
+			list: func() ([]extensions.Job, error) {
+				return lister.List()
+			},
+			outJobNames: sets.NewString("basic", "complex", "complex2"),
+		},
+		// No pod labels
+		{
+			inJobs: []*extensions.Job{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					Spec: extensions.JobSpec{
+						Selector: map[string]string{"foo": "baz"},
+					},
+				},
+			},
+			list: func() ([]extensions.Job, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
+				}
+				return lister.GetPodJobs(pod)
+			},
+			outJobNames: sets.NewString(),
+			expectErr:   true,
+		},
+		// No Job selectors
+		{
+			inJobs: []*extensions.Job{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+				},
+			},
+			list: func() ([]extensions.Job, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "ns",
+						Labels:    map[string]string{"foo": "bar"},
+					},
+				}
+				return lister.GetPodJobs(pod)
+			},
+			outJobNames: sets.NewString(),
+			expectErr:   true,
+		},
+		// Matching labels to selectors and namespace
+		{
+			inJobs: []*extensions.Job{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Spec: extensions.JobSpec{
+						Selector: map[string]string{"foo": "bar"},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+					Spec: extensions.JobSpec{
+						Selector: map[string]string{"foo": "bar"},
+					},
+				},
+			},
+			list: func() ([]extensions.Job, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod1",
+						Labels:    map[string]string{"foo": "bar"},
+						Namespace: "ns",
+					},
+				}
+				return lister.GetPodJobs(pod)
+			},
+			outJobNames: sets.NewString("bar"),
+		},
+	}
+	for _, c := range testCases {
+		for _, r := range c.inJobs {
+			store.Add(r)
+		}
+
+		Jobs, err := c.list()
+		if err != nil && c.expectErr {
+			continue
+		} else if c.expectErr {
+			t.Fatalf("Expected error, got none")
+		} else if err != nil {
+			t.Fatalf("Unexpected error %#v", err)
+		}
+		JobNames := make([]string, len(Jobs))
+		for ix := range Jobs {
+			JobNames[ix] = Jobs[ix].Name
+		}
+		if !c.outJobNames.HasAll(JobNames...) || len(JobNames) != len(c.outJobNames) {
+			t.Errorf("Unexpected got controllers %+v expected %+v", JobNames, c.outJobNames)
+		}
+	}
+}
+
 func TestStoreToPodLister(t *testing.T) {
 	// We test with and without a namespace index, because StoreToPodLister has
 	// special logic to work on namespaces even when no namespace index is
