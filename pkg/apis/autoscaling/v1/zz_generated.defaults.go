@@ -20,18 +20,22 @@ limitations under the License.
 
 package v1
 
-import (
-	runtime "k8s.io/kubernetes/pkg/runtime"
-)
+type DefaultRegisterer interface {
+	AddTypeDefaultingFunc(srcType interface{}, fn func(interface{}))
+}
 
-// RegisterDefaults adds defaulters functions to the given scheme.
+// RegisterDefaults adds defaulters functions to the given DefaultRegisterer.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&HorizontalPodAutoscaler{}, func(obj interface{}) { SetObjectDefaults_HorizontalPodAutoscaler(obj.(*HorizontalPodAutoscaler)) })
-	scheme.AddTypeDefaultingFunc(&HorizontalPodAutoscalerList{}, func(obj interface{}) {
-		SetObjectDefaults_HorizontalPodAutoscalerList(obj.(*HorizontalPodAutoscalerList))
-	})
+func RegisterDefaults(registerer DefaultRegisterer) error {
+	registerer.AddTypeDefaultingFunc(
+		&HorizontalPodAutoscaler{},
+		func(obj interface{}) { SetObjectDefaults_HorizontalPodAutoscaler(obj.(*HorizontalPodAutoscaler)) })
+	registerer.AddTypeDefaultingFunc(
+		&HorizontalPodAutoscalerList{},
+		func(obj interface{}) {
+			SetObjectDefaults_HorizontalPodAutoscalerList(obj.(*HorizontalPodAutoscalerList))
+		})
 	return nil
 }
 

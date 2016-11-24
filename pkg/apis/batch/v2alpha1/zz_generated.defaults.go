@@ -22,18 +22,31 @@ package v2alpha1
 
 import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
-// RegisterDefaults adds defaulters functions to the given scheme.
+type DefaultRegisterer interface {
+	AddTypeDefaultingFunc(srcType interface{}, fn func(interface{}))
+}
+
+// RegisterDefaults adds defaulters functions to the given DefaultRegisterer.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*CronJob)) })
-	scheme.AddTypeDefaultingFunc(&CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*CronJobList)) })
-	scheme.AddTypeDefaultingFunc(&Job{}, func(obj interface{}) { SetObjectDefaults_Job(obj.(*Job)) })
-	scheme.AddTypeDefaultingFunc(&JobList{}, func(obj interface{}) { SetObjectDefaults_JobList(obj.(*JobList)) })
-	scheme.AddTypeDefaultingFunc(&JobTemplate{}, func(obj interface{}) { SetObjectDefaults_JobTemplate(obj.(*JobTemplate)) })
+func RegisterDefaults(registerer DefaultRegisterer) error {
+	registerer.AddTypeDefaultingFunc(
+		&CronJob{},
+		func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*CronJob)) })
+	registerer.AddTypeDefaultingFunc(
+		&CronJobList{},
+		func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*CronJobList)) })
+	registerer.AddTypeDefaultingFunc(
+		&Job{},
+		func(obj interface{}) { SetObjectDefaults_Job(obj.(*Job)) })
+	registerer.AddTypeDefaultingFunc(
+		&JobList{},
+		func(obj interface{}) { SetObjectDefaults_JobList(obj.(*JobList)) })
+	registerer.AddTypeDefaultingFunc(
+		&JobTemplate{},
+		func(obj interface{}) { SetObjectDefaults_JobTemplate(obj.(*JobTemplate)) })
 	return nil
 }
 

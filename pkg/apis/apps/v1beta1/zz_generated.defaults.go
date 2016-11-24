@@ -22,15 +22,22 @@ package v1beta1
 
 import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
-// RegisterDefaults adds defaulters functions to the given scheme.
+type DefaultRegisterer interface {
+	AddTypeDefaultingFunc(srcType interface{}, fn func(interface{}))
+}
+
+// RegisterDefaults adds defaulters functions to the given DefaultRegisterer.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*StatefulSet)) })
-	scheme.AddTypeDefaultingFunc(&StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*StatefulSetList)) })
+func RegisterDefaults(registerer DefaultRegisterer) error {
+	registerer.AddTypeDefaultingFunc(
+		&StatefulSet{},
+		func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*StatefulSet)) })
+	registerer.AddTypeDefaultingFunc(
+		&StatefulSetList{},
+		func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*StatefulSetList)) })
 	return nil
 }
 

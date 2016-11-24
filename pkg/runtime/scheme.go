@@ -431,8 +431,8 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 // when Default() is called. The function will never be called unless the
 // defaulted object matches srcType. If this function is invoked twice with the
 // same srcType, the fn passed to the later call will be used instead.
-func (s *Scheme) AddTypeDefaultingFunc(srcType Object, fn func(interface{})) {
-	s.defaulterFuncs[reflect.TypeOf(srcType)] = fn
+func (s *Scheme) AddTypeDefaultingFunc(srcType interface{}, fn func(interface{})) {
+	s.defaulterFuncs[reflect.TypeOf(srcType.(Object))] = fn
 }
 
 // Default sets defaults on the provided Object.

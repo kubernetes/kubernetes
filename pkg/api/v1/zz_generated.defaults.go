@@ -20,42 +20,98 @@ limitations under the License.
 
 package v1
 
-import (
-	runtime "k8s.io/kubernetes/pkg/runtime"
-)
+type DefaultRegisterer interface {
+	AddTypeDefaultingFunc(srcType interface{}, fn func(interface{}))
+}
 
-// RegisterDefaults adds defaulters functions to the given scheme.
+// RegisterDefaults adds defaulters functions to the given DefaultRegisterer.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&ConfigMap{}, func(obj interface{}) { SetObjectDefaults_ConfigMap(obj.(*ConfigMap)) })
-	scheme.AddTypeDefaultingFunc(&ConfigMapList{}, func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*ConfigMapList)) })
-	scheme.AddTypeDefaultingFunc(&Endpoints{}, func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*Endpoints)) })
-	scheme.AddTypeDefaultingFunc(&EndpointsList{}, func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*EndpointsList)) })
-	scheme.AddTypeDefaultingFunc(&LimitRange{}, func(obj interface{}) { SetObjectDefaults_LimitRange(obj.(*LimitRange)) })
-	scheme.AddTypeDefaultingFunc(&LimitRangeList{}, func(obj interface{}) { SetObjectDefaults_LimitRangeList(obj.(*LimitRangeList)) })
-	scheme.AddTypeDefaultingFunc(&Namespace{}, func(obj interface{}) { SetObjectDefaults_Namespace(obj.(*Namespace)) })
-	scheme.AddTypeDefaultingFunc(&NamespaceList{}, func(obj interface{}) { SetObjectDefaults_NamespaceList(obj.(*NamespaceList)) })
-	scheme.AddTypeDefaultingFunc(&Node{}, func(obj interface{}) { SetObjectDefaults_Node(obj.(*Node)) })
-	scheme.AddTypeDefaultingFunc(&NodeList{}, func(obj interface{}) { SetObjectDefaults_NodeList(obj.(*NodeList)) })
-	scheme.AddTypeDefaultingFunc(&PersistentVolume{}, func(obj interface{}) { SetObjectDefaults_PersistentVolume(obj.(*PersistentVolume)) })
-	scheme.AddTypeDefaultingFunc(&PersistentVolumeClaim{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaim(obj.(*PersistentVolumeClaim)) })
-	scheme.AddTypeDefaultingFunc(&PersistentVolumeClaimList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaimList(obj.(*PersistentVolumeClaimList)) })
-	scheme.AddTypeDefaultingFunc(&PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*PersistentVolumeList)) })
-	scheme.AddTypeDefaultingFunc(&Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*Pod)) })
-	scheme.AddTypeDefaultingFunc(&PodAttachOptions{}, func(obj interface{}) { SetObjectDefaults_PodAttachOptions(obj.(*PodAttachOptions)) })
-	scheme.AddTypeDefaultingFunc(&PodExecOptions{}, func(obj interface{}) { SetObjectDefaults_PodExecOptions(obj.(*PodExecOptions)) })
-	scheme.AddTypeDefaultingFunc(&PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*PodList)) })
-	scheme.AddTypeDefaultingFunc(&PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*PodTemplate)) })
-	scheme.AddTypeDefaultingFunc(&PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*PodTemplateList)) })
-	scheme.AddTypeDefaultingFunc(&ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*ReplicationController)) })
-	scheme.AddTypeDefaultingFunc(&ReplicationControllerList{}, func(obj interface{}) { SetObjectDefaults_ReplicationControllerList(obj.(*ReplicationControllerList)) })
-	scheme.AddTypeDefaultingFunc(&ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*ResourceQuota)) })
-	scheme.AddTypeDefaultingFunc(&ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*ResourceQuotaList)) })
-	scheme.AddTypeDefaultingFunc(&Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*Secret)) })
-	scheme.AddTypeDefaultingFunc(&SecretList{}, func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*SecretList)) })
-	scheme.AddTypeDefaultingFunc(&Service{}, func(obj interface{}) { SetObjectDefaults_Service(obj.(*Service)) })
-	scheme.AddTypeDefaultingFunc(&ServiceList{}, func(obj interface{}) { SetObjectDefaults_ServiceList(obj.(*ServiceList)) })
+func RegisterDefaults(registerer DefaultRegisterer) error {
+	registerer.AddTypeDefaultingFunc(
+		&ConfigMap{},
+		func(obj interface{}) { SetObjectDefaults_ConfigMap(obj.(*ConfigMap)) })
+	registerer.AddTypeDefaultingFunc(
+		&ConfigMapList{},
+		func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*ConfigMapList)) })
+	registerer.AddTypeDefaultingFunc(
+		&Endpoints{},
+		func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*Endpoints)) })
+	registerer.AddTypeDefaultingFunc(
+		&EndpointsList{},
+		func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*EndpointsList)) })
+	registerer.AddTypeDefaultingFunc(
+		&LimitRange{},
+		func(obj interface{}) { SetObjectDefaults_LimitRange(obj.(*LimitRange)) })
+	registerer.AddTypeDefaultingFunc(
+		&LimitRangeList{},
+		func(obj interface{}) { SetObjectDefaults_LimitRangeList(obj.(*LimitRangeList)) })
+	registerer.AddTypeDefaultingFunc(
+		&Namespace{},
+		func(obj interface{}) { SetObjectDefaults_Namespace(obj.(*Namespace)) })
+	registerer.AddTypeDefaultingFunc(
+		&NamespaceList{},
+		func(obj interface{}) { SetObjectDefaults_NamespaceList(obj.(*NamespaceList)) })
+	registerer.AddTypeDefaultingFunc(
+		&Node{},
+		func(obj interface{}) { SetObjectDefaults_Node(obj.(*Node)) })
+	registerer.AddTypeDefaultingFunc(
+		&NodeList{},
+		func(obj interface{}) { SetObjectDefaults_NodeList(obj.(*NodeList)) })
+	registerer.AddTypeDefaultingFunc(
+		&PersistentVolume{},
+		func(obj interface{}) { SetObjectDefaults_PersistentVolume(obj.(*PersistentVolume)) })
+	registerer.AddTypeDefaultingFunc(
+		&PersistentVolumeClaim{},
+		func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaim(obj.(*PersistentVolumeClaim)) })
+	registerer.AddTypeDefaultingFunc(
+		&PersistentVolumeClaimList{},
+		func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaimList(obj.(*PersistentVolumeClaimList)) })
+	registerer.AddTypeDefaultingFunc(
+		&PersistentVolumeList{},
+		func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*PersistentVolumeList)) })
+	registerer.AddTypeDefaultingFunc(
+		&Pod{},
+		func(obj interface{}) { SetObjectDefaults_Pod(obj.(*Pod)) })
+	registerer.AddTypeDefaultingFunc(
+		&PodAttachOptions{},
+		func(obj interface{}) { SetObjectDefaults_PodAttachOptions(obj.(*PodAttachOptions)) })
+	registerer.AddTypeDefaultingFunc(
+		&PodExecOptions{},
+		func(obj interface{}) { SetObjectDefaults_PodExecOptions(obj.(*PodExecOptions)) })
+	registerer.AddTypeDefaultingFunc(
+		&PodList{},
+		func(obj interface{}) { SetObjectDefaults_PodList(obj.(*PodList)) })
+	registerer.AddTypeDefaultingFunc(
+		&PodTemplate{},
+		func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*PodTemplate)) })
+	registerer.AddTypeDefaultingFunc(
+		&PodTemplateList{},
+		func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*PodTemplateList)) })
+	registerer.AddTypeDefaultingFunc(
+		&ReplicationController{},
+		func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*ReplicationController)) })
+	registerer.AddTypeDefaultingFunc(
+		&ReplicationControllerList{},
+		func(obj interface{}) { SetObjectDefaults_ReplicationControllerList(obj.(*ReplicationControllerList)) })
+	registerer.AddTypeDefaultingFunc(
+		&ResourceQuota{},
+		func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*ResourceQuota)) })
+	registerer.AddTypeDefaultingFunc(
+		&ResourceQuotaList{},
+		func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*ResourceQuotaList)) })
+	registerer.AddTypeDefaultingFunc(
+		&Secret{},
+		func(obj interface{}) { SetObjectDefaults_Secret(obj.(*Secret)) })
+	registerer.AddTypeDefaultingFunc(
+		&SecretList{},
+		func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*SecretList)) })
+	registerer.AddTypeDefaultingFunc(
+		&Service{},
+		func(obj interface{}) { SetObjectDefaults_Service(obj.(*Service)) })
+	registerer.AddTypeDefaultingFunc(
+		&ServiceList{},
+		func(obj interface{}) { SetObjectDefaults_ServiceList(obj.(*ServiceList)) })
 	return nil
 }
 
