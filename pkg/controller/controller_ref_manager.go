@@ -166,16 +166,16 @@ func NewReplicaSetControllerRefManager(
 // Classify, classifies the ReplicaSets into three categories:
 // 1. matchesAndControlled are the ReplicaSets whose labels
 // match the selector of the Deployment, and have a controllerRef pointing to the
-// controller
+// Deployment.
 // 2. matchesNeedsController are ReplicaSets ,whose labels match the Deployment,
 // but don't have a controllerRef. (ReplicaSets with matching labels but with a
 // controllerRef pointing to other object are ignored)
 // 3. controlledDoesNotMatch are the ReplicaSets that have a controllerRef pointing
-// to the controller, but their labels no longer match the selector.
-func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*extensions.ReplicaSet) (
-	matchesAndControlled []*extensions.ReplicaSet,
-	matchesNeedsController []*extensions.ReplicaSet,
-	controlledDoesNotMatch []*extensions.ReplicaSet) {
+// to the Deployment, but their labels no longer match the selector.
+func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*v1beta1.ReplicaSet) (
+	matchesAndControlled []*v1beta1.ReplicaSet,
+	matchesNeedsController []*v1beta1.ReplicaSet,
+	controlledDoesNotMatch []*v1beta1.ReplicaSet) {
 	for i := range replicaSets {
 		replicaSet := replicaSets[i]
 		controllerRef := getControllerOf(replicaSet.ObjectMeta)
