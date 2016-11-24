@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -39,15 +39,15 @@ func TestMakePayload(t *testing.T) {
 	caseMappingMode := int32(0400)
 	cases := []struct {
 		name      string
-		mappings  []api.KeyToPath
-		configMap *api.ConfigMap
+		mappings  []v1.KeyToPath
+		configMap *v1.ConfigMap
 		mode      int32
 		payload   map[string]util.FileProjection
 		success   bool
 	}{
 		{
 			name: "no overrides",
-			configMap: &api.ConfigMap{
+			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
 					"bar": "bar",
@@ -62,13 +62,13 @@ func TestMakePayload(t *testing.T) {
 		},
 		{
 			name: "basic 1",
-			mappings: []api.KeyToPath{
+			mappings: []v1.KeyToPath{
 				{
 					Key:  "foo",
 					Path: "path/to/foo.txt",
 				},
 			},
-			configMap: &api.ConfigMap{
+			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
 					"bar": "bar",
@@ -82,13 +82,13 @@ func TestMakePayload(t *testing.T) {
 		},
 		{
 			name: "subdirs",
-			mappings: []api.KeyToPath{
+			mappings: []v1.KeyToPath{
 				{
 					Key:  "foo",
 					Path: "path/to/1/2/3/foo.txt",
 				},
 			},
-			configMap: &api.ConfigMap{
+			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
 					"bar": "bar",
@@ -102,13 +102,13 @@ func TestMakePayload(t *testing.T) {
 		},
 		{
 			name: "subdirs 2",
-			mappings: []api.KeyToPath{
+			mappings: []v1.KeyToPath{
 				{
 					Key:  "foo",
 					Path: "path/to/1/2/3/foo.txt",
 				},
 			},
-			configMap: &api.ConfigMap{
+			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
 					"bar": "bar",
@@ -122,7 +122,7 @@ func TestMakePayload(t *testing.T) {
 		},
 		{
 			name: "subdirs 3",
-			mappings: []api.KeyToPath{
+			mappings: []v1.KeyToPath{
 				{
 					Key:  "foo",
 					Path: "path/to/1/2/3/foo.txt",
@@ -132,7 +132,7 @@ func TestMakePayload(t *testing.T) {
 					Path: "another/path/to/the/esteemed/bar.bin",
 				},
 			},
-			configMap: &api.ConfigMap{
+			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
 					"bar": "bar",
@@ -147,13 +147,13 @@ func TestMakePayload(t *testing.T) {
 		},
 		{
 			name: "non existent key",
-			mappings: []api.KeyToPath{
+			mappings: []v1.KeyToPath{
 				{
 					Key:  "zab",
 					Path: "path/to/foo.txt",
 				},
 			},
-			configMap: &api.ConfigMap{
+			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
 					"bar": "bar",
@@ -164,7 +164,7 @@ func TestMakePayload(t *testing.T) {
 		},
 		{
 			name: "mapping with Mode",
-			mappings: []api.KeyToPath{
+			mappings: []v1.KeyToPath{
 				{
 					Key:  "foo",
 					Path: "foo.txt",
@@ -176,7 +176,7 @@ func TestMakePayload(t *testing.T) {
 					Mode: &caseMappingMode,
 				},
 			},
-			configMap: &api.ConfigMap{
+			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
 					"bar": "bar",
@@ -191,7 +191,7 @@ func TestMakePayload(t *testing.T) {
 		},
 		{
 			name: "mapping with defaultMode",
-			mappings: []api.KeyToPath{
+			mappings: []v1.KeyToPath{
 				{
 					Key:  "foo",
 					Path: "foo.txt",
@@ -201,7 +201,7 @@ func TestMakePayload(t *testing.T) {
 					Path: "bar.bin",
 				},
 			},
-			configMap: &api.ConfigMap{
+			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
 					"bar": "bar",
@@ -260,7 +260,7 @@ func TestCanSupport(t *testing.T) {
 	if plugin.GetPluginName() != configMapPluginName {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
 	}
-	if !plugin.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: ""}}}}}) {
+	if !plugin.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: ""}}}}}) {
 		t.Errorf("Expected true")
 	}
 	if plugin.CanSupport(&volume.Spec{}) {
@@ -290,7 +290,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -354,7 +354,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -387,12 +387,12 @@ func TestPluginReboot(t *testing.T) {
 	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 }
 
-func volumeSpec(volumeName, configMapName string, defaultMode int32) *api.Volume {
-	return &api.Volume{
+func volumeSpec(volumeName, configMapName string, defaultMode int32) *v1.Volume {
+	return &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			ConfigMap: &api.ConfigMapVolumeSource{
-				LocalObjectReference: api.LocalObjectReference{
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{
 					Name: configMapName,
 				},
 				DefaultMode: &defaultMode,
@@ -401,9 +401,9 @@ func volumeSpec(volumeName, configMapName string, defaultMode int32) *api.Volume
 	}
 }
 
-func configMap(namespace, name string) api.ConfigMap {
-	return api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+func configMap(namespace, name string) v1.ConfigMap {
+	return v1.ConfigMap{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
@@ -415,7 +415,7 @@ func configMap(namespace, name string) api.ConfigMap {
 	}
 }
 
-func doTestConfigMapDataInVolume(volumePath string, configMap api.ConfigMap, t *testing.T) {
+func doTestConfigMapDataInVolume(volumePath string, configMap v1.ConfigMap, t *testing.T) {
 	for key, value := range configMap.Data {
 		configMapDataHostPath := path.Join(volumePath, key)
 		if _, err := os.Stat(configMapDataHostPath); err != nil {

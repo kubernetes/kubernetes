@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -35,8 +35,8 @@ func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
 // Tests that pods/maps are properly set after the pod update, and the basic
 // methods work correctly.
 func TestGetSetPods(t *testing.T) {
-	mirrorPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	mirrorPod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "987654321",
 			Name:      "bar",
 			Namespace: "default",
@@ -46,8 +46,8 @@ func TestGetSetPods(t *testing.T) {
 			},
 		},
 	}
-	staticPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	staticPod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:         "123456789",
 			Name:        "bar",
 			Namespace:   "default",
@@ -55,9 +55,9 @@ func TestGetSetPods(t *testing.T) {
 		},
 	}
 
-	expectedPods := []*api.Pod{
+	expectedPods := []*v1.Pod{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: v1.ObjectMeta{
 				UID:         "999999999",
 				Name:        "taco",
 				Namespace:   "default",

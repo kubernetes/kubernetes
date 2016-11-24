@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
-	serviceapi "k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/v1"
+	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
@@ -33,7 +33,7 @@ import (
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
-func (az *Cloud) GetLoadBalancer(clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error) {
+func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 	lbName := getLoadBalancerName(clusterName)
 	pipName := getPublicIPName(clusterName, service)
 	serviceName := getServiceName(service)
@@ -56,13 +56,13 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *api.Service) (stat
 		return nil, false, nil
 	}
 
-	return &api.LoadBalancerStatus{
-		Ingress: []api.LoadBalancerIngress{{IP: *pip.Properties.IPAddress}},
+	return &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{{IP: *pip.Properties.IPAddress}},
 	}, true, nil
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-func (az *Cloud) EnsureLoadBalancer(clusterName string, service *api.Service, nodeNames []string) (*api.LoadBalancerStatus, error) {
+func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) (*v1.LoadBalancerStatus, error) {
 	lbName := getLoadBalancerName(clusterName)
 	pipName := getPublicIPName(clusterName, service)
 	serviceName := getServiceName(service)
@@ -135,13 +135,13 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *api.Service, no
 	}
 
 	glog.V(2).Infof("ensure(%s): FINISH - %s", serviceName, *pip.Properties.IPAddress)
-	return &api.LoadBalancerStatus{
-		Ingress: []api.LoadBalancerIngress{{IP: *pip.Properties.IPAddress}},
+	return &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{{IP: *pip.Properties.IPAddress}},
 	}, nil
 }
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
-func (az *Cloud) UpdateLoadBalancer(clusterName string, service *api.Service, nodeNames []string) error {
+func (az *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) error {
 	_, err := az.EnsureLoadBalancer(clusterName, service, nodeNames)
 	return err
 }
@@ -152,7 +152,7 @@ func (az *Cloud) UpdateLoadBalancer(clusterName string, service *api.Service, no
 // This construction is useful because many cloud providers' load balancers
 // have multiple underlying components, meaning a Get could say that the LB
 // doesn't exist even if some part of it is still laying around.
-func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
+func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	lbName := getLoadBalancerName(clusterName)
 	pipName := getPublicIPName(clusterName, service)
 	serviceName := getServiceName(service)
@@ -160,7 +160,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *api.Serv
 	glog.V(2).Infof("delete(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
 
 	// reconcile logic is capable of fully reconcile, so we can use this to delete
-	service.Spec.Ports = []api.ServicePort{}
+	service.Spec.Ports = []v1.ServicePort{}
 
 	lb, existsLb, err := az.getAzureLoadBalancer(lbName)
 	if err != nil {
@@ -259,7 +259,7 @@ func (az *Cloud) ensurePublicIPDeleted(serviceName, pipName string) error {
 // This ensures load balancer exists and the frontend ip config is setup.
 // This also reconciles the Service's Ports  with the LoadBalancer config.
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
-func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.PublicIPAddress, clusterName string, service *api.Service, nodeNames []string) (network.LoadBalancer, bool, error) {
+func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.PublicIPAddress, clusterName string, service *v1.Service, nodeNames []string) (network.LoadBalancer, bool, error) {
 	lbName := getLoadBalancerName(clusterName)
 	serviceName := getServiceName(service)
 	lbFrontendIPConfigName := getFrontendIPConfigName(service)
@@ -471,7 +471,7 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 
 // This reconciles the Network Security Group similar to how the LB is reconciled.
 // This entails adding required, missing SecurityRules and removing stale rules.
-func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName string, service *api.Service) (network.SecurityGroup, bool, error) {
+func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName string, service *v1.Service) (network.SecurityGroup, bool, error) {
 	serviceName := getServiceName(service)
 	wantLb := len(service.Spec.Ports) > 0
 

@@ -20,7 +20,7 @@ package dockertools
 
 import (
 	dockertypes "github.com/docker/engine-api/types"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func getContainerIP(container *dockertypes.ContainerJSON) string {
@@ -45,7 +45,7 @@ func containerProvidesPodIP(name *KubeletContainerName) bool {
 }
 
 // Returns Seccomp and AppArmor Security options
-func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
+func (dm *DockerManager) getSecurityOpts(pod *v1.Pod, ctrName string) ([]dockerOpt, error) {
 	var securityOpts []dockerOpt
 	if seccompOpts, err := dm.getSeccompOpts(pod, ctrName); err != nil {
 		return nil, err

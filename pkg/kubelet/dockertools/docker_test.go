@@ -33,7 +33,7 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -118,7 +118,7 @@ func TestGetContainerID(t *testing.T) {
 }
 
 func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName string) {
-	container := &api.Container{Name: containerName}
+	container := &v1.Container{Name: containerName}
 	hasher := adler32.New()
 	hashutil.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
@@ -142,7 +142,7 @@ func TestContainerNaming(t *testing.T) {
 	// No Container name
 	verifyPackUnpack(t, "other", podUID, "name", "")
 
-	container := &api.Container{Name: "container"}
+	container := &v1.Container{Name: "container"}
 	podName := "foo"
 	podNamespace := "test"
 	name := fmt.Sprintf("k8s_%s_%s_%s_%s_42", container.Name, podName, podNamespace, podUID)
@@ -416,7 +416,7 @@ func TestPullWithNoSecrets(t *testing.T) {
 			keyring: fakeKeyring,
 		}
 
-		err := dp.Pull(test.imageName, []api.Secret{})
+		err := dp.Pull(test.imageName, []v1.Secret{})
 		if err != nil {
 			t.Errorf("unexpected non-nil err: %s", err)
 			continue
@@ -459,7 +459,7 @@ func TestPullWithJSONError(t *testing.T) {
 			client:  fakeClient,
 			keyring: fakeKeyring,
 		}
-		err := puller.Pull(test.imageName, []api.Secret{})
+		err := puller.Pull(test.imageName, []v1.Secret{})
 		if err == nil || !strings.Contains(err.Error(), test.expectedError) {
 			t.Errorf("%s: expect error %s, got : %s", i, test.expectedError, err)
 			continue
@@ -483,19 +483,19 @@ func TestPullWithSecrets(t *testing.T) {
 
 	tests := map[string]struct {
 		imageName           string
-		passedSecrets       []api.Secret
+		passedSecrets       []v1.Secret
 		builtInDockerConfig credentialprovider.DockerConfig
 		expectedPulls       []string
 	}{
 		"no matching secrets": {
 			"ubuntu",
-			[]api.Secret{},
+			[]v1.Secret{},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{}),
 			[]string{"ubuntu using {}"},
 		},
 		"default keyring secrets": {
 			"ubuntu",
-			[]api.Secret{},
+			[]v1.Secret{},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
 				"index.docker.io/v1/": {Username: "built-in", Password: "password", Email: "email", Provider: nil},
 			}),
@@ -503,7 +503,7 @@ func TestPullWithSecrets(t *testing.T) {
 		},
 		"default keyring secrets unused": {
 			"ubuntu",
-			[]api.Secret{},
+			[]v1.Secret{},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
 				"extraneous": {Username: "built-in", Password: "password", Email: "email", Provider: nil},
 			}),
@@ -511,7 +511,7 @@ func TestPullWithSecrets(t *testing.T) {
 		},
 		"builtin keyring secrets, but use passed": {
 			"ubuntu",
-			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
+			[]v1.Secret{{Type: v1.SecretTypeDockercfg, Data: map[string][]byte{v1.DockerConfigKey: dockercfgContent}}},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
 				"index.docker.io/v1/": {Username: "built-in", Password: "password", Email: "email", Provider: nil},
 			}),
@@ -519,7 +519,7 @@ func TestPullWithSecrets(t *testing.T) {
 		},
 		"builtin keyring secrets, but use passed with new docker config": {
 			"ubuntu",
-			[]api.Secret{{Type: api.SecretTypeDockerConfigJson, Data: map[string][]byte{api.DockerConfigJsonKey: dockerConfigJsonContent}}},
+			[]v1.Secret{{Type: v1.SecretTypeDockerConfigJson, Data: map[string][]byte{v1.DockerConfigJsonKey: dockerConfigJsonContent}}},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
 				"index.docker.io/v1/": {Username: "built-in", Password: "password", Email: "email", Provider: nil},
 			}),
@@ -564,7 +564,7 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 		keyring: fakeKeyring,
 	}
 
-	err := dp.Pull("host/repository/image:version", []api.Secret{})
+	err := dp.Pull("host/repository/image:version", []v1.Secret{})
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -908,7 +908,7 @@ func TestFindContainersByPod(t *testing.T) {
 }
 
 func TestMakePortsAndBindings(t *testing.T) {
-	portMapping := func(container, host int, protocol api.Protocol, ip string) kubecontainer.PortMapping {
+	portMapping := func(container, host int, protocol v1.Protocol, ip string) kubecontainer.PortMapping {
 		return kubecontainer.PortMapping{
 			ContainerPort: container,
 			HostPort:      host,

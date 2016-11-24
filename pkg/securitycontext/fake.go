@@ -18,16 +18,17 @@ package securitycontext
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
 )
 
 // ValidSecurityContextWithContainerDefaults creates a valid security context provider based on
 // empty container defaults.  Used for testing.
-func ValidSecurityContextWithContainerDefaults() *api.SecurityContext {
+func ValidSecurityContextWithContainerDefaults() *v1.SecurityContext {
 	priv := false
-	return &api.SecurityContext{
-		Capabilities: &api.Capabilities{},
+	return &v1.SecurityContext{
+		Capabilities: &v1.Capabilities{},
 		Privileged:   &priv,
 	}
 }
@@ -39,7 +40,17 @@ func NewFakeSecurityContextProvider() SecurityContextProvider {
 
 type FakeSecurityContextProvider struct{}
 
-func (p FakeSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *dockercontainer.Config) {
+func (p FakeSecurityContextProvider) ModifyContainerConfig(pod *v1.Pod, container *v1.Container, config *dockercontainer.Config) {
 }
-func (p FakeSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
+func (p FakeSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
+}
+
+// ValidInternalSecurityContextWithContainerDefaults creates a valid security context provider based on
+// empty container defaults.  Used for testing.
+func ValidInternalSecurityContextWithContainerDefaults() *api.SecurityContext {
+	priv := false
+	return &api.SecurityContext{
+		Capabilities: &api.Capabilities{},
+		Privileged:   &priv,
+	}
 }

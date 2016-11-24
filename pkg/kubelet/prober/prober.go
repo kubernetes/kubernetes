@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -73,8 +73,8 @@ func newProber(
 }
 
 // probe probes the container.
-func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
-	var probeSpec *api.Probe
+func (pb *prober) probe(probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
+	var probeSpec *v1.Probe
 	switch probeType {
 	case readiness:
 		probeSpec = container.ReadinessProbe
@@ -100,12 +100,12 @@ func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus,
 		if err != nil {
 			glog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
 			if hasRef {
-				pb.recorder.Eventf(ref, api.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+				pb.recorder.Eventf(ref, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
 			}
 		} else { // result != probe.Success
 			glog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
 			if hasRef {
-				pb.recorder.Eventf(ref, api.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+				pb.recorder.Eventf(ref, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 			}
 		}
 		return results.Failure, err
@@ -116,7 +116,7 @@ func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus,
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID, retries int) (probe.Result, string, error) {
+func (pb *prober) runProbeWithRetries(p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, retries int) (probe.Result, string, error) {
 	var err error
 	var result probe.Result
 	var output string
@@ -131,7 +131,7 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 
 // buildHeaderMap takes a list of HTTPHeader <name, value> string
 // pairs and returns a populated string->[]string http.Header map.
-func buildHeader(headerList []api.HTTPHeader) http.Header {
+func buildHeader(headerList []v1.HTTPHeader) http.Header {
 	headers := make(http.Header)
 	for _, header := range headerList {
 		headers[header.Name] = append(headers[header.Name], header.Value)
@@ -139,7 +139,7 @@ func buildHeader(headerList []api.HTTPHeader) http.Header {
 	return headers
 }
 
-func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+func (pb *prober) runProbe(p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
@@ -174,7 +174,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", format.Pod(pod), container.Name)
 }
 
-func extractPort(param intstr.IntOrString, container api.Container) (int, error) {
+func extractPort(param intstr.IntOrString, container v1.Container) (int, error) {
 	port := -1
 	var err error
 	switch param.Type {
@@ -197,7 +197,7 @@ func extractPort(param intstr.IntOrString, container api.Container) (int, error)
 }
 
 // findPortByName is a helper function to look up a port in a container by name.
-func findPortByName(container api.Container, portName string) (int, error) {
+func findPortByName(container v1.Container, portName string) (int, error) {
 	for _, port := range container.Ports {
 		if port.Name == portName {
 			return int(port.ContainerPort), nil
@@ -226,7 +226,7 @@ type execInContainer struct {
 	run func() ([]byte, error)
 }
 
-func (pb *prober) newExecInContainer(container api.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
+func (pb *prober) newExecInContainer(container v1.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
 		return pb.runner.RunInContainer(containerID, cmd, timeout)
 	}}

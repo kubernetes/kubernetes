@@ -41,12 +41,12 @@ import (
 	"github.com/elazarl/goproxy"
 	"github.com/ghodss/yaml"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
@@ -204,7 +204,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 			framework.RunKubectlOrDie("run", sjName, "--restart=OnFailure", "--generator=scheduledjob/v2alpha1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			By("verifying the ScheduledJob " + sjName + " was created")
-			sj, err := c.Batch().CronJobs(ns).Get(sjName)
+			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(sjName)
 			if err != nil {
 				framework.Failf("Failed getting ScheduledJob %s: %v", sjName, err)
 			}
@@ -215,7 +215,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
 				framework.Failf("Failed creating ScheduledJob %s for 1 pod with expected image %s: %#v", sjName, busyboxImage, containers)
 			}
-			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
+			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
 				framework.Failf("Failed creating a ScheduledJob with correct restart policy for --restart=OnFailure")
 			}
 		})
@@ -241,7 +241,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			By("verifying the CronJob " + cjName + " was created")
-			sj, err := c.Batch().CronJobs(ns).Get(cjName)
+			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(cjName)
 			if err != nil {
 				framework.Failf("Failed getting CronJob %s: %v", cjName, err)
 			}
@@ -252,7 +252,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
 				framework.Failf("Failed creating CronJob %s for 1 pod with expected image %s: %#v", cjName, busyboxImage, containers)
 			}
-			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
+			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
 				framework.Failf("Failed creating a CronJob with correct restart policy for --restart=OnFailure")
 			}
 		})
@@ -268,10 +268,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		return f.NewClusterVerification(
 			framework.PodStateVerification{
 				Selectors:   map[string]string{"app": "redis"},
-				ValidPhases: []api.PodPhase{api.PodRunning /*api.PodPending*/},
+				ValidPhases: []v1.PodPhase{v1.PodRunning /*v1.PodPending*/},
 			})
 	}
-	forEachPod := func(podFunc func(p api.Pod)) {
+	forEachPod := func(podFunc func(p v1.Pod)) {
 		clusterState().ForEach(podFunc)
 	}
 	var c clientset.Interface
@@ -289,7 +289,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		pods, err := clusterState().WaitFor(atLeast, framework.PodStartTimeout)
 		if err != nil || len(pods) < atLeast {
 			// TODO: Generalize integrating debug info into these tests so we always get debug info when we need it
-			framework.DumpAllNamespaceInfo(c, f.ClientSet_1_5, ns)
+			framework.DumpAllNamespaceInfo(f.ClientSet, ns)
 			framework.Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
 		}
 	}
@@ -519,8 +519,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				WithStdinData("abcd1234\n").
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
-			g := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-			runTestPod, _, err := util.GetFirstPod(f.ClientSet.Core(), ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}), 1*time.Minute, g)
+			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+			runTestPod, _, err := util.GetFirstPod(f.InternalClientset.Core(), ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}), 1*time.Minute, g)
 			if err != nil {
 				os.Exit(1)
 			}
@@ -646,7 +646,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			waitForOrFailWithDebug(1)
 
 			// Pod
-			forEachPod(func(pod api.Pod) {
+			forEachPod(func(pod v1.Pod) {
 				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
 				requiredStrings := [][]string{
 					{"Name:", "redis-master-"},
@@ -700,7 +700,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			// Node
 			// It should be OK to list unschedulable Nodes here.
-			nodes, err := c.Core().Nodes().List(api.ListOptions{})
+			nodes, err := c.Core().Nodes().List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			node := nodes.Items[0]
 			output = framework.RunKubectlOrDie("describe", "node", node.Name)
@@ -748,7 +748,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			// It may take a while for the pods to get registered in some cases, wait to be sure.
 			By("Waiting for Redis master to start.")
 			waitForOrFailWithDebug(1)
-			forEachPod(func(pod api.Pod) {
+			forEachPod(func(pod v1.Pod) {
 				framework.Logf("wait on redis-master startup in %v ", ns)
 				framework.LookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", framework.PodStartTimeout)
 			})
@@ -873,7 +873,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("Waiting for Redis master to start.")
 			waitForOrFailWithDebug(1)
-			forEachPod(func(pod api.Pod) {
+			forEachPod(func(pod v1.Pod) {
 				By("checking for a matching strings")
 				_, err := framework.LookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", framework.PodStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -923,12 +923,12 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("Waiting for Redis master to start.")
 			waitForOrFailWithDebug(1)
 			By("patching all pods")
-			forEachPod(func(pod api.Pod) {
+			forEachPod(func(pod v1.Pod) {
 				framework.RunKubectlOrDie("patch", "pod", pod.Name, nsFlag, "-p", "{\"metadata\":{\"annotations\":{\"x\":\"y\"}}}")
 			})
 
 			By("checking annotations")
-			forEachPod(func(pod api.Pod) {
+			forEachPod(func(pod v1.Pod) {
 				found := false
 				for key, val := range pod.Annotations {
 					if key == "x" && val == "y" {
@@ -1082,7 +1082,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("rolling-update to same image controller")
 
-			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+nginxImage, "--image-pull-policy="+string(api.PullIfNotPresent), nsFlag)
+			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+nginxImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
 			framework.ValidateController(c, nginxImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
 	})
@@ -1166,7 +1166,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
 				framework.Failf("Failed creating job %s for 1 pod with expected image %s: %#v", jobName, nginxImage, containers)
 			}
-			if job.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
+			if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
 				framework.Failf("Failed creating a job with correct restart policy for --restart=OnFailure")
 			}
 		})
@@ -1199,7 +1199,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
 				framework.Failf("Failed creating pod %s with expected image %s", podName, nginxImage)
 			}
-			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
+			if pod.Spec.RestartPolicy != v1.RestartPolicyNever {
 				framework.Failf("Failed creating a pod with correct restart policy for --restart=Never")
 			}
 		})
@@ -1333,10 +1333,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl taint", func() {
 		It("should update the taint on a node", func() {
-			testTaint := api.Taint{
+			testTaint := v1.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-001-%s", string(uuid.NewUUID())),
 				Value:  "testing-taint-value",
-				Effect: api.TaintEffectNoSchedule,
+				Effect: v1.TaintEffectNoSchedule,
 			}
 
 			nodeName := getNodeThatCanRunPod(f)
@@ -1364,10 +1364,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should remove all the taints with the same key off a node", func() {
-			testTaint := api.Taint{
+			testTaint := v1.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-002-%s", string(uuid.NewUUID())),
 				Value:  "testing-taint-value",
-				Effect: api.TaintEffectNoSchedule,
+				Effect: v1.TaintEffectNoSchedule,
 			}
 
 			nodeName := getNodeThatCanRunPod(f)
@@ -1385,10 +1385,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 			checkOutput(output, requiredStrings)
 
-			newTestTaint := api.Taint{
+			newTestTaint := v1.Taint{
 				Key:    testTaint.Key,
 				Value:  "another-testing-taint-value",
-				Effect: api.TaintEffectPreferNoSchedule,
+				Effect: v1.TaintEffectPreferNoSchedule,
 			}
 			By("adding another taint " + newTestTaint.ToString() + " to the node")
 			runKubectlRetryOrDie("taint", "nodes", nodeName, newTestTaint.ToString())
@@ -1434,11 +1434,11 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			if len(quota.Spec.Hard) != 2 {
 				framework.Failf("Expected two resources, got %v", quota.Spec.Hard)
 			}
-			r, found := quota.Spec.Hard[api.ResourcePods]
+			r, found := quota.Spec.Hard[v1.ResourcePods]
 			if expected := resource.MustParse("1000000"); !found || (&r).Cmp(expected) != 0 {
 				framework.Failf("Expected pods=1000000, got %v", r)
 			}
-			r, found = quota.Spec.Hard[api.ResourceServices]
+			r, found = quota.Spec.Hard[v1.ResourceServices]
 			if expected := resource.MustParse("1000000"); !found || (&r).Cmp(expected) != 0 {
 				framework.Failf("Expected services=1000000, got %v", r)
 			}
@@ -1461,14 +1461,14 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			if len(quota.Spec.Scopes) != 2 {
 				framework.Failf("Expected two scopes, got %v", quota.Spec.Scopes)
 			}
-			scopes := make(map[api.ResourceQuotaScope]struct{})
+			scopes := make(map[v1.ResourceQuotaScope]struct{})
 			for _, scope := range quota.Spec.Scopes {
 				scopes[scope] = struct{}{}
 			}
-			if _, found := scopes[api.ResourceQuotaScopeBestEffort]; !found {
+			if _, found := scopes[v1.ResourceQuotaScopeBestEffort]; !found {
 				framework.Failf("Expected BestEffort scope, got %v", quota.Spec.Scopes)
 			}
-			if _, found := scopes[api.ResourceQuotaScopeNotTerminating]; !found {
+			if _, found := scopes[v1.ResourceQuotaScopeNotTerminating]; !found {
 				framework.Failf("Expected NotTerminating scope, got %v", quota.Spec.Scopes)
 			}
 		})
@@ -1640,8 +1640,8 @@ func readBytesFromFile(filename string) []byte {
 	return data
 }
 
-func readReplicationControllerFromString(contents string) *api.ReplicationController {
-	rc := api.ReplicationController{}
+func readReplicationControllerFromString(contents string) *v1.ReplicationController {
+	rc := v1.ReplicationController{}
 	if err := yaml.Unmarshal([]byte(contents), &rc); err != nil {
 		framework.Failf(err.Error())
 	}
@@ -1662,12 +1662,12 @@ func modifyReplicationControllerConfiguration(contents string) io.Reader {
 	return bytes.NewReader(data)
 }
 
-func forEachReplicationController(c clientset.Interface, ns, selectorKey, selectorValue string, fn func(api.ReplicationController)) {
-	var rcs *api.ReplicationControllerList
+func forEachReplicationController(c clientset.Interface, ns, selectorKey, selectorValue string, fn func(v1.ReplicationController)) {
+	var rcs *v1.ReplicationControllerList
 	var err error
 	for t := time.Now(); time.Since(t) < framework.PodListTimeout; time.Sleep(framework.Poll) {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
-		options := api.ListOptions{LabelSelector: label}
+		options := v1.ListOptions{LabelSelector: label.String()}
 		rcs, err = c.Core().ReplicationControllers(ns).List(options)
 		Expect(err).NotTo(HaveOccurred())
 		if len(rcs.Items) > 0 {
@@ -1684,7 +1684,7 @@ func forEachReplicationController(c clientset.Interface, ns, selectorKey, select
 	}
 }
 
-func validateReplicationControllerConfiguration(rc api.ReplicationController) {
+func validateReplicationControllerConfiguration(rc v1.ReplicationController) {
 	if rc.Name == "redis-master" {
 		if _, ok := rc.Annotations[annotations.LastAppliedConfigAnnotation]; !ok {
 			framework.Failf("Annotation not found in modified configuration:\n%v\n", rc)

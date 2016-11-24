@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/etcd"
@@ -73,11 +74,15 @@ func newQuotaAccessor(client clientset.Interface) (*quotaAccessor, error) {
 		return nil, err
 	}
 	lw := &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.Core().ResourceQuotas(api.NamespaceAll).List(options)
+		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			internalOptions := api.ListOptions{}
+			v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+			return client.Core().ResourceQuotas(api.NamespaceAll).List(internalOptions)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.Core().ResourceQuotas(api.NamespaceAll).Watch(options)
+		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			internalOptions := api.ListOptions{}
+			v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+			return client.Core().ResourceQuotas(api.NamespaceAll).Watch(internalOptions)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)

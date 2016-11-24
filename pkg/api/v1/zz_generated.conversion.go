@@ -189,6 +189,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_NodeList_To_v1_NodeList,
 		Convert_v1_NodeProxyOptions_To_api_NodeProxyOptions,
 		Convert_api_NodeProxyOptions_To_v1_NodeProxyOptions,
+		Convert_v1_NodeResources_To_api_NodeResources,
+		Convert_api_NodeResources_To_v1_NodeResources,
 		Convert_v1_NodeSelector_To_api_NodeSelector,
 		Convert_api_NodeSelector_To_v1_NodeSelector,
 		Convert_v1_NodeSelectorRequirement_To_api_NodeSelectorRequirement,
@@ -333,6 +335,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_ServiceSpec_To_v1_ServiceSpec,
 		Convert_v1_ServiceStatus_To_api_ServiceStatus,
 		Convert_api_ServiceStatus_To_v1_ServiceStatus,
+		Convert_v1_Sysctl_To_api_Sysctl,
+		Convert_api_Sysctl_To_v1_Sysctl,
 		Convert_v1_TCPSocketAction_To_api_TCPSocketAction,
 		Convert_api_TCPSocketAction_To_v1_TCPSocketAction,
 		Convert_v1_Taint_To_api_Taint,
@@ -2150,6 +2154,24 @@ func autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in *api.NodeProxyOp
 
 func Convert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in *api.NodeProxyOptions, out *NodeProxyOptions, s conversion.Scope) error {
 	return autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in, out, s)
+}
+
+func autoConvert_v1_NodeResources_To_api_NodeResources(in *NodeResources, out *api.NodeResources, s conversion.Scope) error {
+	out.Capacity = *(*api.ResourceList)(unsafe.Pointer(&in.Capacity))
+	return nil
+}
+
+func Convert_v1_NodeResources_To_api_NodeResources(in *NodeResources, out *api.NodeResources, s conversion.Scope) error {
+	return autoConvert_v1_NodeResources_To_api_NodeResources(in, out, s)
+}
+
+func autoConvert_api_NodeResources_To_v1_NodeResources(in *api.NodeResources, out *NodeResources, s conversion.Scope) error {
+	out.Capacity = *(*ResourceList)(unsafe.Pointer(&in.Capacity))
+	return nil
+}
+
+func Convert_api_NodeResources_To_v1_NodeResources(in *api.NodeResources, out *NodeResources, s conversion.Scope) error {
+	return autoConvert_api_NodeResources_To_v1_NodeResources(in, out, s)
 }
 
 func autoConvert_v1_NodeSelector_To_api_NodeSelector(in *NodeSelector, out *api.NodeSelector, s conversion.Scope) error {
@@ -4153,6 +4175,26 @@ func autoConvert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, ou
 
 func Convert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, out *ServiceStatus, s conversion.Scope) error {
 	return autoConvert_api_ServiceStatus_To_v1_ServiceStatus(in, out, s)
+}
+
+func autoConvert_v1_Sysctl_To_api_Sysctl(in *Sysctl, out *api.Sysctl, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Value = in.Value
+	return nil
+}
+
+func Convert_v1_Sysctl_To_api_Sysctl(in *Sysctl, out *api.Sysctl, s conversion.Scope) error {
+	return autoConvert_v1_Sysctl_To_api_Sysctl(in, out, s)
+}
+
+func autoConvert_api_Sysctl_To_v1_Sysctl(in *api.Sysctl, out *Sysctl, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Value = in.Value
+	return nil
+}
+
+func Convert_api_Sysctl_To_v1_Sysctl(in *api.Sysctl, out *Sysctl, s conversion.Scope) error {
+	return autoConvert_api_Sysctl_To_v1_Sysctl(in, out, s)
 }
 
 func autoConvert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out *api.TCPSocketAction, s conversion.Scope) error {

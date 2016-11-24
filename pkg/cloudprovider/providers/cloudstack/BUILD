@@ -18,7 +18,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/xanzy/go-cloudstack/cloudstack",
@@ -31,5 +31,5 @@ go_test(
     srcs = ["cloudstack_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
+    deps = ["//pkg/api/v1:go_default_library"],
 )

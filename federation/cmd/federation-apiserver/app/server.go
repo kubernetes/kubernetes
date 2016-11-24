@@ -143,7 +143,7 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
 	authorizationConfig := authorizer.AuthorizationConfig{
 		PolicyFile:                  s.GenericServerRunOptions.AuthorizationPolicyFile,

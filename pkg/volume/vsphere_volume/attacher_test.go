@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -187,9 +187,9 @@ func newDetacher(testcase *testcase) *vsphereVMDKDetacher {
 
 func createVolSpec(name string) *volume.Spec {
 	return &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 					VolumePath: name,
 				},
 			},
@@ -199,10 +199,10 @@ func createVolSpec(name string) *volume.Spec {
 
 func createPVSpec(name string) *volume.Spec {
 	return &volume.Spec{
-		PersistentVolume: &api.PersistentVolume{
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 						VolumePath: name,
 					},
 				},

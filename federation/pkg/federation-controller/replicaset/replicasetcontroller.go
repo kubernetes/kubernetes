@@ -106,7 +106,7 @@ type ReplicaSetController struct {
 func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSetController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-replicaset-controller"})
+	recorder := broadcaster.NewRecorder(apiv1.EventSource{Component: "federated-replicaset-controller"})
 
 	frsc := &ReplicaSetController{
 		fedClient:           federationClient,
@@ -125,13 +125,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	replicaSetFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
 				},
 			},
 			&extensionsv1.ReplicaSet{},
@@ -154,13 +152,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Core().Pods(apiv1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+					return clientset.Core().Pods(apiv1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(options)
 				},
 			},
 			&apiv1.Pod{},
@@ -176,13 +172,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 
 	frsc.replicaSetStore.Indexer, frsc.replicaSetController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				versionedOptions := fedutil.VersionizeV1ListOptions(options)
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := fedutil.VersionizeV1ListOptions(options)
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensionsv1.ReplicaSet{},

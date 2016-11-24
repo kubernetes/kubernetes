@@ -15,10 +15,13 @@ go_library(
     srcs = [
         "expansion_generated.go",
         "job.go",
+        "job_expansion.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/client/cache:go_default_library",

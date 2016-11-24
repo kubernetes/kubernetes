@@ -19,26 +19,26 @@ package pod
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestFindPort(t *testing.T) {
 	testCases := []struct {
 		name       string
-		containers []api.Container
+		containers []v1.Container
 		port       intstr.IntOrString
 		expected   int
 		pass       bool
 	}{{
 		name:       "valid int, no ports",
-		containers: []api.Container{{}},
+		containers: []v1.Container{{}},
 		port:       intstr.FromInt(93),
 		expected:   93,
 		pass:       true,
 	}, {
 		name: "valid int, with ports",
-		containers: []api.Container{{Ports: []api.ContainerPort{{
+		containers: []v1.Container{{Ports: []v1.ContainerPort{{
 			Name:          "",
 			ContainerPort: 11,
 			Protocol:      "TCP",
@@ -52,13 +52,13 @@ func TestFindPort(t *testing.T) {
 		pass:     true,
 	}, {
 		name:       "valid str, no ports",
-		containers: []api.Container{{}},
+		containers: []v1.Container{{}},
 		port:       intstr.FromString("p"),
 		expected:   0,
 		pass:       false,
 	}, {
 		name: "valid str, one ctr with ports",
-		containers: []api.Container{{Ports: []api.ContainerPort{{
+		containers: []v1.Container{{Ports: []v1.ContainerPort{{
 			Name:          "",
 			ContainerPort: 11,
 			Protocol:      "UDP",
@@ -76,7 +76,7 @@ func TestFindPort(t *testing.T) {
 		pass:     true,
 	}, {
 		name: "valid str, two ctr with ports",
-		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
 			Name:          "",
 			ContainerPort: 11,
 			Protocol:      "UDP",
@@ -94,7 +94,7 @@ func TestFindPort(t *testing.T) {
 		pass:     true,
 	}, {
 		name: "valid str, two ctr with same port",
-		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
 			Name:          "",
 			ContainerPort: 11,
 			Protocol:      "UDP",
@@ -112,7 +112,7 @@ func TestFindPort(t *testing.T) {
 		pass:     true,
 	}, {
 		name: "valid str, invalid protocol",
-		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
 			Name:          "a",
 			ContainerPort: 11,
 			Protocol:      "snmp",
@@ -123,7 +123,7 @@ func TestFindPort(t *testing.T) {
 		pass:     false,
 	}, {
 		name: "valid hostPort",
-		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
 			Name:          "a",
 			ContainerPort: 11,
 			HostPort:      81,
@@ -136,7 +136,7 @@ func TestFindPort(t *testing.T) {
 	},
 		{
 			name: "invalid hostPort",
-			containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
 				Name:          "a",
 				ContainerPort: 11,
 				HostPort:      -1,
@@ -150,7 +150,7 @@ func TestFindPort(t *testing.T) {
 		},
 		{
 			name: "invalid ContainerPort",
-			containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
 				Name:          "a",
 				ContainerPort: -1,
 				Protocol:      "TCP",
@@ -163,7 +163,7 @@ func TestFindPort(t *testing.T) {
 		},
 		{
 			name: "HostIP Address",
-			containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
 				Name:          "a",
 				ContainerPort: 11,
 				HostIP:        "192.168.1.1",
@@ -177,8 +177,8 @@ func TestFindPort(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		port, err := FindPort(&api.Pod{Spec: api.PodSpec{Containers: tc.containers}},
-			&api.ServicePort{Protocol: "TCP", TargetPort: tc.port})
+		port, err := FindPort(&v1.Pod{Spec: v1.PodSpec{Containers: tc.containers}},
+			&v1.ServicePort{Protocol: "TCP", TargetPort: tc.port})
 		if err != nil && tc.pass {
 			t.Errorf("unexpected error for %s: %v", tc.name, err)
 		}

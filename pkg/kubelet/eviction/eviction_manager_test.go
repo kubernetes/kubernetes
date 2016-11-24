@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -31,13 +31,13 @@ import (
 
 // mockPodKiller is used to testing which pod is killed
 type mockPodKiller struct {
-	pod                 *api.Pod
-	status              api.PodStatus
+	pod                 *v1.Pod
+	status              v1.PodStatus
 	gracePeriodOverride *int64
 }
 
 // killPodNow records the pod that was killed
-func (m *mockPodKiller) killPodNow(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
+func (m *mockPodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
 	m.pod = pod
 	m.status = status
 	m.gracePeriodOverride = gracePeriodOverride
@@ -67,23 +67,23 @@ func (m *mockImageGC) DeleteUnusedImages() (int64, error) {
 	return m.freed, m.err
 }
 
-func makePodWithMemoryStats(name string, requests api.ResourceList, limits api.ResourceList, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
-	pod := newPod(name, []api.Container{
+func makePodWithMemoryStats(name string, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
+	pod := newPod(name, []v1.Container{
 		newContainer(name, requests, limits),
 	}, nil)
 	podStats := newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
 	return pod, podStats
 }
 
-func makePodWithDiskStats(name string, requests api.ResourceList, limits api.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*api.Pod, statsapi.PodStats) {
-	pod := newPod(name, []api.Container{
+func makePodWithDiskStats(name string, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*v1.Pod, statsapi.PodStats) {
+	pod := newPod(name, []v1.Container{
 		newContainer(name, requests, limits),
 	}, nil)
 	podStats := newPodDiskStats(pod, parseQuantity(rootFsUsed), parseQuantity(logsUsed), parseQuantity(perLocalVolumeUsed))
 	return pod, podStats
 }
 
-func makeMemoryStats(nodeAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
+func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
 	val := resource.MustParse(nodeAvailableBytes)
 	availableBytes := uint64(val.Value())
 	WorkingSetBytes := uint64(val.Value())
@@ -102,7 +102,7 @@ func makeMemoryStats(nodeAvailableBytes string, podStats map[*api.Pod]statsapi.P
 	return result
 }
 
-func makeDiskStats(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
+func makeDiskStats(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
 	rootFsVal := resource.MustParse(rootFsAvailableBytes)
 	rootFsBytes := uint64(rootFsVal.Value())
 	rootFsCapacityBytes := uint64(rootFsVal.Value() * 2)
@@ -132,8 +132,8 @@ func makeDiskStats(rootFsAvailableBytes, imageFsAvailableBytes string, podStats 
 
 type podToMake struct {
 	name                     string
-	requests                 api.ResourceList
-	limits                   api.ResourceList
+	requests                 v1.ResourceList
+	limits                   v1.ResourceList
 	memoryWorkingSet         string
 	rootFsUsed               string
 	logsFsUsed               string
@@ -155,15 +155,15 @@ func TestMemoryPressure(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},
 	}
-	pods := []*api.Pod{}
-	podStats := map[*api.Pod]statsapi.PodStats{}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*api.Pod {
+	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
 
@@ -171,7 +171,7 @@ func TestMemoryPressure(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -221,7 +221,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
-	for i, pod := range []*api.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -298,7 +298,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
-	for i, pod := range []*api.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -322,7 +322,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
-	for i, pod := range []*api.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -346,7 +346,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// all pods should admit now
 	expected = []bool{true, true}
-	for i, pod := range []*api.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -372,15 +372,15 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), perLocalVolumeUsed: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "500Mi"},
 	}
-	pods := []*api.Pod{}
-	podStats := map[*api.Pod]statsapi.PodStats{}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*api.Pod {
+	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
 
@@ -388,7 +388,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -569,15 +569,15 @@ func TestMinReclaim(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},
 	}
-	pods := []*api.Pod{}
-	podStats := map[*api.Pod]statsapi.PodStats{}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*api.Pod {
+	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
 
@@ -585,7 +585,7 @@ func TestMinReclaim(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -707,15 +707,15 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "500Mi"},
 	}
-	pods := []*api.Pod{}
-	podStats := map[*api.Pod]statsapi.PodStats{}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*api.Pod {
+	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
 
@@ -724,7 +724,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGcFree := resource.MustParse("700Mi")
 	imageGC := &mockImageGC{freed: imageGcFree.Value(), err: nil}
-	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -866,14 +866,14 @@ func TestNodeReclaimFuncs(t *testing.T) {
 }
 
 func TestInodePressureNodeFsInodes(t *testing.T) {
-	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, rootInodes, logInodes, volumeInodes string) (*api.Pod, statsapi.PodStats) {
-		pod := newPod(name, []api.Container{
+	podMaker := func(name string, requests v1.ResourceList, limits v1.ResourceList, rootInodes, logInodes, volumeInodes string) (*v1.Pod, statsapi.PodStats) {
+		pod := newPod(name, []v1.Container{
 			newContainer(name, requests, limits),
 		}, nil)
 		podStats := newPodInodeStats(pod, parseQuantity(rootInodes), parseQuantity(logInodes), parseQuantity(volumeInodes))
 		return pod, podStats
 	}
-	summaryStatsMaker := func(rootFsInodesFree, rootFsInodes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
+	summaryStatsMaker := func(rootFsInodesFree, rootFsInodes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
 		rootFsInodesFreeVal := resource.MustParse(rootFsInodesFree)
 		internalRootFsInodesFree := uint64(rootFsInodesFreeVal.Value())
 		rootFsInodesVal := resource.MustParse(rootFsInodes)
@@ -900,15 +900,15 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsInodesUsed: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsInodesUsed: "800Mi"},
 	}
-	pods := []*api.Pod{}
-	podStats := map[*api.Pod]statsapi.PodStats{}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsInodesUsed, podToMake.logsFsInodesUsed, podToMake.perLocalVolumeInodesUsed)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*api.Pod {
+	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
 
@@ -916,7 +916,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -49,7 +49,7 @@ type flockerVolume struct {
 	datasetName string
 	// dataset uuid
 	datasetUUID string
-	//pod           *api.Pod
+	//pod           *v1.Pod
 	flockerClient flockerApi.Clientable
 	manager       volumeManager
 	plugin        *flockerPlugin
@@ -111,13 +111,13 @@ func (p *flockerPlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *flockerPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
+func (plugin *flockerPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
 	}
 }
 
-func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*api.FlockerVolumeSource, bool) {
+func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*v1.FlockerVolumeSource, bool) {
 	// AFAIK this will always be r/w, but perhaps for the future it will be needed
 	readOnly := false
 
@@ -127,7 +127,7 @@ func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*api.FlockerV
 	return spec.PersistentVolume.Spec.Flocker, readOnly
 }
 
-func (plugin *flockerPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *flockerPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &FlockerUtil{}, plugin.host.GetMounter())
 }
@@ -172,10 +172,10 @@ func (p *flockerPlugin) newUnmounterInternal(volName string, podUID types.UID, m
 }
 
 func (p *flockerPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	flockerVolume := &api.Volume{
+	flockerVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			Flocker: &api.FlockerVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			Flocker: &v1.FlockerVolumeSource{
 				DatasetName: volumeName,
 			},
 		},
@@ -392,7 +392,7 @@ func (b *flockerVolumeMounter) updateDatasetPrimary(datasetUUID string, primaryU
 
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.FlockerVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (*v1.FlockerVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.Flocker != nil {
 		return spec.Volume.Flocker, spec.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&

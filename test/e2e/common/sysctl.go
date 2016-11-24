@@ -19,7 +19,7 @@ package common
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -34,29 +34,29 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 	f := framework.NewDefaultFramework("sysctl")
 	var podClient *framework.PodClient
 
-	testPod := func() *api.Pod {
+	testPod := func() *v1.Pod {
 		podName := "sysctl-" + string(uuid.NewUUID())
-		pod := api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name:        podName,
 				Annotations: map[string]string{},
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "test-container",
 						Image: "gcr.io/google_containers/busybox:1.24",
 					},
 				},
-				RestartPolicy: api.RestartPolicyNever,
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 
 		return &pod
 	}
 
-	waitForPodErrorEventOrStarted := func(pod *api.Pod) (*api.Event, error) {
-		var ev *api.Event
+	waitForPodErrorEventOrStarted := func(pod *v1.Pod) (*v1.Event, error) {
+		var ev *v1.Event
 		err := wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
 			evnts, err := f.ClientSet.Core().Events(pod.Namespace).Search(pod)
 			if err != nil {
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 
 	It("should support sysctls", func() {
 		pod := testPod()
-		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
+		pod.Annotations[v1.SysctlsPodAnnotationKey] = v1.PodAnnotationsFromSysctls([]v1.Sysctl{
 			{
 				Name:  "kernel.shm_rmid_forced",
 				Value: "1",
@@ -111,7 +111,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking that the pod succeeded")
-		Expect(pod.Status.Phase).To(Equal(api.PodSucceeded))
+		Expect(pod.Status.Phase).To(Equal(v1.PodSucceeded))
 
 		By("Getting logs from the pod")
 		log, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
@@ -123,7 +123,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 
 	It("should support unsafe sysctls which are actually whitelisted", func() {
 		pod := testPod()
-		pod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
+		pod.Annotations[v1.UnsafeSysctlsPodAnnotationKey] = v1.PodAnnotationsFromSysctls([]v1.Sysctl{
 			{
 				Name:  "kernel.shm_rmid_forced",
 				Value: "1",
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking that the pod succeeded")
-		Expect(pod.Status.Phase).To(Equal(api.PodSucceeded))
+		Expect(pod.Status.Phase).To(Equal(v1.PodSucceeded))
 
 		By("Getting logs from the pod")
 		log, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
@@ -164,7 +164,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 
 	It("should reject invalid sysctls", func() {
 		pod := testPod()
-		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
+		pod.Annotations[v1.SysctlsPodAnnotationKey] = v1.PodAnnotationsFromSysctls([]v1.Sysctl{
 			{
 				Name:  "foo-",
 				Value: "bar",
@@ -178,7 +178,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 				Value: "100000000",
 			},
 		})
-		pod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
+		pod.Annotations[v1.UnsafeSysctlsPodAnnotationKey] = v1.PodAnnotationsFromSysctls([]v1.Sysctl{
 			{
 				Name:  "kernel.shmall",
 				Value: "100000000",
@@ -206,7 +206,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 
 	It("should not launch unsafe, but not explicitly enabled sysctls on the node", func() {
 		pod := testPod()
-		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
+		pod.Annotations[v1.SysctlsPodAnnotationKey] = v1.PodAnnotationsFromSysctls([]v1.Sysctl{
 			{
 				Name:  "kernel.msgmax",
 				Value: "10000000000",

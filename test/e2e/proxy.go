@@ -24,10 +24,10 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -49,7 +49,7 @@ const (
 )
 
 var _ = framework.KubeDescribe("Proxy", func() {
-	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := registered.GroupOrDie(v1.GroupName).GroupVersion.Version
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{
 			ClientQPS: -1.0,
@@ -71,13 +71,13 @@ var _ = framework.KubeDescribe("Proxy", func() {
 		It("should proxy through a service and a pod [Conformance]", func() {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
-			service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&api.Service{
-				ObjectMeta: api.ObjectMeta{
+			service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&v1.Service{
+				ObjectMeta: v1.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},
-				Spec: api.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					Selector: labels,
-					Ports: []api.ServicePort{
+					Ports: []v1.ServicePort{
 						{
 							Name:       "portname1",
 							Port:       80,
@@ -107,14 +107,15 @@ var _ = framework.KubeDescribe("Proxy", func() {
 			// a simple server which serves the values of the
 			// environmental variables below.
 			By("starting an echo server on multiple ports")
-			pods := []*api.Pod{}
+			pods := []*v1.Pod{}
 			cfg := testutils.RCConfig{
-				Client:       f.ClientSet,
-				Image:        "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
-				Name:         service.Name,
-				Namespace:    f.Namespace.Name,
-				Replicas:     1,
-				PollInterval: time.Second,
+				Client:         f.ClientSet,
+				InternalClient: f.InternalClientset,
+				Image:          "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+				Name:           service.Name,
+				Namespace:      f.Namespace.Name,
+				Replicas:       1,
+				PollInterval:   time.Second,
 				Env: map[string]string{
 					"SERVE_PORT_80":   `<a href="/rewriteme">test</a>`,
 					"SERVE_PORT_1080": `<a href="/rewriteme">test</a>`,
@@ -132,9 +133,9 @@ var _ = framework.KubeDescribe("Proxy", func() {
 					"tlsdest1": 460,
 					"tlsdest2": 462,
 				},
-				ReadinessProbe: &api.Probe{
-					Handler: api.Handler{
-						HTTPGet: &api.HTTPGetAction{
+				ReadinessProbe: &v1.Probe{
+					Handler: v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
 							Port: intstr.FromInt(80),
 						},
 					},
@@ -146,7 +147,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 				CreatedPods: &pods,
 			}
 			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
-			defer framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, cfg.Name)
+			defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, cfg.Name)
 
 			Expect(f.WaitForAnEndpoint(service.Name)).NotTo(HaveOccurred())
 
@@ -260,7 +261,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 			}
 
 			if len(errs) != 0 {
-				body, err := f.ClientSet.Core().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &api.PodLogOptions{}).Do().Raw()
+				body, err := f.ClientSet.Core().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
 				if err != nil {
 					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {

@@ -19,8 +19,8 @@ package e2e
 import (
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -59,7 +59,7 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 	It("should grab all metrics from a Scheduler.", func() {
 		By("Proxying to Pod through the API server")
 		// Check if master Node is registered
-		nodes, err := c.Core().Nodes().List(api.ListOptions{})
+		nodes, err := c.Core().Nodes().List(v1.ListOptions{})
 		framework.ExpectNoError(err)
 
 		var masterRegistered = false
@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 	It("should grab all metrics from a ControllerManager.", func() {
 		By("Proxying to Pod through the API server")
 		// Check if master Node is registered
-		nodes, err := c.Core().Nodes().List(api.ListOptions{})
+		nodes, err := c.Core().Nodes().List(v1.ListOptions{})
 		framework.ExpectNoError(err)
 
 		var masterRegistered = false

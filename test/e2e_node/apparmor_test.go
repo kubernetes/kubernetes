@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -138,7 +138,7 @@ func loadTestProfiles() error {
 	return nil
 }
 
-func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) api.PodStatus {
+func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.PodStatus {
 	pod := createPodWithAppArmor(f, profile)
 	if shouldRun {
 		// The pod needs to start before it stops, so wait for the longer start timeout.
@@ -146,7 +146,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) api
 			f.ClientSet, pod.Name, f.Namespace.Name, "", framework.PodStartTimeout))
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
-		w, err := f.PodClient().Watch(api.SingleObject(api.ObjectMeta{Name: pod.Name}))
+		w, err := f.PodClient().Watch(v1.SingleObject(v1.ObjectMeta{Name: pod.Name}))
 		framework.ExpectNoError(err)
 		_, err = watch.Until(framework.PodStartTimeout, w, func(e watch.Event) (bool, error) {
 			switch e.Type {
@@ -154,7 +154,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) api
 				return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, pod.Name)
 			}
 			switch t := e.Object.(type) {
-			case *api.Pod:
+			case *v1.Pod:
 				if t.Status.Reason == "AppArmor" {
 					return true, nil
 				}
@@ -168,29 +168,29 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) api
 	return p.Status
 }
 
-func createPodWithAppArmor(f *framework.Framework, profile string) *api.Pod {
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: fmt.Sprintf("test-apparmor-%s", strings.Replace(profile, "/", "-", -1)),
 			Annotations: map[string]string{
 				apparmor.ContainerAnnotationKeyPrefix + "test": profile,
 			},
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
 				Name:    "test",
 				Image:   "gcr.io/google_containers/busybox:1.24",
 				Command: []string{"touch", "foo"},
 			}},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 	return f.PodClient().Create(pod)
 }
 
-func expectSoftRejection(status api.PodStatus) {
+func expectSoftRejection(status v1.PodStatus) {
 	args := []interface{}{"PodStatus: %+v", status}
-	Expect(status.Phase).To(Equal(api.PodPending), args...)
+	Expect(status.Phase).To(Equal(v1.PodPending), args...)
 	Expect(status.Reason).To(Equal("AppArmor"), args...)
 	Expect(status.Message).To(ContainSubstring("AppArmor"), args...)
 	Expect(status.ContainerStatuses[0].State.Waiting.Reason).To(Equal("Blocked"), args...)

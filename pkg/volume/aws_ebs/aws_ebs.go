@@ -25,8 +25,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -85,13 +85,13 @@ func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
+func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
 	}
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *awsElasticBlockStorePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
@@ -176,7 +176,7 @@ func (plugin *awsElasticBlockStorePlugin) newProvisionerInternal(options volume.
 }
 
 func getVolumeSource(
-	spec *volume.Spec) (*api.AWSElasticBlockStoreVolumeSource, bool, error) {
+	spec *volume.Spec) (*v1.AWSElasticBlockStoreVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
 		return spec.Volume.AWSElasticBlockStore, spec.Volume.AWSElasticBlockStore.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
@@ -220,10 +220,10 @@ func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath
 		glog.V(4).Infof("Convert aws volume name from %q to %q ", volumeID, sourceName)
 	}
 
-	awsVolume := &api.Volume{
+	awsVolume := &v1.Volume{
 		Name: volName,
-		VolumeSource: api.VolumeSource{
-			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 				VolumeID: sourceName,
 			},
 		},
@@ -444,29 +444,29 @@ type awsElasticBlockStoreProvisioner struct {
 
 var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
 
-func (c *awsElasticBlockStoreProvisioner) Provision() (*api.PersistentVolume, error) {
+func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, error) {
 	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
 		glog.Errorf("Provision failed: %v", err)
 		return nil, err
 	}
 
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	pv := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "aws-ebs-dynamic-provisioner",
 			},
 		},
-		Spec: api.PersistentVolumeSpec{
+		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   c.options.PVC.Spec.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 					VolumeID:  string(volumeID),
 					FSType:    "ext4",
 					Partition: 0,

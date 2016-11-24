@@ -22,7 +22,6 @@ import (
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefederationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
-	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -81,13 +80,11 @@ func TestFederatedInformer(t *testing.T) {
 	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					versionedOptions := VersionizeV1ListOptions(options)
-					return clientset.Core().Services(api_v1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options api_v1.ListOptions) (runtime.Object, error) {
+					return clientset.Core().Services(api_v1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := VersionizeV1ListOptions(options)
-					return clientset.Core().Services(api_v1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Services(api_v1.NamespaceAll).Watch(options)
 				},
 			},
 			&api_v1.Service{},

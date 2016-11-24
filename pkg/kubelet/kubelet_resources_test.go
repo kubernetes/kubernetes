@@ -25,6 +25,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -41,19 +42,19 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	tk.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
 	tk.kubelet.reservation = kubetypes.Reservation{
-		Kubernetes: api.ResourceList{
-			api.ResourceCPU:    resource.MustParse("3"),
-			api.ResourceMemory: resource.MustParse("4Gi"),
+		Kubernetes: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("3"),
+			v1.ResourceMemory: resource.MustParse("4Gi"),
 		},
-		System: api.ResourceList{
-			api.ResourceCPU:    resource.MustParse("1"),
-			api.ResourceMemory: resource.MustParse("2Gi"),
+		System: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1"),
+			v1.ResourceMemory: resource.MustParse("2Gi"),
 		},
 	}
 
 	cases := []struct {
-		pod      *api.Pod
-		expected *api.Pod
+		pod      *v1.Pod
+		expected *v1.Pod
 	}{
 		{
 			pod:      getPod("0", "0"),
@@ -82,20 +83,20 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	}
 }
 
-func getPod(cpuLimit, memoryLimit string) *api.Pod {
-	resources := api.ResourceRequirements{}
+func getPod(cpuLimit, memoryLimit string) *v1.Pod {
+	resources := v1.ResourceRequirements{}
 	if cpuLimit != "" || memoryLimit != "" {
-		resources.Limits = make(api.ResourceList)
+		resources.Limits = make(v1.ResourceList)
 	}
 	if cpuLimit != "" {
-		resources.Limits[api.ResourceCPU] = resource.MustParse(cpuLimit)
+		resources.Limits[v1.ResourceCPU] = resource.MustParse(cpuLimit)
 	}
 	if memoryLimit != "" {
-		resources.Limits[api.ResourceMemory] = resource.MustParse(memoryLimit)
+		resources.Limits[v1.ResourceMemory] = resource.MustParse(memoryLimit)
 	}
-	return &api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:      "foo",
 					Resources: resources,

@@ -22,9 +22,10 @@ import (
 
 	"github.com/golang/glog"
 
+	"strings"
+
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
-	"strings"
 )
 
 const (

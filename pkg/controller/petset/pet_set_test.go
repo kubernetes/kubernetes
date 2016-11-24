@@ -22,12 +22,12 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	fake_internal "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake"
+	fake_internal "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/errors"
 )
@@ -50,7 +50,7 @@ func checkPets(ps *apps.StatefulSet, creates, deletes int, fc *fakePetClient, t 
 	if fc.petsCreated != creates || fc.petsDeleted != deletes {
 		t.Errorf("Found (creates: %d, deletes: %d), expected (creates: %d, deletes: %d)", fc.petsCreated, fc.petsDeleted, creates, deletes)
 	}
-	gotClaims := map[string]api.PersistentVolumeClaim{}
+	gotClaims := map[string]v1.PersistentVolumeClaim{}
 	for _, pvc := range fc.claims {
 		gotClaims[pvc.Name] = pvc
 	}
@@ -88,7 +88,7 @@ func scaleStatefulSet(t *testing.T, ps *apps.StatefulSet, psc *StatefulSetContro
 }
 
 func saturateStatefulSet(t *testing.T, ps *apps.StatefulSet, psc *StatefulSetController, fc *fakePetClient) {
-	err := scaleStatefulSet(t, ps, psc, fc, int(ps.Spec.Replicas))
+	err := scaleStatefulSet(t, ps, psc, fc, int(*(ps.Spec.Replicas)))
 	if err != nil {
 		t.Errorf("Error scaleStatefulSet: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 
 	// Drain
 	errs := []error{}
-	ps.Spec.Replicas = 0
+	*(ps.Spec.Replicas) = 0
 	knownPods := fc.getPodList()
 	for i := replicas - 1; i >= 0; i-- {
 		if len(fc.pets) != i+1 {
@@ -143,7 +143,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	saturateStatefulSet(t, ps, psc, fc)
 
 	fc.setDeletionTimestamp(replicas - 1)
-	ps.Spec.Replicas = 2
+	*(ps.Spec.Replicas) = 2
 	_, err := psc.syncStatefulSet(ps, fc.getPodList())
 	if err != nil {
 		t.Errorf("Error syncing StatefulSet: %v", err)
@@ -169,7 +169,7 @@ func TestStatefulSetControllerRespectsOrder(t *testing.T) {
 	saturateStatefulSet(t, ps, psc, fc)
 
 	errs := []error{}
-	ps.Spec.Replicas = 0
+	*(ps.Spec.Replicas) = 0
 	// Shuffle known list and check that pets are deleted in reverse
 	knownPods := fc.getPodList()
 	for i := range knownPods {
@@ -285,16 +285,16 @@ type fakeClient struct {
 	statefulsetClient *fakeStatefulSetClient
 }
 
-func (c *fakeClient) Apps() internalversion.AppsInterface {
-	return &fakeApps{c, &fake.FakeApps{}}
+func (c *fakeClient) Apps() v1beta1.AppsV1beta1Interface {
+	return &fakeApps{c, &fake.FakeAppsV1beta1{}}
 }
 
 type fakeApps struct {
 	*fakeClient
-	*fake.FakeApps
+	*fake.FakeAppsV1beta1
 }
 
-func (c *fakeApps) StatefulSets(namespace string) internalversion.StatefulSetInterface {
+func (c *fakeApps) StatefulSets(namespace string) v1beta1.StatefulSetInterface {
 	c.statefulsetClient.Namespace = namespace
 	return c.statefulsetClient
 }

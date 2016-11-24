@@ -19,9 +19,9 @@ package eviction
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 )
 
@@ -126,16 +126,16 @@ type ImageGC interface {
 // pod - the pod to kill
 // status - the desired status to associate with the pod (i.e. why its killed)
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
-type KillPodFunc func(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error
+type KillPodFunc func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
 
 // ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
-type ActivePodsFunc func() []*api.Pod
+type ActivePodsFunc func() []*v1.Pod
 
 // statsFunc returns the usage stats if known for an input pod.
-type statsFunc func(pod *api.Pod) (statsapi.PodStats, bool)
+type statsFunc func(pod *v1.Pod) (statsapi.PodStats, bool)
 
 // rankFunc sorts the pods in eviction order
-type rankFunc func(pods []*api.Pod, stats statsFunc)
+type rankFunc func(pods []*v1.Pod, stats statsFunc)
 
 // signalObservation is the observed resource usage
 type signalObservation struct {
@@ -154,7 +154,7 @@ type signalObservations map[Signal]signalObservation
 type thresholdsObservedAt map[Threshold]time.Time
 
 // nodeConditionsObservedAt maps a node condition to a time that it was observed
-type nodeConditionsObservedAt map[api.NodeConditionType]time.Time
+type nodeConditionsObservedAt map[v1.NodeConditionType]time.Time
 
 // nodeReclaimFunc is a function that knows how to reclaim a resource from the node without impacting pods.
 type nodeReclaimFunc func() (*resource.Quantity, error)

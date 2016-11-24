@@ -19,19 +19,19 @@ package securitycontext
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestParseSELinuxOptions(t *testing.T) {
 	cases := []struct {
 		name     string
 		input    string
-		expected *api.SELinuxOptions
+		expected *v1.SELinuxOptions
 	}{
 		{
 			name:  "simple",
 			input: "user_t:role_t:type_t:s0",
-			expected: &api.SELinuxOptions{
+			expected: &v1.SELinuxOptions{
 				User:  "user_t",
 				Role:  "role_t",
 				Type:  "type_t",
@@ -41,7 +41,7 @@ func TestParseSELinuxOptions(t *testing.T) {
 		{
 			name:  "simple + categories",
 			input: "user_t:role_t:type_t:s0:c0",
-			expected: &api.SELinuxOptions{
+			expected: &v1.SELinuxOptions{
 				User:  "user_t",
 				Role:  "role_t",
 				Type:  "type_t",
@@ -69,7 +69,7 @@ func TestParseSELinuxOptions(t *testing.T) {
 	}
 }
 
-func compareContexts(name string, ex, ac *api.SELinuxOptions, t *testing.T) {
+func compareContexts(name string, ex, ac *v1.SELinuxOptions, t *testing.T) {
 	if e, a := ex.User, ac.User; e != a {
 		t.Errorf("%v: expected user: %v, got: %v", name, e, a)
 	}
@@ -84,8 +84,8 @@ func compareContexts(name string, ex, ac *api.SELinuxOptions, t *testing.T) {
 	}
 }
 
-func containerWithUser(ptr *int64) *api.Container {
-	return &api.Container{SecurityContext: &api.SecurityContext{RunAsUser: ptr}}
+func containerWithUser(ptr *int64) *v1.Container {
+	return &v1.Container{SecurityContext: &v1.SecurityContext{RunAsUser: ptr}}
 }
 
 func TestHaRootUID(t *testing.T) {
@@ -93,11 +93,11 @@ func TestHaRootUID(t *testing.T) {
 	var root int64 = 0
 
 	tests := map[string]struct {
-		container *api.Container
+		container *v1.Container
 		expect    bool
 	}{
 		"nil sc": {
-			container: &api.Container{SecurityContext: nil},
+			container: &v1.Container{SecurityContext: nil},
 		},
 		"nil runAsuser": {
 			container: containerWithUser(nil),
@@ -123,11 +123,11 @@ func TestHasRunAsUser(t *testing.T) {
 	var runAsUser int64 = 0
 
 	tests := map[string]struct {
-		container *api.Container
+		container *v1.Container
 		expect    bool
 	}{
 		"nil sc": {
-			container: &api.Container{SecurityContext: nil},
+			container: &v1.Container{SecurityContext: nil},
 		},
 		"nil runAsUser": {
 			container: containerWithUser(nil),
@@ -151,11 +151,11 @@ func TestHasRootRunAsUser(t *testing.T) {
 	var root int64 = 0
 
 	tests := map[string]struct {
-		container *api.Container
+		container *v1.Container
 		expect    bool
 	}{
 		"nil sc": {
-			container: &api.Container{SecurityContext: nil},
+			container: &v1.Container{SecurityContext: nil},
 		},
 		"nil runAsuser": {
 			container: containerWithUser(nil),

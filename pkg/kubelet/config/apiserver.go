@@ -18,9 +18,12 @@ limitations under the License.
 package config
 
 import (
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
@@ -28,18 +31,22 @@ import (
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
 func NewSourceApiserver(c *clientset.Clientset, nodeName types.NodeName, updates chan<- interface{}) {
-	lw := cache.NewListWatchFromClient(c.Core().RESTClient(), "pods", api.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
+	lw := cache.NewListWatchFromClient(c.Core().RESTClient(), "pods", v1.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
 	newSourceApiserverFromLW(lw, updates)
 }
 
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
 func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}) {
 	send := func(objs []interface{}) {
-		var pods []*api.Pod
+		var pods []*v1.Pod
 		for _, o := range objs {
-			pods = append(pods, o.(*api.Pod))
+			pod := o.(*v1.Pod)
+			if err := podutil.SetInitContainersAndStatuses(pod); err != nil {
+				glog.Error(err)
+			}
+			pods = append(pods, pod)
 		}
 		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.ApiserverSource}
 	}
-	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
+	cache.NewReflector(lw, &v1.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
 }

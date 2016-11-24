@@ -21,7 +21,7 @@ import (
 	"os"
 	"regexp"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -83,13 +83,13 @@ func (plugin *hostPathPlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
+func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
 	}
 }
 
-func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	hostPathVolumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -122,10 +122,10 @@ func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volu
 }
 
 func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	hostPathVolume := &api.Volume{
+	hostPathVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
 				Path: volumeName,
 			},
 		},
@@ -249,11 +249,11 @@ func (r *hostPathRecycler) Recycle() error {
 	if err != nil {
 		return err
 	}
-	pod := templateClone.(*api.Pod)
+	pod := templateClone.(*v1.Pod)
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &r.timeout
-	pod.Spec.Volumes[0].VolumeSource = api.VolumeSource{
-		HostPath: &api.HostPathVolumeSource{
+	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
+		HostPath: &v1.HostPathVolumeSource{
 			Path: r.path,
 		},
 	}
@@ -270,25 +270,25 @@ type hostPathProvisioner struct {
 
 // Create for hostPath simply creates a local /tmp/hostpath_pv/%s directory as a new PersistentVolume.
 // This Provisioner is meant for development and testing only and WILL NOT WORK in a multi-node cluster.
-func (r *hostPathProvisioner) Provision() (*api.PersistentVolume, error) {
+func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
-	capacity := r.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	capacity := r.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	pv := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name: r.options.PVName,
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "hostpath-dynamic-provisioner",
 			},
 		},
-		Spec: api.PersistentVolumeSpec{
+		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: r.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   r.options.PVC.Spec.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): capacity,
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): capacity,
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
 					Path: fullpath,
 				},
 			},
@@ -326,7 +326,7 @@ func (r *hostPathDeleter) Delete() error {
 }
 
 func getVolumeSource(
-	spec *volume.Spec) (*api.HostPathVolumeSource, bool, error) {
+	spec *volume.Spec) (*v1.HostPathVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.HostPath != nil {
 		return spec.Volume.HostPath, spec.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&

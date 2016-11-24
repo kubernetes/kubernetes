@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -137,10 +136,10 @@ func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *repl
 	resyncPeriodFunc := func() time.Duration {
 		return resyncPeriod
 	}
-	podInformer := informers.NewPodInformer(internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod)
+	podInformer := informers.NewPodInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod)
 	rm := replication.NewReplicationManager(
 		podInformer,
-		internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replication-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replication-controller")),
 		resyncPeriodFunc,
 		replication.BurstReplicas,
 		4096,

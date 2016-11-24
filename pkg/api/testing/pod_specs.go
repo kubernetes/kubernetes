@@ -18,6 +18,7 @@ package testing
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // DeepEqualSafePodSpec returns a PodSpec which is ready to be used with api.Semantic.DeepEqual
@@ -28,5 +29,16 @@ func DeepEqualSafePodSpec() api.PodSpec {
 		DNSPolicy:                     api.DNSClusterFirst,
 		TerminationGracePeriodSeconds: &grace,
 		SecurityContext:               &api.PodSecurityContext{},
+	}
+}
+
+// V1DeepEqualSafePodSpec returns a PodSpec which is ready to be used with api.Semantic.DeepEqual
+func V1DeepEqualSafePodSpec() v1.PodSpec {
+	grace := int64(30)
+	return v1.PodSpec{
+		RestartPolicy:                 v1.RestartPolicyAlways,
+		DNSPolicy:                     v1.DNSClusterFirst,
+		TerminationGracePeriodSeconds: &grace,
+		SecurityContext:               &v1.PodSecurityContext{},
 	}
 }

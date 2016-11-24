@@ -28,7 +28,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -323,7 +324,7 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 	result := SchedulingLatency{}
 
 	// Check if master Node is registered
-	nodes, err := c.Core().Nodes().List(api.ListOptions{})
+	nodes, err := c.Core().Nodes().List(v1.ListOptions{})
 	ExpectNoError(err)
 
 	var data string

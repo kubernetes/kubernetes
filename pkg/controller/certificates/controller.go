@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/api/v1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -62,7 +62,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
 	// Configure cfssl signer
 	// TODO: support non-default policy and remote/pkcs11 signing
@@ -84,10 +84,10 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 	// Manage the addition/update of certificate requests
 	cc.csrStore.Store, cc.csrController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return cc.kubeClient.Certificates().CertificateSigningRequests().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				return cc.kubeClient.Certificates().CertificateSigningRequests().Watch(options)
 			},
 		},
@@ -240,7 +240,7 @@ func (cc *CertificateController) maybeAutoApproveCSR(csr *certificates.Certifica
 		return csr, nil
 	}
 
-	x509cr, err := certutil.ParseCSR(csr)
+	x509cr, err := certutil.ParseCSRV1alpha1(csr)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to parse csr %q: %v", csr.Name, err))
 		return csr, nil

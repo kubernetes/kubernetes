@@ -19,7 +19,7 @@ package images
 import (
 	"errors"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 var (
@@ -49,7 +49,7 @@ var (
 // Implementations are expected to be thread safe.
 type ImageManager interface {
 	// EnsureImageExists ensures that image specified in `container` exists.
-	EnsureImageExists(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
+	EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) (error, string)
 
 	// TODO(ronl): consolidating image managing and deleting operation in this interface
 }

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/quota"
@@ -31,12 +32,16 @@ import (
 
 // ListResourceUsingInformerFunc returns a listing function based on the shared informer factory for the specified resource.
 func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, groupResource unversioned.GroupResource) ListFuncByNamespace {
-	return func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+	return func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+		labelSelector, err := labels.Parse(options.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
 		informer, err := f.ForResource(groupResource)
 		if err != nil {
 			return nil, err
 		}
-		return informer.Lister().ByNamespace(namespace).List(options.LabelSelector)
+		return informer.Lister().ByNamespace(namespace).List(labelSelector)
 	}
 }
 
@@ -47,7 +52,7 @@ type ConstraintsFunc func(required []api.ResourceName, item runtime.Object) erro
 type GetFuncByNamespace func(namespace, name string) (runtime.Object, error)
 
 // ListFuncByNamespace knows how to list resources in a namespace
-type ListFuncByNamespace func(namespace string, options api.ListOptions) ([]runtime.Object, error)
+type ListFuncByNamespace func(namespace string, options v1.ListOptions) ([]runtime.Object, error)
 
 // MatchesScopeFunc knows how to evaluate if an object matches a scope
 type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) bool
@@ -183,8 +188,8 @@ func (g *GenericEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.Us
 	for _, resourceName := range g.MatchedResourceNames {
 		result.Used[resourceName] = resource.MustParse("0")
 	}
-	items, err := g.ListFuncByNamespace(options.Namespace, api.ListOptions{
-		LabelSelector: labels.Everything(),
+	items, err := g.ListFuncByNamespace(options.Namespace, v1.ListOptions{
+		LabelSelector: labels.Everything().String(),
 	})
 	if err != nil {
 		return result, fmt.Errorf("%s: Failed to list %v: %v", g.Name, g.GroupKind(), err)

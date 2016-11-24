@@ -25,13 +25,21 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-func GetPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
+func GetPodTemplateSpecHash(template v1.PodTemplateSpec) uint32 {
+	podTemplateSpecHasher := adler32.New()
+	hashutil.DeepHashObject(podTemplateSpecHasher, template)
+	return podTemplateSpecHasher.Sum32()
+}
+
+// TODO: remove the duplicate
+func GetInternalPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
 	podTemplateSpecHasher := adler32.New()
 	hashutil.DeepHashObject(podTemplateSpecHasher, template)
 	return podTemplateSpecHasher.Sum32()
@@ -39,11 +47,11 @@ func GetPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
 
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
-type updatePodFunc func(pod *api.Pod) error
+type updatePodFunc func(pod *v1.Pod) error
 
 // UpdatePodWithRetries updates a pod with given applyUpdate function. Note that pod not found error is ignored.
 // The returned bool value can be used to tell if the pod is actually updated.
-func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, applyUpdate updatePodFunc) (*api.Pod, bool, error) {
+func UpdatePodWithRetries(podClient v1core.PodInterface, pod *v1.Pod, applyUpdate updatePodFunc) (*v1.Pod, bool, error) {
 	var err error
 	var podUpdated bool
 	oldPod := pod
@@ -89,8 +97,8 @@ func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 }
 
 // Filter uses the input function f to filter the given pod list, and return the filtered pods
-func Filter(podList *api.PodList, f func(api.Pod) bool) []api.Pod {
-	pods := make([]api.Pod, 0)
+func Filter(podList *v1.PodList, f func(v1.Pod) bool) []v1.Pod {
+	pods := make([]v1.Pod, 0)
 	for _, p := range podList.Items {
 		if f(p) {
 			pods = append(pods, p)

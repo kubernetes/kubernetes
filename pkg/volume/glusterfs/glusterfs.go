@@ -20,22 +20,22 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	dstrings "strings"
 
 	"github.com/golang/glog"
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
-	"runtime"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -104,15 +104,15 @@ func (plugin *glusterfsPlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
-		api.ReadOnlyMany,
-		api.ReadWriteMany,
+func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+		v1.ReadOnlyMany,
+		v1.ReadWriteMany,
 	}
 }
 
-func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	ep_name := source.EndpointsName
 	// PVC/POD is in same ns.
@@ -126,7 +126,7 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ vol
 	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New())
 }
 
-func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.GlusterfsVolumeSource, bool) {
+func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool) {
 	// Glusterfs volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// Glusterfs volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
@@ -136,7 +136,7 @@ func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.G
 	}
 }
 
-func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface) (volume.Mounter, error) {
+func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endpoints, pod *v1.Pod, mounter mount.Interface, exe exec.Interface) (volume.Mounter, error) {
 	source, readOnly := plugin.getGlusterVolumeSource(spec)
 	return &glusterfsMounter{
 		glusterfs: &glusterfs{
@@ -159,7 +159,7 @@ func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types
 	return &glusterfsUnmounter{&glusterfs{
 		volName: volName,
 		mounter: mounter,
-		pod:     &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		pod:     &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: podUID}},
 		plugin:  plugin,
 	}}, nil
 }
@@ -170,10 +170,10 @@ func (plugin *glusterfsPlugin) execCommand(command string, args []string) ([]byt
 }
 
 func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	glusterfsVolume := &api.Volume{
+	glusterfsVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			Glusterfs: &api.GlusterfsVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			Glusterfs: &v1.GlusterfsVolumeSource{
 				EndpointsName: volumeName,
 				Path:          volumeName,
 			},
@@ -185,7 +185,7 @@ func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string)
 // Glusterfs volumes represent a bare host file or directory mount of an Glusterfs export.
 type glusterfs struct {
 	volName string
-	pod     *api.Pod
+	pod     *v1.Pod
 	mounter mount.Interface
 	plugin  *glusterfsPlugin
 	volume.MetricsNil
@@ -193,7 +193,7 @@ type glusterfs struct {
 
 type glusterfsMounter struct {
 	*glusterfs
-	hosts    *api.Endpoints
+	hosts    *v1.Endpoints
 	path     string
 	readOnly bool
 	exe      exec.Interface
@@ -352,7 +352,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 }
 
 func getVolumeSource(
-	spec *volume.Spec) (*api.GlusterfsVolumeSource, bool, error) {
+	spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
 		return spec.Volume.Glusterfs, spec.Volume.Glusterfs.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
@@ -416,7 +416,7 @@ func (plugin *glusterfsPlugin) newDeleterInternal(spec *volume.Spec) (volume.Del
 type glusterfsVolumeDeleter struct {
 	*glusterfsMounter
 	provisioningConfig
-	spec *api.PersistentVolume
+	spec *v1.PersistentVolume
 }
 
 func (d *glusterfsVolumeDeleter) GetPath() string {
@@ -479,7 +479,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	return nil
 }
 
-func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
+func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	var err error
 	if r.options.PVC.Spec.Selector != nil {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
@@ -499,21 +499,21 @@ func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) 
 		glog.Errorf("glusterfs: create volume err: %v.", err)
 		return nil, fmt.Errorf("glusterfs: create volume err: %v.", err)
 	}
-	pv := new(api.PersistentVolume)
+	pv := new(v1.PersistentVolume)
 	pv.Spec.PersistentVolumeSource.Glusterfs = glusterfs
 	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
 	pv.Spec.AccessModes = r.options.PVC.Spec.AccessModes
 	if len(pv.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = r.plugin.GetAccessModes()
 	}
-	pv.Spec.Capacity = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+	pv.Spec.Capacity = v1.ResourceList{
+		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
 	return pv, nil
 }
 
-func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSource, size int, err error) {
-	capacity := p.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+func (p *glusterfsVolumeProvisioner) CreateVolume() (r *v1.GlusterfsVolumeSource, size int, err error) {
+	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
 	glog.V(2).Infof("glusterfs: create volume of size: %d bytes and configuration %+v", volSizeBytes, p.provisioningConfig)
@@ -573,30 +573,30 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 		return nil, 0, fmt.Errorf("failed to create endpoint/service %v", err)
 	}
 	glog.V(3).Infof("glusterfs: dynamic ep %v and svc : %v ", endpoint, service)
-	return &api.GlusterfsVolumeSource{
+	return &v1.GlusterfsVolumeSource{
 		EndpointsName: endpoint.Name,
 		Path:          volume.Name,
 		ReadOnly:      false,
 	}, sz, nil
 }
 
-func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *api.Endpoints, service *api.Service, err error) {
+func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
 
-	addrlist := make([]api.EndpointAddress, len(hostips))
+	addrlist := make([]v1.EndpointAddress, len(hostips))
 	for i, v := range hostips {
 		addrlist[i].IP = v
 	}
-	endpoint = &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	endpoint = &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: namespace,
 			Name:      epServiceName,
 			Labels: map[string]string{
 				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
 			},
 		},
-		Subsets: []api.EndpointSubset{{
+		Subsets: []v1.EndpointSubset{{
 			Addresses: addrlist,
-			Ports:     []api.EndpointPort{{Port: 1, Protocol: "TCP"}},
+			Ports:     []v1.EndpointPort{{Port: 1, Protocol: "TCP"}},
 		}},
 	}
 	_, err = p.plugin.host.GetKubeClient().Core().Endpoints(namespace).Create(endpoint)
@@ -608,16 +608,16 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 		glog.Errorf("glusterfs: failed to create endpoint %v", err)
 		return nil, nil, fmt.Errorf("error creating endpoint %v", err)
 	}
-	service = &api.Service{
-		ObjectMeta: api.ObjectMeta{
+	service = &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      epServiceName,
 			Namespace: namespace,
 			Labels: map[string]string{
 				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
 			},
 		},
-		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
 				{Protocol: "TCP", Port: 1}}}}
 	_, err = p.plugin.host.GetKubeClient().Core().Services(namespace).Create(service)
 	if err != nil && errors.IsAlreadyExists(err) {

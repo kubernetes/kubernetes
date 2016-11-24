@@ -112,6 +112,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeDaemonEndpoints, InType: reflect.TypeOf(&NodeDaemonEndpoints{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeList, InType: reflect.TypeOf(&NodeList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeProxyOptions, InType: reflect.TypeOf(&NodeProxyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeResources, InType: reflect.TypeOf(&NodeResources{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeSelector, InType: reflect.TypeOf(&NodeSelector{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeSelectorRequirement, InType: reflect.TypeOf(&NodeSelectorRequirement{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeSelectorTerm, InType: reflect.TypeOf(&NodeSelectorTerm{})},
@@ -184,6 +185,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceProxyOptions, InType: reflect.TypeOf(&ServiceProxyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceSpec, InType: reflect.TypeOf(&ServiceSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceStatus, InType: reflect.TypeOf(&ServiceStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Sysctl, InType: reflect.TypeOf(&Sysctl{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_TCPSocketAction, InType: reflect.TypeOf(&TCPSocketAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Taint, InType: reflect.TypeOf(&Taint{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Toleration, InType: reflect.TypeOf(&Toleration{})},
@@ -1685,6 +1687,23 @@ func DeepCopy_v1_NodeProxyOptions(in interface{}, out interface{}, c *conversion
 		out := out.(*NodeProxyOptions)
 		out.TypeMeta = in.TypeMeta
 		out.Path = in.Path
+		return nil
+	}
+}
+
+func DeepCopy_v1_NodeResources(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*NodeResources)
+		out := out.(*NodeResources)
+		if in.Capacity != nil {
+			in, out := &in.Capacity, &out.Capacity
+			*out = make(ResourceList)
+			for key, val := range *in {
+				(*out)[key] = val.DeepCopy()
+			}
+		} else {
+			out.Capacity = nil
+		}
 		return nil
 	}
 }
@@ -3490,6 +3509,16 @@ func DeepCopy_v1_ServiceStatus(in interface{}, out interface{}, c *conversion.Cl
 		if err := DeepCopy_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, c); err != nil {
 			return err
 		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_Sysctl(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Sysctl)
+		out := out.(*Sysctl)
+		out.Name = in.Name
+		out.Value = in.Value
 		return nil
 	}
 }

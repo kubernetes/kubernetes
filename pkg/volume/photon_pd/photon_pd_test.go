@@ -22,7 +22,7 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -46,10 +46,10 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/photon-pd" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{}}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -68,15 +68,15 @@ func TestGetAccessModes(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) {
-		t.Errorf("Expected to support AccessModeTypes:  %s", api.ReadWriteOnce)
+	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) {
+		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteOnce)
 	}
-	if contains(plug.GetAccessModes(), api.ReadOnlyMany) {
-		t.Errorf("Expected not to support AccessModeTypes:  %s", api.ReadOnlyMany)
+	if contains(plug.GetAccessModes(), v1.ReadOnlyMany) {
+		t.Errorf("Expected not to support AccessModeTypes:  %s", v1.ReadOnlyMany)
 	}
 }
 
-func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
+func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true
@@ -112,10 +112,10 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
+	spec := &v1.Volume{
 		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
 				PdID:   "pdid",
 				FSType: "ext4",
 			},
@@ -175,8 +175,8 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("10Gi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
-		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+		PVC: volumetest.CreateTestPVC("10Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*photonPersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
 	persistentSpec, err := provisioner.Provision()
@@ -187,7 +187,7 @@ func TestPlugin(t *testing.T) {
 	if persistentSpec.Spec.PersistentVolumeSource.PhotonPersistentDisk.PdID != "test-photon-pd-id" {
 		t.Errorf("Provision() returned unexpected persistent disk ID: %s", persistentSpec.Spec.PersistentVolumeSource.PhotonPersistentDisk.PdID)
 	}
-	cap := persistentSpec.Spec.Capacity[api.ResourceStorage]
+	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
 	if size != 10*1024*1024*1024 {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
@@ -217,10 +217,10 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
+	spec := &v1.Volume{
 		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
 				PdID:   "pdid",
 				FSType: "ext4",
 			},

@@ -34,7 +34,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -313,8 +313,8 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 	return nil
 }
 
-func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSource, size int, err error) {
-	capacity := p.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource, size int, err error) {
+	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	// convert to MB that rbd defaults on
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024))
@@ -342,7 +342,7 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSourc
 		return nil, 0, err
 	}
 
-	return &api.RBDVolumeSource{
+	return &v1.RBDVolumeSource{
 		CephMonitors: p.rbdMounter.Mon,
 		RBDImage:     p.rbdMounter.Image,
 		RBDPool:      p.rbdMounter.Pool,
