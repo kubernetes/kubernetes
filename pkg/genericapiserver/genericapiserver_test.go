@@ -246,6 +246,23 @@ func TestInstallAPIGroups(t *testing.T) {
 			t.Errorf("[%d] unexpected groupVersion at path %q: got=%q expected=%q", i, path, got, expected)
 			continue
 		}
+
+		// the verbs should match the features of resources
+		for _, r := range resources.APIResources {
+			switch r.Name {
+			case "getter":
+				if got, expected := sets.NewString([]string(r.Verbs)...), sets.NewString("get"); !got.Equal(expected) {
+					t.Errorf("[%d] unexpected verbs for resource %s/%s: got=%v expected=%v", i, resources.GroupVersion, r.Name, got, expected)
+				}
+			case "noverbs":
+				if r.Verbs == nil {
+					t.Errorf("[%d] unexpected nil verbs slice. Expected: []string{}", i)
+				}
+				if got, expected := sets.NewString([]string(r.Verbs)...), sets.NewString(); !got.Equal(expected) {
+					t.Errorf("[%d] unexpected verbs for resource %s/%s: got=%v expected=%v", i, resources.GroupVersion, r.Name, got, expected)
+				}
+			}
+		}
 	}
 }
 
