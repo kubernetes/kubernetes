@@ -144,6 +144,11 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		},
 	}
 
+	succPod := testutil.NewPod("pod0", "node0")
+	succPod.Status.Phase = v1.PodSucceeded
+	failPod := testutil.NewPod("pod0", "node0")
+	failPod.Status.Phase = v1.PodFailed
+
 	table := []struct {
 		fakeNodeHandler     *testutil.FakeNodeHandler
 		daemonSets          []extensions.DaemonSet
@@ -543,6 +548,134 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			secondNodeNewStatus: healthyNodeNewStatus,
 			expectedEvictPods:   true,
 			description:         "Node created long time ago, node controller posted Unknown for a long period of time.",
+		},
+		// Node with a succ pod, created long time ago, node controller posted Unknown for a long period of time.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								metav1.LabelZoneRegion:        "region1",
+								metav1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionUnknown,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								metav1.LabelZoneRegion:        "region1",
+								metav1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*succPod}}),
+			},
+			daemonSets: nil,
+			timeToPass: 60 * time.Minute,
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionUnknown,
+						// Node status was updated by nodecontroller 1hr ago
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Node with a succ pod, created long time ago, node controller posted Unknown for a long period of time.",
+		},
+		// Node with a failed pod created long time ago, node controller posted Unknown for a long period of time.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								metav1.LabelZoneRegion:        "region1",
+								metav1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionUnknown,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								metav1.LabelZoneRegion:        "region1",
+								metav1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*failPod}}),
+			},
+			daemonSets: nil,
+			timeToPass: 60 * time.Minute,
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionUnknown,
+						// Node status was updated by nodecontroller 1hr ago
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Node with a failed pod, created long time ago, node controller posted Unknown for a long period of time.",
 		},
 	}
 
