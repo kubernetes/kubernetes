@@ -56,6 +56,7 @@ go_test(
         "//pkg/kubelet/pod/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
     ],
 )

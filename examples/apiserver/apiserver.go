@@ -24,13 +24,13 @@ import (
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	// Install the testgroup API
@@ -86,7 +86,7 @@ func Run(serverOptions *genericoptions.ServerRunOptions, stopCh <-chan struct{})
 		return fmt.Errorf("%v", err)
 	}
 	storageFactory := newStorageFactory()
-	storageConfig, err := storageFactory.NewConfig(unversioned.GroupResource{Group: groupName, Resource: "testtype"})
+	storageConfig, err := storageFactory.NewConfig(schema.GroupResource{Group: groupName, Resource: "testtype"})
 	if err != nil {
 		return fmt.Errorf("Unable to get storage config: %v", err)
 	}

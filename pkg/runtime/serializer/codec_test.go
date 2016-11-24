@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
 
 	"github.com/ghodss/yaml"
@@ -39,7 +40,7 @@ var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
 
 type testMetaFactory struct{}
 
-func (testMetaFactory) Interpret(data []byte) (*unversioned.GroupVersionKind, error) {
+func (testMetaFactory) Interpret(data []byte) (*schema.GroupVersionKind, error) {
 	findKind := struct {
 		APIVersion string `json:"myVersionKey,omitempty"`
 		ObjectKind string `json:"myKindKey,omitempty"`
@@ -49,11 +50,11 @@ func (testMetaFactory) Interpret(data []byte) (*unversioned.GroupVersionKind, er
 	if err := yaml.Unmarshal(data, &findKind); err != nil {
 		return nil, fmt.Errorf("couldn't get version/kind: %v", err)
 	}
-	gv, err := unversioned.ParseGroupVersion(findKind.APIVersion)
+	gv, err := schema.ParseGroupVersion(findKind.APIVersion)
 	if err != nil {
 		return nil, err
 	}
-	return &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: findKind.ObjectKind}, nil
+	return &schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: findKind.ObjectKind}, nil
 }
 
 // Test a weird version/kind embedding format.
@@ -128,36 +129,36 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 	},
 )
 
-func (obj *MyWeirdCustomEmbeddedVersionKindField) GetObjectKind() unversioned.ObjectKind { return obj }
-func (obj *MyWeirdCustomEmbeddedVersionKindField) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
+func (obj *MyWeirdCustomEmbeddedVersionKindField) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *MyWeirdCustomEmbeddedVersionKindField) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.ObjectKind = gvk.ToAPIVersionAndKind()
 }
-func (obj *MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() unversioned.GroupVersionKind {
-	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.ObjectKind)
+func (obj *MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.ObjectKind)
 }
 
-func (obj *ExternalInternalSame) GetObjectKind() unversioned.ObjectKind {
+func (obj *ExternalInternalSame) GetObjectKind() schema.ObjectKind {
 	return &obj.MyWeirdCustomEmbeddedVersionKindField
 }
 
-func (obj *TestType1) GetObjectKind() unversioned.ObjectKind {
+func (obj *TestType1) GetObjectKind() schema.ObjectKind {
 	return &obj.MyWeirdCustomEmbeddedVersionKindField
 }
 
-func (obj *ExternalTestType1) GetObjectKind() unversioned.ObjectKind {
+func (obj *ExternalTestType1) GetObjectKind() schema.ObjectKind {
 	return &obj.MyWeirdCustomEmbeddedVersionKindField
 }
 
-func (obj *TestType2) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
-func (obj *ExternalTestType2) GetObjectKind() unversioned.ObjectKind {
-	return unversioned.EmptyObjectKind
+func (obj *TestType2) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *ExternalTestType2) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
 }
 
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
-	internalGV := unversioned.GroupVersion{Version: runtime.APIVersionInternal}
-	externalGV := unversioned.GroupVersion{Version: "v1"}
-	externalGV2 := unversioned.GroupVersion{Version: "v2"}
+	internalGV := schema.GroupVersion{Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Version: "v1"}
+	externalGV2 := schema.GroupVersion{Version: "v2"}
 
 	s := runtime.NewScheme()
 	// Ordinarily, we wouldn't add TestType2, but because this is a test and
@@ -174,7 +175,7 @@ func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
 	s.AddUnversionedTypes(externalGV, &unversioned.Status{})
 
 	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
-	codec := cf.LegacyCodec(unversioned.GroupVersion{Version: "v1"})
+	codec := cf.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	return s, codec
 }
 
@@ -255,7 +256,7 @@ func TestVersionedEncoding(t *testing.T) {
 	info, _ := runtime.SerializerInfoForMediaType(cf.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	encoder := info.Serializer
 
-	codec := cf.CodecForVersions(encoder, nil, unversioned.GroupVersion{Version: "v2"}, nil)
+	codec := cf.CodecForVersions(encoder, nil, schema.GroupVersion{Version: "v2"}, nil)
 	out, err := runtime.Encode(codec, &TestType1{})
 	if err != nil {
 		t.Fatal(err)
@@ -264,7 +265,7 @@ func TestVersionedEncoding(t *testing.T) {
 		t.Fatal(string(out))
 	}
 
-	codec = cf.CodecForVersions(encoder, nil, unversioned.GroupVersion{Version: "v3"}, nil)
+	codec = cf.CodecForVersions(encoder, nil, schema.GroupVersion{Version: "v3"}, nil)
 	_, err = runtime.Encode(codec, &TestType1{})
 	if err == nil {
 		t.Fatal(err)
@@ -303,8 +304,8 @@ func TestMultipleNames(t *testing.T) {
 }
 
 func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Version: runtime.APIVersionInternal}
-	externalGV := unversioned.GroupVersion{Version: "v1"}
+	internalGV := schema.GroupVersion{Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Version: "v1"}
 
 	s := runtime.NewScheme()
 	// create two names internally, with TestType1 being preferred
@@ -324,7 +325,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	}
 	expect := &TestType1{A: "test"}
 
-	codec := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{})).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
+	codec := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{})).LegacyCodec(schema.GroupVersion{Version: "v1"})
 
 	obj, err := runtime.Decode(codec, data)
 	if err != nil {
@@ -380,16 +381,16 @@ func TestBadJSONRejection(t *testing.T) {
 	if err := runtime.DecodeInto(codec, []byte(``), &TestType1{}); err != nil {
 		t.Errorf("Should allow empty decode: %v", err)
 	}
-	if _, _, err := codec.Decode([]byte(``), &unversioned.GroupVersionKind{Kind: "ExternalInternalSame"}, nil); err == nil {
+	if _, _, err := codec.Decode([]byte(``), &schema.GroupVersionKind{Kind: "ExternalInternalSame"}, nil); err == nil {
 		t.Errorf("Did not give error for empty data with only kind default")
 	}
-	if _, _, err := codec.Decode([]byte(`{"myVersionKey":"v1"}`), &unversioned.GroupVersionKind{Kind: "ExternalInternalSame"}, nil); err != nil {
+	if _, _, err := codec.Decode([]byte(`{"myVersionKey":"v1"}`), &schema.GroupVersionKind{Kind: "ExternalInternalSame"}, nil); err != nil {
 		t.Errorf("Gave error for version and kind default")
 	}
-	if _, _, err := codec.Decode([]byte(`{"myKindKey":"ExternalInternalSame"}`), &unversioned.GroupVersionKind{Version: "v1"}, nil); err != nil {
+	if _, _, err := codec.Decode([]byte(`{"myKindKey":"ExternalInternalSame"}`), &schema.GroupVersionKind{Version: "v1"}, nil); err != nil {
 		t.Errorf("Gave error for version and kind default")
 	}
-	if _, _, err := codec.Decode([]byte(``), &unversioned.GroupVersionKind{Kind: "ExternalInternalSame", Version: "v1"}, nil); err != nil {
+	if _, _, err := codec.Decode([]byte(``), &schema.GroupVersionKind{Kind: "ExternalInternalSame", Version: "v1"}, nil); err != nil {
 		t.Errorf("Gave error for version and kind defaulted: %v", err)
 	}
 	if _, err := runtime.Decode(codec, []byte(``)); err == nil {
@@ -399,8 +400,8 @@ func TestBadJSONRejection(t *testing.T) {
 
 // Returns a new Scheme set up with the test objects needed by TestDirectCodec.
 func GetDirectCodecTestScheme() *runtime.Scheme {
-	internalGV := unversioned.GroupVersion{Version: runtime.APIVersionInternal}
-	externalGV := unversioned.GroupVersion{Version: "v1"}
+	internalGV := schema.GroupVersion{Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Version: "v1"}
 
 	s := runtime.NewScheme()
 	// Ordinarily, we wouldn't add TestType2, but because this is a test and
@@ -419,7 +420,7 @@ func TestDirectCodec(t *testing.T) {
 	info, _ := runtime.SerializerInfoForMediaType(cf.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	serializer := info.Serializer
 	df := DirectCodecFactory{cf}
-	ignoredGV, err := unversioned.ParseGroupVersion("ignored group/ignored version")
+	ignoredGV, err := schema.ParseGroupVersion("ignored group/ignored version")
 	if err != nil {
 		t.Fatal(err)
 	}

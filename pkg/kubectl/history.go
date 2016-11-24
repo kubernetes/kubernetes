@@ -23,12 +23,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -41,7 +41,7 @@ type HistoryViewer interface {
 	ViewHistory(namespace, name string, revision int64) (string, error)
 }
 
-func HistoryViewerFor(kind unversioned.GroupKind, c clientset.Interface) (HistoryViewer, error) {
+func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentHistoryViewer{c}, nil

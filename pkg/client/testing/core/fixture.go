@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -38,19 +39,19 @@ type ObjectTracker interface {
 	Add(obj runtime.Object) error
 
 	// Get retrieves the object by its kind, namespace and name.
-	Get(gvk unversioned.GroupVersionKind, ns, name string) (runtime.Object, error)
+	Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Object, error)
 
 	// Update updates an existing object in the tracker.
 	Update(obj runtime.Object) error
 
 	// List retrieves all objects of a given kind in the given
 	// namespace. Only non-List kinds are accepted.
-	List(gvk unversioned.GroupVersionKind, ns string) (runtime.Object, error)
+	List(gvk schema.GroupVersionKind, ns string) (runtime.Object, error)
 
 	// Delete deletes an existing object from the tracker. If object
 	// didn't exist in the tracker prior to deletion, Delete returns
 	// no error.
-	Delete(gvk unversioned.GroupVersionKind, ns, name string) error
+	Delete(gvk schema.GroupVersionKind, ns, name string) error
 }
 
 // ObjectScheme abstracts the implementation of common operations on objects.
@@ -143,7 +144,7 @@ type tracker struct {
 	scheme  ObjectScheme
 	decoder runtime.Decoder
 	lock    sync.RWMutex
-	objects map[unversioned.GroupVersionKind][]runtime.Object
+	objects map[schema.GroupVersionKind][]runtime.Object
 }
 
 var _ ObjectTracker = &tracker{}
@@ -154,11 +155,11 @@ func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracke
 	return &tracker{
 		scheme:  scheme,
 		decoder: decoder,
-		objects: make(map[unversioned.GroupVersionKind][]runtime.Object),
+		objects: make(map[schema.GroupVersionKind][]runtime.Object),
 	}
 }
 
-func (t *tracker) List(gvk unversioned.GroupVersionKind, ns string) (runtime.Object, error) {
+func (t *tracker) List(gvk schema.GroupVersionKind, ns string) (runtime.Object, error) {
 	// Heuristic for list kind: original kind + List suffix. Might
 	// not always be true but this tracker has a pretty limited
 	// understanding of the actual API model.
@@ -195,12 +196,12 @@ func (t *tracker) List(gvk unversioned.GroupVersionKind, ns string) (runtime.Obj
 	return list, nil
 }
 
-func (t *tracker) Get(gvk unversioned.GroupVersionKind, ns, name string) (runtime.Object, error) {
+func (t *tracker) Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Object, error) {
 	if err := checkNamespace(gvk, ns); err != nil {
 		return nil, err
 	}
 
-	errNotFound := errors.NewNotFound(unversioned.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name)
+	errNotFound := errors.NewNotFound(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name)
 
 	t.lock.RLock()
 	defer t.lock.RUnlock()
@@ -266,7 +267,7 @@ func (t *tracker) add(obj runtime.Object, replaceExisting bool) error {
 	defer t.lock.Unlock()
 
 	for _, gvk := range gvks {
-		gr := unversioned.GroupResource{Group: gvk.Group, Resource: gvk.Kind}
+		gr := schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}
 
 		// To avoid the object from being accidentally modified by caller
 		// after it's been added to the tracker, we always store the deep
@@ -332,7 +333,7 @@ func (t *tracker) addList(obj runtime.Object, replaceExisting bool) error {
 	return nil
 }
 
-func (t *tracker) Delete(gvk unversioned.GroupVersionKind, ns, name string) error {
+func (t *tracker) Delete(gvk schema.GroupVersionKind, ns, name string) error {
 	if err := checkNamespace(gvk, ns); err != nil {
 		return err
 	}
@@ -358,7 +359,7 @@ func (t *tracker) Delete(gvk unversioned.GroupVersionKind, ns, name string) erro
 		return nil
 	}
 
-	return errors.NewNotFound(unversioned.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name)
+	return errors.NewNotFound(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name)
 }
 
 // filterByNamespaceAndName returns all objects in the collection that
@@ -387,7 +388,7 @@ func filterByNamespaceAndName(objs []runtime.Object, ns, name string) ([]runtime
 // checkNamespace makes sure that the scope of gvk matches ns. It
 // returns an error if namespace is empty but gvk is a namespaced
 // kind, or if ns is non-empty and gvk is a namespaced kind.
-func checkNamespace(gvk unversioned.GroupVersionKind, ns string) error {
+func checkNamespace(gvk schema.GroupVersionKind, ns string) error {
 	group, err := registered.Group(gvk.Group)
 	if err != nil {
 		return err

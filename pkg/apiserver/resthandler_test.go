@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
@@ -50,7 +51,7 @@ type TestPatchSubType struct {
 	StringField string `json:"theField"`
 }
 
-func (obj *testPatchType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *testPatchType) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 func TestPatchAnonymousField(t *testing.T) {
 	originalJS := `{"kind":"testPatchType","theField":"my-value"}`
@@ -186,7 +187,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 	namer := &testNamer{namespace, name}
 	copier := runtime.ObjectCopier(api.Scheme)
-	resource := unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	resource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	versionedObj := &v1.Pod{}
 
 	for _, patchType := range []api.PatchType{api.JSONPatchType, api.MergePatchType, api.StrategicMergePatchType} {

@@ -20,18 +20,18 @@ package webhook
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 )
 
 var (
-	groupVersions = []unversioned.GroupVersion{authentication.SchemeGroupVersion}
+	groupVersions = []schema.GroupVersion{authentication.SchemeGroupVersion}
 )
 
 const retryBackoff = 500 * time.Millisecond

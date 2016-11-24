@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/metrics"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -105,7 +105,7 @@ type TestDataSummary interface {
 type FrameworkOptions struct {
 	ClientQPS    float32
 	ClientBurst  int
-	GroupVersion *unversioned.GroupVersion
+	GroupVersion *schema.GroupVersion
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
@@ -124,7 +124,7 @@ func NewDefaultFederatedFramework(baseName string) *Framework {
 	return f
 }
 
-func NewDefaultGroupVersionFramework(baseName string, groupVersion unversioned.GroupVersion) *Framework {
+func NewDefaultGroupVersionFramework(baseName string, groupVersion schema.GroupVersion) *Framework {
 	f := NewDefaultFramework(baseName)
 	f.options.GroupVersion = &groupVersion
 	return f

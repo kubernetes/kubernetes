@@ -19,6 +19,7 @@ package testing
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type TestStruct struct {
@@ -31,4 +32,4 @@ type TestStruct struct {
 	IntList        []int          `json:"IntList"`
 }
 
-func (obj *TestStruct) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *TestStruct) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

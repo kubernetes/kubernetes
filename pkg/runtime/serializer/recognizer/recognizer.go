@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type RecognizingDecoder interface {
@@ -81,7 +81,7 @@ func (d *decoder) RecognizesData(peek io.Reader) (bool, bool, error) {
 	return false, anyUnknown, lastErr
 }
 
-func (d *decoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (d *decoder) Decode(data []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	var (
 		lastErr error
 		skipped []runtime.Decoder

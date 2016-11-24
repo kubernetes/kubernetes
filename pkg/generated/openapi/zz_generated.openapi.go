@@ -6575,14 +6575,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
-	"unversioned.emptyObjectKind": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Properties: map[string]spec.Schema{},
-			},
-		},
-		Dependencies: []string{},
-	},
 	"v1.AWSElasticBlockStoreVolumeSource": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{

@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -94,8 +95,8 @@ func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
 
-func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
-	m := map[unversioned.GroupKind]Describer{
+func describerMap(c clientset.Interface) map[schema.GroupKind]Describer {
+	m := map[schema.GroupKind]Describer{
 		api.Kind("Pod"):                   &PodDescriber{c},
 		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
 		api.Kind("Secret"):                &SecretDescriber{c},
@@ -142,7 +143,7 @@ func DescribableResources() []string {
 
 // Describer returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind unversioned.GroupKind, c clientset.Interface) (Describer, bool) {
+func DescriberFor(kind schema.GroupKind, c clientset.Interface) (Describer, bool) {
 	f, ok := describerMap(c)[kind]
 	return f, ok
 }

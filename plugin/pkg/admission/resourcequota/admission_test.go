@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -935,7 +935,7 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	}
 
 	registry := &generic.GenericRegistry{
-		InternalEvaluators: map[unversioned.GroupKind]quota.Evaluator{
+		InternalEvaluators: map[schema.GroupKind]quota.Evaluator{
 			podEvaluator.GroupKind(): podEvaluator,
 		},
 	}

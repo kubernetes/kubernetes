@@ -45,6 +45,7 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -642,11 +643,11 @@ func TestDeletePods(t *testing.T) {
 							newPod := newPodMap[name]
 							return &newPod, nil
 						} else {
-							return nil, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
+							return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
 						}
 					}
 				}
-				return nil, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
+				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
 			},
 		},
 		{

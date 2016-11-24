@@ -29,12 +29,12 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kdns "k8s.io/kubernetes/pkg/dns"
 	dnsConfig "k8s.io/kubernetes/pkg/dns/config"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type KubeDNSServer struct {
@@ -86,7 +86,7 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 		// Only --kube-master-url was provided.
 		config = &restclient.Config{
 			Host:          dnsConfig.KubeMasterURL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}},
+			ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}},
 		}
 	} else {
 		// We either have:

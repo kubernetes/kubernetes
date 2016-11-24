@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // Encoder is a runtime.Encoder on a stream.
@@ -37,7 +37,7 @@ type Encoder interface {
 // Decoder is a runtime.Decoder from a stream.
 type Decoder interface {
 	// Decode will return io.EOF when no more objects are available.
-	Decode(defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error)
+	Decode(defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error)
 	// Close closes the underlying stream.
 	Close() error
 }
@@ -71,7 +71,7 @@ func NewDecoder(r io.ReadCloser, d runtime.Decoder) Decoder {
 var ErrObjectTooLarge = fmt.Errorf("object to decode was longer than maximum allowed size")
 
 // Decode reads the next object from the stream and decodes it.
-func (d *decoder) Decode(defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	base := 0
 	for {
 		n, err := d.reader.Read(d.buf[base:])

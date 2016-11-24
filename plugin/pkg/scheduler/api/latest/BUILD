@@ -15,8 +15,8 @@ go_library(
     srcs = ["latest.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/json:go_default_library",
         "//pkg/runtime/serializer/versioning:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",

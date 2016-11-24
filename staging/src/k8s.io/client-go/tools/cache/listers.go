@@ -20,17 +20,19 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/apis/apps"
-	"k8s.io/client-go/pkg/apis/certificates"
-	"k8s.io/client-go/pkg/apis/extensions"
-	"k8s.io/client-go/pkg/apis/policy"
-	"k8s.io/client-go/pkg/apis/storage"
+	"k8s.io/client-go/pkg/api/v1"
+	apps "k8s.io/client-go/pkg/apis/apps/v1beta1"
+	certificates "k8s.io/client-go/pkg/apis/certificates/v1alpha1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	storageinternal "k8s.io/client-go/pkg/apis/storage"
+	storage "k8s.io/client-go/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/pkg/labels"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using
@@ -50,7 +52,7 @@ func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
 }
 
 func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selector, appendFn AppendFunc) error {
-	if namespace == api.NamespaceAll {
+	if namespace == v1.NamespaceAll {
 		for _, m := range indexer.List() {
 			metadata, err := meta.Accessor(m)
 			if err != nil {
@@ -63,7 +65,7 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 		return nil
 	}
 
-	items, err := indexer.Index(NamespaceIndex, &api.ObjectMeta{Namespace: namespace})
+	items, err := indexer.Index(NamespaceIndex, &v1.ObjectMeta{Namespace: namespace})
 	if err != nil {
 		// Ignore error; do slow search without index.
 		glog.Warningf("can not retrieve list of objects using index : %v", err)
@@ -110,13 +112,13 @@ type GenericNamespaceLister interface {
 	Get(name string) (runtime.Object, error)
 }
 
-func NewGenericLister(indexer Indexer, resource unversioned.GroupResource) GenericLister {
+func NewGenericLister(indexer Indexer, resource schema.GroupResource) GenericLister {
 	return &genericLister{indexer: indexer, resource: resource}
 }
 
 type genericLister struct {
 	indexer  Indexer
-	resource unversioned.GroupResource
+	resource schema.GroupResource
 }
 
 func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
@@ -144,7 +146,7 @@ func (s *genericLister) Get(name string) (runtime.Object, error) {
 type genericNamespaceLister struct {
 	indexer   Indexer
 	namespace string
-	resource  unversioned.GroupResource
+	resource  schema.GroupResource
 }
 
 func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
@@ -170,7 +172,7 @@ func (s *genericNamespaceLister) Get(name string) (runtime.Object, error) {
 
 // NodeConditionPredicate is a function that indicates whether the given node's conditions meet
 // some set of criteria defined by the function.
-type NodeConditionPredicate func(node *api.Node) bool
+type NodeConditionPredicate func(node *v1.Node) bool
 
 // StoreToNodeLister makes a Store have the List method of the client.NodeInterface
 // The Store must contain (only) Nodes.
@@ -178,9 +180,9 @@ type StoreToNodeLister struct {
 	Store
 }
 
-func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
+func (s *StoreToNodeLister) List() (machines v1.NodeList, err error) {
 	for _, m := range s.Store.List() {
-		machines.Items = append(machines.Items, *(m.(*api.Node)))
+		machines.Items = append(machines.Items, *(m.(*v1.Node)))
 	}
 	return machines, nil
 }
@@ -199,9 +201,9 @@ type storeToNodeConditionLister struct {
 }
 
 // List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
-func (s storeToNodeConditionLister) List() (nodes []*api.Node, err error) {
+func (s storeToNodeConditionLister) List() (nodes []*v1.Node, err error) {
 	for _, m := range s.store.List() {
-		node := m.(*api.Node)
+		node := m.(*v1.Node)
 		if s.predicate(node) {
 			nodes = append(nodes, node)
 		} else {
@@ -236,7 +238,7 @@ func (s *StoreToDaemonSetLister) List() (dss extensions.DaemonSetList, err error
 
 // GetPodDaemonSets returns a list of daemon sets managing a pod.
 // Returns an error if and only if no matching daemon sets are found.
-func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []extensions.DaemonSet, err error) {
+func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *v1.Pod) (daemonSets []extensions.DaemonSet, err error) {
 	var selector labels.Selector
 	var daemonSet extensions.DaemonSet
 
@@ -274,17 +276,17 @@ type StoreToEndpointsLister struct {
 }
 
 // List lists all endpoints in the store.
-func (s *StoreToEndpointsLister) List() (services api.EndpointsList, err error) {
+func (s *StoreToEndpointsLister) List() (services v1.EndpointsList, err error) {
 	for _, m := range s.Store.List() {
-		services.Items = append(services.Items, *(m.(*api.Endpoints)))
+		services.Items = append(services.Items, *(m.(*v1.Endpoints)))
 	}
 	return services, nil
 }
 
 // GetServiceEndpoints returns the endpoints of a service, matched on service name.
-func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *api.Service) (ep api.Endpoints, err error) {
+func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *v1.Service) (ep v1.Endpoints, err error) {
 	for _, m := range s.Store.List() {
-		ep = *m.(*api.Endpoints)
+		ep = *m.(*v1.Endpoints)
 		if svc.Name == ep.Name && svc.Namespace == ep.Namespace {
 			return ep, nil
 		}
@@ -299,8 +301,8 @@ type StoreToPVFetcher struct {
 }
 
 // GetPersistentVolumeInfo returns cached data for the PersistentVolume 'id'.
-func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVolume, error) {
-	o, exists, err := s.Get(&api.PersistentVolume{ObjectMeta: api.ObjectMeta{Name: id}})
+func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*v1.PersistentVolume, error) {
+	o, exists, err := s.Get(&v1.PersistentVolume{ObjectMeta: v1.ObjectMeta{Name: id}})
 
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving PersistentVolume '%v' from cache: %v", id, err)
@@ -310,7 +312,7 @@ func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVo
 		return nil, fmt.Errorf("PersistentVolume '%v' not found", id)
 	}
 
-	return o.(*api.PersistentVolume), nil
+	return o.(*v1.PersistentVolume), nil
 }
 
 // StoreToStatefulSetLister gives a store List and Exists methods. The store must contain only StatefulSets.
@@ -345,7 +347,7 @@ func (s *StoreToStatefulSetLister) StatefulSets(namespace string) storeStatefulS
 }
 
 // GetPodStatefulSets returns a list of StatefulSets managing a pod. Returns an error only if no matching StatefulSets are found.
-func (s *StoreToStatefulSetLister) GetPodStatefulSets(pod *api.Pod) (psList []apps.StatefulSet, err error) {
+func (s *StoreToStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (psList []apps.StatefulSet, err error) {
 	var selector labels.Selector
 	var ps apps.StatefulSet
 
@@ -404,7 +406,7 @@ type StoreToPodDisruptionBudgetLister struct {
 }
 
 // GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.  Returns an error only if no matching PodDisruptionBudgets are found.
-func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.Pod) (pdbList []policy.PodDisruptionBudget, err error) {
+func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) (pdbList []policy.PodDisruptionBudget, err error) {
 	var selector labels.Selector
 
 	if len(pod.Labels) == 0 {
@@ -466,13 +468,13 @@ func (s *storageClassLister) List(selector labels.Selector) (ret []*storage.Stor
 
 // List returns a list of storage classes
 func (s *storageClassLister) Get(name string) (*storage.StorageClass, error) {
-	key := &storage.StorageClass{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &storage.StorageClass{ObjectMeta: v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(storage.Resource("storageclass"), name)
+		return nil, errors.NewNotFound(storageinternal.Resource("storageclass"), name)
 	}
 	return obj.(*storage.StorageClass), nil
 }

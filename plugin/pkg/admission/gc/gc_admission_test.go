@@ -21,10 +21,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type fakeAuthorizer struct{}
@@ -53,7 +53,7 @@ func TestGCAdmission(t *testing.T) {
 	tests := []struct {
 		name     string
 		username string
-		resource unversioned.GroupVersionResource
+		resource schema.GroupVersionResource
 		oldObj   runtime.Object
 		newObj   runtime.Object
 
@@ -201,7 +201,7 @@ func TestGCAdmission(t *testing.T) {
 			operation = admission.Update
 		}
 		user := &user.DefaultInfo{Name: tc.username}
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, unversioned.GroupVersionKind{}, api.NamespaceDefault, "foo", tc.resource, "", operation, user)
+		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, api.NamespaceDefault, "foo", tc.resource, "", operation, user)
 
 		err := gcAdmit.Admit(attributes)
 		switch {

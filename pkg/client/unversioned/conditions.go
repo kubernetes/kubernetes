@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -29,6 +28,7 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -146,7 +146,7 @@ var ErrContainerTerminated = fmt.Errorf("container terminated")
 func PodRunning(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.Pod:
@@ -165,7 +165,7 @@ func PodRunning(event watch.Event) (bool, error) {
 func PodCompleted(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.Pod:
@@ -183,7 +183,7 @@ func PodCompleted(event watch.Event) (bool, error) {
 func PodRunningAndReady(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.Pod:
@@ -202,7 +202,7 @@ func PodRunningAndReady(event watch.Event) (bool, error) {
 func PodNotPending(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.Pod:
@@ -222,7 +222,7 @@ func PodContainerRunning(containerName string) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Deleted:
-			return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+			return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 		}
 		switch t := event.Object.(type) {
 		case *api.Pod:
@@ -262,7 +262,7 @@ func PodContainerRunning(containerName string) watch.ConditionFunc {
 func ServiceAccountHasSecrets(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "serviceaccounts"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.ServiceAccount:

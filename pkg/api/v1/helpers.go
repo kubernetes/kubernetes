@@ -444,13 +444,13 @@ func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
 }
 
 type Sysctl struct {
-	Name  string
-	Value string
+	Name  string `protobuf:"bytes,1,opt,name=name"`
+	Value string `protobuf:"bytes,2,opt,name=value"`
 }
 
 // NodeResources is an object for conveying resource information about a node.
 // see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
-	Capacity ResourceList
+	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 }

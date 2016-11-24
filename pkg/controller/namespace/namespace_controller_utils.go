@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -55,7 +56,7 @@ const (
 // operationKey is an entry in a cache.
 type operationKey struct {
 	op  operation
-	gvr unversioned.GroupVersionResource
+	gvr schema.GroupVersionResource
 }
 
 // operationNotSupportedCache is a simple cache to remember if an operation is not supported for a resource.
@@ -160,7 +161,7 @@ func finalizeNamespace(kubeClient clientset.Interface, namespace *v1.Namespace, 
 func deleteCollection(
 	dynamicClient *dynamic.Client,
 	opCache *operationNotSupportedCache,
-	gvr unversioned.GroupVersionResource,
+	gvr schema.GroupVersionResource,
 	namespace string,
 ) (bool, error) {
 	glog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
@@ -207,7 +208,7 @@ func deleteCollection(
 func listCollection(
 	dynamicClient *dynamic.Client,
 	opCache *operationNotSupportedCache,
-	gvr unversioned.GroupVersionResource,
+	gvr schema.GroupVersionResource,
 	namespace string,
 ) (*runtime.UnstructuredList, bool, error) {
 	glog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
@@ -247,7 +248,7 @@ func listCollection(
 func deleteEachItem(
 	dynamicClient *dynamic.Client,
 	opCache *operationNotSupportedCache,
-	gvr unversioned.GroupVersionResource,
+	gvr schema.GroupVersionResource,
 	namespace string,
 ) error {
 	glog.V(5).Infof("namespace controller - deleteEachItem - namespace: %s, gvr: %v", namespace, gvr)
@@ -275,7 +276,7 @@ func deleteAllContentForGroupVersionResource(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	gvr unversioned.GroupVersionResource,
+	gvr schema.GroupVersionResource,
 	namespace string,
 	namespaceDeletedAt unversioned.Time,
 ) (int64, error) {
@@ -343,7 +344,7 @@ func deleteAllContent(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResources []unversioned.GroupVersionResource,
+	groupVersionResources []schema.GroupVersionResource,
 	namespace string,
 	namespaceDeletedAt unversioned.Time,
 ) (int64, error) {
@@ -370,7 +371,7 @@ func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResourcesFn func() ([]unversioned.GroupVersionResource, error),
+	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error),
 	namespace *v1.Namespace,
 	finalizerToken v1.FinalizerName,
 ) error {
@@ -457,13 +458,13 @@ func syncNamespace(
 }
 
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
-func estimateGracefulTermination(kubeClient clientset.Interface, groupVersionResource unversioned.GroupVersionResource, ns string, namespaceDeletedAt unversioned.Time) (int64, error) {
+func estimateGracefulTermination(kubeClient clientset.Interface, groupVersionResource schema.GroupVersionResource, ns string, namespaceDeletedAt unversioned.Time) (int64, error) {
 	groupResource := groupVersionResource.GroupResource()
 	glog.V(5).Infof("namespace controller - estimateGracefulTermination - group %s, resource: %s", groupResource.Group, groupResource.Resource)
 	estimate := int64(0)
 	var err error
 	switch groupResource {
-	case unversioned.GroupResource{Group: "", Resource: "pods"}:
+	case schema.GroupResource{Group: "", Resource: "pods"}:
 		estimate, err = estimateGracefulTerminationForPods(kubeClient, ns)
 	}
 	if err != nil {
@@ -505,7 +506,7 @@ func estimateGracefulTerminationForPods(kubeClient clientset.Interface, ns strin
 // sortableGroupVersionResources sorts the input set of resources for deletion, and orders pods to always be last.
 // the idea is that the namespace controller will delete all things that spawn pods first in order to reduce the time
 // those controllers spend creating pods only to be told NO in admission and potentially overwhelming cluster especially if they lack rate limiting.
-type sortableGroupVersionResources []unversioned.GroupVersionResource
+type sortableGroupVersionResources []schema.GroupVersionResource
 
 func (list sortableGroupVersionResources) Len() int {
 	return len(list)

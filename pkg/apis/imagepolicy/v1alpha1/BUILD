@@ -29,6 +29,7 @@ go_library(
         "//pkg/apis/imagepolicy:go_default_library",
         "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/types:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",

@@ -19,7 +19,7 @@ package meta
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
@@ -33,7 +33,7 @@ func (m FirstHitRESTMapper) String() string {
 	return fmt.Sprintf("FirstHitRESTMapper{\n\t%v\n}", m.MultiRESTMapper)
 }
 
-func (m FirstHitRESTMapper) ResourceFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
+func (m FirstHitRESTMapper) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	errors := []error{}
 	for _, t := range m.MultiRESTMapper {
 		ret, err := t.ResourceFor(resource)
@@ -43,10 +43,10 @@ func (m FirstHitRESTMapper) ResourceFor(resource unversioned.GroupVersionResourc
 		errors = append(errors, err)
 	}
 
-	return unversioned.GroupVersionResource{}, collapseAggregateErrors(errors)
+	return schema.GroupVersionResource{}, collapseAggregateErrors(errors)
 }
 
-func (m FirstHitRESTMapper) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
+func (m FirstHitRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
 	errors := []error{}
 	for _, t := range m.MultiRESTMapper {
 		ret, err := t.KindFor(resource)
@@ -56,13 +56,13 @@ func (m FirstHitRESTMapper) KindFor(resource unversioned.GroupVersionResource) (
 		errors = append(errors, err)
 	}
 
-	return unversioned.GroupVersionKind{}, collapseAggregateErrors(errors)
+	return schema.GroupVersionKind{}, collapseAggregateErrors(errors)
 }
 
 // RESTMapping provides the REST mapping for the resource based on the
 // kind and version. This implementation supports multiple REST schemas and
 // return the first match.
-func (m FirstHitRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error) {
+func (m FirstHitRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error) {
 	errors := []error{}
 	for _, t := range m.MultiRESTMapper {
 		ret, err := t.RESTMapping(gk, versions...)

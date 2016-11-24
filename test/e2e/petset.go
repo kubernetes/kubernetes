@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	klabels "k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -66,7 +67,7 @@ const (
 )
 
 var (
-	StatefulSetGroupVersionResource = unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1beta1", Resource: "statefulsets"}
+	StatefulSetGroupVersionResource = schema.GroupVersionResource{Group: apps.GroupName, Version: "v1beta1", Resource: "statefulsets"}
 )
 
 // Time: 25m, slow by design.

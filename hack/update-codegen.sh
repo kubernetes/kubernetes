@@ -70,7 +70,7 @@ pkg/api
 pkg/api/v1
 $(
   cd ${KUBE_ROOT}
-  find pkg/apis -name types.go | xargs dirname | sort
+  find pkg/apis -name types.go | xargs -n1 dirname | sort
 )
 )
 

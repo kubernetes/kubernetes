@@ -27,7 +27,7 @@ import (
 // We use it to construct rules in code.  It's more compact than trying to write them
 // out in a literal and allows us to perform some basic checking during construction
 type PolicyRuleBuilder struct {
-	PolicyRule PolicyRule
+	PolicyRule PolicyRule `protobuf:"bytes,1,opt,name=policyRule"`
 }
 
 func NewRule(verbs ...string) *PolicyRuleBuilder {
@@ -94,7 +94,7 @@ func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
 // We use it to construct bindings in code.  It's more compact than trying to write them
 // out in a literal.
 type ClusterRoleBindingBuilder struct {
-	ClusterRoleBinding ClusterRoleBinding
+	ClusterRoleBinding ClusterRoleBinding `protobuf:"bytes,1,opt,name=clusterRoleBinding"`
 }
 
 func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {

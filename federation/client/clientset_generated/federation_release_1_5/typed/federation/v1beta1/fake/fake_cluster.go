@@ -19,10 +19,10 @@ package fake
 import (
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +31,7 @@ type FakeClusters struct {
 	Fake *FakeFederationV1beta1
 }
 
-var clustersResource = unversioned.GroupVersionResource{Group: "federation", Version: "v1beta1", Resource: "clusters"}
+var clustersResource = schema.GroupVersionResource{Group: "federation", Version: "v1beta1", Resource: "clusters"}
 
 func (c *FakeClusters) Create(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.

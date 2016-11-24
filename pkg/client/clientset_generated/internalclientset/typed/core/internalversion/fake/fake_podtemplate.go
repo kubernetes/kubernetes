@@ -18,9 +18,9 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -30,7 +30,7 @@ type FakePodTemplates struct {
 	ns   string
 }
 
-var podtemplatesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "podtemplates"}
+var podtemplatesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "podtemplates"}
 
 func (c *FakePodTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
 	obj, err := c.Fake.

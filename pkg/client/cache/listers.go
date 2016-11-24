@@ -32,6 +32,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using
@@ -111,13 +112,13 @@ type GenericNamespaceLister interface {
 	Get(name string) (runtime.Object, error)
 }
 
-func NewGenericLister(indexer Indexer, resource unversioned.GroupResource) GenericLister {
+func NewGenericLister(indexer Indexer, resource schema.GroupResource) GenericLister {
 	return &genericLister{indexer: indexer, resource: resource}
 }
 
 type genericLister struct {
 	indexer  Indexer
-	resource unversioned.GroupResource
+	resource schema.GroupResource
 }
 
 func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
@@ -145,7 +146,7 @@ func (s *genericLister) Get(name string) (runtime.Object, error) {
 type genericNamespaceLister struct {
 	indexer   Indexer
 	namespace string
-	resource  unversioned.GroupResource
+	resource  schema.GroupResource
 }
 
 func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {

@@ -29,7 +29,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -59,6 +58,7 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -244,7 +244,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	m.GenericAPIServer.RunPostStartHooks()
 
 	cfg := *masterConfig.GenericConfig.LoopbackClientConfig
-	cfg.ContentConfig.GroupVersion = &unversioned.GroupVersion{}
+	cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
 	if err != nil {
 		glog.Fatal(err)
@@ -310,39 +310,39 @@ func NewMasterConfig() *master.Config {
 
 	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, ns, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: v1.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: v1.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: autoscaling.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: autoscaling.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: batch.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: batch.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: apps.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: apps.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: extensions.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: extensions.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: policy.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: policy.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: rbac.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: rbac.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: certificates.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: certificates.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: storage.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: storage.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		ns)
 

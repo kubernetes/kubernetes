@@ -73,6 +73,7 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/healthz"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
@@ -325,7 +326,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 	resourceQuotaControllerClient := client("resourcequota-controller")
 	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, sharedInformers)
-	groupKindsToReplenish := []unversioned.GroupKind{
+	groupKindsToReplenish := []schema.GroupKind{
 		api.Kind("Pod"),
 		api.Kind("Service"),
 		api.Kind("ReplicationController"),
@@ -371,7 +372,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	namespaceKubeClient := client("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
-	var gvrFn func() ([]unversioned.GroupVersionResource, error)
+	var gvrFn func() ([]schema.GroupVersionResource, error)
 	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
 	if err != nil {
 		glog.Fatalf("Failed to get group version resources: %v", err)
@@ -389,7 +390,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 		if err != nil {
 			glog.Fatalf("Failed to get resources: %v", err)
 		}
-		gvrFn = func() ([]unversioned.GroupVersionResource, error) {
+		gvrFn = func() ([]schema.GroupVersionResource, error) {
 			return gvr, nil
 		}
 	}
@@ -490,7 +491,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 		if containsResource(resources, "cronjobs") {
 			glog.Infof("Starting cronjob controller")
 			// // TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
-			kubeconfig.ContentConfig.GroupVersion = &unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
+			kubeconfig.ContentConfig.GroupVersion = &schema.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
 			go cronjob.NewCronJobController(client("cronjob-controller")).
 				Run(wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
