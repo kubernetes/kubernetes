@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-// formatMap formats map[string]string to a string.
+// FormatMap formats map[string]string to a string.
 func FormatMap(m map[string]string) (fmtStr string) {
 	for key, value := range m {
 		fmtStr += fmt.Sprintf("%v=%q\n", key, value)
