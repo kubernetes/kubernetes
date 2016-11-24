@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 
@@ -116,6 +117,7 @@ type FakeAWSServices struct {
 	selfInstance            *ec2.Instance
 	networkInterfacesMacs   []string
 	networkInterfacesVpcIDs []string
+	securityGroups          []*ec2.SecurityGroup
 
 	ec2      *FakeEC2
 	elb      *FakeELB
@@ -395,20 +397,78 @@ func (ec2 *FakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (resp *ec2.Dele
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
-	panic("Not implemented")
+func (e *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
+	matches := []*ec2.SecurityGroup{}
+	for _, securityGroup := range e.aws.securityGroups {
+		if request.GroupIds != nil {
+			if securityGroup.GroupId == nil {
+				glog.Warning("Security group with no group id: ", securityGroup)
+				continue
+			}
+
+			found := false
+			for _, securityGroupID := range request.GroupIds {
+				if *securityGroupID == *securityGroup.GroupId {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+		if request.Filters != nil {
+			allMatch := true
+			for _, filter := range request.Filters {
+				if !securityGroupMatchesFilter(securityGroup, filter) {
+					allMatch = false
+					break
+				}
+			}
+			if !allMatch {
+				continue
+			}
+		}
+		matches = append(matches, securityGroup)
+	}
+	return matches, nil
 }
 
 func (ec2 *FakeEC2) CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error) {
 	panic("Not implemented")
 }
 
+func securityGroupMatchesFilter(securityGroup *ec2.SecurityGroup, filter *ec2.Filter) bool {
+	name := *filter.Name
+	if strings.HasPrefix(name, "tag:") {
+		tagName := name[4:]
+		for _, securityGroupTag := range securityGroup.Tags {
+			if aws.StringValue(securityGroupTag.Key) == tagName && contains(filter.Values, aws.StringValue(securityGroupTag.Value)) {
+				return true
+			}
+		}
+	}
+	panic("Unknown filter name: " + name)
+}
+
 func (ec2 *FakeEC2) DeleteSecurityGroup(*ec2.DeleteSecurityGroupInput) (*ec2.DeleteSecurityGroupOutput, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
-	panic("Not implemented")
+func (e *FakeEC2) AuthorizeSecurityGroupIngress(request *ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
+	for _, securityGroup := range e.aws.securityGroups {
+		if *securityGroup.GroupId == *request.GroupId {
+			for _, permission := range request.IpPermissions {
+				for _, existingPermission := range securityGroup.IpPermissions {
+					if ipPermissionExists(permission, existingPermission, false) {
+						return nil, awserr.New("InvalidPermission.Duplicate", "", nil)
+					}
+				}
+				securityGroup.IpPermissions = append(securityGroup.IpPermissions, permission)
+			}
+		}
+	}
+	return nil, awserr.New("InvalidGroup.NotFound", "", nil)
 }
 
 func (ec2 *FakeEC2) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error) {
@@ -1217,6 +1277,74 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
 	c.EnsureLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+}
+
+func TestUpdateInstanceSharedSecurityGroups(t *testing.T) {
+	// Instantiating a fake AWSServices, and AWSCloud.
+	awsServices := NewFakeAWSServices()
+	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	awsServices.elb.expectDescribeLoadBalancers("aid")
+
+	// testTags that are attached to security groups
+	testTags := []*ec2.Tag{
+		&ec2.Tag{
+			Key: aws.String(TagNameKubernetesCluster),
+			Value: aws.String(TestClusterId),
+		},
+	}
+
+	// Initialize one default security group and one shared security group
+	awsServices.securityGroups = []*ec2.SecurityGroup{
+		// security group to which we will add shared security group rule
+		&ec2.SecurityGroup{
+			Description: aws.String("example-security-group-description"),
+			GroupName: aws.String("example-security-group-name"),
+			GroupId: aws.String("example-security-group-id"),
+			VpcId: &c.vpcID,
+			Tags: testTags,
+		},
+		// shared security group
+		&ec2.SecurityGroup{
+			Description: aws.String("shared-security-group-description"),
+			GroupName: aws.String("shared-security-group-name"),
+			GroupId: aws.String("shared-security-group-id"),
+			VpcId: &c.vpcID,
+			Tags: testTags,
+		},
+	}
+
+	// Make sure this instance has the security group we intend to test a.k.a sgInput security group
+	instance1 := ec2.Instance {
+		InstanceId: aws.String("i-1"),
+		PrivateDnsName: aws.String("instance-same.ec2.internal"),
+		PrivateIpAddress: aws.String("192.168.0.2"),
+		PublicIpAddress: aws.String("1.2.3.4"),
+		InstanceType: aws.String("c3.large"),
+		Placement: &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")},
+		State: &ec2.InstanceState{Name: aws.String("running")},
+		SecurityGroups: []*ec2.GroupIdentifier{
+			&ec2.GroupIdentifier {
+				GroupId: awsServices.securityGroups[0].GroupId,
+				GroupName: awsServices.securityGroups[0].GroupName,
+			},
+		},
+	}
+
+	awsServices.instances = append(awsServices.instances, &instance1)
+
+	// Set flags properly in order to test updateInstanceSharedSecurityGroups
+	c.cfg.Global.DisableSecurityGroupIngress = false
+	c.cfg.Global.EnableSharedSecurityGroupIngress = true
+
+	c.updateInstanceSharedSecurityGroups("shared-security-group-id", awsServices.instances)
+
+	// Now check if "open to every protocol" rule has been successfully added to the security group
+	assert.Equal(t, "-1", *awsServices.securityGroups[0].IpPermissions[0].IpProtocol)
+	assert.Equal(t, "shared-security-group-id", *awsServices.securityGroups[0].IpPermissions[0].UserIdGroupPairs[0].GroupId)
+
+	// Now try updateInstanceSharedSecurityGroups again and check that AuthorizeSecurityGroupIngress is never called
+	err := c.updateInstanceSharedSecurityGroups("shared-security-group-id", awsServices.instances)
+	assert.Equal(t, nil, err)
 }
 
 func TestBuildListener(t *testing.T) {

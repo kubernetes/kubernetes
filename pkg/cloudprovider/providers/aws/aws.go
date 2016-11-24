@@ -172,6 +172,9 @@ const DefaultVolumeType = "gp2"
 // See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
 const DefaultMaxEBSVolumes = 39
 
+// Default prefix for shared security group name. This will be followed by cluster name.
+const SharedSecurityGroupNamePrefix = "k8s-elb-shared-security-group-"
+
 // Used to call aws_credentials.Init() just once
 var once sync.Once
 
@@ -386,6 +389,15 @@ type CloudConfig struct {
 		//has setup a rule that allows inbound traffic on kubelet ports from the
 		//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
 		DisableSecurityGroupIngress bool
+
+		//This flag enables the automatic shared security group ingress creation.
+		//Please check below to see the full mappings from flags to behavior
+		EnableSharedSecurityGroupIngress bool
+
+		//DisableSecurityGroupIngres=false, EnableSharedSecurityGroupIngress=false: insert security group ingress for nodes (default)
+		//DisableSecurityGroupIngres=false, EnableSharedSecurityGroupIngress=true: insert shared security group ingress for nodes
+		//DisableSecurityGroupIngres=true, EnableSharedSecurityGroupIngress=false: not inserting any ingress rules
+		//DisableSecurityGroupIngress=true, EnableSharedSecurityGroupIngress=true: error
 
 		//During the instantiation of an new AWS cloud provider, the detected region
 		//is validated against a known set of regions.
@@ -706,6 +718,10 @@ func readAWSCloudConfig(config io.Reader, metadata EC2Metadata) (*CloudConfig, e
 		if cfg.Global.Zone == "" {
 			return nil, fmt.Errorf("no zone specified in configuration file")
 		}
+	}
+
+	if cfg.Global.DisableSecurityGroupIngress && cfg.Global.EnableSharedSecurityGroupIngress {
+		return nil, fmt.Errorf("Both DisableSecurityGroupIngress flag and EnableSharedSecurityGroupIngress cannot be true")
 	}
 
 	return &cfg, nil
@@ -2230,6 +2246,12 @@ func (c *Cloud) ensureSecurityGroup(name string, description string) (string, er
 	return groupID, nil
 }
 
+func (s *AWSCloud) ensureSharedSecurityGroup() (string, error) {
+	sgName := SharedSecurityGroupNamePrefix + s.getClusterName()
+	sgDescription := fmt.Sprintf("SharedSecurity group for Kubernetes ELBs %s", s.getClusterName())
+	return s.ensureSecurityGroup(sgName, sgDescription)
+}
+
 // createTags calls EC2 CreateTags, but adds retry-on-failure logic
 // We retry mainly because if we create an object, we cannot tag it until it is "fully created" (eventual consistency)
 // The error code varies though (depending on what we are tagging), so we simply retry on all errors
@@ -2731,6 +2753,21 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, h
 		}
 	}
 	securityGroupIDs := []string{securityGroupID}
+	var sharedSecurityGroupID string
+	if s.cfg.Global.EnableSharedSecurityGroupIngress {
+		// Create the shared security group ID for local reference. (actually create one if doesn't exist)
+		// Returns corresponding securityGroupID if exists. If not, it creates a securityGroup and returns ID.
+		// Note that we don't set any permission/rule for the shared security group.
+		// As long as the shared security group is attached to the ELB, traffic from the ELB will be allowed to
+		// instances.
+		sharedSecurityGroupID, err = s.ensureSharedSecurityGroup()
+		if err != nil {
+			glog.Error("Error creating load balancer security group: ", err)
+			return nil, err
+		}
+		// Should add the shared securityGroupID too.
+		securityGroupIDs = append(securityGroupIDs, sharedSecurityGroupID)
+	}
 
 	// Build the load balancer itself
 	loadBalancer, err := c.ensureLoadBalancer(
@@ -2752,10 +2789,22 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, h
 		return nil, err
 	}
 
-	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
-	if err != nil {
-		glog.Warningf("Error opening ingress rules for the load balancer to the instances: %v", err)
-		return nil, err
+	// Add loadbalancer's security group's rules into instances' security groups' rules.
+	if !c.cfg.Global.EnableSharedSecurityGroupIngress {
+		err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
+		if err != nil {
+			glog.Warningf("Error opening ingress rules for the load balancer to the instances: %v", err)
+			return nil, err
+		}
+	}
+
+	// Add sharedSecurityGroupID into instances' rules only.
+	if c.cfg.Global.EnableSharedSecurityGroupIngress {
+		err = c.updateInstanceSharedSecurityGroups(sharedSecurityGroupID, instances)
+		if err != nil {
+			glog.Warningf("Error opening ingress rules for the shared security group to the instances: %v", err)
+			return nil, err
+		}
 	}
 
 	err = c.ensureLoadBalancerInstances(orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
@@ -2863,6 +2912,92 @@ func (c *Cloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error)
 		m[id] = group
 	}
 	return m, nil
+}
+
+// Almost identical to updateInstanceSecurityGroupsForLoadBalancer, but it only adds ssg rules to
+// instances' inbound rules.
+func (c Cloud) updateInstanceSharedSecurityGroups(ssgID string, allInstances []*ec2.Instance) error {
+
+	// Get the actual list of groups that have this ssgID as part of its ingress rule.
+	describeRequest := &ec2.DescribeSecurityGroupsInput{}
+	filters := []*ec2.Filter{}
+	filters = append(filters, newEc2Filter("ip-permission.group-id", ssgID))
+	describeRequest.Filters = c.addFilters(filters)
+	actualGroups, err := c.ec2.DescribeSecurityGroups(describeRequest)
+	if err != nil {
+		return fmt.Errorf("error querying security groups for ssgID: %v", err)
+	}
+
+	taggedSecurityGroups, err := c.getTaggedSecurityGroups()
+	if err != nil {
+		return fmt.Errorf("error querying for tagged security groups: %v", err)
+	}
+
+	// Open the firewall from the load balancer to the instance
+	// We don't actually have a trivial way to know in advance which security group the instance is in
+	// (it is probably the minion security group, but we don't easily have that).
+	// However, we _do_ have the list of security groups on the instance records.
+
+	// Map containing the changes we want to make; true to add, false to remove
+	instanceSecurityGroupIds := map[string]bool{}
+
+	// Scan instances for groups we want open
+	for _, instance := range allInstances {
+		securityGroup, err := findSecurityGroupForInstance(instance, taggedSecurityGroups)
+		if err != nil {
+			return err
+		}
+
+		if securityGroup == nil {
+			glog.Warning("Ignoring instance without security group: ", orEmpty(instance.InstanceId))
+			continue
+		}
+		id := aws.StringValue(securityGroup.GroupId)
+		if id == "" {
+			glog.Warningf("found security group without id: %v", securityGroup)
+			continue
+		}
+
+		instanceSecurityGroupIds[id] = true
+	}
+
+	// Compare to actual groups
+	for _, actualGroup := range actualGroups {
+		actualGroupID := aws.StringValue(actualGroup.GroupId)
+		if actualGroupID == "" {
+			glog.Warning("Ignoring group without ID: ", actualGroup)
+			continue
+		}
+
+		adding, found := instanceSecurityGroupIds[actualGroupID]
+		if found && adding {
+			// We don't need to make a change; the permission is already in place
+			delete(instanceSecurityGroupIds, actualGroupID)
+		}
+	}
+
+	for instanceSecurityGroupId, _ := range instanceSecurityGroupIds {
+		sourceGroupId := &ec2.UserIdGroupPair{}
+		sourceGroupId.GroupId = &ssgID
+
+		// Instances should allow all traffic coming from the ssg resource.
+		allProtocols := "-1"
+
+		permission := &ec2.IpPermission{}
+		permission.IpProtocol = &allProtocols
+		permission.UserIdGroupPairs = []*ec2.UserIdGroupPair{sourceGroupId}
+
+		permissions := []*ec2.IpPermission{permission}
+
+		changed, err := c.addSecurityGroupIngress(instanceSecurityGroupId, permissions)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			glog.Warning("shared security group id already in instance's security group!")
+		}
+	}
+	return nil
 }
 
 // Open security group ingress rules on the instances so that the load balancer can talk to them
@@ -3030,9 +3165,24 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 
 		// Collect the security groups to delete
 		securityGroupIDs := map[string]struct{}{}
+
+		// shared securitygroup ID for reference
+		var ssgID string
+		var err error
+		if s.cfg.Global.EnableSharedSecurityGroupIngress {
+			ssgID, err = s.ensureSharedSecurityGroup()
+			if err != nil {
+				return fmt.Errorf("Error creating shared security group: ", err)
+			}
+		}
+
 		for _, securityGroupID := range lb.SecurityGroups {
 			if isNilOrEmpty(securityGroupID) {
 				glog.Warning("Ignoring empty security group in ", service.Name)
+				continue
+			}
+			// shouldn't try to delete ssgID
+			if *securityGroupID == ssgID {
 				continue
 			}
 			securityGroupIDs[*securityGroupID] = struct{}{}
