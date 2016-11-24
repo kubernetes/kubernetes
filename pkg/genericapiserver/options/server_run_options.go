@@ -69,6 +69,7 @@ type ServerRunOptions struct {
 	DefaultStorageVersions string
 	TargetRAMMB            int
 	WatchCacheSizes        []string
+	EnableCURLDebug        bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -300,6 +301,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
 		"The individual override format: resource#size, where size is a number. It takes effect "+
 		"when watch-cache is enabled.")
+
+	fs.BoolVar(&s.EnableCURLDebug, "enable-curl-debug", s.EnableCURLDebug, "Enable cURL debug info to the stderr.")
 
 	config.DefaultFeatureGate.AddFlag(fs)
 }
