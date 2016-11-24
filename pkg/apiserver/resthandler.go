@@ -591,11 +591,11 @@ func patchResource(
 			if err != nil {
 				return nil, err
 			}
-			currentPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, currentObjectJS, versionedObj, strategicpatch.SMPatchVersionLatest)
+			currentPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, currentObjectJS, versionedObj)
 			if err != nil {
 				return nil, err
 			}
-			originalPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, originalPatchedObjJS, versionedObj, strategicpatch.SMPatchVersionLatest)
+			originalPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
 			if err != nil {
 				return nil, err
 			}

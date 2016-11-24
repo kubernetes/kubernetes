@@ -533,8 +533,7 @@ func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	// Using SMPatchVersion_1_5, since RecordChangeCause() just update the annotation which is a map[string]string
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object, strategicpatch.SMPatchVersion_1_5)
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object)
 }
 
 // containsChangeCause checks if input resource info contains change-cause annotation.

@@ -343,8 +343,7 @@ func (o TaintOptions) RunTaint() error {
 		if err != nil {
 			return err
 		}
-		// Defaulting to SMPatchVersion_1_5 is safe, since we don't update list of primitives.
-		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, strategicpatch.SMPatchVersion_1_5)
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 		createdPatch := err == nil
 		if err != nil {
 			glog.V(2).Infof("couldn't compute patch: %v", err)
