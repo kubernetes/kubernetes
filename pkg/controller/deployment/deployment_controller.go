@@ -397,19 +397,24 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 
-	err = dc.classifyReplicaSets(deployment)
-	if err != nil {
-		glog.Infof("Classifying ReplicaSets failed")
+	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
+	if err = dc.handleOverlap(d); err != nil {
+		dc.eventRecorder.Eventf(d, api.EventTypeWarning, "SelectorOverlap", err.Error())
+		return nil
 	}
 
 	if d.DeletionTimestamp != nil {
 		return dc.syncStatusOnly(d)
 	}
 
-	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
 	if err = dc.handleOverlap(d); err != nil {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectorOverlap", err.Error())
 		return nil
+	}
+
+	err = dc.classifyReplicaSets(deployment)
+	if err != nil {
+		return err
 	}
 
 	// Update deployment conditions with an Unknown condition when pausing/resuming
