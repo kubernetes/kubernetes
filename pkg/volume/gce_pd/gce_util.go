@@ -86,50 +86,28 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 	// Apply Parameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
 	diskType := ""
-	configuredZone := ""
-	configuredZones := ""
-	zonePresent := false
-	zonesPresent := false
+	var PutAdminAndUserRequestsTogetherParams volume.PutAdminAndUserRequestsTogetherParams
 	for k, v := range c.options.Parameters {
 		switch strings.ToLower(k) {
 		case "type":
 			diskType = v
 		case "zone":
-			zonePresent = true
-			configuredZone = v
+			PutAdminAndUserRequestsTogetherParams.IsSCZoneSpecified = true
+			PutAdminAndUserRequestsTogetherParams.SCZone = v
 		case "zones":
-			zonesPresent = true
-			configuredZones = v
+			PutAdminAndUserRequestsTogetherParams.IsSCZonesSpecified = true
+			PutAdminAndUserRequestsTogetherParams.SCZones = v
 		default:
 			return "", 0, nil, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
 		}
 	}
 
-	if zonePresent && zonesPresent {
-		return "", 0, nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
-	}
-
-	// TODO: implement PVC.Selector parsing
-	if c.options.PVC.Spec.Selector != nil {
-		return "", 0, nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on GCE")
-	}
-
 	var zones sets.String
-	if !zonePresent && !zonesPresent {
-		zones, err = cloud.GetAllZones()
-		if err != nil {
-			glog.V(2).Infof("error getting zone information from GCE: %v", err)
-			return "", 0, nil, err
-		}
-	}
-	if !zonePresent && zonesPresent {
-		if zones, err = volume.ZonesToSet(configuredZones); err != nil {
-			return "", 0, nil, err
-		}
-	}
-	if zonePresent && !zonesPresent {
-		zones = make(sets.String)
-		zones.Insert(configuredZone)
+	PutAdminAndUserRequestsTogetherParams.PVC = c.options.PVC
+	PutAdminAndUserRequestsTogetherParams.GetAllZones = cloud.GetAllZones
+	PutAdminAndUserRequestsTogetherParams.ZoneToRegion = gcecloud.GetGCERegion
+	if zones, err = volume.PutAdminAndUserRequestsTogether(PutAdminAndUserRequestsTogetherParams); err != nil {
+		return "", 0, nil, err
 	}
 	zone := volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
 
