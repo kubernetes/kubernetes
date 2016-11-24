@@ -24,6 +24,8 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
+const SecretDescription = ",classified"
+
 // ConfigOverrides holds values that should override whatever information is pulled from the actual Config object.  You can't
 // simply use an actual Config object, because Configs hold maps, but overrides are restricted to "at most one"
 type ConfigOverrides struct {
@@ -75,6 +77,8 @@ type ClusterOverrideFlags struct {
 // get back a set of recommended flag names, descriptions, and defaults, but allow for customization by an extender.  This makes for
 // coherent extension, without full prescription
 type FlagInfo struct {
+	// Secret is the secret flag for the flag. If this is true, then the target value will be hide
+	Secret bool
 	// LongName is the long string for a flag.  If this is empty, then the flag will not be bound
 	LongName string
 	// ShortName is the single character for a flag.  If this is empty, then there will be no short flag
@@ -89,7 +93,12 @@ type FlagInfo struct {
 func (f FlagInfo) BindStringFlag(flags *pflag.FlagSet, target *string) {
 	// you can't register a flag without a long name
 	if len(f.LongName) > 0 {
-		flags.StringVarP(target, f.LongName, f.ShortName, f.Default, f.Description)
+		// add secret flag
+		description := f.Description
+		if f.Secret {
+			description = description + SecretDescription
+		}
+		flags.StringVarP(target, f.LongName, f.ShortName, f.Default, description)
 	}
 }
 
@@ -103,7 +112,12 @@ func (f FlagInfo) BindBoolFlag(flags *pflag.FlagSet, target *bool) {
 			boolVal = false
 		}
 
-		flags.BoolVarP(target, f.LongName, f.ShortName, boolVal, f.Description)
+		// add secret flag
+		description := f.Description
+		if f.Secret {
+			description = description + SecretDescription
+		}
+		flags.BoolVarP(target, f.LongName, f.ShortName, boolVal, description)
 	}
 }
 
@@ -133,39 +147,39 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 		ClusterOverrideFlags: RecommendedClusterOverrideFlags(prefix),
 		ContextOverrideFlags: RecommendedContextOverrideFlags(prefix),
 
-		CurrentContext: FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
-		Timeout:        FlagInfo{prefix + FlagTimeout, "", "0", "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests."},
+		CurrentContext: FlagInfo{false, prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
+		Timeout:        FlagInfo{false, prefix + FlagTimeout, "", "0", "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests."},
 	}
 }
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 	return AuthOverrideFlags{
-		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS"},
-		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS"},
-		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server"},
-		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation"},
-		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server"},
-		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server"},
+		ClientCertificate: FlagInfo{true, prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS"},
+		ClientKey:         FlagInfo{true, prefix + FlagKeyFile, "", "", "Path to a client key file for TLS"},
+		Token:             FlagInfo{true, prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server"},
+		Impersonate:       FlagInfo{true, prefix + FlagImpersonate, "", "", "Username to impersonate for the operation"},
+		Username:          FlagInfo{true, prefix + FlagUsername, "", "", "Username for basic authentication to the API server"},
+		Password:          FlagInfo{true, prefix + FlagPassword, "", "", "Password for basic authentication to the API server"},
 	}
 }
 
 // RecommendedClusterOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 	return ClusterOverrideFlags{
-		APIServer:             FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server"},
-		APIVersion:            FlagInfo{prefix + FlagAPIVersion, "", "", "DEPRECATED: The API version to use when talking to the server"},
-		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority"},
-		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure"},
+		APIServer:             FlagInfo{false, prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server"},
+		APIVersion:            FlagInfo{false, prefix + FlagAPIVersion, "", "", "DEPRECATED: The API version to use when talking to the server"},
+		CertificateAuthority:  FlagInfo{false, prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority"},
+		InsecureSkipTLSVerify: FlagInfo{false, prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure"},
 	}
 }
 
 // RecommendedContextOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 	return ContextOverrideFlags{
-		ClusterName:  FlagInfo{prefix + FlagClusterName, "", "", "The name of the kubeconfig cluster to use"},
-		AuthInfoName: FlagInfo{prefix + FlagAuthInfoName, "", "", "The name of the kubeconfig user to use"},
-		Namespace:    FlagInfo{prefix + FlagNamespace, "n", "", "If present, the namespace scope for this CLI request"},
+		ClusterName:  FlagInfo{false, prefix + FlagClusterName, "", "", "The name of the kubeconfig cluster to use"},
+		AuthInfoName: FlagInfo{false, prefix + FlagAuthInfoName, "", "", "The name of the kubeconfig user to use"},
+		Namespace:    FlagInfo{false, prefix + FlagNamespace, "n", "", "If present, the namespace scope for this CLI request"},
 	}
 }
 
