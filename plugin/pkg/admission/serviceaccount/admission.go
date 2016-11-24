@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/fields"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
@@ -91,11 +92,15 @@ type serviceAccount struct {
 func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return cl.Core().ServiceAccounts(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return cl.Core().ServiceAccounts(api.NamespaceAll).List(internalOptions)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return cl.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return cl.Core().ServiceAccounts(api.NamespaceAll).Watch(internalOptions)
 			},
 		},
 		&api.ServiceAccount{},
@@ -105,13 +110,17 @@ func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				options.FieldSelector = tokenSelector
-				return cl.Core().Secrets(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				internalOptions.FieldSelector = tokenSelector
+				return cl.Core().Secrets(api.NamespaceAll).List(internalOptions)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				options.FieldSelector = tokenSelector
-				return cl.Core().Secrets(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				internalOptions.FieldSelector = tokenSelector
+				return cl.Core().Secrets(api.NamespaceAll).Watch(internalOptions)
 			},
 		},
 		&api.Secret{},
@@ -304,7 +313,7 @@ func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAcco
 	for _, obj := range index {
 		token := obj.(*api.Secret)
 
-		if serviceaccount.IsServiceAccountToken(token, serviceAccount) {
+		if serviceaccount.InternalIsServiceAccountToken(token, serviceAccount) {
 			tokens = append(tokens, token)
 		}
 	}

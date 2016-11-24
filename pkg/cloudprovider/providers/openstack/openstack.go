@@ -36,7 +36,7 @@ import (
 	"github.com/rackspace/gophercloud/pagination"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -261,13 +261,13 @@ func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*s
 	return &serverList[0], nil
 }
 
-func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) ([]api.NodeAddress, error) {
+func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) ([]v1.NodeAddress, error) {
 	srv, err := getServerByName(client, name)
 	if err != nil {
 		return nil, err
 	}
 
-	addrs := []api.NodeAddress{}
+	addrs := []v1.NodeAddress{}
 
 	for network, netblob := range srv.Addresses {
 		list, ok := netblob.([]interface{})
@@ -276,7 +276,7 @@ func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) 
 		}
 
 		for _, item := range list {
-			var addressType api.NodeAddressType
+			var addressType v1.NodeAddressType
 
 			props, ok := item.(map[string]interface{})
 			if !ok {
@@ -285,9 +285,9 @@ func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) 
 
 			extIPType, ok := props["OS-EXT-IPS:type"]
 			if (ok && extIPType == "floating") || (!ok && network == "public") {
-				addressType = api.NodeExternalIP
+				addressType = v1.NodeExternalIP
 			} else {
-				addressType = api.NodeInternalIP
+				addressType = v1.NodeInternalIP
 			}
 
 			tmp, ok := props["addr"]
@@ -299,8 +299,8 @@ func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) 
 				continue
 			}
 
-			api.AddToNodeAddresses(&addrs,
-				api.NodeAddress{
+			v1.AddToNodeAddresses(&addrs,
+				v1.NodeAddress{
 					Type:    addressType,
 					Address: addr,
 				},
@@ -310,18 +310,18 @@ func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) 
 
 	// AccessIPs are usually duplicates of "public" addresses.
 	if srv.AccessIPv4 != "" {
-		api.AddToNodeAddresses(&addrs,
-			api.NodeAddress{
-				Type:    api.NodeExternalIP,
+		v1.AddToNodeAddresses(&addrs,
+			v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv4,
 			},
 		)
 	}
 
 	if srv.AccessIPv6 != "" {
-		api.AddToNodeAddresses(&addrs,
-			api.NodeAddress{
-				Type:    api.NodeExternalIP,
+		v1.AddToNodeAddresses(&addrs,
+			v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv6,
 			},
 		)
@@ -339,7 +339,7 @@ func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (s
 	}
 
 	for _, addr := range addrs {
-		if addr.Type == api.NodeInternalIP {
+		if addr.Type == v1.NodeInternalIP {
 			return addr.Address, nil
 		}
 	}

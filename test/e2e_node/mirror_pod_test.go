@@ -23,9 +23,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -47,7 +47,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("create the static pod")
 			err := createStaticPod(manifestPath, staticPodName, ns,
-				"gcr.io/google_containers/nginx-slim:0.7", api.RestartPolicyAlways)
+				"gcr.io/google_containers/nginx-slim:0.7", v1.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")
@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("update the static pod container image")
 			image := framework.GetPauseImageNameForHostArch()
-			err = createStaticPod(manifestPath, staticPodName, ns, image, api.RestartPolicyAlways)
+			err = createStaticPod(manifestPath, staticPodName, ns, image, v1.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be updated")
@@ -84,7 +84,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			uid := pod.UID
 
 			By("delete the mirror pod with grace period 30s")
-			err = f.ClientSet.Core().Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(30))
+			err = f.ClientSet.Core().Pods(ns).Delete(mirrorPodName, v1.NewDeleteOptions(30))
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be recreated")
@@ -99,7 +99,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			uid := pod.UID
 
 			By("delete the mirror pod with grace period 0s")
-			err = f.ClientSet.Core().Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(0))
+			err = f.ClientSet.Core().Pods(ns).Delete(mirrorPodName, v1.NewDeleteOptions(0))
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be recreated")
@@ -124,7 +124,7 @@ func staticPodPath(dir, name, namespace string) string {
 	return filepath.Join(dir, namespace+"-"+name+".yaml")
 }
 
-func createStaticPod(dir, name, namespace, image string, restart api.RestartPolicy) error {
+func createStaticPod(dir, name, namespace, image string, restart v1.RestartPolicy) error {
 	template := `
 apiVersion: v1
 kind: Pod
@@ -168,7 +168,7 @@ func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
 	}
-	if pod.Status.Phase != api.PodRunning {
+	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
 	}
 	return nil
@@ -182,7 +182,7 @@ func checkMirrorPodRecreatedAndRunnig(cl clientset.Interface, name, namespace st
 	if pod.UID == oUID {
 		return fmt.Errorf("expected the uid of mirror pod %q to be changed, got %q", name, pod.UID)
 	}
-	if pod.Status.Phase != api.PodRunning {
+	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
 	}
 	return nil

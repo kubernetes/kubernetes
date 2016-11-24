@@ -27,8 +27,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/service:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/errors:go_default_library",
@@ -51,8 +51,8 @@ go_test(
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/service:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/service:go_default_library",
         "//pkg/types:go_default_library",
         "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
         "//vendor:github.com/Azure/azure-sdk-for-go/arm/network",

@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -51,7 +51,7 @@ func updatePetCount(psClient appsclientset.StatefulSetsGetter, ps apps.StatefulS
 	var getErr error
 	for i, ps := 0, &ps; ; i++ {
 		glog.V(4).Infof(fmt.Sprintf("Updating replica count for StatefulSet: %s/%s, ", ps.Namespace, ps.Name) +
-			fmt.Sprintf("replicas %d->%d (need %d), ", ps.Status.Replicas, numPets, ps.Spec.Replicas))
+			fmt.Sprintf("replicas %d->%d (need %d), ", ps.Status.Replicas, numPets, *(ps.Spec.Replicas)))
 
 		ps.Status = apps.StatefulSetStatus{Replicas: int32(numPets)}
 		_, updateErr = psClient.StatefulSets(ps.Namespace).UpdateStatus(ps)
@@ -72,7 +72,7 @@ type unhealthyPetTracker struct {
 }
 
 // Get returns a previously recorded blocking pet for the given statefulset.
-func (u *unhealthyPetTracker) Get(ps *apps.StatefulSet, knownPets []*api.Pod) (*pcb, error) {
+func (u *unhealthyPetTracker) Get(ps *apps.StatefulSet, knownPets []*v1.Pod) (*pcb, error) {
 	u.storeLock.Lock()
 	defer u.storeLock.Unlock()
 

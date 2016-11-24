@@ -23,7 +23,7 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//pkg/api/v1/validation:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
@@ -61,6 +61,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
         "//pkg/kubelet/cm:go_default_library",

@@ -55,6 +55,14 @@ message ClusterRoleBinding {
   optional RoleRef roleRef = 3;
 }
 
+// +k8s:deepcopy-gen=false
+// ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types.
+// We use it to construct bindings in code.  It's more compact than trying to write them
+// out in a literal.
+message ClusterRoleBindingBuilder {
+  optional ClusterRoleBinding clusterRoleBinding = 1;
+}
+
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
 message ClusterRoleBindingList {
   // Standard object's metadata.
@@ -105,6 +113,14 @@ message PolicyRule {
   // Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
   // +optional
   repeated string nonResourceURLs = 6;
+}
+
+// +k8s:deepcopy-gen=false
+// PolicyRuleBuilder let's us attach methods.  A no-no for API types.
+// We use it to construct rules in code.  It's more compact than trying to write them
+// out in a literal and allows us to perform some basic checking during construction
+message PolicyRuleBuilder {
+  optional PolicyRule policyRule = 1;
 }
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.

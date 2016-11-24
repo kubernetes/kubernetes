@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -51,13 +51,13 @@ type RecycleEventRecorder func(eventtype, message string)
 //  pod - the pod designed by a volume plugin to recycle the volume. pod.Name
 //        will be overwritten with unique name based on PV.Name.
 //	client - kube client for API operations.
-func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.Pod, kubeClient clientset.Interface, recorder RecycleEventRecorder) error {
+func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, kubeClient clientset.Interface, recorder RecycleEventRecorder) error {
 	return internalRecycleVolumeByWatchingPodUntilCompletion(pvName, pod, newRecyclerClient(kubeClient, recorder))
 }
 
 // same as above func comments, except 'recyclerClient' is a narrower pod API
 // interface to ease testing
-func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.Pod, recyclerClient recyclerClient) error {
+func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, recyclerClient recyclerClient) error {
 	glog.V(5).Infof("creating recycler pod for volume %s\n", pod.Name)
 
 	// Generate unique name for the recycler pod - we need to get "already
@@ -83,7 +83,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.P
 			return fmt.Errorf("unexpected error creating recycler pod:  %+v\n", err)
 		}
 	}
-	defer func(pod *api.Pod) {
+	defer func(pod *v1.Pod) {
 		glog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
 		if err := recyclerClient.DeletePod(pod.Name, pod.Namespace); err != nil {
 			glog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
@@ -95,17 +95,17 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.P
 	for {
 		event := <-podCh
 		switch event.Object.(type) {
-		case *api.Pod:
+		case *v1.Pod:
 			// POD changed
-			pod := event.Object.(*api.Pod)
+			pod := event.Object.(*v1.Pod)
 			glog.V(4).Infof("recycler pod update received: %s %s/%s %s", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
 			switch event.Type {
 			case watch.Added, watch.Modified:
-				if pod.Status.Phase == api.PodSucceeded {
+				if pod.Status.Phase == v1.PodSucceeded {
 					// Recycle succeeded.
 					return nil
 				}
-				if pod.Status.Phase == api.PodFailed {
+				if pod.Status.Phase == v1.PodFailed {
 					if pod.Status.Message != "" {
 						return fmt.Errorf(pod.Status.Message)
 					} else {
@@ -120,9 +120,9 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.P
 				return fmt.Errorf("recycler pod watcher failed")
 			}
 
-		case *api.Event:
+		case *v1.Event:
 			// Event received
-			podEvent := event.Object.(*api.Event)
+			podEvent := event.Object.(*v1.Event)
 			glog.V(4).Infof("recycler event received: %s %s/%s %s/%s %s", event.Type, podEvent.Namespace, podEvent.Name, podEvent.InvolvedObject.Namespace, podEvent.InvolvedObject.Name, podEvent.Message)
 			if event.Type == watch.Added {
 				recyclerClient.Event(podEvent.Type, podEvent.Message)
@@ -134,8 +134,8 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.P
 // recyclerClient abstracts access to a Pod by providing a narrower interface.
 // This makes it easier to mock a client for testing.
 type recyclerClient interface {
-	CreatePod(pod *api.Pod) (*api.Pod, error)
-	GetPod(name, namespace string) (*api.Pod, error)
+	CreatePod(pod *v1.Pod) (*v1.Pod, error)
+	GetPod(name, namespace string) (*v1.Pod, error)
 	DeletePod(name, namespace string) error
 	// WatchPod returns a ListWatch for watching a pod.  The stopChannel is used
 	// to close the reflector backing the watch.  The caller is responsible for
@@ -157,11 +157,11 @@ type realRecyclerClient struct {
 	recorder RecycleEventRecorder
 }
 
-func (c *realRecyclerClient) CreatePod(pod *api.Pod) (*api.Pod, error) {
+func (c *realRecyclerClient) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
 	return c.client.Core().Pods(pod.Namespace).Create(pod)
 }
 
-func (c *realRecyclerClient) GetPod(name, namespace string) (*api.Pod, error) {
+func (c *realRecyclerClient) GetPod(name, namespace string) (*v1.Pod, error) {
 	return c.client.Core().Pods(namespace).Get(name)
 }
 
@@ -175,8 +175,8 @@ func (c *realRecyclerClient) Event(eventtype, message string) {
 
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
 	podSelector, _ := fields.ParseSelector("metadata.name=" + name)
-	options := api.ListOptions{
-		FieldSelector: podSelector,
+	options := v1.ListOptions{
+		FieldSelector: podSelector.String(),
 		Watch:         true,
 	}
 
@@ -186,8 +186,8 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 	}
 
 	eventSelector, _ := fields.ParseSelector("involvedObject.name=" + name)
-	eventWatch, err := c.client.Core().Events(namespace).Watch(api.ListOptions{
-		FieldSelector: eventSelector,
+	eventWatch, err := c.client.Core().Events(namespace).Watch(v1.ListOptions{
+		FieldSelector: eventSelector.String(),
 		Watch:         true,
 	})
 	if err != nil {
@@ -229,9 +229,9 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 // recycle operation. The calculation and return value is either the
 // minimumTimeout or the timeoutIncrement per Gi of storage size, whichever is
 // greater.
-func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *api.PersistentVolume) int64 {
+func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.PersistentVolume) int64 {
 	giQty := resource.MustParse("1Gi")
-	pvQty := pv.Spec.Capacity[api.ResourceStorage]
+	pvQty := pv.Spec.Capacity[v1.ResourceStorage]
 	giSize := giQty.Value()
 	pvSize := pvQty.Value()
 	timeout := (pvSize / giSize) * int64(timeoutIncrement)

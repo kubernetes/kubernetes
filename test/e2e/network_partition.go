@@ -22,8 +22,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -40,7 +41,7 @@ import (
 // At the end (even in case of errors), the network traffic is brought back to normal.
 // This function executes commands on a node so it will work only for some
 // environments.
-func testUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *api.Node, testFunc func()) {
+func testUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
 	host := framework.GetNodeExternalIP(node)
 	master := framework.GetMasterAddress(c)
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
@@ -54,13 +55,13 @@ func testUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *ap
 	}()
 
 	framework.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !framework.WaitForNodeToBe(c, node.Name, api.NodeReady, true, resizeNodeReadyTimeout) {
+	if !framework.WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
 		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 	framework.BlockNetwork(host, master)
 
 	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !framework.WaitForNodeToBe(c, node.Name, api.NodeReady, false, resizeNodeNotReadyTimeout) {
+	if !framework.WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
 		framework.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 
@@ -68,14 +69,14 @@ func testUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *ap
 	// network traffic is unblocked in a deferred function
 }
 
-func expectNodeReadiness(isReady bool, newNode chan *api.Node) {
+func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 	timeout := false
 	expected := false
 	timer := time.After(nodeReadinessTimeout)
 	for !expected && !timeout {
 		select {
 		case n := <-newNode:
-			if framework.IsNodeConditionSetAsExpected(n, api.NodeReady, isReady) {
+			if framework.IsNodeConditionSetAsExpected(n, v1.NodeReady, isReady) {
 				expected = true
 			} else {
 				framework.Logf("Observed node ready status is NOT %v as expected", isReady)
@@ -89,24 +90,24 @@ func expectNodeReadiness(isReady bool, newNode chan *api.Node) {
 	}
 }
 
-func podOnNode(podName, nodeName string, image string) *api.Pod {
-	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func podOnNode(podName, nodeName string, image string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: podName,
 			Labels: map[string]string{
 				"name": podName,
 			},
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  podName,
 					Image: image,
-					Ports: []api.ContainerPort{{ContainerPort: 9376}},
+					Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 				},
 			},
 			NodeName:      nodeName,
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 }
@@ -158,16 +159,16 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			It("All pods on the unreachable node should be marked as NotReady upon the node turn NotReady "+
 				"AND all pods should be mark back to Ready when the node get back to Ready before pod eviction timeout", func() {
 				By("choose a node - we will block all network traffic on this node")
-				var podOpts api.ListOptions
-				nodeOpts := api.ListOptions{}
+				var podOpts v1.ListOptions
+				nodeOpts := v1.ListOptions{}
 				nodes, err := c.Core().Nodes().List(nodeOpts)
 				Expect(err).NotTo(HaveOccurred())
-				framework.FilterNodes(nodes, func(node api.Node) bool {
-					if !framework.IsNodeConditionSetAsExpected(&node, api.NodeReady, true) {
+				framework.FilterNodes(nodes, func(node v1.Node) bool {
+					if !framework.IsNodeConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
-					podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
-					pods, err := c.Core().Pods(api.NamespaceAll).List(podOpts)
+					podOpts = v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+					pods, err := c.Core().Pods(v1.NamespaceAll).List(podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
 					}
@@ -177,7 +178,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 					framework.Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
-				podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
+				podOpts = v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
 				if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
 					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
@@ -185,25 +186,25 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 				By("Set up watch on node status")
 				nodeSelector := fields.OneTermEqualSelector("metadata.name", node.Name)
 				stopCh := make(chan struct{})
-				newNode := make(chan *api.Node)
+				newNode := make(chan *v1.Node)
 				var controller *cache.Controller
 				_, controller = cache.NewInformer(
 					&cache.ListWatch{
-						ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-							options.FieldSelector = nodeSelector
+						ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+							options.FieldSelector = nodeSelector.String()
 							obj, err := f.ClientSet.Core().Nodes().List(options)
 							return runtime.Object(obj), err
 						},
-						WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-							options.FieldSelector = nodeSelector
+						WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+							options.FieldSelector = nodeSelector.String()
 							return f.ClientSet.Core().Nodes().Watch(options)
 						},
 					},
-					&api.Node{},
+					&v1.Node{},
 					0,
 					cache.ResourceEventHandlerFuncs{
 						UpdateFunc: func(oldObj, newObj interface{}) {
-							n, ok := newObj.(*api.Node)
+							n, ok := newObj.(*v1.Node)
 							Expect(ok).To(Equal(true))
 							newNode <- n
 
@@ -262,7 +263,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-			options := api.ListOptions{LabelSelector: label}
+			options := v1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
@@ -327,7 +328,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-			options := api.ListOptions{LabelSelector: label}
+			options := v1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
@@ -385,8 +386,8 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 
 		It("should come back up if node goes down [Slow] [Disruptive]", func() {
-			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
-			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
+			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
@@ -399,16 +400,16 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			restartNodes(f, nodeNames)
 
 			By("waiting for pods to be running again")
-			pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
+			pst.waitForRunningAndReady(*ps.Spec.Replicas, ps)
 		})
 
 		It("should not reschedule pets if there is a network partition [Slow] [Disruptive]", func() {
-			ps := newStatefulSet(psName, ns, headlessSvcName, 3, []api.VolumeMount{}, []api.VolumeMount{}, labels)
+			ps := newStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
 			pst := statefulSetTester{c: c}
-			pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
+			pst.waitForRunningAndReady(*ps.Spec.Replicas, ps)
 
 			pod := pst.getPodList(ps).Items[0]
 			node, err := c.Core().Nodes().Get(pod.Spec.NodeName)
@@ -429,7 +430,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			}
 
 			By("waiting for pods to be running again")
-			pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
+			pst.waitForRunningAndReady(*ps.Spec.Replicas, ps)
 		})
 	})
 
@@ -438,7 +439,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			parallelism := int32(2)
 			completions := int32(4)
 
-			job := newTestJob("notTerminate", "network-partition", api.RestartPolicyNever, parallelism, completions)
+			job := newTestJob("notTerminate", "network-partition", v1.RestartPolicyNever, parallelism, completions)
 			job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 			Expect(err).NotTo(HaveOccurred())
 			label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: job.Name}))
@@ -448,7 +449,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
-			options := api.ListOptions{LabelSelector: label}
+			options := v1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName

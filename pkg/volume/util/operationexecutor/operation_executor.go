@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/types"
@@ -112,12 +112,12 @@ type OperationExecutor interface {
 
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
-	IsOperationPending(volumeName api.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
 func NewOperationExecutor(
-	kubeClient internalclientset.Interface,
+	kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool) OperationExecutor {
@@ -136,16 +136,16 @@ func NewOperationExecutor(
 // state of the world cache after successful mount/unmount.
 type ActualStateOfWorldMounterUpdater interface {
 	// Marks the specified volume as mounted to the specified pod
-	MarkVolumeAsMounted(podName volumetypes.UniquePodName, podUID types.UID, volumeName api.UniqueVolumeName, mounter volume.Mounter, outerVolumeSpecName string, volumeGidValue string) error
+	MarkVolumeAsMounted(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, outerVolumeSpecName string, volumeGidValue string) error
 
 	// Marks the specified volume as unmounted from the specified pod
-	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) error
+	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume as having been globally mounted.
-	MarkDeviceAsMounted(volumeName api.UniqueVolumeName) error
+	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume as having its global mount unmounted.
-	MarkDeviceAsUnmounted(volumeName api.UniqueVolumeName) error
+	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -158,25 +158,25 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// TODO: in the future, we should be able to remove the volumeName
 	// argument to this method -- since it is used only for attachable
 	// volumes.  See issue 29695.
-	MarkVolumeAsAttached(volumeName api.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
+	MarkVolumeAsAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
 	// Marks the specified volume as detached from the specified node
-	MarkVolumeAsDetached(volumeName api.UniqueVolumeName, nodeName types.NodeName)
+	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
 	// Marks desire to detach the specified volume (remove the volume from the node's
 	// volumesToReportedAsAttached list)
-	RemoveVolumeFromReportAsAttached(volumeName api.UniqueVolumeName, nodeName types.NodeName) error
+	RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) error
 
 	// Unmarks the desire to detach for the specified volume (add the volume back to
 	// the node's volumesToReportedAsAttached list)
-	AddVolumeToReportAsAttached(volumeName api.UniqueVolumeName, nodeName types.NodeName)
+	AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
 type VolumeToAttach struct {
 	// VolumeName is the unique identifier for the volume that should be
 	// attached.
-	VolumeName api.UniqueVolumeName
+	VolumeName v1.UniqueVolumeName
 
 	// VolumeSpec is a volume spec containing the specification for the volume
 	// that should be attached.
@@ -190,7 +190,7 @@ type VolumeToAttach struct {
 	// volume and are scheduled to the underlying node. The key in the map is
 	// the name of the pod and the value is a pod object containing more
 	// information about the pod.
-	ScheduledPods []*api.Pod
+	ScheduledPods []*v1.Pod
 }
 
 // VolumeToMount represents a volume that should be attached to this node and
@@ -198,7 +198,7 @@ type VolumeToAttach struct {
 type VolumeToMount struct {
 	// VolumeName is the unique identifier for the volume that should be
 	// mounted.
-	VolumeName api.UniqueVolumeName
+	VolumeName v1.UniqueVolumeName
 
 	// PodName is the unique identifier for the pod that the volume should be
 	// mounted to after it is attached.
@@ -215,7 +215,7 @@ type VolumeToMount struct {
 	OuterVolumeSpecName string
 
 	// Pod to mount the volume to. Used to create NewMounter.
-	Pod *api.Pod
+	Pod *v1.Pod
 
 	// PluginIsAttachable indicates that the plugin for this volume implements
 	// the volume.Attacher interface
@@ -236,7 +236,7 @@ type VolumeToMount struct {
 // AttachedVolume represents a volume that is attached to a node.
 type AttachedVolume struct {
 	// VolumeName is the unique identifier for the volume that is attached.
-	VolumeName api.UniqueVolumeName
+	VolumeName v1.UniqueVolumeName
 
 	// VolumeSpec is the volume spec containing the specification for the
 	// volume that is attached.
@@ -260,7 +260,7 @@ type MountedVolume struct {
 	PodName volumetypes.UniquePodName
 
 	// VolumeName is the unique identifier of the volume mounted to the pod.
-	VolumeName api.UniqueVolumeName
+	VolumeName v1.UniqueVolumeName
 
 	// InnerVolumeSpecName is the volume.Spec.Name() of the volume. If the
 	// volume was referenced through a persistent volume claims, this contains
@@ -361,7 +361,7 @@ type MountedVolume struct {
 type operationExecutor struct {
 	// Used to fetch objects from the API server like Node in the
 	// VerifyControllerAttachedVolume operation.
-	kubeClient internalclientset.Interface
+	kubeClient clientset.Interface
 
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
@@ -380,7 +380,7 @@ type operationExecutor struct {
 	checkNodeCapabilitiesBeforeMount bool
 }
 
-func (oe *operationExecutor) IsOperationPending(volumeName api.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
+func (oe *operationExecutor) IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
 	return oe.pendingOperations.IsOperationPending(volumeName, podName)
 }
 
@@ -502,7 +502,7 @@ func (oe *operationExecutor) generateVolumesAreAttachedFunc(
 	volumesPerPlugin := make(map[string][]*volume.Spec)
 	// volumeSpecMap maps from a volume spec to its unique volumeName which will be used
 	// when calling MarkVolumeAsDetached
-	volumeSpecMap := make(map[*volume.Spec]api.UniqueVolumeName)
+	volumeSpecMap := make(map[*volume.Spec]v1.UniqueVolumeName)
 	// Iterate each volume spec and put them into a map index by the pluginName
 	for _, volumeAttached := range attachedVolumes {
 		volumePlugin, err :=
@@ -607,7 +607,7 @@ func (oe *operationExecutor) generateAttachVolumeFunc(
 				volumeToAttach.NodeName,
 				attachErr)
 			for _, pod := range volumeToAttach.ScheduledPods {
-				oe.recorder.Eventf(pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+				oe.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
 			}
 			return err
 		}
@@ -620,7 +620,7 @@ func (oe *operationExecutor) generateAttachVolumeFunc(
 
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-			api.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
+			v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
 		if addVolumeNodeErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
@@ -857,7 +857,7 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 					volumeToMount.PodName,
 					volumeToMount.Pod.UID,
 					err)
-				oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+				oe.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
 				return err
 			}
 
@@ -887,7 +887,7 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 		if oe.checkNodeCapabilitiesBeforeMount {
 			if canMountErr := volumeMounter.CanMount(); canMountErr != nil {
 				errMsg := fmt.Sprintf("Unable to mount volume %v (spec.Name: %v) on pod %v (UID: %v). Verify that your node machine has the required components before attempting to mount this volume type. %s", volumeToMount.VolumeName, volumeToMount.VolumeSpec.Name(), volumeToMount.Pod.Name, volumeToMount.Pod.UID, canMountErr.Error())
-				oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeWarning, kevents.FailedMountVolume, errMsg)
+				oe.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, errMsg)
 				glog.Errorf(errMsg)
 				return fmt.Errorf(errMsg)
 			}
@@ -904,7 +904,7 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 				volumeToMount.PodName,
 				volumeToMount.Pod.UID,
 				mountErr)
-			oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+			oe.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
 			return err
 		}
 
@@ -1190,7 +1190,7 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					api.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
+					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
 				glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q) devicePath: %q",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),

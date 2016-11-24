@@ -22,7 +22,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -64,7 +65,7 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			// events for the kube-system namespace on failures
 			namespaceName := api.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.ClientSet.Core().Events(namespaceName).List(api.ListOptions{})
+			events, err := f.ClientSet.Core().Events(namespaceName).List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
@@ -160,7 +161,7 @@ func testReboot(c clientset.Interface, rebootCmd string) {
 	}
 }
 
-func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podNames []string, pods []*api.Pod) {
+func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podNames []string, pods []*v1.Pod) {
 	printFn := func(id, log string, err error, previous bool) {
 		prefix := "Retrieving log for container"
 		if previous {

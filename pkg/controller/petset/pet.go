@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -52,9 +52,9 @@ const (
 // and parent fields to pass it around safely.
 type pcb struct {
 	// pod is the desired pet pod.
-	pod *api.Pod
+	pod *v1.Pod
 	// pvcs is a list of desired persistent volume claims for the pet pod.
-	pvcs []api.PersistentVolumeClaim
+	pvcs []v1.PersistentVolumeClaim
 	// event is the lifecycle event associated with this update.
 	event petLifeCycleEvent
 	// id is the identity index of this pet.
@@ -106,7 +106,7 @@ func (p *petSyncer) Sync(pet *pcb) error {
 		return err
 	}
 	// if pet failed - we need to remove old one because of consistent naming
-	if exists && realPet.pod.Status.Phase == api.PodFailed {
+	if exists && realPet.pod.Status.Phase == v1.PodFailed {
 		glog.V(2).Infof("Deleting evicted pod %v/%v", realPet.pod.Namespace, realPet.pod.Name)
 		if err := p.petClient.Delete(realPet); err != nil {
 			return err
@@ -175,7 +175,7 @@ type petClient interface {
 
 // apiServerPetClient is a statefulset aware Kubernetes client.
 type apiServerPetClient struct {
-	c        internalclientset.Interface
+	c        clientset.Interface
 	recorder record.EventRecorder
 	petHealthChecker
 }
@@ -242,12 +242,12 @@ func (p *apiServerPetClient) DeletePVCs(pet *pcb) error {
 	return nil
 }
 
-func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*api.PersistentVolumeClaim, error) {
+func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
 	pvc, err := p.c.Core().PersistentVolumeClaims(pvcNamespace).Get(pvcName)
 	return pvc, err
 }
 
-func (p *apiServerPetClient) createPVC(pvc *api.PersistentVolumeClaim) error {
+func (p *apiServerPetClient) createPVC(pvc *v1.PersistentVolumeClaim) error {
 	_, err := p.c.Core().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 	return err
 }
@@ -280,17 +280,17 @@ func (p *apiServerPetClient) SyncPVCs(pet *pcb) error {
 // event formats an event for the given runtime object.
 func (p *apiServerPetClient) event(obj runtime.Object, reason, msg string, err error) {
 	if err != nil {
-		p.recorder.Eventf(obj, api.EventTypeWarning, fmt.Sprintf("Failed%v", reason), fmt.Sprintf("%v, error: %v", msg, err))
+		p.recorder.Eventf(obj, v1.EventTypeWarning, fmt.Sprintf("Failed%v", reason), fmt.Sprintf("%v, error: %v", msg, err))
 	} else {
-		p.recorder.Eventf(obj, api.EventTypeNormal, fmt.Sprintf("Successful%v", reason), msg)
+		p.recorder.Eventf(obj, v1.EventTypeNormal, fmt.Sprintf("Successful%v", reason), msg)
 	}
 }
 
 // petHealthChecker is an interface to check pet health. It makes a boolean
 // decision based on the given pod.
 type petHealthChecker interface {
-	isHealthy(*api.Pod) bool
-	isDying(*api.Pod) bool
+	isHealthy(*v1.Pod) bool
+	isDying(*v1.Pod) bool
 }
 
 // defaultPetHealthChecks does basic health checking.
@@ -299,11 +299,11 @@ type defaultPetHealthChecker struct{}
 
 // isHealthy returns true if the pod is ready & running. If the pod has the
 // "pod.alpha.kubernetes.io/initialized" annotation set to "false", pod state is ignored.
-func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
-	if pod == nil || pod.Status.Phase != api.PodRunning {
+func (d *defaultPetHealthChecker) isHealthy(pod *v1.Pod) bool {
+	if pod == nil || pod.Status.Phase != v1.PodRunning {
 		return false
 	}
-	podReady := api.IsPodReady(pod)
+	podReady := v1.IsPodReady(pod)
 
 	// User may have specified a pod readiness override through a debug annotation.
 	initialized, ok := pod.Annotations[StatefulSetInitAnnotation]
@@ -321,6 +321,6 @@ func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
 // isDying returns true if the pod has a non-nil deletion timestamp. Since the
 // timestamp can only decrease, once this method returns true for a given pet, it
 // will never return false.
-func (d *defaultPetHealthChecker) isDying(pod *api.Pod) bool {
+func (d *defaultPetHealthChecker) isDying(pod *v1.Pod) bool {
 	return pod != nil && pod.DeletionTimestamp != nil
 }

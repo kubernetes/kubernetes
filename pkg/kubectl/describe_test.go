@@ -30,11 +30,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	versionedfake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -618,16 +621,18 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 }
 
 func TestDescribeDeployment(t *testing.T) {
-	fake := fake.NewSimpleClientset(&extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+	fake := fake.NewSimpleClientset()
+	versionedFake := versionedfake.NewSimpleClientset(&v1beta1.Deployment{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
 		},
-		Spec: extensions.DeploymentSpec{
-			Template: api.PodTemplateSpec{},
+		Spec: v1beta1.DeploymentSpec{
+			Selector: &unversioned.LabelSelector{},
+			Template: v1.PodTemplateSpec{},
 		},
 	})
-	d := DeploymentDescriber{fake}
+	d := DeploymentDescriber{fake, versionedFake}
 	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -748,12 +753,16 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"DeploymentDescriber": &DeploymentDescriber{
-			fake.NewSimpleClientset(&extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+			fake.NewSimpleClientset(events),
+			versionedfake.NewSimpleClientset(&v1beta1.Deployment{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
 				},
-			}, events),
+				Spec: v1beta1.DeploymentSpec{
+					Selector: &unversioned.LabelSelector{},
+				},
+			}),
 		},
 		"EndpointsDescriber": &EndpointsDescriber{
 			fake.NewSimpleClientset(&api.Endpoints{

@@ -22,12 +22,12 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 
 	"k8s.io/kubernetes/pkg/controller"
@@ -52,7 +52,7 @@ const (
 
 // StatefulSetController controls statefulsets.
 type StatefulSetController struct {
-	kubeClient internalclientset.Interface
+	kubeClient clientset.Interface
 
 	// newSyncer returns an interface capable of syncing a single pet.
 	// Abstracted out for testing.
@@ -83,11 +83,11 @@ type StatefulSetController struct {
 }
 
 // NewStatefulSetController creates a new statefulset controller.
-func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient internalclientset.Interface, resyncPeriod time.Duration) *StatefulSetController {
+func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod time.Duration) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "statefulset"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "statefulset"})
 	pc := &apiServerPetClient{kubeClient, recorder, &defaultPetHealthChecker{}}
 
 	psc := &StatefulSetController{
@@ -112,11 +112,11 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 
 	psc.psStore.Store, psc.psController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return psc.kubeClient.Apps().StatefulSets(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return psc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return psc.kubeClient.Apps().StatefulSets(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return psc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&apps.StatefulSet{},
@@ -156,7 +156,7 @@ func (psc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 
 // addPod adds the statefulset for the pod to the sync queue
 func (psc *StatefulSetController) addPod(obj interface{}) {
-	pod := obj.(*api.Pod)
+	pod := obj.(*v1.Pod)
 	glog.V(4).Infof("Pod %s created, labels: %+v", pod.Name, pod.Labels)
 	ps := psc.getStatefulSetForPod(pod)
 	if ps == nil {
@@ -168,8 +168,8 @@ func (psc *StatefulSetController) addPod(obj interface{}) {
 // updatePod adds the statefulset for the current and old pods to the sync queue.
 // If the labels of the pod didn't change, this method enqueues a single statefulset.
 func (psc *StatefulSetController) updatePod(old, cur interface{}) {
-	curPod := cur.(*api.Pod)
-	oldPod := old.(*api.Pod)
+	curPod := cur.(*v1.Pod)
+	oldPod := old.(*v1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
@@ -189,7 +189,7 @@ func (psc *StatefulSetController) updatePod(old, cur interface{}) {
 
 // deletePod enqueues the statefulset for the pod accounting for deletion tombstones.
 func (psc *StatefulSetController) deletePod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
@@ -201,7 +201,7 @@ func (psc *StatefulSetController) deletePod(obj interface{}) {
 			glog.Errorf("couldn't get object from tombstone %+v", obj)
 			return
 		}
-		pod, ok = tombstone.Obj.(*api.Pod)
+		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
 			glog.Errorf("tombstone contained object that is not a pod %+v", obj)
 			return
@@ -214,18 +214,18 @@ func (psc *StatefulSetController) deletePod(obj interface{}) {
 }
 
 // getPodsForStatefulSets returns the pods that match the selectors of the given statefulset.
-func (psc *StatefulSetController) getPodsForStatefulSet(ps *apps.StatefulSet) ([]*api.Pod, error) {
+func (psc *StatefulSetController) getPodsForStatefulSet(ps *apps.StatefulSet) ([]*v1.Pod, error) {
 	// TODO: Do we want the statefulset to fight with RCs? check parent statefulset annoation, or name prefix?
 	sel, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
-		return []*api.Pod{}, err
+		return []*v1.Pod{}, err
 	}
 	pods, err := psc.podStore.Pods(ps.Namespace).List(sel)
 	if err != nil {
-		return []*api.Pod{}, err
+		return []*v1.Pod{}, err
 	}
 	// TODO: Do we need to copy?
-	result := make([]*api.Pod, 0, len(pods))
+	result := make([]*v1.Pod, 0, len(pods))
 	for i := range pods {
 		result = append(result, &(*pods[i]))
 	}
@@ -233,7 +233,7 @@ func (psc *StatefulSetController) getPodsForStatefulSet(ps *apps.StatefulSet) ([
 }
 
 // getStatefulSetForPod returns the pet set managing the given pod.
-func (psc *StatefulSetController) getStatefulSetForPod(pod *api.Pod) *apps.StatefulSet {
+func (psc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.StatefulSet {
 	ps, err := psc.psStore.GetPodStatefulSets(pod)
 	if err != nil {
 		glog.V(4).Infof("No StatefulSets found for pod %v, StatefulSet controller will avoid syncing", pod.Name)
@@ -320,7 +320,7 @@ func (psc *StatefulSetController) Sync(key string) error {
 }
 
 // syncStatefulSet syncs a tuple of (statefulset, pets).
-func (psc *StatefulSetController) syncStatefulSet(ps *apps.StatefulSet, pets []*api.Pod) (int, error) {
+func (psc *StatefulSetController) syncStatefulSet(ps *apps.StatefulSet, pets []*v1.Pod) (int, error) {
 	glog.V(2).Infof("Syncing StatefulSet %v/%v with %d pods", ps.Namespace, ps.Name, len(pets))
 
 	it := NewStatefulSetIterator(ps, pets)

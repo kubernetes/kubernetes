@@ -22,8 +22,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
@@ -46,9 +47,9 @@ const (
 // if any pods were deleted, or were found pending deletion.
 func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
 	remaining := false
-	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
-	options := api.ListOptions{FieldSelector: selector}
-	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(options)
+	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
+	options := v1.ListOptions{FieldSelector: selector}
+	pods, err := kubeClient.Core().Pods(v1.NamespaceAll).List(options)
 	var updateErrList []error
 
 	if err != nil {
@@ -56,7 +57,7 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	}
 
 	if len(pods.Items) > 0 {
-		recordNodeEvent(recorder, nodeName, nodeUID, api.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
+		recordNodeEvent(recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
 	}
 
 	for _, pod := range pods.Items {
@@ -85,7 +86,7 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		}
 
 		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
-		recorder.Eventf(&pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
+		recorder.Eventf(&pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
 		}
@@ -100,7 +101,7 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 
 // setPodTerminationReason attempts to set a reason and message in the pod status, updates it in the apiserver,
 // and returns an error if it encounters one.
-func setPodTerminationReason(kubeClient clientset.Interface, pod *api.Pod, nodeName string) (*api.Pod, error) {
+func setPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeName string) (*v1.Pod, error) {
 	if pod.Status.Reason == node.NodeUnreachablePodReason {
 		return pod, nil
 	}
@@ -108,7 +109,7 @@ func setPodTerminationReason(kubeClient clientset.Interface, pod *api.Pod, nodeN
 	pod.Status.Reason = node.NodeUnreachablePodReason
 	pod.Status.Message = fmt.Sprintf(node.NodeUnreachablePodMessage, nodeName, pod.Name)
 
-	var updatedPod *api.Pod
+	var updatedPod *v1.Pod
 	var err error
 	if updatedPod, err = kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod); err != nil {
 		return nil, err
@@ -116,10 +117,10 @@ func setPodTerminationReason(kubeClient clientset.Interface, pod *api.Pod, nodeN
 	return updatedPod, nil
 }
 
-func forcefullyDeletePod(c clientset.Interface, pod *api.Pod) error {
+func forcefullyDeletePod(c clientset.Interface, pod *v1.Pod) error {
 	var zero int64
 	glog.Infof("NodeController is force deleting Pod: %v:%v", pod.Namespace, pod.Name)
-	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &api.DeleteOptions{GracePeriodSeconds: &zero})
+	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &zero})
 	if err == nil {
 		glog.V(4).Infof("forceful deletion of %s succeeded", pod.Name)
 	}
@@ -138,14 +139,14 @@ func forcefullyDeleteNode(kubeClient clientset.Interface, nodeName string) error
 // maybeDeleteTerminatingPod non-gracefully deletes pods that are terminating
 // that should not be gracefully terminated.
 func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			glog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		pod, ok = tombstone.Obj.(*api.Pod)
+		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
 			glog.Errorf("Tombstone contained object that is not a Pod %#v", obj)
 			return
@@ -176,7 +177,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	// TODO(mikedanese): this can be removed when we no longer
 	// guarantee backwards compatibility of master API to kubelets with
 	// versions less than 1.1.0
-	node := nodeObj.(*api.Node)
+	node := nodeObj.(*v1.Node)
 	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
 		glog.V(0).Infof("couldn't parse verions %q of minion: %v", node.Status.NodeInfo.KubeletVersion, err)
@@ -191,7 +192,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 
 // update ready status of all pods running on given node from master
 // return true if success
-func markAllPodsNotReady(kubeClient clientset.Interface, node *api.Node) error {
+func markAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	// Don't set pods to NotReady if the kubelet is running a version that
 	// doesn't understand how to correct readiness.
 	// TODO: Remove this check when we no longer guarantee backward compatibility
@@ -201,8 +202,8 @@ func markAllPodsNotReady(kubeClient clientset.Interface, node *api.Node) error {
 	}
 	nodeName := node.Name
 	glog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
-	opts := api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName)}
-	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(opts)
+	opts := v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String()}
+	pods, err := kubeClient.Core().Pods(v1.NamespaceAll).List(opts)
 	if err != nil {
 		return err
 	}
@@ -215,8 +216,8 @@ func markAllPodsNotReady(kubeClient clientset.Interface, node *api.Node) error {
 		}
 
 		for i, cond := range pod.Status.Conditions {
-			if cond.Type == api.PodReady {
-				pod.Status.Conditions[i].Status = api.ConditionFalse
+			if cond.Type == v1.PodReady {
+				pod.Status.Conditions[i].Status = v1.ConditionFalse
 				glog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
 				_, err := kubeClient.Core().Pods(pod.Namespace).UpdateStatus(&pod)
 				if err != nil {
@@ -237,7 +238,7 @@ func markAllPodsNotReady(kubeClient clientset.Interface, node *api.Node) error {
 // in the nodeInfo of the given node is "outdated", meaning < 1.2.0.
 // Older versions were inflexible and modifying pod.Status directly through
 // the apiserver would result in unexpected outcomes.
-func nodeRunningOutdatedKubelet(node *api.Node) bool {
+func nodeRunningOutdatedKubelet(node *v1.Node) bool {
 	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
 		glog.Errorf("couldn't parse version %q of node %v", node.Status.NodeInfo.KubeletVersion, err)
@@ -265,7 +266,7 @@ func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.Nod
 }
 
 func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
-	ref := &api.ObjectReference{
+	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeUID),
@@ -275,8 +276,8 @@ func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
 }
 
-func recordNodeStatusChange(recorder record.EventRecorder, node *api.Node, new_status string) {
-	ref := &api.ObjectReference{
+func recordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, new_status string) {
+	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,
 		UID:       node.UID,
@@ -285,5 +286,5 @@ func recordNodeStatusChange(recorder record.EventRecorder, node *api.Node, new_s
 	glog.V(2).Infof("Recording status change %s event message for node %s", new_status, node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	recorder.Eventf(ref, api.EventTypeNormal, new_status, "Node %s status is now: %s", node.Name, new_status)
+	recorder.Eventf(ref, v1.EventTypeNormal, new_status, "Node %s status is now: %s", node.Name, new_status)
 }

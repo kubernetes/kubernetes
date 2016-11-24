@@ -25,7 +25,7 @@ package e2e
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -33,26 +33,25 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func scTestPod(hostIPC bool, hostPID bool) *api.Pod {
+func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 	podName := "security-context-" + string(uuid.NewUUID())
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:        podName,
 			Labels:      map[string]string{"name": podName},
 			Annotations: map[string]string{},
 		},
-		Spec: api.PodSpec{
-			SecurityContext: &api.PodSecurityContext{
-				HostIPC: hostIPC,
-				HostPID: hostPID,
-			},
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			HostIPC:         hostIPC,
+			HostPID:         hostPID,
+			SecurityContext: &v1.PodSecurityContext{},
+			Containers: []v1.Container{
 				{
 					Name:  "test-container",
 					Image: "gcr.io/google_containers/busybox:1.24",
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 
@@ -86,7 +85,7 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 		var uid int64 = 1001
 		var overrideUid int64 = 1002
 		pod.Spec.SecurityContext.RunAsUser = &uid
-		pod.Spec.Containers[0].SecurityContext = new(api.SecurityContext)
+		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUid
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
 
@@ -110,33 +109,33 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 	It("should support seccomp alpha unconfined annotation on the container [Feature:Seccomp]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+"test-container"] = "unconfined"
-		pod.Annotations[api.SeccompPodAnnotationKey] = "docker/default"
+		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = "unconfined"
+		pod.Annotations[v1.SeccompPodAnnotationKey] = "docker/default"
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput(api.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
+		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	It("should support seccomp alpha unconfined annotation on the pod [Feature:Seccomp]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[api.SeccompPodAnnotationKey] = "unconfined"
+		pod.Annotations[v1.SeccompPodAnnotationKey] = "unconfined"
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput(api.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
+		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	It("should support seccomp alpha docker/default annotation [Feature:Seccomp]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+"test-container"] = "docker/default"
+		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = "docker/default"
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput(api.SeccompPodAnnotationKey, pod, 0, []string{"2"}) // seccomp filtered
+		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"2"}) // seccomp filtered
 	})
 
 	It("should support seccomp default which is unconfined [Feature:Seccomp]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput(api.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
+		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
 })
 
@@ -146,23 +145,23 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod := scTestPod(hostIPC, hostPID)
 	volumeName := "test-volume"
 	mountPath := "/mounted_volume"
-	pod.Spec.Containers[0].VolumeMounts = []api.VolumeMount{
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
 		{
 			Name:      volumeName,
 			MountPath: mountPath,
 		},
 	}
-	pod.Spec.Volumes = []api.Volume{
+	pod.Spec.Volumes = []v1.Volume{
 		{
 			Name: volumeName,
-			VolumeSource: api.VolumeSource{
-				EmptyDir: &api.EmptyDirVolumeSource{
-					Medium: api.StorageMediumDefault,
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium: v1.StorageMediumDefault,
 				},
 			},
 		},
 	}
-	pod.Spec.SecurityContext.SELinuxOptions = &api.SELinuxOptions{
+	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c0,c1",
 	}
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
@@ -190,17 +189,17 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	By(fmt.Sprintf("confirming a container with the same label can read the file under --volume-dir=%s", framework.TestContext.KubeVolumeDir))
 	pod = scTestPod(hostIPC, hostPID)
 	pod.Spec.NodeName = foundPod.Spec.NodeName
-	volumeMounts := []api.VolumeMount{
+	volumeMounts := []v1.VolumeMount{
 		{
 			Name:      volumeName,
 			MountPath: mountPath,
 		},
 	}
-	volumes := []api.Volume{
+	volumes := []v1.Volume{
 		{
 			Name: volumeName,
-			VolumeSource: api.VolumeSource{
-				HostPath: &api.HostPathVolumeSource{
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
 					Path: volumeHostPath,
 				},
 			},
@@ -209,7 +208,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.Containers[0].VolumeMounts = volumeMounts
 	pod.Spec.Volumes = volumes
 	pod.Spec.Containers[0].Command = []string{"cat", testFilePath}
-	pod.Spec.SecurityContext.SELinuxOptions = &api.SELinuxOptions{
+	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c0,c1",
 	}
 
@@ -220,7 +219,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.Volumes = volumes
 	pod.Spec.Containers[0].VolumeMounts = volumeMounts
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
-	pod.Spec.SecurityContext.SELinuxOptions = &api.SELinuxOptions{
+	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c2,c3",
 	}
 	_, err = client.Create(pod)

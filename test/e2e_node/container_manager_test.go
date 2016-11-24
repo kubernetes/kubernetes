@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -95,12 +95,12 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 				var err error
 				podClient := f.PodClient()
 				podName := "besteffort" + string(uuid.NewUUID())
-				podClient.Create(&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				podClient.Create(&v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name: podName,
 					},
-					Spec: api.PodSpec{
-						Containers: []api.Container{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
 							{
 								Image: "gcr.io/google_containers/serve_hostname:v1.4",
 								Name:  podName,
@@ -139,17 +139,17 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 			It("guaranteed container's oom-score-adj should be -998", func() {
 				podClient := f.PodClient()
 				podName := "guaranteed" + string(uuid.NewUUID())
-				podClient.Create(&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				podClient.Create(&v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name: podName,
 					},
-					Spec: api.PodSpec{
-						Containers: []api.Container{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
 							{
 								Image: "gcr.io/google_containers/nginx-slim:0.7",
 								Name:  podName,
-								Resources: api.ResourceRequirements{
-									Limits: api.ResourceList{
+								Resources: v1.ResourceRequirements{
+									Limits: v1.ResourceList{
 										"cpu":    resource.MustParse("100m"),
 										"memory": resource.MustParse("50Mi"),
 									},
@@ -180,17 +180,17 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 			It("burstable container's oom-score-adj should be between [2, 1000)", func() {
 				podClient := f.PodClient()
 				podName := "burstable" + string(uuid.NewUUID())
-				podClient.Create(&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				podClient.Create(&v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name: podName,
 					},
-					Spec: api.PodSpec{
-						Containers: []api.Container{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
 							{
 								Image: "gcr.io/google_containers/test-webserver:e2e",
 								Name:  podName,
-								Resources: api.ResourceRequirements{
-									Requests: api.ResourceList{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
 										"cpu":    resource.MustParse("100m"),
 										"memory": resource.MustParse("50Mi"),
 									},

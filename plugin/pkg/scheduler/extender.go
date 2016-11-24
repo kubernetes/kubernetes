@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -94,20 +94,20 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig, apiVersion string) (al
 // Filter based on extender implemented predicate functions. The filtered list is
 // expected to be a subset of the supplied list. failedNodesMap optionally contains
 // the list of failed nodes and failure reasons.
-func (h *HTTPExtender) Filter(pod *api.Pod, nodes []*api.Node) ([]*api.Node, schedulerapi.FailedNodesMap, error) {
+func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
 	var result schedulerapi.ExtenderFilterResult
 
 	if h.filterVerb == "" {
 		return nodes, schedulerapi.FailedNodesMap{}, nil
 	}
 
-	nodeItems := make([]api.Node, 0, len(nodes))
+	nodeItems := make([]v1.Node, 0, len(nodes))
 	for _, node := range nodes {
 		nodeItems = append(nodeItems, *node)
 	}
 	args := schedulerapi.ExtenderArgs{
 		Pod:   *pod,
-		Nodes: api.NodeList{Items: nodeItems},
+		Nodes: v1.NodeList{Items: nodeItems},
 	}
 
 	if err := h.send(h.filterVerb, &args, &result); err != nil {
@@ -117,7 +117,7 @@ func (h *HTTPExtender) Filter(pod *api.Pod, nodes []*api.Node) ([]*api.Node, sch
 		return nil, nil, fmt.Errorf(result.Error)
 	}
 
-	nodeResult := make([]*api.Node, 0, len(result.Nodes.Items))
+	nodeResult := make([]*v1.Node, 0, len(result.Nodes.Items))
 	for i := range result.Nodes.Items {
 		nodeResult = append(nodeResult, &result.Nodes.Items[i])
 	}
@@ -127,7 +127,7 @@ func (h *HTTPExtender) Filter(pod *api.Pod, nodes []*api.Node) ([]*api.Node, sch
 // Prioritize based on extender implemented priority functions. Weight*priority is added
 // up for each such priority function. The returned score is added to the score computed
 // by Kubernetes scheduler. The total score is used to do the host selection.
-func (h *HTTPExtender) Prioritize(pod *api.Pod, nodes []*api.Node) (*schedulerapi.HostPriorityList, int, error) {
+func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, int, error) {
 	var result schedulerapi.HostPriorityList
 
 	if h.prioritizeVerb == "" {
@@ -138,13 +138,13 @@ func (h *HTTPExtender) Prioritize(pod *api.Pod, nodes []*api.Node) (*schedulerap
 		return &result, 0, nil
 	}
 
-	nodeItems := make([]api.Node, 0, len(nodes))
+	nodeItems := make([]v1.Node, 0, len(nodes))
 	for _, node := range nodes {
 		nodeItems = append(nodeItems, *node)
 	}
 	args := schedulerapi.ExtenderArgs{
 		Pod:   *pod,
-		Nodes: api.NodeList{Items: nodeItems},
+		Nodes: v1.NodeList{Items: nodeItems},
 	}
 
 	if err := h.send(h.prioritizeVerb, &args, &result); err != nil {

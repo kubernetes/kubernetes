@@ -25,6 +25,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -373,8 +374,11 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	}
 
 	failNilAppArmorPod := defaultPod()
-	failInvalidAppArmorPod := defaultPod()
-	apparmor.SetProfileName(failInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
+	v1FailInvalidAppArmorPod := defaultV1Pod()
+	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
+	failInvalidAppArmorPod := &api.Pod{}
+	v1.Convert_v1_Pod_To_api_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
+
 	failAppArmorPSP := defaultPSP()
 	failAppArmorPSP.Annotations = map[string]string{
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
@@ -669,8 +673,10 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	appArmorPSP.Annotations = map[string]string{
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
 	}
-	appArmorPod := defaultPod()
-	apparmor.SetProfileName(appArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
+	v1AppArmorPod := defaultV1Pod()
+	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
+	appArmorPod := &api.Pod{}
+	v1.Convert_v1_Pod_To_api_Pod(v1AppArmorPod, appArmorPod, nil)
 
 	privPSP := defaultPSP()
 	privPSP.Spec.Privileged = true
@@ -920,6 +926,30 @@ func defaultPod() *api.Pod {
 				{
 					Name: defaultContainerName,
 					SecurityContext: &api.SecurityContext{
+						// expected to be set by defaulting mechanisms
+						Privileged: &notPriv,
+						// fill in the rest for test cases
+					},
+				},
+			},
+		},
+	}
+}
+
+func defaultV1Pod() *v1.Pod {
+	var notPriv bool = false
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{
+			// fill in for test cases
+			},
+			Containers: []v1.Container{
+				{
+					Name: defaultContainerName,
+					SecurityContext: &v1.SecurityContext{
 						// expected to be set by defaulting mechanisms
 						Privileged: &notPriv,
 						// fill in the rest for test cases

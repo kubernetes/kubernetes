@@ -25,7 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -95,9 +95,9 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	appName := "logging-soak" + podname
 	podlables := f.CreatePodsPerNodeForSimpleApp(
 		appName,
-		func(n api.Node) api.PodSpec {
-			return api.PodSpec{
-				Containers: []api.Container{{
+		func(n v1.Node) v1.PodSpec {
+			return v1.PodSpec{
+				Containers: []v1.Container{{
 					Name:  "logging-soak",
 					Image: "gcr.io/google_containers/busybox:1.24",
 					Args: []string{
@@ -107,7 +107,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 					},
 				}},
 				NodeName:      n.Name,
-				RestartPolicy: api.RestartPolicyAlways,
+				RestartPolicy: v1.RestartPolicyAlways,
 			}
 		},
 		totalPods,
@@ -116,10 +116,10 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	logSoakVerification := f.NewClusterVerification(
 		framework.PodStateVerification{
 			Selectors:   podlables,
-			ValidPhases: []api.PodPhase{api.PodRunning, api.PodSucceeded},
+			ValidPhases: []v1.PodPhase{v1.PodRunning, v1.PodSucceeded},
 			// we don't validate total log data, since there is no gaurantee all logs will be stored forever.
 			// instead, we just validate that some logs are being created in std out.
-			Verify: func(p api.Pod) (bool, error) {
+			Verify: func(p v1.Pod) (bool, error) {
 				s, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)
 				return s != "", err
 			},

@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -596,7 +597,7 @@ func (f *factory) LogsForObject(object, options runtime.Object) (*restclient.Req
 			return nil, errors.New("provided options object is not a PodLogOptions")
 		}
 		selector := labels.SelectorFromSet(t.Spec.Selector)
-		sortBy := func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) }
+		sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
 		pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 20*time.Second, sortBy)
 		if err != nil {
 			return nil, err
@@ -616,7 +617,7 @@ func (f *factory) LogsForObject(object, options runtime.Object) (*restclient.Req
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
-		sortBy := func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) }
+		sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
 		pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 20*time.Second, sortBy)
 		if err != nil {
 			return nil, err
@@ -797,7 +798,7 @@ func (f *factory) AttachablePodForObject(object runtime.Object) (*api.Pod, error
 	switch t := object.(type) {
 	case *api.ReplicationController:
 		selector := labels.SelectorFromSet(t.Spec.Selector)
-		sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+		sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 		return pod, err
 	case *extensions.Deployment:
@@ -805,7 +806,7 @@ func (f *factory) AttachablePodForObject(object runtime.Object) (*api.Pod, error
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
-		sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+		sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 		return pod, err
 	case *batch.Job:
@@ -813,7 +814,7 @@ func (f *factory) AttachablePodForObject(object runtime.Object) (*api.Pod, error
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
-		sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+		sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 		return pod, err
 	case *api.Pod:
@@ -886,21 +887,25 @@ See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*api.Pod) sort.Interface) (*api.Pod, int, error) {
+func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
 	options := api.ListOptions{LabelSelector: selector}
 
 	podList, err := client.Pods(namespace).List(options)
 	if err != nil {
 		return nil, 0, err
 	}
-	pods := []*api.Pod{}
+	pods := []*v1.Pod{}
 	for i := range podList.Items {
 		pod := podList.Items[i]
-		pods = append(pods, &pod)
+		externalPod := &v1.Pod{}
+		v1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
+		pods = append(pods, externalPod)
 	}
 	if len(pods) > 0 {
 		sort.Sort(sortBy(pods))
-		return pods[0], len(podList.Items), nil
+		internalPod := &api.Pod{}
+		v1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
+		return internalPod, len(podList.Items), nil
 	}
 
 	// Watch until we observe a pod

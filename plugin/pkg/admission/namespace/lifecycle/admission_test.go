@@ -41,7 +41,7 @@ func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.Sh
 
 // newHandlerForTestWithClock returns a configured handler for testing.
 func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (admission.Interface, informers.SharedInformerFactory, error) {
-	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
+	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
 	handler, err := newLifecycleWithClock(c, sets.NewString(api.NamespaceDefault, api.NamespaceSystem), cacheClock)
 	if err != nil {
 		return nil, f, err

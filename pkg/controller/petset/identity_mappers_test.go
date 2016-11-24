@@ -23,8 +23,8 @@ import (
 
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	api_pod "k8s.io/kubernetes/pkg/api/pod"
+	"k8s.io/kubernetes/pkg/api/v1"
+	api_pod "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 func TestPetIDName(t *testing.T) {
@@ -150,10 +150,10 @@ func TestPetIDReset(t *testing.T) {
 	if identityHash(ps, firstPCB.pod) == identityHash(ps, secondPCB.pod) {
 		t.Fatalf("Failed to generate uniquey identities:\n%+v\n%+v", firstPCB.pod.Spec, secondPCB.pod.Spec)
 	}
-	userAdded := api.Volume{
+	userAdded := v1.Volume{
 		Name: "test",
-		VolumeSource: api.VolumeSource{
-			EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory},
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory},
 		},
 	}
 	firstPCB.pod.Spec.Volumes = append(firstPCB.pod.Spec.Volumes, userAdded)

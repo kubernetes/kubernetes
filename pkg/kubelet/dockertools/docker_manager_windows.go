@@ -21,7 +21,7 @@ package dockertools
 import (
 	"os"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 
 	dockertypes "github.com/docker/engine-api/types"
 )
@@ -53,6 +53,6 @@ func containerProvidesPodIP(name *KubeletContainerName) bool {
 }
 
 // Returns nil as both Seccomp and AppArmor security options are not valid on Windows
-func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
+func (dm *DockerManager) getSecurityOpts(pod *v1.Pod, ctrName string) ([]dockerOpt, error) {
 	return nil, nil
 }

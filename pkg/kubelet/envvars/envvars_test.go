@@ -20,67 +20,67 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 )
 
 func TestFromServices(t *testing.T) {
-	sl := []*api.Service{
+	sl := []*v1.Service{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "foo-bar"},
-			Spec: api.ServiceSpec{
+			ObjectMeta: v1.ObjectMeta{Name: "foo-bar"},
+			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "1.2.3.4",
-				Ports: []api.ServicePort{
+				Ports: []v1.ServicePort{
 					{Port: 8080, Protocol: "TCP"},
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-			Spec: api.ServiceSpec{
+			ObjectMeta: v1.ObjectMeta{Name: "abc-123"},
+			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "5.6.7.8",
-				Ports: []api.ServicePort{
+				Ports: []v1.ServicePort{
 					{Name: "u-d-p", Port: 8081, Protocol: "UDP"},
 					{Name: "t-c-p", Port: 8081, Protocol: "TCP"},
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "q-u-u-x"},
-			Spec: api.ServiceSpec{
+			ObjectMeta: v1.ObjectMeta{Name: "q-u-u-x"},
+			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "9.8.7.6",
-				Ports: []api.ServicePort{
+				Ports: []v1.ServicePort{
 					{Port: 8082, Protocol: "TCP"},
 					{Name: "8083", Port: 8083, Protocol: "TCP"},
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-none"},
-			Spec: api.ServiceSpec{
+			ObjectMeta: v1.ObjectMeta{Name: "svrc-clusterip-none"},
+			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "None",
-				Ports: []api.ServicePort{
+				Ports: []v1.ServicePort{
 					{Port: 8082, Protocol: "TCP"},
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-empty"},
-			Spec: api.ServiceSpec{
+			ObjectMeta: v1.ObjectMeta{Name: "svrc-clusterip-empty"},
+			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "",
-				Ports: []api.ServicePort{
+				Ports: []v1.ServicePort{
 					{Port: 8082, Protocol: "TCP"},
 				},
 			},
 		},
 	}
 	vars := envvars.FromServices(sl)
-	expected := []api.EnvVar{
+	expected := []v1.EnvVar{
 		{Name: "FOO_BAR_SERVICE_HOST", Value: "1.2.3.4"},
 		{Name: "FOO_BAR_SERVICE_PORT", Value: "8080"},
 		{Name: "FOO_BAR_PORT", Value: "tcp://1.2.3.4:8080"},

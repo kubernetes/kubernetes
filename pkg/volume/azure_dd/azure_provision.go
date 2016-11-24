@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -104,11 +104,11 @@ type azureDiskProvisioner struct {
 
 var _ volume.Provisioner = &azureDiskProvisioner{}
 
-func (a *azureDiskProvisioner) Provision() (*api.PersistentVolume, error) {
+func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	var sku, location, account string
 
 	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 255)
-	capacity := a.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 
@@ -136,22 +136,22 @@ func (a *azureDiskProvisioner) Provision() (*api.PersistentVolume, error) {
 		return nil, err
 	}
 
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	pv := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name:   a.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "azure-disk-dynamic-provisioner",
 			},
 		},
-		Spec: api.PersistentVolumeSpec{
+		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: a.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   a.options.PVC.Spec.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				AzureDisk: &api.AzureDiskVolumeSource{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				AzureDisk: &v1.AzureDiskVolumeSource{
 					DiskName:    diskName,
 					DataDiskURI: diskUri,
 				},

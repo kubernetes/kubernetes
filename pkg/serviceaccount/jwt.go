@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 
@@ -47,14 +47,14 @@ const (
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
 type ServiceAccountTokenGetter interface {
-	GetServiceAccount(namespace, name string) (*api.ServiceAccount, error)
-	GetSecret(namespace, name string) (*api.Secret, error)
+	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
+	GetSecret(namespace, name string) (*v1.Secret, error)
 }
 
 type TokenGenerator interface {
 	// GenerateToken generates a token which will identify the given ServiceAccount.
 	// The returned token will be stored in the given (and yet-unpersisted) Secret.
-	GenerateToken(serviceAccount api.ServiceAccount, secret api.Secret) (string, error)
+	GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error)
 }
 
 // ReadPrivateKey is a helper function for reading a private key from a PEM-encoded file
@@ -148,7 +148,7 @@ type jwtTokenGenerator struct {
 	privateKey interface{}
 }
 
-func (j *jwtTokenGenerator) GenerateToken(serviceAccount api.ServiceAccount, secret api.Secret) (string, error) {
+func (j *jwtTokenGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error) {
 	var method jwt.SigningMethod
 	switch privateKey := j.privateKey.(type) {
 	case *rsa.PrivateKey:
@@ -299,7 +299,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 				glog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
 				return nil, false, errors.New("Token has been invalidated")
 			}
-			if bytes.Compare(secret.Data[api.ServiceAccountTokenKey], []byte(token)) != 0 {
+			if bytes.Compare(secret.Data[v1.ServiceAccountTokenKey], []byte(token)) != 0 {
 				glog.V(4).Infof("Token contents no longer matches %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
 				return nil, false, errors.New("Token does not match server's copy")
 			}

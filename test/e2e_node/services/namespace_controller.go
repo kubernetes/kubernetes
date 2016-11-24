@@ -19,9 +19,9 @@ package services
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -57,7 +57,7 @@ func (n *NamespaceController) Start() error {
 	}
 	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	gvrFn := client.Discovery().ServerPreferredNamespacedResources
-	nc := namespacecontroller.NewNamespaceController(client, clientPool, gvrFn, ncResyncPeriod, api.FinalizerKubernetes)
+	nc := namespacecontroller.NewNamespaceController(client, clientPool, gvrFn, ncResyncPeriod, v1.FinalizerKubernetes)
 	go nc.Run(ncConcurrency, n.stopCh)
 	return nil
 }

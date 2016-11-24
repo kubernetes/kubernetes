@@ -22,14 +22,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	endptspkg "k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -42,32 +42,32 @@ var emptyNodeName string
 
 func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int) {
 	for i := 0; i < nPods+nNotReady; i++ {
-		p := &api.Pod{
-			TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-			ObjectMeta: api.ObjectMeta{
+		p := &v1.Pod{
+			TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+			ObjectMeta: v1.ObjectMeta{
 				Namespace: namespace,
 				Name:      fmt.Sprintf("pod%d", i),
 				Labels:    map[string]string{"foo": "bar"},
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{{Ports: []api.ContainerPort{}}},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{Ports: []v1.ContainerPort{}}},
 			},
-			Status: api.PodStatus{
+			Status: v1.PodStatus{
 				PodIP: fmt.Sprintf("1.2.3.%d", 4+i),
-				Conditions: []api.PodCondition{
+				Conditions: []v1.PodCondition{
 					{
-						Type:   api.PodReady,
-						Status: api.ConditionTrue,
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
 					},
 				},
 			},
 		}
 		if i >= nPods {
-			p.Status.Conditions[0].Status = api.ConditionFalse
+			p.Status.Conditions[0].Status = v1.ConditionFalse
 		}
 		for j := 0; j < nPorts; j++ {
 			p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports,
-				api.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: int32(8080 + j)})
+				v1.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: int32(8080 + j)})
 		}
 		store.Add(p)
 	}
@@ -94,54 +94,54 @@ func makeTestServer(t *testing.T, namespace string, endpointsResponse serverResp
 }
 
 func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       ns,
 				ResourceVersion: "1",
 			},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
-				Ports:     []api.EndpointPort{{Port: 1000}},
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+				Ports:     []v1.EndpointPort{{Port: 1000}},
 			}},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Port: 80}}},
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 80}}},
 	})
 	endpoints.syncService(ns + "/foo")
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
 func TestCheckLeftoverEndpoints(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1.NamespaceDefault
 	// Note that this requests *all* endpoints, therefore the NamespaceAll
 	// below.
-	testServer, _ := makeTestServer(t, api.NamespaceAll,
-		serverResponse{http.StatusOK, &api.EndpointsList{
+	testServer, _ := makeTestServer(t, v1.NamespaceAll,
+		serverResponse{http.StatusOK, &v1.EndpointsList{
 			ListMeta: unversioned.ListMeta{
 				ResourceVersion: "1",
 			},
-			Items: []api.Endpoints{{
-				ObjectMeta: api.ObjectMeta{
+			Items: []v1.Endpoints{{
+				ObjectMeta: v1.ObjectMeta{
 					Name:            "foo",
 					Namespace:       ns,
 					ResourceVersion: "1",
 				},
-				Subsets: []api.EndpointSubset{{
-					Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
-					Ports:     []api.EndpointPort{{Port: 1000}},
+				Subsets: []v1.EndpointSubset{{
+					Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+					Ports:     []v1.EndpointPort{{Port: 1000}},
 				}},
 			}},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	endpoints.checkLeftoverEndpoints()
@@ -158,41 +158,41 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       ns,
 				ResourceVersion: "1",
 			},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
-				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "TCP"}},
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+				Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "TCP"}},
 			}},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
-		Spec: api.ServiceSpec{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
+			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
 	endpointsHandler.ValidateRequestCount(t, 2)
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
@@ -201,40 +201,40 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       ns,
 				ResourceVersion: "1",
 			},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
-				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "UDP"}},
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+				Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "UDP"}},
 			}},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
-		Spec: api.ServiceSpec{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "UDP"}},
+			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "UDP"}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
 	endpointsHandler.ValidateRequestCount(t, 2)
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "UDP"}},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "UDP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
@@ -243,36 +243,36 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       ns,
 				ResourceVersion: "1",
 			},
-			Subsets: []api.EndpointSubset{},
+			Subsets: []v1.EndpointSubset{},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
-		Spec: api.ServiceSpec{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
@@ -281,36 +281,36 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       ns,
 				ResourceVersion: "1",
 			},
-			Subsets: []api.EndpointSubset{},
+			Subsets: []v1.EndpointSubset{},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 0, 1, 1)
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
-		Spec: api.ServiceSpec{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Subsets: []api.EndpointSubset{{
-			NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			Ports:             []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		Subsets: []v1.EndpointSubset{{
+			NotReadyAddresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:             []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
@@ -319,37 +319,37 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       ns,
 				ResourceVersion: "1",
 			},
-			Subsets: []api.EndpointSubset{},
+			Subsets: []v1.EndpointSubset{},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 1)
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
-		Spec: api.ServiceSpec{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Subsets: []api.EndpointSubset{{
-			Addresses:         []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}}},
-			Ports:             []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		Subsets: []v1.EndpointSubset{{
+			Addresses:         []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			NotReadyAddresses: []v1.EndpointAddress{{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}}},
+			Ports:             []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
@@ -358,108 +358,108 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       ns,
 				ResourceVersion: "1",
 			},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
-				Ports:     []api.EndpointPort{{Port: 1000}},
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+				Ports:     []v1.EndpointPort{{Port: 1000}},
 			}},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
-		Spec: api.ServiceSpec{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
-	ns := api.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, api.NamespaceDefault,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+	ns := v1.NamespaceDefault
+	testServer, endpointsHandler := makeTestServer(t, v1.NamespaceDefault,
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				ResourceVersion: "1",
 				Name:            "foo",
 				Namespace:       ns,
 			},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-				Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+				Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 			}},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
-	addPods(endpoints.podStore.Indexer, api.NamespaceDefault, 1, 1, 0)
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec: api.ServiceSpec{
+	addPods(endpoints.podStore.Indexer, v1.NamespaceDefault, 1, 1, 0)
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: v1.NamespaceDefault},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", api.NamespaceDefault, "foo"), "GET", nil)
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", v1.NamespaceDefault, "foo"), "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{}})
+		serverResponse{http.StatusOK, &v1.Endpoints{}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 3, 2, 0)
 	addPods(endpoints.podStore.Indexer, "blah", 5, 2, 0) // make sure these aren't found!
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
-		Spec: api.ServiceSpec{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports: []api.ServicePort{
+			Ports: []v1.ServicePort{
 				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)},
 				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt(8088)},
 			},
 		},
 	})
 	endpoints.syncService("other/foo")
-	expectedSubsets := []api.EndpointSubset{{
-		Addresses: []api.EndpointAddress{
-			{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
-			{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}},
-			{IP: "1.2.3.6", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2", Namespace: ns}},
+	expectedSubsets := []v1.EndpointSubset{{
+		Addresses: []v1.EndpointAddress{
+			{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+			{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}},
+			{IP: "1.2.3.6", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod2", Namespace: ns}},
 		},
-		Ports: []api.EndpointPort{
+		Ports: []v1.EndpointPort{
 			{Name: "port0", Port: 8080, Protocol: "TCP"},
 			{Name: "port1", Port: 8088, Protocol: "TCP"},
 		},
 	}}
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			ResourceVersion: "",
 		},
 		Subsets: endptspkg.SortSubsets(expectedSubsets),
@@ -472,41 +472,41 @@ func TestSyncEndpointsItems(t *testing.T) {
 func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{}})
+		serverResponse{http.StatusOK, &v1.Endpoints{}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 3, 2, 0)
 	serviceLabels := map[string]string{"foo": "bar"}
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 			Labels:    serviceLabels,
 		},
-		Spec: api.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports: []api.ServicePort{
+			Ports: []v1.ServicePort{
 				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)},
 				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt(8088)},
 			},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	expectedSubsets := []api.EndpointSubset{{
-		Addresses: []api.EndpointAddress{
-			{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
-			{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}},
-			{IP: "1.2.3.6", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2", Namespace: ns}},
+	expectedSubsets := []v1.EndpointSubset{{
+		Addresses: []v1.EndpointAddress{
+			{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+			{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}},
+			{IP: "1.2.3.6", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod2", Namespace: ns}},
 		},
-		Ports: []api.EndpointPort{
+		Ports: []v1.EndpointPort{
 			{Name: "port0", Port: 8080, Protocol: "TCP"},
 			{Name: "port1", Port: 8088, Protocol: "TCP"},
 		},
 	}}
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			ResourceVersion: "",
 			Labels:          serviceLabels,
 		},
@@ -520,8 +520,8 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns,
-		serverResponse{http.StatusOK, &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+		serverResponse{http.StatusOK, &v1.Endpoints{
+			ObjectMeta: v1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       ns,
 				ResourceVersion: "1",
@@ -529,39 +529,39 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 					"foo": "bar",
 				},
 			},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
-				Ports:     []api.EndpointPort{{Port: 1000}},
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+				Ports:     []v1.EndpointPort{{Port: 1000}},
 			}},
 		}})
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
 	serviceLabels := map[string]string{"baz": "blah"}
-	endpoints.serviceStore.Indexer.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{
+	endpoints.serviceStore.Indexer.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 			Labels:    serviceLabels,
 		},
-		Spec: api.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels:          serviceLabels,
 		},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)

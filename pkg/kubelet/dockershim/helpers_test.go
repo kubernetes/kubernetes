@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
@@ -58,19 +58,19 @@ func TestGetContainerSecurityOpts(t *testing.T) {
 	}, {
 		msg: "Seccomp unconfined",
 		config: makeConfig(map[string]string{
-			api.SeccompContainerAnnotationKeyPrefix + containerName: "unconfined",
+			v1.SeccompContainerAnnotationKeyPrefix + containerName: "unconfined",
 		}),
 		expectedOpts: []string{"seccomp=unconfined"},
 	}, {
 		msg: "Seccomp default",
 		config: makeConfig(map[string]string{
-			api.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
+			v1.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
 		}),
 		expectedOpts: nil,
 	}, {
 		msg: "Seccomp pod default",
 		config: makeConfig(map[string]string{
-			api.SeccompPodAnnotationKey: "docker/default",
+			v1.SeccompPodAnnotationKey: "docker/default",
 		}),
 		expectedOpts: nil,
 	}, {
@@ -88,8 +88,8 @@ func TestGetContainerSecurityOpts(t *testing.T) {
 	}, {
 		msg: "AppArmor and seccomp profile",
 		config: makeConfig(map[string]string{
-			api.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
-			apparmor.ContainerAnnotationKeyPrefix + containerName:   apparmor.ProfileNamePrefix + "foo",
+			v1.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
+			apparmor.ContainerAnnotationKeyPrefix + containerName:  apparmor.ProfileNamePrefix + "foo",
 		}),
 		expectedOpts: []string{"apparmor=foo"},
 	}}
@@ -121,20 +121,20 @@ func TestGetSandboxSecurityOpts(t *testing.T) {
 	}, {
 		msg: "Seccomp default",
 		config: makeConfig(map[string]string{
-			api.SeccompPodAnnotationKey: "docker/default",
+			v1.SeccompPodAnnotationKey: "docker/default",
 		}),
 		expectedOpts: nil,
 	}, {
 		msg: "Seccomp unconfined",
 		config: makeConfig(map[string]string{
-			api.SeccompPodAnnotationKey: "unconfined",
+			v1.SeccompPodAnnotationKey: "unconfined",
 		}),
 		expectedOpts: []string{"seccomp=unconfined"},
 	}, {
 		msg: "Seccomp pod and container profile",
 		config: makeConfig(map[string]string{
-			api.SeccompContainerAnnotationKeyPrefix + "test-container": "unconfined",
-			api.SeccompPodAnnotationKey:                                "docker/default",
+			v1.SeccompContainerAnnotationKeyPrefix + "test-container": "unconfined",
+			v1.SeccompPodAnnotationKey:                                "docker/default",
 		}),
 		expectedOpts: nil,
 	}}
@@ -156,8 +156,8 @@ func TestGetSystclsFromAnnotations(t *testing.T) {
 		expectedSysctls map[string]string
 	}{{
 		annotations: map[string]string{
-			api.SysctlsPodAnnotationKey:       "kernel.shmmni=32768,kernel.shmmax=1000000000",
-			api.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
+			v1.SysctlsPodAnnotationKey:       "kernel.shmmni=32768,kernel.shmmax=1000000000",
+			v1.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
 		},
 		expectedSysctls: map[string]string{
 			"kernel.shmmni":            "32768",
@@ -166,7 +166,7 @@ func TestGetSystclsFromAnnotations(t *testing.T) {
 		},
 	}, {
 		annotations: map[string]string{
-			api.SysctlsPodAnnotationKey: "kernel.shmmni=32768,kernel.shmmax=1000000000",
+			v1.SysctlsPodAnnotationKey: "kernel.shmmni=32768,kernel.shmmax=1000000000",
 		},
 		expectedSysctls: map[string]string{
 			"kernel.shmmni": "32768",
@@ -174,7 +174,7 @@ func TestGetSystclsFromAnnotations(t *testing.T) {
 		},
 	}, {
 		annotations: map[string]string{
-			api.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
+			v1.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
 		},
 		expectedSysctls: map[string]string{
 			"knet.ipv4.route.min_pmtu": "1000",

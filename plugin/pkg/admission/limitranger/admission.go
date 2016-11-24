@@ -68,9 +68,9 @@ type liveLookupEntry struct {
 }
 
 func (l *limitRanger) SetInformerFactory(f informers.SharedInformerFactory) {
-	limitRangeInformer := f.LimitRanges().Informer()
+	limitRangeInformer := f.InternalLimitRanges().Informer()
 	l.SetReadyFunc(limitRangeInformer.HasSynced)
-	l.lister = f.LimitRanges().Lister()
+	l.lister = f.InternalLimitRanges().Lister()
 }
 
 func (l *limitRanger) Validate() error {

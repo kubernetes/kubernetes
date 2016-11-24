@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -39,7 +39,7 @@ import (
 type OnCompleteFunc func(err error)
 
 // PodStatusFunc is a function that is invoked to generate a pod status.
-type PodStatusFunc func(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus
+type PodStatusFunc func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus
 
 // KillPodOptions are options when performing a pod update whose update type is kill.
 type KillPodOptions struct {
@@ -52,9 +52,9 @@ type KillPodOptions struct {
 // UpdatePodOptions is an options struct to pass to a UpdatePod operation.
 type UpdatePodOptions struct {
 	// pod to update
-	Pod *api.Pod
+	Pod *v1.Pod
 	// the mirror pod for the pod to update, if it is a static pod
-	MirrorPod *api.Pod
+	MirrorPod *v1.Pod
 	// the type of update (create, update, sync, kill)
 	UpdateType kubetypes.SyncPodType
 	// optional callback function when operation completes
@@ -77,9 +77,9 @@ type PodWorkers interface {
 // syncPodOptions provides the arguments to a SyncPod operation.
 type syncPodOptions struct {
 	// the mirror pod for the pod to sync, if it is a static pod
-	mirrorPod *api.Pod
+	mirrorPod *v1.Pod
 	// pod to sync
-	pod *api.Pod
+	pod *v1.Pod
 	// the type of update (create, update, sync)
 	updateType kubetypes.SyncPodType
 	// the current status
@@ -182,7 +182,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 		}
 		if err != nil {
 			glog.Errorf("Error syncing pod %s, skipping: %v", update.Pod.UID, err)
-			p.recorder.Eventf(update.Pod, api.EventTypeWarning, events.FailedSync, "Error syncing pod, skipping: %v", err)
+			p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "Error syncing pod, skipping: %v", err)
 		}
 		p.wrapUp(update.Pod.UID, err)
 	}
@@ -283,7 +283,7 @@ func (p *podWorkers) checkForUpdates(uid types.UID) {
 // killPodNow returns a KillPodFunc that can be used to kill a pod.
 // It is intended to be injected into other modules that need to kill a pod.
 func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.KillPodFunc {
-	return func(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
+	return func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
 		// determine the grace period to use when killing the pod
 		gracePeriod := int64(0)
 		if gracePeriodOverride != nil {
@@ -313,7 +313,7 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 				ch <- response{err: err}
 			},
 			KillPodOptions: &KillPodOptions{
-				PodStatusFunc: func(p *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
+				PodStatusFunc: func(p *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus {
 					return status
 				},
 				PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
@@ -325,7 +325,7 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 		case r := <-ch:
 			return r.err
 		case <-time.After(timeoutDuration):
-			recorder.Eventf(pod, api.EventTypeWarning, events.ExceededGracePeriod, "Container runtime did not kill the pod within specified grace period.")
+			recorder.Eventf(pod, v1.EventTypeWarning, events.ExceededGracePeriod, "Container runtime did not kill the pod within specified grace period.")
 			return fmt.Errorf("timeout waiting to kill pod")
 		}
 	}

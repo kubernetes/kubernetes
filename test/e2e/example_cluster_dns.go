@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -73,7 +73,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 
 		// we need two namespaces anyway, so let's forget about
 		// the one created in BeforeEach and create two new ones.
-		namespaces := []*api.Namespace{nil, nil}
+		namespaces := []*v1.Namespace{nil, nil}
 		for i := range namespaces {
 			var err error
 			namespaces[i], err = f.CreateNamespace(fmt.Sprintf("dnsexample%d", i), nil)
@@ -97,7 +97,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		// the application itself may have not been initialized. Just query the application.
 		for _, ns := range namespaces {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
-			options := api.ListOptions{LabelSelector: label}
+			options := v1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.Core().Pods(ns.Name).List(options)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
@@ -117,7 +117,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		// dns error or timeout.
 		// This code is probably unnecessary, but let's stay on the safe side.
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendPodName}))
-		options := api.ListOptions{LabelSelector: label}
+		options := v1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.Core().Pods(namespaces[0].Name).List(options)
 
 		if err != nil || pods == nil || len(pods.Items) == 0 {
@@ -151,6 +151,6 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 	})
 })
 
-func getNsCmdFlag(ns *api.Namespace) string {
+func getNsCmdFlag(ns *v1.Namespace) string {
 	return fmt.Sprintf("--namespace=%v", ns.Name)
 }

@@ -25,8 +25,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -34,7 +34,7 @@ import (
 
 // ConnectionDetails represents a master API endpoint connection
 type ConnectionDetails struct {
-	CertClient *certclient.CertificatesClient
+	CertClient *certclient.CertificatesV1alpha1Client
 	Endpoint   string
 	CACert     []byte
 	NodeName   types.NodeName
@@ -82,7 +82,7 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 				// connection established, stop all wait threads
 				close(stopChan)
 				result <- &ConnectionDetails{
-					CertClient: clientSet.CertificatesClient,
+					CertClient: clientSet.CertificatesV1alpha1Client,
 					Endpoint:   apiEndpoint,
 					CACert:     caCert,
 					NodeName:   nodeName,

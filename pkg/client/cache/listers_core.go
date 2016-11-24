@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -40,9 +41,9 @@ type StoreToPodLister struct {
 	Indexer Indexer
 }
 
-func (s *StoreToPodLister) List(selector labels.Selector) (ret []*api.Pod, err error) {
+func (s *StoreToPodLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
 	err = ListAll(s.Indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Pod))
+		ret = append(ret, m.(*v1.Pod))
 	})
 	return ret, err
 }
@@ -56,14 +57,14 @@ type storePodsNamespacer struct {
 	namespace string
 }
 
-func (s storePodsNamespacer) List(selector labels.Selector) (ret []*api.Pod, err error) {
+func (s storePodsNamespacer) List(selector labels.Selector) (ret []*v1.Pod, err error) {
 	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Pod))
+		ret = append(ret, m.(*v1.Pod))
 	})
 	return ret, err
 }
 
-func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
+func (s storePodsNamespacer) Get(name string) (*v1.Pod, error) {
 	obj, exists, err := s.Indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -71,7 +72,7 @@ func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
 	if !exists {
 		return nil, errors.NewNotFound(api.Resource("pod"), name)
 	}
-	return obj.(*api.Pod), nil
+	return obj.(*v1.Pod), nil
 }
 
 // StoreToServiceLister helps list services
@@ -79,9 +80,9 @@ type StoreToServiceLister struct {
 	Indexer Indexer
 }
 
-func (s *StoreToServiceLister) List(selector labels.Selector) (ret []*api.Service, err error) {
+func (s *StoreToServiceLister) List(selector labels.Selector) (ret []*v1.Service, err error) {
 	err = ListAll(s.Indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Service))
+		ret = append(ret, m.(*v1.Service))
 	})
 	return ret, err
 }
@@ -95,14 +96,14 @@ type storeServicesNamespacer struct {
 	namespace string
 }
 
-func (s storeServicesNamespacer) List(selector labels.Selector) (ret []*api.Service, err error) {
+func (s storeServicesNamespacer) List(selector labels.Selector) (ret []*v1.Service, err error) {
 	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Service))
+		ret = append(ret, m.(*v1.Service))
 	})
 	return ret, err
 }
 
-func (s storeServicesNamespacer) Get(name string) (*api.Service, error) {
+func (s storeServicesNamespacer) Get(name string) (*v1.Service, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -110,12 +111,12 @@ func (s storeServicesNamespacer) Get(name string) (*api.Service, error) {
 	if !exists {
 		return nil, errors.NewNotFound(api.Resource("service"), name)
 	}
-	return obj.(*api.Service), nil
+	return obj.(*v1.Service), nil
 }
 
 // TODO: Move this back to scheduler as a helper function that takes a Store,
 // rather than a method of StoreToServiceLister.
-func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service, err error) {
+func (s *StoreToServiceLister) GetPodServices(pod *v1.Pod) (services []*v1.Service, err error) {
 	allServices, err := s.Services(pod.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -141,9 +142,9 @@ type StoreToReplicationControllerLister struct {
 	Indexer Indexer
 }
 
-func (s *StoreToReplicationControllerLister) List(selector labels.Selector) (ret []*api.ReplicationController, err error) {
+func (s *StoreToReplicationControllerLister) List(selector labels.Selector) (ret []*v1.ReplicationController, err error) {
 	err = ListAll(s.Indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ReplicationController))
+		ret = append(ret, m.(*v1.ReplicationController))
 	})
 	return ret, err
 }
@@ -157,14 +158,14 @@ type storeReplicationControllersNamespacer struct {
 	namespace string
 }
 
-func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (ret []*api.ReplicationController, err error) {
+func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (ret []*v1.ReplicationController, err error) {
 	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ReplicationController))
+		ret = append(ret, m.(*v1.ReplicationController))
 	})
 	return ret, err
 }
 
-func (s storeReplicationControllersNamespacer) Get(name string) (*api.ReplicationController, error) {
+func (s storeReplicationControllersNamespacer) Get(name string) (*v1.ReplicationController, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -172,24 +173,24 @@ func (s storeReplicationControllersNamespacer) Get(name string) (*api.Replicatio
 	if !exists {
 		return nil, errors.NewNotFound(api.Resource("replicationcontroller"), name)
 	}
-	return obj.(*api.ReplicationController), nil
+	return obj.(*v1.ReplicationController), nil
 }
 
 // GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
-func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []*api.ReplicationController, err error) {
+func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.ReplicationController, err error) {
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
-	key := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace}}
+	key := &v1.ReplicationController{ObjectMeta: v1.ObjectMeta{Namespace: pod.Namespace}}
 	items, err := s.Indexer.Index(NamespaceIndex, key)
 	if err != nil {
 		return
 	}
 
 	for _, m := range items {
-		rc := m.(*api.ReplicationController)
+		rc := m.(*v1.ReplicationController)
 		selector := labels.Set(rc.Spec.Selector).AsSelectorPreValidated()
 
 		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
@@ -209,9 +210,9 @@ type StoreToServiceAccountLister struct {
 	Indexer Indexer
 }
 
-func (s *StoreToServiceAccountLister) List(selector labels.Selector) (ret []*api.ServiceAccount, err error) {
+func (s *StoreToServiceAccountLister) List(selector labels.Selector) (ret []*v1.ServiceAccount, err error) {
 	err = ListAll(s.Indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ServiceAccount))
+		ret = append(ret, m.(*v1.ServiceAccount))
 	})
 	return ret, err
 }
@@ -225,14 +226,14 @@ type storeServiceAccountsNamespacer struct {
 	namespace string
 }
 
-func (s storeServiceAccountsNamespacer) List(selector labels.Selector) (ret []*api.ServiceAccount, err error) {
+func (s storeServiceAccountsNamespacer) List(selector labels.Selector) (ret []*v1.ServiceAccount, err error) {
 	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ServiceAccount))
+		ret = append(ret, m.(*v1.ServiceAccount))
 	})
 	return ret, err
 }
 
-func (s storeServiceAccountsNamespacer) Get(name string) (*api.ServiceAccount, error) {
+func (s storeServiceAccountsNamespacer) Get(name string) (*v1.ServiceAccount, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -240,7 +241,7 @@ func (s storeServiceAccountsNamespacer) Get(name string) (*api.ServiceAccount, e
 	if !exists {
 		return nil, errors.NewNotFound(api.Resource("serviceaccount"), name)
 	}
-	return obj.(*api.ServiceAccount), nil
+	return obj.(*v1.ServiceAccount), nil
 }
 
 // StoreToLimitRangeLister helps list limit ranges
@@ -248,9 +249,9 @@ type StoreToLimitRangeLister struct {
 	Indexer Indexer
 }
 
-func (s *StoreToLimitRangeLister) List(selector labels.Selector) (ret []*api.LimitRange, err error) {
+func (s *StoreToLimitRangeLister) List(selector labels.Selector) (ret []*v1.LimitRange, err error) {
 	err = ListAll(s.Indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.LimitRange))
+		ret = append(ret, m.(*v1.LimitRange))
 	})
 	return ret, err
 }
@@ -261,9 +262,9 @@ type StoreToPersistentVolumeClaimLister struct {
 }
 
 // List returns all persistentvolumeclaims that match the specified selector
-func (s *StoreToPersistentVolumeClaimLister) List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error) {
+func (s *StoreToPersistentVolumeClaimLister) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
 	err = ListAll(s.Indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.PersistentVolumeClaim))
+		ret = append(ret, m.(*v1.PersistentVolumeClaim))
 	})
 	return ret, err
 }
@@ -277,14 +278,14 @@ type storeLimitRangesNamespacer struct {
 	namespace string
 }
 
-func (s storeLimitRangesNamespacer) List(selector labels.Selector) (ret []*api.LimitRange, err error) {
+func (s storeLimitRangesNamespacer) List(selector labels.Selector) (ret []*v1.LimitRange, err error) {
 	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.LimitRange))
+		ret = append(ret, m.(*v1.LimitRange))
 	})
 	return ret, err
 }
 
-func (s storeLimitRangesNamespacer) Get(name string) (*api.LimitRange, error) {
+func (s storeLimitRangesNamespacer) Get(name string) (*v1.LimitRange, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -292,7 +293,7 @@ func (s storeLimitRangesNamespacer) Get(name string) (*api.LimitRange, error) {
 	if !exists {
 		return nil, errors.NewNotFound(api.Resource("limitrange"), name)
 	}
-	return obj.(*api.LimitRange), nil
+	return obj.(*v1.LimitRange), nil
 }
 
 // PersistentVolumeClaims returns all claims in a specified namespace.
@@ -305,14 +306,14 @@ type storePersistentVolumeClaimsNamespacer struct {
 	namespace string
 }
 
-func (s storePersistentVolumeClaimsNamespacer) List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error) {
+func (s storePersistentVolumeClaimsNamespacer) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
 	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.PersistentVolumeClaim))
+		ret = append(ret, m.(*v1.PersistentVolumeClaim))
 	})
 	return ret, err
 }
 
-func (s storePersistentVolumeClaimsNamespacer) Get(name string) (*api.PersistentVolumeClaim, error) {
+func (s storePersistentVolumeClaimsNamespacer) Get(name string) (*v1.PersistentVolumeClaim, error) {
 	obj, exists, err := s.Indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -320,7 +321,7 @@ func (s storePersistentVolumeClaimsNamespacer) Get(name string) (*api.Persistent
 	if !exists {
 		return nil, errors.NewNotFound(api.Resource("persistentvolumeclaims"), name)
 	}
-	return obj.(*api.PersistentVolumeClaim), nil
+	return obj.(*v1.PersistentVolumeClaim), nil
 }
 
 // IndexerToNamespaceLister gives an Indexer List method
@@ -329,14 +330,14 @@ type IndexerToNamespaceLister struct {
 }
 
 // List returns a list of namespaces
-func (i *IndexerToNamespaceLister) List(selector labels.Selector) (ret []*api.Namespace, err error) {
+func (i *IndexerToNamespaceLister) List(selector labels.Selector) (ret []*v1.Namespace, err error) {
 	err = ListAll(i.Indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Namespace))
+		ret = append(ret, m.(*v1.Namespace))
 	})
 	return ret, err
 }
 
-func (i *IndexerToNamespaceLister) Get(name string) (*api.Namespace, error) {
+func (i *IndexerToNamespaceLister) Get(name string) (*v1.Namespace, error) {
 	obj, exists, err := i.Indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -344,5 +345,5 @@ func (i *IndexerToNamespaceLister) Get(name string) (*api.Namespace, error) {
 	if !exists {
 		return nil, errors.NewNotFound(api.Resource("namespace"), name)
 	}
-	return obj.(*api.Namespace), nil
+	return obj.(*v1.Namespace), nil
 }

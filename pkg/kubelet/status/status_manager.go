@@ -21,12 +21,14 @@ import (
 	"sync"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -36,10 +38,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-// A wrapper around api.PodStatus that includes a version to enforce that stale pod statuses are
+// A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
 // not sent to the API server.
 type versionedPodStatus struct {
-	status api.PodStatus
+	status v1.PodStatus
 	// Monotonically increasing version number (per pod).
 	version uint64
 	// Pod name & namespace, for sending updates to API server.
@@ -71,11 +73,11 @@ type manager struct {
 type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
 	// was a cache hit.
-	GetPodStatus(uid types.UID) (api.PodStatus, bool)
+	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
-// the latest api.PodStatus. It also syncs updates back to the API server.
+// the latest v1.PodStatus. It also syncs updates back to the API server.
 type Manager interface {
 	PodStatusProvider
 
@@ -83,7 +85,7 @@ type Manager interface {
 	Start()
 
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
-	SetPodStatus(pod *api.Pod, status api.PodStatus)
+	SetPodStatus(pod *v1.Pod, status v1.PodStatus)
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
@@ -91,7 +93,7 @@ type Manager interface {
 
 	// TerminatePod resets the container status for the provided pod to terminated and triggers
 	// a status update.
-	TerminatePod(pod *api.Pod)
+	TerminatePod(pod *v1.Pod)
 
 	// RemoveOrphanedStatuses scans the status cache and removes any entries for pods not included in
 	// the provided podUIDs.
@@ -113,7 +115,7 @@ func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager) Mana
 // isStatusEqual returns true if the given pod statuses are equal, false otherwise.
 // This method normalizes the status before comparing so as to make sure that meaningless
 // changes will be ignored.
-func isStatusEqual(oldStatus, status *api.PodStatus) bool {
+func isStatusEqual(oldStatus, status *v1.PodStatus) bool {
 	return api.Semantic.DeepEqual(status, oldStatus)
 }
 
@@ -139,14 +141,14 @@ func (m *manager) Start() {
 	}, 0)
 }
 
-func (m *manager) GetPodStatus(uid types.UID) (api.PodStatus, bool) {
+func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	status, ok := m.podStatuses[m.podManager.TranslatePodUID(uid)]
 	return status.status, ok
 }
 
-func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
+func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	// Make sure we're caching a deep copy.
@@ -202,7 +204,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 	// Update pod condition.
 	readyConditionIndex := -1
 	for i, condition := range status.Conditions {
-		if condition.Type == api.PodReady {
+		if condition.Type == v1.PodReady {
 			readyConditionIndex = i
 			break
 		}
@@ -218,7 +220,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 	m.updateStatusInternal(pod, status, false)
 }
 
-func findContainerStatus(status *api.PodStatus, containerID string) (containerStatus *api.ContainerStatus, init bool, ok bool) {
+func findContainerStatus(status *v1.PodStatus, containerID string) (containerStatus *v1.ContainerStatus, init bool, ok bool) {
 	// Find the container to update.
 	for i, c := range status.ContainerStatuses {
 		if c.ContainerID == containerID {
@@ -236,7 +238,7 @@ func findContainerStatus(status *api.PodStatus, containerID string) (containerSt
 
 }
 
-func (m *manager) TerminatePod(pod *api.Pod) {
+func (m *manager) TerminatePod(pod *v1.Pod) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	oldStatus := &pod.Status
@@ -248,13 +250,13 @@ func (m *manager) TerminatePod(pod *api.Pod) {
 		return
 	}
 	for i := range status.ContainerStatuses {
-		status.ContainerStatuses[i].State = api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{},
+		status.ContainerStatuses[i].State = v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{},
 		}
 	}
 	for i := range status.InitContainerStatuses {
-		status.InitContainerStatuses[i].State = api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{},
+		status.InitContainerStatuses[i].State = v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{},
 		}
 	}
 	m.updateStatusInternal(pod, pod.Status, true)
@@ -263,8 +265,8 @@ func (m *manager) TerminatePod(pod *api.Pod) {
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
 // necessary. Returns whether an update was triggered.
 // This method IS NOT THREAD SAFE and must be called from a locked function.
-func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, forceUpdate bool) bool {
-	var oldStatus api.PodStatus
+func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUpdate bool) bool {
+	var oldStatus v1.PodStatus
 	cachedStatus, isCached := m.podStatuses[pod.UID]
 	if isCached {
 		oldStatus = cachedStatus.status
@@ -275,10 +277,10 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, force
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
-	if _, readyCondition := api.GetPodCondition(&status, api.PodReady); readyCondition != nil {
+	if _, readyCondition := v1.GetPodCondition(&status, v1.PodReady); readyCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := unversioned.Now()
-		_, oldReadyCondition := api.GetPodCondition(&oldStatus, api.PodReady)
+		_, oldReadyCondition := v1.GetPodCondition(&oldStatus, v1.PodReady)
 		if oldReadyCondition != nil && readyCondition.Status == oldReadyCondition.Status {
 			lastTransitionTime = oldReadyCondition.LastTransitionTime
 		}
@@ -286,10 +288,10 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, force
 	}
 
 	// Set InitializedCondition.LastTransitionTime.
-	if _, initCondition := api.GetPodCondition(&status, api.PodInitialized); initCondition != nil {
+	if _, initCondition := v1.GetPodCondition(&status, v1.PodInitialized); initCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := unversioned.Now()
-		_, oldInitCondition := api.GetPodCondition(&oldStatus, api.PodInitialized)
+		_, oldInitCondition := v1.GetPodCondition(&oldStatus, v1.PodInitialized)
 		if oldInitCondition != nil && initCondition.Status == oldInitCondition.Status {
 			lastTransitionTime = oldInitCondition.LastTransitionTime
 		}
@@ -419,6 +421,9 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			return
 		}
 		pod.Status = status.status
+		if err := podutil.SetInitContainersStatusesAnnotations(pod); err != nil {
+			glog.Error(err)
+		}
 		// TODO: handle conflict as a retry, make that easier too.
 		pod, err = m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
@@ -435,10 +440,9 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 				return
 			}
-			deleteOptions := api.NewDeleteOptions(0)
+			deleteOptions := v1.NewDeleteOptions(0)
 			// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
-			deleteOptions.Preconditions = api.NewUIDPreconditions(string(pod.UID))
-			glog.V(2).Infof("Removing Pod %q from etcd", format.Pod(pod))
+			deleteOptions.Preconditions = v1.NewUIDPreconditions(string(pod.UID))
 			if err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
 				m.deletePodStatus(uid)
@@ -467,7 +471,7 @@ func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 // now the pod manager only supports getting mirror pod by static pod, so we have to pass
 // static pod uid here.
 // TODO(random-liu): Simplify the logic when mirror pod manager is added.
-func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
+func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 	// The pod could be a static pod, so we should translate first.
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
@@ -508,11 +512,11 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 // In fact, the best way to solve this is to do it on api side. However, for now, we normalize the status locally in
 // kubelet temporarily.
 // TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
-func normalizeStatus(pod *api.Pod, status *api.PodStatus) *api.PodStatus {
+func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	normalizeTimeStamp := func(t *unversioned.Time) {
 		*t = t.Rfc3339Copy()
 	}
-	normalizeContainerState := func(c *api.ContainerState) {
+	normalizeContainerState := func(c *v1.ContainerState) {
 		if c.Running != nil {
 			normalizeTimeStamp(&c.Running.StartedAt)
 		}
@@ -553,7 +557,7 @@ func normalizeStatus(pod *api.Pod, status *api.PodStatus) *api.PodStatus {
 
 // notRunning returns true if every status is terminated or waiting, or the status list
 // is empty.
-func notRunning(statuses []api.ContainerStatus) bool {
+func notRunning(statuses []v1.ContainerStatus) bool {
 	for _, status := range statuses {
 		if status.State.Terminated == nil && status.State.Waiting == nil {
 			return false
@@ -562,12 +566,12 @@ func notRunning(statuses []api.ContainerStatus) bool {
 	return true
 }
 
-func copyStatus(source *api.PodStatus) (api.PodStatus, error) {
+func copyStatus(source *v1.PodStatus) (v1.PodStatus, error) {
 	clone, err := api.Scheme.DeepCopy(source)
 	if err != nil {
 		glog.Errorf("Failed to clone status %+v: %v", source, err)
-		return api.PodStatus{}, err
+		return v1.PodStatus{}, err
 	}
-	status := *clone.(*api.PodStatus)
+	status := *clone.(*v1.PodStatus)
 	return status, nil
 }

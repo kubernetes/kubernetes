@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -144,10 +144,10 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
+	spec := &v1.Volume{
 		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			Flocker: &api.FlockerVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			Flocker: &v1.FlockerVolumeSource{
 				DatasetUUID: "uuid1",
 			},
 		},
@@ -181,24 +181,24 @@ func TestCanSupport(t *testing.T) {
 
 	specs := map[*volume.Spec]bool{
 		&volume.Spec{
-			Volume: &api.Volume{
-				VolumeSource: api.VolumeSource{
-					Flocker: &api.FlockerVolumeSource{},
+			Volume: &v1.Volume{
+				VolumeSource: v1.VolumeSource{
+					Flocker: &v1.FlockerVolumeSource{},
 				},
 			},
 		}: true,
 		&volume.Spec{
-			PersistentVolume: &api.PersistentVolume{
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						Flocker: &api.FlockerVolumeSource{},
+			PersistentVolume: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						Flocker: &v1.FlockerVolumeSource{},
 					},
 				},
 			},
 		}: true,
 		&volume.Spec{
-			Volume: &api.Volume{
-				VolumeSource: api.VolumeSource{},
+			Volume: &v1.Volume{
+				VolumeSource: v1.VolumeSource{},
 			},
 		}: false,
 	}
@@ -215,9 +215,9 @@ func TestGetFlockerVolumeSource(t *testing.T) {
 	p := flockerPlugin{}
 
 	spec := &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				Flocker: &api.FlockerVolumeSource{},
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				Flocker: &v1.FlockerVolumeSource{},
 			},
 		},
 	}
@@ -226,10 +226,10 @@ func TestGetFlockerVolumeSource(t *testing.T) {
 	assert.Equal(spec.Volume.Flocker, vs)
 
 	spec = &volume.Spec{
-		PersistentVolume: &api.PersistentVolume{
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					Flocker: &api.FlockerVolumeSource{},
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Flocker: &v1.FlockerVolumeSource{},
 				},
 			},
 		},
@@ -247,16 +247,16 @@ func TestNewMounterDatasetName(t *testing.T) {
 	assert.NoError(err)
 
 	spec := &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				Flocker: &api.FlockerVolumeSource{
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				Flocker: &v1.FlockerVolumeSource{
 					DatasetName: "something",
 				},
 			},
 		},
 	}
 
-	_, err = plug.NewMounter(spec, &api.Pod{}, volume.VolumeOptions{})
+	_, err = plug.NewMounter(spec, &v1.Pod{}, volume.VolumeOptions{})
 	assert.NoError(err)
 }
 
@@ -268,16 +268,16 @@ func TestNewMounterDatasetUUID(t *testing.T) {
 	assert.NoError(err)
 
 	spec := &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				Flocker: &api.FlockerVolumeSource{
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				Flocker: &v1.FlockerVolumeSource{
 					DatasetUUID: "uuid1",
 				},
 			},
 		},
 	}
 
-	mounter, err := plug.NewMounter(spec, &api.Pod{}, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(spec, &v1.Pod{}, volume.VolumeOptions{})
 	assert.NoError(err)
 	assert.NotNil(mounter, "got a nil mounter")
 
@@ -349,7 +349,7 @@ func TestSetUpAtInternal(t *testing.T) {
 	plug, err := plugMgr.FindPluginByName(flockerPluginName)
 	assert.NoError(err)
 
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
 	b := flockerVolumeMounter{flockerVolume: &flockerVolume{pod: pod, plugin: plug.(*flockerPlugin)}}
 	b.client = newMockFlockerClient("dataset-id", "primary-uid", mockPath)
 

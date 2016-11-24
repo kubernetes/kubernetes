@@ -24,7 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -37,7 +38,7 @@ func listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient clientset.I
 	// TODO: ideally, we could pass dynamic client pool down into this code, and have one way of doing this.
 	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
 	// structured objects.
-	return func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+	return func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 		itemList, err := kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
 		if err != nil {
 			return nil, err
@@ -75,13 +76,21 @@ func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface, f informe
 
 // PersistentVolumeClaimUsageFunc knows how to measure usage associated with persistent volume claims
 func PersistentVolumeClaimUsageFunc(object runtime.Object) api.ResourceList {
-	pvc, ok := object.(*api.PersistentVolumeClaim)
-	if !ok {
-		return api.ResourceList{}
-	}
 	result := api.ResourceList{}
+	var found bool
+	var request resource.Quantity
+
+	switch t := object.(type) {
+	case *v1.PersistentVolumeClaim:
+		request, found = t.Spec.Resources.Requests[v1.ResourceStorage]
+	case *api.PersistentVolumeClaim:
+		request, found = t.Spec.Resources.Requests[api.ResourceStorage]
+	default:
+		panic(fmt.Sprintf("expect *api.PersistenVolumeClaim or *v1.PersistentVolumeClaim, got %v", t))
+	}
+
 	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
-	if request, found := pvc.Spec.Resources.Requests[api.ResourceStorage]; found {
+	if found {
 		result[api.ResourceRequestsStorage] = request
 	}
 	return result

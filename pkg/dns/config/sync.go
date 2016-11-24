@@ -18,9 +18,9 @@ package config
 
 import (
 	"k8s.io/client-go/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	fed "k8s.io/kubernetes/pkg/dns/federation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -55,19 +55,19 @@ func NewSync(client clientset.Interface, ns string, name string) Sync {
 	}
 
 	listWatch := &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			options.FieldSelector = fields.Set{"metadata.name": name}.AsSelector()
+		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fields.Set{"metadata.name": name}.AsSelector().String()
 			return client.Core().ConfigMaps(ns).List(options)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			options.FieldSelector = fields.Set{"metadata.name": name}.AsSelector()
+		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fields.Set{"metadata.name": name}.AsSelector().String()
 			return client.Core().ConfigMaps(ns).Watch(options)
 		},
 	}
 
 	store, controller := cache.NewInformer(
 		listWatch,
-		&api.ConfigMap{},
+		&v1.ConfigMap{},
 		time.Duration(0),
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sync.onAdd,
@@ -115,8 +115,8 @@ func (sync *kubeSync) Periodic() <-chan *Config {
 	return sync.channel
 }
 
-func (sync *kubeSync) toConfigMap(obj interface{}) *api.ConfigMap {
-	cm, ok := obj.(*api.ConfigMap)
+func (sync *kubeSync) toConfigMap(obj interface{}) *v1.ConfigMap {
+	cm, ok := obj.(*v1.ConfigMap)
 	if !ok {
 		glog.Fatalf("Expected ConfigMap, got %T", obj)
 	}
@@ -154,7 +154,7 @@ func (sync *kubeSync) onUpdate(_, obj interface{}) {
 	}
 }
 
-func (sync *kubeSync) processUpdate(cm *api.ConfigMap) (config *Config, changed bool, err error) {
+func (sync *kubeSync) processUpdate(cm *v1.ConfigMap) (config *Config, changed bool, err error) {
 	glog.V(4).Infof("processUpdate ConfigMap %+v", *cm)
 
 	if cm.ObjectMeta.ResourceVersion != sync.latestVersion {
@@ -184,7 +184,7 @@ func (sync *kubeSync) processUpdate(cm *api.ConfigMap) (config *Config, changed 
 	return
 }
 
-func (sync *kubeSync) updateFederations(cm *api.ConfigMap, config *Config) (err error) {
+func (sync *kubeSync) updateFederations(cm *v1.ConfigMap, config *Config) (err error) {
 	if flagValue, ok := cm.Data["federations"]; ok {
 		config.Federations = make(map[string]string)
 		if err = fed.ParseFederationsFlag(flagValue, config.Federations); err != nil {
