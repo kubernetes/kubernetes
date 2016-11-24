@@ -86,33 +86,27 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 	// Apply Parameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
 	diskType := ""
-	zone := ""
+	var calculateZonesParams volume.CalculateSetOfZonesParams
 	for k, v := range c.options.Parameters {
 		switch strings.ToLower(k) {
 		case "type":
 			diskType = v
 		case "zone":
-			zone = v
+			calculateZonesParams.IsSCZoneSpecified = true
+			calculateZonesParams.StorageClassZones = v
 		default:
 			return "", 0, nil, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
 		}
 	}
 
-	// TODO: implement PVC.Selector parsing
-	if c.options.PVC.Spec.Selector != nil {
-		return "", 0, nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on GCE")
+	var zones sets.String
+	calculateZonesParams.PVC = c.options.PVC
+	calculateZonesParams.GetAllZones = cloud.GetAllZones
+	calculateZonesParams.Zone2region = gcecloud.GetGCERegion
+	if zones, err = volume.CalculateSetOfZones(calculateZonesParams); err != nil {
+		return "", 0, nil, err
 	}
-
-	if zone == "" {
-		// No zone specified, choose one randomly in the same region as the
-		// node is running.
-		zones, err := cloud.GetAllZones()
-		if err != nil {
-			glog.V(2).Infof("error getting zone information from GCE: %v", err)
-			return "", 0, nil, err
-		}
-		zone = volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
-	}
+	zone := volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
 
 	err = cloud.CreateDisk(name, diskType, zone, int64(requestGB), *c.options.CloudTags)
 	if err != nil {
