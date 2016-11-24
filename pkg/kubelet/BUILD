@@ -145,6 +145,7 @@ go_test(
         "pod_workers_test.go",
         "reason_cache_test.go",
         "runonce_test.go",
+        "secret_manager_test.go",
     ],
     library = "go_default_library",
     tags = ["automanaged"],
