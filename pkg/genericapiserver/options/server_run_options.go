@@ -159,6 +159,7 @@ func NewServerRunOptions() *ServerRunOptions {
 func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 	o.StorageConfig = storagebackend.Config{
 		Prefix: DefaultEtcdPathPrefix,
+		Quorum: DefaultReadQuorumFlag,
 		// Default cache size to 0 - if unset, its size will be set based on target
 		// memory usage.
 		DeserializationCacheSize: 0,

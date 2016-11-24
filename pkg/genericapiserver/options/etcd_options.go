@@ -22,6 +22,7 @@ import (
 
 const (
 	DefaultEtcdPathPrefix = "/registry"
+	DefaultReadQuorumFlag = true
 )
 
 // AddEtcdFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
