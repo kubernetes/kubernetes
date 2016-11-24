@@ -1183,8 +1183,7 @@ func (kl *Kubelet) initializeModules() error {
 	// Step 5: Start container manager.
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
-		glog.Errorf("Cannot get Node info: %v", err)
-		return fmt.Errorf("Kubelet failed to get node info.")
+		return fmt.Errorf("Kubelet failed to get node info: %v", err)
 	}
 
 	if err := kl.containerManager.Start(node); err != nil {
