@@ -34,6 +34,9 @@ const (
 
 	FederatedServiceName    = "federated-service"
 	FederatedServicePodName = "federated-service-test-pod"
+
+	KubeDNSConfigMapName      = "kube-dns"
+	KubeDNSConfigMapNamespace = "kube-system"
 )
 
 var FederatedServiceLabels = map[string]string{
@@ -122,6 +125,27 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				framework.SkipUnlessFederated(f.ClientSet)
 
 				nsName := f.FederationNamespace.Name
+				// Create kube-dns configmap for kube-dns to accept federation queries.
+				federationsDomainMap := os.Getenv("FEDERATIONS_DOMAIN_MAP")
+				if federationsDomainMap == "" {
+					framework.Failf("missing required env var FEDERATIONS_DOMAIN_MAP")
+				}
+				kubeDNSConfigMap := v1.ConfigMap{
+					ObjectMeta: v1.ObjectMeta{
+						Name:      KubeDNSConfigMapName,
+						Namespace: KubeDNSConfigMapNamespace,
+					},
+					Data: map[string]string{
+						"federations": federationsDomainMap,
+					},
+				}
+				// Create this configmap in all clusters.
+				for clusterName, cluster := range clusters {
+					By(fmt.Sprintf("Creating kube dns config map in cluster: %s", clusterName))
+					_, err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Create(&kubeDNSConfigMap)
+					framework.ExpectNoError(err, fmt.Sprintf("Error in creating config map in cluster %s", clusterName))
+				}
+
 				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
 				waitForServiceShardsOrFail(nsName, service, clusters)
@@ -142,6 +166,12 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 					service = nil
 				} else {
 					By("No service to delete.  Service is nil")
+				}
+				// Delete the kube-dns config map from all clusters.
+				for clusterName, cluster := range clusters {
+					By(fmt.Sprintf("Deleting kube dns config map from cluster: %s", clusterName))
+					err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Delete(KubeDNSConfigMapName, nil)
+					framework.ExpectNoError(err, fmt.Sprintf("Error in deleting config map from cluster %s", clusterName))
 				}
 			})
 
