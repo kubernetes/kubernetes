@@ -132,7 +132,9 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
-	nm.queue.Add(key)
+	// delay processing namespace deletions long enough for the lifecycle admission
+	// plugins to also observe the deletion and stop new objects from being created
+	nm.queue.AddAfter(key, 5*time.Second)
 }
 
 // worker processes the queue of namespace objects.
