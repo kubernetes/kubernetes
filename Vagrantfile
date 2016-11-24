@@ -228,7 +228,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
        config.ssh.password = ENV['MASTER_PASSWD']
 
        config.ssh.pty = true
-       config.ssh.insert_key = true
+       config.ssh.insert_key = false
        #config.ssh.private_key_path = '~/.ssh/id_rsa_vsphere'
       
       # Don't attempt to update the tools on the image (this can

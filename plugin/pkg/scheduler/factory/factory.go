@@ -56,7 +56,7 @@ const (
 type ConfigFactory struct {
 	Client clientset.Interface
 	// queue for pods that need scheduling
-	PodQueue *cache.FIFO
+	PodQueue *cache.Priority
 	// a means to list all known scheduled pods.
 	ScheduledPodLister *cache.StoreToPodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
@@ -115,7 +115,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 
 	c := &ConfigFactory{
 		Client:             client,
-		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
+		PodQueue:           cache.NewPriority(cache.MetaNamespaceKeyFunc),
 		ScheduledPodLister: &cache.StoreToPodLister{},
 		informerFactory:    informerFactory,
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
@@ -389,6 +389,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		NextPod: func() *api.Pod {
 			return f.getNextPod()
 		},
+		ReEnqueuePod:   f.reEnqueuePod,
 		Error:          f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
 		StopEverything: f.StopEverything,
 	}, nil
@@ -491,6 +492,10 @@ func (f *ConfigFactory) getNextPod() *api.Pod {
 	}
 }
 
+func (f *ConfigFactory) reEnqueuePod(pod *api.Pod) error {
+	return f.PodQueue.AddIfNotPresent(pod)
+}
+
 func (f *ConfigFactory) responsibleForPod(pod *api.Pod) bool {
 	if f.SchedulerName == api.DefaultSchedulerName {
 		return pod.Annotations[SchedulerAnnotationKey] == f.SchedulerName || pod.Annotations[SchedulerAnnotationKey] == ""
@@ -575,7 +580,7 @@ func (factory *ConfigFactory) createReplicaSetLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client.Extensions().RESTClient(), "replicasets", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
-func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
+func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.Priority) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
 		if err == scheduler.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
