@@ -336,7 +336,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 	})
 
 	It("[Feature:GarbageCollector] should delete RS created by deployment when not orphaning", func() {
-		clientSet := f.ClientSet_1_5
+		clientSet := f.ClientSet
 		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
 		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
