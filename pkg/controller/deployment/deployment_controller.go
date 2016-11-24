@@ -22,10 +22,6 @@ package deployment
 
 import (
 	"fmt"
-	"reflect"
-	"sort"
-	"time"
-
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -40,11 +36,15 @@ import (
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
+	"reflect"
+	"sort"
+	"time"
 )
 
 const (
@@ -59,8 +59,8 @@ const (
 	MaxRetries = 5
 )
 
-func getDeploymentKind() unversioned.GroupVersionKind {
-	return v1beta1.SchemeGroupVersion.WithKind("Deployment")
+func getDeploymentKind() schema.GroupVersionKind {
+	return extensions.SchemeGroupVersion.WithKind("Deployment")
 }
 
 // DeploymentController is responsible for synchronizing Deployment objects stored

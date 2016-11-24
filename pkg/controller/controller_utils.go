@@ -746,9 +746,9 @@ func FilterActivePods(pods []*v1.Pod) []*v1.Pod {
 	return result
 }
 
-func IsPodActive(p *api.Pod) bool {
-	return api.PodSucceeded != p.Status.Phase &&
-		api.PodFailed != p.Status.Phase &&
+func IsPodActive(p *v1.Pod) bool {
+	return v1.PodSucceeded != p.Status.Phase &&
+		v1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
 }
 

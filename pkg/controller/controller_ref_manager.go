@@ -18,14 +18,13 @@ package controller
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime/schema"
+	"strings"
 )
 
 type PodControllerRefManager struct {
@@ -146,7 +145,7 @@ func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 
 type ReplicaSetControllerRefManager struct {
 	rsControl          RSControlInterface
-	controllerObject   api.ObjectMeta
+	controllerObject   v1.ObjectMeta
 	controllerSelector labels.Selector
 	controllerKind     schema.GroupVersionKind
 }
@@ -155,7 +154,7 @@ type ReplicaSetControllerRefManager struct {
 // methods to manage the controllerRef of ReplicaSets.
 func NewReplicaSetControllerRefManager(
 	rsControl RSControlInterface,
-	controllerObject api.ObjectMeta,
+	controllerObject v1.ObjectMeta,
 	controllerSelector labels.Selector,
 	controllerKind schema.GroupVersionKind,
 ) *ReplicaSetControllerRefManager {
@@ -171,10 +170,10 @@ func NewReplicaSetControllerRefManager(
 // controllerRef pointing to other object are ignored)
 // 3. controlledDoesNotMatch are the ReplicaSets that have a controllerRef pointing
 // to the Deployment, but their labels no longer match the selector.
-func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*v1beta1.ReplicaSet) (
-	matchesAndControlled []*v1beta1.ReplicaSet,
-	matchesNeedsController []*v1beta1.ReplicaSet,
-	controlledDoesNotMatch []*v1beta1.ReplicaSet) {
+func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*extensions.ReplicaSet) (
+	matchesAndControlled []*extensions.ReplicaSet,
+	matchesNeedsController []*extensions.ReplicaSet,
+	controlledDoesNotMatch []*extensions.ReplicaSet) {
 	for i := range replicaSets {
 		replicaSet := replicaSets[i]
 		controllerRef := getControllerOf(replicaSet.ObjectMeta)
@@ -205,7 +204,7 @@ func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*v1beta1.Replica
 // AdoptReplicaSet sends a patch to take control of the ReplicaSet. It returns the error if
 // the patching fails.
 func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(replicaSet *extensions.ReplicaSet) error {
-	// we should not adopt any ReplicaSets if the controller is about to be deleted
+	// we should not adopt any ReplicaSets if the Deployment is about to be deleted
 	if m.controllerObject.DeletionTimestamp != nil {
 		return fmt.Errorf("cancel the adopt attempt for RS %s because the controller %v is being deleted",
 			strings.Join([]string{replicaSet.Namespace, replicaSet.Name, string(replicaSet.UID)}, "_"), m.controllerObject.Name)
