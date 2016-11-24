@@ -21,10 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	reflect "reflect"
-
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	reflect "reflect"
 )
 
 func init() {
