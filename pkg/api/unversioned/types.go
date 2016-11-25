@@ -73,6 +73,11 @@ type ExportOptions struct {
 	Export bool `json:"export" protobuf:"varint,1,opt,name=export"`
 	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
+	// If specified:
+	// - if unset, then the result result is returned from remote storage based on quorum-read flag;
+	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
+	// - if set to non zero, then the result is as fresh as given rv.
+	ResourceVersion string
 }
 
 // Status is a return value for calls that don't return other objects.

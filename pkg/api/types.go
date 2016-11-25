@@ -2793,6 +2793,11 @@ type ExportOptions struct {
 	Export bool `json:"export"`
 	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
 	Exact bool `json:"exact"`
+	// If specified:
+	// - if unset, then the result result is returned from remote storage based on quorum-read flag;
+	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
+	// - if set to non zero, then the result is as fresh as given rv.
+	ResourceVersion string
 }
 
 // ListOptions is the query options to a standard REST list call, and has future support for
@@ -2806,8 +2811,9 @@ type ListOptions struct {
 	FieldSelector fields.Selector
 	// If true, watch for changes to this list
 	Watch bool
-	// For watch, it's the resource version to watch.
-	// For list,
+	// When specified with a watch call, shows changes that occur after that particular version of a resource.
+	// Defaults to changes from the beginning of history.
+	// When specified for list:
 	// - if unset, then the result is returned from remote storage based on quorum-read flag;
 	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
 	// - if set to non zero, then the result is as fresh as given rv.
