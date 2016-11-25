@@ -375,6 +375,48 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 	})
 
+	framework.KubeDescribe("kubectl plugins", func() {
+		var tmpdir string
+		var pluginDescriptorFilename string
+		var pluginsPathEnvVar string
+		BeforeEach(func() {
+			tmpdir, err := ioutil.TempDir("", "kubectl-plugins-e2e")
+			if err != nil {
+				framework.Failf("Failed to create temporary directory: %v", err)
+			}
+			if err := os.Mkdir(filepath.Join(tmpdir, "echo"), 0755); err != nil {
+				framework.Failf("Failed to create plugin directory: %v", err)
+			}
+			pluginDescriptor := readTestFileOrDie("kubectl-plugin.yaml")
+			pluginDescriptorFilename = filepath.Join(tmpdir, "echo", "plugin.yaml")
+			if err := ioutil.WriteFile(pluginDescriptorFilename, []byte(pluginDescriptor), 0644); err != nil {
+				framework.Failf("Failed to write plugin descriptor file: %v", err)
+			}
+			pluginsPathEnvVar = "KUBECTL_PLUGINS_PATH=" + tmpdir
+		})
+		AfterEach(func() {
+			os.RemoveAll(tmpdir)
+		})
+
+		It("should support help for plugins", func() {
+			By("displaying plugins in main help")
+			helpOutput := framework.NewKubectlCommand("-h").WithEnv(append(os.Environ(), pluginsPathEnvVar)).ExecOrDie()
+			Expect(helpOutput).To(ContainSubstring("Plugins:"))
+			Expect(helpOutput).To(ContainSubstring("echo"))
+			Expect(helpOutput).To(ContainSubstring("Echoes for testing purposes"))
+
+			By("displaying help for individual plugin")
+			helpOutput = framework.NewKubectlCommand("echo", "-h").WithEnv(append(os.Environ(), pluginsPathEnvVar)).ExecOrDie()
+			Expect(helpOutput).To(ContainSubstring("Long description for the echo plugin"))
+		})
+
+		It("should successfully run plugins", func() {
+			By("running and displaying plugin output message")
+			pluginOutput := framework.NewKubectlCommand("echo").WithEnv(append(os.Environ(), pluginsPathEnvVar)).ExecOrDie()
+			Expect(pluginOutput).To(Equal("This plugin works!\n"))
+		})
+	})
+
 	framework.KubeDescribe("Simple pod", func() {
 		var podPath []byte
 

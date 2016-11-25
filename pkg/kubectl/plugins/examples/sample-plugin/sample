@@ -1,0 +1,3 @@
+#!/usr/bin/env ruby
+
+puts "I'm the magnificent foo plugin."
