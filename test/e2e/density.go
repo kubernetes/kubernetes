@@ -47,10 +47,26 @@ import (
 )
 
 const (
-	MinSaturationThreshold     = 2 * time.Minute
-	MinPodsPerSecondThroughput = 8
-	DensityPollInterval        = 10 * time.Second
+	MinSaturationThreshold        = 2 * time.Minute
+	MinPodsPerSecondThroughput    = 8
+	DensityPollInterval           = 10 * time.Second
+	deploymentResource            = "deployment"
+	replicaSetResource            = "replicaSet"
+	replicationControllerResource = "replicationController"
 )
+
+func runResource(resource string, config testutils.RCConfig) error {
+	switch resource {
+	case deploymentResource:
+		return testutils.RunDeployment(testutils.DeploymentConfig{config})
+	case replicaSetResource:
+		return testutils.RunReplicaSet(testutils.ReplicaSetConfig{config})
+	case replicationControllerResource:
+		return testutils.RunRC(config)
+	default:
+		return fmt.Errorf("Trying to run unknown resource type: %v", resource)
+	}
+}
 
 // Maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
@@ -61,6 +77,8 @@ type DensityTestConfig struct {
 	InternalClientset internalclientset.Interface
 	PollInterval      time.Duration
 	PodCount          int
+	// What kind of resource we want to create
+	resource string
 }
 
 func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceConstraint {
@@ -199,7 +217,7 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 			// Call wg.Done() in defer to avoid blocking whole test
 			// in case of error from RunRC.
 			defer wg.Done()
-			framework.ExpectNoError(framework.RunRC(rcConfig))
+			framework.ExpectNoError(runResource(dtc.resource, rcConfig))
 		}()
 	}
 	logStopCh := make(chan struct{})
@@ -352,6 +370,8 @@ var _ = framework.KubeDescribe("Density", func() {
 		podsPerNode    int
 		// Controls how often the apiserver is polled for pods
 		interval time.Duration
+		// What kind of resource we should be creating. Default: ReplicationController
+		resource string
 	}
 
 	densityTests := []Density{
@@ -361,18 +381,29 @@ var _ = framework.KubeDescribe("Density", func() {
 		{podsPerNode: 50, runLatencyTest: false},
 		{podsPerNode: 95, runLatencyTest: true},
 		{podsPerNode: 100, runLatencyTest: false},
+		{podsPerNode: 30, runLatencyTest: true, resource: deploymentResource},
+		{podsPerNode: 30, runLatencyTest: true, resource: replicaSetResource},
 	}
 
 	for _, testArg := range densityTests {
 		feature := "ManualPerformance"
+		if testArg.resource == "" {
+			testArg.resource = replicationControllerResource
+		}
+		if testArg.resource != deploymentResource && testArg.resource != replicaSetResource && testArg.resource != replicationControllerResource {
+			framework.Failf("Unknown resource type: %v", testArg.resource)
+		}
+
 		switch testArg.podsPerNode {
 		case 30:
-			feature = "Performance"
+			if testArg.resource == replicationControllerResource {
+				feature = "Performance"
+			}
 		case 95:
 			feature = "HighDensityPerformance"
 		}
 
-		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node", feature, testArg.podsPerNode)
+		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v", feature, testArg.podsPerNode, testArg.resource)
 		itArg := testArg
 		It(name, func() {
 			nodePreparer := framework.NewE2ETestNodePreparer(
@@ -430,6 +461,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				Configs:           RCConfigs,
 				PodCount:          totalPods,
 				PollInterval:      DensityPollInterval,
+				resource:          testArg.resource,
 			}
 			e2eStartupTime = runDensityTest(dConfig)
 			if itArg.runLatencyTest {
