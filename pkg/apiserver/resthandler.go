@@ -93,8 +93,8 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 // may be used to deserialize an options object to pass to the getter.
 type getterFunc func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error)
 
-// MaxPatchConflicts is the maximum number of conflicts retry for during a patch operation before returning failure
-const MaxPatchConflicts = 5
+// maxRetryWhenPatchConflicts is the maximum number of conflicts retry during a patch operation before returning failure
+const maxRetryWhenPatchConflicts = 5
 
 // getResourceHandler is an HTTP handler function for get requests. It delegates to the
 // passed-in getterFunc to perform the actual get.
@@ -645,7 +645,7 @@ func patchResource(
 
 	return finishRequest(timeout, func() (runtime.Object, error) {
 		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo)
-		for i := 0; i < MaxPatchConflicts && (errors.IsConflict(updateErr)); i++ {
+		for i := 0; i < maxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
 			lastConflictErr = updateErr
 			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo)
 		}
