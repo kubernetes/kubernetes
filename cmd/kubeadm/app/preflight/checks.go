@@ -80,6 +80,32 @@ func (sc ServiceCheck) Check() (warnings, errors []error) {
 	return warnings, errors
 }
 
+// FirewalldCheck checks if firewalld is enabled or active, and if so outputs a warning.
+type FirewalldCheck struct {
+	ports []int
+}
+
+func (fc FirewalldCheck) Check() (warnings, errors []error) {
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		return []error{err}, nil
+	}
+
+	warnings = []error{}
+
+	if !initSystem.ServiceExists("firewalld") {
+		return nil, nil
+	}
+
+	if initSystem.ServiceIsActive("firewalld") {
+		warnings = append(warnings,
+			fmt.Errorf("firewalld is active, please ensure ports %v are open or your cluster may not function correctly",
+				fc.ports))
+	}
+
+	return warnings, errors
+}
+
 // PortOpenCheck ensures the given port is available for use.
 type PortOpenCheck struct {
 	port int
@@ -220,6 +246,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		HostnameCheck{},
 		ServiceCheck{Service: "kubelet"},
 		ServiceCheck{Service: "docker"},
+		FirewalldCheck{ports: []int{int(cfg.API.BindPort), int(cfg.Discovery.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
 		PortOpenCheck{port: 2379},
 		PortOpenCheck{port: 8080},
