@@ -1,0 +1,21 @@
+#!/usr/bin/env ruby
+
+if ARGV[0] == "metadata"
+  metadata = <<-META
+{
+  "use"    : "foo",
+  "short"  : "Foo plugin short description",
+  "long"   : "Foo really LONG description\\n\\nCan take multi lines.",
+  "tunnel" : true
+}
+META
+  puts metadata
+else
+  api_host = ENV['KUBECTL_PLUGIN_API_HOST']
+  api_endpoint = "http://#{api_host}/api"
+
+  puts "I'm the magnificent foo plugin."
+  puts ""
+  puts "I can use the API from #{api_host}:"
+  puts `curl -s #{api_endpoint}`
+end

@@ -30,6 +30,23 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
+type ProxyOptions struct {
+	WWW       string
+	WWWPrefix string
+	APIPrefix string
+
+	AcceptPaths   string
+	RejectPaths   string
+	AcceptHosts   string
+	RejectMethods string
+	DisableFilter bool
+
+	Port    int
+	Address string
+
+	UnixSocket string
+}
+
 var (
 	default_port = 8001
 	proxy_long   = templates.LongDesc(`
@@ -63,36 +80,34 @@ var (
 )
 
 func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &ProxyOptions{}
+
 	cmd := &cobra.Command{
 		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
 		Short:   "Run a proxy to the Kubernetes API server",
 		Long:    proxy_long,
 		Example: proxy_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunProxy(f, out, cmd)
+			err := options.RunProxy(f, out)
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
-	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
-	cmd.Flags().StringP("api-prefix", "", "/", "Prefix to serve the proxied API under.")
-	cmd.Flags().String("accept-paths", kubectl.DefaultPathAcceptRE, "Regular expression for paths that the proxy should accept.")
-	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
-	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
-	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
-	cmd.Flags().IntP("port", "p", default_port, "The port on which to run the proxy. Set to 0 to pick a random port.")
-	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
-	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
-	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
+	cmd.Flags().StringVarP(&options.WWW, "www", "w", "", "Also serve static files from the given directory under the specified prefix.")
+	cmd.Flags().StringVarP(&options.WWWPrefix, "www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
+	cmd.Flags().StringVarP(&options.APIPrefix, "api-prefix", "", "/", "Prefix to serve the proxied API under.")
+	cmd.Flags().StringVar(&options.AcceptPaths, "accept-paths", kubectl.DefaultPathAcceptRE, "Regular expression for paths that the proxy should accept.")
+	cmd.Flags().StringVar(&options.RejectPaths, "reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
+	cmd.Flags().StringVar(&options.AcceptHosts, "accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
+	cmd.Flags().StringVar(&options.RejectMethods, "reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
+	cmd.Flags().IntVarP(&options.Port, "port", "p", default_port, "The port on which to run the proxy. Set to 0 to pick a random port.")
+	cmd.Flags().StringVarP(&options.Address, "address", "", "127.0.0.1", "The IP address on which to serve on.")
+	cmd.Flags().BoolVar(&options.DisableFilter, "disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
+	cmd.Flags().StringVarP(&options.UnixSocket, "unix-socket", "u", "", "Unix socket on which to run the proxy.")
 	return cmd
 }
 
-func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	path := cmdutil.GetFlagString(cmd, "unix-socket")
-	port := cmdutil.GetFlagInt(cmd, "port")
-	address := cmdutil.GetFlagString(cmd, "address")
-
-	if port != default_port && path != "" {
+func (o *ProxyOptions) RunProxy(f cmdutil.Factory, out io.Writer) error {
+	if o.Port != default_port && o.UnixSocket != "" {
 		return errors.New("Don't specify both --unix-socket and --port")
 	}
 
@@ -101,36 +116,36 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
-	staticPrefix := cmdutil.GetFlagString(cmd, "www-prefix")
+	staticPrefix := o.WWWPrefix
 	if !strings.HasSuffix(staticPrefix, "/") {
 		staticPrefix += "/"
 	}
 
-	apiProxyPrefix := cmdutil.GetFlagString(cmd, "api-prefix")
+	apiProxyPrefix := o.APIPrefix
 	if !strings.HasSuffix(apiProxyPrefix, "/") {
 		apiProxyPrefix += "/"
 	}
 	filter := &kubectl.FilterServer{
-		AcceptPaths: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-paths")),
-		RejectPaths: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "reject-paths")),
-		AcceptHosts: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-hosts")),
+		AcceptPaths: kubectl.MakeRegexpArrayOrDie(o.AcceptPaths),
+		RejectPaths: kubectl.MakeRegexpArrayOrDie(o.RejectPaths),
+		AcceptHosts: kubectl.MakeRegexpArrayOrDie(o.AcceptHosts),
 	}
-	if cmdutil.GetFlagBool(cmd, "disable-filter") {
-		if path == "" {
+	if o.DisableFilter {
+		if o.UnixSocket == "" {
 			glog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
 		}
 		filter = nil
 	}
 
-	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, filter, clientConfig)
+	server, err := kubectl.NewProxyServer(o.WWW, apiProxyPrefix, staticPrefix, filter, clientConfig)
 
 	// Separate listening from serving so we can report the bound port
 	// when it is chosen by os (eg: port == 0)
 	var l net.Listener
-	if path == "" {
-		l, err = server.Listen(address, port)
+	if o.UnixSocket == "" {
+		l, err = server.Listen(o.Address, o.Port)
 	} else {
-		l, err = server.ListenUnix(path)
+		l, err = server.ListenUnix(o.UnixSocket)
 	}
 	if err != nil {
 		glog.Fatal(err)

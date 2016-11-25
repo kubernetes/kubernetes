@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugin
+package plugins
 
 import (
 	"bytes"
@@ -31,7 +31,7 @@ import (
 )
 
 type PluginLoader interface {
-	Load() PluginList
+	Load() Plugins
 }
 
 type ConfigDirPluginLoader struct {
@@ -44,12 +44,13 @@ func NewConfigDirPluginLoader() *ConfigDirPluginLoader {
 	return loader
 }
 
-func (l *ConfigDirPluginLoader) Load() (PluginList, error) {
+func (l *ConfigDirPluginLoader) Load() (Plugins, error) {
 	if len(l.pluginsDir) == 0 {
 		return nil, fmt.Errorf("Directory not specified for the plugin loader.")
 	}
 
-	list := PluginList{}
+	list := Plugins{}
+
 	err := filepath.Walk(l.pluginsDir, func(path string, fileInfo os.FileInfo, err error) error {
 		glog.V(9).Infof("Checking plugin in %s...", path)
 
@@ -64,15 +65,20 @@ func (l *ConfigDirPluginLoader) Load() (PluginList, error) {
 		var out bytes.Buffer
 		cmd.Stdout = &out
 
-		glog.V(6).Infof("File %s is potentially a plugin, calling with args %s...", cmd.Path, cmd.Args)
+		glog.V(6).Infof("File %s is potentially a plugin, checking metadata with args %s...", cmd.Path, cmd.Args)
 
 		if err := cmd.Run(); err == nil {
 			plugin := &Plugin{
 				Path: path,
 			}
+
 			if err := json.Unmarshal(out.Bytes(), plugin); err == nil {
-				glog.V(5).Infof("Loading plugin %s", plugin)
+				if len(plugin.Use) == 0 || len(plugin.Short) == 0 {
+					glog.V(5).Infoln("Plugin metadata requires the 'use' and 'short' fields")
+				}
+
 				list = append(list, plugin)
+				glog.V(5).Infof("Plugin loaded: %s", plugin)
 			}
 		}
 
