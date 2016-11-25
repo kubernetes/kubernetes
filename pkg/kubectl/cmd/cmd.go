@@ -318,6 +318,22 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			},
 		},
 	}
+
+	// Loads plugins and create commands for each plugin identified
+	loadedPlugins, _ := f.PluginLoader().Load()
+	if len(loadedPlugins) > 0 {
+		pluginCmds := []*cobra.Command{}
+		for i := range loadedPlugins {
+			plugin := loadedPlugins[i]
+			pluginCmd := NewCmdForPlugin(plugin, f, in, out, err)
+			pluginCmds = append(pluginCmds, pluginCmd)
+		}
+		groups = append(groups, templates.CommandGroup{
+			Message:  "Plugins:",
+			Commands: pluginCmds,
+		})
+	}
+
 	groups.Add(cmds)
 
 	filters := []string{
