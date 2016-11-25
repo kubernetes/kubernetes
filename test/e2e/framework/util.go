@@ -2757,26 +2757,91 @@ func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selecto
 	return
 }
 
-// DeleteRCAndPods a Replication Controller and all pods it spawned
-func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
-	By(fmt.Sprintf("deleting replication controller %s in namespace %s", name, ns))
-	rc, err := clientset.Core().ReplicationControllers(ns).Get(name)
+func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, name string) (runtime.Object, error) {
+	switch kind {
+  case api.Kind("ReplicationController"):
+		return c.Core().ReplicationControllers(ns).Get(name)
+	case extensionsinternal.Kind("ReplicaSet"):
+		return c.Extensions().ReplicaSets(ns).Get(name)
+	case extensionsinternal.Kind("Deployment"):
+		return c.Extensions().Deployments(ns).Get(name)
+	default:
+    return nil, fmt.Errorf("Unsupported kind: %v", kind)
+  }
+}
+
+func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name string, deleteOption *v1.DeleteOptions) error {
+	switch kind {
+	case api.Kind("ReplicationController"):
+		return c.Core().ReplicationControllers(ns).Delete(name, deleteOption)
+	case extensionsinternal.Kind("ReplicaSet"):
+		return c.Extensions().ReplicaSets(ns).Delete(name, deleteOption)
+	case extensionsinternal.Kind("Deployment"):
+		return c.Extensions().Deployments(ns).Delete(name, deleteOption)
+	default:
+		return fmt.Errorf("Unsupported kind: %v", kind)
+	}
+}
+
+func getSelectorFromRuntimeObject(obj runtime.Object) (*unversioned.LabelSelector, error) {
+  switch typed := obj.(type) {
+    case *v1.ReplicationController:
+      return &unversioned.LabelSelector{MatchLabels: typed.Spec.Selector}, nil
+    case *extensionsinternal.ReplicaSet:
+      return typed.Spec.Selector, nil
+    case *extensionsinternal.Deployment:
+      return typed.Spec.Selector, nil
+    default:
+      return nil, fmt.Errorf("Unsupported kind: %v", obj)
+  }
+}
+
+func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
+  switch typed := obj.(type){
+    case *v1.ReplicationController:
+      if typed.Spec.Replicas != nil {
+        return *typed.Spec.Replicas, nil
+      }
+      return 0, nil
+    case *extensionsinternal.ReplicaSet:
+      return typed.Spec.Replicas, nil
+    case *extensionsinternal.Deployment:
+      return typed.Spec.Replicas, nil
+    default:
+      return -1, fmt.Errorf("Unsupported kind: %v", obj)
+  }
+}
+
+// DeleteResourceAndPods deletes a given resource and all pods it spawned
+func DeleteResourceAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, kind schema.GroupKind, ns, name string) error {
+	By(fmt.Sprintf("deleting %v %s in namespace %s", kind, name, ns))
+
+	rtObject, err := getRuntimeObjectForKind(clientset, kind, ns, name)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			Logf("RC %s was already deleted: %v", name, err)
+			Logf("%v %s not found: %v", kind, name, err)
 			return nil
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperForReplicationController(internalClientset.Core(), 10*time.Minute)
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			Logf("RC %s was already deleted: %v", name, err)
-			return nil
-		}
-		return err
+  selector, err := getSelectorFromRuntimeObject(rtObject)
+  if err != nil {
+    return err
+  }
+
+	var reaper kubectl.Reaper
+	switch kind {
+	case api.Kind("ReplicationController"):
+		reaper, err = kubectl.ReaperFor(api.Kind("ReplicationController"), internalClientset)
+	case extensionsinternal.Kind("ReplicaSet"):
+	  reaper, err = kubectl.ReaperFor(extensionsinternal.Kind("ReplicaSet"), internalClientset)
+  case extensionsinternal.Kind("Deployment"):
+	  reaper, err = kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClientset)
+  default:
+		return fmt.Errorf("Unsupported kind: %v", kind)
 	}
-	ps, err := podStoreForRC(clientset, rc)
+
+	ps, err := podStoreForSelector(clientset, ns, selector)
 	if err != nil {
 		return err
 	}
@@ -2784,20 +2849,20 @@ func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalcl
 	startTime := time.Now()
 	err = reaper.Stop(ns, name, 0, nil)
 	if apierrs.IsNotFound(err) {
-		Logf("RC %s was already deleted: %v", name, err)
+		Logf("%v %s was already deleted: %v", kind, name, err)
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("error while stopping RC: %s: %v", name, err)
+		return fmt.Errorf("error while stopping %v: %s: %v", kind, name, err)
 	}
-	deleteRCTime := time.Now().Sub(startTime)
-	Logf("Deleting RC %s took: %v", name, deleteRCTime)
+	deleteTime := time.Now().Sub(startTime)
+	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
 	err = waitForPodsInactive(ps, 10*time.Millisecond, 10*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
-	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
-	Logf("Terminating RC %s pods took: %v", name, terminatePodTime)
+	terminatePodTime := time.Now().Sub(startTime) - deleteTime
+	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
 	// this is to relieve namespace controller's pressure when deleting the
 	// namespace after a test.
 	err = waitForPodsGone(ps, 10*time.Second, 10*time.Minute)
@@ -2807,57 +2872,75 @@ func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalcl
 	return nil
 }
 
-// DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
-func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
-	By(fmt.Sprintf("deleting replication controller %s in namespace %s, will wait for the garbage collector to delete the pods", name, ns))
-	rc, err := c.Core().ReplicationControllers(ns).Get(name)
+func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
+	return DeleteResourceAndPods(clientset, internalClientset, api.Kind("ReplicationController"), ns, name)
+}
+
+// DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
+func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns, name string) error {
+	By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))
+
+	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			Logf("RC %s was already deleted: %v", name, err)
+			Logf("%v %s not found: %v", kind, name, err)
 			return nil
 		}
 		return err
 	}
-	ps, err := podStoreForRC(c, rc)
+  selector, err := getSelectorFromRuntimeObject(rtObject)
+  if err != nil {
+    return err
+  }
+  replicas, err := getReplicasFromRuntimeObject(rtObject)
+  if err != nil {
+    return err
+  }
+
+	ps, err := podStoreForSelector(c, ns, selector)
 	if err != nil {
 		return err
 	}
+
 	defer ps.Stop()
 	startTime := time.Now()
 	falseVar := false
 	deleteOption := &v1.DeleteOptions{OrphanDependents: &falseVar}
-	err = c.Core().ReplicationControllers(ns).Delete(name, deleteOption)
+	err = deleteResource(c, kind, ns, name, deleteOption)
 	if err != nil && apierrs.IsNotFound(err) {
-		Logf("RC %s was already deleted: %v", name, err)
+		Logf("%v %s was already deleted: %v", kind, name, err)
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	deleteRCTime := time.Now().Sub(startTime)
-	Logf("Deleting RC %s took: %v", name, deleteRCTime)
+	deleteTime := time.Now().Sub(startTime)
+	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
+
 	var interval, timeout time.Duration
 	switch {
-	case *(rc.Spec.Replicas) < 100:
+	case replicas < 100:
 		interval = 100 * time.Millisecond
-	case *(rc.Spec.Replicas) < 1000:
+	case replicas < 1000:
 		interval = 1 * time.Second
 	default:
 		interval = 10 * time.Second
 	}
-	if *(rc.Spec.Replicas) < 5000 {
+	if replicas < 5000 {
 		timeout = 10 * time.Minute
 	} else {
-		timeout = time.Duration(*(rc.Spec.Replicas)/gcThroughput) * time.Second
+		timeout = time.Duration(replicas/gcThroughput) * time.Second
 		// gcThroughput is pretty strict now, add a bit more to it
 		timeout = timeout + 3*time.Minute
 	}
+
 	err = waitForPodsInactive(ps, interval, timeout)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
-	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
-	Logf("Terminating RC %s pods took: %v", name, terminatePodTime)
+	terminatePodTime := time.Now().Sub(startTime) - deleteTime
+	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
+
 	err = waitForPodsGone(ps, interval, 10*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
@@ -2865,12 +2948,20 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return nil
 }
 
-// podStoreForRC creates a PodStore that monitors pods belong to the rc. It
-// waits until the reflector does a List() before returning.
-func podStoreForRC(c clientset.Interface, rc *v1.ReplicationController) (*testutils.PodStore, error) {
-	labels := labels.SelectorFromSet(rc.Spec.Selector)
-	ps := testutils.NewPodStore(c, rc.Namespace, labels, fields.Everything())
-	err := wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
+// DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
+func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
+	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
+}
+
+// podStoreForSelector creates a PodStore that monitors pods from given namespace matching given selector.
+// It waits until the reflector does a List() before returning.
+func podStoreForSelector(c clientset.Interface, ns string, selector *unversioned.LabelSelector) (*testutils.PodStore, error) {
+	labels, err := unversioned.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return nil, err
+	}
+	ps := testutils.NewPodStore(c, ns, labels, fields.Everything())
+	err = wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
 		if len(ps.Reflector.LastSyncResourceVersion()) != 0 {
 			return true, nil
 		}
@@ -4288,7 +4379,7 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 			return err
 		}
 		if replicas == 0 {
-			ps, err := podStoreForRC(clientset, rc)
+			ps, err := podStoreForSelector(clientset, rc.Namespace, &unversioned.LabelSelector{MatchLabels: rc.Spec.Selector})
 			if err != nil {
 				return err
 			}
