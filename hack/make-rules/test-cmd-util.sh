@@ -3679,5 +3679,49 @@ __EOF__
     kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
   fi
 
+  ###########
+  # Plugins #
+  ###########
+  kube::log::status "Testing kubectl plugins"
+
+  # single plugins path
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl -h 2>&1)
+  kube::test::if_has_string "${output_message}" 'echo\s\+Echoes for test-cmd'
+  kube::test::if_has_string "${output_message}" 'get\s\+The wonderful new plugin-based get!'
+  kube::test::if_has_string "${output_message}" 'error\s\+The tremendous plugin that always fails!'
+  kube::test::if_has_not_string "${output_message}" 'The hello plugin'
+  kube::test::if_has_not_string "${output_message}" 'Incomplete plugin'
+
+  # when overriding existing command, both appear in help. TODO handle this to not register plugins that override existing cmd.
+  kube::test::if_has_string "${output_message}" 'get\s\+Display one or many resources'
+
+  # multiple plugins path
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl -h 2>&1)
+  kube::test::if_has_string "${output_message}" 'echo\s\+Echoes for test-cmd'
+  kube::test::if_has_string "${output_message}" 'get\s\+The wonderful new plugin-based get!'
+  kube::test::if_has_string "${output_message}" 'error\s\+The tremendous plugin that always fails!'
+  kube::test::if_has_string "${output_message}" 'hello\s\+The hello plugin'
+  kube::test::if_has_not_string "${output_message}" 'Incomplete plugin'
+
+  # don't override existing commands
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl get -h 2>&1)
+  kube::test::if_has_string "${output_message}" 'Display one or many resources'
+  kube::test::if_has_not_string "$output_message{output_message}" 'The wonderful new plugin-based get'
+
+  # plugin help
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl hello -h 2>&1)
+  kube::test::if_has_string "${output_message}" 'The hello plugin is a new plugin used by test-cmd to test multiple plugin locations.'
+  kube::test::if_has_string "${output_message}" 'Usage:'
+
+  # run plugin
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl hello 2>&1)
+  kube::test::if_has_string "${output_message}" '#hello#'
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl echo 2>&1)
+  kube::test::if_has_string "${output_message}" 'This plugin works!'
+  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/ kubectl hello 2>&1)
+  kube::test::if_has_string "${output_message}" 'unknown command'
+  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/ kubectl error 2>&1)
+  kube::test::if_has_string "${output_message}" 'error: exit status 1'
+
   kube::test::clear_all
 }

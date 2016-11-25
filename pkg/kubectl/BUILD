@@ -190,6 +190,7 @@ filegroup(
         ":package-srcs",
         "//pkg/kubectl/cmd:all-srcs",
         "//pkg/kubectl/metricsutil:all-srcs",
+        "//pkg/kubectl/plugins:all-srcs",
         "//pkg/kubectl/resource:all-srcs",
         "//pkg/kubectl/testing:all-srcs",
     ],
