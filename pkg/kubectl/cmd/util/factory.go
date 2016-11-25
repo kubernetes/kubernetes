@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -236,6 +237,10 @@ type BuilderFactory interface {
 	PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// One stop shopping for a Builder
 	NewBuilder() *resource.Builder
+	// PluginLoader provides the implementation to be used to load cli plugins.
+	PluginLoader() plugins.PluginLoader
+	// PluginRunner provides the implementation to be used to run cli plugins.
+	PluginRunner() plugins.PluginRunner
 }
 
 func getGroupVersionKinds(gvks []schema.GroupVersionKind, group string) []schema.GroupVersionKind {
