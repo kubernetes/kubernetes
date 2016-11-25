@@ -178,6 +178,10 @@ const (
 	// Default time to wait for nodes to become schedulable.
 	// Set so high for scale tests.
 	NodeSchedulableTimeout = 4 * time.Hour
+
+	DeploymentResource            = "deployment"
+	ReplicaSetResource            = "replicaSet"
+	ReplicationControllerResource = "replicationController"
 )
 
 var (
@@ -2757,26 +2761,87 @@ func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selecto
 	return
 }
 
-// DeleteRCAndPods a Replication Controller and all pods it spawned
-func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
-	By(fmt.Sprintf("deleting replication controller %s in namespace %s", name, ns))
-	rc, err := clientset.Core().ReplicationControllers(ns).Get(name)
+func getSelectorAndReplicasFromResource(c clientset.Interface, resource, ns, name string) (*unversioned.LabelSelector, int32, error) {
+	var rc *v1.ReplicationController
+	var dep *extensions.Deployment
+	var rs *extensions.ReplicaSet
+	var selector *unversioned.LabelSelector
+	var replicas int32
+	var err error
+
+	switch resource {
+	case ReplicationControllerResource:
+		rc, err = c.Core().ReplicationControllers(ns).Get(name)
+		if err == nil {
+			selector = &unversioned.LabelSelector{MatchLabels: rc.Spec.Selector}
+			if rc.Spec.Replicas != nil {
+				replicas = *rc.Spec.Replicas
+			}
+		}
+	case ReplicaSetResource:
+		rs, err = c.Extensions().ReplicaSets(ns).Get(name)
+		if err == nil {
+			selector = rs.Spec.Selector
+			if rc.Spec.Replicas != nil {
+				replicas = *rs.Spec.Replicas
+			}
+		}
+	case DeploymentResource:
+		dep, err = c.Extensions().Deployments(ns).Get(name)
+		if err == nil {
+			selector = dep.Spec.Selector
+			if rc.Spec.Replicas != nil {
+				replicas = *dep.Spec.Replicas
+			}
+		}
+	}
+	return selector, replicas, err
+}
+
+func deleteResource(c clientset.Interface, resource, ns, name string, deleteOption *v1.DeleteOptions) error {
+	switch resource {
+	case ReplicationControllerResource:
+		return c.Core().ReplicationControllers(ns).Delete(name, deleteOption)
+	case ReplicaSetResource:
+		return c.Extensions().ReplicaSets(ns).Delete(name, deleteOption)
+	case DeploymentResource:
+		return c.Extensions().Deployments(ns).Delete(name, deleteOption)
+	default:
+		return fmt.Errorf("Unknown resource kind: %v", resource)
+	}
+}
+
+// DeleteResourceAndPods deletes a given resource and all pods it spawned
+func DeleteResourceAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, resource, ns, name string) error {
+	By(fmt.Sprintf("deleting %v %s in namespace %s", resource, name, ns))
+
+	selector, _, err := getSelectorAndReplicasFromResource(clientset, resource, ns, name)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			Logf("RC %s was already deleted: %v", name, err)
+			Logf("%v %s not found: %v", resource, name, err)
 			return nil
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperForReplicationController(internalClientset.Core(), 10*time.Minute)
+
+	var reaper kubectl.Reaper
+	switch resource {
+	case ReplicationControllerResource:
+		reaper, err = kubectl.ReaperFor(api.Kind("ReplicationController"), internalClientset)
+	case ReplicaSetResource:
+		reaper, err = kubectl.ReaperFor(extensionsinternal.Kind("ReplicaSet"), internalClientset)
+	case DeploymentResource:
+		reaper, err = kubectl.ReaperFor(extensionsinternal.Kind("DaemonSet"), internalClientset)
+	}
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			Logf("RC %s was already deleted: %v", name, err)
+			Logf("%v %s was already deleted: %v", resource, name, err)
 			return nil
 		}
 		return err
 	}
-	ps, err := podStoreForRC(clientset, rc)
+
+	ps, err := podStoreForE2E(clientset, ns, selector)
 	if err != nil {
 		return err
 	}
@@ -2790,14 +2855,14 @@ func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalcl
 	if err != nil {
 		return fmt.Errorf("error while stopping RC: %s: %v", name, err)
 	}
-	deleteRCTime := time.Now().Sub(startTime)
-	Logf("Deleting RC %s took: %v", name, deleteRCTime)
+	deleteTime := time.Now().Sub(startTime)
+	Logf("Deleting %v %s took: %v", resource, name, deleteTime)
 	err = waitForPodsInactive(ps, 10*time.Millisecond, 10*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
-	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
-	Logf("Terminating RC %s pods took: %v", name, terminatePodTime)
+	terminatePodTime := time.Now().Sub(startTime) - deleteTime
+	Logf("Terminating %v %s pods took: %v", resource, name, terminatePodTime)
 	// this is to relieve namespace controller's pressure when deleting the
 	// namespace after a test.
 	err = waitForPodsGone(ps, 10*time.Second, 10*time.Minute)
@@ -2807,57 +2872,67 @@ func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalcl
 	return nil
 }
 
-// DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
-func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
-	By(fmt.Sprintf("deleting replication controller %s in namespace %s, will wait for the garbage collector to delete the pods", name, ns))
-	rc, err := c.Core().ReplicationControllers(ns).Get(name)
+func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
+	return DeleteResourceAndPods(clientset, internalClientset, ReplicationControllerResource, ns, name)
+}
+
+// DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
+func DeleteResourceAndWaitForGC(c clientset.Interface, resource, ns, name string) error {
+	By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", resource, name, ns))
+
+	selector, replicas, err := getSelectorAndReplicasFromResource(c, resource, ns, name)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			Logf("RC %s was already deleted: %v", name, err)
+			Logf("%v %s not found: %v", resource, name, err)
 			return nil
 		}
 		return err
 	}
-	ps, err := podStoreForRC(c, rc)
+
+	ps, err := podStoreForE2E(c, ns, selector)
 	if err != nil {
 		return err
 	}
+
 	defer ps.Stop()
 	startTime := time.Now()
 	falseVar := false
 	deleteOption := &v1.DeleteOptions{OrphanDependents: &falseVar}
-	err = c.Core().ReplicationControllers(ns).Delete(name, deleteOption)
+	err = deleteResource(c, resource, ns, name, deleteOption)
 	if err != nil && apierrs.IsNotFound(err) {
-		Logf("RC %s was already deleted: %v", name, err)
+		Logf("%v %s was already deleted: %v", resource, name, err)
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	deleteRCTime := time.Now().Sub(startTime)
-	Logf("Deleting RC %s took: %v", name, deleteRCTime)
+	deleteTime := time.Now().Sub(startTime)
+	Logf("Deleting %v %s took: %v", resource, name, deleteTime)
+
 	var interval, timeout time.Duration
 	switch {
-	case *(rc.Spec.Replicas) < 100:
+	case replicas < 100:
 		interval = 100 * time.Millisecond
-	case *(rc.Spec.Replicas) < 1000:
+	case replicas < 1000:
 		interval = 1 * time.Second
 	default:
 		interval = 10 * time.Second
 	}
-	if *(rc.Spec.Replicas) < 5000 {
+	if replicas < 5000 {
 		timeout = 10 * time.Minute
 	} else {
-		timeout = time.Duration(*(rc.Spec.Replicas)/gcThroughput) * time.Second
+		timeout = time.Duration(replicas/gcThroughput) * time.Second
 		// gcThroughput is pretty strict now, add a bit more to it
 		timeout = timeout + 3*time.Minute
 	}
+
 	err = waitForPodsInactive(ps, interval, timeout)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
-	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
+	terminatePodTime := time.Now().Sub(startTime) - deleteTime
 	Logf("Terminating RC %s pods took: %v", name, terminatePodTime)
+
 	err = waitForPodsGone(ps, interval, 10*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
@@ -2865,12 +2940,20 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return nil
 }
 
-// podStoreForRC creates a PodStore that monitors pods belong to the rc. It
-// waits until the reflector does a List() before returning.
-func podStoreForRC(c clientset.Interface, rc *v1.ReplicationController) (*testutils.PodStore, error) {
-	labels := labels.SelectorFromSet(rc.Spec.Selector)
-	ps := testutils.NewPodStore(c, rc.Namespace, labels, fields.Everything())
-	err := wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
+// DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
+func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
+	return DeleteResourceAndWaitForGC(c, ReplicationControllerResource, ns, name)
+}
+
+// podStoreForE2E creates a PodStore that monitors pods from given namespace matching given selector.
+// It waits until the reflector does a List() before returning.
+func podStoreForE2E(c clientset.Interface, ns string, selector *unversioned.LabelSelector) (*testutils.PodStore, error) {
+	labels, err := unversioned.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return nil, err
+	}
+	ps := testutils.NewPodStore(c, ns, labels, fields.Everything())
+	err = wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
 		if len(ps.Reflector.LastSyncResourceVersion()) != 0 {
 			return true, nil
 		}
@@ -4288,7 +4371,7 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 			return err
 		}
 		if replicas == 0 {
-			ps, err := podStoreForRC(clientset, rc)
+			ps, err := podStoreForE2E(clientset, rc.Namespace, &unversioned.LabelSelector{MatchLabels: rc.Spec.Selector})
 			if err != nil {
 				return err
 			}
