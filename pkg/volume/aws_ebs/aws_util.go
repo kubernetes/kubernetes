@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
@@ -91,18 +92,19 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 	}
 	// Apply Parameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
-	volumeOptions.ZonePresent = false
-	volumeOptions.ZonesPresent = false
+	zonesConf := new(volume.ZonesConf)
 	for k, v := range c.options.Parameters {
 		switch strings.ToLower(k) {
 		case "type":
 			volumeOptions.VolumeType = v
 		case "zone":
-			volumeOptions.ZonePresent = true
-			volumeOptions.AvailabilityZone = v
+			if err = zonesConf.SetZone(v); err != nil {
+				return "", 0, nil, err
+			}
 		case "zones":
-			volumeOptions.ZonesPresent = true
-			volumeOptions.AvailabilityZones = v
+			if err = zonesConf.SetZones(v); err != nil {
+				return "", 0, nil, err
+			}
 		case "iopspergb":
 			volumeOptions.IOPSPerGB, err = strconv.Atoi(v)
 			if err != nil {
@@ -120,15 +122,15 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 		}
 	}
 
-	if volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
-		return "", 0, nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
+	var zones sets.String
+	zonesConf.PVC = c.options.PVC
+	zonesConf.GetAllZones = cloud.GetCandidateZonesForDynamicVolume
+	zonesConf.ZoneToRegion = aws.AzToRegion
+	if zones, err = zonesConf.GetConfZones(); err != nil {
+		return "", 0, nil, err
 	}
 
-	// TODO: implement PVC.Selector parsing
-	if c.options.PVC.Spec.Selector != nil {
-		return "", 0, nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on AWS")
-	}
-
+	volumeOptions.AvailabilityZone = volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
 	name, err := cloud.CreateDisk(volumeOptions)
 	if err != nil {
 		glog.V(2).Infof("Error creating EBS Disk volume: %v", err)
