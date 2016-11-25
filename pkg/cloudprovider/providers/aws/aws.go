@@ -730,7 +730,7 @@ func isRegionValid(region string) bool {
 
 // Derives the region from a valid az name.
 // Returns an error if the az is known invalid (empty)
-func azToRegion(az string) (string, error) {
+func AzToRegion(az string) (string, error) {
 	if len(az) < 1 {
 		return "", fmt.Errorf("invalid (empty) AZ")
 	}
@@ -759,7 +759,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 	if len(zone) <= 1 {
 		return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
 	}
-	regionName, err := azToRegion(zone)
+	regionName, err := AzToRegion(zone)
 	if err != nil {
 		return nil, err
 	}
@@ -1036,9 +1036,9 @@ func (c *Cloud) List(filter string) ([]types.NodeName, error) {
 	return c.getInstancesByRegex(filter)
 }
 
-// getAllZones retrieves  a list of all the zones in which nodes are running
+// GetAllZones retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
-func (c *Cloud) getAllZones() (sets.String, error) {
+func (c *Cloud) GetAllZones() (sets.String, error) {
 	// We don't currently cache this; it is currently used only in volume
 	// creation which is expected to be a comparatively rare occurrence.
 
@@ -1582,16 +1582,6 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 
 // CreateDisk implements Volumes.CreateDisk
 func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, error) {
-	allZones, err := c.getAllZones()
-	if err != nil {
-		return "", fmt.Errorf("error querying for all zones: %v", err)
-	}
-
-	createAZ := volumeOptions.AvailabilityZone
-	if createAZ == "" {
-		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
-	}
-
 	var createType string
 	var iops int64
 	switch volumeOptions.VolumeType {
@@ -1623,7 +1613,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	request := &ec2.CreateVolumeInput{}
-	request.AvailabilityZone = aws.String(createAZ)
+	request.AvailabilityZone = aws.String(volumeOptions.AvailabilityZone)
 	request.Size = aws.Int64(int64(volumeOptions.CapacityGB))
 	request.VolumeType = aws.String(createType)
 	request.Encrypted = aws.Bool(volumeOptions.Encrypted)
@@ -1695,7 +1685,7 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 	}
 
 	labels[unversioned.LabelZoneFailureDomain] = az
-	region, err := azToRegion(az)
+	region, err := AzToRegion(az)
 	if err != nil {
 		return nil, err
 	}

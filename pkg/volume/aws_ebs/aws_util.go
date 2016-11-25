@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -91,12 +92,14 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 	}
 	// Apply Parameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
+	var calculateZonesParams volume.CalculateSetOfZonesParams
 	for k, v := range c.options.Parameters {
 		switch strings.ToLower(k) {
 		case "type":
 			volumeOptions.VolumeType = v
 		case "zone":
-			volumeOptions.AvailabilityZone = v
+			calculateZonesParams.IsSCZoneSpecified = true
+			calculateZonesParams.StorageClassZones = v
 		case "iopspergb":
 			volumeOptions.IOPSPerGB, err = strconv.Atoi(v)
 			if err != nil {
@@ -114,11 +117,15 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 		}
 	}
 
-	// TODO: implement PVC.Selector parsing
-	if c.options.PVC.Spec.Selector != nil {
-		return "", 0, nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on AWS")
+	var zones sets.String
+	calculateZonesParams.PVC = c.options.PVC
+	calculateZonesParams.GetAllZones = cloud.GetAllZones
+	calculateZonesParams.Zone2region = aws.AzToRegion
+	if zones, err = volume.CalculateSetOfZones(calculateZonesParams); err != nil {
+		return "", 0, nil, err
 	}
 
+	volumeOptions.AvailabilityZone = volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
 	name, err := cloud.CreateDisk(volumeOptions)
 	if err != nil {
 		glog.V(2).Infof("Error creating EBS Disk volume: %v", err)
