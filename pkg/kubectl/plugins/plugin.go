@@ -14,16 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugin
+package plugins
+
+import (
+	"io"
+	"os/exec"
+
+	"github.com/golang/glog"
+)
 
 type Plugin struct {
-	Path string `json:"-"`
+	Path string
+	PluginMetadata
+}
 
-	Use     string `json:"use,omitempty"`
-	Short   string `json:"short,omitempty"`
+type PluginMetadata struct {
+	Use     string `json:"use"`
+	Short   string `json:"short"`
 	Long    string `json:"long,omitempty"`
 	Example string `json:"example,omitempty"`
 	Tunnel  bool   `json:"tunnel,omitempty"`
 }
 
-type PluginList []*Plugin
+type Plugins []*Plugin
+
+func (p *Plugin) Run(in io.Reader, out, errout io.Writer, env []string, args ...string) error {
+	cmd := exec.Command(p.Path, args...)
+
+	cmd.Stdin = in
+	cmd.Stdout = out
+	cmd.Stderr = errout
+
+	cmd.Env = env
+
+	glog.V(9).Infof("Running plugin with %s", cmd.Args)
+	return cmd.Run()
+}

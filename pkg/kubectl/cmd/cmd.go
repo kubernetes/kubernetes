@@ -19,7 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os/exec"
+	"os"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/plugin"
+	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/golang/glog"
@@ -299,32 +299,47 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *
 		},
 	}
 
-	pluginsLoader := plugin.NewConfigDirPluginLoader()
-	plugins, err := pluginsLoader.Load()
+	loadedPlugins, err := plugins.NewConfigDirPluginLoader().Load()
 	if err != nil {
 		fmt.Printf("Unable to load plugins due to: %v\n", err)
 	}
-	if len(plugins) > 0 {
-		pluginsCmds := []*cobra.Command{}
-		for _, plugin := range plugins {
-			pluginsCmds = append(pluginsCmds, &cobra.Command{
+
+	if len(loadedPlugins) > 0 {
+		pluginCmds := []*cobra.Command{}
+
+		for _, plugin := range loadedPlugins {
+			pluginCmds = append(pluginCmds, &cobra.Command{
 				Use:     plugin.Use,
 				Short:   plugin.Short,
 				Long:    templates.LongDesc(plugin.Long),
 				Example: templates.Examples(plugin.Example),
 				Run: func(cmd *cobra.Command, args []string) {
-					executable := exec.Command(plugin.Path, args...)
-					executable.Stdin = in
-					executable.Stdout = out
-					executable.Stderr = errOut
-					glog.V(9).Infof("Calling plugin with %s", executable)
-					cmdutil.CheckErr(executable.Run())
+					env := os.Environ()
+
+					if plugin.Tunnel {
+						clientConfig, err := f.ClientConfig()
+						if err != nil {
+							glog.Fatal(err)
+						}
+
+						listener, err := plugins.ServePluginAPIProxy(clientConfig)
+						if err != nil {
+							glog.Fatal(err)
+						}
+						defer listener.Close()
+
+						env = append(env, fmt.Sprintf("KUBECTL_PLUGIN_API_HOST=%s", listener.Addr()))
+					}
+
+					err := plugin.Run(in, out, errOut, env, args...)
+					cmdutil.CheckErr(err)
 				},
 			})
 		}
+
 		groups = append(groups, templates.CommandGroup{
 			Message:  "Plugins:",
-			Commands: pluginsCmds,
+			Commands: pluginCmds,
 		})
 	}
 
