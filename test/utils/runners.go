@@ -27,12 +27,14 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -44,6 +46,18 @@ const (
 	// String used to mark pod deletion
 	nonExist = "NonExist"
 )
+
+type RunObjectConfig interface {
+	Run() error
+	GetName() string
+	GetNamespace() string
+	GetKind() schema.GroupKind
+	GetClient() clientset.Interface
+	GetInternalClient() internalclientset.Interface
+	SetClient(clientset.Interface)
+	SetInternalClient(internalclientset.Interface)
+	GetReplicas() int
+}
 
 type RCConfig struct {
 	Client         clientset.Interface
@@ -193,6 +207,14 @@ func RunDeployment(config DeploymentConfig) error {
 	return config.start()
 }
 
+func (config *DeploymentConfig) Run() error {
+	return RunDeployment(*config)
+}
+
+func (config *DeploymentConfig) GetKind() schema.GroupKind {
+	return extensionsinternal.Kind("Deployment")
+}
+
 func (config *DeploymentConfig) create() error {
 	deployment := &extensions.Deployment{
 		ObjectMeta: v1.ObjectMeta{
@@ -245,6 +267,14 @@ func RunReplicaSet(config ReplicaSetConfig) error {
 	return config.start()
 }
 
+func (config *ReplicaSetConfig) Run() error {
+	return RunReplicaSet(*config)
+}
+
+func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
+	return extensionsinternal.Kind("ReplicaSet")
+}
+
 func (config *ReplicaSetConfig) create() error {
 	rs := &extensions.ReplicaSet{
 		ObjectMeta: v1.ObjectMeta{
@@ -295,6 +325,42 @@ func RunRC(config RCConfig) error {
 		return err
 	}
 	return config.start()
+}
+
+func (config *RCConfig) Run() error {
+	return RunRC(*config)
+}
+
+func (config *RCConfig) GetName() string {
+	return config.Name
+}
+
+func (config *RCConfig) GetNamespace() string {
+	return config.Namespace
+}
+
+func (config *RCConfig) GetKind() schema.GroupKind {
+	return api.Kind("ReplicationController")
+}
+
+func (config *RCConfig) GetClient() clientset.Interface {
+	return config.Client
+}
+
+func (config *RCConfig) GetInternalClient() internalclientset.Interface {
+	return config.InternalClient
+}
+
+func (config *RCConfig) SetClient(c clientset.Interface) {
+	config.Client = c
+}
+
+func (config *RCConfig) SetInternalClient(c internalclientset.Interface) {
+	config.InternalClient = c
+}
+
+func (config *RCConfig) GetReplicas() int {
+	return config.Replicas
 }
 
 func (config *RCConfig) create() error {

@@ -104,7 +104,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	if err != nil {
 		return
 	}
-	if err = framework.WaitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
+	if err = framework.WaitForControlledPodsRunning(h.client, namespace, rc.Name, api.Kind("ReplicationController")); err != nil {
 		return
 	}
 	h.rcName = rc.Name
@@ -171,7 +171,7 @@ func (s *ingManager) start(namespace string) (err error) {
 		if err != nil {
 			return
 		}
-		if err = framework.WaitForRCPodsRunning(s.client, rc.Namespace, rc.Name); err != nil {
+		if err = framework.WaitForControlledPodsRunning(s.client, rc.Namespace, rc.Name, api.Kind("ReplicationController")); err != nil {
 			return
 		}
 	}
