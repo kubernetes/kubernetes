@@ -59,7 +59,12 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer metrics.Monitor(&verb, &apiResource, net.GetHTTPClient(req), w.Header().Get("Content-Type"), httpCode, reqStart)
+	defer func() {
+		metrics.Monitor(&verb, &apiResource,
+			net.GetHTTPClient(req),
+			w.Header().Get("Content-Type"),
+			httpCode, reqStart)
+	}()
 
 	ctx, ok := r.Mapper.Get(req)
 	if !ok {
