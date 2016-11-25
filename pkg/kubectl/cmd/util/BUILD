@@ -38,6 +38,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//pkg/kubectl/plugins:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
