@@ -1,0 +1,4 @@
+name: "echo-plugin"
+shortDesc: "Echoes for testing purposes"
+longDesc: "Long description for the echo plugin"
+command: "echo This plugin works!"

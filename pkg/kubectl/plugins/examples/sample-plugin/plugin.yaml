@@ -1,0 +1,3 @@
+name: "sample-plugin"
+shortDesc: "The magnificent sample plugin"
+command: "./sample"

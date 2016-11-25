@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -129,4 +130,16 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
 
 	return resource.NewBuilder(mapper, categoryExpander, typer, resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping), f.clientAccessFactory.Decoder(true))
+}
+
+func (f *ring2Factory) PluginLoader() plugins.PluginLoader {
+	return plugins.TolerantMultiPluginLoader{
+		plugins.XDGDataPluginLoader(),
+		plugins.PluginsEnvVarPluginLoader(),
+		plugins.UserDirPluginLoader(),
+	}
+}
+
+func (f *ring2Factory) PluginRunner() plugins.PluginRunner {
+	return &plugins.ExecPluginRunner{}
 }

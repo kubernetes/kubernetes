@@ -375,6 +375,34 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 	})
 
+	framework.KubeDescribe("kubectl plugins", func() {
+		BeforeEach(func() {
+			pluginsPath := filepath.Join(kubeCtlManifestPath, "plugins")
+			os.Setenv("KUBECTL_PLUGINS_PATH", pluginsPath)
+		})
+		AfterEach(func() {
+			os.Unsetenv("KUBECTL_PLUGINS_PATH")
+		})
+
+		It("should support help for plugins", func() {
+			By("displaying plugins in main help")
+			helpOutput := framework.RunKubectlOrDie("-h")
+			Expect(helpOutput).To(ContainSubstring("Plugins:"))
+			Expect(helpOutput).To(ContainSubstring("echo-plugin"))
+			Expect(helpOutput).To(ContainSubstring("Echoes for testing purposes"))
+
+			By("displaying help for individual plugin")
+			helpOutput = framework.RunKubectlOrDie("echo", "-h")
+			Expect(helpOutput).To(ContainSubstring("Long description for the echo plugin"))
+		})
+
+		It("should successfully run plugins", func() {
+			By("running and displaying plugin output message")
+			pluginOutput := framework.RunKubectlOrDie("echo")
+			Expect(pluginOutput).To(Equal("This plugin works!\n"))
+		})
+	})
+
 	framework.KubeDescribe("Simple pod", func() {
 		var podPath []byte
 
