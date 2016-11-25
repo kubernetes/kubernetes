@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os/exec"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/plugin"
 	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/golang/glog"
@@ -207,7 +209,7 @@ __custom_func() {
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -230,25 +232,25 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
-				NewCmdCreate(f, out, err),
+				NewCmdCreate(f, out, errOut),
 				NewCmdExposeService(f, out),
-				NewCmdRun(f, in, out, err),
-				set.NewCmdSet(f, out, err),
+				NewCmdRun(f, in, out, errOut),
+				set.NewCmdSet(f, out, errOut),
 			},
 		},
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				NewCmdGet(f, out, err),
-				NewCmdExplain(f, out, err),
-				NewCmdEdit(f, out, err),
-				NewCmdDelete(f, out, err),
+				NewCmdGet(f, out, errOut),
+				NewCmdExplain(f, out, errOut),
+				NewCmdEdit(f, out, errOut),
+				NewCmdDelete(f, out, errOut),
 			},
 		},
 		{
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
-				rollout.NewCmdRollout(f, out, err),
+				rollout.NewCmdRollout(f, out, errOut),
 				NewCmdRollingUpdate(f, out),
 				NewCmdScale(f, out),
 				NewCmdAutoscale(f, out),
@@ -259,23 +261,23 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdCertificate(f, out),
 				NewCmdClusterInfo(f, out),
-				NewCmdTop(f, out, err),
+				NewCmdTop(f, out, errOut),
 				NewCmdCordon(f, out),
 				NewCmdUncordon(f, out),
-				NewCmdDrain(f, out, err),
+				NewCmdDrain(f, out, errOut),
 				NewCmdTaint(f, out),
 			},
 		},
 		{
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
-				NewCmdDescribe(f, out, err),
+				NewCmdDescribe(f, out, errOut),
 				NewCmdLogs(f, out),
-				NewCmdAttach(f, in, out, err),
-				NewCmdExec(f, in, out, err),
-				NewCmdPortForward(f, out, err),
+				NewCmdAttach(f, in, out, errOut),
+				NewCmdExec(f, in, out, errOut),
+				NewCmdPortForward(f, out, errOut),
 				NewCmdProxy(f, out),
-				NewCmdCp(f, in, out, err),
+				NewCmdCp(f, in, out, errOut),
 			},
 		},
 		{
@@ -296,6 +298,36 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			},
 		},
 	}
+
+	pluginsLoader := plugin.NewConfigDirPluginLoader()
+	plugins, err := pluginsLoader.Load()
+	if err != nil {
+		fmt.Printf("Unable to load plugins due to: %v\n", err)
+	}
+	if len(plugins) > 0 {
+		pluginsCmds := []*cobra.Command{}
+		for _, plugin := range plugins {
+			pluginsCmds = append(pluginsCmds, &cobra.Command{
+				Use:     plugin.Use,
+				Short:   plugin.Short,
+				Long:    templates.LongDesc(plugin.Long),
+				Example: templates.Examples(plugin.Example),
+				Run: func(cmd *cobra.Command, args []string) {
+					executable := exec.Command(plugin.Path, args...)
+					executable.Stdin = in
+					executable.Stdout = out
+					executable.Stderr = errOut
+					glog.V(9).Infof("Calling plugin with %s", executable)
+					cmdutil.CheckErr(executable.Run())
+				},
+			})
+		}
+		groups = append(groups, templates.CommandGroup{
+			Message:  "Plugins:",
+			Commands: pluginsCmds,
+		})
+	}
+
 	groups.Add(cmds)
 
 	filters := []string{
@@ -314,7 +346,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		)
 	}
 
-	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
+	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, errOut))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdOptions(out))
