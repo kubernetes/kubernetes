@@ -17,8 +17,10 @@ limitations under the License.
 package clouddns
 
 import (
+	"fmt"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
+	"strings"
 )
 
 // Compile time check for interface adeherence
@@ -40,6 +42,36 @@ func (zones Zones) List() ([]dnsprovider.Zone, error) {
 		zoneList[i] = &Zone{zone, &zones}
 	}
 	return zoneList, nil
+}
+
+func (zones Zones) Get(dnsZoneName string, dnsZoneID string) (dnsprovider.Zone, error) {
+	if len(dnsZoneID) > 0 {
+		response, err := zones.impl.Get(zones.project(), dnsZoneID).Do()
+		if err != nil {
+			return nil, err
+		}
+		return &Zone{response, &zones}, nil
+	} else {
+		response, err := zones.impl.List(zones.project()).DnsName(strings.TrimSuffix(dnsZoneName, ".")).Do()
+		if err != nil {
+			return nil, err
+		}
+
+		var matches []interfaces.ManagedZone
+		for _, managedZone := range response.ManagedZones() {
+			if strings.TrimSuffix(dnsZoneName, ".") == strings.TrimSuffix(managedZone.DnsName(), ".") {
+				matches = append(matches, managedZone)
+			}
+		}
+
+		if len(matches) == 0 {
+			return nil, nil
+		}
+		if len(matches) > 1 {
+			return nil, fmt.Errorf("DNS zone %s is ambiguous (please specify zoneID).", dnsZoneName)
+		}
+		return &Zone{matches[0], &zones}, nil
+	}
 }
 
 func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {

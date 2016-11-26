@@ -15,6 +15,7 @@ go_library(
     srcs = ["route53api.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/util/uuid:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/service/route53",
     ],

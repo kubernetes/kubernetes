@@ -19,6 +19,7 @@ package coredns
 import (
 	"fmt"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"strings"
 )
 
 // Compile time check for interface adherence
@@ -35,6 +36,28 @@ func (zones Zones) List() ([]dnsprovider.Zone, error) {
 		zoneList = append(zoneList, zone)
 	}
 	return zoneList, nil
+}
+
+func (zones Zones) Get(dnsZoneName string, dnsZoneID string) (dnsprovider.Zone, error) {
+	dnsZones, err := zones.List()
+	if err != nil {
+		return nil, err
+	}
+
+	var matches []dnsprovider.Zone
+	for _, zone := range dnsZones {
+		if strings.TrimSuffix(dnsZoneName, ".") == strings.TrimSuffix(zone.Name(), ".") {
+			matches = append(matches, zone)
+		}
+	}
+
+	if len(matches) == 0 {
+		return nil, nil
+	}
+	if len(matches) > 1 {
+		return nil, fmt.Errorf("DNS zone %s is ambiguous (please specify zoneID).", dnsZoneName)
+	}
+	return matches[0], nil
 }
 
 func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {
