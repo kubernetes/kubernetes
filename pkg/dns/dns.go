@@ -107,9 +107,9 @@ type KubeDNS struct {
 	domainPath []string
 
 	// endpointsController  invokes registered callbacks when endpoints change.
-	endpointsController *kcache.Controller
+	endpointsController kcache.Controller
 	// serviceController invokes registered callbacks when services change.
-	serviceController *kcache.Controller
+	serviceController kcache.Controller
 
 	// config set from the dynamic configuration source.
 	config *config.Config

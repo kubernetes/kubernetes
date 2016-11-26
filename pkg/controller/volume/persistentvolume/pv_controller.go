@@ -145,9 +145,9 @@ const createProvisionedPVInterval = 10 * time.Second
 // cache.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
-	volumeController          *cache.Controller
+	volumeController          cache.Controller
 	volumeSource              cache.ListerWatcher
-	claimController           *cache.Controller
+	claimController           cache.Controller
 	claimSource               cache.ListerWatcher
 	classReflector            *cache.Reflector
 	classSource               cache.ListerWatcher

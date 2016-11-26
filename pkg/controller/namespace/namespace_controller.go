@@ -44,7 +44,7 @@ type NamespaceController struct {
 	// store that holds the namespaces
 	store cache.Store
 	// controller that observes the namespaces
-	controller *cache.Controller
+	controller cache.Controller
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
 	// function to list of preferred group versions and their corresponding resource set for namespace deletion

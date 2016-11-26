@@ -53,8 +53,8 @@ type PodGCController struct {
 	podStore  cache.StoreToPodLister
 	nodeStore cache.StoreToNodeLister
 
-	podController  cache.ControllerInterface
-	nodeController cache.ControllerInterface
+	podController  cache.Controller
+	nodeController cache.Controller
 
 	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int

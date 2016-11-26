@@ -41,11 +41,11 @@ type clusterCache struct {
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
-	serviceController *cache.Controller
+	serviceController cache.Controller
 	// A store of endpoint, populated by the serviceController
 	endpointStore cache.StoreToEndpointsLister
 	// Watches changes to all endpoints
-	endpointController *cache.Controller
+	endpointController cache.Controller
 	// services that need to be synced
 	serviceQueue *workqueue.Type
 	// endpoints that need to be synced

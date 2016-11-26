@@ -64,7 +64,7 @@ type DaemonSetController struct {
 	// Definitions of daemonsets that should be federated.
 	daemonsetInformerStore cache.Store
 	// Informer controller for daemonsets that should be federated.
-	daemonsetInformerController cache.ControllerInterface
+	daemonsetInformerController cache.Controller
 
 	// Client to federated api server.
 	federatedApiClient federationclientset.Interface
@@ -120,7 +120,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 	// Federated informer on daemonsets in members of federation.
 	daemonsetcontroller.daemonsetFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api_v1.ListOptions) (pkg_runtime.Object, error) {

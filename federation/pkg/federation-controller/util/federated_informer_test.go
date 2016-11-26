@@ -77,7 +77,7 @@ func TestFederatedInformer(t *testing.T) {
 		return true, watch.NewFake(), nil
 	})
 
-	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api_v1.ListOptions) (runtime.Object, error) {

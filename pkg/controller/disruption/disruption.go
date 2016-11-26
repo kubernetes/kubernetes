@@ -62,22 +62,22 @@ type DisruptionController struct {
 	kubeClient clientset.Interface
 
 	pdbStore      cache.Store
-	pdbController *cache.Controller
+	pdbController cache.Controller
 	pdbLister     cache.StoreToPodDisruptionBudgetLister
 
-	podController cache.ControllerInterface
+	podController cache.Controller
 	podLister     cache.StoreToPodLister
 
 	rcIndexer    cache.Indexer
-	rcController *cache.Controller
+	rcController cache.Controller
 	rcLister     cache.StoreToReplicationControllerLister
 
 	rsStore      cache.Store
-	rsController *cache.Controller
+	rsController cache.Controller
 	rsLister     cache.StoreToReplicaSetLister
 
 	dIndexer    cache.Indexer
-	dController *cache.Controller
+	dController cache.Controller
 	dLister     cache.StoreToDeploymentLister
 
 	// PodDisruptionBudget keys that need to be synced.

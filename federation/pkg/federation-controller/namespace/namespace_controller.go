@@ -61,7 +61,7 @@ type NamespaceController struct {
 	// Definitions of namespaces that should be federated.
 	namespaceInformerStore cache.Store
 	// Informer controller for namespaces that should be federated.
-	namespaceInformerController cache.ControllerInterface
+	namespaceInformerController cache.Controller
 
 	// Client to federated api server.
 	federatedApiClient federationclientset.Interface
@@ -117,7 +117,7 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 	// Federated informer on namespaces in members of federation.
 	nc.namespaceFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api_v1.ListOptions) (runtime.Object, error) {

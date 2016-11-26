@@ -37,6 +37,14 @@ func (*FakeController) HasSynced() bool {
 	return true
 }
 
+func (*FakeController) LastSyncResourceVersion() string {
+	return ""
+}
+
+func (*FakeController) Requeue(obj interface{}) error {
+	return nil
+}
+
 func TestGCTerminated(t *testing.T) {
 	type nameToPhase struct {
 		name  string

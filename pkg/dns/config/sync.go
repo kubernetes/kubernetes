@@ -88,7 +88,7 @@ type kubeSync struct {
 
 	client     clientset.Interface
 	store      cache.Store
-	controller *cache.Controller
+	controller cache.Controller
 
 	channel chan *Config
 

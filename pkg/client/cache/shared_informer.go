@@ -43,10 +43,11 @@ type SharedInformer interface {
 	AddEventHandler(handler ResourceEventHandler) error
 	GetStore() Store
 	// GetController gives back a synthetic interface that "votes" to start the informer
-	GetController() ControllerInterface
+	GetController() Controller
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
 	LastSyncResourceVersion() string
+	Requeue(obj interface{}) error
 }
 
 type SharedIndexInformer interface {
@@ -108,7 +109,7 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 
 type sharedIndexInformer struct {
 	indexer    Indexer
-	controller *Controller
+	controller Controller
 
 	processor             *sharedProcessor
 	cacheMutationDetector CacheMutationDetector
@@ -143,6 +144,14 @@ func (v *dummyController) Run(stopCh <-chan struct{}) {
 
 func (v *dummyController) HasSynced() bool {
 	return v.informer.HasSynced()
+}
+
+func (v *dummyController) LastSyncResourceVersion() string {
+	return v.informer.LastSyncResourceVersion()
+}
+
+func (v *dummyController) Requeue(obj interface{}) error {
+	return nil
 }
 
 type updateNotification struct {
@@ -207,10 +216,15 @@ func (s *sharedIndexInformer) LastSyncResourceVersion() string {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
-	if s.controller == nil || s.controller.reflector == nil {
+	if s.controller == nil {
 		return ""
 	}
-	return s.controller.reflector.LastSyncResourceVersion()
+
+	return s.controller.LastSyncResourceVersion()
+}
+
+func (s *sharedIndexInformer) Requeue(obj interface{}) error {
+	return fmt.Errorf("Not implemented yet")
 }
 
 func (s *sharedIndexInformer) GetStore() Store {
@@ -232,7 +246,7 @@ func (s *sharedIndexInformer) AddIndexers(indexers Indexers) error {
 	return s.indexer.AddIndexers(indexers)
 }
 
-func (s *sharedIndexInformer) GetController() ControllerInterface {
+func (s *sharedIndexInformer) GetController() Controller {
 	return &dummyController{informer: s}
 }
 

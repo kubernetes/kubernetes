@@ -64,12 +64,12 @@ type StatefulSetController struct {
 	// podStoreSynced returns true if the pod store has synced at least once.
 	podStoreSynced func() bool
 	// Watches changes to all pods.
-	podController cache.ControllerInterface
+	podController cache.Controller
 
 	// A store of StatefulSets, populated by the psController.
 	psStore cache.StoreToStatefulSetLister
 	// Watches changes to all StatefulSets.
-	psController *cache.Controller
+	psController cache.Controller
 
 	// A store of the 1 unhealthy pet blocking progress for a given ps
 	blockingPetStore *unhealthyPetTracker
