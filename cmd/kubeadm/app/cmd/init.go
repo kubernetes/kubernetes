@@ -28,12 +28,11 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/flags"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	"k8s.io/kubernetes/pkg/runtime"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
@@ -103,9 +102,9 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
-	cmd.PersistentFlags().StringVar(
-		&cfg.CloudProvider, "cloud-provider", cfg.CloudProvider,
-		`Enable cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
+	cmd.PersistentFlags().Var(
+		flags.NewCloudProviderFlag(&cfg.CloudProvider), "cloud-provider",
+		`Enable cloud provider features (external load-balancers, storage, etc). Note that you have to configure all kubelets manually`,
 	)
 
 	cmd.PersistentFlags().StringVar(
@@ -193,14 +192,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		fmt.Println("Skipping pre-flight checks")
 	}
 
-	// TODO(phase1+) create a custom flag
-	if cfg.CloudProvider != "" {
-		if cloudprovider.IsCloudProvider(cfg.CloudProvider) {
-			fmt.Printf("cloud provider %q initialized for the control plane. Remember to set the same cloud provider flag on the kubelet.\n", cfg.CloudProvider)
-		} else {
-			return nil, fmt.Errorf("cloud provider %q is not supported, you can use any of %v, or leave it unset.\n", cfg.CloudProvider, cloudprovider.CloudProviders())
-		}
-	}
 	return &Init{cfg: cfg}, nil
 }
 

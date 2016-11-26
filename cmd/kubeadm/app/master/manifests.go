@@ -34,10 +34,9 @@ import (
 )
 
 // Static pod definitions in golang form are included below so that `kubeadm init` can get going.
-
 const (
 	DefaultClusterName     = "kubernetes"
-	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config.json"
+	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
 	etcd                  = "etcd"
 	apiServer             = "apiserver"
@@ -262,6 +261,15 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) (command []string)
 		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", cfg.Etcd.CertFile)
 		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", cfg.Etcd.KeyFile)
 		command = append(command, etcdClientFileArg, etcdKeyFileArg)
+	}
+
+	if cfg.CloudProvider != "" {
+		command = append(command, "--cloud-provider="+cfg.CloudProvider)
+
+		// Only append the --cloud-config option if there's a such file
+		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
+			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
+		}
 	}
 
 	return
