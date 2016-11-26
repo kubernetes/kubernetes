@@ -460,7 +460,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 	config := &testutils.RCConfig{
 		Client:         f.ClientSet,
 		InternalClient: f.InternalClientset,
-		Name:           "node-selector",
+		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        defaultTimeout,
 		Image:          framework.GetPauseImageName(f.ClientSet),
