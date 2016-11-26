@@ -22,6 +22,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"strings"
 )
 
 // Compile time check for interface conformance
@@ -32,6 +34,8 @@ type Route53API interface {
 	ListResourceRecordSetsPages(input *route53.ListResourceRecordSetsInput, fn func(p *route53.ListResourceRecordSetsOutput, lastPage bool) (shouldContinue bool)) error
 	ChangeResourceRecordSets(*route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error)
 	ListHostedZonesPages(input *route53.ListHostedZonesInput, fn func(p *route53.ListHostedZonesOutput, lastPage bool) (shouldContinue bool)) error
+	ListHostedZonesByName(input *route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error)
+	GetHostedZone(input *route53.GetHostedZoneInput) (*route53.GetHostedZoneOutput, error)
 	CreateHostedZone(*route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error)
 	DeleteHostedZone(*route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error)
 }
@@ -61,7 +65,11 @@ func (r *Route53APIStub) ListResourceRecordSetsPages(input *route53.ListResource
 	} else {
 		for _, rrsets := range r.recordSets[*input.HostedZoneId] {
 			for _, rrset := range rrsets {
-				output.ResourceRecordSets = append(output.ResourceRecordSets, rrset)
+				// find matching records if StartRecordName exist in input
+				if input.StartRecordName == nil ||
+					strings.TrimSuffix(aws.StringValue(input.StartRecordName), ".") == strings.TrimSuffix(aws.StringValue(rrset.Name), ".") {
+					output.ResourceRecordSets = append(output.ResourceRecordSets, rrset)
+				}
 			}
 		}
 	}
@@ -108,9 +116,28 @@ func (r *Route53APIStub) ListHostedZonesPages(input *route53.ListHostedZonesInpu
 	return nil
 }
 
+func (r *Route53APIStub) ListHostedZonesByName(input *route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error) {
+	output := &route53.ListHostedZonesByNameOutput{}
+	for _, zone := range r.zones {
+		if strings.TrimSuffix(aws.StringValue(input.DNSName), ".") == strings.TrimSuffix(aws.StringValue(zone.Name), ".") {
+			output.HostedZones = append(output.HostedZones, zone)
+		}
+	}
+	return output, nil
+}
+
+func (r *Route53APIStub) GetHostedZone(input *route53.GetHostedZoneInput) (*route53.GetHostedZoneOutput, error) {
+	id := "/hostedzone/" + aws.StringValue(input.Id)
+	zone, ok := r.zones[id]
+	if !ok {
+		return nil, fmt.Errorf("Error getting hosted DNS zone: %s does not exists", id)
+	}
+	return &route53.GetHostedZoneOutput{HostedZone: zone}, nil
+}
+
 func (r *Route53APIStub) CreateHostedZone(input *route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error) {
 	name := aws.StringValue(input.Name)
-	id := "/hostedzone/" + name
+	id := "/hostedzone/" + string(uuid.NewUUID())
 	if _, ok := r.zones[id]; ok {
 		return nil, fmt.Errorf("Error creating hosted DNS zone: %s already exists", id)
 	}

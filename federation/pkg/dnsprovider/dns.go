@@ -31,6 +31,8 @@ type Interface interface {
 type Zones interface {
 	// List returns the managed Zones, or an error if the list operation failed.
 	List() ([]Zone, error)
+	// Get returns the managed Zone with dnsZoneID or dnsZoneName (returns nil if not found), or an error if the get operation failed.
+	Get(dnsZoneName string, dnsZoneID string) (Zone, error)
 	// Add creates and returns a new managed zone, or an error if the operation failed
 	Add(Zone) (Zone, error)
 	// Remove deletes a managed zone, or returns an error if the operation failed.

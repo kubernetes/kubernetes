@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+	"strings"
 )
 
 // Compile time check for interface adherence
@@ -49,18 +50,28 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 }
 
 func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet, error) {
-	var newRrset dnsprovider.ResourceRecordSet
-	rrsetList, err := rrsets.List()
+	input := route53.ListResourceRecordSetsInput{
+		HostedZoneId:    rrsets.zone.impl.Id,
+		StartRecordName: aws.String(name),
+		MaxItems:        aws.String("2"), // get 2 items to make sure there is no duplicate records with same DNS name
+	}
+
+	var list []dnsprovider.ResourceRecordSet
+	err := rrsets.zone.zones.interface_.service.ListResourceRecordSetsPages(&input, func(page *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
+		for _, rrset := range page.ResourceRecordSets {
+			if strings.TrimSuffix(name, ".") == strings.TrimSuffix(aws.StringValue(rrset.Name), ".") {
+				list = append(list, &ResourceRecordSet{rrset, &rrsets})
+			}
+		}
+		return true
+	})
 	if err != nil {
 		return nil, err
 	}
-	for _, rrset := range rrsetList {
-		if rrset.Name() == name {
-			newRrset = rrset
-			break
-		}
+	if len(list) == 0 {
+		return nil, nil
 	}
-	return newRrset, nil
+	return list[0], nil
 }
 
 func (r ResourceRecordSets) StartChangeset() dnsprovider.ResourceRecordChangeset {

@@ -22,8 +22,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"strings"
-
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
@@ -96,62 +94,6 @@ func (s *ServiceController) getServiceDnsSuffix() (string, error) {
 	return s.serviceDnsSuffix, nil
 }
 
-// getDnsZones returns the DNS zones matching dnsZoneName and dnsZoneID (if specified)
-func getDnsZones(dnsZoneName string, dnsZoneID string, dnsZonesInterface dnsprovider.Zones) ([]dnsprovider.Zone, error) {
-	// TODO: We need query-by-name and query-by-id functions
-	dnsZones, err := dnsZonesInterface.List()
-	if err != nil {
-		return nil, err
-	}
-
-	var matches []dnsprovider.Zone
-	findName := strings.TrimSuffix(dnsZoneName, ".")
-	for _, dnsZone := range dnsZones {
-		if dnsZoneID != "" {
-			if dnsZoneID != dnsZone.ID() {
-				continue
-			}
-		}
-		if findName != "" {
-			if strings.TrimSuffix(dnsZone.Name(), ".") != findName {
-				continue
-			}
-		}
-		matches = append(matches, dnsZone)
-	}
-
-	return matches, nil
-}
-
-// getDnsZone returns the DNS zone, as identified by dnsZoneName and dnsZoneID
-// This is similar to getDnsZones, but returns an error if there are zero or multiple matching zones.
-func getDnsZone(dnsZoneName string, dnsZoneID string, dnsZonesInterface dnsprovider.Zones) (dnsprovider.Zone, error) {
-	dnsZones, err := getDnsZones(dnsZoneName, dnsZoneID, dnsZonesInterface)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(dnsZones) == 1 {
-		return dnsZones[0], nil
-	}
-
-	name := dnsZoneName
-	if dnsZoneID != "" {
-		name += "/" + dnsZoneID
-	}
-
-	if len(dnsZones) == 0 {
-		return nil, fmt.Errorf("DNS zone %s not found", name)
-	} else {
-		return nil, fmt.Errorf("DNS zone %s is ambiguous (please specify zoneID)", name)
-	}
-}
-
-//   Note that if the named resource record set does not exist, but no error occurred, the returned set, and error, are both nil
-func getRrset(dnsName string, rrsetsInterface dnsprovider.ResourceRecordSets) (dnsprovider.ResourceRecordSet, error) {
-	return rrsetsInterface.Get(dnsName)
-}
-
 /* getResolvedEndpoints performs DNS resolution on the provided slice of endpoints (which might be DNS names or IPv4 addresses)
    and returns a list of IPv4 addresses.  If any of the endpoints are neither valid IPv4 addresses nor resolvable DNS names,
    non-nil error is also returned (possibly along with a partially complete list of resolved endpoints.
@@ -183,7 +125,7 @@ func (s *ServiceController) ensureDnsRrsets(dnsZone dnsprovider.Zone, dnsName st
 	if !supported {
 		return fmt.Errorf("Failed to ensure DNS records for %s. DNS provider does not support the ResourceRecordSets interface.", dnsName)
 	}
-	rrset, err := getRrset(dnsName, rrsets) // TODO: rrsets.Get(dnsName)
+	rrset, err := rrsets.Get(dnsName)
 	if err != nil {
 		return err
 	}
@@ -339,7 +281,7 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 
 	endpoints := [][]string{zoneEndpoints, regionEndpoints, globalEndpoints}
 
-	dnsZone, err := getDnsZone(s.zoneName, s.zoneID, s.dnsZones)
+	dnsZone, err := s.dnsZones.Get(s.zoneName, s.zoneID)
 	if err != nil {
 		return err
 	}

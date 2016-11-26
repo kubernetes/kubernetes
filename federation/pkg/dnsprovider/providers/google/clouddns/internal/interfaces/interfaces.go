@@ -176,7 +176,7 @@ type (
 		Do(opts ...googleapi.CallOption) (ResourceRecordSetsListResponse, error)
 		// Fields(s ...googleapi.Field) *ResourceRecordSetsListCall  // TODO: Add as needed
 		// IfNoneMatch(entityTag string) *ResourceRecordSetsListCall  // TODO: Add as needed
-		// MaxResults(maxResults int64) *ResourceRecordSetsListCall  // TODO: Add as needed
+		MaxResults(maxResults int64) ResourceRecordSetsListCall
 		Name(name string) ResourceRecordSetsListCall
 		// PageToken(pageToken string) *ResourceRecordSetsListCall  // TODO: Add as needed
 		Type(type_ string) ResourceRecordSetsListCall
