@@ -3215,16 +3215,6 @@ type DeleteOptions struct {
 	OrphanDependents *bool `json:"orphanDependents,omitempty" protobuf:"varint,3,opt,name=orphanDependents"`
 }
 
-// ExportOptions is the query options to the standard REST get call.
-type ExportOptions struct {
-	unversioned.TypeMeta `json:",inline"`
-
-	// Should this value be exported.  Export strips fields that a user can not specify.
-	Export bool `json:"export" protobuf:"varint,1,opt,name=export"`
-	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
-	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
-}
-
 // ListOptions is the query options to a standard REST list call.
 type ListOptions struct {
 	unversioned.TypeMeta `json:",inline"`
