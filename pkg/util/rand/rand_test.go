@@ -41,6 +41,75 @@ func TestString(t *testing.T) {
 	}
 }
 
+func checkAlternating(t *testing.T, s string) {
+	validvowels := "aeiou"
+	validcons := "bcdfghjkmnpqrstvwxyz"
+	validalphabets := "abcdefghijkmnpqrstuvwxyz"
+
+	if len(s) == 0 {
+		return
+	}
+
+	if len(s) == 1 {
+		if !strings.Contains(validalphabets, s) {
+			t.Errorf("expected an alphabet, got %v", s[0])
+		}
+		return
+	}
+
+	var parity bool
+	for i, c := range s {
+		if i == 0 {
+			if strings.ContainsRune(validvowels, c) {
+				parity = true
+			} else {
+				parity = false
+			}
+		} else {
+			if strings.ContainsRune(validcons, c) && parity == false ||
+				strings.ContainsRune(validvowels, c) && parity == true {
+				t.Errorf("expected alternating vowels and consonants")
+			}
+			parity = !parity
+		}
+	}
+}
+
+func TestPhoneticString(t *testing.T) {
+	validnumbers := "0123456789"
+
+	for _, l := range []int{0, 1, 2, 10, 123} {
+		s := PhoneticString(l)
+		if len(s) != l {
+			t.Errorf("expected phonetic string of size %d, got %q", l, s)
+		}
+
+		if l < 4 {
+			checkAlternating(t, s)
+		} else {
+			numbers := 0
+			spliton := make([]rune, 1)
+			for _, c := range s {
+				if strings.ContainsRune(validnumbers, c) {
+					numbers++
+					spliton[0] = c
+				}
+			}
+			if numbers != 1 {
+				t.Errorf("expected 1 number, got %v", numbers)
+			} else {
+				splits := strings.Split(s, string(spliton))
+				if len(splits) != 2 {
+					t.Errorf("expected 2 chunks around a number, got %v", splits)
+				} else {
+					checkAlternating(t, splits[0])
+					checkAlternating(t, splits[1])
+				}
+			}
+		}
+	}
+}
+
 // Confirm that panic occurs on invalid input.
 func TestRangePanic(t *testing.T) {
 	defer func() {
