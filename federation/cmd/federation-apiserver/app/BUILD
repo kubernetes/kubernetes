@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "autoscaling.go",
         "batch.go",
         "core.go",
         "extensions.go",
@@ -28,6 +29,8 @@ go_library(
         "//federation/registry/cluster/etcd:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/autoscaling/install:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/install:go_default_library",
         "//pkg/apis/extensions:go_default_library",
@@ -43,6 +46,7 @@ go_library(
         "//pkg/genericapiserver/server/filters:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
+        "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
         "//pkg/registry/batch/job/storage:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/configmap/storage:go_default_library",
