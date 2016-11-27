@@ -131,9 +131,16 @@ func (r *Reset) Run(out io.Writer) error {
 	// Don't check for errors here, since umount will return a non-zero exit code if there is no directories to umount
 	exec.Command("sh", "-c", "cat /proc/mounts | awk '{print $2}' | grep '/var/lib/kubelet' | xargs umount").Run()
 
+	dirsToClean := []string{"/var/lib/kubelet"}
+
+	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
+	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
+	if _, err := os.Stat("/etc/kubernetes/manifests/etcd.json"); os.IsNotExist(err) {
+		dirsToClean = append(dirsToClean, "/var/lib/etcd")
+	}
+
 	resetConfigDir("/etc/kubernetes/")
 
-	dirsToClean := []string{"/var/lib/kubelet", "/var/lib/etcd"}
 	fmt.Printf("Deleting contents of stateful directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		cleanDir(dir)
