@@ -2766,7 +2766,7 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	case extensionsinternal.Kind("Deployment"):
 		return c.Extensions().Deployments(ns).Get(name)
 	default:
-		return nil, fmt.Errorf("Unsupported kind: %v", kind)
+		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
 	}
 }
 
@@ -2779,7 +2779,7 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name strin
 	case extensionsinternal.Kind("Deployment"):
 		return c.Extensions().Deployments(ns).Delete(name, deleteOption)
 	default:
-		return fmt.Errorf("Unsupported kind: %v", kind)
+		return fmt.Errorf("Unsupported kind when deleting: %v", kind)
 	}
 }
 
@@ -2787,12 +2787,12 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (*unversioned.LabelSelecto
 	switch typed := obj.(type) {
 	case *v1.ReplicationController:
 		return &unversioned.LabelSelector{MatchLabels: typed.Spec.Selector}, nil
-	case *extensionsinternal.ReplicaSet:
+	case *extensions.ReplicaSet:
 		return typed.Spec.Selector, nil
-	case *extensionsinternal.Deployment:
+	case *extensions.Deployment:
 		return typed.Spec.Selector, nil
 	default:
-		return nil, fmt.Errorf("Unsupported kind: %v", obj)
+		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
 	}
 }
 
@@ -2803,16 +2803,22 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
-	case *extensionsinternal.ReplicaSet:
-		return typed.Spec.Replicas, nil
-	case *extensionsinternal.Deployment:
-		return typed.Spec.Replicas, nil
+	case *extensions.ReplicaSet:
+		if typed.Spec.Replicas != nil {
+			return *typed.Spec.Replicas, nil
+		}
+		return 0, nil
+	case *extensions.Deployment:
+		if typed.Spec.Replicas != nil {
+			return *typed.Spec.Replicas, nil
+		}
+		return 0, nil
 	default:
-		return -1, fmt.Errorf("Unsupported kind: %v", obj)
+		return -1, fmt.Errorf("Unsupported kind when getting number of replicas: %v", obj)
 	}
 }
 
-func getReaperForKind(clientset clientset.Interface, internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Reaper, error) {
+func getReaperForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Reaper, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return kubectl.ReaperFor(api.Kind("ReplicationController"), internalClientset)
@@ -2841,7 +2847,7 @@ func DeleteResourceAndPods(clientset clientset.Interface, internalClientset inte
 	if err != nil {
 		return err
 	}
-	reaper, err := getReaperForKind(clientset, internalClientset, kind)
+	reaper, err := getReaperForKind(internalClientset, kind)
 	if err != nil {
 		return err
 	}
