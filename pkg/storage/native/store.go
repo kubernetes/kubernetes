@@ -359,7 +359,6 @@ func (s *store) GuaranteedUpdate(
 	}
 
 	var doCreate bool
-	var origUid types.UID
 	var origState *objState
 	if len(suggestion) == 1 && suggestion[0] != nil {
 		origState, err = s.getStateFromObject(suggestion[0])
@@ -367,12 +366,9 @@ func (s *store) GuaranteedUpdate(
 			return err
 		}
 
-		objMeta, err := api.ObjectMetaFor(origState.obj)
-		if err != nil {
-			return storage.NewInternalErrorf("can't get meta on un-introspectable object %v, got error: %v", origState.obj, err)
+		if origState.rev == 0 {
+			glog.Fatalf("origState.rev unexpectedly 0")
 		}
-
-		origUid = objMeta.UID
 	} else {
 		op := &StorageOperation{
 			OpType: StorageOperationType_GET,
@@ -407,12 +403,14 @@ func (s *store) GuaranteedUpdate(
 				return err
 			}
 
-			origUid = types.UID(result.ItemData.Uid)
+			if origState.rev == 0 {
+				glog.Fatalf("origState.rev unexpectedly 0")
+			}
 		}
 	}
 
 	for {
-		if err := checkPreconditions(path, precondtions, origUid); err != nil {
+		if err := checkPreconditions(path, precondtions, origState.uid); err != nil {
 			return err
 		}
 
@@ -454,6 +452,10 @@ func (s *store) GuaranteedUpdate(
 			// response will be the new item if we swapped,
 			// or the existing item if err==errorLSNMismatch
 			glog.Infof("Trying update of %s with lsn %d", path, origState.rev)
+
+			if origState.rev == 0 {
+				glog.Fatalf("origState.rev unexpectedly 0")
+			}
 
 			op := &StorageOperation{
 				OpType:          StorageOperationType_UPDATE,
@@ -521,6 +523,7 @@ type objState struct {
 	obj  runtime.Object
 	meta *storage.ResponseMeta
 	rev  LSN
+	uid  types.UID
 	data []byte
 }
 
@@ -529,6 +532,7 @@ func (s *store) getState(result *StorageOperationResult, v reflect.Value) (*objS
 		obj:  reflect.New(v.Type()).Interface().(runtime.Object),
 		meta: &storage.ResponseMeta{},
 	}
+	state.uid = types.UID(result.ItemData.Uid)
 	state.rev = LSN(result.ItemData.Lsn)
 	state.meta.ResourceVersion = result.ItemData.Lsn
 	state.data = result.ItemData.Data
@@ -543,6 +547,12 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 		obj:  obj,
 		meta: &storage.ResponseMeta{},
 	}
+
+	objMeta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return storage.NewInternalErrorf("can't get meta on un-introspectable object %v, got error: %v", obj, err)
+	}
+	state.uid = objMeta.UID
 
 	rv, err := s.versioner.ObjectResourceVersion(obj)
 	if err != nil {

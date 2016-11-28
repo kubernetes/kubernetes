@@ -19,14 +19,13 @@ package validation
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
 func VerifyEtcdServersList(options *options.ServerRunOptions) {
-	// HACK
-	/*
+	if options.StorageConfig.Type != storagebackend.StorageTypeNativeEmbedded {
 		if len(options.StorageConfig.ServerList) == 0 {
 			glog.Fatalf("--etcd-servers must be specified")
 		}
-	*/
-	glog.Warningf("skipping etcd-servers validation")
+	}
 }
