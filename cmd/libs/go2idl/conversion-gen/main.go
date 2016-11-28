@@ -56,7 +56,7 @@ func main() {
 		ExtraPeerDirs: []string{
 			"k8s.io/kubernetes/pkg/api",
 			"k8s.io/kubernetes/pkg/api/v1",
-			"k8s.io/kubernetes/pkg/api/unversioned",
+			"k8s.io/kubernetes/pkg/apis/meta/v1",
 			"k8s.io/kubernetes/pkg/conversion",
 			"k8s.io/kubernetes/pkg/runtime",
 		},
