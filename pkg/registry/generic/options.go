@@ -16,7 +16,11 @@ limitations under the License.
 
 package generic
 
-import "k8s.io/kubernetes/pkg/storage/storagebackend"
+import (
+	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
+)
 
 // RESTOptions is set of configuration options to generic registries.
 type RESTOptions struct {
@@ -26,4 +30,11 @@ type RESTOptions struct {
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
 	ResourcePrefix          string
+}
+
+type RESTOptionsGetter func(resource schema.GroupResource) RESTOptions
+
+type RESTStorageProvider interface {
+	GroupName() string
+	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
 }
