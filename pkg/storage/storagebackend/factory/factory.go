@@ -28,6 +28,9 @@ type DestroyFunc func()
 
 // Create creates a storage backend based on given config.
 func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+	// HACK: Force StorageTypeNativeEmbedded
+	c.Type = storagebackend.StorageTypeNativeEmbedded
+
 	switch c.Type {
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD2:
 		return newETCD2Storage(c)
