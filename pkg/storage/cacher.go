@@ -177,6 +177,10 @@ type Cacher struct {
 	watcherIdx int
 	watchers   indexedWatchers
 
+	// Defines a time budget that can be spend on waiting for not-ready watchers
+	// while dispatching event before shutting them down.
+	dispatchTimeoutBudget *timeBudget
+
 	// Handling graceful termination.
 	stopLock sync.RWMutex
 	stopped  bool
@@ -199,6 +203,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		}
 	}
 
+	stopCh := make(chan struct{})
 	cacher := &Cacher{
 		ready:       newReady(),
 		storage:     config.Storage,
@@ -213,18 +218,18 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 			valueWatchers: make(map[string]watchersMap),
 		},
 		// TODO: Figure out the correct value for the buffer size.
-		incoming: make(chan watchCacheEvent, 100),
+		incoming:              make(chan watchCacheEvent, 100),
+		dispatchTimeoutBudget: newTimeBudget(stopCh),
 		// We need to (potentially) stop both:
 		// - wait.Until go-routine
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
-		stopCh: make(chan struct{}),
+		stopCh: stopCh,
 	}
 	watchCache.SetOnEvent(cacher.processEvent)
 	go cacher.dispatchEvents()
 
-	stopCh := cacher.stopCh
 	cacher.stopWg.Add(1)
 	go func() {
 		defer cacher.stopWg.Done()
@@ -577,23 +582,17 @@ func (c *Cacher) dispatchEvents() {
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	triggerValues, supported := c.triggerValues(event)
 
-	// TODO: For now we assume we have a given <timeout> budget for dispatching
-	// a single event. We should consider changing to the approach with:
-	// - budget has upper bound at <max_timeout>
-	// - we add <portion> to current timeout every second
-	timeout := time.Duration(250) * time.Millisecond
-
 	c.Lock()
 	defer c.Unlock()
 	// Iterate over "allWatchers" no matter what the trigger function is.
 	for _, watcher := range c.watchers.allWatchers {
-		watcher.add(event, &timeout)
+		watcher.add(event, c.dispatchTimeoutBudget)
 	}
 	if supported {
 		// Iterate over watchers interested in the given values of the trigger.
 		for _, triggerValue := range triggerValues {
 			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
-				watcher.add(event, &timeout)
+				watcher.add(event, c.dispatchTimeoutBudget)
 			}
 		}
 	} else {
@@ -606,7 +605,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		// Iterate over watchers interested in exact values for all values.
 		for _, watchers := range c.watchers.valueWatchers {
 			for _, watcher := range watchers {
-				watcher.add(event, &timeout)
+				watcher.add(event, c.dispatchTimeoutBudget)
 			}
 		}
 	}
@@ -790,7 +789,7 @@ func (c *cacheWatcher) stop() {
 
 var timerPool sync.Pool
 
-func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
+func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 	// Try to send the event immediately, without blocking.
 	select {
 	case c.input <- *event:
@@ -802,12 +801,13 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
 	// cacheWatcher.add is called very often, so arrange
 	// to reuse timers instead of constantly allocating.
 	startTime := time.Now()
+	timeout := budget.takeAvailable()
 
 	t, ok := timerPool.Get().(*time.Timer)
 	if ok {
-		t.Reset(*timeout)
+		t.Reset(timeout)
 	} else {
-		t = time.NewTimer(*timeout)
+		t = time.NewTimer(timeout)
 	}
 	defer timerPool.Put(t)
 
@@ -827,9 +827,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
 		c.stop()
 	}
 
-	if *timeout = *timeout - time.Since(startTime); *timeout < 0 {
-		*timeout = 0
-	}
+	budget.returnUnused(timeout - time.Since(startTime))
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
