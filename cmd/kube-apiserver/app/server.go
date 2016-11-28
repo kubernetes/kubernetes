@@ -86,7 +86,7 @@ func Run(s *options.ServerRunOptions) error {
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
 							Complete()                               // set default values based on the known values
 
-	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
 	if err != nil {
 		glog.Fatalf("Error determining service IP ranges: %v", err)
 	}
