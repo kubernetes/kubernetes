@@ -47,7 +47,6 @@ go_library(
         "//pkg/credentialprovider:go_default_library",
         "//pkg/credentialprovider/aws:go_default_library",
         "//pkg/credentialprovider/gcp:go_default_library",
-        "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
@@ -108,6 +107,7 @@ go_library(
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
         "//vendor:golang.org/x/exp/inotify",
+        "//vendor:k8s.io/genericapiserver/pkg/server/authorizer",
     ],
 )
 

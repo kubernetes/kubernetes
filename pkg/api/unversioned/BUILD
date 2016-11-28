@@ -30,7 +30,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/conversion:go_default_library",
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/selection:go_default_library",
@@ -38,6 +37,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
     ],
 )
 

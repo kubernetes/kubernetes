@@ -21,8 +21,6 @@ go_library(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/apiserver:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata/etcd:go_default_library",
@@ -31,5 +29,7 @@ go_library(
         "//pkg/runtime/schema:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver",
+        "//vendor:k8s.io/genericapiserver/pkg/server",
     ],
 )

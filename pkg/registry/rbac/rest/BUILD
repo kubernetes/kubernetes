@@ -21,7 +21,7 @@ go_library(
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/rbac/validation:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
+        "//pkg/registry/generic:go_default_library",
         "//pkg/registry/rbac/clusterrole:go_default_library",
         "//pkg/registry/rbac/clusterrole/etcd:go_default_library",
         "//pkg/registry/rbac/clusterrole/policybased:go_default_library",
@@ -37,5 +37,6 @@ go_library(
         "//pkg/util/runtime:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/genericapiserver/pkg/server",
     ],
 )

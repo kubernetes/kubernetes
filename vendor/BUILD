@@ -9332,7 +9332,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/spf13/pflag",
         "//vendor:gopkg.in/inf.v0",
-        "//vendor:k8s.io/client-go/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
     ],
 )
 
@@ -9401,10 +9401,10 @@ go_library(
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/google/gofuzz",
         "//vendor:k8s.io/client-go/pkg/conversion",
-        "//vendor:k8s.io/client-go/pkg/genericapiserver/openapi/common",
         "//vendor:k8s.io/client-go/pkg/labels",
         "//vendor:k8s.io/client-go/pkg/runtime/schema",
         "//vendor:k8s.io/client-go/pkg/selection",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
     ],
 )
 
@@ -10806,7 +10806,7 @@ go_library(
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/google/gofuzz",
-        "//vendor:k8s.io/client-go/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
     ],
 )
 
@@ -11784,4 +11784,386 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = ["//vendor:github.com/gogo/protobuf/proto"],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/apiserver",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/apiserver/api_installer.go",
+        "k8s.io/genericapiserver/pkg/apiserver/apiserver.go",
+        "k8s.io/genericapiserver/pkg/apiserver/doc.go",
+        "k8s.io/genericapiserver/pkg/apiserver/errors.go",
+        "k8s.io/genericapiserver/pkg/apiserver/negotiate.go",
+        "k8s.io/genericapiserver/pkg/apiserver/proxy.go",
+        "k8s.io/genericapiserver/pkg/apiserver/resthandler.go",
+        "k8s.io/genericapiserver/pkg/apiserver/serviceerror.go",
+        "k8s.io/genericapiserver/pkg/apiserver/validator.go",
+        "k8s.io/genericapiserver/pkg/apiserver/watch.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/admission:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/api/errors:go_default_library",
+        "//pkg/api/meta:go_default_library",
+        "//pkg/api/rest:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
+        "//pkg/conversion:go_default_library",
+        "//pkg/fields:go_default_library",
+        "//pkg/httplog:go_default_library",
+        "//pkg/probe:go_default_library",
+        "//pkg/probe/http:go_default_library",
+        "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
+        "//pkg/runtime/serializer/streaming:go_default_library",
+        "//pkg/storage:go_default_library",
+        "//pkg/util:go_default_library",
+        "//pkg/util/errors:go_default_library",
+        "//pkg/util/flushwriter:go_default_library",
+        "//pkg/util/httpstream:go_default_library",
+        "//pkg/util/net:go_default_library",
+        "//pkg/util/proxy:go_default_library",
+        "//pkg/util/runtime:go_default_library",
+        "//pkg/util/sets:go_default_library",
+        "//pkg/util/strategicpatch:go_default_library",
+        "//pkg/util/strings:go_default_library",
+        "//pkg/util/wsstream:go_default_library",
+        "//pkg/version:go_default_library",
+        "//pkg/watch:go_default_library",
+        "//pkg/watch/versioned:go_default_library",
+        "//vendor:bitbucket.org/ww/goautoneg",
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/evanphx/json-patch",
+        "//vendor:github.com/golang/glog",
+        "//vendor:golang.org/x/net/websocket",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/metrics",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/request",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/apiserver/authenticator",
+    srcs = ["k8s.io/genericapiserver/pkg/apiserver/authenticator/authn.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/auth/authenticator:go_default_library",
+        "//pkg/auth/authenticator/bearertoken:go_default_library",
+        "//pkg/auth/group:go_default_library",
+        "//pkg/auth/user:go_default_library",
+        "//pkg/serviceaccount:go_default_library",
+        "//pkg/util/cert:go_default_library",
+        "//plugin/pkg/auth/authenticator/password/keystone:go_default_library",
+        "//plugin/pkg/auth/authenticator/password/passwordfile:go_default_library",
+        "//plugin/pkg/auth/authenticator/request/anonymous:go_default_library",
+        "//plugin/pkg/auth/authenticator/request/basicauth:go_default_library",
+        "//plugin/pkg/auth/authenticator/request/headerrequest:go_default_library",
+        "//plugin/pkg/auth/authenticator/request/union:go_default_library",
+        "//plugin/pkg/auth/authenticator/request/x509:go_default_library",
+        "//plugin/pkg/auth/authenticator/token/anytoken:go_default_library",
+        "//plugin/pkg/auth/authenticator/token/oidc:go_default_library",
+        "//plugin/pkg/auth/authenticator/token/tokenfile:go_default_library",
+        "//plugin/pkg/auth/authenticator/token/webhook:go_default_library",
+        "//vendor:github.com/go-openapi/spec",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/apiserver/filters",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/apiserver/filters/audit.go",
+        "k8s.io/genericapiserver/pkg/apiserver/filters/authorization.go",
+        "k8s.io/genericapiserver/pkg/apiserver/filters/doc.go",
+        "k8s.io/genericapiserver/pkg/apiserver/filters/errors.go",
+        "k8s.io/genericapiserver/pkg/apiserver/filters/impersonation.go",
+        "k8s.io/genericapiserver/pkg/apiserver/filters/requestinfo.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/apis/authentication:go_default_library",
+        "//pkg/auth/authorizer:go_default_library",
+        "//pkg/auth/user:go_default_library",
+        "//pkg/httplog:go_default_library",
+        "//pkg/serviceaccount:go_default_library",
+        "//pkg/util/net:go_default_library",
+        "//pkg/util/runtime:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/request",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/apiserver/metrics",
+    srcs = ["k8s.io/genericapiserver/pkg/apiserver/metrics/metrics.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/util/net:go_default_library",
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/apiserver/openapi",
+    srcs = ["k8s.io/genericapiserver/pkg/apiserver/openapi/openapi.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/util:go_default_library",
+        "//vendor:github.com/emicklei/go-restful",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/apiserver/request",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/apiserver/request/doc.go",
+        "k8s.io/genericapiserver/pkg/apiserver/request/requestinfo.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/util/sets:go_default_library",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/apiserver/testing",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/apiserver/testing/types.generated.go",
+        "k8s.io/genericapiserver/pkg/apiserver/testing/types.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
+        "//pkg/types:go_default_library",
+        "//vendor:github.com/ugorji/go/codec",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/server/config.go",
+        "k8s.io/genericapiserver/pkg/server/default_storage_factory_builder.go",
+        "k8s.io/genericapiserver/pkg/server/discovery.go",
+        "k8s.io/genericapiserver/pkg/server/doc.go",
+        "k8s.io/genericapiserver/pkg/server/genericapiserver.go",
+        "k8s.io/genericapiserver/pkg/server/healthz.go",
+        "k8s.io/genericapiserver/pkg/server/hooks.go",
+        "k8s.io/genericapiserver/pkg/server/resource_config.go",
+        "k8s.io/genericapiserver/pkg/server/resource_encoding_config.go",
+        "k8s.io/genericapiserver/pkg/server/serve.go",
+        "k8s.io/genericapiserver/pkg/server/storage_factory.go",
+        "k8s.io/genericapiserver/pkg/server/tunneler.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/admission:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/api/rest:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/apimachinery:go_default_library",
+        "//pkg/apimachinery/registered:go_default_library",
+        "//pkg/auth/authenticator:go_default_library",
+        "//pkg/auth/authorizer:go_default_library",
+        "//pkg/auth/handlers:go_default_library",
+        "//pkg/client/restclient:go_default_library",
+        "//pkg/cloudprovider:go_default_library",
+        "//pkg/healthz:go_default_library",
+        "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
+        "//pkg/runtime/serializer/recognizer:go_default_library",
+        "//pkg/ssh:go_default_library",
+        "//pkg/storage/storagebackend:go_default_library",
+        "//pkg/util:go_default_library",
+        "//pkg/util/cert:go_default_library",
+        "//pkg/util/clock:go_default_library",
+        "//pkg/util/config:go_default_library",
+        "//pkg/util/net:go_default_library",
+        "//pkg/util/runtime:go_default_library",
+        "//pkg/util/sets:go_default_library",
+        "//pkg/util/validation:go_default_library",
+        "//pkg/util/wait:go_default_library",
+        "//pkg/version:go_default_library",
+        "//vendor:github.com/coreos/go-systemd/daemon",
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/pkg/errors",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:gopkg.in/natefinch/lumberjack.v2",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/filters",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/openapi",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/request",
+        "//vendor:k8s.io/genericapiserver/pkg/server/filters",
+        "//vendor:k8s.io/genericapiserver/pkg/server/mux",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
+        "//vendor:k8s.io/genericapiserver/pkg/server/options",
+        "//vendor:k8s.io/genericapiserver/pkg/server/routes",
+        "//vendor:k8s.io/genericapiserver/pkg/server/validation",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/authorizer",
+    srcs = ["k8s.io/genericapiserver/pkg/server/authorizer/authz.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/auth/authorizer:go_default_library",
+        "//pkg/auth/authorizer/abac:go_default_library",
+        "//pkg/auth/authorizer/union:go_default_library",
+        "//pkg/controller/informers:go_default_library",
+        "//plugin/pkg/auth/authorizer/rbac:go_default_library",
+        "//plugin/pkg/auth/authorizer/webhook:go_default_library",
+        "//vendor:k8s.io/genericapiserver/pkg/server/options",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/filters",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/server/filters/cors.go",
+        "k8s.io/genericapiserver/pkg/server/filters/doc.go",
+        "k8s.io/genericapiserver/pkg/server/filters/longrunning.go",
+        "k8s.io/genericapiserver/pkg/server/filters/maxinflight.go",
+        "k8s.io/genericapiserver/pkg/server/filters/panics.go",
+        "k8s.io/genericapiserver/pkg/server/filters/timeout.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/errors:go_default_library",
+        "//pkg/httplog:go_default_library",
+        "//pkg/util:go_default_library",
+        "//pkg/util/runtime:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/request",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/mux",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/server/mux/container.go",
+        "k8s.io/genericapiserver/pkg/server/mux/doc.go",
+        "k8s.io/genericapiserver/pkg/server/mux/pathrecorder.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/runtime:go_default_library",
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/openapi",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/server/openapi/doc.go",
+        "k8s.io/genericapiserver/pkg/server/openapi/openapi.go",
+        "k8s.io/genericapiserver/pkg/server/openapi/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/util:go_default_library",
+        "//pkg/util/json:go_default_library",
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
+        "//vendor:k8s.io/genericapiserver/pkg/server/mux",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/openapi/common",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/server/openapi/common/common.go",
+        "k8s.io/genericapiserver/pkg/server/openapi/common/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/options",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/server/options/authenticator.go",
+        "k8s.io/genericapiserver/pkg/server/options/doc.go",
+        "k8s.io/genericapiserver/pkg/server/options/etcd_options.go",
+        "k8s.io/genericapiserver/pkg/server/options/server_run_options.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/admission:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/apimachinery/registered:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/restclient:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
+        "//pkg/storage/storagebackend:go_default_library",
+        "//pkg/util/config:go_default_library",
+        "//pkg/util/net:go_default_library",
+        "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/authenticator",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/routes",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/server/routes/doc.go",
+        "k8s.io/genericapiserver/pkg/server/routes/index.go",
+        "k8s.io/genericapiserver/pkg/server/routes/metrics.go",
+        "k8s.io/genericapiserver/pkg/server/routes/openapi.go",
+        "k8s.io/genericapiserver/pkg/server/routes/profiling.go",
+        "k8s.io/genericapiserver/pkg/server/routes/swagger.go",
+        "k8s.io/genericapiserver/pkg/server/routes/swaggerui.go",
+        "k8s.io/genericapiserver/pkg/server/routes/version.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/storage/etcd/metrics:go_default_library",
+        "//pkg/version:go_default_library",
+        "//vendor:github.com/elazarl/go-bindata-assetfs",
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/emicklei/go-restful/swagger",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver",
+        "//vendor:k8s.io/genericapiserver/pkg/apiserver/metrics",
+        "//vendor:k8s.io/genericapiserver/pkg/server/mux",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
+        "//vendor:k8s.io/genericapiserver/pkg/server/routes/data/swagger",
+    ],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/routes/data/swagger",
+    srcs = ["k8s.io/genericapiserver/pkg/server/routes/data/swagger/datafile.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/genericapiserver/pkg/server/validation",
+    srcs = [
+        "k8s.io/genericapiserver/pkg/server/validation/etcd_validation.go",
+        "k8s.io/genericapiserver/pkg/server/validation/universal_validation.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/util/errors:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/genericapiserver/pkg/server/options",
+    ],
 )

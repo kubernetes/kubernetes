@@ -15,8 +15,8 @@ go_library(
     srcs = ["openapi.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
         "//vendor:k8s.io/gengo/args",
         "//vendor:k8s.io/gengo/generator",
         "//vendor:k8s.io/gengo/namer",
