@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
 	"time"
+	"sort"
 )
 
 type LSN uint64
@@ -69,7 +70,6 @@ func (s *store) Versioner() storage.Versioner {
 // in seconds (0 means forever). If no error is returned and out is not nil, out will be
 // set to the read value from database.
 func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object, ttl uint64) error {
-	glog.Infof("Create %s", path)
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
@@ -97,14 +97,11 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 		Path:     path,
 		ItemData: itemData,
 	}
-	glog.Infof("Doing operation %v", op)
 	result, err := s.doOperation(ctx, op)
-	glog.Infof("Created0 %v", result)
 
 	if err != nil {
 		return err
 	}
-	glog.Infof("Created1 %v", result)
 
 	if result.ErrorCode != 0 {
 		switch result.ErrorCode {
@@ -115,8 +112,6 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 			return fmt.Errorf("unexpected error code: %v", result.ErrorCode)
 		}
 	}
-
-	glog.Infof("Created")
 
 	if out != nil {
 		return decode(s.codec, s.versioner, data, out, LSN(result.ItemData.Lsn))
@@ -288,7 +283,10 @@ func (s *store) List(ctx context.Context, path, resourceVersion string, pred sto
 			return fmt.Errorf("unexpected error code: %v", result.ErrorCode)
 		}
 	} else {
-		if err := decodeList(result.ItemList, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
+		// For compatability with etcd, we sort by path
+		items := result.ItemList
+		sort.Sort(ByPath(items))
+		if err := decodeList(items, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 			return err
 		}
 	}
