@@ -96,7 +96,7 @@ func MatchConfigMap(label labels.Selector, field fields.Selector) apistorage.Sel
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 			cfg, ok := obj.(*api.ConfigMap)
 			if !ok {
-				return nil, nil, fmt.Errorf("given object is not of type ConfigMap")
+				return nil, nil, fmt.Errorf("given object is not a ConfigMap")
 			}
 
 			return labels.Set(cfg.ObjectMeta.Labels), ConfigMapToSelectableFields(cfg), nil
