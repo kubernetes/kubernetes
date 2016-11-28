@@ -22,10 +22,8 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -33,12 +31,8 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/builder"
 )
 
-var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
-var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
 var testTimeoutSeconds = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
-
-var sshOptionsMap map[string]string
 
 const (
 	archiveName  = "e2e_node_test.tar.gz"
@@ -47,36 +41,6 @@ const (
 )
 
 var CNIURL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNIRelease)
-
-var hostnameIpOverrides = struct {
-	sync.RWMutex
-	m map[string]string
-}{m: make(map[string]string)}
-
-func init() {
-	usr, err := user.Current()
-	if err != nil {
-		glog.Fatal(err)
-	}
-	sshOptionsMap = map[string]string{
-		"gce": fmt.Sprintf("-i %s/.ssh/google_compute_engine -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o LogLevel=ERROR", usr.HomeDir),
-	}
-}
-
-func AddHostnameIp(hostname, ip string) {
-	hostnameIpOverrides.Lock()
-	defer hostnameIpOverrides.Unlock()
-	hostnameIpOverrides.m[hostname] = ip
-}
-
-func GetHostnameOrIp(hostname string) string {
-	hostnameIpOverrides.RLock()
-	defer hostnameIpOverrides.RUnlock()
-	if ip, found := hostnameIpOverrides.m[hostname]; found {
-		return ip
-	}
-	return hostname
-}
 
 // CreateTestArchive builds the local source and creates a tar archive e2e_node_test.tar.gz containing
 // the binaries k8s required for node e2e tests
@@ -360,36 +324,4 @@ func WriteLog(host, filename, content string) error {
 	defer f.Close()
 	_, err = f.WriteString(content)
 	return err
-}
-
-// getSSHCommand handles proper quoting so that multiple commands are executed in the same shell over ssh
-func getSSHCommand(sep string, args ...string) string {
-	return fmt.Sprintf("'%s'", strings.Join(args, sep))
-}
-
-// SSH executes ssh command with runSSHCommand as root. The `sudo` makes sure that all commands
-// are executed by root, so that there won't be permission mismatch between different commands.
-func SSH(host string, cmd ...string) (string, error) {
-	return runSSHCommand("ssh", append([]string{GetHostnameOrIp(host), "--", "sudo"}, cmd...)...)
-}
-
-// SSHNoSudo executes ssh command with runSSHCommand as normal user. Sometimes we need this,
-// for example creating a directory that we'll copy files there with scp.
-func SSHNoSudo(host string, cmd ...string) (string, error) {
-	return runSSHCommand("ssh", append([]string{GetHostnameOrIp(host), "--"}, cmd...)...)
-}
-
-// runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
-func runSSHCommand(cmd string, args ...string) (string, error) {
-	if env, found := sshOptionsMap[*sshEnv]; found {
-		args = append(strings.Split(env, " "), args...)
-	}
-	if *sshOptions != "" {
-		args = append(strings.Split(*sshOptions, " "), args...)
-	}
-	output, err := exec.Command(cmd, args...).CombinedOutput()
-	if err != nil {
-		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
-	}
-	return string(output), nil
 }
