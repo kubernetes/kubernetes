@@ -93,7 +93,7 @@ func Run(s *options.ServerRunOptions) error {
 							ApplyAuthenticationOptions(s.Authentication).
 							ApplyRBACSuperUser(s.Authorization.RBACSuperUser)
 
-	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
 	if err != nil {
 		glog.Fatalf("Error determining service IP ranges: %v", err)
 	}
