@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1alpha1
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import "k8s.io/client-go/pkg/api/unversioned"
 
 type KubeProxyConfiguration struct {
 	unversioned.TypeMeta

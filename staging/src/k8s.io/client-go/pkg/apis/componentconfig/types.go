@@ -17,8 +17,8 @@ limitations under the License.
 package componentconfig
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
+	"k8s.io/client-go/pkg/api/unversioned"
+	utilconfig "k8s.io/client-go/pkg/util/config"
 )
 
 type KubeProxyConfiguration struct {
