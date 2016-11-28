@@ -300,7 +300,7 @@ func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, st
 	return nil
 }
 
-func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, resize <-chan term.Size) error {
+func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	assert.Equal(f.t, testContainerID, containerID)
 	doServerStreams(f.t, "attach", stdin, stdout, stderr)
 	return nil
