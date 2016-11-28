@@ -14,16 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package registry
 
 import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
+// RESTOptionsGetter is a function type for returning RESTOptions for a GroupVersion.
 type RESTOptionsGetter func(resource schema.GroupResource) generic.RESTOptions
-
-type RESTStorageProvider interface {
-	GroupName() string
-	NewRESTStorage(apiResourceConfigSource APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (APIGroupInfo, bool)
-}

@@ -21,14 +21,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/configmap"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for ConfigMap against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work with ConfigMap objects.
@@ -46,7 +46,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		configmap.GetAttrs,
 		storage.NoTriggerPublisher)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object {
 			return &api.ConfigMap{}
 		},
@@ -57,13 +57,13 @@ func NewREST(opts generic.RESTOptions) *REST {
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix.
 		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
+			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 
 		// Produces a path that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
+			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 
 		// Retrieves the name field of a ConfigMap object.
