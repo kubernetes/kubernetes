@@ -2223,11 +2223,11 @@
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "f1f1a805ed361a0e078bb537e4ea78cd37dcf065"
+			"Rev": "faddd6128c66c4708f45fdc007f575f75e592a3c"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec/codecgen",
-			"Rev": "f1f1a805ed361a0e078bb537e4ea78cd37dcf065"
+			"Rev": "faddd6128c66c4708f45fdc007f575f75e592a3c"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink",

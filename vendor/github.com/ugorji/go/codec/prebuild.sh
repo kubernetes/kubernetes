@@ -171,7 +171,7 @@ do
         'xf') zforce=1;;
         'xb') zbak=1;;
         'xx') zexternal=1;;
-        *) echo "prebuild.sh accepts [-fb] only"; return 1;;
+        *) echo "prebuild.sh accepts [-fbx] only"; return 1;;
     esac
 done
 shift $((OPTIND-1))

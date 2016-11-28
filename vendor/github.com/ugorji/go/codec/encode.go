@@ -110,6 +110,28 @@ type EncodeOptions struct {
 	//
 	Canonical bool
 
+	// CheckCircularRef controls whether we check for circular references
+	// and error fast during an encode.
+	//
+	// If enabled, an error is received if a pointer to a struct
+	// references itself either directly or through one of its fields (iteratively).
+	//
+	// This is opt-in, as there may be a performance hit to checking circular references.
+	CheckCircularRef bool
+
+	// RecursiveEmptyCheck controls whether we descend into interfaces, structs and pointers
+	// when checking if a value is empty.
+	//
+	// Note that this may make OmitEmpty more expensive, as it incurs a lot more reflect calls.
+	RecursiveEmptyCheck bool
+
+	// Raw controls whether we encode Raw values.
+	// This is a "dangerous" option and must be explicitly set.
+	// If set, we blindly encode Raw values as-is, without checking
+	// if they are a correct representation of a value in that format.
+	// If unset, we error out.
+	Raw bool
+
 	// AsSymbols defines what should be encoded as symbols.
 	//
 	// Encoding as symbols can reduce the encoded size significantly.
@@ -132,13 +154,16 @@ type simpleIoEncWriterWriter struct {
 	w  io.Writer
 	bw io.ByteWriter
 	sw ioEncStringWriter
+	bs [1]byte
 }
 
 func (o *simpleIoEncWriterWriter) WriteByte(c byte) (err error) {
 	if o.bw != nil {
 		return o.bw.WriteByte(c)
 	}
-	_, err = o.w.Write([]byte{c})
+	// _, err = o.w.Write([]byte{c})
+	o.bs[0] = c
+	_, err = o.w.Write(o.bs[:])
 	return
 }
 
@@ -230,8 +255,8 @@ func (z *bytesEncWriter) writen1(b1 byte) {
 
 func (z *bytesEncWriter) writen2(b1 byte, b2 byte) {
 	c := z.grow(2)
-	z.b[c] = b1
 	z.b[c+1] = b2
+	z.b[c] = b1
 }
 
 func (z *bytesEncWriter) atEndOfEncode() {
@@ -270,6 +295,10 @@ func (f *encFnInfo) builtin(rv reflect.Value) {
 	f.e.e.EncodeBuiltin(f.ti.rtid, rv.Interface())
 }
 
+func (f *encFnInfo) raw(rv reflect.Value) {
+	f.e.raw(rv.Interface().(Raw))
+}
+
 func (f *encFnInfo) rawExt(rv reflect.Value) {
 	// rev := rv.Interface().(RawExt)
 	// f.e.e.EncodeRawExt(&rev, f.e)
@@ -296,7 +325,7 @@ func (f *encFnInfo) getValueForMarshalInterface(rv reflect.Value, indir int8) (v
 		v = rv.Interface()
 	} else if indir == -1 {
 		// If a non-pointer was passed to Encode(), then that value is not addressable.
-		// Take addr if addresable, else copy value to an addressable value.
+		// Take addr if addressable, else copy value to an addressable value.
 		if rv.CanAddr() {
 			v = rv.Addr().Interface()
 		} else {
@@ -464,7 +493,7 @@ func (f *encFnInfo) kSlice(rv reflect.Value) {
 		for j := 0; j < l; j++ {
 			if cr != nil {
 				if ti.mbs {
-					if l%2 == 0 {
+					if j%2 == 0 {
 						cr.sendContainerState(containerMapKey)
 					} else {
 						cr.sendContainerState(containerMapValue)
@@ -503,7 +532,7 @@ func (f *encFnInfo) kStruct(rv reflect.Value) {
 	newlen := len(fti.sfi)
 
 	// Use sync.Pool to reduce allocating slices unnecessarily.
-	// The cost of the occasional locking is less than the cost of new allocation.
+	// The cost of sync.Pool is less than the cost of new allocation.
 	pool, poolv, fkvs := encStructPoolGet(newlen)
 
 	// if toMap, use the sorted array. If toArray, use unsorted array (to match sequence in struct)
@@ -512,25 +541,20 @@ func (f *encFnInfo) kStruct(rv reflect.Value) {
 	}
 	newlen = 0
 	var kv stringRv
+	recur := e.h.RecursiveEmptyCheck
 	for _, si := range tisfi {
 		kv.r = si.field(rv, false)
-		// if si.i != -1 {
-		// 	rvals[newlen] = rv.Field(int(si.i))
-		// } else {
-		// 	rvals[newlen] = rv.FieldByIndex(si.is)
-		// }
 		if toMap {
-			if si.omitEmpty && isEmptyValue(kv.r) {
+			if si.omitEmpty && isEmptyValue(kv.r, recur, recur) {
 				continue
 			}
 			kv.v = si.encName
 		} else {
 			// use the zero value.
 			// if a reference or struct, set to nil (so you do not output too much)
-			if si.omitEmpty && isEmptyValue(kv.r) {
+			if si.omitEmpty && isEmptyValue(kv.r, recur, recur) {
 				switch kv.r.Kind() {
-				case reflect.Struct, reflect.Interface, reflect.Ptr, reflect.Array,
-					reflect.Map, reflect.Slice:
+				case reflect.Struct, reflect.Interface, reflect.Ptr, reflect.Array, reflect.Map, reflect.Slice:
 					kv.r = reflect.Value{} //encode as nil
 				}
 			}
@@ -541,7 +565,7 @@ func (f *encFnInfo) kStruct(rv reflect.Value) {
 
 	// debugf(">>>> kStruct: newlen: %v", newlen)
 	// sep := !e.be
-	ee := e.e //don't dereference everytime
+	ee := e.e //don't dereference every time
 
 	if toMap {
 		ee.EncodeMapStart(newlen)
@@ -596,13 +620,15 @@ func (f *encFnInfo) kStruct(rv reflect.Value) {
 // 	f.e.encodeValue(rv.Elem())
 // }
 
-func (f *encFnInfo) kInterface(rv reflect.Value) {
-	if rv.IsNil() {
-		f.e.e.EncodeNil()
-		return
-	}
-	f.e.encodeValue(rv.Elem(), nil)
-}
+// func (f *encFnInfo) kInterface(rv reflect.Value) {
+// 	println("kInterface called")
+// 	debug.PrintStack()
+// 	if rv.IsNil() {
+// 		f.e.e.EncodeNil()
+// 		return
+// 	}
+// 	f.e.encodeValue(rv.Elem(), nil)
+// }
 
 func (f *encFnInfo) kMap(rv reflect.Value) {
 	ee := f.e.e
@@ -877,6 +903,7 @@ type Encoder struct {
 	// as the handler MAY need to do some coordination.
 	w  encWriter
 	s  []encRtidFn
+	ci set
 	be bool // is binary encoding
 	js bool // is json handle
 
@@ -925,7 +952,7 @@ func newEncoder(h Handle) *Encoder {
 
 // Reset the Encoder with a new output stream.
 //
-// This accomodates using the state of the Encoder,
+// This accommodates using the state of the Encoder,
 // where it has "cached" information about sub-engines.
 func (e *Encoder) Reset(w io.Writer) {
 	ww, ok := w.(ioEncWriterWriter)
@@ -1057,7 +1084,8 @@ func (e *Encoder) encode(iv interface{}) {
 		e.e.EncodeNil()
 	case Selfer:
 		v.CodecEncodeSelf(e)
-
+	case Raw:
+		e.raw(v)
 	case reflect.Value:
 		e.encodeValue(v, nil)
 
@@ -1133,20 +1161,23 @@ func (e *Encoder) encode(iv interface{}) {
 	}
 }
 
-func (e *Encoder) encodeI(iv interface{}, checkFastpath, checkCodecSelfer bool) {
-	if rv, proceed := e.preEncodeValue(reflect.ValueOf(iv)); proceed {
-		rt := rv.Type()
-		rtid := reflect.ValueOf(rt).Pointer()
-		fn := e.getEncFn(rtid, rt, checkFastpath, checkCodecSelfer)
-		fn.f(&fn.i, rv)
-	}
-}
-
-func (e *Encoder) preEncodeValue(rv reflect.Value) (rv2 reflect.Value, proceed bool) {
+func (e *Encoder) preEncodeValue(rv reflect.Value) (rv2 reflect.Value, sptr uintptr, proceed bool) {
 	// use a goto statement instead of a recursive function for ptr/interface.
 TOP:
 	switch rv.Kind() {
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Ptr:
+		if rv.IsNil() {
+			e.e.EncodeNil()
+			return
+		}
+		rv = rv.Elem()
+		if e.h.CheckCircularRef && rv.Kind() == reflect.Struct {
+			// TODO: Movable pointers will be an issue here. Future problem.
+			sptr = rv.UnsafeAddr()
+			break TOP
+		}
+		goto TOP
+	case reflect.Interface:
 		if rv.IsNil() {
 			e.e.EncodeNil()
 			return
@@ -1163,18 +1194,40 @@ TOP:
 		return
 	}
 
-	return rv, true
+	proceed = true
+	rv2 = rv
+	return
+}
+
+func (e *Encoder) doEncodeValue(rv reflect.Value, fn *encFn, sptr uintptr,
+	checkFastpath, checkCodecSelfer bool) {
+	if sptr != 0 {
+		if (&e.ci).add(sptr) {
+			e.errorf("circular reference found: # %d", sptr)
+		}
+	}
+	if fn == nil {
+		rt := rv.Type()
+		rtid := reflect.ValueOf(rt).Pointer()
+		// fn = e.getEncFn(rtid, rt, true, true)
+		fn = e.getEncFn(rtid, rt, checkFastpath, checkCodecSelfer)
+	}
+	fn.f(&fn.i, rv)
+	if sptr != 0 {
+		(&e.ci).remove(sptr)
+	}
+}
+
+func (e *Encoder) encodeI(iv interface{}, checkFastpath, checkCodecSelfer bool) {
+	if rv, sptr, proceed := e.preEncodeValue(reflect.ValueOf(iv)); proceed {
+		e.doEncodeValue(rv, nil, sptr, checkFastpath, checkCodecSelfer)
+	}
 }
 
 func (e *Encoder) encodeValue(rv reflect.Value, fn *encFn) {
 	// if a valid fn is passed, it MUST BE for the dereferenced type of rv
-	if rv, proceed := e.preEncodeValue(rv); proceed {
-		if fn == nil {
-			rt := rv.Type()
-			rtid := reflect.ValueOf(rt).Pointer()
-			fn = e.getEncFn(rtid, rt, true, true)
-		}
-		fn.f(&fn.i, rv)
+	if rv, sptr, proceed := e.preEncodeValue(rv); proceed {
+		e.doEncodeValue(rv, fn, sptr, true, true)
 	}
 }
 
@@ -1217,6 +1270,8 @@ func (e *Encoder) getEncFn(rtid uintptr, rt reflect.Type, checkFastpath, checkCo
 
 	if checkCodecSelfer && ti.cs {
 		fn.f = (*encFnInfo).selferMarshal
+	} else if rtid == rawTypId {
+		fn.f = (*encFnInfo).raw
 	} else if rtid == rawExtTypId {
 		fn.f = (*encFnInfo).rawExt
 	} else if e.e.IsBuiltinType(rtid) {
@@ -1234,7 +1289,7 @@ func (e *Encoder) getEncFn(rtid uintptr, rt reflect.Type, checkFastpath, checkCo
 	} else {
 		rk := rt.Kind()
 		if fastpathEnabled && checkFastpath && (rk == reflect.Map || rk == reflect.Slice) {
-			if rt.PkgPath() == "" {
+			if rt.PkgPath() == "" { // un-named slice or map
 				if idx := fastpathAV.index(rtid); idx != -1 {
 					fn.f = fastpathAV[idx].encfn
 				}
@@ -1284,10 +1339,11 @@ func (e *Encoder) getEncFn(rtid uintptr, rt reflect.Type, checkFastpath, checkCo
 				fn.f = (*encFnInfo).kSlice
 			case reflect.Struct:
 				fn.f = (*encFnInfo).kStruct
+				// reflect.Ptr and reflect.Interface are handled already by preEncodeValue
 				// case reflect.Ptr:
 				// 	fn.f = (*encFnInfo).kPtr
-			case reflect.Interface:
-				fn.f = (*encFnInfo).kInterface
+				// case reflect.Interface:
+				// 	fn.f = (*encFnInfo).kInterface
 			case reflect.Map:
 				fn.f = (*encFnInfo).kMap
 			default:
@@ -1313,6 +1369,18 @@ func (e *Encoder) marshal(bs []byte, fnerr error, asis bool, c charEncoding) {
 }
 
 func (e *Encoder) asis(v []byte) {
+	if e.as == nil {
+		e.w.writeb(v)
+	} else {
+		e.as.EncodeAsis(v)
+	}
+}
+
+func (e *Encoder) raw(vv Raw) {
+	v := []byte(vv)
+	if !e.h.Raw {
+		e.errorf("Raw values cannot be encoded: %v", v)
+	}
 	if e.as == nil {
 		e.w.writeb(v)
 	} else {
@@ -1353,25 +1421,6 @@ func encStructPoolGet(newlen int) (p *sync.Pool, v interface{}, s []stringRv) {
 	// 	panic(errors.New("encStructPoolLen must be equal to 4")) // defensive, in case it is changed
 	// }
 	// idxpool := newlen / 8
-
-	// if pool == nil {
-	// 	fkvs = make([]stringRv, newlen)
-	// } else {
-	// 	poolv = pool.Get()
-	// 	switch vv := poolv.(type) {
-	// 	case *[8]stringRv:
-	// 		fkvs = vv[:newlen]
-	// 	case *[16]stringRv:
-	// 		fkvs = vv[:newlen]
-	// 	case *[32]stringRv:
-	// 		fkvs = vv[:newlen]
-	// 	case *[64]stringRv:
-	// 		fkvs = vv[:newlen]
-	// 	case *[128]stringRv:
-	// 		fkvs = vv[:newlen]
-	// 	}
-	// }
-
 	if newlen <= 8 {
 		p = &encStructPool[0]
 		v = p.Get()

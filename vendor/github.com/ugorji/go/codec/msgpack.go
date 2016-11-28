@@ -374,7 +374,7 @@ func (d *msgpackDecDriver) DecodeNaked() {
 	}
 	if n.v == valueTypeUint && d.h.SignedInteger {
 		n.v = valueTypeInt
-		n.i = int64(n.v)
+		n.i = int64(n.u)
 	}
 	return
 }
@@ -561,6 +561,13 @@ func (d *msgpackDecDriver) readNextBd() {
 	d.bdRead = true
 }
 
+func (d *msgpackDecDriver) uncacheRead() {
+	if d.bdRead {
+		d.r.unreadn1()
+		d.bdRead = false
+	}
+}
+
 func (d *msgpackDecDriver) ContainerType() (vt valueType) {
 	bd := d.bd
 	if bd == mpNil {
@@ -729,6 +736,7 @@ func (e *msgpackEncDriver) reset() {
 
 func (d *msgpackDecDriver) reset() {
 	d.r = d.d.r
+	d.bd, d.bdRead = 0, false
 }
 
 //--------------------------------------------------

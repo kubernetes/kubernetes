@@ -348,6 +348,13 @@ func (d *bincDecDriver) readNextBd() {
 	d.bdRead = true
 }
 
+func (d *bincDecDriver) uncacheRead() {
+	if d.bdRead {
+		d.r.unreadn1()
+		d.bdRead = false
+	}
+}
+
 func (d *bincDecDriver) ContainerType() (vt valueType) {
 	if d.vd == bincVdSpecial && d.vs == bincSpNil {
 		return valueTypeNil
@@ -705,7 +712,7 @@ func (d *bincDecDriver) decStringAndBytes(bs []byte, withString, zerocopy bool) 
 }
 
 func (d *bincDecDriver) DecodeString() (s string) {
-	// DecodeBytes does not accomodate symbols, whose impl stores string version in map.
+	// DecodeBytes does not accommodate symbols, whose impl stores string version in map.
 	// Use decStringAndBytes directly.
 	// return string(d.DecodeBytes(d.b[:], true, true))
 	_, s = d.decStringAndBytes(d.b[:], true, true)
@@ -908,10 +915,14 @@ func (h *BincHandle) newDecDriver(d *Decoder) decDriver {
 
 func (e *bincEncDriver) reset() {
 	e.w = e.e.w
+	e.s = 0
+	e.m = nil
 }
 
 func (d *bincDecDriver) reset() {
 	d.r = d.d.r
+	d.s = nil
+	d.bd, d.bdRead, d.vd, d.vs = 0, false, 0, 0
 }
 
 var _ decDriver = (*bincDecDriver)(nil)
