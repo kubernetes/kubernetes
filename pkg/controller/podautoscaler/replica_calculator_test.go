@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
@@ -138,7 +138,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: testNamespace,
 					},
-					Timestamp: unversioned.Time{Time: tc.timestamp},
+					Timestamp: metav1.Time{Time: tc.timestamp},
 					Containers: []metrics_api.ContainerMetrics{
 						{
 							Name: "container1",
@@ -214,7 +214,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		podsGetter:    testClient.Core(),
 	}
 
-	selector, err := unversioned.LabelSelectorAsSelector(&unversioned.LabelSelector{
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
 	})
 	if err != nil {

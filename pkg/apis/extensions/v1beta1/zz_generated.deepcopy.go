@@ -21,8 +21,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
@@ -226,8 +226,8 @@ func DeepCopy_v1beta1_DaemonSetSpec(in interface{}, out interface{}, c *conversi
 		out := out.(*DaemonSetSpec)
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -338,8 +338,8 @@ func DeepCopy_v1beta1_DeploymentSpec(in interface{}, out interface{}, c *convers
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -541,7 +541,7 @@ func DeepCopy_v1beta1_HorizontalPodAutoscalerStatus(in interface{}, out interfac
 		}
 		if in.LastScaleTime != nil {
 			in, out := &in.LastScaleTime, &out.LastScaleTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.LastScaleTime = nil
@@ -801,8 +801,8 @@ func DeepCopy_v1beta1_JobSpec(in interface{}, out interface{}, c *conversion.Clo
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -839,14 +839,14 @@ func DeepCopy_v1beta1_JobStatus(in interface{}, out interface{}, c *conversion.C
 		}
 		if in.StartTime != nil {
 			in, out := &in.StartTime, &out.StartTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.StartTime = nil
 		}
 		if in.CompletionTime != nil {
 			in, out := &in.CompletionTime, &out.CompletionTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.CompletionTime = nil
@@ -930,8 +930,8 @@ func DeepCopy_v1beta1_NetworkPolicyPeer(in interface{}, out interface{}, c *conv
 		out := out.(*NetworkPolicyPeer)
 		if in.PodSelector != nil {
 			in, out := &in.PodSelector, &out.PodSelector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -939,8 +939,8 @@ func DeepCopy_v1beta1_NetworkPolicyPeer(in interface{}, out interface{}, c *conv
 		}
 		if in.NamespaceSelector != nil {
 			in, out := &in.NamespaceSelector, &out.NamespaceSelector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -976,7 +976,7 @@ func DeepCopy_v1beta1_NetworkPolicySpec(in interface{}, out interface{}, c *conv
 	{
 		in := in.(*NetworkPolicySpec)
 		out := out.(*NetworkPolicySpec)
-		if err := unversioned.DeepCopy_unversioned_LabelSelector(&in.PodSelector, &out.PodSelector, c); err != nil {
+		if err := meta_v1.DeepCopy_v1_LabelSelector(&in.PodSelector, &out.PodSelector, c); err != nil {
 			return err
 		}
 		if in.Ingress != nil {
@@ -1166,8 +1166,8 @@ func DeepCopy_v1beta1_ReplicaSetSpec(in interface{}, out interface{}, c *convers
 		out.MinReadySeconds = in.MinReadySeconds
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {

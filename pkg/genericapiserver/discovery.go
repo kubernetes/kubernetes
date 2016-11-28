@@ -19,11 +19,11 @@ package genericapiserver
 import (
 	"net"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 type DiscoveryAddresses interface {
-	ServerAddressByClientCIDRs(net.IP) []unversioned.ServerAddressByClientCIDR
+	ServerAddressByClientCIDRs(net.IP) []metav1.ServerAddressByClientCIDR
 }
 
 // DefaultDiscoveryAddresses is a default implementation of DiscoveryAddresses that will work in most cases
@@ -45,8 +45,8 @@ type DiscoveryCIDRRule struct {
 	Address string
 }
 
-func (d DefaultDiscoveryAddresses) ServerAddressByClientCIDRs(clientIP net.IP) []unversioned.ServerAddressByClientCIDR {
-	addressCIDRMap := []unversioned.ServerAddressByClientCIDR{
+func (d DefaultDiscoveryAddresses) ServerAddressByClientCIDRs(clientIP net.IP) []metav1.ServerAddressByClientCIDR {
+	addressCIDRMap := []metav1.ServerAddressByClientCIDR{
 		{
 			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: d.DefaultAddress,
@@ -59,11 +59,11 @@ func (d DefaultDiscoveryAddresses) ServerAddressByClientCIDRs(clientIP net.IP) [
 	return addressCIDRMap
 }
 
-func (d DiscoveryCIDRRule) ServerAddressByClientCIDRs(clientIP net.IP) []unversioned.ServerAddressByClientCIDR {
-	addressCIDRMap := []unversioned.ServerAddressByClientCIDR{}
+func (d DiscoveryCIDRRule) ServerAddressByClientCIDRs(clientIP net.IP) []metav1.ServerAddressByClientCIDR {
+	addressCIDRMap := []metav1.ServerAddressByClientCIDR{}
 
 	if d.IPRange.Contains(clientIP) {
-		addressCIDRMap = append(addressCIDRMap, unversioned.ServerAddressByClientCIDR{
+		addressCIDRMap = append(addressCIDRMap, metav1.ServerAddressByClientCIDR{
 			ClientCIDR:    d.IPRange.String(),
 			ServerAddress: d.Address,
 		})

@@ -24,7 +24,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/unversioned:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apiserver:go_default_library",
         "//pkg/apiserver/metrics:go_default_library",
         "//pkg/genericapiserver/mux:go_default_library",

@@ -28,7 +28,7 @@ import (
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
@@ -61,13 +61,13 @@ func marshallBody(metrics interface{}) (io.ReadCloser, error) {
 
 func testNodeMetricsData() (*metrics_api.NodeMetricsList, *api.NodeList) {
 	metrics := &metrics_api.NodeMetricsList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "1",
 		},
 		Items: []metrics_api.NodeMetrics{
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
-				Window:     unversioned.Duration{Duration: time.Minute},
+				Window:     metav1.Duration{Duration: time.Minute},
 				Usage: v1.ResourceList{
 					v1.ResourceCPU:     *resource.NewMilliQuantity(1, resource.DecimalSI),
 					v1.ResourceMemory:  *resource.NewQuantity(2*(1024*1024), resource.DecimalSI),
@@ -76,7 +76,7 @@ func testNodeMetricsData() (*metrics_api.NodeMetricsList, *api.NodeList) {
 			},
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "node2", ResourceVersion: "11"},
-				Window:     unversioned.Duration{Duration: time.Minute},
+				Window:     metav1.Duration{Duration: time.Minute},
 				Usage: v1.ResourceList{
 					v1.ResourceCPU:     *resource.NewMilliQuantity(5, resource.DecimalSI),
 					v1.ResourceMemory:  *resource.NewQuantity(6*(1024*1024), resource.DecimalSI),
@@ -86,7 +86,7 @@ func testNodeMetricsData() (*metrics_api.NodeMetricsList, *api.NodeList) {
 		},
 	}
 	nodes := &api.NodeList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
 		Items: []api.Node{
@@ -117,13 +117,13 @@ func testNodeMetricsData() (*metrics_api.NodeMetricsList, *api.NodeList) {
 
 func testPodMetricsData() *metrics_api.PodMetricsList {
 	return &metrics_api.PodMetricsList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "2",
 		},
 		Items: []metrics_api.PodMetrics{
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "pod1", Namespace: "test", ResourceVersion: "10"},
-				Window:     unversioned.Duration{Duration: time.Minute},
+				Window:     metav1.Duration{Duration: time.Minute},
 				Containers: []metrics_api.ContainerMetrics{
 					{
 						Name: "container1-1",
@@ -145,7 +145,7 @@ func testPodMetricsData() *metrics_api.PodMetricsList {
 			},
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "pod2", Namespace: "test", ResourceVersion: "11"},
-				Window:     unversioned.Duration{Duration: time.Minute},
+				Window:     metav1.Duration{Duration: time.Minute},
 				Containers: []metrics_api.ContainerMetrics{
 					{
 						Name: "container2-1",
@@ -175,7 +175,7 @@ func testPodMetricsData() *metrics_api.PodMetricsList {
 			},
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "pod3", Namespace: "test", ResourceVersion: "12"},
-				Window:     unversioned.Duration{Duration: time.Minute},
+				Window:     metav1.Duration{Duration: time.Minute},
 				Containers: []metrics_api.ContainerMetrics{
 					{
 						Name: "container3-1",

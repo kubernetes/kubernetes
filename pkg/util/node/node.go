@@ -26,7 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/types"
@@ -63,7 +63,7 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 		// If hostname was requested and no Hostname address was registered...
 		if addressType == v1.NodeHostName {
 			// ...fall back to the kubernetes.io/hostname label for compatibility with kubelets before 1.5
-			if hostname, ok := node.Labels[unversioned.LabelHostname]; ok && len(hostname) > 0 {
+			if hostname, ok := node.Labels[metav1.LabelHostname]; ok && len(hostname) > 0 {
 				return hostname, nil
 			}
 		}
@@ -123,8 +123,8 @@ func GetZoneKey(node *v1.Node) string {
 		return ""
 	}
 
-	region, _ := labels[unversioned.LabelZoneRegion]
-	failureDomain, _ := labels[unversioned.LabelZoneFailureDomain]
+	region, _ := labels[metav1.LabelZoneRegion]
+	failureDomain, _ := labels[metav1.LabelZoneFailureDomain]
 
 	if region == "" && failureDomain == "" {
 		return ""
@@ -145,7 +145,7 @@ func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.N
 		}
 		return []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw)), nil
 	}
-	condition.LastHeartbeatTime = unversioned.NewTime(time.Now())
+	condition.LastHeartbeatTime = metav1.NewTime(time.Now())
 	patch, err := generatePatch(condition)
 	if err != nil {
 		return nil

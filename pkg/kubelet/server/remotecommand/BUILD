@@ -24,7 +24,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/httplog:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",

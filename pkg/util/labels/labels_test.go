@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestCloneAndAddLabel(t *testing.T) {
@@ -151,8 +151,8 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		ls_in := unversioned.LabelSelector{MatchLabels: tc.labels}
-		ls_out := unversioned.LabelSelector{MatchLabels: tc.want}
+		ls_in := metav1.LabelSelector{MatchLabels: tc.labels}
+		ls_out := metav1.LabelSelector{MatchLabels: tc.want}
 
 		got := CloneSelectorAndAddLabel(&ls_in, tc.labelKey, tc.labelValue)
 		if !reflect.DeepEqual(got, &ls_out) {
@@ -200,8 +200,8 @@ func TestAddLabelToSelector(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		ls_in := unversioned.LabelSelector{MatchLabels: tc.labels}
-		ls_out := unversioned.LabelSelector{MatchLabels: tc.want}
+		ls_in := metav1.LabelSelector{MatchLabels: tc.labels}
+		ls_out := metav1.LabelSelector{MatchLabels: tc.want}
 
 		got := AddLabelToSelector(&ls_in, tc.labelKey, tc.labelValue)
 		if !reflect.DeepEqual(got, &ls_out) {

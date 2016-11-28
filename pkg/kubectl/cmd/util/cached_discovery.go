@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -61,12 +61,12 @@ type CachedDiscoveryClient struct {
 var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
-func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	filename := filepath.Join(d.cacheDirectory, groupVersion, "serverresources.json")
 	cachedBytes, err := d.getCachedFile(filename)
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
 	if err == nil {
-		cachedResources := &unversioned.APIResourceList{}
+		cachedResources := &metav1.APIResourceList{}
 		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), cachedBytes, cachedResources); err == nil {
 			glog.V(6).Infof("returning cached discovery info from %v", filename)
 			return cachedResources, nil
@@ -86,13 +86,13 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 }
 
 // ServerResources returns the supported resources for all groups and versions.
-func (d *CachedDiscoveryClient) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (d *CachedDiscoveryClient) ServerResources() (map[string]*metav1.APIResourceList, error) {
 	apiGroups, err := d.ServerGroups()
 	if err != nil {
 		return nil, err
 	}
-	groupVersions := unversioned.ExtractGroupVersions(apiGroups)
-	result := map[string]*unversioned.APIResourceList{}
+	groupVersions := metav1.ExtractGroupVersions(apiGroups)
+	result := map[string]*metav1.APIResourceList{}
 	for _, groupVersion := range groupVersions {
 		resources, err := d.ServerResourcesForGroupVersion(groupVersion)
 		if err != nil {
@@ -103,12 +103,12 @@ func (d *CachedDiscoveryClient) ServerResources() (map[string]*unversioned.APIRe
 	return result, nil
 }
 
-func (d *CachedDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error) {
+func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	filename := filepath.Join(d.cacheDirectory, "servergroups.json")
 	cachedBytes, err := d.getCachedFile(filename)
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
 	if err == nil {
-		cachedGroups := &unversioned.APIGroupList{}
+		cachedGroups := &metav1.APIGroupList{}
 		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), cachedBytes, cachedGroups); err == nil {
 			glog.V(6).Infof("returning cached discovery info from %v", filename)
 			return cachedGroups, nil

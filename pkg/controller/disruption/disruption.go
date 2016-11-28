@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
@@ -400,7 +400,7 @@ func (dc *DisruptionController) getPdbForPod(pod *v1.Pod) *policy.PodDisruptionB
 }
 
 func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) ([]*v1.Pod, error) {
-	sel, err := unversioned.LabelSelectorAsSelector(pdb.Spec.Selector)
+	sel, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 	if sel.Empty() {
 		return []*v1.Pod{}, nil
 	}
@@ -582,7 +582,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	return
 }
 
-func countHealthyPods(pods []*v1.Pod, disruptedPods map[string]unversioned.Time, currentTime time.Time) (currentHealthy int32) {
+func countHealthyPods(pods []*v1.Pod, disruptedPods map[string]metav1.Time, currentTime time.Time) (currentHealthy int32) {
 Pod:
 	for _, pod := range pods {
 		// Pod is beeing deleted.
@@ -604,9 +604,9 @@ Pod:
 
 // Builds new PodDisruption map, possibly removing items that refer to non-existing, already deleted
 // or not-deleted at all items. Also returns an information when this check should be repeated.
-func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy.PodDisruptionBudget, currentTime time.Time) (map[string]unversioned.Time, *time.Time) {
+func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy.PodDisruptionBudget, currentTime time.Time) (map[string]metav1.Time, *time.Time) {
 	disruptedPods := pdb.Status.DisruptedPods
-	result := make(map[string]unversioned.Time)
+	result := make(map[string]metav1.Time)
 	var recheckTime *time.Time
 
 	if disruptedPods == nil || len(disruptedPods) == 0 {
@@ -655,7 +655,7 @@ func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error 
 }
 
 func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget, currentHealthy, desiredHealthy, expectedCount int32,
-	disruptedPods map[string]unversioned.Time) error {
+	disruptedPods map[string]metav1.Time) error {
 
 	// We require expectedCount to be > 0 so that PDBs which currently match no
 	// pods are in a safe state when their first pods appear but this controller

@@ -40,7 +40,7 @@ func (s Swagger) Install(c *mux.APIContainer) {
 		SwaggerFilePath: "/swagger-ui/",
 		SchemaFormatHandler: func(typeName string) string {
 			switch typeName {
-			case "unversioned.Time", "*unversioned.Time":
+			case "metav1.Time", "*metav1.Time":
 				return "date-time"
 			}
 			return ""

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -44,7 +44,7 @@ func getTestRunningStatus() v1.PodStatus {
 		Name:        testContainerName,
 		ContainerID: testContainerID.String(),
 	}
-	containerStatus.State.Running = &v1.ContainerStateRunning{StartedAt: unversioned.Now()}
+	containerStatus.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.Now()}
 	podStatus := v1.PodStatus{
 		Phase:             v1.PodRunning,
 		ContainerStatuses: []v1.ContainerStatus{containerStatus},

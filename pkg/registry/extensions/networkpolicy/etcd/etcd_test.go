@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -57,12 +57,12 @@ func validNewNetworkPolicy() *extensions.NetworkPolicy {
 			Labels:    map[string]string{"a": "b"},
 		},
 		Spec: extensions.NetworkPolicySpec{
-			PodSelector: unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Ingress: []extensions.NetworkPolicyIngressRule{
 				{
 					From: []extensions.NetworkPolicyPeer{
 						{
-							PodSelector: &unversioned.LabelSelector{MatchLabels: map[string]string{"c": "d"}},
+							PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"c": "d"}},
 						},
 					},
 					Ports: []extensions.NetworkPolicyPort{
@@ -93,7 +93,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&extensions.NetworkPolicy{
 			Spec: extensions.NetworkPolicySpec{
-				PodSelector: unversioned.LabelSelector{MatchLabels: invalidSelector},
+				PodSelector: metav1.LabelSelector{MatchLabels: invalidSelector},
 				Ingress:     []extensions.NetworkPolicyIngressRule{},
 			},
 		},
@@ -121,7 +121,7 @@ func TestUpdate(t *testing.T) {
 		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.NetworkPolicy)
-			object.Spec.PodSelector = unversioned.LabelSelector{MatchLabels: map[string]string{}}
+			object.Spec.PodSelector = metav1.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
 	)

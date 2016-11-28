@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -49,7 +49,7 @@ func TestDoProbe(t *testing.T) {
 	terminatedStatus := getTestRunningStatus()
 	terminatedStatus.ContainerStatuses[0].State.Running = nil
 	terminatedStatus.ContainerStatuses[0].State.Terminated = &v1.ContainerStateTerminated{
-		StartedAt: unversioned.Now(),
+		StartedAt: metav1.Now(),
 	}
 	otherStatus := getTestRunningStatus()
 	otherStatus.ContainerStatuses[0].Name = "otherContainer"

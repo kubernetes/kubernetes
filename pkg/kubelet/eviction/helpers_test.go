@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/quota"
@@ -915,7 +915,7 @@ func TestThresholdsUpdatedStats(t *testing.T) {
 			thresholds: []Threshold{updatedThreshold},
 			observations: signalObservations{
 				SignalMemoryAvailable: signalObservation{
-					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+					time: metav1.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
 				},
 			},
 			last:   signalObservations{},
@@ -925,12 +925,12 @@ func TestThresholdsUpdatedStats(t *testing.T) {
 			thresholds: []Threshold{updatedThreshold},
 			observations: signalObservations{
 				SignalMemoryAvailable: signalObservation{
-					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+					time: metav1.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
 				},
 			},
 			last: signalObservations{
 				SignalMemoryAvailable: signalObservation{
-					time: unversioned.Date(2016, 1, 1, 0, 1, 0, 0, locationUTC),
+					time: metav1.Date(2016, 1, 1, 0, 1, 0, 0, locationUTC),
 				},
 			},
 			result: []Threshold{},
@@ -939,12 +939,12 @@ func TestThresholdsUpdatedStats(t *testing.T) {
 			thresholds: []Threshold{updatedThreshold},
 			observations: signalObservations{
 				SignalMemoryAvailable: signalObservation{
-					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+					time: metav1.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
 				},
 			},
 			last: signalObservations{
 				SignalMemoryAvailable: signalObservation{
-					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+					time: metav1.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
 				},
 			},
 			result: []Threshold{},
@@ -953,12 +953,12 @@ func TestThresholdsUpdatedStats(t *testing.T) {
 			thresholds: []Threshold{updatedThreshold},
 			observations: signalObservations{
 				SignalMemoryAvailable: signalObservation{
-					time: unversioned.Date(2016, 1, 1, 0, 1, 0, 0, locationUTC),
+					time: metav1.Date(2016, 1, 1, 0, 1, 0, 0, locationUTC),
 				},
 			},
 			last: signalObservations{
 				SignalMemoryAvailable: signalObservation{
-					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+					time: metav1.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
 				},
 			},
 			result: []Threshold{updatedThreshold},
@@ -1098,8 +1098,8 @@ func TestThresholdsFirstObservedAt(t *testing.T) {
 			Quantity: quantityMustParse("1Gi"),
 		},
 	}
-	now := unversioned.Now()
-	oldTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	now := metav1.Now()
+	oldTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
 	testCases := map[string]struct {
 		thresholds     []Threshold
 		lastObservedAt thresholdsObservedAt
@@ -1140,7 +1140,7 @@ func TestThresholdsFirstObservedAt(t *testing.T) {
 }
 
 func TestThresholdsMetGracePeriod(t *testing.T) {
-	now := unversioned.Now()
+	now := metav1.Now()
 	hardThreshold := Threshold{
 		Signal:   SignalMemoryAvailable,
 		Operator: OpLessThan,
@@ -1156,7 +1156,7 @@ func TestThresholdsMetGracePeriod(t *testing.T) {
 		},
 		GracePeriod: 1 * time.Minute,
 	}
-	oldTime := unversioned.NewTime(now.Time.Add(-2 * time.Minute))
+	oldTime := metav1.NewTime(now.Time.Add(-2 * time.Minute))
 	testCases := map[string]struct {
 		observedAt thresholdsObservedAt
 		now        time.Time
@@ -1222,8 +1222,8 @@ func TestNodeConditions(t *testing.T) {
 }
 
 func TestNodeConditionsLastObservedAt(t *testing.T) {
-	now := unversioned.Now()
-	oldTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	now := metav1.Now()
+	oldTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
 	testCases := map[string]struct {
 		nodeConditions []v1.NodeConditionType
 		lastObservedAt nodeConditionsObservedAt
@@ -1268,8 +1268,8 @@ func TestNodeConditionsLastObservedAt(t *testing.T) {
 }
 
 func TestNodeConditionsObservedSince(t *testing.T) {
-	now := unversioned.Now()
-	observedTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	now := metav1.Now()
+	observedTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
 	testCases := map[string]struct {
 		observedAt nodeConditionsObservedAt
 		period     time.Duration

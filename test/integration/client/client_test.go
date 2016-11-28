@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -126,7 +126,7 @@ func TestAtomicPut(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	rcBody := v1.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: c.Core().RESTClient().APIVersion().String(),
 		},
 		ObjectMeta: v1.ObjectMeta{
@@ -220,7 +220,7 @@ func TestPatch(t *testing.T) {
 	name := "patchpod"
 	resource := "pods"
 	podBody := v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: c.Core().RESTClient().APIVersion().String(),
 		},
 		ObjectMeta: v1.ObjectMeta{
@@ -439,7 +439,7 @@ func TestAPIVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get api versions: %v", err)
 	}
-	versions := unversioned.ExtractGroupVersions(g)
+	versions := metav1.ExtractGroupVersions(g)
 
 	// Verify that the server supports the API version used by the client.
 	for _, version := range versions {

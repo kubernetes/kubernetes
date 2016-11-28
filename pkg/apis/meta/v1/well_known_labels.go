@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 const (
 	// If you add a new topology domain here, also consider adding it to the set of default values

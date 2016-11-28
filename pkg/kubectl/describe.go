@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -1154,7 +1154,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
-	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -1174,7 +1174,7 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		fmt.Fprintf(out, "Name:\t%s\n", rs.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", rs.Namespace)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
-		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
+		fmt.Fprintf(out, "Selector:\t%s\n", metav1.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(out, "Labels", rs.Labels)
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t")
@@ -1215,7 +1215,7 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		fmt.Fprintf(out, "Name:\t%s\n", job.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", job.Namespace)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&job.Spec.Template.Spec))
-		selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+		selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		if job.Spec.Completions != nil {
@@ -1288,7 +1288,7 @@ func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string
 func describeJobTemplate(jobTemplate batch.JobTemplateSpec, out io.Writer) {
 	fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&jobTemplate.Spec.Template.Spec))
 	if jobTemplate.Spec.Selector != nil {
-		selector, _ := unversioned.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
+		selector, _ := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 	} else {
 		fmt.Fprintf(out, "Selector:\t<unset>\n")
@@ -1339,7 +1339,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 		return "", err
 	}
 
-	selector, err := unversioned.LabelSelectorAsSelector(daemon.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -1360,7 +1360,7 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", daemon.Name)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
-		selector, err := unversioned.LabelSelectorAsSelector(daemon.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
 		if err != nil {
 			// this shouldn't happen if LabelSelector passed validation
 			return err
@@ -1894,7 +1894,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 	}
 	pc := p.client.Core().Pods(namespace)
 
-	selector, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -1908,7 +1908,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 		fmt.Fprintf(out, "Name:\t%s\n", ps.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", ps.Namespace)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&ps.Spec.Template.Spec))
-		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(ps.Spec.Selector))
+		fmt.Fprintf(out, "Selector:\t%s\n", metav1.FormatLabelSelector(ps.Spec.Selector))
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(ps.Labels))
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", ps.Status.Replicas, ps.Spec.Replicas)
 		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(ps.Annotations))
@@ -2163,7 +2163,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -2226,7 +2226,7 @@ func getDaemonSetsForLabels(c extensionsclient.DaemonSetInterface, labelsToMatch
 	// Find the ones that match labelsToMatch.
 	var matchingDaemonSets []extensions.DaemonSet
 	for _, ds := range dss.Items {
-		selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
 			// this should never happen if the DaemonSet passed validation
 			return nil, err
@@ -2427,7 +2427,7 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 		fmt.Fprintf(out, "Name:\t%s\n", pdb.Name)
 		fmt.Fprintf(out, "Min available:\t%s\n", pdb.Spec.MinAvailable.String())
 		if pdb.Spec.Selector != nil {
-			fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(pdb.Spec.Selector))
+			fmt.Fprintf(out, "Selector:\t%s\n", metav1.FormatLabelSelector(pdb.Spec.Selector))
 		} else {
 			fmt.Fprintf(out, "Selector:\t<unset>\n")
 		}

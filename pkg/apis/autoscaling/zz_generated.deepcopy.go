@@ -22,7 +22,7 @@ package autoscaling
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
@@ -134,7 +134,7 @@ func DeepCopy_autoscaling_HorizontalPodAutoscalerStatus(in interface{}, out inte
 		}
 		if in.LastScaleTime != nil {
 			in, out := &in.LastScaleTime, &out.LastScaleTime
-			*out = new(unversioned.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.LastScaleTime = nil

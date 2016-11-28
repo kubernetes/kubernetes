@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	types "k8s.io/kubernetes/pkg/types"
@@ -1883,7 +1883,7 @@ func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Clone
 		out.CreationTimestamp = in.CreationTimestamp.DeepCopy()
 		if in.DeletionTimestamp != nil {
 			in, out := &in.DeletionTimestamp, &out.DeletionTimestamp
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.DeletionTimestamp = nil
@@ -2040,8 +2040,8 @@ func DeepCopy_v1_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *c
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -2362,8 +2362,8 @@ func DeepCopy_v1_PodAffinityTerm(in interface{}, out interface{}, c *conversion.
 		out := out.(*PodAffinityTerm)
 		if in.LabelSelector != nil {
 			in, out := &in.LabelSelector, &out.LabelSelector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -2498,7 +2498,7 @@ func DeepCopy_v1_PodLogOptions(in interface{}, out interface{}, c *conversion.Cl
 		}
 		if in.SinceTime != nil {
 			in, out := &in.SinceTime, &out.SinceTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.SinceTime = nil
@@ -2706,7 +2706,7 @@ func DeepCopy_v1_PodStatus(in interface{}, out interface{}, c *conversion.Cloner
 		out.PodIP = in.PodIP
 		if in.StartTime != nil {
 			in, out := &in.StartTime, &out.StartTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.StartTime = nil

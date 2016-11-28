@@ -22,7 +22,7 @@ import (
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch"
@@ -78,7 +78,7 @@ type Exporter interface {
 	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
 	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
 	// retained, otherwise they are stripped also.
-	Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error)
+	Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error)
 }
 
 // Getter is an object that can retrieve a named RESTful resource.

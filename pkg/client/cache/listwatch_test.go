@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -60,7 +60,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(registered.GroupOrDie(v1.GroupName).GroupVersion.String())
+	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam(registered.GroupOrDie(v1.GroupName).GroupVersion.String())
 	table := []struct {
 		location      string
 		resource      string
@@ -110,7 +110,7 @@ func TestListWatchesCanList(t *testing.T) {
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(registered.GroupOrDie(v1.GroupName).GroupVersion.String())
+	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam(registered.GroupOrDie(v1.GroupName).GroupVersion.String())
 	table := []struct {
 		rv            string
 		location      string

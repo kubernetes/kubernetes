@@ -28,7 +28,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/install"
 
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -123,7 +123,7 @@ func setupGC(t *testing.T, config *restclient.Config) *GarbageCollector {
 
 func getPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},

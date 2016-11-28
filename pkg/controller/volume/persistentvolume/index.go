@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -97,7 +97,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
-		internalSelector, err := unversioned.LabelSelectorAsSelector(claim.Spec.Selector)
+		internalSelector, err := metav1.LabelSelectorAsSelector(claim.Spec.Selector)
 		if err != nil {
 			// should be unreachable code due to validation
 			return nil, fmt.Errorf("error creating internal label selector for claim: %v: %v", claimToClaimKey(claim), err)

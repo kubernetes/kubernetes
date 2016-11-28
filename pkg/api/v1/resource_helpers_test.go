@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestResourceHelpers(t *testing.T) {
@@ -64,7 +64,7 @@ func TestDefaultResourceHelpers(t *testing.T) {
 	}
 }
 
-func newPod(now unversioned.Time, ready bool, beforeSec int) *Pod {
+func newPod(now metav1.Time, ready bool, beforeSec int) *Pod {
 	conditionStatus := ConditionFalse
 	if ready {
 		conditionStatus = ConditionTrue
@@ -74,7 +74,7 @@ func newPod(now unversioned.Time, ready bool, beforeSec int) *Pod {
 			Conditions: []PodCondition{
 				{
 					Type:               PodReady,
-					LastTransitionTime: unversioned.NewTime(now.Time.Add(-1 * time.Duration(beforeSec) * time.Second)),
+					LastTransitionTime: metav1.NewTime(now.Time.Add(-1 * time.Duration(beforeSec) * time.Second)),
 					Status:             conditionStatus,
 				},
 			},
@@ -83,7 +83,7 @@ func newPod(now unversioned.Time, ready bool, beforeSec int) *Pod {
 }
 
 func TestIsPodAvailable(t *testing.T) {
-	now := unversioned.Now()
+	now := metav1.Now()
 	tests := []struct {
 		pod             *Pod
 		minReadySeconds int32

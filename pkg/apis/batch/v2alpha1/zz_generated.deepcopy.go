@@ -21,8 +21,8 @@ limitations under the License.
 package v2alpha1
 
 import (
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
@@ -131,7 +131,7 @@ func DeepCopy_v2alpha1_CronJobStatus(in interface{}, out interface{}, c *convers
 		}
 		if in.LastScheduleTime != nil {
 			in, out := &in.LastScheduleTime, &out.LastScheduleTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.LastScheduleTime = nil
@@ -220,8 +220,8 @@ func DeepCopy_v2alpha1_JobSpec(in interface{}, out interface{}, c *conversion.Cl
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -258,14 +258,14 @@ func DeepCopy_v2alpha1_JobStatus(in interface{}, out interface{}, c *conversion.
 		}
 		if in.StartTime != nil {
 			in, out := &in.StartTime, &out.StartTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.StartTime = nil
 		}
 		if in.CompletionTime != nil {
 			in, out := &in.CompletionTime, &out.CompletionTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.CompletionTime = nil

@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -45,7 +45,7 @@ func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, affinityPod *v1.Pod, term 
 		return false, nil
 	}
 
-	selector, err := unversioned.LabelSelectorAsSelector(term.LabelSelector)
+	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil || !selector.Matches(labels.Set(pod.Labels)) {
 		return false, err
 	}

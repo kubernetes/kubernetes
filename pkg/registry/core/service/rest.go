@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -245,7 +245,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 			}
 		}
 	}
-	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
+	return &metav1.Status{Status: metav1.StatusSuccess}, nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
@@ -264,7 +264,7 @@ func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 
 // Export returns Service stripped of cluster-specific information.
 // It implements rest.Exporter.
-func (rs *REST) Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error) {
+func (rs *REST) Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	return rs.registry.ExportService(ctx, name, opts)
 }
 

@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -246,7 +246,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	apiVersions := unversioned.APIVersions{}
+	apiVersions := metav1.APIVersions{}
 	assert.NoError(decodeResponse(resp, &apiVersions))
 	assert.Equal(apiVersions.APIVersion, "")
 
@@ -255,7 +255,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	resourceList := unversioned.APIResourceList{}
+	resourceList := metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "")
 
@@ -264,7 +264,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	groupList := unversioned.APIGroupList{}
+	groupList := metav1.APIGroupList{}
 	assert.NoError(decodeResponse(resp, &groupList))
 	assert.Equal(groupList.APIVersion, "")
 
@@ -273,7 +273,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	group := unversioned.APIGroup{}
+	group := metav1.APIGroup{}
 	assert.NoError(decodeResponse(resp, &group))
 	assert.Equal(group.APIVersion, "")
 
@@ -282,7 +282,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	resourceList = unversioned.APIResourceList{}
+	resourceList = metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "")
 
@@ -292,7 +292,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	group = unversioned.APIGroup{}
+	group = metav1.APIGroup{}
 	assert.NoError(decodeResponse(resp, &group))
 	assert.Equal(group.APIVersion, "v1")
 
@@ -303,7 +303,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	resourceList = unversioned.APIResourceList{}
+	resourceList = metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "v1")
 

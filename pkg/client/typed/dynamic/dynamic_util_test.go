@@ -19,15 +19,15 @@ package dynamic
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestDiscoveryRESTMapper(t *testing.T) {
-	resources := []*unversioned.APIResourceList{
+	resources := []*metav1.APIResourceList{
 		{
 			GroupVersion: "test/beta1",
-			APIResources: []unversioned.APIResource{
+			APIResources: []metav1.APIResource{
 				{
 					Name:       "test_kinds",
 					Namespaced: true,

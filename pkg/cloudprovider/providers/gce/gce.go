@@ -30,7 +30,7 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -2582,8 +2582,8 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 	}
 
 	labels := make(map[string]string)
-	labels[unversioned.LabelZoneFailureDomain] = zone
-	labels[unversioned.LabelZoneRegion] = region
+	labels[metav1.LabelZoneFailureDomain] = zone
+	labels[metav1.LabelZoneRegion] = region
 
 	return labels, nil
 }

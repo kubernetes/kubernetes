@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -45,7 +45,7 @@ func testLabels() map[string]string {
 func newRS(name, namespace string, replicas int) *v1beta1.ReplicaSet {
 	replicasCopy := int32(replicas)
 	return &v1beta1.ReplicaSet{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicaSet",
 			APIVersion: "extensions/v1beta1",
 		},
@@ -54,7 +54,7 @@ func newRS(name, namespace string, replicas int) *v1beta1.ReplicaSet {
 			Name:      name,
 		},
 		Spec: v1beta1.ReplicaSetSpec{
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: testLabels(),
 			},
 			Replicas: &replicasCopy,
@@ -77,7 +77,7 @@ func newRS(name, namespace string, replicas int) *v1beta1.ReplicaSet {
 
 func newMatchingPod(podName, namespace string) *v1.Pod {
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},

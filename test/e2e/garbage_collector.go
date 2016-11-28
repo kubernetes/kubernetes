@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/metrics"
@@ -44,7 +44,7 @@ func newOwnerRC(f *framework.Framework, name string) *v1.ReplicationController {
 	var replicas int32
 	replicas = 2
 	return &v1.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
 		},

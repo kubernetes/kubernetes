@@ -15,7 +15,7 @@ go_library(
     srcs = ["validation.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/unversioned:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/util/validation:go_default_library",
         "//pkg/util/validation/field:go_default_library",
     ],

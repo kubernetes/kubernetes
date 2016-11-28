@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
@@ -53,7 +53,7 @@ func TestStorageClasses(t *testing.T) {
 func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 	// Make a storage class object.
 	s := storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: v1.ObjectMeta{

@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -257,7 +257,7 @@ func TestReplicaSetStop(t *testing.T) {
 							},
 							Spec: extensions.ReplicaSetSpec{
 								Replicas: 0,
-								Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
+								Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
 							},
 						},
 					},
@@ -278,7 +278,7 @@ func TestReplicaSetStop(t *testing.T) {
 							},
 							Spec: extensions.ReplicaSetSpec{
 								Replicas: 0,
-								Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"k3": "v3"}},
+								Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k3": "v3"}},
 							},
 						},
 						{
@@ -288,7 +288,7 @@ func TestReplicaSetStop(t *testing.T) {
 							},
 							Spec: extensions.ReplicaSetSpec{
 								Replicas: 0,
-								Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
+								Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
 							},
 						},
 					},
@@ -348,7 +348,7 @@ func TestJobStop(t *testing.T) {
 							},
 							Spec: batch.JobSpec{
 								Parallelism: &zero,
-								Selector: &unversioned.LabelSelector{
+								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"k1": "v1"},
 								},
 							},
@@ -372,7 +372,7 @@ func TestJobStop(t *testing.T) {
 							},
 							Spec: batch.JobSpec{
 								Parallelism: &zero,
-								Selector: &unversioned.LabelSelector{
+								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"k1": "v1"},
 								},
 							},
@@ -433,7 +433,7 @@ func TestDeploymentStop(t *testing.T) {
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: 0,
-			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
 		},
 		Status: extensions.DeploymentStatus{
 			Replicas: 0,
@@ -456,7 +456,7 @@ func TestDeploymentStop(t *testing.T) {
 					},
 					Spec: extensions.DeploymentSpec{
 						Replicas: 0,
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
 					},
 					Status: extensions.DeploymentStatus{
 						Replicas: 0,
@@ -670,7 +670,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: 0,
-			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
 		},
 		Status: extensions.DeploymentStatus{
 			Replicas: 0,

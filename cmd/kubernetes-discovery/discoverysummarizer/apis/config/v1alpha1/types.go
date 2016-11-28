@@ -38,6 +38,6 @@ type GroupVersionDiscoveryPath struct {
 	Path string `json:"path"`
 
 	// True if the path is for legacy group version.
-	// (i.e the path returns unversioned.APIVersions instead of unversioned.APIGroupList)
+	// (i.e the path returns metav1.APIVersions instead of metav1.APIGroupList)
 	IsLegacy bool `json:"isLegacy"`
 }

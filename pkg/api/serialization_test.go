@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -365,11 +365,11 @@ func TestBadJSONRejection(t *testing.T) {
 
 func TestUnversionedTypes(t *testing.T) {
 	testcases := []runtime.Object{
-		&unversioned.Status{Status: "Failure", Message: "something went wrong"},
-		&unversioned.APIVersions{Versions: []string{"A", "B", "C"}},
-		&unversioned.APIGroupList{Groups: []unversioned.APIGroup{{Name: "mygroup"}}},
-		&unversioned.APIGroup{Name: "mygroup"},
-		&unversioned.APIResourceList{GroupVersion: "mygroup/myversion"},
+		&metav1.Status{Status: "Failure", Message: "something went wrong"},
+		&metav1.APIVersions{Versions: []string{"A", "B", "C"}},
+		&metav1.APIGroupList{Groups: []metav1.APIGroup{{Name: "mygroup"}}},
+		&metav1.APIGroup{Name: "mygroup"},
+		&metav1.APIResourceList{GroupVersion: "mygroup/myversion"},
 	}
 
 	for _, obj := range testcases {

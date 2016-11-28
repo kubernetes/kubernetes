@@ -14,5 +14,5 @@ go_library(
     name = "go_default_library",
     srcs = ["types.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/api/unversioned:go_default_library"],
+    deps = ["//pkg/apis/meta/v1:go_default_library"],
 )

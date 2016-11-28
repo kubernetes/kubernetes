@@ -23,7 +23,7 @@ import (
 	"sort"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/integer"
@@ -166,10 +166,10 @@ func isLess(i, j reflect.Value) (bool, error) {
 	case reflect.Ptr:
 		return isLess(i.Elem(), j.Elem())
 	case reflect.Struct:
-		// sort unversioned.Time
+		// sort metav1.Time
 		in := i.Interface()
-		if t, ok := in.(unversioned.Time); ok {
-			return t.Before(j.Interface().(unversioned.Time)), nil
+		if t, ok := in.(metav1.Time); ok {
+			return t.Before(j.Interface().(metav1.Time)), nil
 		}
 		// fallback to the fields comparison
 		for idx := 0; idx < i.NumField(); idx++ {

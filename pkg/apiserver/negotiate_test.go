@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -224,7 +224,7 @@ func TestNegotiate(t *testing.T) {
 				t.Errorf("%d: failed, error should be statusError: %v", i, err)
 				continue
 			}
-			if status.Status().Status != unversioned.StatusFailure || status.Status().Code != http.StatusNotAcceptable {
+			if status.Status().Status != metav1.StatusFailure || status.Status().Code != http.StatusNotAcceptable {
 				t.Errorf("%d: failed: %v", i, err)
 				continue
 			}

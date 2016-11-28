@@ -16,10 +16,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/unversioned/validation:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/apis/meta/v1/validation:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
@@ -38,8 +38,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",

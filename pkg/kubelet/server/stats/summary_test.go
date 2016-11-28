@@ -25,7 +25,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	k8sv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubestats "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -440,7 +440,7 @@ func TestCustomMetrics(t *testing.T) {
 				Type:  kubestats.MetricGauge,
 				Units: "per second",
 			},
-			Time:  unversioned.NewTime(timestamp2),
+			Time:  metav1.NewTime(timestamp2),
 			Value: 100,
 		},
 		kubestats.UserDefinedMetric{
@@ -449,7 +449,7 @@ func TestCustomMetrics(t *testing.T) {
 				Type:  kubestats.MetricCumulative,
 				Units: "count",
 			},
-			Time:  unversioned.NewTime(timestamp2),
+			Time:  metav1.NewTime(timestamp2),
 			Value: 2.1,
 		})
 }

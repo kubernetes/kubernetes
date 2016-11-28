@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	NonZeroExitCodeReason = unversioned.StatusReason("NonZeroExitCode")
-	ExitCodeCauseType     = unversioned.CauseType("ExitCode")
+	NonZeroExitCodeReason = metav1.StatusReason("NonZeroExitCode")
+	ExitCodeCauseType     = metav1.CauseType("ExitCode")
 )
 
 // Executor knows how to execute a command in a container in a pod.
@@ -60,11 +60,11 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 	if err != nil {
 		if exitErr, ok := err.(utilexec.ExitError); ok && exitErr.Exited() {
 			rc := exitErr.ExitStatus()
-			ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
-				Status: unversioned.StatusFailure,
+			ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+				Status: metav1.StatusFailure,
 				Reason: NonZeroExitCodeReason,
-				Details: &unversioned.StatusDetails{
-					Causes: []unversioned.StatusCause{
+				Details: &metav1.StatusDetails{
+					Causes: []metav1.StatusCause{
 						{
 							Type:    ExitCodeCauseType,
 							Message: fmt.Sprintf("%d", rc),
@@ -79,8 +79,8 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 			ctx.writeStatus(apierrors.NewInternalError(err))
 		}
 	} else {
-		ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
-			Status: unversioned.StatusSuccess,
+		ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+			Status: metav1.StatusSuccess,
 		}})
 	}
 }

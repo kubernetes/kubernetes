@@ -35,8 +35,8 @@ go_test(
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/authentication/v1beta1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/auth/user:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
     ],

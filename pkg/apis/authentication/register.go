@@ -18,7 +18,7 @@ package authentication
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
@@ -48,7 +48,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&api.ListOptions{},
 		&api.DeleteOptions{},
-		&unversioned.ExportOptions{},
+		&metav1.ExportOptions{},
 
 		&TokenReview{},
 	)

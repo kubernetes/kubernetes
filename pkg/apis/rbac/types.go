@@ -18,7 +18,7 @@ package rbac
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -94,7 +94,7 @@ type RoleRef struct {
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
 type Role struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 	// Standard object's metadata.
 	api.ObjectMeta
 
@@ -108,7 +108,7 @@ type Role struct {
 // It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
 // namespace only have effect in that namespace.
 type RoleBinding struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 	api.ObjectMeta
 
 	// Subjects holds references to the objects the role applies to.
@@ -121,9 +121,9 @@ type RoleBinding struct {
 
 // RoleBindingList is a collection of RoleBindings
 type RoleBindingList struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 	// Standard object's metadata.
-	unversioned.ListMeta
+	metav1.ListMeta
 
 	// Items is a list of roleBindings
 	Items []RoleBinding
@@ -131,9 +131,9 @@ type RoleBindingList struct {
 
 // RoleList is a collection of Roles
 type RoleList struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 	// Standard object's metadata.
-	unversioned.ListMeta
+	metav1.ListMeta
 
 	// Items is a list of roles
 	Items []Role
@@ -144,7 +144,7 @@ type RoleList struct {
 
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 type ClusterRole struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 	// Standard object's metadata.
 	api.ObjectMeta
 
@@ -158,7 +158,7 @@ type ClusterRole struct {
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
 // and adds who information via Subject.
 type ClusterRoleBinding struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 	// Standard object's metadata.
 	api.ObjectMeta
 
@@ -172,9 +172,9 @@ type ClusterRoleBinding struct {
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
 type ClusterRoleBindingList struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 	// Standard object's metadata.
-	unversioned.ListMeta
+	metav1.ListMeta
 
 	// Items is a list of ClusterRoleBindings
 	Items []ClusterRoleBinding
@@ -182,9 +182,9 @@ type ClusterRoleBindingList struct {
 
 // ClusterRoleList is a collection of ClusterRoles
 type ClusterRoleList struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 	// Standard object's metadata.
-	unversioned.ListMeta
+	metav1.ListMeta
 
 	// Items is a list of ClusterRoles
 	Items []ClusterRole

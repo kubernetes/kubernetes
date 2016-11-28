@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -366,7 +366,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 
 	nodeConstraints := make(map[string]string)
 	for k, v := range node.ObjectMeta.Labels {
-		if k != unversioned.LabelZoneFailureDomain && k != unversioned.LabelZoneRegion {
+		if k != metav1.LabelZoneFailureDomain && k != metav1.LabelZoneRegion {
 			continue
 		}
 		nodeConstraints[k] = v
@@ -412,7 +412,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
-				if k != unversioned.LabelZoneFailureDomain && k != unversioned.LabelZoneRegion {
+				if k != metav1.LabelZoneFailureDomain && k != metav1.LabelZoneRegion {
 					continue
 				}
 				nodeV, _ := nodeConstraints[k]

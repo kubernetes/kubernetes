@@ -30,7 +30,7 @@ import (
 	"github.com/golang/glog"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -69,7 +69,7 @@ func newPod(podName, podNamespace string, ownerReferences []v1.OwnerReference) *
 		ownerReferences[i].APIVersion = "v1"
 	}
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -91,7 +91,7 @@ func newPod(podName, podNamespace string, ownerReferences []v1.OwnerReference) *
 
 func newOwnerRC(name, namespace string) *v1.ReplicationController {
 	return &v1.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
 		},

@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -99,7 +99,7 @@ func getKey(rs *extensions.ReplicaSet, t *testing.T) string {
 
 func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.ReplicaSet {
 	rs := &extensions.ReplicaSet{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -108,7 +108,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
-			Selector: &unversioned.LabelSelector{MatchLabels: selectorMap},
+			Selector: &metav1.LabelSelector{MatchLabels: selectorMap},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
@@ -138,7 +138,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 }
 
 // create a pod with the given phase for the given rs (same selectors and namespace)
-func newPod(name string, rs *extensions.ReplicaSet, status v1.PodPhase, lastTransitionTime *unversioned.Time) *v1.Pod {
+func newPod(name string, rs *extensions.ReplicaSet, status v1.PodPhase, lastTransitionTime *metav1.Time) *v1.Pod {
 	var conditions []v1.PodCondition
 	if status == v1.PodRunning {
 		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
@@ -474,7 +474,7 @@ func TestPodControllerLookup(t *testing.T) {
 				{
 					ObjectMeta: v1.ObjectMeta{Name: "foo"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -489,7 +489,7 @@ func TestPodControllerLookup(t *testing.T) {
 				{
 					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -630,7 +630,7 @@ func TestUpdatePods(t *testing.T) {
 	manager.rsLister.Indexer.Add(testRSSpec1)
 	testRSSpec2 := *testRSSpec1
 	labelMap2 := map[string]string{"bar": "foo"}
-	testRSSpec2.Spec.Selector = &unversioned.LabelSelector{MatchLabels: labelMap2}
+	testRSSpec2.Spec.Selector = &metav1.LabelSelector{MatchLabels: labelMap2}
 	testRSSpec2.Name = "barfoo"
 	manager.rsLister.Indexer.Add(&testRSSpec2)
 
@@ -1008,7 +1008,7 @@ func TestOverlappingRSs(t *testing.T) {
 			var controllers []*extensions.ReplicaSet
 			for j := 1; j < 10; j++ {
 				rsSpec := newReplicaSet(1, labelMap)
-				rsSpec.CreationTimestamp = unversioned.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
+				rsSpec.CreationTimestamp = metav1.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
 				rsSpec.Name = string(uuid.NewUUID())
 				controllers = append(controllers, rsSpec)
 			}
@@ -1044,7 +1044,7 @@ func TestDeletionTimestamp(t *testing.T) {
 		t.Errorf("Couldn't get key for object %#v: %v", rs, err)
 	}
 	pod := newPodList(nil, 1, v1.PodPending, labelMap, rs, "pod").Items[0]
-	pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	pod.ResourceVersion = "1"
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 
@@ -1090,7 +1090,7 @@ func TestDeletionTimestamp(t *testing.T) {
 		},
 	}
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(secondPod)})
-	oldPod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+	oldPod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	oldPod.ResourceVersion = "2"
 	manager.updatePod(&oldPod, &pod)
 
@@ -1326,7 +1326,7 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, fakePodControl := setupManagerWithGCEnabled(stopCh, rs)
-	now := unversioned.Now()
+	now := metav1.Now()
 	rs.DeletionTimestamp = &now
 	manager.rsLister.Indexer.Add(rs)
 	pod1 := newPod("pod1", rs, v1.PodRunning, nil)
@@ -1409,12 +1409,12 @@ func TestAvailableReplicas(t *testing.T) {
 	manager.rsLister.Indexer.Add(rs)
 
 	// First pod becomes ready 20s ago
-	moment := unversioned.Time{Time: time.Now().Add(-2e10)}
+	moment := metav1.Time{Time: time.Now().Add(-2e10)}
 	pod := newPod("pod", rs, v1.PodRunning, &moment)
 	manager.podLister.Indexer.Add(pod)
 
 	// Second pod becomes ready now
-	otherMoment := unversioned.Now()
+	otherMoment := metav1.Now()
 	otherPod := newPod("otherPod", rs, v1.PodRunning, &otherMoment)
 	manager.podLister.Indexer.Add(otherPod)
 

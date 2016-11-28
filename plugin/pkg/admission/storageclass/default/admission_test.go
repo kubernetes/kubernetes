@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -31,7 +31,7 @@ import (
 
 func TestAdmission(t *testing.T) {
 	defaultClass1 := &storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -43,7 +43,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "default1",
 	}
 	defaultClass2 := &storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -56,7 +56,7 @@ func TestAdmission(t *testing.T) {
 	}
 	// Class that has explicit default = false
 	classWithFalseDefault := &storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -69,7 +69,7 @@ func TestAdmission(t *testing.T) {
 	}
 	// Class with missing default annotation (=non-default)
 	classWithNoDefault := &storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -79,7 +79,7 @@ func TestAdmission(t *testing.T) {
 	}
 	// Class with empty default annotation (=non-default)
 	classWithEmptyDefault := &storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -92,7 +92,7 @@ func TestAdmission(t *testing.T) {
 	}
 
 	claimWithClass := &api.PersistentVolumeClaim{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -104,7 +104,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 	claimWithEmptyClass := &api.PersistentVolumeClaim{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -116,7 +116,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 	claimWithNoClass := &api.PersistentVolumeClaim{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
 		ObjectMeta: api.ObjectMeta{

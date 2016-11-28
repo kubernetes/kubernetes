@@ -54,7 +54,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -213,7 +213,7 @@ func (le *LeaderElector) renew() {
 // else it tries to renew the lease if it has already been acquired. Returns true
 // on success else returns false.
 func (le *LeaderElector) tryAcquireOrRenew() bool {
-	now := unversioned.Now()
+	now := metav1.Now()
 	leaderElectionRecord := rl.LeaderElectionRecord{
 		HolderIdentity:       le.config.Lock.Identity(),
 		LeaseDurationSeconds: int(le.config.LeaseDuration / time.Second),
@@ -279,9 +279,9 @@ func (l *LeaderElector) maybeReportTransition() {
 func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfiguration {
 	return componentconfig.LeaderElectionConfiguration{
 		LeaderElect:   false,
-		LeaseDuration: unversioned.Duration{Duration: DefaultLeaseDuration},
-		RenewDeadline: unversioned.Duration{Duration: DefaultRenewDeadline},
-		RetryPeriod:   unversioned.Duration{Duration: DefaultRetryPeriod},
+		LeaseDuration: metav1.Duration{Duration: DefaultLeaseDuration},
+		RenewDeadline: metav1.Duration{Duration: DefaultRenewDeadline},
+		RetryPeriod:   metav1.Duration{Duration: DefaultRetryPeriod},
 	}
 }
 

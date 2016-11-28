@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
@@ -242,8 +242,8 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			t.Errorf("[%v]unexpected result of tryAcquireOrRenew: [succeded=%v]", i, !test.expectSuccess)
 		}
 
-		le.observedRecord.AcquireTime = unversioned.Time{}
-		le.observedRecord.RenewTime = unversioned.Time{}
+		le.observedRecord.AcquireTime = metav1.Time{}
+		le.observedRecord.RenewTime = metav1.Time{}
 		if le.observedRecord.HolderIdentity != test.outHolder {
 			t.Errorf("[%v]expected holder:\n\t%+v\ngot:\n\t%+v", i, test.outHolder, le.observedRecord.HolderIdentity)
 		}

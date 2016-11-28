@@ -18,12 +18,12 @@ package testing
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type Simple struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
@@ -34,7 +34,7 @@ type Simple struct {
 func (obj *Simple) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleRoot struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
@@ -45,7 +45,7 @@ type SimpleRoot struct {
 func (obj *SimpleRoot) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleGetOptions struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	Param1               string `json:"param1"`
 	Param2               string `json:"param2"`
 	Path                 string `json:"atAPath"`
@@ -61,8 +61,8 @@ func (SimpleGetOptions) SwaggerDoc() map[string]string {
 func (obj *SimpleGetOptions) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleList struct {
-	unversioned.TypeMeta `json:",inline"`
-	unversioned.ListMeta `json:"metadata,inline"`
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,inline"`
 	// +optional
 	Items []Simple `json:"items,omitempty"`
 }

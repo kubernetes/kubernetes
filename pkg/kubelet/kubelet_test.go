@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -426,8 +426,8 @@ func TestHandlePortConflicts(t *testing.T) {
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
 	}
 	// Make sure the Pods are in the reverse order of creation time.
-	pods[1].CreationTimestamp = unversioned.NewTime(time.Now())
-	pods[0].CreationTimestamp = unversioned.NewTime(time.Now().Add(1 * time.Second))
+	pods[1].CreationTimestamp = metav1.NewTime(time.Now())
+	pods[0].CreationTimestamp = metav1.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
@@ -565,8 +565,8 @@ func TestHandleMemExceeded(t *testing.T) {
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
 	}
 	// Make sure the Pods are in the reverse order of creation time.
-	pods[1].CreationTimestamp = unversioned.NewTime(time.Now())
-	pods[0].CreationTimestamp = unversioned.NewTime(time.Now().Add(1 * time.Second))
+	pods[1].CreationTimestamp = metav1.NewTime(time.Now())
+	pods[0].CreationTimestamp = metav1.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
@@ -1162,8 +1162,8 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	now := metav1.Now()
+	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
 	exceededActiveDeadlineSeconds := int64(30)
 
 	pods := []*v1.Pod{
@@ -1214,8 +1214,8 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 
 	kubelet := testKubelet.kubelet
 
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	now := metav1.Now()
+	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
 	exceededActiveDeadlineSeconds := int64(300)
 
 	pods := []*v1.Pod{
@@ -1373,7 +1373,7 @@ func TestGetPodsToSync(t *testing.T) {
 
 	exceededActiveDeadlineSeconds := int64(30)
 	notYetActiveDeadlineSeconds := int64(120)
-	startTime := unversioned.NewTime(clock.Now())
+	startTime := metav1.NewTime(clock.Now())
 	pods[0].Status.StartTime = &startTime
 	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
 	pods[1].Status.StartTime = &startTime
@@ -1531,7 +1531,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 			oldStatuses: []v1.ContainerStatus{},
 			expectedState: map[string]v1.ContainerState{
 				"running": {Running: &v1.ContainerStateRunning{
-					StartedAt: unversioned.NewTime(testTimestamp),
+					StartedAt: metav1.NewTime(testTimestamp),
 				}},
 			},
 			expectedLastTerminationState: map[string]v1.ContainerState{

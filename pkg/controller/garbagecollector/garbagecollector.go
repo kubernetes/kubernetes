@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -456,7 +456,7 @@ func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource)
 			// leave it empty. We want to list this resource in all
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
-			apiResource := unversioned.APIResource{Name: resource.Resource}
+			apiResource := metav1.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
 				Resource(&apiResource, v1.NamespaceAll).
 				List(&options)
@@ -466,7 +466,7 @@ func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource)
 			// leave it empty. We want to list this resource in all
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
-			apiResource := unversioned.APIResource{Name: resource.Resource}
+			apiResource := metav1.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
 				Resource(&apiResource, v1.NamespaceAll).
 				Watch(&options)
@@ -592,15 +592,15 @@ func (gc *GarbageCollector) worker() {
 }
 
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
-// namespace> tuple to a unversioned.APIResource struct.
-func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool) (*unversioned.APIResource, error) {
+// namespace> tuple to a metav1.APIResource struct.
+func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool) (*metav1.APIResource, error) {
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get REST mapping for kind: %s, version: %s", kind, apiVersion)
 	}
 	glog.V(6).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
-	resource := unversioned.APIResource{
+	resource := metav1.APIResource{
 		Name:       mapping.Resource,
 		Namespaced: namespaced,
 		Kind:       kind,
@@ -667,7 +667,7 @@ func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
 
 func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.MetadataOnlyObject {
 	return &metaonly.MetadataOnlyObject{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: ref.APIVersion,
 			Kind:       ref.Kind,
 		},

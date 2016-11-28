@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -83,8 +83,8 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 	}
 }
 
-func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIVersions) {
-	now := unversioned.Now()
+func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersions) {
+	now := metav1.Now()
 	namespaceName := "test"
 	testNamespacePendingFinalize := &v1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
@@ -222,11 +222,11 @@ func TestRetryOnConflictError(t *testing.T) {
 }
 
 func TestSyncNamespaceThatIsTerminatingNonExperimental(t *testing.T) {
-	testSyncNamespaceThatIsTerminating(t, &unversioned.APIVersions{})
+	testSyncNamespaceThatIsTerminating(t, &metav1.APIVersions{})
 }
 
 func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
-	testSyncNamespaceThatIsTerminating(t, &unversioned.APIVersions{Versions: []string{"extensions/v1beta1"}})
+	testSyncNamespaceThatIsTerminating(t, &metav1.APIVersions{Versions: []string{"extensions/v1beta1"}})
 }
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {

@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
@@ -188,7 +188,7 @@ func newClaim(ns string, alpha bool) *v1.PersistentVolumeClaim {
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
 func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	pod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -245,7 +245,7 @@ func newStorageClass() *storage.StorageClass {
 	}
 
 	return &storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: v1.ObjectMeta{

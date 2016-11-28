@@ -22,9 +22,9 @@ package v2alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	unsafe "unsafe"
@@ -171,7 +171,7 @@ func Convert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(in *batch.CronJobSpec, ou
 
 func autoConvert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in *CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
 	out.Active = *(*[]api.ObjectReference)(unsafe.Pointer(&in.Active))
-	out.LastScheduleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScheduleTime))
+	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	return nil
 }
 
@@ -180,8 +180,8 @@ func Convert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in *CronJobStatus, ou
 }
 
 func autoConvert_batch_CronJobStatus_To_v2alpha1_CronJobStatus(in *batch.CronJobStatus, out *CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]v1.ObjectReference)(unsafe.Pointer(&in.Active))
-	out.LastScheduleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScheduleTime))
+	out.Active = *(*[]api_v1.ObjectReference)(unsafe.Pointer(&in.Active))
+	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	return nil
 }
 
@@ -241,7 +241,7 @@ func Convert_v2alpha1_JobCondition_To_batch_JobCondition(in *JobCondition, out *
 
 func autoConvert_batch_JobCondition_To_v2alpha1_JobCondition(in *batch.JobCondition, out *JobCondition, s conversion.Scope) error {
 	out.Type = JobConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
+	out.Status = api_v1.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -297,9 +297,9 @@ func autoConvert_v2alpha1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSp
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -309,9 +309,9 @@ func autoConvert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSp
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
-	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -319,8 +319,8 @@ func autoConvert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSp
 
 func autoConvert_v2alpha1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]batch.JobCondition)(unsafe.Pointer(&in.Conditions))
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = (*v1.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*v1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -333,8 +333,8 @@ func Convert_v2alpha1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.Job
 
 func autoConvert_batch_JobStatus_To_v2alpha1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]JobCondition)(unsafe.Pointer(&in.Conditions))
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = (*v1.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*v1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed

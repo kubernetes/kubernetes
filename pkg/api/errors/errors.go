@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -41,13 +41,13 @@ const (
 // StatusError is an error intended for consumption by a REST API server; it can also be
 // reconstructed by clients from a REST response. Public to allow easy type switches.
 type StatusError struct {
-	ErrStatus unversioned.Status
+	ErrStatus metav1.Status
 }
 
 // APIStatus is exposed by errors that can be converted to an api.Status object
 // for finer grained details.
 type APIStatus interface {
-	Status() unversioned.Status
+	Status() metav1.Status
 }
 
 var _ error = &StatusError{}
@@ -59,7 +59,7 @@ func (e *StatusError) Error() string {
 
 // Status allows access to e's status without having to know the detailed workings
 // of StatusError. Used by pkg/apiserver.
-func (e *StatusError) Status() unversioned.Status {
+func (e *StatusError) Status() metav1.Status {
 	return e.ErrStatus
 }
 
@@ -81,11 +81,11 @@ func (u *UnexpectedObjectError) Error() string {
 	return fmt.Sprintf("unexpected object: %v", u.Object)
 }
 
-// FromObject generates an StatusError from an unversioned.Status, if that is the type of obj; otherwise,
+// FromObject generates an StatusError from an metav1.Status, if that is the type of obj; otherwise,
 // returns an UnexpecteObjectError.
 func FromObject(obj runtime.Object) error {
 	switch t := obj.(type) {
-	case *unversioned.Status:
+	case *metav1.Status:
 		return &StatusError{*t}
 	}
 	return &UnexpectedObjectError{obj}
@@ -93,11 +93,11 @@ func FromObject(obj runtime.Object) error {
 
 // NewNotFound returns a new error which indicates that the resource of the kind and the name was not found.
 func NewNotFound(qualifiedResource schema.GroupResource, name string) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   http.StatusNotFound,
-		Reason: unversioned.StatusReasonNotFound,
-		Details: &unversioned.StatusDetails{
+		Reason: metav1.StatusReasonNotFound,
+		Details: &metav1.StatusDetails{
 			Group: qualifiedResource.Group,
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
@@ -108,11 +108,11 @@ func NewNotFound(qualifiedResource schema.GroupResource, name string) *StatusErr
 
 // NewAlreadyExists returns an error indicating the item requested exists by that identifier.
 func NewAlreadyExists(qualifiedResource schema.GroupResource, name string) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   http.StatusConflict,
-		Reason: unversioned.StatusReasonAlreadyExists,
-		Details: &unversioned.StatusDetails{
+		Reason: metav1.StatusReasonAlreadyExists,
+		Details: &metav1.StatusDetails{
 			Group: qualifiedResource.Group,
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
@@ -128,21 +128,21 @@ func NewUnauthorized(reason string) *StatusError {
 	if len(message) == 0 {
 		message = "not authorized"
 	}
-	return &StatusError{unversioned.Status{
-		Status:  unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
 		Code:    http.StatusUnauthorized,
-		Reason:  unversioned.StatusReasonUnauthorized,
+		Reason:  metav1.StatusReasonUnauthorized,
 		Message: message,
 	}}
 }
 
 // NewForbidden returns an error indicating the requested action was forbidden
 func NewForbidden(qualifiedResource schema.GroupResource, name string, err error) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   http.StatusForbidden,
-		Reason: unversioned.StatusReasonForbidden,
-		Details: &unversioned.StatusDetails{
+		Reason: metav1.StatusReasonForbidden,
+		Details: &metav1.StatusDetails{
 			Group: qualifiedResource.Group,
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
@@ -153,11 +153,11 @@ func NewForbidden(qualifiedResource schema.GroupResource, name string, err error
 
 // NewConflict returns an error indicating the item can't be updated as provided.
 func NewConflict(qualifiedResource schema.GroupResource, name string, err error) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   http.StatusConflict,
-		Reason: unversioned.StatusReasonConflict,
-		Details: &unversioned.StatusDetails{
+		Reason: metav1.StatusReasonConflict,
+		Details: &metav1.StatusDetails{
 			Group: qualifiedResource.Group,
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
@@ -168,30 +168,30 @@ func NewConflict(qualifiedResource schema.GroupResource, name string, err error)
 
 // NewGone returns an error indicating the item no longer available at the server and no forwarding address is known.
 func NewGone(message string) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status:  unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
 		Code:    http.StatusGone,
-		Reason:  unversioned.StatusReasonGone,
+		Reason:  metav1.StatusReasonGone,
 		Message: message,
 	}}
 }
 
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
 func NewInvalid(qualifiedKind schema.GroupKind, name string, errs field.ErrorList) *StatusError {
-	causes := make([]unversioned.StatusCause, 0, len(errs))
+	causes := make([]metav1.StatusCause, 0, len(errs))
 	for i := range errs {
 		err := errs[i]
-		causes = append(causes, unversioned.StatusCause{
-			Type:    unversioned.CauseType(err.Type),
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseType(err.Type),
 			Message: err.ErrorBody(),
 			Field:   err.Field,
 		})
 	}
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   StatusUnprocessableEntity, // RFC 4918: StatusUnprocessableEntity
-		Reason: unversioned.StatusReasonInvalid,
-		Details: &unversioned.StatusDetails{
+		Reason: metav1.StatusReasonInvalid,
+		Details: &metav1.StatusDetails{
 			Group:  qualifiedKind.Group,
 			Kind:   qualifiedKind.Kind,
 			Name:   name,
@@ -203,31 +203,31 @@ func NewInvalid(qualifiedKind schema.GroupKind, name string, errs field.ErrorLis
 
 // NewBadRequest creates an error that indicates that the request is invalid and can not be processed.
 func NewBadRequest(reason string) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status:  unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
 		Code:    http.StatusBadRequest,
-		Reason:  unversioned.StatusReasonBadRequest,
+		Reason:  metav1.StatusReasonBadRequest,
 		Message: reason,
 	}}
 }
 
 // NewServiceUnavailable creates an error that indicates that the requested service is unavailable.
 func NewServiceUnavailable(reason string) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status:  unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
 		Code:    http.StatusServiceUnavailable,
-		Reason:  unversioned.StatusReasonServiceUnavailable,
+		Reason:  metav1.StatusReasonServiceUnavailable,
 		Message: reason,
 	}}
 }
 
 // NewMethodNotSupported returns an error indicating the requested action is not supported on this kind.
 func NewMethodNotSupported(qualifiedResource schema.GroupResource, action string) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   http.StatusMethodNotAllowed,
-		Reason: unversioned.StatusReasonMethodNotAllowed,
-		Details: &unversioned.StatusDetails{
+		Reason: metav1.StatusReasonMethodNotAllowed,
+		Details: &metav1.StatusDetails{
 			Group: qualifiedResource.Group,
 			Kind:  qualifiedResource.Resource,
 		},
@@ -238,11 +238,11 @@ func NewMethodNotSupported(qualifiedResource schema.GroupResource, action string
 // NewServerTimeout returns an error indicating the requested action could not be completed due to a
 // transient error, and the client should try again.
 func NewServerTimeout(qualifiedResource schema.GroupResource, operation string, retryAfterSeconds int) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   http.StatusInternalServerError,
-		Reason: unversioned.StatusReasonServerTimeout,
-		Details: &unversioned.StatusDetails{
+		Reason: metav1.StatusReasonServerTimeout,
+		Details: &metav1.StatusDetails{
 			Group:             qualifiedResource.Group,
 			Kind:              qualifiedResource.Resource,
 			Name:              operation,
@@ -260,12 +260,12 @@ func NewServerTimeoutForKind(qualifiedKind schema.GroupKind, operation string, r
 
 // NewInternalError returns an error indicating the item is invalid and cannot be processed.
 func NewInternalError(err error) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   http.StatusInternalServerError,
-		Reason: unversioned.StatusReasonInternalError,
-		Details: &unversioned.StatusDetails{
-			Causes: []unversioned.StatusCause{{Message: err.Error()}},
+		Reason: metav1.StatusReasonInternalError,
+		Details: &metav1.StatusDetails{
+			Causes: []metav1.StatusCause{{Message: err.Error()}},
 		},
 		Message: fmt.Sprintf("Internal error occurred: %v", err),
 	}}
@@ -274,12 +274,12 @@ func NewInternalError(err error) *StatusError {
 // NewTimeoutError returns an error indicating that a timeout occurred before the request
 // could be completed.  Clients may retry, but the operation may still complete.
 func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
-	return &StatusError{unversioned.Status{
-		Status:  unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
 		Code:    StatusServerTimeout,
-		Reason:  unversioned.StatusReasonTimeout,
+		Reason:  metav1.StatusReasonTimeout,
 		Message: fmt.Sprintf("Timeout: %s", message),
-		Details: &unversioned.StatusDetails{
+		Details: &metav1.StatusDetails{
 			RetryAfterSeconds: int32(retryAfterSeconds),
 		},
 	}}
@@ -287,43 +287,43 @@ func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
 
 // NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
 func NewGenericServerResponse(code int, verb string, qualifiedResource schema.GroupResource, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) *StatusError {
-	reason := unversioned.StatusReasonUnknown
+	reason := metav1.StatusReasonUnknown
 	message := fmt.Sprintf("the server responded with the status code %d but did not return more information", code)
 	switch code {
 	case http.StatusConflict:
 		if verb == "POST" {
-			reason = unversioned.StatusReasonAlreadyExists
+			reason = metav1.StatusReasonAlreadyExists
 		} else {
-			reason = unversioned.StatusReasonConflict
+			reason = metav1.StatusReasonConflict
 		}
 		message = "the server reported a conflict"
 	case http.StatusNotFound:
-		reason = unversioned.StatusReasonNotFound
+		reason = metav1.StatusReasonNotFound
 		message = "the server could not find the requested resource"
 	case http.StatusBadRequest:
-		reason = unversioned.StatusReasonBadRequest
+		reason = metav1.StatusReasonBadRequest
 		message = "the server rejected our request for an unknown reason"
 	case http.StatusUnauthorized:
-		reason = unversioned.StatusReasonUnauthorized
+		reason = metav1.StatusReasonUnauthorized
 		message = "the server has asked for the client to provide credentials"
 	case http.StatusForbidden:
-		reason = unversioned.StatusReasonForbidden
+		reason = metav1.StatusReasonForbidden
 		message = "the server does not allow access to the requested resource"
 	case http.StatusMethodNotAllowed:
-		reason = unversioned.StatusReasonMethodNotAllowed
+		reason = metav1.StatusReasonMethodNotAllowed
 		message = "the server does not allow this method on the requested resource"
 	case StatusUnprocessableEntity:
-		reason = unversioned.StatusReasonInvalid
+		reason = metav1.StatusReasonInvalid
 		message = "the server rejected our request due to an error in our request"
 	case StatusServerTimeout:
-		reason = unversioned.StatusReasonServerTimeout
+		reason = metav1.StatusReasonServerTimeout
 		message = "the server cannot complete the requested operation at this time, try again later"
 	case StatusTooManyRequests:
-		reason = unversioned.StatusReasonTimeout
+		reason = metav1.StatusReasonTimeout
 		message = "the server has received too many requests and has asked us to try again later"
 	default:
 		if code >= 500 {
-			reason = unversioned.StatusReasonInternalError
+			reason = metav1.StatusReasonInternalError
 			message = fmt.Sprintf("an error on the server (%q) has prevented the request from succeeding", serverMessage)
 		}
 	}
@@ -333,22 +333,22 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 	case !qualifiedResource.Empty():
 		message = fmt.Sprintf("%s (%s %s)", message, strings.ToLower(verb), qualifiedResource.String())
 	}
-	var causes []unversioned.StatusCause
+	var causes []metav1.StatusCause
 	if isUnexpectedResponse {
-		causes = []unversioned.StatusCause{
+		causes = []metav1.StatusCause{
 			{
-				Type:    unversioned.CauseTypeUnexpectedServerResponse,
+				Type:    metav1.CauseTypeUnexpectedServerResponse,
 				Message: serverMessage,
 			},
 		}
 	} else {
 		causes = nil
 	}
-	return &StatusError{unversioned.Status{
-		Status: unversioned.StatusFailure,
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
 		Code:   int32(code),
 		Reason: reason,
-		Details: &unversioned.StatusDetails{
+		Details: &metav1.StatusDetails{
 			Group: qualifiedResource.Group,
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
@@ -362,56 +362,56 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 
 // IsNotFound returns true if the specified error was created by NewNotFound.
 func IsNotFound(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonNotFound
+	return reasonForError(err) == metav1.StatusReasonNotFound
 }
 
 // IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
 func IsAlreadyExists(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonAlreadyExists
+	return reasonForError(err) == metav1.StatusReasonAlreadyExists
 }
 
 // IsConflict determines if the err is an error which indicates the provided update conflicts.
 func IsConflict(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonConflict
+	return reasonForError(err) == metav1.StatusReasonConflict
 }
 
 // IsInvalid determines if the err is an error which indicates the provided resource is not valid.
 func IsInvalid(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonInvalid
+	return reasonForError(err) == metav1.StatusReasonInvalid
 }
 
 // IsMethodNotSupported determines if the err is an error which indicates the provided action could not
 // be performed because it is not supported by the server.
 func IsMethodNotSupported(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonMethodNotAllowed
+	return reasonForError(err) == metav1.StatusReasonMethodNotAllowed
 }
 
 // IsBadRequest determines if err is an error which indicates that the request is invalid.
 func IsBadRequest(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonBadRequest
+	return reasonForError(err) == metav1.StatusReasonBadRequest
 }
 
 // IsUnauthorized determines if err is an error which indicates that the request is unauthorized and
 // requires authentication by the user.
 func IsUnauthorized(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonUnauthorized
+	return reasonForError(err) == metav1.StatusReasonUnauthorized
 }
 
 // IsForbidden determines if err is an error which indicates that the request is forbidden and cannot
 // be completed as requested.
 func IsForbidden(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonForbidden
+	return reasonForError(err) == metav1.StatusReasonForbidden
 }
 
 // IsServerTimeout determines if err is an error which indicates that the request needs to be retried
 // by the client.
 func IsServerTimeout(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonServerTimeout
+	return reasonForError(err) == metav1.StatusReasonServerTimeout
 }
 
 // IsInternalError determines if err is an error which indicates an internal server error.
 func IsInternalError(err error) bool {
-	return reasonForError(err) == unversioned.StatusReasonInternalError
+	return reasonForError(err) == metav1.StatusReasonInternalError
 }
 
 // IsTooManyRequests determines if err is an error which indicates that there are too many requests
@@ -432,7 +432,7 @@ func IsUnexpectedServerError(err error) bool {
 	case APIStatus:
 		if d := t.Status().Details; d != nil {
 			for _, cause := range d.Causes {
-				if cause.Type == unversioned.CauseTypeUnexpectedServerResponse {
+				if cause.Type == metav1.CauseTypeUnexpectedServerResponse {
 					return true
 				}
 			}
@@ -454,7 +454,7 @@ func SuggestsClientDelay(err error) (int, bool) {
 	case APIStatus:
 		if t.Status().Details != nil {
 			switch t.Status().Reason {
-			case unversioned.StatusReasonServerTimeout, unversioned.StatusReasonTimeout:
+			case metav1.StatusReasonServerTimeout, metav1.StatusReasonTimeout:
 				return int(t.Status().Details.RetryAfterSeconds), true
 			}
 		}
@@ -462,10 +462,10 @@ func SuggestsClientDelay(err error) (int, bool) {
 	return 0, false
 }
 
-func reasonForError(err error) unversioned.StatusReason {
+func reasonForError(err error) metav1.StatusReason {
 	switch t := err.(type) {
 	case APIStatus:
 		return t.Status().Reason
 	}
-	return unversioned.StatusReasonUnknown
+	return metav1.StatusReasonUnknown
 }

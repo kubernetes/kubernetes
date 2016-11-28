@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -132,7 +132,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 
 			// check for export
 			if values := req.Request.URL.Query(); len(values) > 0 {
-				exports := unversioned.ExportOptions{}
+				exports := metav1.ExportOptions{}
 				if err := scope.ParameterCodec.DecodeParameters(values, schema.GroupVersion{Version: "v1"}, &exports); err != nil {
 					return nil, err
 				}
@@ -402,7 +402,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			out, err := r.Create(ctx, name, obj)
-			if status, ok := out.(*unversioned.Status); ok && err == nil && status.Code == 0 {
+			if status, ok := out.(*metav1.Status); ok && err == nil && status.Code == 0 {
 				status.Code = http.StatusCreated
 			}
 			return out, err
@@ -815,17 +815,17 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
 		if result == nil {
-			result = &unversioned.Status{
-				Status: unversioned.StatusSuccess,
+			result = &metav1.Status{
+				Status: metav1.StatusSuccess,
 				Code:   http.StatusOK,
-				Details: &unversioned.StatusDetails{
+				Details: &metav1.StatusDetails{
 					Name: name,
 					Kind: scope.Kind.Kind,
 				},
 			}
 		} else {
 			// when a non-status response is returned, set the self link
-			if _, ok := result.(*unversioned.Status); !ok {
+			if _, ok := result.(*metav1.Status); !ok {
 				if err := setSelfLink(result, req, scope.Namer); err != nil {
 					scope.err(err, res.ResponseWriter, req.Request)
 					return
@@ -920,16 +920,16 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
 		if result == nil {
-			result = &unversioned.Status{
-				Status: unversioned.StatusSuccess,
+			result = &metav1.Status{
+				Status: metav1.StatusSuccess,
 				Code:   http.StatusOK,
-				Details: &unversioned.StatusDetails{
+				Details: &metav1.StatusDetails{
 					Kind: scope.Kind.Kind,
 				},
 			}
 		} else {
 			// when a non-status response is returned, set the self link
-			if _, ok := result.(*unversioned.Status); !ok {
+			if _, ok := result.(*metav1.Status); !ok {
 				if _, err := setListSelfLink(result, req, scope.Namer); err != nil {
 					scope.err(err, res.ResponseWriter, req.Request)
 					return
@@ -967,7 +967,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 
 	select {
 	case result = <-ch:
-		if status, ok := result.(*unversioned.Status); ok {
+		if status, ok := result.(*metav1.Status); ok {
 			return nil, errors.FromObject(status)
 		}
 		return result, nil

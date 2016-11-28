@@ -18,8 +18,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/util/exec:go_default_library",

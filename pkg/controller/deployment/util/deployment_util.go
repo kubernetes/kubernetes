@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -114,8 +114,8 @@ func NewDeploymentCondition(condType extensions.DeploymentConditionType, status 
 	return &extensions.DeploymentCondition{
 		Type:               condType,
 		Status:             status,
-		LastUpdateTime:     unversioned.Now(),
-		LastTransitionTime: unversioned.Now(),
+		LastUpdateTime:     metav1.Now(),
+		LastTransitionTime: metav1.Now(),
 		Reason:             reason,
 		Message:            message,
 	}
@@ -568,7 +568,7 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830;
 	//       or use controllerRef, see https://github.com/kubernetes/kubernetes/issues/2210
 	namespace := deployment.Namespace
-	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -579,7 +579,7 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 // ListPods returns a list of pods the given deployment targets.
 func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*v1.PodList, error) {
 	namespace := deployment.Namespace
-	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -643,7 +643,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 	for _, pod := range podList.Items {
 		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
 		for _, rs := range rsList {
-			rsLabelsSelector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+			rsLabelsSelector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 			if err != nil {
 				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
 			}
@@ -1000,7 +1000,7 @@ func SelectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
 }
 
 // LastSelectorUpdate returns the last time given deployment's selector is updated
-func LastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
+func LastSelectorUpdate(d *extensions.Deployment) metav1.Time {
 	t := d.Annotations[SelectorUpdateAnnotation]
 	if len(t) > 0 {
 		parsedTime, err := time.Parse(t, time.RFC3339)
@@ -1008,7 +1008,7 @@ func LastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
 		if err != nil {
 			return d.CreationTimestamp
 		}
-		return unversioned.Time{Time: parsedTime}
+		return metav1.Time{Time: parsedTime}
 	}
 	// If it's never updated, use creation timestamp instead
 	return d.CreationTimestamp
@@ -1036,11 +1036,11 @@ func OverlapsWith(current, other *extensions.Deployment) (bool, error) {
 	if current.UID == other.UID {
 		return false, nil
 	}
-	currentSelector, err := unversioned.LabelSelectorAsSelector(current.Spec.Selector)
+	currentSelector, err := metav1.LabelSelectorAsSelector(current.Spec.Selector)
 	if err != nil {
 		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", current.Namespace, current.Name, err)
 	}
-	otherSelector, err := unversioned.LabelSelectorAsSelector(other.Spec.Selector)
+	otherSelector, err := metav1.LabelSelectorAsSelector(other.Spec.Selector)
 	if err != nil {
 		// Broken selectors from other deployments shouldn't block current deployment. Just log the error and continue.
 		glog.V(2).Infof("Skip overlapping check: deployment %s/%s has invalid label selector: %v", other.Namespace, other.Name, err)

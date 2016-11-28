@@ -19,7 +19,7 @@ package e2e
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		podName := "with-label"
 		_, err := c.Core().Pods(ns).Create(&v1.Pod{
-			TypeMeta: unversioned.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: v1.ObjectMeta{

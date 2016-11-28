@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -43,7 +43,7 @@ func TestDeploymentGenerate(t *testing.T) {
 				},
 				Spec: extensions.DeploymentSpec{
 					Replicas: 1,
-					Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"app": "foo"},
@@ -68,7 +68,7 @@ func TestDeploymentGenerate(t *testing.T) {
 				},
 				Spec: extensions.DeploymentSpec{
 					Replicas: 1,
-					Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"app": "foo"},

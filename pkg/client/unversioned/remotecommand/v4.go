@@ -23,14 +23,14 @@ import (
 	"strconv"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 // streamProtocolV4 implements version 4 of the streaming protocol for attach
 // and exec. This version adds support for exit codes on the error stream through
-// the use of unversioned.Status instead of plain text messages.
+// the use of metav1.Status instead of plain text messages.
 type streamProtocolV4 struct {
 	*streamProtocolV3
 }
@@ -75,20 +75,20 @@ func (p *streamProtocolV4) stream(conn streamCreator) error {
 	return <-errorChan
 }
 
-// errorDecoderV4 interprets the json-marshaled unversioned.Status on the error channel
+// errorDecoderV4 interprets the json-marshaled metav1.Status on the error channel
 // and creates an exec.ExitError from it.
 type errorDecoderV4 struct{}
 
 func (d *errorDecoderV4) decode(message []byte) error {
-	status := unversioned.Status{}
+	status := metav1.Status{}
 	err := json.Unmarshal(message, &status)
 	if err != nil {
 		return fmt.Errorf("error stream protocol error: %v in %q", err, string(message))
 	}
 	switch status.Status {
-	case unversioned.StatusSuccess:
+	case metav1.StatusSuccess:
 		return nil
-	case unversioned.StatusFailure:
+	case metav1.StatusFailure:
 		if status.Reason == remotecommand.NonZeroExitCodeReason {
 			if status.Details == nil {
 				return errors.New("error stream protocol error: details must be set")

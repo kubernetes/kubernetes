@@ -18,13 +18,13 @@ package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // +genclient=true
 
 type TestType struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// ---
 	// the next tag removes the field from openapi spec. Adding unversioned objectMeta bring in a whole set of
 	// unversioned objects in the generate file that is not used anywhere other than this test type.
@@ -36,9 +36,9 @@ type TestType struct {
 }
 
 type TestTypeList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []TestType `json:"items"`
 }

@@ -50,7 +50,7 @@ limitations under the License.
 		Timestamp
 		TypeMeta
 */
-package unversioned
+package v1
 
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"

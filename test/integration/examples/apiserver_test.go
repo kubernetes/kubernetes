@@ -30,12 +30,12 @@ import (
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/examples/apiserver"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 var groupVersion = v1.SchemeGroupVersion
 
-var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
+var groupVersionForDiscovery = metav1.GroupVersionForDiscovery{
 	GroupVersion: groupVersion.String(),
 	Version:      groupVersion.Version,
 }
@@ -130,7 +130,7 @@ func testAPIGroupList(t *testing.T, serverIP string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiGroupList unversioned.APIGroupList
+	var apiGroupList metav1.APIGroupList
 	err = json.Unmarshal(contents, &apiGroupList)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -148,7 +148,7 @@ func testAPIGroup(t *testing.T, serverIP string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiGroup unversioned.APIGroup
+	var apiGroup metav1.APIGroup
 	err = json.Unmarshal(contents, &apiGroup)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -167,7 +167,7 @@ func testAPIResourceList(t *testing.T, serverIP string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiResourceList unversioned.APIResourceList
+	var apiResourceList metav1.APIResourceList
 	err = json.Unmarshal(contents, &apiResourceList)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)

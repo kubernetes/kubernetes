@@ -65,7 +65,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -178,7 +178,7 @@ func (plugin *execNetworkPlugin) GetPodNetworkStatus(namespace string, name stri
 		return nil, nil
 	}
 	findVersion := struct {
-		unversioned.TypeMeta `json:",inline"`
+		metav1.TypeMeta `json:",inline"`
 	}{}
 	err = json.Unmarshal(out, &findVersion)
 	if err != nil {

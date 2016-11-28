@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -166,7 +166,7 @@ func TestAccessorImplementations(t *testing.T) {
 						continue
 					}
 				default:
-					if _, ok := obj.(unversioned.ListMetaAccessor); ok {
+					if _, ok := obj.(metav1.ListMetaAccessor); ok {
 						continue
 					}
 					if _, ok := value.Elem().Type().FieldByName("ObjectMeta"); ok {

@@ -24,40 +24,40 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestErrorsToAPIStatus(t *testing.T) {
-	cases := map[error]unversioned.Status{
+	cases := map[error]metav1.Status{
 		errors.NewNotFound(schema.GroupResource{Group: "legacy.kubernetes.io", Resource: "foos"}, "bar"): {
-			Status:  unversioned.StatusFailure,
+			Status:  metav1.StatusFailure,
 			Code:    http.StatusNotFound,
-			Reason:  unversioned.StatusReasonNotFound,
+			Reason:  metav1.StatusReasonNotFound,
 			Message: "foos.legacy.kubernetes.io \"bar\" not found",
-			Details: &unversioned.StatusDetails{
+			Details: &metav1.StatusDetails{
 				Group: "legacy.kubernetes.io",
 				Kind:  "foos",
 				Name:  "bar",
 			},
 		},
 		errors.NewAlreadyExists(api.Resource("foos"), "bar"): {
-			Status:  unversioned.StatusFailure,
+			Status:  metav1.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "AlreadyExists",
 			Message: "foos \"bar\" already exists",
-			Details: &unversioned.StatusDetails{
+			Details: &metav1.StatusDetails{
 				Group: "",
 				Kind:  "foos",
 				Name:  "bar",
 			},
 		},
 		errors.NewConflict(api.Resource("foos"), "bar", stderrs.New("failure")): {
-			Status:  unversioned.StatusFailure,
+			Status:  metav1.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "Conflict",
 			Message: "Operation cannot be fulfilled on foos \"bar\": failure",
-			Details: &unversioned.StatusDetails{
+			Details: &metav1.StatusDetails{
 				Group: "",
 				Kind:  "foos",
 				Name:  "bar",

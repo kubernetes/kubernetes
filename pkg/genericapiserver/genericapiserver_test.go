@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -309,7 +309,7 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 	return nil
 }
 
-func getGroupList(server *httptest.Server) (*unversioned.APIGroupList, error) {
+func getGroupList(server *httptest.Server) (*metav1.APIGroupList, error) {
 	resp, err := http.Get(server.URL + "/apis")
 	if err != nil {
 		return nil, err
@@ -319,7 +319,7 @@ func getGroupList(server *httptest.Server) (*unversioned.APIGroupList, error) {
 		return nil, fmt.Errorf("unexpected server response, expected %d, actual: %d", http.StatusOK, resp.StatusCode)
 	}
 
-	groupList := unversioned.APIGroupList{}
+	groupList := metav1.APIGroupList{}
 	err = decodeResponse(resp, &groupList)
 	return &groupList, err
 }
@@ -336,17 +336,17 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	assert.Equal(0, len(groupList.Groups))
 
 	// Add a Group.
-	extensionsVersions := []unversioned.GroupVersionForDiscovery{
+	extensionsVersions := []metav1.GroupVersionForDiscovery{
 		{
 			GroupVersion: testapi.Extensions.GroupVersion().String(),
 			Version:      testapi.Extensions.GroupVersion().Version,
 		},
 	}
-	extensionsPreferredVersion := unversioned.GroupVersionForDiscovery{
+	extensionsPreferredVersion := metav1.GroupVersionForDiscovery{
 		GroupVersion: extensions.GroupName + "/preferred",
 		Version:      "preferred",
 	}
-	master.AddAPIGroupForDiscovery(unversioned.APIGroup{
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{
 		Name:             extensions.GroupName,
 		Versions:         extensionsVersions,
 		PreferredVersion: extensionsPreferredVersion,
@@ -375,13 +375,13 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 }
 
 func TestGetServerAddressByClientCIDRs(t *testing.T) {
-	publicAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
+	publicAddressCIDRMap := []metav1.ServerAddressByClientCIDR{
 		{
 			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: "ExternalAddress",
 		},
 	}
-	internalAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
+	internalAddressCIDRMap := []metav1.ServerAddressByClientCIDR{
 		publicAddressCIDRMap[0],
 		{
 			ClientCIDR:    "10.0.0.0/24",
@@ -392,7 +392,7 @@ func TestGetServerAddressByClientCIDRs(t *testing.T) {
 	publicIP := "1.1.1.1"
 	testCases := []struct {
 		Request     http.Request
-		ExpectedMap []unversioned.ServerAddressByClientCIDR
+		ExpectedMap []metav1.ServerAddressByClientCIDR
 	}{
 		{
 			Request:     http.Request{},

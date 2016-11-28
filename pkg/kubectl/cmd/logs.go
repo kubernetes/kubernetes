@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -140,7 +140,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		Timestamps: cmdutil.GetFlagBool(cmd, "timestamps"),
 	}
 	if sinceTime := cmdutil.GetFlagString(cmd, "since-time"); len(sinceTime) > 0 {
-		t, err := api.ParseRFC3339(sinceTime, unversioned.Now)
+		t, err := api.ParseRFC3339(sinceTime, metav1.Now)
 		if err != nil {
 			return err
 		}

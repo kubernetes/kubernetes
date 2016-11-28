@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 )
@@ -45,6 +45,6 @@ func (i Index) Install(c *mux.APIContainer) {
 		// Extract the paths handled using mux handler.
 		handledPaths = append(handledPaths, c.NonSwaggerRoutes.HandledPaths()...)
 		sort.Strings(handledPaths)
-		apiserver.WriteRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
+		apiserver.WriteRawJSON(status, metav1.RootPaths{Paths: handledPaths}, w)
 	})
 }

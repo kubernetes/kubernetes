@@ -20,11 +20,11 @@ go_library(
     deps = [
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/core/v1:go_default_library",
         "//pkg/client/leaderelection:go_default_library",

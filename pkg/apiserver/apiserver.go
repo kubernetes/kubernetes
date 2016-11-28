@@ -35,7 +35,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -55,7 +55,7 @@ func init() {
 }
 
 type APIResourceLister interface {
-	ListAPIResources() []unversioned.APIResource
+	ListAPIResources() []metav1.APIResource
 }
 
 // APIGroupVersion is a helper for exposing rest.Storage objects as http.Handlers via go-restful
@@ -118,10 +118,10 @@ const (
 
 // staticLister implements the APIResourceLister interface
 type staticLister struct {
-	list []unversioned.APIResource
+	list []metav1.APIResource
 }
 
-func (s staticLister) ListAPIResources() []unversioned.APIResource {
+func (s staticLister) ListAPIResources() []metav1.APIResource {
 	return s.list
 }
 
@@ -209,7 +209,7 @@ func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, 
 }
 
 // Adds a service to return the supported api versions at the legacy /api.
-func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, getAPIVersionsFunc func(req *restful.Request) *unversioned.APIVersions) {
+func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, getAPIVersionsFunc func(req *restful.Request) *metav1.APIVersions) {
 	// TODO: InstallREST should register each version automatically
 
 	// Because in release 1.1, /api returns response with empty APIVersion, we
@@ -226,7 +226,7 @@ func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Contain
 		Operation("getAPIVersions").
 		Produces(mediaTypes...).
 		Consumes(mediaTypes...).
-		Writes(unversioned.APIVersions{}))
+		Writes(metav1.APIVersions{}))
 	container.Add(ws)
 }
 
@@ -277,7 +277,7 @@ func keepUnversioned(group string) bool {
 }
 
 // NewApisWebService returns a webservice serving the available api version under /apis.
-func NewApisWebService(s runtime.NegotiatedSerializer, apiPrefix string, f func(req *restful.Request) []unversioned.APIGroup) *restful.WebService {
+func NewApisWebService(s runtime.NegotiatedSerializer, apiPrefix string, f func(req *restful.Request) []metav1.APIGroup) *restful.WebService {
 	// Because in release 1.1, /apis returns response with empty APIVersion, we
 	// use StripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
@@ -292,13 +292,13 @@ func NewApisWebService(s runtime.NegotiatedSerializer, apiPrefix string, f func(
 		Operation("getAPIVersions").
 		Produces(mediaTypes...).
 		Consumes(mediaTypes...).
-		Writes(unversioned.APIGroupList{}))
+		Writes(metav1.APIGroupList{}))
 	return ws
 }
 
 // NewGroupWebService returns a webservice serving the supported versions, preferred version, and name
 // of a group. E.g., such a web service will be registered at /apis/extensions.
-func NewGroupWebService(s runtime.NegotiatedSerializer, path string, group unversioned.APIGroup) *restful.WebService {
+func NewGroupWebService(s runtime.NegotiatedSerializer, path string, group metav1.APIGroup) *restful.WebService {
 	ss := s
 	if keepUnversioned(group.Name) {
 		// Because in release 1.1, /apis/extensions returns response with empty
@@ -316,7 +316,7 @@ func NewGroupWebService(s runtime.NegotiatedSerializer, path string, group unver
 		Operation("getAPIGroup").
 		Produces(mediaTypes...).
 		Consumes(mediaTypes...).
-		Writes(unversioned.APIGroup{}))
+		Writes(metav1.APIGroup{}))
 	return ws
 }
 
@@ -337,11 +337,11 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 		Operation("getAPIResources").
 		Produces(mediaTypes...).
 		Consumes(mediaTypes...).
-		Writes(unversioned.APIResourceList{}))
+		Writes(metav1.APIResourceList{}))
 }
 
 // APIVersionHandler returns a handler which will list the provided versions as available.
-func APIVersionHandler(s runtime.NegotiatedSerializer, getAPIVersionsFunc func(req *restful.Request) *unversioned.APIVersions) restful.RouteFunction {
+func APIVersionHandler(s runtime.NegotiatedSerializer, getAPIVersionsFunc func(req *restful.Request) *metav1.APIVersions) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		writeNegotiated(s, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, getAPIVersionsFunc(req))
 	}
@@ -370,12 +370,12 @@ func isOldKubectl(userAgent string) bool {
 var groupsWithNewVersionsIn1_5 = sets.NewString("apps", "policy")
 
 // TODO: Remove in 1.6.
-func filterAPIGroups(req *restful.Request, groups []unversioned.APIGroup) []unversioned.APIGroup {
+func filterAPIGroups(req *restful.Request, groups []metav1.APIGroup) []metav1.APIGroup {
 	if !isOldKubectl(req.HeaderParameter("User-Agent")) {
 		return groups
 	}
 	// hide API group that has new versions added in 1.5.
-	var ret []unversioned.APIGroup
+	var ret []metav1.APIGroup
 	for _, group := range groups {
 		if groupsWithNewVersionsIn1_5.Has(group.Name) {
 			continue
@@ -386,15 +386,15 @@ func filterAPIGroups(req *restful.Request, groups []unversioned.APIGroup) []unve
 }
 
 // RootAPIHandler returns a handler which will list the provided groups and versions as available.
-func RootAPIHandler(s runtime.NegotiatedSerializer, f func(req *restful.Request) []unversioned.APIGroup) restful.RouteFunction {
+func RootAPIHandler(s runtime.NegotiatedSerializer, f func(req *restful.Request) []metav1.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: filterAPIGroups(req, f(req))})
+		writeNegotiated(s, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &metav1.APIGroupList{Groups: filterAPIGroups(req, f(req))})
 	}
 }
 
 // GroupHandler returns a handler which will return the api.GroupAndVersion of
 // the group.
-func GroupHandler(s runtime.NegotiatedSerializer, group unversioned.APIGroup) restful.RouteFunction {
+func GroupHandler(s runtime.NegotiatedSerializer, group metav1.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		writeNegotiated(s, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &group)
 	}
@@ -403,7 +403,7 @@ func GroupHandler(s runtime.NegotiatedSerializer, group unversioned.APIGroup) re
 // SupportedResourcesHandler returns a handler which will list the provided resources as available.
 func SupportedResourcesHandler(s runtime.NegotiatedSerializer, groupVersion schema.GroupVersion, lister APIResourceLister) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: lister.ListAPIResources()})
+		writeNegotiated(s, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &metav1.APIResourceList{GroupVersion: groupVersion.String(), APIResources: lister.ListAPIResources()})
 	}
 }
 

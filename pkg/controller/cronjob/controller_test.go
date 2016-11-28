@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -80,7 +80,7 @@ func cronJob() batch.CronJob {
 			Namespace:         "snazzycats",
 			UID:               types.UID("1a2b3c"),
 			SelfLink:          "/apis/batch/v2alpha1/namespaces/snazzycats/cronjobs/mycronjob",
-			CreationTimestamp: unversioned.Time{Time: justBeforeTheHour()},
+			CreationTimestamp: metav1.Time{Time: justBeforeTheHour()},
 		},
 		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
@@ -204,8 +204,8 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		)
 		js := []batch.Job{}
 		if tc.ranPreviously {
-			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeThePriorHour()}
-			sj.Status.LastScheduleTime = &unversioned.Time{Time: justAfterThePriorHour()}
+			sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
+			sj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
 			job, err = getJobFromTemplate(&sj, sj.Status.LastScheduleTime.Time)
 			if err != nil {
 				t.Fatalf("%s: nexpected error creating a job from template: %v", name, err)
@@ -217,7 +217,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 				js = append(js, *job)
 			}
 		} else {
-			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeTheHour()}
+			sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
 			if tc.stillActive {
 				t.Errorf("%s: test setup error: this case makes no sense", name)
 			}
@@ -346,13 +346,13 @@ func TestSyncOne_Status(t *testing.T) {
 			sj.Spec.StartingDeadlineSeconds = &tc.deadline
 		}
 		if tc.ranPreviously {
-			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeThePriorHour()}
-			sj.Status.LastScheduleTime = &unversioned.Time{Time: justAfterThePriorHour()}
+			sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
+			sj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
 		} else {
 			if tc.hasFinishedJob || tc.hasUnexpectedJob {
 				t.Errorf("%s: test setup error: this case makes no sense", name)
 			}
-			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeTheHour()}
+			sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
 		}
 		jobs := []batch.Job{}
 		if tc.hasFinishedJob {

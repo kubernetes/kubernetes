@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -211,7 +211,7 @@ type protocolHandler interface {
 }
 
 // v4ProtocolHandler implements the V4 protocol version for streaming command execution. It only differs
-// in from v3 in the error stream format using an json-marshaled unversioned.Status which carries
+// in from v3 in the error stream format using an json-marshaled metav1.Status which carries
 // the process' exit code.
 type v4ProtocolHandler struct{}
 
@@ -435,7 +435,7 @@ func handleResizeEvents(stream io.Reader, channel chan<- term.Size) {
 
 func v1WriteStatusFunc(stream io.WriteCloser) func(status *apierrors.StatusError) error {
 	return func(status *apierrors.StatusError) error {
-		if status.Status().Status == unversioned.StatusSuccess {
+		if status.Status().Status == metav1.StatusSuccess {
 			return nil // send error messages
 		}
 		_, err := stream.Write([]byte(status.Error()))
