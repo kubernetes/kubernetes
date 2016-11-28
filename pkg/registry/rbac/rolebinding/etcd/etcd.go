@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -29,7 +29,7 @@ import (
 
 // REST implements a RESTStorage for RoleBinding against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against RoleBinding objects.
@@ -48,14 +48,14 @@ func NewREST(opts generic.RESTOptions) *REST {
 		storage.NoTriggerPublisher,
 	)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &rbac.RoleBinding{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
+			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, id)
+			return genericregistry.NamespaceKeyFunc(ctx, prefix, id)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*rbac.RoleBinding).Name, nil

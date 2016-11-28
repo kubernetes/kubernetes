@@ -22,13 +22,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/resourcequota"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against resource quotas.
@@ -47,14 +47,14 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		storage.NoTriggerPublisher,
 	)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
+			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
+			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.ResourceQuota).Name, nil
@@ -81,7 +81,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 // StatusREST implements the REST endpoint for changing the status of a resourcequota.
 type StatusREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {

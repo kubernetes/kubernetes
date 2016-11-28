@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/node"
 	noderest "k8s.io/kubernetes/pkg/registry/core/node/rest"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -43,14 +43,14 @@ type NodeStorage struct {
 }
 
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 	connection     client.ConnectionInfoGetter
 	proxyTransport http.RoundTripper
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
 type StatusREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {
@@ -82,14 +82,14 @@ func NewStorage(opts generic.RESTOptions, kubeletClientConfig client.KubeletClie
 		node.GetAttrs,
 		node.NodeNameTriggerFunc)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, name)
+			return genericregistry.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil

@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/replicaset"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -53,7 +53,7 @@ func NewStorage(opts generic.RESTOptions) ReplicaSetStorage {
 }
 
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
@@ -72,7 +72,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		storage.NoTriggerPublisher,
 	)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object { return &extensions.ReplicaSet{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
@@ -80,12 +80,12 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
+			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		// Produces a path that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
+			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		// Retrieve the name field of a ReplicaSet
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
@@ -115,7 +115,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 // StatusREST implements the REST endpoint for changing the status of a ReplicaSet
 type StatusREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {

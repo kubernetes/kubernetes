@@ -43,13 +43,13 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
+	"k8s.io/kubernetes/pkg/registry"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/routes"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -225,7 +225,7 @@ func (c completedConfig) New() (*Master, error) {
 	}
 
 	if c.EnableWatchCache {
-		restOptionsFactory.storageDecorator = registry.StorageWithCacher
+		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
 	} else {
 		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
 	}
@@ -244,7 +244,7 @@ func (c completedConfig) New() (*Master, error) {
 		m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider)
 	}
 
-	restStorageProviders := []genericapiserver.RESTStorageProvider{
+	restStorageProviders := []RESTStorageProvider{
 		appsrest.RESTStorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
@@ -265,7 +265,7 @@ func (c completedConfig) New() (*Master, error) {
 	return m, nil
 }
 
-func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter registry.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
 		glog.Fatalf("Error building core storage: %v", err)
@@ -293,8 +293,14 @@ func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient 
 	}, func() float64 { return float64(tunneler.SecondsSinceSync()) })
 }
 
+// RESTStorageProvider is a factory type for REST storage.
+type RESTStorageProvider interface {
+	GroupName() string
+	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+}
+
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter, restStorageProviders ...genericapiserver.RESTStorageProvider) {
+func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
