@@ -121,7 +121,10 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	volumePath, _ := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	volumePath, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
 	glog.V(5).Infof("vSphere volume path is %q", volumePath)
 	vsphereVolume := &api.Volume{
 		Name: volumeName,
