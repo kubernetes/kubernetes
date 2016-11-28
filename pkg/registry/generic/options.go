@@ -16,7 +16,9 @@ limitations under the License.
 
 package generic
 
-import "k8s.io/kubernetes/pkg/storage/storagebackend"
+import (
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
+)
 
 // RESTOptions is set of configuration options to generic registries.
 type RESTOptions struct {

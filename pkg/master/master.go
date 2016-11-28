@@ -43,13 +43,13 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
-
+	"k8s.io/kubernetes/pkg/registry"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -244,7 +244,7 @@ func (c completedConfig) New() (*Master, error) {
 		m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider)
 	}
 
-	restStorageProviders := []genericapiserver.RESTStorageProvider{
+	restStorageProviders := []registry.RESTStorageProvider{
 		appsrest.RESTStorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
@@ -265,7 +265,7 @@ func (c completedConfig) New() (*Master, error) {
 	return m, nil
 }
 
-func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter registry.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
 		glog.Fatalf("Error building core storage: %v", err)
@@ -294,7 +294,7 @@ func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient 
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter, restStorageProviders ...genericapiserver.RESTStorageProvider) {
+func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter, restStorageProviders ...registry.RESTStorageProvider) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
