@@ -909,8 +909,9 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta interface
 // TODO: Do we really need any pod matching, or all pods matching? I think the latter.
 func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, allPods []*v1.Pod, node *v1.Node, term *v1.PodAffinityTerm) (bool, bool, error) {
 	matchingPodExists := false
+	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, *term)
 	for _, existingPod := range allPods {
-		match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, pod, term)
+		match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, term)
 		if err != nil {
 			return false, matchingPodExists, err
 		}
@@ -994,7 +995,8 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 				continue
 			}
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, existingPod, &term)
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, term)
+				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, &term)
 				if err != nil {
 					catchError(err)
 					return
@@ -1025,7 +1027,8 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods [
 				return nil, err
 			}
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, existingPod, &term)
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, term)
+				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, &term)
 				if err != nil {
 					return nil, err
 				}
@@ -1090,7 +1093,8 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 			// If the requirement matches a pod's own labels are namespace, and there are
 			// no other such pods, then disregard the requirement. This is necessary to
 			// not block forever because the first pod of the collection can't be scheduled.
-			match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, pod, &term)
+			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
+			match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, &term)
 			if err != nil || !match || matchingPodExists {
 				glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAffinityTerm %v, err: %v",
 					podName(pod), node.Name, term, err)
