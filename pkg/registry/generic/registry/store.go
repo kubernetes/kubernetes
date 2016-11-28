@@ -318,7 +318,7 @@ func (e *Store) shouldDelete(ctx api.Context, key string, obj, existing runtime.
 
 func (e *Store) deleteForEmptyFinalizers(ctx api.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
 	out := e.NewFunc()
-	glog.V(6).Infof("going to delete %s from regitry, triggered by update", name)
+	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
 	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
