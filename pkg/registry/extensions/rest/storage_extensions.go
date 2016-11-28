@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/etcd"
 	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/extensions/controller/etcd"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 type RESTStorageProvider struct {

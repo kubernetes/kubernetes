@@ -48,9 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -59,6 +56,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
+	"k8s.io/genericapiserver/pkg/server/authorizer"
+	genericvalidation "k8s.io/genericapiserver/pkg/server/validation"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters

@@ -33,12 +33,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/core/event/etcd"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/core/namespace/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/core/service/etcd"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {

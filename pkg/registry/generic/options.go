@@ -17,9 +17,9 @@ limitations under the License.
 package generic
 
 import (
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 // RESTOptions is set of configuration options to generic registries.

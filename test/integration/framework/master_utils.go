@@ -52,8 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
@@ -65,6 +63,8 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
+	"k8s.io/genericapiserver/pkg/server/authorizer"
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"

@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"

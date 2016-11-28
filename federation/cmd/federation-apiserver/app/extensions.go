@@ -23,11 +23,11 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	daemonsetetcd "k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd"
 	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
 	ingressetcd "k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {

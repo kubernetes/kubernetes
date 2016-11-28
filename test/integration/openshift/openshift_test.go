@@ -19,8 +19,8 @@ package openshift
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/master"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 // This test references methods that OpenShift uses to customize the master on startup, that

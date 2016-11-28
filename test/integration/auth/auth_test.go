@@ -48,11 +48,11 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
-	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
+	apiserverauthorizer "k8s.io/genericapiserver/pkg/server/authorizer"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )

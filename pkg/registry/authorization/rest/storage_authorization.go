@@ -21,11 +21,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/authorization/localsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/selfsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 type RESTStorageProvider struct {

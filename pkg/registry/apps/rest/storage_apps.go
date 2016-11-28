@@ -20,9 +20,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	statefulsetetcd "k8s.io/kubernetes/pkg/registry/apps/petset/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 type RESTStorageProvider struct{}

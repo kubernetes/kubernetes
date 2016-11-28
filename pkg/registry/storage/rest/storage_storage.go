@@ -20,9 +20,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	storageclassetcd "k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 type RESTStorageProvider struct {

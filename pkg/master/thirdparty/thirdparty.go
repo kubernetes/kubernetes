@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 // dynamicLister is used to list resources for dynamic third party
