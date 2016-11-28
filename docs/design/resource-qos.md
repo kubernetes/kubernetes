@@ -51,7 +51,7 @@ The relationship between "Requests and Limits" and "QoS Classes" is subtle. Theo
 
 Pods can be of one of 3 different classes:
 
-- If `limits` and optionally `requests` (not equal to `0`) are set for all resources across all containers and they are *equal*, then the container is classified as **Guaranteed**.
+- If `limits` and optionally `requests` (not equal to `0`) are set for all resources across all containers and they are *equal*, then the pod is classified as **Guaranteed**.
 
 Examples:
 
