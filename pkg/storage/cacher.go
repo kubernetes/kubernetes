@@ -172,6 +172,10 @@ type Cacher struct {
 	watcherIdx int
 	watchers   indexedWatchers
 
+	// Defines how much time we can block on a watcher before simply closing it
+	// and proceeding to the next one.
+	blockTimeout *selfRefreshingTimeout
+
 	// Handling graceful termination.
 	stopLock sync.RWMutex
 	stopped  bool
@@ -194,6 +198,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		}
 	}
 
+	stopCh := make(chan struct{})
 	cacher := &Cacher{
 		ready:       newReady(),
 		storage:     config.Storage,
@@ -208,18 +213,18 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 			valueWatchers: make(map[string]watchersMap),
 		},
 		// TODO: Figure out the correct value for the buffer size.
-		incoming: make(chan watchCacheEvent, 100),
+		incoming:     make(chan watchCacheEvent, 100),
+		blockTimeout: newSelfRefreshingTimeout(stopCh),
 		// We need to (potentially) stop both:
 		// - wait.Until go-routine
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
-		stopCh: make(chan struct{}),
+		stopCh: stopCh,
 	}
 	watchCache.SetOnEvent(cacher.processEvent)
 	go cacher.dispatchEvents()
 
-	stopCh := cacher.stopCh
 	cacher.stopWg.Add(1)
 	go func() {
 		defer cacher.stopWg.Done()
@@ -532,23 +537,17 @@ func (c *Cacher) dispatchEvents() {
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	triggerValues, supported := c.triggerValues(event)
 
-	// TODO: For now we assume we have a given <timeout> budget for dispatching
-	// a single event. We should consider changing to the approach with:
-	// - budget has upper bound at <max_timeout>
-	// - we add <portion> to current timeout every second
-	timeout := time.Duration(250) * time.Millisecond
-
 	c.Lock()
 	defer c.Unlock()
 	// Iterate over "allWatchers" no matter what the trigger function is.
 	for _, watcher := range c.watchers.allWatchers {
-		watcher.add(event, &timeout)
+		watcher.add(event, c.blockTimeout.get, c.blockTimeout.use)
 	}
 	if supported {
 		// Iterate over watchers interested in the given values of the trigger.
 		for _, triggerValue := range triggerValues {
 			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
-				watcher.add(event, &timeout)
+				watcher.add(event, c.blockTimeout.get, c.blockTimeout.use)
 			}
 		}
 	} else {
@@ -561,7 +560,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		// Iterate over watchers interested in exact values for all values.
 		for _, watchers := range c.watchers.valueWatchers {
 			for _, watcher := range watchers {
-				watcher.add(event, &timeout)
+				watcher.add(event, c.blockTimeout.get, c.blockTimeout.use)
 			}
 		}
 	}
@@ -620,6 +619,53 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 	}
 
 	return strconv.ParseUint(resourceVersion, 10, 64)
+}
+
+const (
+	timeoutStep  = 50 * time.Millisecond
+	timeoutBurst = 200 * time.Millisecond
+)
+
+type selfRefreshingTimeout struct {
+	sync.Mutex
+	timeout time.Duration
+}
+
+func newSelfRefreshingTimeout(stopCh <-chan struct{}) *selfRefreshingTimeout {
+	result := &selfRefreshingTimeout{timeout: time.Duration(0)}
+	go result.periodicallyRefresh(stopCh)
+	return result
+}
+
+func (s *selfRefreshingTimeout) periodicallyRefresh(stopCh <-chan struct{}) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.Lock()
+			if s.timeout = s.timeout + timeoutStep; s.timeout > timeoutBurst {
+				s.timeout = timeoutBurst
+			}
+			s.Unlock()
+		case <-stopCh:
+			return
+		}
+	}
+}
+
+func (s *selfRefreshingTimeout) get() time.Duration {
+	s.Lock()
+	defer s.Unlock()
+	return s.timeout
+}
+
+func (s *selfRefreshingTimeout) use(used time.Duration) {
+	s.Lock()
+	defer s.Unlock()
+	if s.timeout = s.timeout - used; s.timeout < 0 {
+		s.timeout = 0
+	}
 }
 
 // cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
@@ -735,7 +781,7 @@ func (c *cacheWatcher) stop() {
 
 var timerPool sync.Pool
 
-func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
+func (c *cacheWatcher) add(event *watchCacheEvent, getTimeout func() time.Duration, useTimeout func(time.Duration)) {
 	// Try to send the event immediately, without blocking.
 	select {
 	case c.input <- *event:
@@ -750,9 +796,9 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
 
 	t, ok := timerPool.Get().(*time.Timer)
 	if ok {
-		t.Reset(*timeout)
+		t.Reset(getTimeout())
 	} else {
-		t = time.NewTimer(*timeout)
+		t = time.NewTimer(getTimeout())
 	}
 	defer timerPool.Put(t)
 
@@ -772,9 +818,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
 		c.stop()
 	}
 
-	if *timeout = *timeout - time.Since(startTime); *timeout < 0 {
-		*timeout = 0
-	}
+	useTimeout(time.Since(startTime))
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
