@@ -179,7 +179,7 @@ are satisfied for each node, and the node(s) with the highest weight(s) are the
 most preferred.
 
 In reality there are two variants of `RequiredDuringScheduling`: one suffixed
-with `RequiredDuringEecution` and one suffixed with `IgnoredDuringExecution`.
+with `RequiredDuringExecution` and one suffixed with `IgnoredDuringExecution`.
 For the first variant, if the affinity/anti-affinity ceases to be met at some
 point during pod execution (e.g. due to a pod label update), the system will try
 to eventually evict the pod from its node. In the second variant, the system may
