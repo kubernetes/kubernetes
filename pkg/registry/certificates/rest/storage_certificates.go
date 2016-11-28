@@ -17,12 +17,12 @@ limitations under the License.
 package rest
 
 import (
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	certificateetcd "k8s.io/kubernetes/pkg/registry/certificates/certificates/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 type RESTStorageProvider struct{}

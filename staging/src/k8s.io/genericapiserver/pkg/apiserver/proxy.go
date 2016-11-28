@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apiserver/metrics"
+	"k8s.io/genericapiserver/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -39,7 +39,7 @@ import (
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	"k8s.io/genericapiserver/pkg/apiserver/request"
 )
 
 // ProxyHandler provides a http.Handler which will proxy traffic to locations

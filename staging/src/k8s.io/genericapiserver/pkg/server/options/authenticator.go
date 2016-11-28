@@ -17,7 +17,7 @@ limitations under the License.
 package options
 
 import (
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	"k8s.io/genericapiserver/pkg/apiserver/authenticator"
 )
 
 // AuthenticationRequestHeaderConfig returns an authenticator config object for these options

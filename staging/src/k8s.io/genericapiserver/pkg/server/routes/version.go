@@ -21,7 +21,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/genericapiserver/pkg/apiserver"
 	"k8s.io/genericapiserver/pkg/server/mux"
 	"k8s.io/kubernetes/pkg/version"
 )

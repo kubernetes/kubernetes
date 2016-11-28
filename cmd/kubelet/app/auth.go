@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	alwaysallowauthorizer "k8s.io/genericapiserver/pkg/server/authorizer"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
 	webhooktoken "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
 	webhooksar "k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
-	alwaysallowauthorizer "k8s.io/genericapiserver/pkg/server/authorizer"
 )
 
 func buildAuth(nodeName types.NodeName, client clientset.Interface, config componentconfig.KubeletConfiguration) (server.AuthInterface, error) {

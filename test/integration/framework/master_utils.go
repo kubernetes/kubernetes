@@ -27,6 +27,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/genericapiserver/pkg/apiserver/authenticator"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
+	"k8s.io/genericapiserver/pkg/server/authorizer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -39,7 +42,6 @@ import (
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	authauthenticator "k8s.io/kubernetes/pkg/auth/authenticator"
 	authauthorizer "k8s.io/kubernetes/pkg/auth/authorizer"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
@@ -63,8 +65,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
-	"k8s.io/genericapiserver/pkg/server/authorizer"
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"

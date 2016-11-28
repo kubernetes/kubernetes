@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package request contains everything around extracting info from
-// a http request object.
-// TODO: this package is temporary. Handlers must move into pkg/apiserver/handlers to avoid dependency cycle
-package request // import "k8s.io/kubernetes/pkg/apiserver/request"
+// Package apiserver contains the code that provides a rest.ful api service.
+package apiserver // import "k8s.io/genericapiserver/pkg/apiserver"

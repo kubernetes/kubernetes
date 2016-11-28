@@ -14,16 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filters
-
-import (
-	"k8s.io/kubernetes/pkg/apiserver/request"
-	"k8s.io/kubernetes/pkg/util/sets"
-)
-
-func newTestRequestInfoResolver() *request.RequestInfoFactory {
-	return &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
-	}
-}
+// Package request contains everything around extracting info from
+// a http request object.
+// TODO: this package is temporary. Handlers must move into pkg/apiserver/handlers to avoid dependency cycle
+package request // import "k8s.io/genericapiserver/pkg/apiserver/request"

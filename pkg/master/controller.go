@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -38,7 +39,6 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes controller

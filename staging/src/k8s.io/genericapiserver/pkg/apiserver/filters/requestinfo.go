@@ -22,7 +22,7 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	"k8s.io/genericapiserver/pkg/apiserver/request"
 )
 
 // WithRequestInfo attaches a RequestInfo to the context.

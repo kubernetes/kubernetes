@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"testing"
 
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -52,7 +53,6 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
 
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"

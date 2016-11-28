@@ -25,11 +25,11 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/genericapiserver/pkg/server/openapi/common"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/genericapiserver/pkg/server/openapi/common"
 
 	"github.com/golang/glog"
 )

@@ -20,6 +20,10 @@ import (
 	"fmt"
 	"net"
 
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
+	"k8s.io/genericapiserver/pkg/server/authorizer"
+	genericoptions "k8s.io/genericapiserver/pkg/server/options"
+	genericvalidation "k8s.io/genericapiserver/pkg/server/validation"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
@@ -28,10 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
-	"k8s.io/genericapiserver/pkg/server/authorizer"
-	genericoptions "k8s.io/genericapiserver/pkg/server/options"
-	genericvalidation "k8s.io/genericapiserver/pkg/server/validation"
 
 	// Install the testgroup API
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"

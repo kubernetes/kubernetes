@@ -20,7 +20,7 @@ import (
 	"io"
 	"net/http"
 
-	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
+	apiservermetrics "k8s.io/genericapiserver/pkg/apiserver/metrics"
 	"k8s.io/genericapiserver/pkg/server/mux"
 	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
 

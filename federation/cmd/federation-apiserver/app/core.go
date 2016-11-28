@@ -26,6 +26,7 @@ import (
 	// TODO(nikhiljindal): Fix this by ensuring that pkg/api/install and federation/apis/core/install do not conflict with each other.
 	_ "k8s.io/kubernetes/pkg/api/install"
 
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
 	"k8s.io/kubernetes/federation/apis/core/v1"
@@ -38,7 +39,6 @@ import (
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/core/namespace/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/core/service/etcd"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {

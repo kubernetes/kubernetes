@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
+	apiservertesting "k8s.io/genericapiserver/pkg/apiserver/testing"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"

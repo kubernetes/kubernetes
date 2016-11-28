@@ -27,11 +27,11 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/genericapiserver/pkg/apiserver"
 	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apiserver"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"

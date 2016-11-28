@@ -29,7 +29,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	"k8s.io/genericapiserver/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 

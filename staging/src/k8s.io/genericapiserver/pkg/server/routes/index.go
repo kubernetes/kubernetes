@@ -21,7 +21,7 @@ import (
 	"sort"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/genericapiserver/pkg/apiserver"
 	"k8s.io/genericapiserver/pkg/server/mux"
 )
 

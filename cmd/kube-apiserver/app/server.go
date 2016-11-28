@@ -33,14 +33,17 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/genericapiserver/pkg/apiserver"
+	"k8s.io/genericapiserver/pkg/apiserver/authenticator"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
+	"k8s.io/genericapiserver/pkg/server/authorizer"
+	genericvalidation "k8s.io/genericapiserver/pkg/server/validation"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -56,9 +59,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
-	"k8s.io/genericapiserver/pkg/server/authorizer"
-	genericvalidation "k8s.io/genericapiserver/pkg/server/validation"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters

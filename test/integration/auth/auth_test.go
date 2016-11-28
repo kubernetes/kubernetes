@@ -36,6 +36,7 @@ import (
 	"testing"
 	"time"
 
+	apiserverauthorizer "k8s.io/genericapiserver/pkg/server/authorizer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -52,7 +53,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
-	apiserverauthorizer "k8s.io/genericapiserver/pkg/server/authorizer"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )

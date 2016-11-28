@@ -18,6 +18,7 @@ package app
 
 import (
 	"github.com/golang/glog"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -27,7 +28,6 @@ import (
 	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
 	ingressetcd "k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {

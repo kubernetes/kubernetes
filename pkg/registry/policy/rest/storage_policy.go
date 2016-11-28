@@ -17,12 +17,12 @@ limitations under the License.
 package rest
 
 import (
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	poddisruptionbudgetetcd "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd"
-	genericapiserver "k8s.io/genericapiserver/pkg/server"
 )
 
 type RESTStorageProvider struct{}
