@@ -51,13 +51,12 @@ func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, 
 	return r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize, timeout)
 }
 
-func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, resize <-chan term.Size) error {
-	container, err := checkContainerStatus(r.client, containerID)
+func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan term.Size) error {
+	_, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err
 	}
 
-	tty := container.Config.Tty
 	return dockertools.AttachContainer(r.client, containerID, in, out, errw, tty, resize)
 }
 
