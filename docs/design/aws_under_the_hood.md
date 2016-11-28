@@ -198,7 +198,7 @@ Within the AWS cloud provider logic, we filter requests to the AWS APIs to
 match resources with our cluster tag. By filtering the requests, we ensure
 that we see only our own AWS objects.
 
-** Important: ** If you choose not to use kube-up, you must pick a unique
+**Important:** If you choose not to use kube-up, you must pick a unique
 cluster-id value, and ensure that all AWS resources have a tag with
 `Name=KubernetesCluster,Value=<clusterid>`.
 
