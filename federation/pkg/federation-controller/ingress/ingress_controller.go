@@ -352,6 +352,12 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		ic.ingressFederatedInformer.Stop()
 		glog.Infof("Stopping ConfigMap Federated Informer")
 		ic.configMapFederatedInformer.Stop()
+		glog.Infof("Stopoing ingress deliverer")
+		ic.ingressDeliverer.Stop()
+		glog.Infof("Stopping configmap deliverer")
+		ic.configMapDeliverer.Stop()
+		glog.Infof("Stopping cluster deliverer")
+		ic.clusterDeliverer.Stop()
 	}()
 	ic.ingressDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
 		ingress := item.Value.(types.NamespacedName)
@@ -388,7 +394,7 @@ func (ic *IngressController) deliverIngressObj(obj interface{}, delay time.Durat
 }
 
 func (ic *IngressController) deliverIngress(ingress types.NamespacedName, delay time.Duration, failed bool) {
-	glog.V(4).Infof("Delivering ingress: %s", ingress)
+	glog.V(4).Infof("Delivering ingress: %s with delay: %v error: %v", ingress, delay, failed)
 	key := ingress.String()
 	if failed {
 		ic.ingressBackoff.Next(key, time.Now())
@@ -681,7 +687,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	if err != nil {
 		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in ingress %s: %v",
 			baseIngress.Name, err)
-		ic.deliverIngress(ingress, 0, false)
+		ic.deliverIngress(ingress, 0, true)
 		return
 	}
 	baseIngress = updatedIngressObj.(*extensions_v1beta1.Ingress)
@@ -845,7 +851,6 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	if len(operations) == 0 {
 		// Everything is in order
 		glog.V(4).Infof("Ingress %q is up-to-date in all clusters - no propagation to clusters required.", ingress)
-		ic.deliverIngress(ingress, ic.ingressReviewDelay, false)
 		return
 	}
 	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
