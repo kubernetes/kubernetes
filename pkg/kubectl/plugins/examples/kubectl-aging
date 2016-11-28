@@ -1,0 +1,83 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'date'
+
+class Numeric
+  def duration
+    secs  = self.to_int
+    mins  = secs / 60
+    hours = mins / 60
+    days  = hours / 24
+    if days > 0
+      "#{days} day(s)"
+    elsif hours > 0
+      "#{hours} hour(s)"
+    elsif mins > 0
+      "#{mins} minute(s)"
+    elsif secs >= 0
+      "#{secs} second(s)"
+    end
+  end
+end
+
+if ARGV[0] == "metadata"
+  metadata = <<-META
+{
+  "use"    : "aging",
+  "short"  : "Aging shows pods by age",
+  "long"   : "Aging shows pods by age\\n\\nWhich shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age which shows pods by age.",
+  "tunnel" : true
+}
+META
+  puts metadata
+else
+  api_host = ENV['KUBECTL_PLUGIN_API_HOST']
+  api_endpoint = "http://#{api_host}/api/v1/namespaces/myproject/pods"
+
+  pods_json = `curl -s #{api_endpoint}`
+  pods_parsed = JSON.parse(pods_json)
+
+  puts "I'm the magnificent aging plugin."
+  puts ""
+
+  data = Hash.new
+  max_name_length = 0
+  max_age = 0
+  min_age = 0
+
+  pods_parsed['items'].each { |pod|
+    name = pod['metadata']['name']
+    creation = pod['metadata']['creationTimestamp']
+
+    age = Time.now - DateTime.parse(creation).to_time
+    data[name] = age
+
+    if name.length > max_name_length
+      max_name_length = name.length
+    end
+    if age > max_age
+      max_age = age
+    end
+    if age < min_age
+      min_age = age
+    end
+
+  } 
+
+  data = data.sort_by{ |name, age| age }
+
+  if data.length
+    data.each { |name, age|
+      output = ""
+      output += name.rjust(max_name_length, ' ') + ": "
+      bar_size = (age*80/max_age).ceil 
+      bar_size.times{ output += "▒" }
+      output += " " + age.duration
+      puts output
+      puts ""
+    }
+  else
+    puts "No pods"
+  end
+end

@@ -33,7 +33,7 @@ func ServePluginAPIProxy(clientConfig *restclient.Config) (net.Listener, error) 
 		AcceptHosts: kubectl.MakeRegexpArrayOrDie(kubectl.DefaultHostAcceptRE),
 	}
 
-	server, err := kubectl.NewProxyServer("", "/api", "", filter, clientConfig)
+	server, err := kubectl.NewProxyServer("", "/", "", filter, clientConfig)
 	if err != nil {
 		return nil, err
 	}

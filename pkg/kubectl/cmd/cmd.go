@@ -283,7 +283,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *
 		{
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
-				NewCmdApply(f, out, err),
+				NewCmdApply(f, out, errOut),
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out),
 				NewCmdConvert(f, out),
@@ -307,7 +307,9 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *
 	if len(loadedPlugins) > 0 {
 		pluginCmds := []*cobra.Command{}
 
-		for _, plugin := range loadedPlugins {
+		for i := 0; i < len(loadedPlugins); i++ {
+			plugin := loadedPlugins[i]
+
 			pluginCmds = append(pluginCmds, &cobra.Command{
 				Use:     plugin.Use,
 				Short:   plugin.Short,
