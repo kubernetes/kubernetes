@@ -22,8 +22,8 @@ package v1beta1
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	policy "k8s.io/client-go/pkg/apis/policy"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
@@ -135,7 +135,7 @@ func Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(i
 
 func autoConvert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
 	out.MinAvailable = in.MinAvailable
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
@@ -145,7 +145,7 @@ func Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(i
 
 func autoConvert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *PodDisruptionBudgetSpec, s conversion.Scope) error {
 	out.MinAvailable = in.MinAvailable
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
@@ -155,7 +155,7 @@ func Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(i
 
 func autoConvert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
-	out.DisruptedPods = *(*map[string]unversioned.Time)(unsafe.Pointer(&in.DisruptedPods))
+	out.DisruptedPods = *(*map[string]meta_v1.Time)(unsafe.Pointer(&in.DisruptedPods))
 	out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
@@ -169,7 +169,7 @@ func Convert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStat
 
 func autoConvert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *PodDisruptionBudgetStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
-	out.DisruptedPods = *(*map[string]unversioned.Time)(unsafe.Pointer(&in.DisruptedPods))
+	out.DisruptedPods = *(*map[string]meta_v1.Time)(unsafe.Pointer(&in.DisruptedPods))
 	out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy

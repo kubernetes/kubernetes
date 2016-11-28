@@ -25,8 +25,8 @@ import (
 
 	"github.com/golang/groupcache/lru"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/client-go/pkg/util/sets"
 	"k8s.io/client-go/pkg/util/strategicpatch"
@@ -138,13 +138,13 @@ type aggregateRecord struct {
 	// if the size of this set exceeds the max, we know we need to aggregate
 	localKeys sets.String
 	// The last time at which the aggregate was recorded
-	lastTimestamp unversioned.Time
+	lastTimestamp metav1.Time
 }
 
 // EventAggregate identifies similar events and groups into a common event if required
 func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, error) {
 	aggregateKey, localKey := e.keyFunc(newEvent)
-	now := unversioned.NewTime(e.clock.Now())
+	now := metav1.NewTime(e.clock.Now())
 	record := aggregateRecord{localKeys: sets.NewString(), lastTimestamp: now}
 	e.Lock()
 	defer e.Unlock()
@@ -194,7 +194,7 @@ type eventLog struct {
 	count int
 
 	// The time at which the event was first recorded.
-	firstTimestamp unversioned.Time
+	firstTimestamp metav1.Time
 
 	// The unique name of the first occurrence of this event
 	name string
@@ -240,7 +240,7 @@ func (e *eventLogger) eventObserve(newEvent *v1.Event) (*v1.Event, []byte, error
 
 		eventCopy2 := *event
 		eventCopy2.Count = 0
-		eventCopy2.LastTimestamp = unversioned.NewTime(time.Unix(0, 0))
+		eventCopy2.LastTimestamp = metav1.NewTime(time.Unix(0, 0))
 
 		newData, _ := json.Marshal(event)
 		oldData, _ := json.Marshal(eventCopy2)

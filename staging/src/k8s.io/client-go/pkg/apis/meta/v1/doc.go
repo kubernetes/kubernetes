@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+// +k8s:deepcopy-gen=package
+// +k8s:openapi-gen=true
+// +k8s:defaulter-gen=TypeMeta
 
-import (
-	"k8s.io/client-go/pkg/runtime/schema"
-)
-
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: "", Version: ""}
-
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
-func Kind(kind string) schema.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
+// +groupName=meta.k8s.io
+package v1

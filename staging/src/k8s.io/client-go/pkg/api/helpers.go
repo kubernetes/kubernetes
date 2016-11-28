@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/pkg/api/resource"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/conversion"
 	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/pkg/labels"
@@ -61,7 +61,7 @@ var Semantic = conversion.EqualitiesOrDie(
 		// Uninitialized quantities are equivalent to 0 quantities.
 		return a.Cmp(b) == 0
 	},
-	func(a, b unversioned.Time) bool {
+	func(a, b metav1.Time) bool {
 		return a.UTC() == b.UTC()
 	},
 	func(a, b labels.Selector) bool {
@@ -397,15 +397,15 @@ func containsAccessMode(modes []PersistentVolumeAccessMode, mode PersistentVolum
 }
 
 // ParseRFC3339 parses an RFC3339 date in either RFC3339Nano or RFC3339 format.
-func ParseRFC3339(s string, nowFn func() unversioned.Time) (unversioned.Time, error) {
+func ParseRFC3339(s string, nowFn func() metav1.Time) (metav1.Time, error) {
 	if t, timeErr := time.Parse(time.RFC3339Nano, s); timeErr == nil {
-		return unversioned.Time{Time: t}, nil
+		return metav1.Time{Time: t}, nil
 	}
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
-		return unversioned.Time{}, err
+		return metav1.Time{}, err
 	}
-	return unversioned.Time{Time: t}, nil
+	return metav1.Time{Time: t}, nil
 }
 
 // NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements

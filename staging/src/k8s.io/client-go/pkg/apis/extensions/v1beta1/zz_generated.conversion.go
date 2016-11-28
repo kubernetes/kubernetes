@@ -22,11 +22,11 @@ package v1beta1
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
-	v1 "k8s.io/client-go/pkg/api/v1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
 	autoscaling "k8s.io/client-go/pkg/apis/autoscaling"
 	batch "k8s.io/client-go/pkg/apis/batch"
 	extensions "k8s.io/client-go/pkg/apis/extensions"
+	v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
 	intstr "k8s.io/client-go/pkg/util/intstr"
@@ -73,8 +73,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus,
 		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
 		Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
-		Convert_v1beta1_ExportOptions_To_api_ExportOptions,
-		Convert_api_ExportOptions_To_v1beta1_ExportOptions,
 		Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions,
 		Convert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions,
 		Convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath,
@@ -347,8 +345,8 @@ func Convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extensions.Da
 }
 
 func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -359,8 +357,8 @@ func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec
 }
 
 func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -446,7 +444,7 @@ func Convert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(in *D
 
 func autoConvert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition(in *extensions.DeploymentCondition, out *DeploymentCondition, s conversion.Scope) error {
 	out.Type = DeploymentConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
+	out.Status = api_v1.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -528,8 +526,8 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 	if err := api.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -547,8 +545,8 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	if err := api.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -616,26 +614,6 @@ func autoConvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in 
 		out.RollingUpdate = nil
 	}
 	return nil
-}
-
-func autoConvert_v1beta1_ExportOptions_To_api_ExportOptions(in *ExportOptions, out *api.ExportOptions, s conversion.Scope) error {
-	out.Export = in.Export
-	out.Exact = in.Exact
-	return nil
-}
-
-func Convert_v1beta1_ExportOptions_To_api_ExportOptions(in *ExportOptions, out *api.ExportOptions, s conversion.Scope) error {
-	return autoConvert_v1beta1_ExportOptions_To_api_ExportOptions(in, out, s)
-}
-
-func autoConvert_api_ExportOptions_To_v1beta1_ExportOptions(in *api.ExportOptions, out *ExportOptions, s conversion.Scope) error {
-	out.Export = in.Export
-	out.Exact = in.Exact
-	return nil
-}
-
-func Convert_api_ExportOptions_To_v1beta1_ExportOptions(in *api.ExportOptions, out *ExportOptions, s conversion.Scope) error {
-	return autoConvert_api_ExportOptions_To_v1beta1_ExportOptions(in, out, s)
 }
 
 func autoConvert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(in *FSGroupStrategyOptions, out *extensions.FSGroupStrategyOptions, s conversion.Scope) error {
@@ -794,7 +772,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPo
 
 func autoConvert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.LastScaleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScaleTime))
+	out.LastScaleTime = (*v1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
@@ -807,7 +785,7 @@ func Convert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodA
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.LastScaleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScaleTime))
+	out.LastScaleTime = (*v1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
@@ -1094,7 +1072,7 @@ func Convert_v1beta1_JobCondition_To_batch_JobCondition(in *JobCondition, out *b
 
 func autoConvert_batch_JobCondition_To_v1beta1_JobCondition(in *batch.JobCondition, out *JobCondition, s conversion.Scope) error {
 	out.Type = JobConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
+	out.Status = api_v1.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -1150,9 +1128,9 @@ func autoConvert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpe
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	// WARNING: in.AutoSelector requires manual conversion: does not exist in peer-type
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -1162,9 +1140,9 @@ func autoConvert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpe
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	// WARNING: in.ManualSelector requires manual conversion: does not exist in peer-type
-	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -1172,8 +1150,8 @@ func autoConvert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpe
 
 func autoConvert_v1beta1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]batch.JobCondition)(unsafe.Pointer(&in.Conditions))
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = (*v1.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*v1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -1186,8 +1164,8 @@ func Convert_v1beta1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobS
 
 func autoConvert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]JobCondition)(unsafe.Pointer(&in.Conditions))
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = (*v1.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*v1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -1269,8 +1247,8 @@ func Convert_extensions_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *exten
 }
 
 func autoConvert_v1beta1_NetworkPolicyPeer_To_extensions_NetworkPolicyPeer(in *NetworkPolicyPeer, out *extensions.NetworkPolicyPeer, s conversion.Scope) error {
-	out.PodSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.PodSelector))
-	out.NamespaceSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.PodSelector = (*v1.LabelSelector)(unsafe.Pointer(in.PodSelector))
+	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	return nil
 }
 
@@ -1279,8 +1257,8 @@ func Convert_v1beta1_NetworkPolicyPeer_To_extensions_NetworkPolicyPeer(in *Netwo
 }
 
 func autoConvert_extensions_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *extensions.NetworkPolicyPeer, out *NetworkPolicyPeer, s conversion.Scope) error {
-	out.PodSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.PodSelector))
-	out.NamespaceSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.PodSelector = (*v1.LabelSelector)(unsafe.Pointer(in.PodSelector))
+	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	return nil
 }
 
@@ -1299,7 +1277,7 @@ func Convert_v1beta1_NetworkPolicyPort_To_extensions_NetworkPolicyPort(in *Netwo
 }
 
 func autoConvert_extensions_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *extensions.NetworkPolicyPort, out *NetworkPolicyPort, s conversion.Scope) error {
-	out.Protocol = (*v1.Protocol)(unsafe.Pointer(in.Protocol))
+	out.Protocol = (*api_v1.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	return nil
 }
@@ -1440,9 +1418,9 @@ func Convert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(i
 
 func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *extensions.PodSecurityPolicySpec, out *PodSecurityPolicySpec, s conversion.Scope) error {
 	out.Privileged = in.Privileged
-	out.DefaultAddCapabilities = *(*[]v1.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
-	out.RequiredDropCapabilities = *(*[]v1.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
-	out.AllowedCapabilities = *(*[]v1.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
+	out.DefaultAddCapabilities = *(*[]api_v1.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
+	out.RequiredDropCapabilities = *(*[]api_v1.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
+	out.AllowedCapabilities = *(*[]api_v1.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
 	out.Volumes = *(*[]FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
 	if in.HostPorts != nil {
@@ -1529,7 +1507,7 @@ func Convert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *R
 
 func autoConvert_extensions_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in *extensions.ReplicaSetCondition, out *ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = ReplicaSetConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
+	out.Status = api_v1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -1585,8 +1563,8 @@ func autoConvert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *Replica
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -1597,8 +1575,8 @@ func autoConvert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensi
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -1710,7 +1688,7 @@ func Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions
 
 func autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *extensions.SELinuxStrategyOptions, out *SELinuxStrategyOptions, s conversion.Scope) error {
 	out.Rule = SELinuxStrategy(in.Rule)
-	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	out.SELinuxOptions = (*api_v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	return nil
 }
 
@@ -1774,14 +1752,14 @@ func Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec,
 
 func autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs *k8s.io/kubernetes/pkg/api/unversioned.LabelSelector)
+	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs *k8s.io/kubernetes/pkg/apis/meta/v1.LabelSelector)
 	// WARNING: in.TargetSelector requires manual conversion: does not exist in peer-type
 	return nil
 }
 
 func autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: in.Selector requires manual conversion: inconvertible types (*k8s.io/kubernetes/pkg/api/unversioned.LabelSelector vs map[string]string)
+	// WARNING: in.Selector requires manual conversion: inconvertible types (*k8s.io/kubernetes/pkg/apis/meta/v1.LabelSelector vs map[string]string)
 	return nil
 }
 

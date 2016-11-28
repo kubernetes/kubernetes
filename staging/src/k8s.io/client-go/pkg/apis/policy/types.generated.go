@@ -26,7 +26,7 @@ import (
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
 	pkg3_api "k8s.io/client-go/pkg/api"
-	pkg2_unversioned "k8s.io/client-go/pkg/api/unversioned"
+	pkg2_unversioned "k8s.io/client-go/pkg/apis/meta/v1"
 	pkg4_types "k8s.io/client-go/pkg/types"
 	pkg1_intstr "k8s.io/client-go/pkg/util/intstr"
 	"reflect"
