@@ -165,6 +165,8 @@ func (s *FSM) opCreate(op *StorageOperation) (*StorageOperationResult, bool) {
 	b := s.root.resolveBucket(bucket, true)
 	existing, found := b.items[k]
 	if found {
+		glog.V(2).Infof("response %s %s: ALREADY_EXISTS", op.OpType, op.Path)
+
 		return &StorageOperationResult{
 			ItemData:  toProto(existing),
 			ErrorCode: ErrorCode_ALREADY_EXISTS,
@@ -199,6 +201,8 @@ func (s *FSM) opCreate(op *StorageOperation) (*StorageOperationResult, bool) {
 		s.expiryManager.add(op.Path, expiry)
 	}
 
+	glog.V(2).Infof("response %s %s: OK", op.OpType, op.Path)
+
 	return &StorageOperationResult{
 		ItemData: &ItemData{
 			Uid:  op.ItemData.Uid,
@@ -216,18 +220,22 @@ func (s *FSM) opDelete(op *StorageOperation) (*StorageOperationResult, bool) {
 
 	b := s.root.resolveBucket(bucket, false)
 	if b == nil {
+		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 		return &StorageOperationResult{ErrorCode: ErrorCode_NOT_FOUND}, false
 	}
 	oldItem, found := b.items[k]
 	if !found {
+		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 		return &StorageOperationResult{ErrorCode: ErrorCode_NOT_FOUND}, false
 	}
 
 	if op.PreconditionUid != "" && types.UID(op.PreconditionUid) != oldItem.uid {
+		glog.V(2).Infof("response %s %s: PRECONDITION_NOT_MET_UID", op.OpType, op.Path)
 		return &StorageOperationResult{ItemData: toProto(oldItem), ErrorCode: ErrorCode_PRECONDITION_NOT_MET_UID}, false
 	}
 
 	if op.PreconditionLsn != 0 && LSN(op.PreconditionLsn) != oldItem.lsn {
+		glog.V(2).Infof("response %s %s: PRECONDITION_NOT_MET_LSN", op.OpType, op.Path)
 		return &StorageOperationResult{ItemData: toProto(oldItem), ErrorCode: ErrorCode_PRECONDITION_NOT_MET_LSN}, false
 	}
 
@@ -243,6 +251,7 @@ func (s *FSM) opDelete(op *StorageOperation) (*StorageOperationResult, bool) {
 
 	delete(b.items, k)
 
+	glog.V(2).Infof("response %s %s: OK", op.OpType, op.Path)
 	return &StorageOperationResult{
 		ItemData:   toProto(oldItem),
 		CurrentLsn: uint64(s.lastLSN),
@@ -277,13 +286,16 @@ func (s *FSM) opUpdate(op *StorageOperation) (*StorageOperationResult, bool) {
 	b := s.root.resolveBucket(bucket, true)
 	oldItem, found := b.items[k]
 	if !found {
+		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 		return &StorageOperationResult{ErrorCode: ErrorCode_NOT_FOUND}, false
 	}
 	if op.PreconditionLsn != 0 && LSN(op.PreconditionLsn) != oldItem.lsn {
+		glog.V(2).Infof("response %s %s: PRECONDITION_NOT_MET_LSN", op.OpType, op.Path)
 		return &StorageOperationResult{ItemData: toProto(oldItem), ErrorCode: ErrorCode_PRECONDITION_NOT_MET_LSN}, false
 	}
 
 	if op.PreconditionUid != "" && types.UID(op.PreconditionUid) != oldItem.uid {
+		glog.V(2).Infof("response %s %s: PRECONDITION_NOT_MET_UID", op.OpType, op.Path)
 		return &StorageOperationResult{ItemData: toProto(oldItem), ErrorCode: ErrorCode_PRECONDITION_NOT_MET_UID}, false
 	}
 
@@ -312,6 +324,7 @@ func (s *FSM) opUpdate(op *StorageOperation) (*StorageOperationResult, bool) {
 		s.expiryManager.add(op.Path, expiry)
 	}
 
+	glog.V(2).Infof("response %s %s: OK", op.OpType, op.Path)
 	return &StorageOperationResult{
 		ItemData: &ItemData{
 			Uid:  op.ItemData.Uid,
@@ -331,6 +344,8 @@ func (s *FSM) opGet(ctx context.Context, op *StorageOperation) (*StorageOperatio
 
 	b := s.root.resolveBucket(bucket, false)
 	if b == nil {
+		glog.V(2).Infof("response %s %s: NOT_FOUND (bucket)", op.OpType, op.Path)
+
 		return &StorageOperationResult{
 			ErrorCode:  ErrorCode_NOT_FOUND,
 			CurrentLsn: uint64(s.lastLSN),
@@ -338,6 +353,8 @@ func (s *FSM) opGet(ctx context.Context, op *StorageOperation) (*StorageOperatio
 	}
 	item, found := b.items[k]
 	if !found {
+		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
+
 		return &StorageOperationResult{
 			ErrorCode:  ErrorCode_NOT_FOUND,
 			CurrentLsn: uint64(s.lastLSN),
@@ -361,6 +378,8 @@ func (s *FSM) opGet(ctx context.Context, op *StorageOperation) (*StorageOperatio
 		resultItemData.Ttl = ttl
 	}
 
+	glog.V(2).Infof("response %s %s: OK", op.OpType, op.Path)
+
 	return &StorageOperationResult{
 		ItemData:   resultItemData,
 		CurrentLsn: uint64(s.lastLSN),
@@ -379,6 +398,9 @@ func (s *FSM) rawGet(path string, dest *itemData) bool {
 	}
 	var found bool
 	*dest, found = b.items[k]
+
+	glog.V(2).Infof("rawGet %s: found=%v", path, found)
+
 	return found
 }
 
@@ -390,6 +412,7 @@ func (s *FSM) opList(ctx context.Context, op *StorageOperation) (*StorageOperati
 
 	b := s.root.resolveBucket(bucket, false)
 	if b == nil {
+		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 		return &StorageOperationResult{
 			ErrorCode:  ErrorCode_NOT_FOUND,
 			CurrentLsn: uint64(s.lastLSN),
@@ -425,10 +448,14 @@ func (s *FSM) opList(ctx context.Context, op *StorageOperation) (*StorageOperati
 		}
 	}
 
+	glog.V(2).Infof("response %s %s: %d items", op.OpType, op.Path, len(result.ItemList))
+
 	return result, nil
 }
 
 func (s *FSM) enableExpiryManager(backend *RaftBackend, enable bool) *expiryManager {
+	glog.V(2).Infof("enableExpiryManager enabled=%v", enable)
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -458,6 +485,8 @@ func (s *FSM) enableExpiryManager(backend *RaftBackend, enable bool) *expiryMana
 }
 
 func (s *FSM) Snapshot() (raft.FSMSnapshot, error) {
+	glog.V(2).Infof("Snapshot")
+
 	// Snapshot is used to support log compaction. This call should
 	// return an FSMSnapshot which can be used to save a point-in-time
 	// snapshot of the FSM. Apply and Snapshot are not called in multiple
@@ -508,6 +537,7 @@ func (s *FSM) Snapshot() (raft.FSMSnapshot, error) {
 }
 
 func (s *FSM) Restore(in io.ReadCloser) error {
+	glog.V(2).Infof("Restore")
 	//// Restore is used to restore an FSM from a snapshot. It is not called
 	//// concurrently with any other command. The FSM must discard all previous
 	//// state.
