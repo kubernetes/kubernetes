@@ -22,7 +22,6 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
