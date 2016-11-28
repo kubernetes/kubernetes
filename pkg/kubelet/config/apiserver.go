@@ -18,10 +18,8 @@ limitations under the License.
 package config
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
@@ -40,11 +38,7 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
-			pod := o.(*v1.Pod)
-			if err := podutil.SetInitContainersAndStatuses(pod); err != nil {
-				glog.Error(err)
-			}
-			pods = append(pods, pod)
+			pods = append(pods, o.(*v1.Pod))
 		}
 		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.ApiserverSource}
 	}
