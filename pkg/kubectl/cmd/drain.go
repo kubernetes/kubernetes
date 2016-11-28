@@ -80,8 +80,8 @@ const (
 	kDaemonsetWarning    = "Ignoring DaemonSet-managed pods"
 	kLocalStorageFatal   = "pods with local storage (use --delete-local-data to override)"
 	kLocalStorageWarning = "Deleting pods with local storage"
-	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet (use --force to override)"
-	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet"
+	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
+	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
 	kMaxNodeUpdateRetry  = 10
 )
 
@@ -140,14 +140,20 @@ var (
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
-		The 'drain' deletes all pods except mirror pods (which cannot be deleted through
+		'drain' evicts the pods if the APIServer supports eviciton
+		(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal DELETE
+		to delete the pods.
+		The 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through
 		the API server).  If there are DaemonSet-managed pods, drain will not proceed
 		without --ignore-daemonsets, and regardless it will not delete any
 		DaemonSet-managed pods, because those pods would be immediately replaced by the
 		DaemonSet controller, which ignores unschedulable markings.  If there are any
 		pods that are neither mirror pods nor managed by ReplicationController,
-		ReplicaSet, DaemonSet or Job, then drain will not delete any pods unless you
+		ReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you
 		use --force.
+
+		'drain' waits for graceful termination. You should not operate on the machine until
+		the command completes.
 
 		When you are ready to put the node back into service, use kubectl uncordon, which
 		will make the node schedulable again.
@@ -155,10 +161,10 @@ var (
 		![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)`)
 
 	drain_example = templates.Examples(`
-		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet on it.
+		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.
 		$ kubectl drain foo --force
 
-		# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet, and use a grace period of 15 minutes.
+		# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.
 		$ kubectl drain foo --grace-period=900`)
 )
 
@@ -175,7 +181,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunDrain())
 		},
 	}
-	cmd.Flags().BoolVar(&options.Force, "force", false, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet.")
+	cmd.Flags().BoolVar(&options.Force, "force", false, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
 	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", false, "Ignore DaemonSet-managed pods.")
 	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
