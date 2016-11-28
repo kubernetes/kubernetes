@@ -177,7 +177,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 		if err != nil {
 			return
 		}
-		containerStatus, _, _ = findContainerStatus(&status, containerID.String())
+		containerStatus, _, _ = findContainerStatus(&pod.Status, containerID.String())
 		containerStatus.Ready = ready
 
 		// Update pod condition.
