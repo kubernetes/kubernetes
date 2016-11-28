@@ -129,7 +129,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 	// Register Unversioned types under their own special group
 	scheme.AddUnversionedTypes(Unversioned,
-		&unversioned.ExportOptions{},
 		&unversioned.Status{},
 		&unversioned.APIVersions{},
 		&unversioned.APIGroupList{},

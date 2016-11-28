@@ -28,8 +28,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	err := scheme.AddConversionFuncs(
 		v1.Convert_v1_DeleteOptions_To_api_DeleteOptions,
 		v1.Convert_api_DeleteOptions_To_v1_DeleteOptions,
-		v1.Convert_v1_ExportOptions_To_api_ExportOptions,
-		v1.Convert_api_ExportOptions_To_v1_ExportOptions,
 		v1.Convert_v1_List_To_api_List,
 		v1.Convert_api_List_To_v1_List,
 		v1.Convert_v1_ListOptions_To_api_ListOptions,
