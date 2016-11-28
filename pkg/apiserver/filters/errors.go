@@ -38,6 +38,6 @@ func forbidden(w http.ResponseWriter, req *http.Request) {
 // internalError renders a simple internal error
 func internalError(w http.ResponseWriter, req *http.Request, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Server Error: %#v", req.RequestURI)
+	fmt.Fprintf(w, "Forbidden: %#v, Internal Server Error: %v", req.RequestURI, err)
 	runtime.HandleError(err)
 }
