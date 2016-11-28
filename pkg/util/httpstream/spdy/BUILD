@@ -21,7 +21,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//third_party/forked/golang/netutil:go_default_library",

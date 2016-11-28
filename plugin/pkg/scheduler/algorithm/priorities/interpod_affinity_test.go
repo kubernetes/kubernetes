@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -607,7 +607,7 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 		"az": "az1",
 	}
 	LabelZoneFailureDomainAZ1 := map[string]string{
-		unversioned.LabelZoneFailureDomain: "az1",
+		metav1.LabelZoneFailureDomain: "az1",
 	}
 	podLabel1 := map[string]string{
 		"security": "S1",

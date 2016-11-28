@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -344,7 +344,7 @@ func TestMaybeConvert(t *testing.T) {
 			},
 			gv: schema.GroupVersion{Group: "", Version: "v1"},
 			expected: &v1.Pod{
-				TypeMeta: unversioned.TypeMeta{
+				TypeMeta: metav1.TypeMeta{
 					APIVersion: "v1",
 					Kind:       "Pod",
 				},

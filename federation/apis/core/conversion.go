@@ -24,7 +24,7 @@ import (
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	return scheme.AddConversionFuncs(
-		api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
+		api.Convert_v1_TypeMeta_To_v1_TypeMeta,
 		api.Convert_unversioned_ListMeta_To_unversioned_ListMeta,
 		api.Convert_intstr_IntOrString_To_intstr_IntOrString,
 		api.Convert_unversioned_Time_To_unversioned_Time,

@@ -21,8 +21,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
@@ -95,8 +95,8 @@ func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conver
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {

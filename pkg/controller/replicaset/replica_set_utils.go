@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1"
@@ -113,7 +113,7 @@ func calculateStatus(rs extensions.ReplicaSet, filteredPods []*v1.Pod, manageRep
 		}
 		if v1.IsPodReady(pod) {
 			readyReplicasCount++
-			if v1.IsPodAvailable(pod, rs.Spec.MinReadySeconds, unversioned.Now()) {
+			if v1.IsPodAvailable(pod, rs.Spec.MinReadySeconds, metav1.Now()) {
 				availableReplicasCount++
 			}
 		}
@@ -145,7 +145,7 @@ func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status 
 	return extensions.ReplicaSetCondition{
 		Type:               condType,
 		Status:             status,
-		LastTransitionTime: unversioned.Now(),
+		LastTransitionTime: metav1.Now(),
 		Reason:             reason,
 		Message:            msg,
 	}

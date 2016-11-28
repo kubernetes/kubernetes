@@ -18,7 +18,7 @@ package core
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
@@ -59,7 +59,7 @@ var (
 )
 
 func addKnownTypes(scheme *runtime.Scheme) error {
-	if err := scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
 		return err
 	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
@@ -79,12 +79,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 	// Register Unversioned types under their own special group
 	scheme.AddUnversionedTypes(Unversioned,
-		&unversioned.ExportOptions{},
-		&unversioned.Status{},
-		&unversioned.APIVersions{},
-		&unversioned.APIGroupList{},
-		&unversioned.APIGroup{},
-		&unversioned.APIResourceList{},
+		&metav1.ExportOptions{},
+		&metav1.Status{},
+		&metav1.APIVersions{},
+		&metav1.APIGroupList{},
+		&metav1.APIGroup{},
+		&metav1.APIResourceList{},
 	)
 	return nil
 }

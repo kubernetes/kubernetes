@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	apiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,7 +56,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				},
 			})
 			Eventually(func() string {
-				sinceTime := apiUnversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
+				sinceTime := metav1.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
 				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream()
 				if err != nil {
 					return ""

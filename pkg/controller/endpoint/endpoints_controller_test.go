@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -43,7 +43,7 @@ var emptyNodeName string
 func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int) {
 	for i := 0; i < nPods+nNotReady; i++ {
 		p := &v1.Pod{
-			TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+			TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 			ObjectMeta: v1.ObjectMeta{
 				Namespace: namespace,
 				Name:      fmt.Sprintf("pod%d", i),
@@ -125,7 +125,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 	// below.
 	testServer, _ := makeTestServer(t, v1.NamespaceAll,
 		serverResponse{http.StatusOK, &v1.EndpointsList{
-			ListMeta: unversioned.ListMeta{
+			ListMeta: metav1.ListMeta{
 				ResourceVersion: "1",
 			},
 			Items: []v1.Endpoints{{

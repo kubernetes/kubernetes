@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
@@ -126,7 +126,7 @@ type RollingUpdater struct {
 	// getReadyPods returns the amount of old and new ready pods.
 	getReadyPods func(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error)
 	// nowFn returns the current time used to calculate the minReadySeconds
-	nowFn func() unversioned.Time
+	nowFn func() metav1.Time
 }
 
 // NewRollingUpdater creates a RollingUpdater from a client.
@@ -141,7 +141,7 @@ func NewRollingUpdater(namespace string, rcClient coreclient.ReplicationControll
 	updater.getOrCreateTargetController = updater.getOrCreateTargetControllerWithClient
 	updater.getReadyPods = updater.readyPods
 	updater.cleanup = updater.cleanupWithClients
-	updater.nowFn = func() unversioned.Time { return unversioned.Now() }
+	updater.nowFn = func() metav1.Time { return metav1.Now() }
 	return updater
 }
 
@@ -409,7 +409,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 	oldReady := int32(0)
 	newReady := int32(0)
 	if r.nowFn == nil {
-		r.nowFn = func() unversioned.Time { return unversioned.Now() }
+		r.nowFn = func() metav1.Time { return metav1.Now() }
 	}
 
 	for i := range controllers {

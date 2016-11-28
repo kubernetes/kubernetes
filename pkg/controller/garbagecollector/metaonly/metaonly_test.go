@@ -23,7 +23,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -32,7 +32,7 @@ import (
 
 func getPod() *v1.Pod {
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -63,7 +63,7 @@ func getPodJson(t *testing.T) []byte {
 
 func getPodListJson(t *testing.T) []byte {
 	data, err := json.Marshal(&v1.PodList{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "PodList",
 			APIVersion: "v1",
 		},

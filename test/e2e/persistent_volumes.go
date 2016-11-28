@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -703,7 +703,7 @@ func makeWritePod(ns string, pvcName string) *v1.Pod {
 
 	var isPrivileged bool = true
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},

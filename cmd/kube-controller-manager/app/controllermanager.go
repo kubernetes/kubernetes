@@ -33,7 +33,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -358,7 +358,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	if err != nil {
 		glog.Fatalf("Failed to get api versions from server: %v", err)
 	}
-	versions := &unversioned.APIVersions{Versions: versionStrings}
+	versions := &metav1.APIVersions{Versions: versionStrings}
 
 	resourceMap, err := discoveryClient.ServerResources()
 	if err != nil {
@@ -591,7 +591,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	select {}
 }
 
-func containsVersion(versions *unversioned.APIVersions, version string) bool {
+func containsVersion(versions *metav1.APIVersions, version string) bool {
 	for ix := range versions.Versions {
 		if versions.Versions[ix] == version {
 			return true
@@ -600,7 +600,7 @@ func containsVersion(versions *unversioned.APIVersions, version string) bool {
 	return false
 }
 
-func containsResource(resources *unversioned.APIResourceList, resourceName string) bool {
+func containsResource(resources *metav1.APIResourceList, resourceName string) bool {
 	for ix := range resources.APIResources {
 		resource := resources.APIResources[ix]
 		if resource.Name == resourceName {

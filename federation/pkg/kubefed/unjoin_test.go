@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -183,7 +183,7 @@ func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 				case http.MethodGet:
 					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &cluster)}, nil
 				case http.MethodDelete:
-					status := unversioned.Status{
+					status := metav1.Status{
 						Status: "Success",
 					}
 					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
@@ -213,7 +213,7 @@ func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 				if got != name {
 					return nil, errors.NewNotFound(api.Resource("secrets"), got)
 				}
-				status := unversioned.Status{
+				status := metav1.Status{
 					Status: "Success",
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil

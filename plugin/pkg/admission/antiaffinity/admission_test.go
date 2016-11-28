@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -92,7 +92,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 								}]
 							},
 							"namespaces": [],
-							"topologyKey": "` + unversioned.LabelHostname + `"
+							"topologyKey": "` + metav1.LabelHostname + `"
 						}]
 					}}`,
 			},
@@ -112,7 +112,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 								}]
 							},
 							"namespaces":[],
-							"topologyKey": "` + unversioned.LabelHostname + `"
+							"topologyKey": "` + metav1.LabelHostname + `"
 						}]
 					}}`,
 			},
@@ -173,7 +173,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 								}]
 							},
 							"namespaces":[],
-							"topologyKey": "` + unversioned.LabelHostname + `"
+							"topologyKey": "` + metav1.LabelHostname + `"
 						},
 						{
 							"labelSelector": {
@@ -195,7 +195,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 								}]
 							},
 							"namespaces": [],
-							"topologyKey": "` + unversioned.LabelHostname + `"
+							"topologyKey": "` + metav1.LabelHostname + `"
 						}]
 					}}`,
 			},

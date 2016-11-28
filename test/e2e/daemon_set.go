@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
@@ -158,7 +158,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: complexLabel},
+				Selector: &metav1.LabelSelector{MatchLabels: complexLabel},
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
 						Labels: complexLabel,
@@ -226,7 +226,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: complexLabel},
+				Selector: &metav1.LabelSelector{MatchLabels: complexLabel},
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
 						Labels:      complexLabel,
@@ -323,7 +323,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 			newLabels, _ = separateDaemonSetNodeLabels(newNode.Labels)
 			return true, err
 		}
-		if se, ok := err.(*apierrs.StatusError); ok && se.ErrStatus.Reason == unversioned.StatusReasonConflict {
+		if se, ok := err.(*apierrs.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 			framework.Logf("failed to update node due to resource version conflict")
 			return false, nil
 		}

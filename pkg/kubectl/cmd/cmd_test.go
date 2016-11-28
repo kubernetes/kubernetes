@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
@@ -161,7 +161,7 @@ func Example_printReplicationControllerWithNamespace() {
 			Name:              "foo",
 			Namespace:         "beep",
 			Labels:            map[string]string{"foo": "bar"},
-			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
@@ -210,7 +210,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "foo",
 			Labels:            map[string]string{"foo": "bar"},
-			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
@@ -261,7 +261,7 @@ func Example_printReplicationController() {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "foo",
 			Labels:            map[string]string{"foo": "bar"},
-			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
@@ -313,7 +313,7 @@ func Example_printPodWithWideFormat() {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "test1",
-			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: api.PodSpec{
 			Containers: make([]api.Container, 2),
@@ -353,7 +353,7 @@ func Example_printPodWithShowLabels() {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "test1",
-			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 			Labels: map[string]string{
 				"l1": "key",
 				"l2": "value",
@@ -388,7 +388,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test1",
-					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -405,7 +405,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test2",
-					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -422,7 +422,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test3",
-					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -439,7 +439,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test4",
-					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -456,7 +456,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test5",
-					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -548,7 +548,7 @@ func Example_printServiceWithNamespacesAndLabels() {
 				ObjectMeta: api.ObjectMeta{
 					Name:              "svc1",
 					Namespace:         "ns1",
-					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 					Labels: map[string]string{
 						"l1": "value",
 					},
@@ -569,7 +569,7 @@ func Example_printServiceWithNamespacesAndLabels() {
 				ObjectMeta: api.ObjectMeta{
 					Name:              "svc2",
 					Namespace:         "ns2",
-					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 					Labels: map[string]string{
 						"l1": "dolla-bill-yall",
 					},

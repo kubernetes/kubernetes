@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -306,7 +306,7 @@ func (jm *JobController) syncJob(key string) error {
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(key)
-	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+	selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 	pods, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
 		return err
@@ -317,7 +317,7 @@ func (jm *JobController) syncJob(key string) error {
 	succeeded, failed := getStatus(pods)
 	conditions := len(job.Status.Conditions)
 	if job.Status.StartTime == nil {
-		now := unversioned.Now()
+		now := metav1.Now()
 		job.Status.StartTime = &now
 	}
 	// if job was finished previously, we don't want to redo the termination
@@ -380,7 +380,7 @@ func (jm *JobController) syncJob(key string) error {
 		}
 		if complete {
 			job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
-			now := unversioned.Now()
+			now := metav1.Now()
 			job.Status.CompletionTime = &now
 		}
 	}
@@ -403,7 +403,7 @@ func pastActiveDeadline(job *batch.Job) bool {
 	if job.Spec.ActiveDeadlineSeconds == nil || job.Status.StartTime == nil {
 		return false
 	}
-	now := unversioned.Now()
+	now := metav1.Now()
 	start := job.Status.StartTime.Time
 	duration := now.Time.Sub(start)
 	allowedDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds) * time.Second
@@ -414,8 +414,8 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 	return batch.JobCondition{
 		Type:               conditionType,
 		Status:             v1.ConditionTrue,
-		LastProbeTime:      unversioned.Now(),
-		LastTransitionTime: unversioned.Now(),
+		LastProbeTime:      metav1.Now(),
+		LastTransitionTime: metav1.Now(),
 		Reason:             reason,
 		Message:            message,
 	}

@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -667,7 +667,7 @@ func TestGenerateDeployment(t *testing.T) {
 				},
 				Spec: extensions.DeploymentSpec{
 					Replicas: 3,
-					Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar", "baz": "blah"}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar", "baz": "blah"}},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -758,7 +758,7 @@ func TestGenerateJob(t *testing.T) {
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: batch.JobSpec{
-					Selector: &unversioned.LabelSelector{
+					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar", "baz": "blah"},
 					},
 					ManualSelector: newBool(true),

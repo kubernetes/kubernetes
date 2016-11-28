@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -86,7 +86,7 @@ func TestProvision(t *testing.T) {
 	assert.Error(err, "Provision() did not fail with Parameters specified")
 
 	// selectors are not supported
-	pvc.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"key": "value"}}
+	pvc.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"key": "value"}}
 	options = volume.VolumeOptions{
 		PVC: pvc,
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
