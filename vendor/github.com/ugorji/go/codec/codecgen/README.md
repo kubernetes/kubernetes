@@ -23,6 +23,7 @@ Usage of codecgen:
   -c="github.com/ugorji/go/codec": codec path
   -o="": out file
   -r=".*": regex for type name to match
+  -nr="": regex for type name to exclude
   -rt="": tags for go run
   -t="": build tag to put in file
   -u=false: Use unsafe, e.g. to avoid unnecessary allocation on []byte->string
