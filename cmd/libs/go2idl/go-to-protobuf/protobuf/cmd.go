@@ -65,7 +65,7 @@ func New() *Generator {
 			`+k8s.io/kubernetes/pkg/runtime/schema`,
 			`+k8s.io/kubernetes/pkg/runtime`,
 			`+k8s.io/kubernetes/pkg/watch/versioned`,
-			`k8s.io/kubernetes/pkg/api/unversioned`,
+			`k8s.io/kubernetes/pkg/apis/meta/v1`,
 			`k8s.io/kubernetes/pkg/api/v1`,
 			`k8s.io/kubernetes/pkg/apis/policy/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/extensions/v1beta1`,
