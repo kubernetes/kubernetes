@@ -50,8 +50,7 @@ scheduling policies to apply, and can add new ones.
 ### Policies (Predicates and Priorities)
 
 The built-in predicates and priorities are
-defined in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithm/predicates/predicates.go) and
-[plugin/pkg/scheduler/algorithm/priorities/priorities.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithm/priorities/priorities.go), respectively.
+defined in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithm/predicates/predicates.go) and the directory  [plugin/pkg/scheduler/algorithm/priorities](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithm/priorities/) , respectively.
 
 ### Modifying policies
 
@@ -60,7 +59,7 @@ the policies used are selected by the functions `defaultPredicates()` and `defau
 [plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go).
 However, the choice of policies can be overridden by passing the command-line flag `--policy-config-file` to the scheduler, pointing to a JSON file specifying which scheduling policies to use. See [examples/scheduler-policy-config.json](../../examples/scheduler-policy-config.json) for an example
 config file. (Note that the config file format is versioned; the API is defined in [plugin/pkg/scheduler/api](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/api/)).
-Thus to add a new scheduling policy, you should modify predicates.go or priorities.go, and either register the policy in `defaultPredicates()` or `defaultPriorities()`, or use a policy config file.
+Thus to add a new scheduling policy, you should modify [plugin/pkg/scheduler/algorithm/predicates/predicates.go] (http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithm/predicates/predicates.go) or add to the directory  [plugin/pkg/scheduler/algorithm/priorities](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithm/priorities/), and either register the policy in `defaultPredicates()` or `defaultPriorities()`, or use a policy config file.
 
 ## Exploring the code
 
