@@ -42,8 +42,9 @@ func newNativeStorage(c storagebackend.Config, embedded bool) (storage.Interface
 	initMutex.Lock()
 	defer initMutex.Unlock()
 	if client == nil {
-		var grpcServerUrlString string
+		var grpcServerURLString string
 		if embedded {
+			glog.Infof("Using embedded StateServer")
 			options := &native.ServerOptions{}
 			options.InitDefaults()
 
@@ -64,7 +65,7 @@ func newNativeStorage(c storagebackend.Config, embedded bool) (storage.Interface
 				}
 			}
 
-			grpcServerUrlString = "http://" + options.ClientBind
+			grpcServerURLString = "http://" + options.ClientBind
 		} else {
 			if len(c.ServerList) == 0 {
 				return nil, nil, fmt.Errorf("no servers provided")
@@ -73,21 +74,23 @@ func newNativeStorage(c storagebackend.Config, embedded bool) (storage.Interface
 			if len(c.ServerList) > 1 {
 				glog.Warningf("ignoring additional state servers: %s", c.ServerList)
 			}
-			grpcServerUrlString = c.ServerList[0]
+			grpcServerURLString = c.ServerList[0]
+
+			glog.Infof("Using native StateServer: %q", grpcServerURLString)
 		}
 
-		grpcServerUrl, err := url.Parse(grpcServerUrlString)
+		grpcServerURL, err := url.Parse(grpcServerURLString)
 		if err != nil {
-			return nil, nil, fmt.Errorf("cannot parse server url: %q", grpcServerUrlString)
+			return nil, nil, fmt.Errorf("cannot parse server url: %q", grpcServerURLString)
 		}
 		var opts []grpc.DialOption
-		if grpcServerUrl.Scheme == "http" {
+		if grpcServerURL.Scheme == "http" {
 			opts = append(opts, grpc.WithInsecure())
 		} else {
-			return nil, nil, fmt.Errorf("unhandled scheme: %q", grpcServerUrlString)
+			return nil, nil, fmt.Errorf("unhandled scheme: %q", grpcServerURLString)
 		}
 
-		host := grpcServerUrl.Host
+		host := grpcServerURL.Host
 
 		conn, err := grpc.Dial(host, opts...)
 		if err != nil {
