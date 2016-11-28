@@ -17,6 +17,7 @@ go_library(
         "doc.go",
         "import_known_versions.go",
         "master.go",
+        "services.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -66,6 +67,7 @@ go_library(
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/rest:go_default_library",
         "//pkg/registry/core/service:go_default_library",
+        "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/core/service/ipallocator/controller:go_default_library",
         "//pkg/registry/core/service/portallocator/controller:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
