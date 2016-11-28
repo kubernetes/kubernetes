@@ -110,7 +110,7 @@ func removeZoneFromZones(zones []string, zone string) []string {
 	return zones
 }
 
-var _ = framework.KubeDescribe("HA-master", func() {
+var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 	f := framework.NewDefaultFramework("ha-master")
 	var c clientset.Interface
 	var ns string
