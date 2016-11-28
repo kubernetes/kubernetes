@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -41,11 +41,11 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 	podTestSpecs := []podTestSpec{
 		{
 			evictionPriority: 1, // This pod should be evicted before the normal memory usage pod
-			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "container-inode-hog-pod"},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyNever,
-					Containers: []api.Container{
+			pod: v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "container-inode-hog-pod"},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
 						{
 							Image: "gcr.io/google_containers/busybox:1.24",
 							Name:  "container-inode-hog-pod",
@@ -61,11 +61,11 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 		},
 		{
 			evictionPriority: 1, // This pod should be evicted before the normal memory usage pod
-			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "volume-inode-hog-pod"},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyNever,
-					Containers: []api.Container{
+			pod: v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "volume-inode-hog-pod"},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
 						{
 							Image: "gcr.io/google_containers/busybox:1.24",
 							Name:  "volume-inode-hog-pod",
@@ -74,24 +74,24 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 								"-c", // Make 100 billion small files (more than we have inodes)
 								"i=0; while [[ $i -lt 100000000000 ]]; do touch /test-empty-dir-mnt/smallfile$i.txt; sleep 0.001; i=$((i+=1)); done;",
 							},
-							VolumeMounts: []api.VolumeMount{
+							VolumeMounts: []v1.VolumeMount{
 								{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
 							},
 						},
 					},
-					Volumes: []api.Volume{
-						{Name: "test-empty-dir", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+					Volumes: []v1.Volume{
+						{Name: "test-empty-dir", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 					},
 				},
 			},
 		},
 		{
 			evictionPriority: 0, // This pod should never be evicted
-			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "normal-memory-usage-pod"},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyNever,
-					Containers: []api.Container{
+			pod: v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "normal-memory-usage-pod"},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
 						{
 							Image: "gcr.io/google_containers/busybox:1.24",
 							Name:  "normal-memory-usage-pod",
@@ -118,7 +118,7 @@ type podTestSpec struct {
 	// If two are ranked at 1, either is permitted to fail before the other.
 	// The test ends when all other than the 0 have been evicted
 	evictionPriority int
-	pod              api.Pod
+	pod              v1.Pod
 }
 
 // runEvictionTest sets up a testing environment given the provided nodes, and checks a few things:
@@ -152,7 +152,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 
 			Eventually(func() error {
 				// Gather current information
-				updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(api.ListOptions{})
+				updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{})
 				updatedPods := updatedPodList.Items
 				for _, p := range updatedPods {
 					framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
@@ -163,7 +163,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 				By("checking eviction ordering and ensuring important pods dont fail")
 				done := true
 				for _, priorityPodSpec := range podTestSpecs {
-					var priorityPod api.Pod
+					var priorityPod v1.Pod
 					for _, p := range updatedPods {
 						if p.Name == priorityPodSpec.pod.Name {
 							priorityPod = p
@@ -174,27 +174,27 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 					// Check eviction ordering.
 					// Note: it is alright for a priority 1 and priority 2 pod (for example) to fail in the same round
 					for _, lowPriorityPodSpec := range podTestSpecs {
-						var lowPriorityPod api.Pod
+						var lowPriorityPod v1.Pod
 						for _, p := range updatedPods {
 							if p.Name == lowPriorityPodSpec.pod.Name {
 								lowPriorityPod = p
 							}
 						}
 						Expect(lowPriorityPod).NotTo(BeNil())
-						if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == api.PodRunning {
-							Expect(priorityPod.Status.Phase).NotTo(Equal(api.PodFailed),
+						if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == v1.PodRunning {
+							Expect(priorityPod.Status.Phase).NotTo(Equal(v1.PodFailed),
 								fmt.Sprintf("%s pod failed before %s pod", priorityPodSpec.pod.Name, lowPriorityPodSpec.pod.Name))
 						}
 					}
 
 					// EvictionPriority 0 pods should not fail
 					if priorityPodSpec.evictionPriority == 0 {
-						Expect(priorityPod.Status.Phase).NotTo(Equal(api.PodFailed),
+						Expect(priorityPod.Status.Phase).NotTo(Equal(v1.PodFailed),
 							fmt.Sprintf("%s pod failed (and shouldn't have failed)", priorityPod.Name))
 					}
 
 					// If a pod that is not evictionPriority 0 has not been evicted, we are not done
-					if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != api.PodFailed {
+					if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != v1.PodFailed {
 						done = false
 					}
 				}
@@ -222,13 +222,13 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 
 			By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
-			f.PodClient().Create(&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			f.PodClient().Create(&v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Name: podName,
 				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyNever,
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
 						{
 							Image: "gcr.io/google_containers/busybox:1.24",
 							Name:  podName,
@@ -247,15 +247,15 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 // Returns TRUE if the node has disk pressure due to inodes exists on the node, FALSE otherwise
 func hasInodePressure(f *framework.Framework, testCondition string) (bool, error) {
 
-	nodeList, err := f.ClientSet.Core().Nodes().List(api.ListOptions{})
+	nodeList, err := f.ClientSet.Core().Nodes().List(v1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	if len(nodeList.Items) != 1 {
 		return false, fmt.Errorf("expected 1 node, but see %d. List: %v", len(nodeList.Items), nodeList.Items)
 	}
 
-	_, pressure := api.GetNodeCondition(&nodeList.Items[0].Status, api.NodeDiskPressure)
+	_, pressure := v1.GetNodeCondition(&nodeList.Items[0].Status, v1.NodeDiskPressure)
 	Expect(pressure).NotTo(BeNil())
-	hasPressure := pressure.Status == api.ConditionTrue
+	hasPressure := pressure.Status == v1.ConditionTrue
 	By(fmt.Sprintf("checking if pod has %s: %v", testCondition, hasPressure))
 
 	// Additional Logging relating to Inodes
