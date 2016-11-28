@@ -73,8 +73,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus,
 		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
 		Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
-		Convert_v1beta1_ExportOptions_To_api_ExportOptions,
-		Convert_api_ExportOptions_To_v1beta1_ExportOptions,
 		Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions,
 		Convert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions,
 		Convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath,
@@ -616,26 +614,6 @@ func autoConvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in 
 		out.RollingUpdate = nil
 	}
 	return nil
-}
-
-func autoConvert_v1beta1_ExportOptions_To_api_ExportOptions(in *ExportOptions, out *api.ExportOptions, s conversion.Scope) error {
-	out.Export = in.Export
-	out.Exact = in.Exact
-	return nil
-}
-
-func Convert_v1beta1_ExportOptions_To_api_ExportOptions(in *ExportOptions, out *api.ExportOptions, s conversion.Scope) error {
-	return autoConvert_v1beta1_ExportOptions_To_api_ExportOptions(in, out, s)
-}
-
-func autoConvert_api_ExportOptions_To_v1beta1_ExportOptions(in *api.ExportOptions, out *ExportOptions, s conversion.Scope) error {
-	out.Export = in.Export
-	out.Exact = in.Exact
-	return nil
-}
-
-func Convert_api_ExportOptions_To_v1beta1_ExportOptions(in *api.ExportOptions, out *ExportOptions, s conversion.Scope) error {
-	return autoConvert_api_ExportOptions_To_v1beta1_ExportOptions(in, out, s)
 }
 
 func autoConvert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(in *FSGroupStrategyOptions, out *extensions.FSGroupStrategyOptions, s conversion.Scope) error {

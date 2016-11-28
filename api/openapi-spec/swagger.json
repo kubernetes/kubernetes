@@ -958,7 +958,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -1355,7 +1355,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -1752,7 +1752,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -2149,7 +2149,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -2546,7 +2546,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -3079,7 +3079,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -4538,7 +4538,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -4935,7 +4935,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -5604,7 +5604,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -6137,7 +6137,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -6534,7 +6534,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -6865,7 +6865,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -7568,7 +7568,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -8133,7 +8133,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -9089,7 +9089,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -14890,7 +14890,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -16230,7 +16230,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -17161,7 +17161,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -18136,7 +18136,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -18669,7 +18669,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -19202,7 +19202,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -20635,7 +20635,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -21749,7 +21749,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -22282,7 +22282,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -23015,7 +23015,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -23548,7 +23548,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -24081,7 +24081,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -24614,7 +24614,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -25011,7 +25011,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -25962,7 +25962,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -28364,7 +28364,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
@@ -31833,7 +31833,7 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
        "name": "exact",
        "in": "query"
       },
