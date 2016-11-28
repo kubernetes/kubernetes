@@ -300,7 +300,7 @@ func (s *FSM) opUpdate(op *StorageOperation) (*StorageOperationResult, bool) {
 	}
 
 	//s.lastLSN++
-	//lsn := s.lastLSN
+	lsn := s.lastLSN
 	//log := &logEntry{lsn: lsn}
 	//log.items = []logItem{{b.path + k, watch.Modified, newItem.data}}
 
@@ -313,7 +313,7 @@ func (s *FSM) opUpdate(op *StorageOperation) (*StorageOperationResult, bool) {
 	b.items[k] = itemData{
 		uid:    types.UID(op.ItemData.Uid),
 		data:   op.ItemData.Data,
-		lsn:    LSN(op.ItemData.Lsn),
+		lsn:    lsn,
 		expiry: expiry,
 	}
 
@@ -330,9 +330,9 @@ func (s *FSM) opUpdate(op *StorageOperation) (*StorageOperationResult, bool) {
 			Uid:  op.ItemData.Uid,
 			Data: op.ItemData.Data,
 			Ttl:  op.ItemData.Ttl,
-			Lsn:  uint64(s.lastLSN),
+			Lsn:  uint64(lsn),
 		},
-		CurrentLsn: uint64(s.lastLSN),
+		CurrentLsn: uint64(lsn),
 	}, true
 }
 
