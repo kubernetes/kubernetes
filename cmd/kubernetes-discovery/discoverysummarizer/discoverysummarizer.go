@@ -24,6 +24,13 @@ import (
 
 	config "k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer/apis/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+
+	// force compilation of packages we'll later rely upon
+	_ "k8s.io/kubernetes/apifederator/pkg/apis/apifederation/install"
+	_ "k8s.io/kubernetes/apifederator/pkg/apis/apifederation/validation"
+	_ "k8s.io/kubernetes/apifederator/pkg/client/clientset_generated/internalclientset"
+	_ "k8s.io/kubernetes/apifederator/pkg/client/listers/apifederation/internalversion"
+	_ "k8s.io/kubernetes/apifederator/pkg/client/listers/apifederation/v1alpha1"
 )
 
 type DiscoverySummarizer interface {

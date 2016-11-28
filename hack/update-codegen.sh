@@ -80,3 +80,6 @@ LISTERGEN_APIS=$(IFS=,; echo "${LISTERGEN_APIS[*]}")
 ${listergen} --input-dirs "${LISTERGEN_APIS}" "$@"
 
 # You may add additional calls of code generators like set-gen above.
+
+# call generation on sub-project for now
+apifederator/hack/update-codegen.sh

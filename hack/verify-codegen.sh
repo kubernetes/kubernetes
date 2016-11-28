@@ -23,4 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+# call verify on sub-project for now
+apifederator/hack/verify-codegen.sh
+
 "${KUBE_ROOT}/hack/update-codegen.sh" --verify-only
+
