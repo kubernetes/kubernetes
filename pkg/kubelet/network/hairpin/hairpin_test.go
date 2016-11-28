@@ -17,74 +17,11 @@ limitations under the License.
 package hairpin
 
 import (
-	"errors"
 	"fmt"
-	"net"
 	"os"
 	"strings"
 	"testing"
-
-	"k8s.io/kubernetes/pkg/util/exec"
 )
-
-func TestFindPairInterfaceOfContainerInterface(t *testing.T) {
-	// there should be at least "lo" on any system
-	interfaces, _ := net.Interfaces()
-	validOutput := fmt.Sprintf("garbage\n   peer_ifindex: %d", interfaces[0].Index)
-	invalidOutput := fmt.Sprintf("garbage\n   unknown: %d", interfaces[0].Index)
-
-	tests := []struct {
-		output       string
-		err          error
-		expectedName string
-		expectErr    bool
-	}{
-		{
-			output:       validOutput,
-			expectedName: interfaces[0].Name,
-		},
-		{
-			output:    invalidOutput,
-			expectErr: true,
-		},
-		{
-			output:    validOutput,
-			err:       errors.New("error"),
-			expectErr: true,
-		},
-	}
-	for _, test := range tests {
-		fcmd := exec.FakeCmd{
-			CombinedOutputScript: []exec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test.output), test.err },
-			},
-		}
-		fexec := exec.FakeExec{
-			CommandScript: []exec.FakeCommandAction{
-				func(cmd string, args ...string) exec.Cmd {
-					return exec.InitFakeCmd(&fcmd, cmd, args...)
-				},
-			},
-			LookPathFunc: func(file string) (string, error) {
-				return fmt.Sprintf("/fake-bin/%s", file), nil
-			},
-		}
-		nsenterArgs := []string{"-t", "123", "-n"}
-		name, err := findPairInterfaceOfContainerInterface(&fexec, "eth0", "123", nsenterArgs)
-		if test.expectErr {
-			if err == nil {
-				t.Errorf("unexpected non-error")
-			}
-		} else {
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		}
-		if name != test.expectedName {
-			t.Errorf("unexpected name: %s (expected: %s)", name, test.expectedName)
-		}
-	}
-}
 
 func TestSetUpInterfaceNonExistent(t *testing.T) {
 	err := setUpInterface("non-existent")

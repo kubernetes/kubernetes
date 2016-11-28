@@ -11785,3 +11785,10 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:github.com/gogo/protobuf/proto"],
 )
+
+go_library(
+    name = "github.com/containernetworking/cni/pkg/ns",
+    srcs = ["github.com/containernetworking/cni/pkg/ns/ns.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/sys/unix"],
+)
