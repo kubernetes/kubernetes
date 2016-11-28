@@ -43,7 +43,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// Store implements generic.Registry.
+// Store implements pkg/api/rest.StandardStorage.
 // It's intended to be embeddable, so that you can implement any
 // non-generic functions if needed.
 // You must supply a value for every field below before use; these are
@@ -125,6 +125,8 @@ type Store struct {
 	// Used for all storage access functions
 	Storage storage.Interface
 }
+
+var _ rest.StandardStorage = &Store{}
 
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
