@@ -13,7 +13,7 @@ Environment variables are currently defined by servies or the `Env` object in a 
 The introduction of ConfigMaps adds a third possibility. To prevent any change in behavior, the `Env` object will still override any environment variable introduced by a ConfigMap. A ConfigMap is allowed to override variables defined by services.
 Variable references defined by an `EnvVar` struct can be resolved by values defined in other `EnvVar`s or those introduced by ConfigMaps and services.
 
-To prevent collisions amongst multiple ConfigMaps, each defined ConfigMap can have an optional associated prefix that is prepended to each key in the ConfigMap. Prefixes must be unique. A validation error will occur if two prefixes are identical.
+To prevent collisions amongst multiple ConfigMaps, each defined ConfigMap can have an optional associated prefix that is prepended to each key in the ConfigMap.  Prefixes must be a "C" identifier.
 
 ### Kubectl updates
 
@@ -26,7 +26,7 @@ A new `EnvFromSource` type containing a `ConfigMapRef` will be added to the `Con
 ```go
 // EnvFromSource represents the source of a set of ConfigMaps
 type EnvFromSource struct {
-  // A string to place in front of every key
+  // A string to place in front of every key. Must be a C_IDENTIFIER.
   // +optional
   Prefix string `json:"prefix,omitempty"`
 	// The ConfigMap to select from
@@ -36,7 +36,7 @@ type EnvFromSource struct {
 
 type Container struct {
   // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a "C" identifier. An invalid key
+  // The keys defined within a source must be a C_IDENTIFIER. An invalid key
   // will prevent the container from starting.
   // All env values will take precedence over any listed source.
   // Cannot be updated.
