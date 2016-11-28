@@ -164,7 +164,7 @@ func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 		DeserializationCacheSize: 0,
 	}
 	// Temporary hack to force native
-	o.StorageConfig.Type = storagebackend.StorageTypeNative
+	o.StorageConfig.Type = storagebackend.StorageTypeNativeEmbedded
 	return o
 }
 

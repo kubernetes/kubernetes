@@ -38,7 +38,9 @@ func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 		// - Support non-quorum read.
 		return newETCD3Storage(c)
 	case storagebackend.StorageTypeNative:
-		return newNativeStorage(c)
+		return newNativeStorage(c, false)
+	case storagebackend.StorageTypeNativeEmbedded:
+		return newNativeStorage(c, true)
 	default:
 		return nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}

@@ -28,38 +28,36 @@ import (
 	"time"
 )
 
-var clientMutex sync.Mutex
+var initMutex sync.Mutex
 var client native.StorageServiceClient
-var server *native.Server
+var embeddedServer *native.Server
 
-func newNativeStorage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+func newNativeStorage(c storagebackend.Config, embedded bool) (storage.Interface, DestroyFunc, error) {
 	destroyFunc := func() {
 		// TODO: what is the behaviour of this currently?
 		glog.Infof("native destroy function called")
 	}
 
 	// TODO: yuk
-	clientMutex.Lock()
-	defer clientMutex.Unlock()
+	initMutex.Lock()
+	defer initMutex.Unlock()
 	if client == nil {
 		var grpcServerUrlString string
-		if len(c.ServerList) == 0 {
-			// We assume embedded
-
+		if embedded {
 			options := &native.ServerOptions{}
 			options.InitDefaults()
 
-			if server == nil {
-				server = native.NewServer(options)
+			if embeddedServer == nil {
+				embeddedServer = native.NewServer(options)
 				go func() {
-					err := server.Run()
+					err := embeddedServer.Run()
 					if err != nil {
 						glog.Fatalf("embedded state server exited unexpectedly: %v", err)
 					}
 				}()
 
 				for {
-					if server.IsStarted() && server.IsLeader() {
+					if embeddedServer.IsStarted() && embeddedServer.IsLeader() {
 						break
 					}
 					time.Sleep(100 * time.Millisecond)
@@ -68,6 +66,10 @@ func newNativeStorage(c storagebackend.Config) (storage.Interface, DestroyFunc, 
 
 			grpcServerUrlString = "http://" + options.ClientBind
 		} else {
+			if len(c.ServerList) == 0 {
+				return nil, nil, fmt.Errorf("no servers provided")
+			}
+
 			if len(c.ServerList) > 1 {
 				glog.Warningf("ignoring additional state servers: %s", c.ServerList)
 			}
