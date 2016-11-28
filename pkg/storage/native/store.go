@@ -550,7 +550,7 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 
 	objMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return storage.NewInternalErrorf("can't get meta on un-introspectable object %v, got error: %v", obj, err)
+		return nil, storage.NewInternalErrorf("can't get meta on un-introspectable object %v, got error: %v", obj, err)
 	}
 	state.uid = objMeta.UID
 
