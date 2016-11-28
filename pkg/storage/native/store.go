@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
-	"time"
 	"sort"
+	"time"
 )
 
 type LSN uint64
@@ -359,7 +359,7 @@ func (s *store) GuaranteedUpdate(
 	}
 
 	var doCreate bool
-	var uid types.UID
+	var origUid types.UID
 	var origState *objState
 	if len(suggestion) == 1 && suggestion[0] != nil {
 		origState, err = s.getStateFromObject(suggestion[0])
@@ -372,7 +372,7 @@ func (s *store) GuaranteedUpdate(
 			return storage.NewInternalErrorf("can't get meta on un-introspectable object %v, got error: %v", origState.obj, err)
 		}
 
-		uid = objMeta.UID
+		origUid = objMeta.UID
 	} else {
 		op := &StorageOperation{
 			OpType: StorageOperationType_GET,
@@ -407,21 +407,21 @@ func (s *store) GuaranteedUpdate(
 				return err
 			}
 
-			uid = types.UID(result.ItemData.Uid)
+			origUid = types.UID(result.ItemData.Uid)
 		}
 	}
 
 	for {
-		if err := checkPreconditions(path, precondtions, uid); err != nil {
+		if err := checkPreconditions(path, precondtions, origUid); err != nil {
 			return err
 		}
 
-		ret, ttl, err := s.updateState(origState, tryUpdate)
+		newObj, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
 			return err
 		}
 
-		data, err := runtime.Encode(s.codec, ret)
+		data, err := runtime.Encode(s.codec, newObj)
 		if err != nil {
 			return err
 		}
@@ -429,7 +429,13 @@ func (s *store) GuaranteedUpdate(
 			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
 		}
 
-		newItem := itemData{uid, data, 0, 0}
+		objMeta, err := api.ObjectMetaFor(newObj)
+		if err != nil {
+			return storage.NewInternalErrorf("can't get meta on un-introspectable object %v, got error: %v", newObj, err)
+		}
+
+		newUid := objMeta.UID
+		newItem := itemData{newUid, data, 0, 0}
 		if ttl != 0 {
 			newItem.expiry = uint64(time.Now().Unix()) + ttl
 		}
