@@ -148,11 +148,11 @@ func (pm *basicManager) AddPod(pod *v1.Pod) {
 func (pm *basicManager) UpdatePodSpec(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	oldPod, ok := pm.podByUID[pod.UID]
-	if ok {
-		// Leave the status intact if possible
-		pod.Status = oldPod.Status
-	}
+	// oldPod, ok := pm.podByUID[pod.UID]
+	// if ok {
+	// 	// Leave the status intact if possible
+	// 	pod.Status = oldPod.Status
+	// }
 	pm.updatePodsInternal(pod)
 }
 
