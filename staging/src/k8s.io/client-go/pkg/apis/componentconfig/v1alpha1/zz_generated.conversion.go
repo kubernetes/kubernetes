@@ -21,11 +21,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/client-go/pkg/api"
-	componentconfig "k8s.io/client-go/pkg/apis/componentconfig"
-	conversion "k8s.io/client-go/pkg/conversion"
-	runtime "k8s.io/client-go/pkg/runtime"
-	config "k8s.io/client-go/pkg/util/config"
+	api "k8s.io/kubernetes/pkg/api"
+	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
+	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
+	config "k8s.io/kubernetes/pkg/util/config"
 	unsafe "unsafe"
 )
 
@@ -253,6 +253,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
 	out.ManifestURLHeader = in.ManifestURLHeader
+	out.ManifestURLHeaders = *(*[]string)(unsafe.Pointer(&in.ManifestURLHeaders))
 	if err := api.Convert_Pointer_bool_To_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
 		return err
 	}
@@ -422,6 +423,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
 	out.ManifestURLHeader = in.ManifestURLHeader
+	out.ManifestURLHeaders = *(*[]string)(unsafe.Pointer(&in.ManifestURLHeaders))
 	if err := api.Convert_bool_To_Pointer_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
 		return err
 	}

@@ -21,9 +21,9 @@ limitations under the License.
 package componentconfig
 
 import (
-	conversion "k8s.io/client-go/pkg/conversion"
-	runtime "k8s.io/client-go/pkg/runtime"
-	config "k8s.io/client-go/pkg/util/config"
+	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
+	config "k8s.io/kubernetes/pkg/util/config"
 	reflect "reflect"
 )
 
@@ -240,6 +240,13 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.HTTPCheckFrequency = in.HTTPCheckFrequency
 		out.ManifestURL = in.ManifestURL
 		out.ManifestURLHeader = in.ManifestURLHeader
+		if in.ManifestURLHeaders != nil {
+			in, out := &in.ManifestURLHeaders, &out.ManifestURLHeaders
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.ManifestURLHeaders = nil
+		}
 		out.EnableServer = in.EnableServer
 		out.Address = in.Address
 		out.Port = in.Port

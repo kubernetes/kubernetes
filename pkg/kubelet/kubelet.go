@@ -235,6 +235,17 @@ func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps
 		manifestURLHeader.Set(pieces[0], pieces[1])
 	}
 
+	// Support multi HTTP headers, values will be combined with kubeCfg.ManifestURLHeader
+	if len(kubeCfg.ManifestURLHeaders) > 0 {
+		for _, urlHeader := range kubeCfg.ManifestURLHeaders {
+			pieces := strings.Split(urlHeader, ":")
+			if len(pieces) != 2 {
+				return nil, fmt.Errorf("manifest-url-headers must have a single ':' key-value separator for every header, got %q", kubeCfg.ManifestURLHeader)
+			}
+			manifestURLHeader.Set(pieces[0], pieces[1])
+		}
+	}
+
 	// source of all configuration
 	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
 

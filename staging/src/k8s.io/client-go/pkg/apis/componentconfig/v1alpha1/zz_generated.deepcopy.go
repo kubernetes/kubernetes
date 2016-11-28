@@ -21,10 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
-
-	conversion "k8s.io/client-go/pkg/conversion"
-	runtime "k8s.io/client-go/pkg/runtime"
 )
 
 func init() {
@@ -170,6 +169,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.HTTPCheckFrequency = in.HTTPCheckFrequency
 		out.ManifestURL = in.ManifestURL
 		out.ManifestURLHeader = in.ManifestURLHeader
+		if in.ManifestURLHeaders != nil {
+			in, out := &in.ManifestURLHeaders, &out.ManifestURLHeaders
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.ManifestURLHeaders = nil
+		}
 		if in.EnableServer != nil {
 			in, out := &in.EnableServer, &out.EnableServer
 			*out = new(bool)
