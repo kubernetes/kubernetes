@@ -8,5 +8,5 @@ runcmd:
   - mount -B -o remount,exec /home/kubernetes/bin 
   - wget https://storage.googleapis.com/kubernetes-release/rkt/v1.18.0/rkt -O /home/kubernetes/bin/rkt
   - wget https://storage.googleapis.com/kubernetes-release/rkt/v1.18.0/stage1-fly.aci -O /home/kubernetes/bin/stage1-fly.aci
-  - wget https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-v2.aci -O /home/kubernetes/bin/gci-mounter-v2.aci
+  - wget https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-v3.aci -O /home/kubernetes/bin/gci-mounter-v3.aci
   - chmod a+x /home/kubernetes/bin/rkt
