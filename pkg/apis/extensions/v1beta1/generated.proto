@@ -289,15 +289,6 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
-// ExportOptions is the query options to the standard REST get call.
-message ExportOptions {
-  // Should this value be exported.  Export strips fields that a user can not specify.
-  optional bool export = 1;
-
-  // Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
-  optional bool exact = 2;
-}
-
 // FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
 message FSGroupStrategyOptions {
   // Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
