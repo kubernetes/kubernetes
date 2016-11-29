@@ -449,7 +449,21 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 	// Only delete the files if we are keeping the instance and want it cleaned up.
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
-	return testHost(host, deleteFiles, junitFilePrefix, *setupNode, ginkgoFlagsStr)
+
+	result := testHost(host, deleteFiles, junitFilePrefix, *setupNode, ginkgoFlagsStr)
+	// This is a temporary solution to collect serial node serial log. Only port 1 contains useful information.
+	// TODO(random-liu): Extract out and unify log collection logic with cluste e2e.
+	serialPortOutput, err := computeService.Instances.GetSerialPortOutput(*project, *zone, host).Port(1).Do()
+	if err != nil {
+		glog.Errorf("Failed to collect serial output from node %q: %v", host, err)
+	} else {
+		logFilename := "serial-1.log"
+		err := remote.WriteLog(host, logFilename, serialPortOutput.Contents)
+		if err != nil {
+			glog.Errorf("Failed to write serial output from node %q to %q: %v", host, logFilename, err)
+		}
+	}
+	return result
 }
 
 // Provision a gce instance using image
