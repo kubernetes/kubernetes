@@ -185,7 +185,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", false, "Ignore DaemonSet-managed pods.")
 	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
-	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
+	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up, zero means infinite")
 	return cmd
 }
 
@@ -249,13 +249,7 @@ func (o *DrainOptions) deleteOrEvictPodsSimple() error {
 	if err != nil {
 		return err
 	}
-	if o.Timeout == 0 {
-		maxGracePeriod := int64(math.Max(float64(o.GracePeriodSeconds), 30))
-		for _, pod := range pods {
-			maxGracePeriod = int64(math.Max(float64(maxGracePeriod), float64(*pod.Spec.TerminationGracePeriodSeconds)))
-		}
-		o.Timeout = kubectl.Timeout + time.Duration(maxGracePeriod)*time.Second
-	}
+
 	err = o.deleteOrEvictPods(pods)
 	if err != nil {
 		pendingPods, newErr := o.getPodsForDeletion()
@@ -489,21 +483,29 @@ func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getP
 				} else if apierrors.IsTooManyRequests(err) {
 					time.Sleep(5 * time.Second)
 				} else {
-					errCh <- err
+					errCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
 					return
 				}
 			}
 			podArray := []api.Pod{pod}
-			_, err = o.waitForDelete(podArray, kubectl.Interval, o.Timeout, true, getPodFn)
+			podTimeout := kubectl.Timeout + time.Duration(int64(math.Max(float64(o.GracePeriodSeconds), float64(*pod.Spec.TerminationGracePeriodSeconds))))*time.Second
+			_, err = o.waitForDelete(podArray, kubectl.Interval, podTimeout, true, getPodFn)
 			if err == nil {
 				doneCh <- true
 			} else {
-				errCh <- err
+				errCh <- fmt.Errorf("error when waiting for pod %q terminating: %v", pod.Name, err)
 			}
 		}(pod, doneCh, errCh)
 	}
 
 	doneCount := 0
+	// 0 timeout means infinite, we use MaxInt64 to represent it.
+	var globalTimeout time.Duration
+	if o.Timeout == 0 {
+		globalTimeout = time.Duration(math.MaxInt64)
+	} else {
+		globalTimeout = o.Timeout
+	}
 	for {
 		select {
 		case err := <-errCh:
@@ -513,20 +515,27 @@ func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getP
 			if doneCount == len(pods) {
 				return nil
 			}
-		case <-time.After(o.Timeout):
-			return fmt.Errorf("Drain did not complete within %v", o.Timeout)
+		case <-time.After(globalTimeout):
+			return fmt.Errorf("Drain did not complete within %v", globalTimeout)
 		}
 	}
 }
 
 func (o *DrainOptions) deletePods(pods []api.Pod, getPodFn func(namespace, name string) (*api.Pod, error)) error {
+	// 0 timeout means infinite, we use MaxInt64 to represent it.
+	var globalTimeout time.Duration
+	if o.Timeout == 0 {
+		globalTimeout = time.Duration(math.MaxInt64)
+	} else {
+		globalTimeout = o.Timeout
+	}
 	for _, pod := range pods {
 		err := o.deletePod(pod)
 		if err != nil {
 			return err
 		}
 	}
-	_, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, false, getPodFn)
+	_, err := o.waitForDelete(pods, kubectl.Interval, globalTimeout, false, getPodFn)
 	return err
 }
 
