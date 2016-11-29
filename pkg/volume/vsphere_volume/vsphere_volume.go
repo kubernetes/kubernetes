@@ -132,7 +132,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 		Name: volumeName,
 		VolumeSource: api.VolumeSource{
 			VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-				VolumePath: volumeName,
+				VolumePath: volumePath,
 			},
 		},
 	}
