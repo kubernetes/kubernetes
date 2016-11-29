@@ -27,8 +27,9 @@ package v1
 
 import (
 	"fmt"
-
 	"strings"
+
+	"github.com/ugorji/go/codec"
 )
 
 // TypeMeta describes an individual object in an API response or request
@@ -420,6 +421,27 @@ type Verbs []string
 
 func (vs Verbs) String() string {
 	return fmt.Sprintf("%v", []string(vs))
+}
+
+// CodecEncodeSelf is part of the codec.Selfer interface.
+func (vs *Verbs) CodecEncodeSelf(encoder *codec.Encoder) {
+	encoder.Encode(vs)
+}
+
+// CodecDecodeSelf is part of the codec.Selfer interface. It is overwritten here to make sure
+// that an empty verbs list is not decoded as nil. On the other hand, an undefined verbs list
+// will lead to nil because this decoding for Verbs is not invoked.
+//
+// TODO(sttts): this is due to a ugorji regression: https://github.com/ugorji/go/issues/119. Remove the
+// workaround when the regression is fixed.
+func (vs *Verbs) CodecDecodeSelf(decoder *codec.Decoder) {
+	m := []string{}
+	decoder.Decode(&m)
+	if len(m) == 0 {
+		*vs = []string{}
+	} else {
+		*vs = m
+	}
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
