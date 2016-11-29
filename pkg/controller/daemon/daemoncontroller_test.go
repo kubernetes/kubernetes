@@ -252,7 +252,7 @@ func allocatableResources(memory, cpu string) v1.ResourceList {
 }
 
 // DaemonSets should not place onto nodes with insufficient free resource
-func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
+func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 	manager, podControl := newTestController()
 	node := newNode("too-much-mem", nil)
@@ -267,7 +267,7 @@ func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
-func TestSufficentCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
+func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 	manager, podControl := newTestController()
 	node := newNode("too-much-mem", nil)
@@ -284,7 +284,7 @@ func TestSufficentCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 }
 
 // DaemonSets should place onto nodes with sufficient free resource
-func TestSufficentCapacityNodeDaemonLaunchesPod(t *testing.T) {
+func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
 	manager, podControl := newTestController()
 	node := newNode("not-too-much-mem", nil)
