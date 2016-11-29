@@ -18,6 +18,8 @@
 
 [ ! -z ${UTIL_SH_DEBUG+x} ] && set -x
 
+command -v kubectl >/dev/null 2>&1 || { echo >&2 "kubectl not found in path. Aborting."; exit 1; }
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
 source "$ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}"
@@ -208,14 +210,13 @@ function render-template {
 
 function wait-cluster-readiness {
   echo "Wait for cluster readiness"
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
   local timeout=120
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_nodes=$("${kubectl}" get nodes -o go-template="{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    nb_ready_nodes=$(kubectl get nodes -o go-template="{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
     echo "Nb ready nodes: $nb_ready_nodes / $NUM_NODES"
     if [[ "$nb_ready_nodes" -eq "$NUM_NODES" ]]; then
-        return 0
+      return 0
     fi
 
     timeout=$(($timeout-1))
@@ -283,7 +284,7 @@ function kube-up {
   echo
   echo "  http://${KUBE_MASTER_IP}:8080"
   echo
-  echo "You can control the Kubernetes cluster with: 'cluster/kubectl.sh'"
+  echo "You can control the Kubernetes cluster with: 'kubectl'"
   echo "You can connect on the master with: 'ssh core@${KUBE_MASTER_IP}'"
 
   wait-registry-readiness
@@ -292,11 +293,10 @@ function kube-up {
 
 function create_registry_rc() {
   echo " Create registry replication controller"
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" create -f $ROOT/registry-rc.yaml
+  kubectl create -f $ROOT/registry-rc.yaml
   local timeout=120
   while [[ $timeout -ne 0 ]]; do
-    phase=$("${kubectl}" get pods -n kube-system -lk8s-app=kube-registry --output='jsonpath={.items..status.phase}')
+    phase=$(kubectl get pods -n kube-system -lk8s-app=kube-registry --output='jsonpath={.items..status.phase}')
     if [ "$phase" = "Running" ]; then
       return 0
     fi
@@ -308,28 +308,26 @@ function create_registry_rc() {
 
 function create_registry_svc() {
   echo " Create registry service"
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/registry/registry-svc.yaml"
+  kubectl create -f "${KUBE_ROOT}/cluster/addons/registry/registry-svc.yaml"
 }
 
 function wait-registry-readiness() {
-  if [[ "$ENABLE_CLUSTER_REGISTRY" == "true" ]]; then
-    echo "Wait for registry readiness..."
-    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-
-    local timeout=120
-    while [[ $timeout -ne 0 ]]; do
-      phase=$("${kubectl}" get namespaces --output=jsonpath='{.items[?(@.metadata.name=="kube-system")].status.phase}')
-      if [ "$phase" = "Active" ]; then
-        create_registry_rc
-        create_registry_svc
-        return 0
-      fi
-      echo "waiting for namespace kube-system"
-      timeout=$(($timeout-1))
-      sleep .5
-    done
+  if [[ "$ENABLE_CLUSTER_REGISTRY" != "true" ]]; then
+    return 0
   fi
+  echo "Wait for registry readiness..."
+  local timeout=120
+  while [[ $timeout -ne 0 ]]; do
+    phase=$(kubectl get namespaces --output=jsonpath='{.items[?(@.metadata.name=="kube-system")].status.phase}')
+    if [ "$phase" = "Active" ]; then
+      create_registry_rc
+      create_registry_svc
+      return 0
+    fi
+    echo "waiting for namespace kube-system"
+    timeout=$(($timeout-1))
+    sleep .5
+  done
 }
 
 # Delete a kubernetes cluster
