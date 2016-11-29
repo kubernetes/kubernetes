@@ -24,7 +24,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -48,7 +48,7 @@ func newTestDockerService() (*dockerService, *dockertools.FakeDockerClient, *clo
 func TestStatus(t *testing.T) {
 	ds, fDocker, _ := newTestDockerService()
 
-	assertStatus := func(expected map[string]bool, status *runtimeApi.RuntimeStatus) {
+	assertStatus := func(expected map[string]bool, status *runtimeapi.RuntimeStatus) {
 		conditions := status.GetConditions()
 		assert.Equal(t, len(expected), len(conditions))
 		for k, v := range expected {
@@ -64,8 +64,8 @@ func TestStatus(t *testing.T) {
 	status, err := ds.Status()
 	assert.NoError(t, err)
 	assertStatus(map[string]bool{
-		runtimeApi.RuntimeReady: true,
-		runtimeApi.NetworkReady: true,
+		runtimeapi.RuntimeReady: true,
+		runtimeapi.NetworkReady: true,
 	}, status)
 
 	// Should not report ready status if version returns error.
@@ -73,8 +73,8 @@ func TestStatus(t *testing.T) {
 	status, err = ds.Status()
 	assert.NoError(t, err)
 	assertStatus(map[string]bool{
-		runtimeApi.RuntimeReady: false,
-		runtimeApi.NetworkReady: true,
+		runtimeapi.RuntimeReady: false,
+		runtimeapi.NetworkReady: true,
 	}, status)
 
 	// Should not report ready status is network plugin returns error.
@@ -85,7 +85,7 @@ func TestStatus(t *testing.T) {
 	status, err = ds.Status()
 	assert.NoError(t, err)
 	assertStatus(map[string]bool{
-		runtimeApi.RuntimeReady: true,
-		runtimeApi.NetworkReady: false,
+		runtimeapi.RuntimeReady: true,
+		runtimeapi.NetworkReady: false,
 	}, status)
 }

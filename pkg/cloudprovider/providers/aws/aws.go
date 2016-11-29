@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	aws_credentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
+	awscredentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
@@ -172,7 +172,7 @@ const DefaultVolumeType = "gp2"
 // See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
 const DefaultMaxEBSVolumes = 39
 
-// Used to call aws_credentials.Init() just once
+// Used to call awscredentials.Init() just once
 var once sync.Once
 
 // Services is an abstraction over AWS, to allow mocking/other implementations
@@ -720,7 +720,7 @@ func getAvailabilityZone(metadata EC2Metadata) (string, error) {
 }
 
 func isRegionValid(region string) bool {
-	for _, r := range aws_credentials.AWSRegions {
+	for _, r := range awscredentials.AWSRegions {
 		if r == region {
 			return true
 		}
@@ -836,7 +836,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 
 	// Register handler for ECR credentials
 	once.Do(func() {
-		aws_credentials.Init()
+		awscredentials.Init()
 	})
 
 	return awsCloud, nil

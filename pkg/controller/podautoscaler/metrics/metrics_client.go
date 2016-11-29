@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 )
 
 // PodResourceInfo contains pod resourcemetric values as a map from pod names to
@@ -92,7 +92,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 
 	glog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
 
-	metrics := metrics_api.PodMetricsList{}
+	metrics := metricsapi.PodMetricsList{}
 	err = json.Unmarshal(resultRaw, &metrics)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to unmarshal heapster response: %v", err)

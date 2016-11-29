@@ -20,19 +20,19 @@ import (
 	"hash/fnv"
 	"sort"
 
-	fed_api "k8s.io/kubernetes/federation/apis/federation"
+	fedapi "k8s.io/kubernetes/federation/apis/federation"
 )
 
 // Planner decides how many out of the given replicas should be placed in each of the
 // federated clusters.
 type Planner struct {
-	preferences *fed_api.FederatedReplicaSetPreferences
+	preferences *fedapi.FederatedReplicaSetPreferences
 }
 
 type namedClusterReplicaSetPreferences struct {
 	clusterName string
 	hash        uint32
-	fed_api.ClusterReplicaSetPreferences
+	fedapi.ClusterReplicaSetPreferences
 }
 
 type byWeight []*namedClusterReplicaSetPreferences
@@ -46,7 +46,7 @@ func (a byWeight) Less(i, j int) bool {
 	return (a[i].Weight > a[j].Weight) || (a[i].Weight == a[j].Weight && a[i].hash < a[j].hash)
 }
 
-func NewPlanner(preferences *fed_api.FederatedReplicaSetPreferences) *Planner {
+func NewPlanner(preferences *fedapi.FederatedReplicaSetPreferences) *Planner {
 	return &Planner{
 		preferences: preferences,
 	}
@@ -71,7 +71,7 @@ func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, c
 	plan := make(map[string]int64, len(preferences))
 	overflow := make(map[string]int64, len(preferences))
 
-	named := func(name string, pref fed_api.ClusterReplicaSetPreferences) *namedClusterReplicaSetPreferences {
+	named := func(name string, pref fedapi.ClusterReplicaSetPreferences) *namedClusterReplicaSetPreferences {
 		// Seems to work better than addler for our case.
 		hasher := fnv.New32()
 		hasher.Write([]byte(name))

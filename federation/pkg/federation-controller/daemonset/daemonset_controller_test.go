@@ -22,16 +22,16 @@ import (
 	"testing"
 	"time"
 
-	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	//"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -39,30 +39,30 @@ import (
 )
 
 func TestDaemonSetController(t *testing.T) {
-	cluster1 := NewCluster("cluster1", api_v1.ConditionTrue)
-	cluster2 := NewCluster("cluster2", api_v1.ConditionTrue)
+	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
+	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
-	fakeClient := &fake_fedclientset.Clientset{}
-	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
+	fakeClient := &fakefedclientset.Clientset{}
+	RegisterFakeList("clusters", &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
 	RegisterFakeList("daemonsets", &fakeClient.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
 	daemonsetWatch := RegisterFakeWatch("daemonsets", &fakeClient.Fake)
 	// daemonsetUpdateChan := RegisterFakeCopyOnUpdate("daemonsets", &fakeClient.Fake, daemonsetWatch)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
-	cluster1Client := &fake_kubeclientset.Clientset{}
+	cluster1Client := &fakekubeclientset.Clientset{}
 	cluster1Watch := RegisterFakeWatch("daemonsets", &cluster1Client.Fake)
 	RegisterFakeList("daemonsets", &cluster1Client.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
 	cluster1CreateChan := RegisterFakeCopyOnCreate("daemonsets", &cluster1Client.Fake, cluster1Watch)
 	// cluster1UpdateChan := RegisterFakeCopyOnUpdate("daemonsets", &cluster1Client.Fake, cluster1Watch)
 
-	cluster2Client := &fake_kubeclientset.Clientset{}
+	cluster2Client := &fakekubeclientset.Clientset{}
 	cluster2Watch := RegisterFakeWatch("daemonsets", &cluster2Client.Fake)
 	RegisterFakeList("daemonsets", &cluster2Client.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate("daemonsets", &cluster2Client.Fake, cluster2Watch)
 
 	daemonsetController := NewDaemonSetController(fakeClient)
 	informer := ToFederatedInformerForTestOnly(daemonsetController.daemonsetFederatedInformer)
-	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
+	informer.SetClientFactory(func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
 			return cluster1Client, nil
@@ -82,7 +82,7 @@ func TestDaemonSetController(t *testing.T) {
 	daemonsetController.Run(stop)
 
 	daemonset1 := extensionsv1.DaemonSet{
-		ObjectMeta: api_v1.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      "test-daemonset",
 			Namespace: "ns",
 			SelfLink:  "/api/v1/namespaces/ns/daemonsets/test-daemonset",
@@ -102,7 +102,7 @@ func TestDaemonSetController(t *testing.T) {
 		updatedDaemonSet := GetDaemonSetFromChan(daemonsetUpdateChan)
 		assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
 		updatedDaemonSet = GetDaemonSetFromChan(daemonsetUpdateChan)
-		assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, api_v1.FinalizerOrphan))
+		assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, apiv1.FinalizerOrphan))
 		daemonset1 = *updatedDaemonSet
 	*/
 	createdDaemonSet := GetDaemonSetFromChan(cluster1CreateChan)

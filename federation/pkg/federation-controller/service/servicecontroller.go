@@ -34,7 +34,7 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -164,7 +164,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	}
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
 				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
@@ -187,7 +187,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
 				return s.federationClient.Federation().Clusters().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {

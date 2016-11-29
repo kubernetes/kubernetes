@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
@@ -55,7 +55,7 @@ const (
 	DockerPullableImageIDPrefix = dockertools.DockerPullablePrefix
 )
 
-func makeSandboxName(s *runtimeApi.PodSandboxConfig) string {
+func makeSandboxName(s *runtimeapi.PodSandboxConfig) string {
 	return strings.Join([]string{
 		kubePrefix,                                 // 0
 		sandboxContainerName,                       // 1
@@ -66,7 +66,7 @@ func makeSandboxName(s *runtimeApi.PodSandboxConfig) string {
 	}, nameDelimiter)
 }
 
-func makeContainerName(s *runtimeApi.PodSandboxConfig, c *runtimeApi.ContainerConfig) string {
+func makeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerConfig) string {
 	return strings.Join([]string{
 		kubePrefix,                                 // 0
 		c.Metadata.GetName(),                       // 1:
@@ -87,7 +87,7 @@ func parseUint32(s string) (uint32, error) {
 }
 
 // TODO: Evaluate whether we should rely on labels completely.
-func parseSandboxName(name string) (*runtimeApi.PodSandboxMetadata, error) {
+func parseSandboxName(name string) (*runtimeapi.PodSandboxMetadata, error) {
 	// Docker adds a "/" prefix to names. so trim it.
 	name = strings.TrimPrefix(name, "/")
 
@@ -104,7 +104,7 @@ func parseSandboxName(name string) (*runtimeApi.PodSandboxMetadata, error) {
 		return nil, fmt.Errorf("failed to parse the sandbox name %q: %v", name, err)
 	}
 
-	return &runtimeApi.PodSandboxMetadata{
+	return &runtimeapi.PodSandboxMetadata{
 		Name:      &parts[2],
 		Namespace: &parts[3],
 		Uid:       &parts[4],
@@ -113,7 +113,7 @@ func parseSandboxName(name string) (*runtimeApi.PodSandboxMetadata, error) {
 }
 
 // TODO: Evaluate whether we should rely on labels completely.
-func parseContainerName(name string) (*runtimeApi.ContainerMetadata, error) {
+func parseContainerName(name string) (*runtimeapi.ContainerMetadata, error) {
 	// Docker adds a "/" prefix to names. so trim it.
 	name = strings.TrimPrefix(name, "/")
 
@@ -130,7 +130,7 @@ func parseContainerName(name string) (*runtimeApi.ContainerMetadata, error) {
 		return nil, fmt.Errorf("failed to parse the container name %q: %v", name, err)
 	}
 
-	return &runtimeApi.ContainerMetadata{
+	return &runtimeapi.ContainerMetadata{
 		Name:    &parts[1],
 		Attempt: &attempt,
 	}, nil

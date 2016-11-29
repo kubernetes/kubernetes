@@ -29,7 +29,7 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"github.com/miekg/dns"
 	skymsg "github.com/skynetservices/skydns/msg"
-	skyServer "github.com/skynetservices/skydns/server"
+	skyserver "github.com/skynetservices/skydns/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -171,9 +171,9 @@ func assertSRVRecordsMatchPort(t *testing.T, records []dns.RR, port ...int) {
 
 func TestSkySimpleSRVLookup(t *testing.T) {
 	kd := newKubeDNS()
-	skydnsConfig := &skyServer.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
-	skyServer.SetDefaults(skydnsConfig)
-	s := skyServer.New(kd, skydnsConfig)
+	skydnsConfig := &skyserver.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
+	skyserver.SetDefaults(skydnsConfig)
+	s := skyserver.New(kd, skydnsConfig)
 
 	service := newHeadlessService()
 	endpointIPs := []string{"10.0.0.1", "10.0.0.2"}
@@ -201,9 +201,9 @@ func TestSkySimpleSRVLookup(t *testing.T) {
 
 func TestSkyPodHostnameSRVLookup(t *testing.T) {
 	kd := newKubeDNS()
-	skydnsConfig := &skyServer.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
-	skyServer.SetDefaults(skydnsConfig)
-	s := skyServer.New(kd, skydnsConfig)
+	skydnsConfig := &skyserver.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
+	skyserver.SetDefaults(skydnsConfig)
+	s := skyserver.New(kd, skydnsConfig)
 
 	service := newHeadlessService()
 	endpointIPs := []string{"10.0.0.1", "10.0.0.2"}
@@ -240,9 +240,9 @@ func TestSkyPodHostnameSRVLookup(t *testing.T) {
 
 func TestSkyNamedPortSRVLookup(t *testing.T) {
 	kd := newKubeDNS()
-	skydnsConfig := &skyServer.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
-	skyServer.SetDefaults(skydnsConfig)
-	s := skyServer.New(kd, skydnsConfig)
+	skydnsConfig := &skyserver.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
+	skyserver.SetDefaults(skydnsConfig)
+	s := skyserver.New(kd, skydnsConfig)
 
 	service := newHeadlessService()
 	eip := "10.0.0.1"

@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -298,15 +298,15 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		var heapsterRawMemResponse []byte
 
 		if tc.useMetricsApi {
-			metrics := metrics_api.PodMetricsList{}
+			metrics := metricsapi.PodMetricsList{}
 			for i, cpu := range tc.reportedLevels {
-				podMetric := metrics_api.PodMetrics{
+				podMetric := metricsapi.PodMetrics{
 					ObjectMeta: v1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},
 					Timestamp: unversioned.Time{Time: time.Now()},
-					Containers: []metrics_api.ContainerMetrics{
+					Containers: []metricsapi.ContainerMetrics{
 						{
 							Name: "container",
 							Usage: v1.ResourceList{
