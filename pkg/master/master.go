@@ -48,7 +48,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
 
 	"github.com/golang/glog"
@@ -225,7 +225,7 @@ func (c completedConfig) New() (*Master, error) {
 	}
 
 	if c.EnableWatchCache {
-		restOptionsFactory.storageDecorator = registry.StorageWithCacher
+		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
 	} else {
 		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
 	}

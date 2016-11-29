@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -40,13 +40,13 @@ const (
 	MaxDisruptedPodSize = 2000
 )
 
-func newEvictionStorage(store *registry.Store, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) *EvictionREST {
+func newEvictionStorage(store *genericregistry.Store, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) *EvictionREST {
 	return &EvictionREST{store: store, podDisruptionBudgetClient: podDisruptionBudgetClient}
 }
 
 // EvictionREST implements the REST endpoint for evicting pods from nodes when etcd is in use.
 type EvictionREST struct {
-	store                     *registry.Store
+	store                     *genericregistry.Store
 	podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter
 }
 

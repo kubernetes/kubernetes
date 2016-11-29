@@ -41,7 +41,7 @@ import (
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -217,7 +217,7 @@ func Run(s *options.ServerRunOptions) error {
 		deleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
 	}
 	if s.GenericServerRunOptions.EnableWatchCache {
-		restOptionsFactory.storageDecorator = registry.StorageWithCacher
+		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
 	} else {
 		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
 	}

@@ -21,13 +21,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // REST implements a RESTStorage for ThirdPartyResources against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a registry which will store ThirdPartyResource in the given helper
@@ -37,14 +37,14 @@ func NewREST(opts generic.RESTOptions) *REST {
 	// We explicitly do NOT do any decoration here yet.
 	storageInterface, dFunc := generic.NewRawStorage(opts.StorageConfig)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResource{} },
 		NewListFunc: func() runtime.Object { return &extensions.ThirdPartyResourceList{} },
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, id)
+			return genericregistry.NoNamespaceKeyFunc(ctx, prefix, id)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensions.ThirdPartyResource).Name, nil
