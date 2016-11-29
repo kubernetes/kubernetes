@@ -1,0 +1,15 @@
+{
+	"GoPrefix": "k8s.io/kubernetes",
+	"SrcDirs": [
+		"./pkg",
+		"./cmd",
+		"./third_party",
+		"./plugin",
+		"./test",
+		"./federation"
+	],
+	"SkippedPaths": [
+		"pkg\\/client\\/clientset_generated\\/release_1_(3|4)",
+		"^_output"
+	]
+}
