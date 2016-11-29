@@ -50,7 +50,7 @@ you’re looking for.
  a particular resource.  They also provide convenience functions for accessing shared caches and determining when a
  cache is primed.
 
- Use the factory methods down in https://github.com/kubernetes/kubernetes/blob/master/pkg/controller/framework/informers/factory.go
+ Use the factory methods down in https://github.com/kubernetes/kubernetes/blob/master/pkg/controller/informers/factory.go
  to ensure that you are sharing the same instance of the cache as everyone else.
 
  This saves us connections against the API server, duplicate serialization costs server-side, duplicate deserialization
@@ -119,7 +119,7 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}){
 	// don't let panics crash the process
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
-	defer dsc.queue.ShutDown()
+	defer c.queue.ShutDown()
 
 	glog.Infof("Starting <NAME> controller")
 
@@ -142,7 +142,7 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}){
 
 func (c *Controller) runWorker() {
 	// hot loop until we're told to stop.  processNextWorkItem will automatically wait until there's work
-	// available, so we don't don't worry about secondary waits
+	// available, so we don't worry about secondary waits
 	for c.processNextWorkItem() {
 	}
 }
@@ -157,7 +157,7 @@ func (c *Controller) processNextWorkItem() bool {
 	// you always have to indicate to the queue that you've completed a piece of work
 	defer c.queue.Done(key)
 
-	// do your work on the key.  This method will contains your "do stuff" logic"
+	// do your work on the key.  This method will contains your "do stuff" logic
 	err := c.syncHandler(key.(string))
 	if err == nil {
 		// if you had no error, tell the queue to stop tracking history for your key.  This will
@@ -171,7 +171,7 @@ func (c *Controller) processNextWorkItem() bool {
 	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
 	// since we failed, we should requeue the item to work on later.  This method will add a backoff
 	// to avoid hotlooping on particular items (they're probably still not going to work right away)
-	// and overall controller protection (everything I've done is broken, this controller needs to 
+	// and overall controller protection (everything I've done is broken, this controller needs to
 	// calm down or it can starve other useful work) cases.
 	c.queue.AddRateLimited(key)
 
