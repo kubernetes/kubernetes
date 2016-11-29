@@ -9,7 +9,7 @@ A proposal for populating environment variables of a container from an entire Co
 Containers can specify the ConfigMaps that are consumed as environment variables.
 Each key defined in the ConfigMap's `Data` object must be a "C" identifier. If an invalid key is present, the container will fail to start.
 
-Environment variables are currently defined by servies or the `Env` object in a container, where the `Env` takes precedence.
+Environment variables are currently defined by services or the `Env` object in a container, where the `Env` takes precedence.
 The introduction of ConfigMaps adds a third possibility. To prevent any change in behavior, the `Env` object will still override any environment variable introduced by a ConfigMap. A ConfigMap is allowed to override variables defined by services.
 Variable references defined by an `EnvVar` struct can be resolved by values defined in other `EnvVar`s or those introduced by ConfigMaps and services.
 
