@@ -238,16 +238,6 @@ func (o *DrainOptions) RunDrain() error {
 	}
 
 	err := o.deleteOrEvictPodsSimple()
-	// TODO: update IsTooManyRequests() when the TooManyRequests(429) error returned from the API server has a non-empty Reason field
-	for i := 1; i <= maxPatchRetry && apierrors.IsTooManyRequests(err); i++ {
-		if i > triesBeforeBackOff {
-			currBackOffPeriod := time.Duration(math.Exp2(float64(i-triesBeforeBackOff))) * backOffPeriod
-			fmt.Fprintf(o.errOut, "Retry in %v\n", currBackOffPeriod)
-			o.backOff.Sleep(currBackOffPeriod)
-		}
-		fmt.Fprintf(o.errOut, "Retrying\n")
-		err = o.deleteOrEvictPodsSimple()
-	}
 	if err == nil {
 		cmdutil.PrintSuccess(o.mapper, false, o.out, "node", o.nodeInfo.Name, false, "drained")
 	}
@@ -260,7 +250,11 @@ func (o *DrainOptions) deleteOrEvictPodsSimple() error {
 		return err
 	}
 	if o.Timeout == 0 {
-		o.Timeout = kubectl.Timeout + time.Duration(10*len(pods))*time.Second
+		maxGracePeriod := int64(math.Max(float64(o.GracePeriodSeconds), 30))
+		for _, pod := range pods {
+			maxGracePeriod = int64(math.Max(float64(maxGracePeriod), float64(*pod.Spec.TerminationGracePeriodSeconds)))
+		}
+		o.Timeout = kubectl.Timeout + time.Duration(maxGracePeriod)*time.Second
 	}
 	err = o.deleteOrEvictPods(pods)
 	if err != nil {
@@ -470,31 +464,85 @@ func (o *DrainOptions) deleteOrEvictPods(pods []api.Pod) error {
 		return err
 	}
 
+	getPodFn := func(namespace, name string) (*api.Pod, error) {
+		return o.client.Core().Pods(namespace).Get(name)
+	}
+
+	if len(policyGroupVersion) > 0 {
+		return o.evictPods(pods, policyGroupVersion, getPodFn)
+	} else {
+		return o.deletePods(pods, getPodFn)
+	}
+}
+
+func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*api.Pod, error)) error {
+	doneCh := make(chan bool, len(pods))
+	errCh := make(chan error, 1)
+
 	for _, pod := range pods {
-		if len(policyGroupVersion) > 0 {
-			err = o.evictPod(pod, policyGroupVersion)
-		} else {
-			err = o.deletePod(pod)
+		go func(pod api.Pod, doneCh chan bool, errCh chan error) {
+			var err error
+			for {
+				err = o.evictPod(pod, policyGroupVersion)
+				if err == nil {
+					break
+				} else if apierrors.IsTooManyRequests(err) {
+					time.Sleep(5 * time.Second)
+				} else {
+					errCh <- err
+					return
+				}
+			}
+			podArray := []api.Pod{pod}
+			_, err = o.waitForDelete(podArray, kubectl.Interval, o.Timeout, true, getPodFn)
+			if err == nil {
+				doneCh <- true
+			} else {
+				errCh <- err
+			}
+		}(pod, doneCh, errCh)
+	}
+
+	doneCount := 0
+	for {
+		select {
+		case err := <-errCh:
+			return err
+		case <-doneCh:
+			doneCount++
+			if doneCount == len(pods) {
+				return nil
+			}
+		case <-time.After(o.Timeout):
+			return fmt.Errorf("Drain did not complete within %v", o.Timeout)
 		}
+	}
+}
+
+func (o *DrainOptions) deletePods(pods []api.Pod, getPodFn func(namespace, name string) (*api.Pod, error)) error {
+	for _, pod := range pods {
+		err := o.deletePod(pod)
 		if err != nil {
 			return err
 		}
 	}
-
-	getPodFn := func(namespace, name string) (*api.Pod, error) {
-		return o.client.Core().Pods(namespace).Get(name)
-	}
-	_, err = o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
+	_, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, false, getPodFn)
 	return err
 }
 
-func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Duration, getPodFn func(string, string) (*api.Pod, error)) ([]api.Pod, error) {
+func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*api.Pod, error)) ([]api.Pod, error) {
+	var verbStr string
+	if usingEviction {
+		verbStr = "evicted"
+	} else {
+		verbStr = "deleted"
+	}
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pendingPods := []api.Pod{}
 		for i, pod := range pods {
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, "deleted")
+				cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, verbStr)
 				continue
 			} else if err != nil {
 				return false, err
