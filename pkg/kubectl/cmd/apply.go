@@ -109,7 +109,7 @@ func NewCmdApply(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
-	cmd.Flags().StringArrayP("prune-whitelist", "w", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().StringArray("prune-whitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
