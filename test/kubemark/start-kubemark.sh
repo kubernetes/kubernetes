@@ -163,7 +163,7 @@ writeEnvironmentFiles
 
 gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${SERVER_BINARY_TAR}" \
-  "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
+  "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
   "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
   "${RESOURCE_DIRECTORY}/apiserver_flags" \
   "${RESOURCE_DIRECTORY}/scheduler_flags" \
