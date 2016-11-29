@@ -322,8 +322,9 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 			panic("Key found in assumed set but not in podStates. Potentially a logical error.")
 		}
 		if now.After(*ps.deadline) {
+			glog.Warningf("Pod %s/%s expired", ps.pod.Namespace, ps.pod.Name)
 			if err := cache.expirePod(key, ps); err != nil {
-				glog.Errorf(" expirePod failed for %s: %v", key, err)
+				glog.Errorf("ExpirePod failed for %s: %v", key, err)
 			}
 		}
 	}
