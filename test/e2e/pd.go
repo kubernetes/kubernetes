@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	mathrand "math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -85,7 +86,6 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 
 		host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
 		host1Pod := testPDPod([]string{diskName}, host1Name, false /* readOnly */, 1 /* numContainers */)
-		containerName := "mycontainer"
 
 		defer func() {
 			// Teardown pods, PD. Ignore errors.
@@ -105,7 +105,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		testFile := "/testpd1/tracker"
 		testFileContents := fmt.Sprintf("%v", mathrand.Int())
 
-		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, host0Pod.Spec.Containers[0].Name, testFile, testFileContents))
 		framework.Logf("Wrote value: %v", testFileContents)
 
 		// Verify that disk shows up for in node 1's VolumeInUse list
@@ -185,7 +185,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 
 		framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
 
-		v, err := f.ReadFileViaContainer(host1Pod.Name, containerName, testFile)
+		v, err := f.ReadFileViaContainer(host1Pod.Name, host1Pod.Spec.Containers[0].Name, testFile)
 		framework.ExpectNoError(err)
 		framework.Logf("Read value: %v", v)
 
@@ -338,20 +338,17 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
 			// randomly select a container and read/verify pd contents from it
-			containerName := fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
-			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
+			verifyPDContentsViaContainer(f, host0Pod.Name, host0Pod.Spec.Containers[mathrand.Intn(numContainers)].Name, fileAndContentToVerify)
 
 			// Randomly select a container to write a file to PD from
-			containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
 			testFile := fmt.Sprintf("/testpd1/tracker%v", i)
 			testFileContents := fmt.Sprintf("%v", mathrand.Int())
 			fileAndContentToVerify[testFile] = testFileContents
-			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, host0Pod.Spec.Containers[mathrand.Intn(numContainers)].Name, testFile, testFileContents))
 			framework.Logf("Wrote value: \"%v\" to PD %q from pod %q container %q", testFileContents, diskName, host0Pod.Name, containerName)
 
 			// Randomly select a container and read/verify pd contents from it
-			containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
-			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
+			verifyPDContentsViaContainer(f, host0Pod.Name, host0Pod.Spec.Containers[mathrand.Intn(numContainers)].Name, fileAndContentToVerify)
 
 			By("deleting host0Pod")
 			framework.ExpectNoError(podClient.Delete(host0Pod.Name, v1.NewDeleteOptions(0)), "Failed to delete host0Pod")
@@ -383,7 +380,6 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			detachAndDeletePDs(disk2Name, []types.NodeName{host0Name})
 		}()
 
-		containerName := "mycontainer"
 		fileAndContentToVerify := make(map[string]string)
 		for i := 0; i < 3; i++ {
 			framework.Logf("PD Read/Writer Iteration #%v", i)
@@ -395,7 +391,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
 			// Read/verify pd contents for both disks from container
-			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
+			verifyPDContentsViaContainer(f, host0Pod.Name, host0Pod.Spec.Containers[0].Name, fileAndContentToVerify)
 
 			// Write a file to both PDs from container
 			testFilePD1 := fmt.Sprintf("/testpd1/tracker%v", i)
@@ -404,13 +400,13 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			testFilePD2Contents := fmt.Sprintf("%v", mathrand.Int())
 			fileAndContentToVerify[testFilePD1] = testFilePD1Contents
 			fileAndContentToVerify[testFilePD2] = testFilePD2Contents
-			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD1, testFilePD1Contents))
-			framework.Logf("Wrote value: \"%v\" to PD1 (%q) from pod %q container %q", testFilePD1Contents, disk1Name, host0Pod.Name, containerName)
-			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD2, testFilePD2Contents))
-			framework.Logf("Wrote value: \"%v\" to PD2 (%q) from pod %q container %q", testFilePD2Contents, disk2Name, host0Pod.Name, containerName)
+			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, host0Pod.Spec.Containers[0].Name, testFilePD1, testFilePD1Contents))
+			framework.Logf("Wrote value: \"%v\" to PD1 (%q) from pod %q container %q", testFilePD1Contents, disk1Name, host0Pod.Name, host0Pod.Spec.Containers[0].Name)
+			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, host0Pod.Spec.Containers[0].Name, testFilePD2, testFilePD2Contents))
+			framework.Logf("Wrote value: \"%v\" to PD2 (%q) from pod %q container %q", testFilePD2Contents, disk2Name, host0Pod.Name, host0Pod.Spec.Containers[0].Name)
 
 			// Read/verify pd contents for both disks from container
-			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
+			verifyPDContentsViaContainer(f, host0Pod.Name, host0Pod.Spec.Containers[0].Name, fileAndContentToVerify)
 
 			By("deleting host0Pod")
 			framework.ExpectNoError(podClient.Delete(host0Pod.Name, v1.NewDeleteOptions(0)), "Failed to delete host0Pod")
@@ -593,9 +589,10 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, numContainers int) *v1.Pod {
 	containers := make([]v1.Container, numContainers)
 	for i := range containers {
-		containers[i].Name = "mycontainer"
+		name := "mycontainer" + strconv.Itoa(mathrand.Int())
+		containers[i].Name = name
 		if numContainers > 1 {
-			containers[i].Name = fmt.Sprintf("mycontainer%v", i+1)
+			containers[i].Name = fmt.Sprintf("%s%v", name, i+1)
 		}
 
 		containers[i].Image = "gcr.io/google_containers/busybox:1.24"
