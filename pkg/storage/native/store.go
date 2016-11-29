@@ -17,25 +17,22 @@ limitations under the License.
 package native
 
 import (
-	"k8s.io/kubernetes/pkg/storage"
-
+	"bytes"
 	"errors"
 	"fmt"
-	"reflect"
-
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/runtime"
-
-	"bytes"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
 	"path"
-	"sort"
+	"reflect"
+	"strings"
 	"time"
 )
 
@@ -307,9 +304,7 @@ func (s *store) List(ctx context.Context, p, resourceVersion string, pred storag
 			return fmt.Errorf("unexpected error code: %v", result.ErrorCode)
 		}
 	} else {
-		// For compatability with etcd, we sort by path
 		items := result.ItemList
-		sort.Sort(ByPath(items))
 		if err := decodeList(items, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 			return err
 		}

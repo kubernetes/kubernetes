@@ -25,6 +25,7 @@ import (
 	"golang.org/x/net/context"
 	"io"
 	"k8s.io/kubernetes/pkg/types"
+	"sort"
 	"sync"
 	"time"
 )
@@ -427,11 +428,12 @@ func (s *FSM) opList(ctx context.Context, op *StorageOperation) (*StorageOperati
 		now := uint64(time.Now().Unix())
 
 		result.ItemList = make([]*ItemData, 0, len(b.items))
-		for _, item := range b.items {
+		for p, item := range b.items {
 			resultItemData := &ItemData{
 				Data: item.data,
 				Uid:  string(item.uid),
 				Lsn:  uint64(item.lsn),
+				Path: p,
 			}
 			if item.expiry != 0 {
 				var ttl uint64
@@ -445,6 +447,15 @@ func (s *FSM) opList(ctx context.Context, op *StorageOperation) (*StorageOperati
 			}
 
 			result.ItemList = append(result.ItemList, resultItemData)
+		}
+
+		// For compatability with etcd, we sort by path
+		sort.Sort(ByPath(result.ItemList))
+
+		// But we don't need to return the paths
+		// TODO: This is annoying, particularly as we hold the lock
+		for _, item := range result.ItemList {
+			item.Path = ""
 		}
 	}
 
