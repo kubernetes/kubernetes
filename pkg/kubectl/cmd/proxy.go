@@ -58,7 +58,7 @@ var (
 		kubectl proxy --port=0
 
 		# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-		# This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
+		# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/
 		kubectl proxy --api-prefix=/k8s-api`)
 )
 
