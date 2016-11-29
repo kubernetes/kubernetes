@@ -2447,6 +2447,14 @@ func TestValidateEnv(t *testing.T) {
 			expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified when `value` is not empty",
 		},
 		{
+			name: "valueFrom without a source",
+			envs: []api.EnvVar{{
+				Name:      "abc",
+				ValueFrom: &api.EnvVarSource{},
+			}},
+			expectedError: "[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
+		},
+		{
 			name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
 			envs: []api.EnvVar{{
 				Name: "abc",
