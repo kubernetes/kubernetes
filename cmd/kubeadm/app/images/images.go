@@ -37,7 +37,7 @@ const (
 	Pause                = "pause"
 
 	gcrPrefix   = "gcr.io/google_containers"
-	etcdVersion = "2.2.5"
+	etcdVersion = "3.0.14-kubeadm"
 
 	kubeDNSVersion     = "1.7"
 	dnsmasqVersion     = "1.3"
