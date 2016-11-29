@@ -584,12 +584,41 @@ func clusterSize(deploy deployer) (int, error) {
 	}
 	o, err := exec.Command("kubectl", "get", "nodes", "--no-headers").Output()
 	if err != nil {
-		log.Printf("kubectl get nodes failed: %v", err)
+		log.Printf("kubectl get nodes failed: %s\n%s", WrapError(err).Error(), string(o))
 		return -1, err
 	}
 	stdout := strings.TrimSpace(string(o))
 	log.Printf("Cluster nodes:\n%s", stdout)
 	return len(strings.Split(stdout, "\n")), nil
+}
+
+// CommandError will provide stderr output (if available) from structured
+// exit errors
+type CommandError struct {
+	err error
+}
+
+func WrapError(err error) *CommandError {
+	if err == nil {
+		return nil
+	}
+	return &CommandError{err: err}
+}
+
+func (e *CommandError) Error() string {
+	if e == nil {
+		return ""
+	}
+	exitErr, ok := e.err.(*exec.ExitError)
+	if !ok {
+		return e.err.Error()
+	}
+
+	stderr := ""
+	if exitErr.Stderr != nil {
+		stderr = string(stderr)
+	}
+	return fmt.Sprintf("%q: %q", exitErr.Error(), stderr)
 }
 
 func DumpClusterLogs(location string) error {
