@@ -587,9 +587,9 @@ func podMatchesNodeLabels(pod *v1.Pod, node *v1.Node) bool {
 		// Match node selector for requiredDuringSchedulingRequiredDuringExecution.
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
 		// if nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
-		// 	nodeSelectorTerms := nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution.NodeSelectorTerms
-		// 	glog.V(10).Infof("Match for RequiredDuringSchedulingRequiredDuringExecution node selector terms %+v", nodeSelectorTerms)
-		// 	nodeAffinityMatches = nodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
+		//	nodeSelectorTerms := nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution.NodeSelectorTerms
+		//	glog.V(10).Infof("Match for RequiredDuringSchedulingRequiredDuringExecution node selector terms %+v", nodeSelectorTerms)
+		//	nodeAffinityMatches = nodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
 		// }
 
 		// Match node selector for requiredDuringSchedulingIgnoredDuringExecution.
@@ -718,17 +718,17 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 // Details:
 //
 // If (the svc affinity labels are not a subset of pod's label selectors )
-// 	The pod has all information necessary to check affinity, the pod's label selector is sufficient to calculate
-// 	the match.
+//	The pod has all information necessary to check affinity, the pod's label selector is sufficient to calculate
+//	the match.
 // Otherwise:
-// 	Create an "implicit selector" which guarantees pods will land on nodes with similar values
-// 	for the affinity labels.
+//	Create an "implicit selector" which guarantees pods will land on nodes with similar values
+//	for the affinity labels.
 //
-// 	To do this, we "reverse engineer" a selector by introspecting existing pods running under the same service+namespace.
+//	To do this, we "reverse engineer" a selector by introspecting existing pods running under the same service+namespace.
 //	These backfilled labels in the selector "L" are defined like so:
-// 		- L is a label that the ServiceAffinity object needs as a matching constraints.
-// 		- L is not defined in the pod itself already.
-// 		- and SOME pod, from a service, in the same namespace, ALREADY scheduled onto a node, has a matching value.
+//		- L is a label that the ServiceAffinity object needs as a matching constraints.
+//		- L is not defined in the pod itself already.
+//		- and SOME pod, from a service, in the same namespace, ALREADY scheduled onto a node, has a matching value.
 //
 // WARNING: This Predicate is NOT guaranteed to work if some of the predicateMetadata data isn't precomputed...
 // For that reason it is not exported, i.e. it is highly coupled to the implementation of the FitPredicate construction.
@@ -909,8 +909,13 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta interface
 // TODO: Do we really need any pod matching, or all pods matching? I think the latter.
 func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, allPods []*v1.Pod, node *v1.Node, term *v1.PodAffinityTerm) (bool, bool, error) {
 	matchingPodExists := false
+	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, *term)
+	if err != nil {
+		return false, false, err
+	}
 	for _, existingPod := range allPods {
-		match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, pod, term)
+		match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector)
 		if err != nil {
 			return false, matchingPodExists, err
 		}
@@ -993,8 +998,15 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 			if affinity == nil {
 				continue
 			}
+
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, existingPod, &term)
+				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+				if err != nil {
+					catchError(err)
+					return
+				}
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, term)
+				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
 				if err != nil {
 					catchError(err)
 					return
@@ -1025,7 +1037,13 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods [
 				return nil, err
 			}
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, existingPod, &term)
+
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, term)
+				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+				if err != nil {
+					return nil, err
+				}
+				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
 				if err != nil {
 					return nil, err
 				}
@@ -1090,7 +1108,14 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 			// If the requirement matches a pod's own labels are namespace, and there are
 			// no other such pods, then disregard the requirement. This is necessary to
 			// not block forever because the first pod of the collection can't be scheduled.
-			match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, pod, &term)
+			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+			if err != nil {
+				glog.V(10).Infof("Cannot schedule pod  %+v onto node %v, because of error creating selector for term %v, err: %v",
+					podName(pod), node.Name, term, err)
+				return false
+			}
+			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
+			match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
 			if err != nil || !match || matchingPodExists {
 				glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAffinityTerm %v, err: %v",
 					podName(pod), node.Name, term, err)
