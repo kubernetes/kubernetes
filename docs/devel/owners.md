@@ -1,6 +1,6 @@
 # Owners files
 
-_Note_: This is a design for a feature that is not yet implemented.
+_Note_: This is a design for a feature that is not yet implemented. See the [contrib PR](https://github.com/kubernetes/contrib/issues/1389) for the current progress.
 
 ## Overview
 
