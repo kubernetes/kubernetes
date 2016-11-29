@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -32,11 +32,26 @@ import (
 
 // TopNodeOptions contains all the options for running the top-node cli command.
 type TopNodeOptions struct {
-	ResourceName string
-	Selector     string
-	NodeClient   coreclient.NodesGetter
-	Client       *metricsutil.HeapsterMetricsClient
-	Printer      *metricsutil.TopCmdPrinter
+	ResourceName    string
+	Selector        string
+	NodeClient      coreclient.NodesGetter
+	HeapsterOptions HeapsterTopOptions
+	Client          *metricsutil.HeapsterMetricsClient
+	Printer         *metricsutil.TopCmdPrinter
+}
+
+type HeapsterTopOptions struct {
+	Namespace string
+	Service   string
+	Scheme    string
+	Port      string
+}
+
+func (o *HeapsterTopOptions) Bind(flags *pflag.FlagSet) {
+	flags.StringVar(&o.Namespace, "heapster-namespace", metricsutil.DefaultHeapsterNamespace, "Namespace Heapster service is located in")
+	flags.StringVar(&o.Service, "heapster-service", metricsutil.DefaultHeapsterService, "Name of Heapster service")
+	flags.StringVar(&o.Scheme, "heapster-scheme", metricsutil.DefaultHeapsterScheme, "Scheme (http or https) to connect to Heapster as")
+	flags.StringVar(&o.Port, "heapster-port", metricsutil.DefaultHeapsterPort, "Port name in service to use")
 }
 
 var (
@@ -75,6 +90,7 @@ func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Aliases: []string{"nodes"},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
+	options.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
 
@@ -91,7 +107,7 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 	o.NodeClient = clientset.Core()
-	o.Client = metricsutil.DefaultHeapsterMetricsClient(clientset.Core())
+	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.Core(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 	o.Printer = metricsutil.NewTopCmdPrinter(out)
 	return nil
 }

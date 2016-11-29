@@ -247,6 +247,10 @@ hard
 hard-pod-affinity-symmetric-weight
 healthz-bind-address
 healthz-port
+heapster-namespace
+heapster-port
+heapster-scheme
+heapster-service
 horizontal-pod-autoscaler-sync-period
 host-cluster-context
 host-ipc-sources
