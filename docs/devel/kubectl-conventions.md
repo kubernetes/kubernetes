@@ -311,7 +311,7 @@ func NewCmdMine(parent, name string, f *cmdutil.Factory, out io.Writer) *cobra.C
     },
   }
 
-  cmd.Flags().BoolVar(&options.mineLatest, "latest", false, "Use latest stuff")
+  cmd.Flags().BoolVar(&opts.mineLatest, "latest", false, "Use latest stuff")
   return cmd
 }
 
