@@ -803,3 +803,19 @@ func HasNames(args []string) (bool, error) {
 	}
 	return hasCombinedTypes || len(args) > 1, nil
 }
+
+// HasMultipleTypes returns true if the provided args contain resource names
+func HasMultipleTypes(args []string) bool {
+	typesList := args[0]
+	for _, arg := range args {
+		if arg == "all" {
+			return true
+		}
+		if strings.ContainsAny(arg, ",") {
+			typesList = arg
+			break
+		}
+	}
+	resTypes := strings.Split(typesList, ",")
+	return (len(resTypes) > 1)
+}
