@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -254,6 +255,17 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	}
 
 	update := change.(kubetypes.PodUpdate)
+	// The InitContainers and InitContainerStatuses fields are lost during
+	// serialization and deserialization. They are conveyed via Annotations.
+	// Setting these fields here so that kubelet doesn't have to check for
+	// annotations.
+	if source == kubetypes.ApiserverSource {
+		for _, pod := range update.Pods {
+			if err := podutil.SetInitContainersAndStatuses(pod); err != nil {
+				glog.Error(err)
+			}
+		}
+	}
 	switch update.Op {
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
