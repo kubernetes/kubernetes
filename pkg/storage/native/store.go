@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 	"path"
 	"reflect"
-	"strings"
 	"time"
 )
 
