@@ -30,6 +30,11 @@ readonly report_dir="${1:-_artifacts}"
 # must be set for auth.
 readonly use_kubectl="${LOG_DUMP_USE_KUBECTL:-}"
 
+# Enable LOG_DUMP_AWSCLI_REGIONS to dump logs from a kops-tagged AWS
+# cluster. This variable should be a comma separated list of AWS
+# regions to query.
+IFS=', ' read -r -a awscli_regions <<< "${LOG_DUMP_AWSCLI_REGIONS:-}"
+
 readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws"
 
@@ -50,22 +55,24 @@ readonly max_scp_processes=25
 readonly ips_and_images='{range .items[*]}{@.status.addresses[?(@.type == "ExternalIP")].address} {@.status.images[*].names[*]}{"\n"}{end}'
 
 function setup() {
-  if [[ -z "${use_kubectl}" ]]; then
+  if [[ -z "${use_kubectl}" ]] && [[ -z "${awscli_regions[@]}" ]]; then
     KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
     : ${KUBE_CONFIG_FILE:="config-test.sh"}
     source "${KUBE_ROOT}/cluster/kube-util.sh"
     detect-project &> /dev/null
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
-    echo "LOG_DUMP_SSH_KEY not set, but required by LOG_DUMP_USE_KUBECTL"
+    echo "LOG_DUMP_SSH_KEY not set, but required by LOG_DUMP_USE_KUBECTL and LOG_DUMP_AWSCLI_REGIONS"
     exit 1
   elif [[ -z "${LOG_DUMP_SSH_USER:-}" ]]; then
-    echo "LOG_DUMP_SSH_USER not set, but required by LOG_DUMP_USE_KUBECTL"
+    echo "LOG_DUMP_SSH_USER not set, but required by LOG_DUMP_USE_KUBECTL and LOG_DUMP_AWSCLI_REGIONS"
     exit 1
+  elif [[ -n "${awscli_regions[@]}" ]]; then
+    pip install awscli
   fi
 }
 
 function log-dump-ssh() {
-  if [[ -z "${use_kubectl}" ]]; then
+  if [[ -z "${use_kubectl}" ]] || [[ -n "${awscli_regions[@]}" ]]; then
     ssh-to-node "$@"
     return
   fi
@@ -92,7 +99,7 @@ function copy-logs-from-node() {
     # Comma delimit (even the singleton, or scp does the wrong thing), surround by braces.
     local -r scp_files="{$(printf "%s," "${files[@]}")}"
 
-    if [[ -n "${use_kubectl}" ]]; then
+    if [[ -n "${use_kubectl}" ]] || [[ -n "${awscli_regions[@]}" ]]; then
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${LOG_DUMP_SSH_KEY}" "${LOG_DUMP_SSH_USER}@${node}:${scp_files}" "${dir}" > /dev/null || true
     else
       case "${KUBERNETES_PROVIDER}" in
@@ -116,7 +123,7 @@ function save-logs() {
     local -r node_name="${1}"
     local -r dir="${2}"
     local files="${3}"
-    if [[ -n "${use_kubectl}" ]]; then
+    if [[ -n "${use_kubectl}" ]] || [[ -n "${awscli_regions[@]}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
         files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
       fi
@@ -152,10 +159,19 @@ function kubectl-guess-nodes() {
   kubectl get node -ojsonpath --template="${ips_and_images}" | grep -v kube-apiserver | cut -f1 -d" "
 }
 
-function dump_master() {
-  local master_name
+function awscli-instances() {
+  local -r role=$1
+  for region in "${awscli_regions[@]}"; do
+    aws ec2 describe-instances --region "${region}" --filter "Name=tag-value,Values=$(kubectl config current-context)" "Name=instance-state-name,Values=running" "Name=tag-key,Values=k8s.io/role/${role}" | jq -r '.["Reservations"][]["Instances"][]["PublicDnsName"]'
+  done
+}
+
+function dump_masters() {
+  local master_names
   if [[ -n "${use_kubectl}" ]]; then
-    master_name=$(kubectl-guess-master)
+    master_names=( $(kubectl-guess-master) )
+  elif [[ -n "${awscli_regions[@]}" ]]; then
+    master_names=( $(awscli-instances master) )
   elif [[ ! "${master_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
     return
@@ -164,18 +180,41 @@ function dump_master() {
       echo "Master not detected. Is the cluster up?"
       return
     fi
-    master_name="${MASTER_NAME}"
+    master_names=( "${MASTER_NAME}" )
   fi
 
-  readonly master_dir="${report_dir}/${master_name}"
-  mkdir -p "${master_dir}"
-  save-logs "${master_name}" "${master_dir}" "${master_logfiles}"
+  if [[ "${#master_names[@]}" == 0 ]]; then
+    echo "No masters found?"
+    return
+  fi
+
+  proc=${max_scp_processes}
+  for master_name in "${master_names[@]}"; do
+    master_dir="${report_dir}/${master_name}"
+    mkdir -p "${master_dir}"
+    save-logs "${master_name}" "${master_dir}" "${master_logfiles}" &
+
+    # We don't want to run more than ${max_scp_processes} at a time, so
+    # wait once we hit that many nodes. This isn't ideal, since one might
+    # take much longer than the others, but it should help.
+    proc=$((proc - 1))
+    if [[ proc -eq 0 ]]; then
+      proc=${max_scp_processes}
+      wait
+    fi
+  done
+  # Wait for any remaining processes.
+  if [[ proc -gt 0 && proc -lt ${max_scp_processes} ]]; then
+    wait
+  fi
 }
 
 function dump_nodes() {
   local node_names
   if [[ -n "${use_kubectl}" ]]; then
     node_names=( $(kubectl-guess-nodes) )
+  elif [[ -n "${awscli_regions[@]}" ]]; then
+    node_names=( $(awscli-instances node) )
   elif [[ ! "${node_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Node SSH not supported for ${KUBERNETES_PROVIDER}"
     return
@@ -186,6 +225,11 @@ function dump_nodes() {
       return
     fi
     node_names=( "${NODE_NAMES[@]}" )
+  fi
+
+  if [[ "${#node_names[@]}" == 0 ]]; then
+    echo "No nodes found?"
+    return
   fi
 
   proc=${max_scp_processes}
@@ -213,5 +257,5 @@ function dump_nodes() {
 
 setup
 echo "Dumping master and node logs to ${report_dir}"
-dump_master
+dump_masters
 dump_nodes
