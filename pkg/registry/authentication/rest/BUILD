@@ -19,7 +19,8 @@ go_library(
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/authentication/v1beta1:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/authentication/tokenreview:go_default_library",
+        "//pkg/registry/generic:go_default_library",
+        "//vendor:k8s.io/genericapiserver/pkg/server",
     ],
 )

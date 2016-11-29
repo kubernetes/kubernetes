@@ -23,11 +23,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/spf13/pflag",
         "//vendor:gopkg.in/inf.v0",
+        "//vendor:k8s.io/genericapiserver/pkg/server/openapi/common",
     ],
 )
 

@@ -18,12 +18,12 @@ package app
 
 import (
 	"github.com/golang/glog"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	daemonsetetcd "k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd"
 	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
 	ingressetcd "k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd"

@@ -33,14 +33,17 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/genericapiserver/pkg/apiserver"
+	"k8s.io/genericapiserver/pkg/apiserver/authenticator"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
+	"k8s.io/genericapiserver/pkg/server/authorizer"
+	genericvalidation "k8s.io/genericapiserver/pkg/server/validation"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -48,9 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -86,7 +86,7 @@ func Run(s *options.ServerRunOptions) error {
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
 							Complete()                               // set default values based on the known values
 
-	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
 	if err != nil {
 		glog.Fatalf("Error determining service IP ranges: %v", err)
 	}

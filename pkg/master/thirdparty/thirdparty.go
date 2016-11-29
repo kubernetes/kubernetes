@@ -23,14 +23,14 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/genericapiserver/pkg/apiserver"
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"

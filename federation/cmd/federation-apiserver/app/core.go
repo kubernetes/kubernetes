@@ -26,6 +26,7 @@ import (
 	// TODO(nikhiljindal): Fix this by ensuring that pkg/api/install and federation/apis/core/install do not conflict with each other.
 	_ "k8s.io/kubernetes/pkg/api/install"
 
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
 	"k8s.io/kubernetes/federation/apis/core/v1"
@@ -33,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/core/event/etcd"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/core/namespace/etcd"

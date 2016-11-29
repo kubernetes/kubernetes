@@ -19,9 +19,10 @@ go_library(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/batch/cronjob/etcd:go_default_library",
         "//pkg/registry/batch/job/etcd:go_default_library",
+        "//pkg/registry/generic:go_default_library",
         "//pkg/runtime/schema:go_default_library",
+        "//vendor:k8s.io/genericapiserver/pkg/server",
     ],
 )

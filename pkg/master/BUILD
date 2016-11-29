@@ -17,6 +17,7 @@ go_library(
         "doc.go",
         "import_known_versions.go",
         "master.go",
+        "services.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -51,8 +52,6 @@ go_library(
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/core/v1:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
-        "//pkg/genericapiserver/options:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/thirdparty:go_default_library",
@@ -66,6 +65,7 @@ go_library(
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/rest:go_default_library",
         "//pkg/registry/core/service:go_default_library",
+        "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/core/service/ipallocator/controller:go_default_library",
         "//pkg/registry/core/service/portallocator/controller:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
@@ -84,6 +84,8 @@ go_library(
         "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/genericapiserver/pkg/server",
+        "//vendor:k8s.io/genericapiserver/pkg/server/options",
     ],
 )
 
@@ -118,7 +120,6 @@ go_test(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/generated/openapi:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/runtime:go_default_library",
@@ -133,5 +134,6 @@ go_test(
         "//vendor:github.com/go-openapi/strfmt",
         "//vendor:github.com/go-openapi/validate",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/genericapiserver/pkg/server",
     ],
 )

@@ -20,9 +20,9 @@ package options
 import (
 	"time"
 
+	genericoptions "k8s.io/genericapiserver/pkg/server/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 

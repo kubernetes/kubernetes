@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"time"
 
+	genericapiserver "k8s.io/genericapiserver/pkg/server"
+	"k8s.io/genericapiserver/pkg/server/options"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -38,8 +40,6 @@ import (
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
@@ -144,7 +144,7 @@ type completedConfig struct {
 func (c *Config) Complete() completedConfig {
 	c.GenericConfig.Complete()
 
-	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(c.ServiceIPRange)
+	serviceIPRange, apiServerServiceIP, err := DefaultServiceIPRange(c.ServiceIPRange)
 	if err != nil {
 		glog.Fatalf("Error determining service IP ranges: %v", err)
 	}
@@ -244,7 +244,7 @@ func (c completedConfig) New() (*Master, error) {
 		m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider)
 	}
 
-	restStorageProviders := []genericapiserver.RESTStorageProvider{
+	restStorageProviders := []generic.RESTStorageProvider{
 		appsrest.RESTStorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
@@ -265,7 +265,7 @@ func (c completedConfig) New() (*Master, error) {
 	return m, nil
 }
 
-func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
 		glog.Fatalf("Error building core storage: %v", err)
@@ -294,7 +294,7 @@ func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient 
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter, restStorageProviders ...genericapiserver.RESTStorageProvider) {
+func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...generic.RESTStorageProvider) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {

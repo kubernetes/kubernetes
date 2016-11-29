@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	alwaysallowauthorizer "k8s.io/genericapiserver/pkg/server/authorizer"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -29,7 +30,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
 	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1"
-	alwaysallowauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/cert"
