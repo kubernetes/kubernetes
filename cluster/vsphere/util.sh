@@ -505,7 +505,7 @@ function kube-up {
   remote-pgrep ${KUBE_MASTER_IP} "salt-master"
 
   printf "Waiting for all packages to be installed on ${KUBE_MASTER} ...\n"
-  kube-check  ${KUBE_MASTER_IP} 'sudo salt "kubernetes-master" state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
+  kube-check  ${KUBE_MASTER_IP} "sudo salt \"${MASTER_NAME}\" state.highstate -t 30 | grep -E \"Failed:[[:space:]]+0\""
 
   local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
