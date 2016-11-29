@@ -24,6 +24,7 @@ go_library(
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/genericapiserver:go_default_library",
+        "//pkg/registry:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/etcd:go_default_library",
         "//pkg/registry/batch/job/etcd:go_default_library",
         "//pkg/registry/extensions/controller/etcd:go_default_library",

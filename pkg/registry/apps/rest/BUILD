@@ -19,6 +19,7 @@ go_library(
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/genericapiserver:go_default_library",
+        "//pkg/registry:go_default_library",
         "//pkg/registry/apps/petset/etcd:go_default_library",
     ],
 )
