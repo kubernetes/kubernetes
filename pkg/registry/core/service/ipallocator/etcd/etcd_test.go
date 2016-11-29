@@ -28,14 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	//"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
+	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 
 	"golang.org/x/net/context"
 )
 
-func newStorage(t *testing.T) (*etcdtesting.EtcdTestServer, ipallocator.Interface, allocator.Interface, storage.Interface, factory.DestroyFunc) {
+func newStorage(t *testing.T) (storagetesting.TestServer, ipallocator.Interface, allocator.Interface, storage.Interface, factory.DestroyFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {
@@ -66,7 +66,8 @@ func validNewRangeAllocation() *api.RangeAllocation {
 
 func key() string {
 	s := "/ranges/serviceips"
-	return etcdtest.AddPrefix(s)
+	// TODO: Why addPrefix?
+	return s // etcdtest.AddPrefix(s)
 }
 
 func TestEmpty(t *testing.T) {

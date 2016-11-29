@@ -56,7 +56,7 @@ go_test(
         "//pkg/securitycontext:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/etcd/etcdtest:go_default_library",
-        "//pkg/storage/etcd/testing:go_default_library",
+        "//pkg/storage/testing:go_default_library",
         "//pkg/util/diff:go_default_library",
         "//vendor:golang.org/x/net/context",
     ],

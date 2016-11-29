@@ -33,7 +33,7 @@ go_library(
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage/etcd:go_default_library",
-        "//pkg/storage/etcd/testing:go_default_library",
+        "//pkg/storage/native/testing:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//pkg/storage/testing:go_default_library",
         "//pkg/watch:go_default_library",

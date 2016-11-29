@@ -41,6 +41,6 @@ go_test(
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/runtime:go_default_library",
-        "//pkg/storage/etcd/testing:go_default_library",
+        "//pkg/storage/testing:go_default_library",
     ],
 )

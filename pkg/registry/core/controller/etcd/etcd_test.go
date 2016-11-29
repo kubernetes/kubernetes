@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
@@ -37,7 +37,7 @@ const (
 	name      = "foo"
 )
 
-func newStorage(t *testing.T) (ControllerStorage, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (ControllerStorage, storagetesting.TestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
 	storage := NewStorage(restOptions)

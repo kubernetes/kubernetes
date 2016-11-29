@@ -19,6 +19,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/genericapiserver/options:go_default_library",
+        "//pkg/storage/storagebackend:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
