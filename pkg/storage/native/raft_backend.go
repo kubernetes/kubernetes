@@ -233,6 +233,7 @@ func (s *RaftBackend) opDelete(ctx context.Context, op *StorageOperation) (*Stor
 			OpType:          StorageOperationType_DELETE,
 			Path:            op.Path,
 			PreconditionLsn: getResult.ItemData.Lsn,
+			ItemData:        getResult.ItemData,
 		}
 
 		deleteResult, err := s.forwardOrApplyOperation(ctx, conditionalDelete)
@@ -309,6 +310,7 @@ func (s *RaftBackend) checkExpiration(now uint64, candidates []expiringItem) err
 			OpType:          StorageOperationType_DELETE,
 			Path:            candidate.path,
 			PreconditionLsn: uint64(itemData.lsn),
+			ItemData:        toProto(itemData),
 		}
 		entry := &RaftLogEntry{
 			Op: op,

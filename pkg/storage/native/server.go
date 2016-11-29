@@ -50,9 +50,12 @@ func (s *ServerOptions) InitDefaults() {
 }
 
 type Server struct {
-	options *ServerOptions
-	started int32
-	raft    *raft.Raft
+	options    *ServerOptions
+	started    int32
+	raft       *raft.Raft
+	grpcServer *grpc.Server
+
+	stop int32
 }
 
 func NewServer(options *ServerOptions) *Server {
@@ -68,6 +71,26 @@ func (s *Server) IsStarted() bool {
 func (s *Server) IsLeader() bool {
 	r := s.raft
 	return r != nil && r.State() == raft.Leader
+}
+
+func (s *Server) Stop() error {
+	atomic.StoreInt32(&s.stop, 1)
+
+	if s.grpcServer != nil {
+		s.grpcServer.Stop()
+		s.grpcServer = nil
+	}
+
+	if s.raft != nil {
+		f := s.raft.Shutdown()
+		err := f.Error()
+		if err != nil {
+			return err
+		}
+		s.raft = nil
+	}
+
+	return nil
 }
 
 func (s *Server) Run() error {
@@ -131,10 +154,14 @@ func (s *Server) Run() error {
 		return fmt.Errorf("failed to listen on %q: %v", grpcBindAddress, err)
 	}
 
-	grpcServer := grpc.NewServer()
-	RegisterStorageServiceServer(grpcServer, backend)
+	s.grpcServer = grpc.NewServer()
+	RegisterStorageServiceServer(s.grpcServer, backend)
 	atomic.StoreInt32(&s.started, 1)
-	err = grpcServer.Serve(lis)
+	err = s.grpcServer.Serve(lis)
+
+	if atomic.LoadInt32(&s.stop) != 0 {
+		return nil
+	}
 
 	return err
 }

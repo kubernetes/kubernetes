@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
+	"path"
 	"sort"
 	"time"
 )
@@ -45,16 +46,22 @@ type store struct {
 	codec     runtime.Codec
 
 	backend StorageServiceClient
+
+	prefix string
 }
 
 func NewStore(prefix string, codec runtime.Codec, backend StorageServiceClient) *store {
 	glog.Infof("building native store prefix=%q", prefix)
 
+	if prefix == "" {
+		prefix = "/"
+	}
 	versioner := etcd.APIObjectVersioner{}
 	s := &store{
 		backend:   backend,
 		versioner: versioner,
 		codec:     codec,
+		prefix:    prefix,
 	}
 	return s
 }
@@ -69,7 +76,9 @@ func (s *store) Versioner() storage.Versioner {
 // Create adds a new object at a key unless it already exists. 'ttl' is time-to-live
 // in seconds (0 means forever). If no error is returned and out is not nil, out will be
 // set to the read value from database.
-func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object, ttl uint64) error {
+func (s *store) Create(ctx context.Context, p string, obj, out runtime.Object, ttl uint64) error {
+	p = path.Join(s.prefix, p)
+
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
@@ -94,7 +103,7 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 
 	op := &StorageOperation{
 		OpType:   StorageOperationType_CREATE,
-		Path:     path,
+		Path:     p,
 		ItemData: itemData,
 	}
 	result, err := s.doOperation(ctx, op)
@@ -106,7 +115,7 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 	if result.ErrorCode != 0 {
 		switch result.ErrorCode {
 		case ErrorCode_ALREADY_EXISTS:
-			return storage.NewKeyExistsError(path, 0)
+			return storage.NewKeyExistsError(p, 0)
 
 		default:
 			return fmt.Errorf("unexpected error code: %v", result.ErrorCode)
@@ -121,7 +130,9 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 
 // Delete removes the specified key and returns the value that existed at that spot.
 // If key didn't exist, it will return NotFound storage error.
-func (s *store) Delete(ctx context.Context, path string, out runtime.Object, preconditions *storage.Preconditions) error {
+func (s *store) Delete(ctx context.Context, p string, out runtime.Object, preconditions *storage.Preconditions) error {
+	p = path.Join(s.prefix, p)
+
 	// TODO: Needed?
 	_, err := conversion.EnforcePtr(out)
 	if err != nil {
@@ -130,7 +141,7 @@ func (s *store) Delete(ctx context.Context, path string, out runtime.Object, pre
 
 	op := &StorageOperation{
 		OpType: StorageOperationType_DELETE,
-		Path:   path,
+		Path:   p,
 	}
 	if preconditions != nil {
 		if preconditions.UID != nil {
@@ -145,11 +156,11 @@ func (s *store) Delete(ctx context.Context, path string, out runtime.Object, pre
 	if result.ErrorCode != 0 {
 		switch result.ErrorCode {
 		case ErrorCode_NOT_FOUND:
-			return storage.NewKeyNotFoundError(path, 0)
+			return storage.NewKeyNotFoundError(p, 0)
 
 		case ErrorCode_PRECONDITION_NOT_MET_UID:
 			errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *preconditions.UID, result.ItemData.Uid)
-			return storage.NewInvalidObjError(path, errMsg)
+			return storage.NewInvalidObjError(p, errMsg)
 
 		default:
 			return fmt.Errorf("unexpected error code: %v", result.ErrorCode)
@@ -165,14 +176,16 @@ func (s *store) Delete(ctx context.Context, path string, out runtime.Object, pre
 // resourceVersion may be used to specify what version to begin watching,
 // which should be the current resourceVersion, and no longer rv+1
 // (e.g. reconnecting without missing any updates).
-func (s *store) Watch(ctx context.Context, path string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
-	glog.V(4).Infof("Watch %s from %s", path, resourceVersion)
+func (s *store) Watch(ctx context.Context, p string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+	p = path.Join(s.prefix, p)
+
+	glog.V(4).Infof("Watch %s from %s", p, resourceVersion)
 	rev, err := storage.ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	return newGrpcWatcher(ctx, s.backend, LSN(rev), path, false, p)
+	return newGrpcWatcher(ctx, s.backend, LSN(rev), p, false, pred, s.versioner, s.codec)
 }
 
 // WatchList begins watching the specified key's items. Items are decoded into API
@@ -180,39 +193,46 @@ func (s *store) Watch(ctx context.Context, path string, resourceVersion string, 
 // resourceVersion may be used to specify what version to begin watching,
 // which should be the current resourceVersion, and no longer rv+1
 // (e.g. reconnecting without missing any updates).
-func (s *store) WatchList(ctx context.Context, path string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
-	glog.V(4).Infof("WatchList %s from %s", path, resourceVersion)
+func (s *store) WatchList(ctx context.Context, p string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+	p = path.Join(s.prefix, p)
+
+	glog.V(4).Infof("WatchList %s from %s", p, resourceVersion)
 	rev, err := storage.ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	return newGrpcWatcher(ctx, s.backend, LSN(rev), path, true, p)
+	return newGrpcWatcher(ctx, s.backend, LSN(rev), p, true, pred, s.versioner, s.codec)
 }
 
 // Get implements storage.Interface.Get.
-func (s *store) Get(ctx context.Context, path string, out runtime.Object, ignoreNotFound bool) error {
-	glog.V(4).Infof("Get %s", path)
+func (s *store) Get(ctx context.Context, p string, out runtime.Object, ignoreNotFound bool) error {
+	p = path.Join(s.prefix, p)
+
+	glog.V(4).Infof("Get %s", p)
 
 	op := &StorageOperation{
 		OpType: StorageOperationType_GET,
-		Path:   path,
+		Path:   p,
 	}
 	result, err := s.doOperation(ctx, op)
 	if err != nil {
+		glog.V(4).Infof("Get %s => error %v", p, err)
 		return err
 	}
 
 	if result.ErrorCode != 0 {
 		switch result.ErrorCode {
 		case ErrorCode_NOT_FOUND:
+			glog.V(4).Infof("Get %s => NOT_FOUND", p)
 			if ignoreNotFound {
 				return runtime.SetZeroValue(out)
 			} else {
-				return storage.NewKeyNotFoundError(path, 0)
+				return storage.NewKeyNotFoundError(p, 0)
 			}
 
 		default:
+			glog.V(4).Infof("Get %s => error code %s", result.ErrorCode)
 			return fmt.Errorf("unexpected error code: %v", result.ErrorCode)
 		}
 	}
@@ -221,8 +241,10 @@ func (s *store) Get(ctx context.Context, path string, out runtime.Object, ignore
 }
 
 // GetToList implements storage.Interface.GetToList.
-func (s *store) GetToList(ctx context.Context, path string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
-	glog.V(4).Infof("GetToList %s", path)
+func (s *store) GetToList(ctx context.Context, p string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+	p = path.Join(s.prefix, p)
+
+	glog.V(4).Infof("GetToList %s", p)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -230,7 +252,7 @@ func (s *store) GetToList(ctx context.Context, path string, resourceVersion stri
 
 	op := &StorageOperation{
 		OpType: StorageOperationType_GET,
-		Path:   path,
+		Path:   p,
 	}
 	result, err := s.doOperation(ctx, op)
 	if err != nil {
@@ -256,8 +278,10 @@ func (s *store) GetToList(ctx context.Context, path string, resourceVersion stri
 }
 
 // List implements storage.Interface.List.
-func (s *store) List(ctx context.Context, path, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
-	glog.V(4).Infof("List %s", path)
+func (s *store) List(ctx context.Context, p, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+	p = path.Join(s.prefix, p)
+
+	glog.V(4).Infof("List %s", p)
 
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
@@ -266,7 +290,7 @@ func (s *store) List(ctx context.Context, path, resourceVersion string, pred sto
 
 	op := &StorageOperation{
 		OpType: StorageOperationType_LIST,
-		Path:   path,
+		Path:   p,
 	}
 
 	result, err := s.doOperation(ctx, op)
@@ -349,9 +373,11 @@ func decodeList(elems []*ItemData, filter storage.FilterFunc, ListPtr interface{
 // })
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
 func (s *store) GuaranteedUpdate(
-	ctx context.Context, path string, out runtime.Object, ignoreNotFound bool,
+	ctx context.Context, p string, out runtime.Object, ignoreNotFound bool,
 	precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
-	glog.Infof("GuaranteedUpdate %s", path)
+	p = path.Join(s.prefix, p)
+
+	glog.V(4).Infof("GuaranteedUpdate %s", p)
 
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
@@ -372,7 +398,7 @@ func (s *store) GuaranteedUpdate(
 	} else {
 		op := &StorageOperation{
 			OpType: StorageOperationType_GET,
-			Path:   path,
+			Path:   p,
 		}
 		result, err := s.doOperation(ctx, op)
 		if err != nil {
@@ -391,7 +417,7 @@ func (s *store) GuaranteedUpdate(
 						meta: &storage.ResponseMeta{},
 					}
 				} else {
-					return storage.NewKeyNotFoundError(path, 0)
+					return storage.NewKeyNotFoundError(p, 0)
 				}
 
 			default:
@@ -410,7 +436,7 @@ func (s *store) GuaranteedUpdate(
 	}
 
 	for {
-		if err := checkPreconditions(path, precondtions, origState.uid); err != nil {
+		if err := checkPreconditions(p, precondtions, origState.uid); err != nil {
 			return err
 		}
 
@@ -440,18 +466,18 @@ func (s *store) GuaranteedUpdate(
 
 		var result *StorageOperationResult
 		if doCreate {
-			glog.Infof("Trying create of %s", path)
+			glog.Infof("Trying create of %s", p)
 
 			op := &StorageOperation{
 				OpType:   StorageOperationType_CREATE,
 				ItemData: toProto(newItem),
-				Path:     path,
+				Path:     p,
 			}
 			result, err = s.doOperation(ctx, op)
 		} else {
 			// response will be the new item if we swapped,
 			// or the existing item if err==errorLSNMismatch
-			glog.Infof("Trying update of %s with lsn %d", path, origState.rev)
+			glog.Infof("Trying update of %s with lsn %d", p, origState.rev)
 
 			if origState.rev == 0 {
 				glog.Fatalf("origState.rev unexpectedly 0")
@@ -460,7 +486,7 @@ func (s *store) GuaranteedUpdate(
 			op := &StorageOperation{
 				OpType:          StorageOperationType_UPDATE,
 				ItemData:        toProto(newItem),
-				Path:            path,
+				Path:            p,
 				PreconditionLsn: uint64(origState.rev),
 			}
 			result, err = s.doOperation(ctx, op)
@@ -473,7 +499,7 @@ func (s *store) GuaranteedUpdate(
 		if result.ErrorCode != 0 {
 			switch result.ErrorCode {
 			case ErrorCode_PRECONDITION_NOT_MET_LSN:
-				glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", path)
+				glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", p)
 
 				origState, err = s.getState(result, v)
 				if err != nil {
@@ -496,11 +522,11 @@ func (s *store) GuaranteedUpdate(
 					continue
 				}
 
-				return storage.NewKeyNotFoundError(path, 0)
+				return storage.NewKeyNotFoundError(p, 0)
 
 			case ErrorCode_ALREADY_EXISTS:
 				// this is the create path
-				glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict (on create), going to retry", path)
+				glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict (on create), going to retry", p)
 
 				origState, err = s.getState(result, v)
 				if err != nil {

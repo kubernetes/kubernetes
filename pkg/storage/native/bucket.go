@@ -17,7 +17,6 @@ limitations under the License.
 package native
 
 import (
-	"bytes"
 	"strings"
 )
 
@@ -85,20 +84,20 @@ func splitPath(path string) (string, string) {
 	return bucket, item
 }
 
-func normalizePath(path string) string {
-	// TODO: Easy to optimize (a lot)
-	path = strings.Trim(path, "/")
-
-	var b bytes.Buffer
-
-	for _, t := range strings.Split(path, "/") {
-		if t == "" {
-			continue
-		}
-		if b.Len() != 0 {
-			b.WriteString("/")
-		}
-		b.WriteString(t)
-	}
-	return b.String()
-}
+//func normalizePath(path string) string {
+//	// TODO: Easy to optimize (a lot)
+//	path = strings.Trim(path, "/")
+//
+//	var b bytes.Buffer
+//
+//	for _, t := range strings.Split(path, "/") {
+//		if t == "" {
+//			continue
+//		}
+//		if b.Len() != 0 {
+//			b.WriteString("/")
+//		}
+//		b.WriteString(t)
+//	}
+//	return b.String()
+//}

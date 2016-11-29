@@ -29,7 +29,7 @@ import (
 )
 
 var initMutex sync.Mutex
-var client native.StorageServiceClient
+var clients map[string]native.StorageServiceClient
 var embeddedServer *native.Server
 
 func newNativeStorage(c storagebackend.Config, embedded bool) (storage.Interface, DestroyFunc, error) {
@@ -41,44 +41,46 @@ func newNativeStorage(c storagebackend.Config, embedded bool) (storage.Interface
 	// TODO: yuk
 	initMutex.Lock()
 	defer initMutex.Unlock()
-	if client == nil {
-		var grpcServerURLString string
-		if embedded {
-			glog.Infof("Using embedded StateServer")
-			options := &native.ServerOptions{}
-			options.InitDefaults()
+	var grpcServerURLString string
+	if embedded {
+		glog.Infof("Using embedded StateServer")
+		options := &native.ServerOptions{}
+		options.InitDefaults()
 
-			if embeddedServer == nil {
-				embeddedServer = native.NewServer(options)
-				go func() {
-					err := embeddedServer.Run()
-					if err != nil {
-						glog.Fatalf("embedded state server exited unexpectedly: %v", err)
-					}
-				}()
-
-				for {
-					if embeddedServer.IsStarted() && embeddedServer.IsLeader() {
-						break
-					}
-					time.Sleep(100 * time.Millisecond)
+		if embeddedServer == nil {
+			embeddedServer = native.NewServer(options)
+			go func() {
+				err := embeddedServer.Run()
+				if err != nil {
+					glog.Fatalf("embedded state server exited unexpectedly: %v", err)
 				}
-			}
+			}()
 
-			grpcServerURLString = "http://" + options.ClientBind
-		} else {
-			if len(c.ServerList) == 0 {
-				return nil, nil, fmt.Errorf("no servers provided")
+			for {
+				if embeddedServer.IsStarted() && embeddedServer.IsLeader() {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
 			}
-
-			if len(c.ServerList) > 1 {
-				glog.Warningf("ignoring additional state servers: %s", c.ServerList)
-			}
-			grpcServerURLString = c.ServerList[0]
-
-			glog.Infof("Using native StateServer: %q", grpcServerURLString)
 		}
 
+		grpcServerURLString = "http://" + options.ClientBind
+	} else {
+		if len(c.ServerList) == 0 {
+			return nil, nil, fmt.Errorf("no servers provided")
+		}
+
+		if len(c.ServerList) > 1 {
+			glog.Warningf("ignoring additional state servers: %s", c.ServerList)
+		}
+		grpcServerURLString = c.ServerList[0]
+
+		glog.Infof("Using native StateServer: %q", grpcServerURLString)
+	}
+
+	// TODO: Do we want to reuse clients?
+	client := clients[grpcServerURLString]
+	if client == nil {
 		grpcServerURL, err := url.Parse(grpcServerURLString)
 		if err != nil {
 			return nil, nil, fmt.Errorf("cannot parse server url: %q", grpcServerURLString)
@@ -100,6 +102,10 @@ func newNativeStorage(c storagebackend.Config, embedded bool) (storage.Interface
 		// TODO: Close conn
 
 		client = native.NewStorageServiceClient(conn)
+		if clients == nil {
+			clients = make(map[string]native.StorageServiceClient)
+		}
+		clients[grpcServerURLString] = client
 	}
 	nativeStore := native.NewStore(c.Prefix, c.Codec, client)
 	return nativeStore, destroyFunc, nil

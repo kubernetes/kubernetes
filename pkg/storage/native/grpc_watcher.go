@@ -26,38 +26,52 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
 type grpcWatcher struct {
-	client StorageServiceClient
-
 	versioner storage.Versioner
 	codec     runtime.Codec
-
-	log        ReadableLog
-	resultChan chan watch.Event
-
-	stop int32
 
 	position   LSN
 	pathPrefix string
 	recursive  bool
 	selection  storage.SelectionPredicate
+
+	cancelFunction context.CancelFunc
+
+	outgoing chan watch.Event
+	//userStop chan struct{}
+	//stopped  bool
+	//stopLock sync.Mutex
+	stop int32
+	// wg is used to avoid calls to etcd after Stop(), and to make sure
+	// that the translate goroutine is not leaked.
+	wg sync.WaitGroup
 }
 
 var _ watch.Interface = &grpcWatcher{}
 
-func newGrpcWatcher(ctx context.Context, client StorageServiceClient, startPosition LSN, path string, recursive bool, selection storage.SelectionPredicate) (watch.Interface, error) {
+func newGrpcWatcher(ctx context.Context,
+	client StorageServiceClient,
+	startPosition LSN,
+	path string,
+	recursive bool,
+	selection storage.SelectionPredicate,
+	versioner storage.Versioner,
+	codec runtime.Codec) (watch.Interface, error) {
 	// TODO: etc3 code has this
 	//if pred.Label.Empty() && pred.Field.Empty() {
 	//	// The filter doesn't filter out any object.
 	//	wc.internalFilter = nil
 	//}
 
-	pathPrefix := normalizePath(path)
+	pathPrefix := path
 	if recursive {
-		pathPrefix += "/"
+		if !strings.HasSuffix(pathPrefix, "/") {
+			pathPrefix += "/"
+		}
 	}
 
 	watchRequest := &WatchRequest{
@@ -69,20 +83,25 @@ func newGrpcWatcher(ctx context.Context, client StorageServiceClient, startPosit
 	// Prevent goroutine thrashing
 	bufferSize := 16
 
-	watchClient, err := client.Watch(ctx, watchRequest)
+	watchContext, cancelFunction := context.WithCancel(ctx)
+	watchClient, err := client.Watch(watchContext, watchRequest)
 	if err != nil {
 		return nil, fmt.Errorf("error starting watch: %v", err)
 	}
 
 	w := &grpcWatcher{
-		resultChan: make(chan watch.Event, bufferSize),
+		outgoing:   make(chan watch.Event, bufferSize),
 		position:   startPosition,
 		pathPrefix: pathPrefix,
 		recursive:  recursive,
+		selection:  selection,
+		versioner:  versioner,
+		codec:      codec,
 
-		selection: selection,
+		cancelFunction: cancelFunction,
 	}
-	go w.run(ctx, watchClient)
+	w.wg.Add(1)
+	go w.run(watchClient)
 
 	return w, nil
 }
@@ -90,48 +109,80 @@ func newGrpcWatcher(ctx context.Context, client StorageServiceClient, startPosit
 // Stops watching. Will close the channel returned by ResultChan(). Releases
 // any resources used by the watch.
 func (w *grpcWatcher) Stop() {
-	close(w.resultChan)
+	//w.stopLock.Lock()
+	//if w.cancel != nil {
+	//	w.cancel()
+	//	w.cancel = nil
+	//}
+	//if !w.stopped {
+	//	w.stopped = true
+	//	close(w.userStop)
+	//}
+	//w.stopLock.Unlock()
+
 	atomic.StoreInt32(&w.stop, 1)
+
+	w.cancelFunction()
+
+	// Wait until all calls to etcd are finished and no other
+	// will be issued.
+	w.wg.Wait()
 }
 
 // Returns a chan which will receive all the events. If an error occurs
 // or Stop() is called, this channel will be closed, in which case the
 // watch should be completely cleaned up.
 func (w *grpcWatcher) ResultChan() <-chan watch.Event {
-	return w.resultChan
+	return w.outgoing
 }
 
-func (w *grpcWatcher) run(ctx context.Context, watchClient StorageService_WatchClient) {
+func (w *grpcWatcher) emit(e watch.Event) {
+	//if curLen := int64(len(w.outgoing)); w.outgoingHWM.Update(curLen) {
+	//	// Monitor if this gets backed up, and how much.
+	//	glog.V(1).Infof("watch (%v): %v objects queued in outgoing channel.", reflect.TypeOf(e.Object).String(), curLen)
+	//}
+	//// Give up on user stop, without this we leak a lot of goroutines in tests.
+	//select {
+	//case w.outgoing <- e:
+	//case <-w.userStop:
+	//}
+
+	w.outgoing <- e
+}
+
+func (w *grpcWatcher) run(watchClient StorageService_WatchClient) {
+	defer w.wg.Done()
+
 	for {
 		event, err := watchClient.Recv()
 
-		if atomic.LoadInt32(&w.stop) != 0 {
-			return
-		}
-
 		if err != nil {
+			if atomic.LoadInt32(&w.stop) != 0 {
+				return
+			}
+
 			glog.Warningf("error from watch receieve: %v", err)
-			w.resultChan <- watch.Event{
+			w.emit(watch.Event{
 				Type: watch.Error,
 				Object: &unversioned.Status{
 					Status:  unversioned.StatusFailure,
 					Message: err.Error(),
 					Reason:  unversioned.StatusReasonInternalError,
 				},
-			}
+			})
 			return
 		}
 
 		if event.Error != nil {
 			glog.Warningf("error from watch: %v", event.Error)
-			w.resultChan <- watch.Event{
+			w.emit(watch.Event{
 				Type: watch.Error,
 				Object: &unversioned.Status{
 					Status:  unversioned.StatusFailure,
 					Message: event.Error.Message,
 					Reason:  unversioned.StatusReasonInternalError,
 				},
-			}
+			})
 			return
 		}
 
@@ -148,17 +199,21 @@ func (w *grpcWatcher) run(ctx context.Context, watchClient StorageService_WatchC
 			}
 		}
 
+		if op.ItemData == nil || op.ItemData.Data == nil {
+			glog.Fatalf("itemdata nil in %v", op)
+		}
+
 		obj, err := w.decode(op.ItemData.Data, LSN(op.ItemData.Lsn))
 		if err != nil {
 			glog.Warningf("error decoding change event: %v", err)
-			w.resultChan <- watch.Event{
+			w.emit(watch.Event{
 				Type: watch.Error,
 				Object: &unversioned.Status{
 					Status:  unversioned.StatusFailure,
 					Message: err.Error(),
 					Reason:  unversioned.StatusReasonInternalError,
 				},
-			}
+			})
 			return
 		}
 
@@ -190,22 +245,22 @@ func (w *grpcWatcher) run(ctx context.Context, watchClient StorageService_WatchC
 
 		default:
 			glog.Warningf("error decoding change event - unknown event: %v", op.OpType)
-			w.resultChan <- watch.Event{
+			w.emit(watch.Event{
 				Type: watch.Error,
 				Object: &unversioned.Status{
 					Status:  unversioned.StatusFailure,
 					Message: fmt.Sprintf("Unknown event %v", op.OpType),
 					Reason:  unversioned.StatusReasonInternalError,
 				},
-			}
+			})
 			return
 		}
 		glog.V(4).Infof("Sending %s for %v", eventType, obj)
 
-		w.resultChan <- watch.Event{
+		w.emit(watch.Event{
 			Type:   eventType,
 			Object: obj,
-		}
+		})
 	}
 }
 

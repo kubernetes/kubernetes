@@ -454,14 +454,16 @@ func (s *FSM) opList(ctx context.Context, op *StorageOperation) (*StorageOperati
 }
 
 func (s *FSM) enableExpiryManager(backend *RaftBackend, enable bool) *expiryManager {
-	glog.V(2).Infof("enableExpiryManager enabled=%v", enable)
-
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	if !enable {
-		s.expiryManager = nil
+		if s.expiryManager != nil {
+			glog.V(2).Infof("enableExpiryManager enabled=%v", enable)
+			s.expiryManager = nil
+		}
 	} else if s.expiryManager == nil {
+		glog.V(2).Infof("enableExpiryManager enabled=%v", enable)
 		var expiringItems []expiringItem
 
 		var addFn func(b *bucket)
