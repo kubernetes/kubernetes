@@ -1,3 +1,6 @@
+### Version 6.1 (Tue November 29 2016 Zihong Zheng <zihongz@google.com>)
+ - Support pruning old Deployments.
+
 ### Version 6.0 (Fri November 18 2016 Zihong Zheng <zihongz@google.com>)
  - Upgrade Addon Manager to use `kubectl apply`.
 

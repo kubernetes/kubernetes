@@ -195,6 +195,7 @@ done
 # otherwise they would be leaked during upgrade.
 log INFO "== Annotating the old addon resources at $(date -Is) =="
 annotate_addons ReplicationController
+annotate_addons Deployment
 
 # Create new addon resources by apply (with --prune=false).
 # The old RCs will not fight for pods created by new Deployments with the same label because the `controllerRef` feature.
