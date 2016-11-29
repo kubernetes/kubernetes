@@ -62,6 +62,25 @@ The same program can provide both discovery summarization and reverse proxy.
   other federated server to come up. Other servers can only depend on the core
   kubernetes server.
 
+## Component Dependency Order
+
+A discovery summarization server and proxy are not part of the core `kube-apiserver`.
+The dependency order looks like this:
+ 1. `etcd`
+ 2. `kube-apiserver`
+ 3. core scheduler, kubelet, service proxy (enough stuff to create a pod, run it on a node, and find it via service)
+ 4. `kubernetes-discovery` as a pod/service - default summarizer and proxy
+ 5. controllers
+ 6. other API servers and their controllers
+ 7. clients, web consoles, etc
+
+Nothing below the `kubernetes-discovery` can rely on the summarizer or proxy being present.
+`kubernetes-discovery` should be runnable as a pod backing a service in a well-known location.
+Something like `api.kube-public.svc` or similar seems appropriate since we'll want to allow
+network traffic to it from every other namespace in the cluster.  We could also choose to put
+it in a dedicated namespace.  Compromise of that namespace will expose the entire cluster since
+the proxy has the power to act as any user against any API server.
+
 ## Implementation Details
 
 ### Summarizing discovery information
@@ -85,6 +104,11 @@ In future, we can also use ingress. That will give cluster admins the flexibilit
 easily swap out the ingress controller by a Go reverse proxy, nginx, haproxy
 or any other solution they might want.
 
+`kubernetes-discovery` uses a simple proxy implementation alongside its discovery information
+which supports connection upgrade (for `exec`, `attach`, etc) and runs with delegated
+authentication and authorization against the core `kube-apiserver`.  As a proxy, it adds
+complete user information, including user, groups, and "extra" for backing API servers.
+
 ### Storage
 
 Each API server is responsible for storing their resources. They can have their
@@ -106,11 +130,25 @@ in the cluster.
 Since the actual server which serves client's request can be opaque to the client,
 all API servers need to have homogeneous authentication and authorisation mechanisms.
 All API servers will handle authn and authz for their resources themselves.
-In future, we can also have the proxy do the auth and then have apiservers trust
-it (via client certs) to report the actual user in an X-something header.
+The current authentication infrastructure allows token authentication delegation to the
+core `kube-apiserver` and trust of an authentication proxy, which can be fullfilled by
+`kubernetes-discovery`.
 
-For now, we will trust system admins to configure homogeneous auth on all servers.
-Future proposals will refine how auth is managed across the cluster.
+### Server Bootstrapping
+
+External API server will often have to provide resources they require on other API servers
+in the cluster.  This will usually be RBAC clusterroles, RBAC clusterrolebindings, and
+apifederation types to describe their API server.  The external API server should *never*
+attempt to self-register these since the power to mutate those resources provides the power
+to destroy the cluster.  Instead, there are two paths:
+ 1. the easy path - In this flow, the API server supports a `/bootstrap/<group>` endpoint
+    which provides the resources that can be piped to a `kubectl create -f` command a cluster-admin
+    can use those endpoints to prime other servers.
+ 2. the reliable path - In a production cluster, you generally want to know, audit, and
+    track the resources required to make your cluster work.  In these scenarios, you want
+    to have the API resource list ahead of time.  API server authors can provide a template.
+
+Nothing stops an external API server from supporting both.
 
 ### kubectl
 
