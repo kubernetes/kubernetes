@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -44,11 +44,11 @@ func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcdte
 
 type Tester struct {
 	tester  *resttest.Tester
-	storage *registry.Store
+	storage *genericregistry.Store
 }
 type UpdateFunc func(runtime.Object) runtime.Object
 
-func New(t *testing.T, storage *registry.Store) *Tester {
+func New(t *testing.T, storage *genericregistry.Store) *Tester {
 	return &Tester{
 		tester:  resttest.New(t, storage),
 		storage: storage,
