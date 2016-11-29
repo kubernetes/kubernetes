@@ -23,12 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -47,8 +47,8 @@ func TestCreate(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	factory := NewConfigFactory(client, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	factory := NewConfigFactory(client, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	factory.Create()
 }
 
@@ -65,8 +65,8 @@ func TestCreateFromConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	factory := NewConfigFactory(client, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	factory := NewConfigFactory(client, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -106,8 +106,8 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	factory := NewConfigFactory(client, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	factory := NewConfigFactory(client, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 
 	configData = []byte(`{}`)
 	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
@@ -117,26 +117,26 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory.CreateFromConfig(policy)
 }
 
-func PredicateOne(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PredicateTwo(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateTwo(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PriorityOne(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
-		Spec:       apitesting.DeepEqualSafePodSpec(),
+	testPod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"},
+		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
 	handler := utiltesting.FakeHandler{
 		StatusCode:   200,
@@ -149,7 +149,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	factory := NewConfigFactory(clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}), api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	factory := NewConfigFactory(clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}}), v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
 		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
@@ -178,11 +178,11 @@ func TestDefaultErrorFunc(t *testing.T) {
 }
 
 func TestNodeEnumerator(t *testing.T) {
-	testList := &api.NodeList{
-		Items: []api.Node{
-			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
-			{ObjectMeta: api.ObjectMeta{Name: "baz"}},
+	testList := &v1.NodeList{
+		Items: []v1.Node{
+			{ObjectMeta: v1.ObjectMeta{Name: "foo"}},
+			{ObjectMeta: v1.ObjectMeta{Name: "bar"}},
+			{ObjectMeta: v1.ObjectMeta{Name: "baz"}},
 		},
 	}
 	me := nodeEnumerator{testList}
@@ -192,7 +192,7 @@ func TestNodeEnumerator(t *testing.T) {
 	}
 	for i := range testList.Items {
 		gotObj := me.Get(i)
-		if e, a := testList.Items[i].Name, gotObj.(*api.Node).Name; e != a {
+		if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
@@ -211,14 +211,14 @@ func (f *fakeClock) Now() time.Time {
 
 func TestBind(t *testing.T) {
 	table := []struct {
-		binding *api.Binding
+		binding *v1.Binding
 	}{
-		{binding: &api.Binding{
-			ObjectMeta: api.ObjectMeta{
-				Namespace: api.NamespaceDefault,
+		{binding: &v1.Binding{
+			ObjectMeta: v1.ObjectMeta{
+				Namespace: v1.NamespaceDefault,
 				Name:      "foo",
 			},
-			Target: api.ObjectReference{
+			Target: v1.ObjectReference{
 				Name: "foohost.kubernetes.mydomain.com",
 			},
 		}},
@@ -232,7 +232,7 @@ func TestBind(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
@@ -240,7 +240,7 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
-		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", api.NamespaceDefault, ""), "POST", &expectedBody)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", v1.NamespaceDefault, ""), "POST", &expectedBody)
 	}
 }
 
@@ -317,45 +317,45 @@ func TestResponsibleForPod(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	// factory of "default-scheduler"
-	factoryDefaultScheduler := NewConfigFactory(client, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	factoryDefaultScheduler := NewConfigFactory(client, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	// factory of "foo-scheduler"
-	factoryFooScheduler := NewConfigFactory(client, "foo-scheduler", api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	factoryFooScheduler := NewConfigFactory(client, "foo-scheduler", v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	// scheduler annotations to be tested
 	schedulerAnnotationFitsDefault := map[string]string{"scheduler.alpha.kubernetes.io/name": "default-scheduler"}
 	schedulerAnnotationFitsFoo := map[string]string{"scheduler.alpha.kubernetes.io/name": "foo-scheduler"}
 	schedulerAnnotationFitsNone := map[string]string{"scheduler.alpha.kubernetes.io/name": "bar-scheduler"}
 	tests := []struct {
-		pod             *api.Pod
+		pod             *v1.Pod
 		pickedByDefault bool
 		pickedByFoo     bool
 	}{
 		{
 			// pod with no annotation "scheduler.alpha.kubernetes.io/name=<scheduler-name>" should be
 			// picked by the default scheduler, NOT by the one of name "foo-scheduler"
-			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"}},
+			pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"}},
 			pickedByDefault: true,
 			pickedByFoo:     false,
 		},
 		{
 			// pod with annotation "scheduler.alpha.kubernetes.io/name=default-scheduler" should be picked
 			// by the scheduler of name "default-scheduler", NOT by the one of name "foo-scheduler"
-			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsDefault}},
+			pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsDefault}},
 			pickedByDefault: true,
 			pickedByFoo:     false,
 		},
 		{
 			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
 			// be picked by the scheduler of name "default-scheduler", but by the one of name "foo-scheduler"
-			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsFoo}},
+			pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsFoo}},
 			pickedByDefault: false,
 			pickedByFoo:     true,
 		},
 		{
 			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
 			// be picked by niether the scheduler of name "default-scheduler" nor the one of name "foo-scheduler"
-			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsNone}},
+			pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsNone}},
 			pickedByDefault: false,
 			pickedByFoo:     false,
 		},
@@ -381,9 +381,9 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	// factory of "default-scheduler"
-	factory := NewConfigFactory(client, api.DefaultSchedulerName, -1, api.DefaultFailureDomains)
+	factory := NewConfigFactory(client, v1.DefaultSchedulerName, -1, v1.DefaultFailureDomains)
 	_, err := factory.Create()
 	if err == nil {
 		t.Errorf("expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
@@ -398,7 +398,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	testCases := []struct {
 		hardPodAffinitySymmetricWeight int
@@ -407,12 +407,12 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	}{
 		{
 			hardPodAffinitySymmetricWeight: -1,
-			failureDomains:                 api.DefaultFailureDomains,
+			failureDomains:                 v1.DefaultFailureDomains,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: -1, must be in the range 0-100",
 		},
 		{
 			hardPodAffinitySymmetricWeight: 101,
-			failureDomains:                 api.DefaultFailureDomains,
+			failureDomains:                 v1.DefaultFailureDomains,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: 101, must be in the range 0-100",
 		},
 		{
@@ -423,7 +423,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		factory := NewConfigFactory(client, api.DefaultSchedulerName, test.hardPodAffinitySymmetricWeight, test.failureDomains)
+		factory := NewConfigFactory(client, v1.DefaultSchedulerName, test.hardPodAffinitySymmetricWeight, test.failureDomains)
 		_, err := factory.Create()
 		if err == nil {
 			t.Errorf("expected err: %s, got nothing", test.expectErr)
@@ -434,32 +434,32 @@ func TestInvalidFactoryArgs(t *testing.T) {
 
 func TestNodeConditionPredicate(t *testing.T) {
 	nodeFunc := getNodeConditionPredicate()
-	nodeList := &api.NodeList{
-		Items: []api.Node{
+	nodeList := &v1.NodeList{
+		Items: []v1.Node{
 			// node1 considered
-			{ObjectMeta: api.ObjectMeta{Name: "node1"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
 			// node2 ignored - node not Ready
-			{ObjectMeta: api.ObjectMeta{Name: "node2"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
 			// node3 ignored - node out of disk
-			{ObjectMeta: api.ObjectMeta{Name: "node3"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeOutOfDisk, Status: api.ConditionTrue}}}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
 			// node4 considered
-			{ObjectMeta: api.ObjectMeta{Name: "node4"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeOutOfDisk, Status: api.ConditionFalse}}}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
 
 			// node5 ignored - node out of disk
-			{ObjectMeta: api.ObjectMeta{Name: "node5"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}, {Type: api.NodeOutOfDisk, Status: api.ConditionTrue}}}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
 			// node6 considered
-			{ObjectMeta: api.ObjectMeta{Name: "node6"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}, {Type: api.NodeOutOfDisk, Status: api.ConditionFalse}}}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
 			// node7 ignored - node out of disk, node not Ready
-			{ObjectMeta: api.ObjectMeta{Name: "node7"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}, {Type: api.NodeOutOfDisk, Status: api.ConditionTrue}}}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
 			// node8 ignored - node not Ready
-			{ObjectMeta: api.ObjectMeta{Name: "node8"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}, {Type: api.NodeOutOfDisk, Status: api.ConditionFalse}}}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
 
 			// node9 ignored - node unschedulable
-			{ObjectMeta: api.ObjectMeta{Name: "node9"}, Spec: api.NodeSpec{Unschedulable: true}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
 			// node10 considered
-			{ObjectMeta: api.ObjectMeta{Name: "node10"}, Spec: api.NodeSpec{Unschedulable: false}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
 			// node11 considered
-			{ObjectMeta: api.ObjectMeta{Name: "node11"}},
+			{ObjectMeta: v1.ObjectMeta{Name: "node11"}},
 		},
 	}
 

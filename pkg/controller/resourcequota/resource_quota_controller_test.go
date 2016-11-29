@@ -22,83 +22,84 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func getResourceList(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func getResourceList(cpu, memory string) v1.ResourceList {
+	res := v1.ResourceList{}
 	if cpu != "" {
-		res[api.ResourceCPU] = resource.MustParse(cpu)
+		res[v1.ResourceCPU] = resource.MustParse(cpu)
 	}
 	if memory != "" {
-		res[api.ResourceMemory] = resource.MustParse(memory)
+		res[v1.ResourceMemory] = resource.MustParse(memory)
 	}
 	return res
 }
 
-func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
-	res := api.ResourceRequirements{}
+func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequirements {
+	res := v1.ResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
 	return res
 }
 
 func TestSyncResourceQuota(t *testing.T) {
-	podList := api.PodList{
-		Items: []api.Pod{
+	podList := v1.PodList{
+		Items: []v1.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "pod-running", Namespace: "testing"},
-				Status:     api.PodStatus{Phase: api.PodRunning},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
+				ObjectMeta: v1.ObjectMeta{Name: "pod-running", Namespace: "testing"},
+				Status:     v1.PodStatus{Phase: v1.PodRunning},
+				Spec: v1.PodSpec{
+					Volumes:    []v1.Volume{{Name: "vol"}},
+					Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "pod-running-2", Namespace: "testing"},
-				Status:     api.PodStatus{Phase: api.PodRunning},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
+				ObjectMeta: v1.ObjectMeta{Name: "pod-running-2", Namespace: "testing"},
+				Status:     v1.PodStatus{Phase: v1.PodRunning},
+				Spec: v1.PodSpec{
+					Volumes:    []v1.Volume{{Name: "vol"}},
+					Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "pod-failed", Namespace: "testing"},
-				Status:     api.PodStatus{Phase: api.PodFailed},
-				Spec: api.PodSpec{
-					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
+				ObjectMeta: v1.ObjectMeta{Name: "pod-failed", Namespace: "testing"},
+				Status:     v1.PodStatus{Phase: v1.PodFailed},
+				Spec: v1.PodSpec{
+					Volumes:    []v1.Volume{{Name: "vol"}},
+					Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
 				},
 			},
 		},
 	}
-	resourceQuota := api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "testing"},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+	resourceQuota := v1.ResourceQuota{
+		ObjectMeta: v1.ObjectMeta{Name: "quota", Namespace: "testing"},
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3"),
+				v1.ResourceMemory: resource.MustParse("100Gi"),
+				v1.ResourcePods:   resource.MustParse("5"),
 			},
 		},
 	}
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+	expectedUsage := v1.ResourceQuota{
+		Status: v1.ResourceQuotaStatus{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3"),
+				v1.ResourceMemory: resource.MustParse("100Gi"),
+				v1.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("200m"),
-				api.ResourceMemory: resource.MustParse("2Gi"),
-				api.ResourcePods:   resource.MustParse("2"),
+			Used: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+				v1.ResourcePods:   resource.MustParse("2"),
 			},
 		},
 	}
@@ -108,7 +109,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
@@ -135,7 +136,7 @@ func TestSyncResourceQuota(t *testing.T) {
 	}
 
 	lastActionIndex := len(kubeClient.Actions()) - 1
-	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*v1.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -157,33 +158,33 @@ func TestSyncResourceQuota(t *testing.T) {
 }
 
 func TestSyncResourceQuotaSpecChange(t *testing.T) {
-	resourceQuota := api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+	resourceQuota := v1.ResourceQuota{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: "default",
 			Name:      "rq",
 		},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("4"),
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
 			},
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("3"),
+		Status: v1.ResourceQuotaStatus{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("3"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("0"),
+			Used: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("0"),
 			},
 		},
 	}
 
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("4"),
+	expectedUsage := v1.ResourceQuota{
+		Status: v1.ResourceQuotaStatus{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("0"),
+			Used: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("0"),
 			},
 		},
 	}
@@ -193,7 +194,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
@@ -221,7 +222,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	}
 
 	lastActionIndex := len(kubeClient.Actions()) - 1
-	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*v1.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -243,35 +244,35 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 
 }
 func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
-	resourceQuota := api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+	resourceQuota := v1.ResourceQuota{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: "default",
 			Name:      "rq",
 		},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("4"),
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
 			},
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("1Gi"),
+		Status: v1.ResourceQuotaStatus{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("0"),
-				api.ResourceMemory: resource.MustParse("0"),
+			Used: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("0"),
+				v1.ResourceMemory: resource.MustParse("0"),
 			},
 		},
 	}
 
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("4"),
+	expectedUsage := v1.ResourceQuota{
+		Status: v1.ResourceQuotaStatus{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("0"),
+			Used: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("0"),
 			},
 		},
 	}
@@ -281,7 +282,7 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
@@ -309,7 +310,7 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 	}
 
 	lastActionIndex := len(kubeClient.Actions()) - 1
-	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*v1.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -331,45 +332,45 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 
 	// ensure usage hard and used are are synced with spec hard, not have dirty resource
 	for k, v := range usage.Status.Hard {
-		if k == api.ResourceMemory {
+		if k == v1.ResourceMemory {
 			t.Errorf("Unexpected Usage Hard: Key: %v, Value: %v", k, v.String())
 		}
 	}
 
 	for k, v := range usage.Status.Used {
-		if k == api.ResourceMemory {
+		if k == v1.ResourceMemory {
 			t.Errorf("Unexpected Usage Used: Key: %v, Value: %v", k, v.String())
 		}
 	}
 }
 
 func TestSyncResourceQuotaNoChange(t *testing.T) {
-	resourceQuota := api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+	resourceQuota := v1.ResourceQuota{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: "default",
 			Name:      "rq",
 		},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("4"),
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
 			},
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("4"),
+		Status: v1.ResourceQuotaStatus{
+			Hard: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("0"),
+			Used: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("0"),
 			},
 		},
 	}
 
-	kubeClient := fake.NewSimpleClientset(&api.PodList{}, &resourceQuota)
+	kubeClient := fake.NewSimpleClientset(&v1.PodList{}, &resourceQuota)
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
@@ -401,7 +402,7 @@ func TestAddQuota(t *testing.T) {
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
 		Registry:     install.NewRegistry(kubeClient, nil),
-		GroupKindsToReplenish: []unversioned.GroupKind{
+		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
@@ -416,20 +417,20 @@ func TestAddQuota(t *testing.T) {
 	testCases := []struct {
 		name string
 
-		quota            *api.ResourceQuota
+		quota            *v1.ResourceQuota
 		expectedPriority bool
 	}{
 		{
 			name:             "no status",
 			expectedPriority: true,
-			quota: &api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
+			quota: &v1.ResourceQuota{
+				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
-				Spec: api.ResourceQuotaSpec{
-					Hard: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("4"),
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
 					},
 				},
 			},
@@ -437,19 +438,19 @@ func TestAddQuota(t *testing.T) {
 		{
 			name:             "status, no usage",
 			expectedPriority: true,
-			quota: &api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
+			quota: &v1.ResourceQuota{
+				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
-				Spec: api.ResourceQuotaSpec{
-					Hard: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("4"),
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
 					},
 				},
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("4"),
+				Status: v1.ResourceQuotaStatus{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
 					},
 				},
 			},
@@ -457,22 +458,22 @@ func TestAddQuota(t *testing.T) {
 		{
 			name:             "status, mismatch",
 			expectedPriority: true,
-			quota: &api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
+			quota: &v1.ResourceQuota{
+				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
-				Spec: api.ResourceQuotaSpec{
-					Hard: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("4"),
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
 					},
 				},
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("6"),
+				Status: v1.ResourceQuotaStatus{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("6"),
 					},
-					Used: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("0"),
+					Used: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("0"),
 					},
 				},
 			},
@@ -480,19 +481,19 @@ func TestAddQuota(t *testing.T) {
 		{
 			name:             "status, missing usage, but don't care",
 			expectedPriority: false,
-			quota: &api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
+			quota: &v1.ResourceQuota{
+				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
-				Spec: api.ResourceQuotaSpec{
-					Hard: api.ResourceList{
-						api.ResourceServices: resource.MustParse("4"),
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceServices: resource.MustParse("4"),
 					},
 				},
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourceServices: resource.MustParse("4"),
+				Status: v1.ResourceQuotaStatus{
+					Hard: v1.ResourceList{
+						v1.ResourceServices: resource.MustParse("4"),
 					},
 				},
 			},
@@ -500,22 +501,22 @@ func TestAddQuota(t *testing.T) {
 		{
 			name:             "ready",
 			expectedPriority: false,
-			quota: &api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
+			quota: &v1.ResourceQuota{
+				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
-				Spec: api.ResourceQuotaSpec{
-					Hard: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("4"),
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
 					},
 				},
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("4"),
+				Status: v1.ResourceQuotaStatus{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
 					},
-					Used: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("0"),
+					Used: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("0"),
 					},
 				},
 			},

@@ -24,8 +24,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -45,7 +46,7 @@ var data = `{
 
 type Foo struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty" description:"standard object metadata"`
+	v1.ObjectMeta        `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
@@ -64,7 +65,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("thirdparty")
 
 	rsrc := &extensions.ThirdPartyResource{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "foo.company.com",
 		},
 		Versions: []extensions.APIVersion{
@@ -120,7 +121,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 				TypeMeta: unversioned.TypeMeta{
 					Kind: "Foo",
 				},
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 				},
 				SomeField:  "bar",

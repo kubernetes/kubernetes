@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -37,7 +38,7 @@ type SimpleSecurityContextProvider struct{}
 // ModifyContainerConfig is called before the Docker createContainer call.
 // The security context provider can make changes to the Config with which
 // the container is created.
-func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *dockercontainer.Config) {
+func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *v1.Pod, container *v1.Container, config *dockercontainer.Config) {
 	effectiveSC := DetermineEffectiveSecurityContext(pod, container)
 	if effectiveSC == nil {
 		return
@@ -50,7 +51,7 @@ func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, conta
 // ModifyHostConfig is called before the Docker runContainer call. The
 // security context provider can make changes to the HostConfig, affecting
 // security options, whether the container is privileged, volume binds, etc.
-func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
+func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
 	// Apply supplemental groups
 	if container.Name != leaky.PodInfraContainerName {
 		// TODO: We skip application of supplemental groups to the
@@ -96,7 +97,7 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container 
 }
 
 // ModifySecurityOptions adds SELinux options to config.
-func ModifySecurityOptions(config []string, selinuxOpts *api.SELinuxOptions) []string {
+func ModifySecurityOptions(config []string, selinuxOpts *v1.SELinuxOptions) []string {
 	config = modifySecurityOption(config, DockerLabelUser, selinuxOpts.User)
 	config = modifySecurityOption(config, DockerLabelRole, selinuxOpts.Role)
 	config = modifySecurityOption(config, DockerLabelType, selinuxOpts.Type)
@@ -115,7 +116,7 @@ func modifySecurityOption(config []string, name, value string) []string {
 }
 
 // MakeCapabilities creates string slices from Capability slices
-func MakeCapabilities(capAdd []api.Capability, capDrop []api.Capability) ([]string, []string) {
+func MakeCapabilities(capAdd []v1.Capability, capDrop []v1.Capability) ([]string, []string) {
 	var (
 		addCaps  []string
 		dropCaps []string
@@ -129,8 +130,80 @@ func MakeCapabilities(capAdd []api.Capability, capDrop []api.Capability) ([]stri
 	return addCaps, dropCaps
 }
 
-func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *api.SecurityContext {
+func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
+	containerSc := container.SecurityContext
+
+	if effectiveSc == nil && containerSc == nil {
+		return nil
+	}
+	if effectiveSc != nil && containerSc == nil {
+		return effectiveSc
+	}
+	if effectiveSc == nil && containerSc != nil {
+		return containerSc
+	}
+
+	if containerSc.SELinuxOptions != nil {
+		effectiveSc.SELinuxOptions = new(v1.SELinuxOptions)
+		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
+	}
+
+	if containerSc.Capabilities != nil {
+		effectiveSc.Capabilities = new(v1.Capabilities)
+		*effectiveSc.Capabilities = *containerSc.Capabilities
+	}
+
+	if containerSc.Privileged != nil {
+		effectiveSc.Privileged = new(bool)
+		*effectiveSc.Privileged = *containerSc.Privileged
+	}
+
+	if containerSc.RunAsUser != nil {
+		effectiveSc.RunAsUser = new(int64)
+		*effectiveSc.RunAsUser = *containerSc.RunAsUser
+	}
+
+	if containerSc.RunAsNonRoot != nil {
+		effectiveSc.RunAsNonRoot = new(bool)
+		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
+	}
+
+	if containerSc.ReadOnlyRootFilesystem != nil {
+		effectiveSc.ReadOnlyRootFilesystem = new(bool)
+		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
+	return effectiveSc
+}
+
+func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
+	if pod.Spec.SecurityContext == nil {
+		return nil
+	}
+
+	synthesized := &v1.SecurityContext{}
+
+	if pod.Spec.SecurityContext.SELinuxOptions != nil {
+		synthesized.SELinuxOptions = &v1.SELinuxOptions{}
+		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
+	}
+	if pod.Spec.SecurityContext.RunAsUser != nil {
+		synthesized.RunAsUser = new(int64)
+		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
+	}
+
+	if pod.Spec.SecurityContext.RunAsNonRoot != nil {
+		synthesized.RunAsNonRoot = new(bool)
+		*synthesized.RunAsNonRoot = *pod.Spec.SecurityContext.RunAsNonRoot
+	}
+
+	return synthesized
+}
+
+// TODO: remove the duplicate code
+func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *api.SecurityContext {
+	effectiveSc := internalSecurityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext
 
 	if effectiveSc == nil && containerSc == nil {
@@ -176,7 +249,7 @@ func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *
 	return effectiveSc
 }
 
-func securityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityContext {
+func internalSecurityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityContext {
 	if pod.Spec.SecurityContext == nil {
 		return nil
 	}

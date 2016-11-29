@@ -25,8 +25,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -136,17 +137,17 @@ func WaitForGroupSize(group string, size int32) error {
 	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
 }
 
-func svcByName(name string, port int) *api.Service {
-	return &api.Service{
-		ObjectMeta: api.ObjectMeta{
+func svcByName(name string, port int) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeNodePort,
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeNodePort,
 			Selector: map[string]string{
 				"name": name,
 			},
-			Ports: []api.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Port:       int32(port),
 				TargetPort: intstr.FromInt(port),
 			}},
@@ -159,18 +160,18 @@ func newSVCByName(c clientset.Interface, ns, name string) error {
 	return err
 }
 
-func rcByNamePort(name string, replicas int32, image string, port int, protocol api.Protocol,
-	labels map[string]string, gracePeriod *int64) *api.ReplicationController {
+func rcByNamePort(name string, replicas int32, image string, port int, protocol v1.Protocol,
+	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
 
-	return rcByNameContainer(name, replicas, image, labels, api.Container{
+	return rcByNameContainer(name, replicas, image, labels, v1.Container{
 		Name:  name,
 		Image: image,
-		Ports: []api.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
+		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
 	}, gracePeriod)
 }
 
-func rcByNameContainer(name string, replicas int32, image string, labels map[string]string, c api.Container,
-	gracePeriod *int64) *api.ReplicationController {
+func rcByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
+	gracePeriod *int64) *v1.ReplicationController {
 
 	zeroGracePeriod := int64(0)
 
@@ -179,25 +180,25 @@ func rcByNameContainer(name string, replicas int32, image string, labels map[str
 	if gracePeriod == nil {
 		gracePeriod = &zeroGracePeriod
 	}
-	return &api.ReplicationController{
+	return &v1.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Selector: map[string]string{
 				"name": name,
 			},
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: labels,
 				},
-				Spec: api.PodSpec{
-					Containers:                    []api.Container{c},
+				Spec: v1.PodSpec{
+					Containers:                    []v1.Container{c},
 					TerminationGracePeriodSeconds: gracePeriod,
 				},
 			},
@@ -206,10 +207,10 @@ func rcByNameContainer(name string, replicas int32, image string, labels map[str
 }
 
 // newRCByName creates a replication controller with a selector by name of name.
-func newRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*api.ReplicationController, error) {
+func newRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
 	return c.Core().ReplicationControllers(ns).Create(rcByNamePort(
-		name, replicas, serveHostnameImage, 9376, api.ProtocolTCP, map[string]string{}, gracePeriod))
+		name, replicas, serveHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
@@ -217,7 +218,7 @@ func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 	if err != nil {
 		return err
 	}
-	rc.Spec.Replicas = replicas
+	*(rc.Spec.Replicas) = replicas
 	_, err = c.Core().ReplicationControllers(rc.Namespace).Update(rc)
 	return err
 }

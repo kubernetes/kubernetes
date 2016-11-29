@@ -15,6 +15,8 @@ go_library(
     srcs = ["options.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/dns/federation:go_default_library",
         "//pkg/util/validation:go_default_library",
         "//vendor:github.com/spf13/pflag",
     ],

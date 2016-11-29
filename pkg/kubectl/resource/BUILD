@@ -34,6 +34,7 @@ go_library(
         "//pkg/client/restclient:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/yaml:go_default_library",

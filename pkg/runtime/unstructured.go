@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/json"
 )
@@ -327,15 +328,15 @@ func (u *Unstructured) SetAnnotations(annotations map[string]string) {
 	u.setNestedMap(annotations, "metadata", "annotations")
 }
 
-func (u *Unstructured) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
+func (u *Unstructured) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	u.SetAPIVersion(gvk.GroupVersion().String())
 	u.SetKind(gvk.Kind)
 }
 
-func (u *Unstructured) GroupVersionKind() unversioned.GroupVersionKind {
-	gv, err := unversioned.ParseGroupVersion(u.GetAPIVersion())
+func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
+	gv, err := schema.ParseGroupVersion(u.GetAPIVersion())
 	if err != nil {
-		return unversioned.GroupVersionKind{}
+		return schema.GroupVersionKind{}
 	}
 	gvk := gv.WithKind(u.GetKind())
 	return gvk
@@ -421,15 +422,15 @@ func (u *UnstructuredList) SetSelfLink(selfLink string) {
 	u.setNestedField(selfLink, "metadata", "selfLink")
 }
 
-func (u *UnstructuredList) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
+func (u *UnstructuredList) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	u.SetAPIVersion(gvk.GroupVersion().String())
 	u.SetKind(gvk.Kind)
 }
 
-func (u *UnstructuredList) GroupVersionKind() unversioned.GroupVersionKind {
-	gv, err := unversioned.ParseGroupVersion(u.GetAPIVersion())
+func (u *UnstructuredList) GroupVersionKind() schema.GroupVersionKind {
+	gv, err := schema.ParseGroupVersion(u.GetAPIVersion())
 	if err != nil {
-		return unversioned.GroupVersionKind{}
+		return schema.GroupVersionKind{}
 	}
 	gvk := gv.WithKind(u.GetKind())
 	return gvk
@@ -442,7 +443,7 @@ var UnstructuredJSONScheme Codec = unstructuredJSONScheme{}
 
 type unstructuredJSONScheme struct{}
 
-func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionKind, obj Object) (Object, *unversioned.GroupVersionKind, error) {
+func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, obj Object) (Object, *schema.GroupVersionKind, error) {
 	var err error
 	if obj != nil {
 		err = s.decodeInto(data, obj)
@@ -597,7 +598,7 @@ func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 
 func (UnstructuredObjectConverter) ConvertToVersion(in Object, target GroupVersioner) (Object, error) {
 	if kind := in.GetObjectKind().GroupVersionKind(); !kind.Empty() {
-		gvk, ok := target.KindForGroupVersionKinds([]unversioned.GroupVersionKind{kind})
+		gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
 		if !ok {
 			// TODO: should this be a typed error?
 			return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)

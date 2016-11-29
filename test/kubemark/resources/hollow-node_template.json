@@ -81,6 +81,9 @@
 							"cpu": "50m",
 							"memory": "100M"
 						}
+					},
+					"securityContext": {
+						"privileged": true
 					}
 
 				},

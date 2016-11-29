@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // MetaFactory is used to store and retrieve the version and kind
@@ -28,7 +28,7 @@ import (
 type MetaFactory interface {
 	// Interpret should return the version and kind of the wire-format of
 	// the object.
-	Interpret(data []byte) (*unversioned.GroupVersionKind, error)
+	Interpret(data []byte) (*schema.GroupVersionKind, error)
 }
 
 // DefaultMetaFactory is a default factory for versioning objects in JSON. The object
@@ -45,7 +45,7 @@ type SimpleMetaFactory struct {
 
 // Interpret will return the APIVersion and Kind of the JSON wire-format
 // encoding of an object, or an error.
-func (SimpleMetaFactory) Interpret(data []byte) (*unversioned.GroupVersionKind, error) {
+func (SimpleMetaFactory) Interpret(data []byte) (*schema.GroupVersionKind, error) {
 	findKind := struct {
 		// +optional
 		APIVersion string `json:"apiVersion,omitempty"`
@@ -55,9 +55,9 @@ func (SimpleMetaFactory) Interpret(data []byte) (*unversioned.GroupVersionKind, 
 	if err := json.Unmarshal(data, &findKind); err != nil {
 		return nil, fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
 	}
-	gv, err := unversioned.ParseGroupVersion(findKind.APIVersion)
+	gv, err := schema.ParseGroupVersion(findKind.APIVersion)
 	if err != nil {
 		return nil, err
 	}
-	return &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: findKind.Kind}, nil
+	return &schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: findKind.Kind}, nil
 }

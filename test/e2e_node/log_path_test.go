@@ -17,7 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -44,14 +44,14 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				checkPodName := "checker" + string(uuid.NewUUID())
 				checkContName := "checker-c-" + string(uuid.NewUUID())
 
-				logPod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				logPod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name: logPodName,
 					},
-					Spec: api.PodSpec{
+					Spec: v1.PodSpec{
 						// this pod is expected to exit successfully
-						RestartPolicy: api.RestartPolicyNever,
-						Containers: []api.Container{
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{
 							{
 								Image:   "gcr.io/google_containers/busybox:1.24",
 								Name:    logContName,
@@ -72,21 +72,21 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 
 				expectedlogFile := logDir + "/" + logPodName + "_" + ns + "_" + logContName + "-" + logConID.ID + ".log"
 
-				checkPod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				checkPod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name: checkPodName,
 					},
-					Spec: api.PodSpec{
+					Spec: v1.PodSpec{
 						// this pod is expected to exit successfully
-						RestartPolicy: api.RestartPolicyNever,
-						Containers: []api.Container{
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{
 							{
 								Image: "gcr.io/google_containers/busybox:1.24",
 								Name:  checkContName,
 								// If we find expected log file and contains right content, exit 0
 								// else, keep checking until test timeout
 								Command: []string{"sh", "-c", "while true; do if [ -e " + expectedlogFile + " ] && grep -q " + logString + " " + expectedlogFile + "; then exit 0; fi; sleep 1; done"},
-								VolumeMounts: []api.VolumeMount{
+								VolumeMounts: []v1.VolumeMount{
 									{
 										Name: logDirVolumeName,
 										// mount ContainerLogsDir to the same path in container
@@ -96,11 +96,11 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 								},
 							},
 						},
-						Volumes: []api.Volume{
+						Volumes: []v1.Volume{
 							{
 								Name: logDirVolumeName,
-								VolumeSource: api.VolumeSource{
-									HostPath: &api.HostPathVolumeSource{
+								VolumeSource: v1.VolumeSource{
+									HostPath: &v1.HostPathVolumeSource{
 										Path: expectedlogFile,
 									},
 								},

@@ -98,7 +98,7 @@ func isSysFSWritable() (bool, error) {
 
 	for _, mountPoint := range mountPoints {
 		const sysfsDevice = "sysfs"
-		if mountPoint.Device != sysfsDevice {
+		if mountPoint.Type != sysfsDevice {
 			continue
 		}
 		// Check whether sysfs is 'rw'

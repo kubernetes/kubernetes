@@ -20,7 +20,6 @@ package e2e_node
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -32,8 +31,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -151,15 +150,8 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
 
-	data, err := json.Marshal(&framework.TestContext.NodeTestContextType)
-	Expect(err).NotTo(HaveOccurred(), "should be able to serialize node test context.")
-
-	return data
-}, func(data []byte) {
-	// The node test context is updated in the first function, update it on every test node.
-	err := json.Unmarshal(data, &framework.TestContext.NodeTestContextType)
-	Expect(err).NotTo(HaveOccurred(), "should be able to deserialize node test context.")
-
+	return nil
+}, func([]byte) {
 	// update test context with node configuration.
 	Expect(updateTestContext()).To(Succeed(), "update test context with node config.")
 })
@@ -220,7 +212,7 @@ func waitForNodeReady() {
 		if err != nil {
 			return fmt.Errorf("failed to get node: %v", err)
 		}
-		if !api.IsNodeReady(node) {
+		if !v1.IsNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil
@@ -235,18 +227,26 @@ func updateTestContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to get apiserver client: %v", err)
 	}
+	// Update test context with current node object.
 	node, err := getNode(client)
 	if err != nil {
 		return fmt.Errorf("failed to get node: %v", err)
 	}
-	// Initialize the node name
-	framework.TestContext.NodeName = node.Name
+	framework.TestContext.NodeName = node.Name // Set node name.
+	// Update test context with current kubelet configuration.
+	// This assumes all tests which dynamically change kubelet configuration
+	// must: 1) run in serial; 2) restore kubelet configuration after test.
+	kubeletCfg, err := getCurrentKubeletConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get kubelet configuration: %v", err)
+	}
+	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config.
 	return nil
 }
 
 // getNode gets node object from the apiserver.
-func getNode(c *clientset.Clientset) (*api.Node, error) {
-	nodes, err := c.Nodes().List(api.ListOptions{})
+func getNode(c *clientset.Clientset) (*v1.Node, error) {
+	nodes, err := c.Nodes().List(v1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")

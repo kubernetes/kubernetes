@@ -19,8 +19,8 @@ package api
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
@@ -134,9 +134,9 @@ type ExtenderConfig struct {
 // nodes for a pod.
 type ExtenderArgs struct {
 	// Pod being scheduled
-	Pod api.Pod `json:"pod"`
+	Pod v1.Pod `json:"pod"`
 	// List of candidate nodes where the pod can be scheduled
-	Nodes api.NodeList `json:"nodes"`
+	Nodes v1.NodeList `json:"nodes"`
 }
 
 // FailedNodesMap represents the filtered out nodes, with node names and failure messages
@@ -145,7 +145,7 @@ type FailedNodesMap map[string]string
 // ExtenderFilterResult represents the results of a filter call to an extender
 type ExtenderFilterResult struct {
 	// Filtered set of nodes where the pod can be scheduled
-	Nodes api.NodeList `json:"nodes,omitempty"`
+	Nodes v1.NodeList `json:"nodes,omitempty"`
 	// Filtered out nodes where the pod can't be scheduled and the failure messages
 	FailedNodes FailedNodesMap `json:"failedNodes,omitempty"`
 	// Error message indicating failure

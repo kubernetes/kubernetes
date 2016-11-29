@@ -20,7 +20,7 @@ import (
 	"io"
 	"net/url"
 
-	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 const (
@@ -36,7 +36,7 @@ type GroupVersioner interface {
 	// target is known. In general, if the return target is not in the input list, the caller is expected to invoke
 	// Scheme.New(target) and then perform a conversion between the current Go type and the destination Go type.
 	// Sophisticated implementations may use additional information about the input kinds to pick a destination kind.
-	KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (target unversioned.GroupVersionKind, ok bool)
+	KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (target schema.GroupVersionKind, ok bool)
 }
 
 // Encoders write objects to a serialized form
@@ -55,7 +55,7 @@ type Decoder interface {
 	// guaranteed to be populated. The returned object is not guaranteed to match into. If defaults are
 	// provided, they are applied to the data by default. If no defaults or partial defaults are provided, the
 	// type of the into may be used to guide conversion decisions.
-	Decode(data []byte, defaults *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error)
+	Decode(data []byte, defaults *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error)
 }
 
 // Serializer is the core interface for transforming objects into a serialized format and back.
@@ -76,9 +76,9 @@ type Codec Serializer
 type ParameterCodec interface {
 	// DecodeParameters takes the given url.Values in the specified group version and decodes them
 	// into the provided object, or returns an error.
-	DecodeParameters(parameters url.Values, from unversioned.GroupVersion, into Object) error
+	DecodeParameters(parameters url.Values, from schema.GroupVersion, into Object) error
 	// EncodeParameters encodes the provided object as query parameters or returns an error.
-	EncodeParameters(obj Object, to unversioned.GroupVersion) (url.Values, error)
+	EncodeParameters(obj Object, to schema.GroupVersion) (url.Values, error)
 }
 
 // Framer is a factory for creating readers and writers that obey a particular framing pattern.
@@ -191,16 +191,16 @@ type ObjectTyper interface {
 	// ObjectKinds returns the all possible group,version,kind of the provided object, true if
 	// the object is unversioned, or an error if the object is not recognized
 	// (IsNotRegisteredError will return true).
-	ObjectKinds(Object) ([]unversioned.GroupVersionKind, bool, error)
+	ObjectKinds(Object) ([]schema.GroupVersionKind, bool, error)
 	// Recognizes returns true if the scheme is able to handle the provided version and kind,
 	// or more precisely that the provided version is a possible conversion or decoding
 	// target.
-	Recognizes(gvk unversioned.GroupVersionKind) bool
+	Recognizes(gvk schema.GroupVersionKind) bool
 }
 
 // ObjectCreater contains methods for instantiating an object by kind and version.
 type ObjectCreater interface {
-	New(kind unversioned.GroupVersionKind) (out Object, err error)
+	New(kind schema.GroupVersionKind) (out Object, err error)
 }
 
 // ObjectCopier duplicates an object.
@@ -233,5 +233,5 @@ type SelfLinker interface {
 // serializers to set the kind, version, and group the object is represented as. An Object may choose
 // to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.
 type Object interface {
-	GetObjectKind() unversioned.ObjectKind
+	GetObjectKind() schema.ObjectKind
 }

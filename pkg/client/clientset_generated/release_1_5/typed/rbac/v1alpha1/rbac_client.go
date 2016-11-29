@@ -19,9 +19,9 @@ package v1alpha1
 import (
 	fmt "fmt"
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
@@ -83,7 +83,7 @@ func New(c restclient.Interface) *RbacV1alpha1Client {
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	gv, err := unversioned.ParseGroupVersion("rbac.authorization.k8s.io/v1alpha1")
+	gv, err := schema.ParseGroupVersion("rbac.authorization.k8s.io/v1alpha1")
 	if err != nil {
 		return err
 	}

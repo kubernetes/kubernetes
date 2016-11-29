@@ -92,7 +92,7 @@ func (s *strategy) Validate(pod *api.Pod, container *api.Container) field.ErrorL
 	allErrs := field.ErrorList{}
 	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(apparmor.ContainerAnnotationKeyPrefix + container.Name)
 
-	profile := apparmor.GetProfileName(pod, container.Name)
+	profile := apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
 	if profile == "" {
 		if len(s.allowedProfiles) > 0 {
 			allErrs = append(allErrs, field.Forbidden(fieldPath, "AppArmor profile must be set"))

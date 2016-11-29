@@ -18,18 +18,14 @@ package kuberuntime
 
 import (
 	"fmt"
-	"strconv"
 
-	"github.com/gogo/protobuf/proto"
-	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-// determineEffectiveSecurityContext gets container's security context from api.Pod and api.Container.
-func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.Pod, container *api.Container, imageUser string) *runtimeapi.LinuxContainerSecurityContext {
+// determineEffectiveSecurityContext gets container's security context from v1.Pod and v1.Container.
+func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container, uid *int64, username *string) *runtimeapi.LinuxContainerSecurityContext {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
@@ -38,7 +34,8 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.P
 
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {
-		synthesized.RunAsUser = &imageUser
+		synthesized.RunAsUser = uid
+		synthesized.RunAsUsername = username
 	}
 
 	// set namespace options and supplemental groups.
@@ -47,9 +44,9 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.P
 		return synthesized
 	}
 	synthesized.NamespaceOptions = &runtimeapi.NamespaceOption{
-		HostNetwork: &podSc.HostNetwork,
-		HostIpc:     &podSc.HostIPC,
-		HostPid:     &podSc.HostPID,
+		HostNetwork: &pod.Spec.HostNetwork,
+		HostIpc:     &pod.Spec.HostIPC,
+		HostPid:     &pod.Spec.HostPID,
 	}
 	if podSc.FSGroup != nil {
 		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, *podSc.FSGroup)
@@ -65,7 +62,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.P
 }
 
 // verifyRunAsNonRoot verifies RunAsNonRoot.
-func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, imageUser string) error {
+func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid int64) error {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil {
 		return nil
@@ -78,15 +75,6 @@ func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, imageUser string
 		return nil
 	}
 
-	// Non-root verification only supports numeric user now. For non-numeric user,
-	// just return nil to by-pass the verfication.
-	// TODO: Support non-numeric user.
-	uid, err := strconv.ParseInt(imageUser, 10, 64)
-	if err != nil {
-		glog.Warningf("Non-root verification doesn't support non-numeric user (%s)", imageUser)
-		return nil
-	}
-
 	if uid == 0 {
 		return fmt.Errorf("container has runAsNonRoot and image will run as root")
 	}
@@ -94,14 +82,14 @@ func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, imageUser string
 	return nil
 }
 
-// convertToRuntimeSecurityContext converts api.SecurityContext to runtimeapi.SecurityContext.
-func convertToRuntimeSecurityContext(securityContext *api.SecurityContext) *runtimeapi.LinuxContainerSecurityContext {
+// convertToRuntimeSecurityContext converts v1.SecurityContext to runtimeapi.SecurityContext.
+func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runtimeapi.LinuxContainerSecurityContext {
 	if securityContext == nil {
 		return nil
 	}
 
 	return &runtimeapi.LinuxContainerSecurityContext{
-		RunAsUser:      convertToRuntimeRunAsUser(securityContext.RunAsUser),
+		RunAsUser:      securityContext.RunAsUser,
 		Privileged:     securityContext.Privileged,
 		ReadonlyRootfs: securityContext.ReadOnlyRootFilesystem,
 		Capabilities:   convertToRuntimeCapabilities(securityContext.Capabilities),
@@ -109,16 +97,8 @@ func convertToRuntimeSecurityContext(securityContext *api.SecurityContext) *runt
 	}
 }
 
-// convertToRuntimeRunAsUser converts RunAsUser from *int64 to *string.
-func convertToRuntimeRunAsUser(runAsUser *int64) *string {
-	if runAsUser == nil {
-		return nil
-	}
-	return proto.String(strconv.FormatInt(*runAsUser, 10))
-}
-
-// convertToRuntimeSELinuxOption converts api.SELinuxOptions to runtimeapi.SELinuxOption.
-func convertToRuntimeSELinuxOption(opts *api.SELinuxOptions) *runtimeapi.SELinuxOption {
+// convertToRuntimeSELinuxOption converts v1.SELinuxOptions to runtimeapi.SELinuxOption.
+func convertToRuntimeSELinuxOption(opts *v1.SELinuxOptions) *runtimeapi.SELinuxOption {
 	if opts == nil {
 		return nil
 	}
@@ -131,8 +111,8 @@ func convertToRuntimeSELinuxOption(opts *api.SELinuxOptions) *runtimeapi.SELinux
 	}
 }
 
-// convertToRuntimeCapabilities converts api.Capabilities to runtimeapi.Capability.
-func convertToRuntimeCapabilities(opts *api.Capabilities) *runtimeapi.Capability {
+// convertToRuntimeCapabilities converts v1.Capabilities to runtimeapi.Capability.
+func convertToRuntimeCapabilities(opts *v1.Capabilities) *runtimeapi.Capability {
 	if opts == nil {
 		return nil
 	}

@@ -25,10 +25,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -168,8 +168,8 @@ func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 
 // StorageGroupsToEncodingVersion returns a map from group name to group version,
 // computed from s.StorageVersions flag.
-func (s *ServerRunOptions) StorageGroupsToEncodingVersion() (map[string]unversioned.GroupVersion, error) {
-	storageVersionMap := map[string]unversioned.GroupVersion{}
+func (s *ServerRunOptions) StorageGroupsToEncodingVersion() (map[string]schema.GroupVersion, error) {
+	storageVersionMap := map[string]schema.GroupVersion{}
 
 	// First, get the defaults.
 	if err := mergeGroupVersionIntoMap(s.DefaultStorageVersions, storageVersionMap); err != nil {
@@ -184,7 +184,7 @@ func (s *ServerRunOptions) StorageGroupsToEncodingVersion() (map[string]unversio
 }
 
 // dest must be a map of group to groupVersion.
-func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVersion) error {
+func mergeGroupVersionIntoMap(gvList string, dest map[string]schema.GroupVersion) error {
 	for _, gvString := range strings.Split(gvList, ",") {
 		if gvString == "" {
 			continue
@@ -193,7 +193,7 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVe
 		// "group=group/version". The latter is used when types
 		// move between groups.
 		if !strings.Contains(gvString, "=") {
-			gv, err := unversioned.ParseGroupVersion(gvString)
+			gv, err := schema.ParseGroupVersion(gvString)
 			if err != nil {
 				return err
 			}
@@ -201,7 +201,7 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVe
 
 		} else {
 			parts := strings.SplitN(gvString, "=", 2)
-			gv, err := unversioned.ParseGroupVersion(parts[1])
+			gv, err := schema.ParseGroupVersion(parts[1])
 			if err != nil {
 				return err
 			}

@@ -110,7 +110,7 @@ unique places you need to update the go version.
 
 - The image for cross compiling in [build-tools/build-image/cross/](../../build-tools/build-image/cross/). The `VERSION` file and `Dockerfile`.
 - Update [dockerized-e2e-runner.sh](https://github.com/kubernetes/test-infra/blob/master/jenkins/dockerized-e2e-runner.sh) to run a kubekins-e2e with the desired go version, which requires pushing [e2e-image](https://github.com/kubernetes/test-infra/tree/master/jenkins/e2e-image) and [test-image](https://github.com/kubernetes/test-infra/tree/master/jenkins/test-image) images that are `FROM` the desired go version.
-- The docker image being run in [hack/jenkins/gotest-dockerized.sh](../../hack/jenkins/gotest-dockerized.sh).
+- The docker image being run in [gotest-dockerized.sh](https://github.com/kubernetes/test-infra/tree/master/jenkins/gotest-dockerized.sh).
 - The cross tag `KUBE_BUILD_IMAGE_CROSS_TAG` in [build-tools/common.sh](../../build-tools/common.sh)
 
 ## Workflow
@@ -194,6 +194,23 @@ git push -f origin my-feature
 
 **Note:** If you have write access, please refrain from using the GitHub UI for creating PRs, because GitHub will create the PR branch inside the main repository rather than inside your fork.
 
+### Getting a code review
+
+Once your pull request has been opened it will be assigned to one or more
+reviewers.  Those reviewers will do a thorough code review, looking for
+correctness, bugs, opportunities for improvement, documentation and comments,
+and style.
+
+Very small PRs are easy to review.  Very large PRs are very difficult to
+review.  Github has a built-in code review tool, which is what most people use.
+At the assigned reviewer's discretion, a PR may be switched to use
+[Reviewable](https://reviewable.k8s.io) instead.  Once a PR is switched to
+Reviewable, please ONLY send or reply to comments through reviewable.  Mixing
+code review tools can be very confusing.
+
+See [Faster Reviews](faster_reviews.md) for some thoughts on how to streamline
+the review process.
+
 ### When to retain commits and when to squash
 
 Upon merge, all git commits should represent meaningful milestones or units of
@@ -205,9 +222,6 @@ pass tests independently, but it is worth striving for. For mass automated
 fixups (e.g. automated doc formatting), use one or more commits for the
 changes to tooling and a final commit to apply the fixup en masse. This makes
 reviews much easier.
-
-See [Faster Reviews](faster_reviews.md) for more details.
-
 
 ## Testing
 

@@ -20,37 +20,37 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestSortInitContainerStatuses(t *testing.T) {
-	pod := api.Pod{
-		Spec: api.PodSpec{},
+	pod := v1.Pod{
+		Spec: v1.PodSpec{},
 	}
 	var cases = []struct {
-		containers     []api.Container
-		statuses       []api.ContainerStatus
-		sortedStatuses []api.ContainerStatus
+		containers     []v1.Container
+		statuses       []v1.ContainerStatus
+		sortedStatuses []v1.ContainerStatus
 	}{
 		{
-			containers:     []api.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			statuses:       []api.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			sortedStatuses: []api.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses:       []v1.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			sortedStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
 		},
 		{
-			containers:     []api.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			statuses:       []api.ContainerStatus{{Name: "second"}, {Name: "first"}, {Name: "fourth"}, {Name: "third"}},
-			sortedStatuses: []api.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses:       []v1.ContainerStatus{{Name: "second"}, {Name: "first"}, {Name: "fourth"}, {Name: "third"}},
+			sortedStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
 		},
 		{
-			containers:     []api.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			statuses:       []api.ContainerStatus{{Name: "fourth"}, {Name: "first"}},
-			sortedStatuses: []api.ContainerStatus{{Name: "first"}, {Name: "fourth"}},
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses:       []v1.ContainerStatus{{Name: "fourth"}, {Name: "first"}},
+			sortedStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "fourth"}},
 		},
 		{
-			containers:     []api.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			statuses:       []api.ContainerStatus{{Name: "first"}, {Name: "third"}},
-			sortedStatuses: []api.ContainerStatus{{Name: "first"}, {Name: "third"}},
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses:       []v1.ContainerStatus{{Name: "first"}, {Name: "third"}},
+			sortedStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "third"}},
 		},
 	}
 	for _, data := range cases {

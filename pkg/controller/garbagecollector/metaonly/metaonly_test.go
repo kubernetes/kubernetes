@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
@@ -91,7 +92,7 @@ func TestDecodeToMetadataOnlyObject(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected to get a JSON serializer")
 	}
-	codec := cf.DecoderToVersion(info.Serializer, unversioned.GroupVersion{Group: "SOMEGROUP", Version: "SOMEVERSION"})
+	codec := cf.DecoderToVersion(info.Serializer, schema.GroupVersion{Group: "SOMEGROUP", Version: "SOMEVERSION"})
 	// decode with into
 	into := &MetadataOnlyObject{}
 	ret, _, err := codec.Decode(data, nil, into)
@@ -137,7 +138,7 @@ func TestDecodeToMetadataOnlyObjectList(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected to get a JSON serializer")
 	}
-	codec := cf.DecoderToVersion(info.Serializer, unversioned.GroupVersion{Group: "SOMEGROUP", Version: "SOMEVERSION"})
+	codec := cf.DecoderToVersion(info.Serializer, schema.GroupVersion{Group: "SOMEGROUP", Version: "SOMEVERSION"})
 	// decode with into
 	into := &MetadataOnlyObjectList{}
 	ret, _, err := codec.Decode(data, nil, into)

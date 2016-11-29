@@ -23,6 +23,7 @@ To update automanaged build files, run:
 $ ./hack/update-bazel.sh
 ```
 
+**NOTES**: `update-bazel.sh` only works if check out directory of Kubernetes is "$GOPATH/src/k8s.io/kubernetes".
 
 To update a single build file, run:
 
@@ -30,7 +31,7 @@ To update a single build file, run:
 $ # get gazel
 $ go get -u github.com/mikedanese/gazel
 $ # .e.g. ./pkg/kubectl/BUILD
-$ gazel ./pkg/kubectl
+$ gazel -root="${YOUR_KUBE_ROOT_PATH}" ./pkg/kubectl
 ```
 
 Updating BUILD file for a package will be required when:

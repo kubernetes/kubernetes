@@ -19,7 +19,7 @@ package images
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
@@ -42,7 +42,7 @@ type throttledImageService struct {
 	limiter flowcontrol.RateLimiter
 }
 
-func (ts throttledImageService) PullImage(image kubecontainer.ImageSpec, secrets []api.Secret) error {
+func (ts throttledImageService) PullImage(image kubecontainer.ImageSpec, secrets []v1.Secret) error {
 	if ts.limiter.TryAccept() {
 		return ts.ImageService.PullImage(image, secrets)
 	}

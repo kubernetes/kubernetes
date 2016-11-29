@@ -19,7 +19,8 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -38,7 +39,7 @@ func NewConfigMapEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceConfigMaps),
 		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceConfigMaps),
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ConfigMaps(namespace).List(options)
 			if err != nil {
 				return nil, err

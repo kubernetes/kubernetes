@@ -21,11 +21,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -39,10 +39,10 @@ func newPetClient(client *clientset.Clientset) *apiServerPetClient {
 }
 
 func makeTwoDifferntPCB() (pcb1, pcb2 *pcb) {
-	userAdded := api.Volume{
+	userAdded := v1.Volume{
 		Name: "test",
-		VolumeSource: api.VolumeSource{
-			EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory},
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory},
 		},
 	}
 	ps := newStatefulSet(2)
@@ -88,14 +88,14 @@ func TestUpdatePetWithoutRetry(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
-		body := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "empty_pod"}})
+		body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "empty_pod"}})
 		fakeHandler := utiltesting.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: string(body),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
 
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 		petClient := newPetClient(client)
 		err := petClient.Update(tc.realPet, tc.expectedPet)
 
@@ -115,7 +115,7 @@ func TestUpdatePetWithFailure(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	petClient := newPetClient(client)
 
 	pcb1, pcb2 := makeTwoDifferntPCB()

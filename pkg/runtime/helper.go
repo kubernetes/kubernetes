@@ -21,8 +21,8 @@ import (
 	"io"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/errors"
 )
 
@@ -173,7 +173,7 @@ type MultiObjectTyper []ObjectTyper
 
 var _ ObjectTyper = MultiObjectTyper{}
 
-func (m MultiObjectTyper) ObjectKinds(obj Object) (gvks []unversioned.GroupVersionKind, unversionedType bool, err error) {
+func (m MultiObjectTyper) ObjectKinds(obj Object) (gvks []schema.GroupVersionKind, unversionedType bool, err error) {
 	for _, t := range m {
 		gvks, unversionedType, err = t.ObjectKinds(obj)
 		if err == nil {
@@ -183,7 +183,7 @@ func (m MultiObjectTyper) ObjectKinds(obj Object) (gvks []unversioned.GroupVersi
 	return
 }
 
-func (m MultiObjectTyper) Recognizes(gvk unversioned.GroupVersionKind) bool {
+func (m MultiObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
 	for _, t := range m {
 		if t.Recognizes(gvk) {
 			return true

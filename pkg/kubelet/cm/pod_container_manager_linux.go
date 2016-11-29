@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -39,7 +39,7 @@ const (
 // management if qos Cgroup is enabled.
 type podContainerManagerImpl struct {
 	// nodeInfo stores information about the node resource capacity
-	nodeInfo *api.Node
+	nodeInfo *v1.Node
 	// qosContainersInfo hold absolute paths of the top level qos containers
 	qosContainersInfo QOSContainersInfo
 	// Stores the mounted cgroup subsystems
@@ -54,14 +54,14 @@ var _ PodContainerManager = &podContainerManagerImpl{}
 
 // applyLimits sets pod cgroup resource limits
 // It also updates the resource limits on top level qos containers.
-func (m *podContainerManagerImpl) applyLimits(pod *api.Pod) error {
+func (m *podContainerManagerImpl) applyLimits(pod *v1.Pod) error {
 	// This function will house the logic for setting the resource parameters
 	// on the pod container config and updating top level qos container configs
 	return nil
 }
 
 // Exists checks if the pod's cgroup already exists
-func (m *podContainerManagerImpl) Exists(pod *api.Pod) bool {
+func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	podContainerName, _ := m.GetPodContainerName(pod)
 	return m.cgroupManager.Exists(podContainerName)
 }
@@ -69,7 +69,7 @@ func (m *podContainerManagerImpl) Exists(pod *api.Pod) bool {
 // EnsureExists takes a pod as argument and makes sure that
 // pod cgroup exists if qos cgroup hierarchy flag is enabled.
 // If the pod level container doesen't already exist it is created.
-func (m *podContainerManagerImpl) EnsureExists(pod *api.Pod) error {
+func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	podContainerName, _ := m.GetPodContainerName(pod)
 	// check if container already exist
 	alreadyExists := m.Exists(pod)
@@ -94,7 +94,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *api.Pod) error {
 }
 
 // GetPodContainerName returns the CgroupName identifer, and its literal cgroupfs form on the host.
-func (m *podContainerManagerImpl) GetPodContainerName(pod *api.Pod) (CgroupName, string) {
+func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, string) {
 	podQOS := qos.GetPodQOS(pod)
 	// Get the parent QOS container name
 	var parentContainer string
@@ -233,19 +233,19 @@ type podContainerManagerNoop struct {
 // Make sure that podContainerManagerStub implements the PodContainerManager interface
 var _ PodContainerManager = &podContainerManagerNoop{}
 
-func (m *podContainerManagerNoop) Exists(_ *api.Pod) bool {
+func (m *podContainerManagerNoop) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *podContainerManagerNoop) EnsureExists(_ *api.Pod) error {
+func (m *podContainerManagerNoop) EnsureExists(_ *v1.Pod) error {
 	return nil
 }
 
-func (m *podContainerManagerNoop) GetPodContainerName(_ *api.Pod) (CgroupName, string) {
+func (m *podContainerManagerNoop) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
 	return m.cgroupRoot, string(m.cgroupRoot)
 }
 
-func (m *podContainerManagerNoop) GetPodContainerNameForDriver(_ *api.Pod) string {
+func (m *podContainerManagerNoop) GetPodContainerNameForDriver(_ *v1.Pod) string {
 	return ""
 }
 

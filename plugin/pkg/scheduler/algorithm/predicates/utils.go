@@ -16,8 +16,10 @@ limitations under the License.
 
 package predicates
 
-import "k8s.io/kubernetes/pkg/labels"
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/labels"
+)
 
 // FindLabelsInSet gets as many key/value pairs as possible out of a label set.
 func FindLabelsInSet(labelsToKeep []string, selector labels.Set) map[string]string {
@@ -45,8 +47,8 @@ func AddUnsetLabelsToMap(aL map[string]string, labelsToAdd []string, labelSet la
 }
 
 // FilterPodsByNamespace filters pods outside a namespace from the given list.
-func FilterPodsByNamespace(pods []*api.Pod, ns string) []*api.Pod {
-	filtered := []*api.Pod{}
+func FilterPodsByNamespace(pods []*v1.Pod, ns string) []*v1.Pod {
+	filtered := []*v1.Pod{}
 	for _, nsPod := range pods {
 		if nsPod.Namespace == ns {
 			filtered = append(filtered, nsPod)

@@ -46,7 +46,7 @@ func TestDeleteCluster(t *testing.T) {
 		config:           conf,
 		clusterToDelete:  "minikube",
 		expectedClusters: []string{"otherkube"},
-		expectedOut:      "deleted cluster minikube from %s",
+		expectedOut:      "deleted cluster minikube from %s\n",
 	}
 
 	test.run(t)

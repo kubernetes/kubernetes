@@ -19,8 +19,8 @@ package v1alpha1
 import (
 	fmt "fmt"
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	registered "k8s.io/client-go/pkg/apimachinery/registered"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	serializer "k8s.io/client-go/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 )
@@ -83,7 +83,7 @@ func New(c rest.Interface) *RbacV1alpha1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := unversioned.ParseGroupVersion("rbac.authorization.k8s.io/v1alpha1")
+	gv, err := schema.ParseGroupVersion("rbac.authorization.k8s.io/v1alpha1")
 	if err != nil {
 		return err
 	}

@@ -588,7 +588,7 @@ func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
 
 // newHandlerForTest returns a handler configured for testing.
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
-	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
+	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
 	handler, err := NewLimitRanger(c, &DefaultLimitRangerActions{})
 	if err != nil {
 		return nil, f, err

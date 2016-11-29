@@ -617,7 +617,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 							Command: []string{
 								"/hyperkube",
 								"federation-controller-manager",
-								"--master=https://federation-apiserver",
+								"--master=https://" + svcName,
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
 								fmt.Sprintf("--dns-provider=%s", dnsProvider),
 								"--dns-provider-config=",

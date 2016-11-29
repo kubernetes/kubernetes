@@ -17,19 +17,19 @@ limitations under the License.
 package genericapiserver
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type ResourceEncodingConfig interface {
 	// StorageEncoding returns the serialization format for the resource.
 	// TODO this should actually return a GroupVersionKind since you can logically have multiple "matching" Kinds
 	// For now, it returns just the GroupVersion for consistency with old behavior
-	StorageEncodingFor(unversioned.GroupResource) (unversioned.GroupVersion, error)
+	StorageEncodingFor(schema.GroupResource) (schema.GroupVersion, error)
 
 	// InMemoryEncodingFor returns the groupVersion for the in memory representation the storage should convert to.
-	InMemoryEncodingFor(unversioned.GroupResource) (unversioned.GroupVersion, error)
+	InMemoryEncodingFor(schema.GroupResource) (schema.GroupVersion, error)
 }
 
 type DefaultResourceEncodingConfig struct {
@@ -37,11 +37,11 @@ type DefaultResourceEncodingConfig struct {
 }
 
 type GroupResourceEncodingConfig struct {
-	DefaultExternalEncoding   unversioned.GroupVersion
-	ExternalResourceEncodings map[string]unversioned.GroupVersion
+	DefaultExternalEncoding   schema.GroupVersion
+	ExternalResourceEncodings map[string]schema.GroupVersion
 
-	DefaultInternalEncoding   unversioned.GroupVersion
-	InternalResourceEncodings map[string]unversioned.GroupVersion
+	DefaultInternalEncoding   schema.GroupVersion
+	InternalResourceEncodings map[string]schema.GroupVersion
 }
 
 var _ ResourceEncodingConfig = &DefaultResourceEncodingConfig{}
@@ -50,14 +50,14 @@ func NewDefaultResourceEncodingConfig() *DefaultResourceEncodingConfig {
 	return &DefaultResourceEncodingConfig{Groups: map[string]*GroupResourceEncodingConfig{}}
 }
 
-func newGroupResourceEncodingConfig(defaultEncoding, defaultInternalVersion unversioned.GroupVersion) *GroupResourceEncodingConfig {
+func newGroupResourceEncodingConfig(defaultEncoding, defaultInternalVersion schema.GroupVersion) *GroupResourceEncodingConfig {
 	return &GroupResourceEncodingConfig{
-		DefaultExternalEncoding: defaultEncoding, ExternalResourceEncodings: map[string]unversioned.GroupVersion{},
-		DefaultInternalEncoding: defaultInternalVersion, InternalResourceEncodings: map[string]unversioned.GroupVersion{},
+		DefaultExternalEncoding: defaultEncoding, ExternalResourceEncodings: map[string]schema.GroupVersion{},
+		DefaultInternalEncoding: defaultInternalVersion, InternalResourceEncodings: map[string]schema.GroupVersion{},
 	}
 }
 
-func (o *DefaultResourceEncodingConfig) SetVersionEncoding(group string, externalEncodingVersion, internalVersion unversioned.GroupVersion) {
+func (o *DefaultResourceEncodingConfig) SetVersionEncoding(group string, externalEncodingVersion, internalVersion schema.GroupVersion) {
 	_, groupExists := o.Groups[group]
 	if !groupExists {
 		o.Groups[group] = newGroupResourceEncodingConfig(externalEncodingVersion, internalVersion)
@@ -67,7 +67,7 @@ func (o *DefaultResourceEncodingConfig) SetVersionEncoding(group string, externa
 	o.Groups[group].DefaultInternalEncoding = internalVersion
 }
 
-func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored unversioned.GroupResource, externalEncodingVersion, internalVersion unversioned.GroupVersion) {
+func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored schema.GroupResource, externalEncodingVersion, internalVersion schema.GroupVersion) {
 	group := resourceBeingStored.Group
 	_, groupExists := o.Groups[group]
 	if !groupExists {
@@ -78,10 +78,10 @@ func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored 
 	o.Groups[group].InternalResourceEncodings[resourceBeingStored.Resource] = internalVersion
 }
 
-func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource unversioned.GroupResource) (unversioned.GroupVersion, error) {
+func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource schema.GroupResource) (schema.GroupVersion, error) {
 	groupMeta, err := registered.Group(resource.Group)
 	if err != nil {
-		return unversioned.GroupVersion{}, err
+		return schema.GroupVersion{}, err
 	}
 
 	groupEncoding, groupExists := o.Groups[resource.Group]
@@ -99,14 +99,14 @@ func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource unversioned.
 	return resourceOverride, nil
 }
 
-func (o *DefaultResourceEncodingConfig) InMemoryEncodingFor(resource unversioned.GroupResource) (unversioned.GroupVersion, error) {
+func (o *DefaultResourceEncodingConfig) InMemoryEncodingFor(resource schema.GroupResource) (schema.GroupVersion, error) {
 	if _, err := registered.Group(resource.Group); err != nil {
-		return unversioned.GroupVersion{}, err
+		return schema.GroupVersion{}, err
 	}
 
 	groupEncoding, groupExists := o.Groups[resource.Group]
 	if !groupExists {
-		return unversioned.GroupVersion{Group: resource.Group, Version: runtime.APIVersionInternal}, nil
+		return schema.GroupVersion{Group: resource.Group, Version: runtime.APIVersionInternal}, nil
 	}
 
 	resourceOverride, resourceExists := groupEncoding.InternalResourceEncodings[resource.Resource]

@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
@@ -142,21 +142,21 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
 // pods.
-func (kl *Kubelet) GetPods() []*api.Pod {
+func (kl *Kubelet) GetPods() []*v1.Pod {
 	return kl.podManager.GetPods()
 }
 
 // GetRunningPods returns all pods running on kubelet from looking at the
 // container runtime cache. This function converts kubecontainer.Pod to
-// api.Pod, so only the fields that exist in both kubecontainer.Pod and
-// api.Pod are considered meaningful.
-func (kl *Kubelet) GetRunningPods() ([]*api.Pod, error) {
+// v1.Pod, so only the fields that exist in both kubecontainer.Pod and
+// v1.Pod are considered meaningful.
+func (kl *Kubelet) GetRunningPods() ([]*v1.Pod, error) {
 	pods, err := kl.runtimeCache.GetPods()
 	if err != nil {
 		return nil, err
 	}
 
-	apiPods := make([]*api.Pod, 0, len(pods))
+	apiPods := make([]*v1.Pod, 0, len(pods))
 	for _, pod := range pods {
 		apiPods = append(apiPods, pod.ToAPIPod())
 	}
@@ -165,13 +165,13 @@ func (kl *Kubelet) GetRunningPods() ([]*api.Pod, error) {
 
 // GetPodByFullName gets the pod with the given 'full' name, which
 // incorporates the namespace as well as whether the pod was found.
-func (kl *Kubelet) GetPodByFullName(podFullName string) (*api.Pod, bool) {
+func (kl *Kubelet) GetPodByFullName(podFullName string) (*v1.Pod, bool) {
 	return kl.podManager.GetPodByFullName(podFullName)
 }
 
 // GetPodByName provides the first pod that matches namespace and name, as well
 // as whether the pod was found.
-func (kl *Kubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
+func (kl *Kubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return kl.podManager.GetPodByName(namespace, name)
 }
 
@@ -187,19 +187,19 @@ func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 }
 
 // GetNode returns the node info for the configured node name of this Kubelet.
-func (kl *Kubelet) GetNode() (*api.Node, error) {
+func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	if kl.standaloneMode {
 		return kl.initialNode()
 	}
 	return kl.nodeInfo.GetNodeInfo(string(kl.nodeName))
 }
 
-// getNodeAnyWay() must return a *api.Node which is required by RunGeneralPredicates().
-// The *api.Node is obtained as follows:
+// getNodeAnyWay() must return a *v1.Node which is required by RunGeneralPredicates().
+// The *v1.Node is obtained as follows:
 // Return kubelet's nodeInfo for this node, except on error or if in standalone mode,
 // in which case return a manufactured nodeInfo representing a node with no pods,
 // zero capacity, and the default labels.
-func (kl *Kubelet) getNodeAnyWay() (*api.Node, error) {
+func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if !kl.standaloneMode {
 		if n, err := kl.nodeInfo.GetNodeInfo(string(kl.nodeName)); err == nil {
 			return n, nil
@@ -235,7 +235,7 @@ func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
 // GetExtraSupplementalGroupsForPod returns a list of the extra
 // supplemental groups for the Pod. These extra supplemental groups come
 // from annotations on persistent volumes that the pod depends on.
-func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	return kl.volumeManager.GetExtraSupplementalGroupsForPod(pod)
 }
 

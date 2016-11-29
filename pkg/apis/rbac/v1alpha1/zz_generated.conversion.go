@@ -39,12 +39,16 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole,
 		Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding,
 		Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding,
+		Convert_v1alpha1_ClusterRoleBindingBuilder_To_rbac_ClusterRoleBindingBuilder,
+		Convert_rbac_ClusterRoleBindingBuilder_To_v1alpha1_ClusterRoleBindingBuilder,
 		Convert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList,
 		Convert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList,
 		Convert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList,
 		Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList,
 		Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule,
 		Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule,
+		Convert_v1alpha1_PolicyRuleBuilder_To_rbac_PolicyRuleBuilder,
+		Convert_rbac_PolicyRuleBuilder_To_v1alpha1_PolicyRuleBuilder,
 		Convert_v1alpha1_Role_To_rbac_Role,
 		Convert_rbac_Role_To_v1alpha1_Role,
 		Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding,
@@ -138,6 +142,28 @@ func Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in *rbac.Clu
 	return autoConvert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in, out, s)
 }
 
+func autoConvert_v1alpha1_ClusterRoleBindingBuilder_To_rbac_ClusterRoleBindingBuilder(in *ClusterRoleBindingBuilder, out *rbac.ClusterRoleBindingBuilder, s conversion.Scope) error {
+	if err := Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(&in.ClusterRoleBinding, &out.ClusterRoleBinding, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1alpha1_ClusterRoleBindingBuilder_To_rbac_ClusterRoleBindingBuilder(in *ClusterRoleBindingBuilder, out *rbac.ClusterRoleBindingBuilder, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ClusterRoleBindingBuilder_To_rbac_ClusterRoleBindingBuilder(in, out, s)
+}
+
+func autoConvert_rbac_ClusterRoleBindingBuilder_To_v1alpha1_ClusterRoleBindingBuilder(in *rbac.ClusterRoleBindingBuilder, out *ClusterRoleBindingBuilder, s conversion.Scope) error {
+	if err := Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(&in.ClusterRoleBinding, &out.ClusterRoleBinding, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_rbac_ClusterRoleBindingBuilder_To_v1alpha1_ClusterRoleBindingBuilder(in *rbac.ClusterRoleBindingBuilder, out *ClusterRoleBindingBuilder, s conversion.Scope) error {
+	return autoConvert_rbac_ClusterRoleBindingBuilder_To_v1alpha1_ClusterRoleBindingBuilder(in, out, s)
+}
+
 func autoConvert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *ClusterRoleBindingList, out *rbac.ClusterRoleBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]rbac.ClusterRoleBinding)(unsafe.Pointer(&in.Items))
@@ -228,6 +254,28 @@ func autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out
 
 func Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out *PolicyRule, s conversion.Scope) error {
 	return autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in, out, s)
+}
+
+func autoConvert_v1alpha1_PolicyRuleBuilder_To_rbac_PolicyRuleBuilder(in *PolicyRuleBuilder, out *rbac.PolicyRuleBuilder, s conversion.Scope) error {
+	if err := Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(&in.PolicyRule, &out.PolicyRule, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1alpha1_PolicyRuleBuilder_To_rbac_PolicyRuleBuilder(in *PolicyRuleBuilder, out *rbac.PolicyRuleBuilder, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PolicyRuleBuilder_To_rbac_PolicyRuleBuilder(in, out, s)
+}
+
+func autoConvert_rbac_PolicyRuleBuilder_To_v1alpha1_PolicyRuleBuilder(in *rbac.PolicyRuleBuilder, out *PolicyRuleBuilder, s conversion.Scope) error {
+	if err := Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(&in.PolicyRule, &out.PolicyRule, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_rbac_PolicyRuleBuilder_To_v1alpha1_PolicyRuleBuilder(in *rbac.PolicyRuleBuilder, out *PolicyRuleBuilder, s conversion.Scope) error {
+	return autoConvert_rbac_PolicyRuleBuilder_To_v1alpha1_PolicyRuleBuilder(in, out, s)
 }
 
 func autoConvert_v1alpha1_Role_To_rbac_Role(in *Role, out *rbac.Role, s conversion.Scope) error {

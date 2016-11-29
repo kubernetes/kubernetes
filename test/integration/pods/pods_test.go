@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -37,7 +37,7 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 	ns := framework.CreateTestingNamespace("pod-activedeadline-update", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	var (
 		iZero = int64(0)
@@ -46,13 +46,13 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		iNeg  = int64(-1)
 	)
 
-	prototypePod := func() *api.Pod {
-		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+	prototypePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "xxx",
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "fake-name",
 						Image: "fakeimage",
@@ -155,18 +155,18 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 	ns := framework.CreateTestingNamespace("pod-readonly-root", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "xxx",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "fake-name",
 					Image: "fakeimage",
-					SecurityContext: &api.SecurityContext{
+					SecurityContext: &v1.SecurityContext{
 						ReadOnlyRootFilesystem: &isReadOnly,
 					},
 				},

@@ -17,7 +17,7 @@ limitations under the License.
 package algorithm
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
@@ -28,16 +28,16 @@ type SchedulerExtender interface {
 	// Filter based on extender-implemented predicate functions. The filtered list is
 	// expected to be a subset of the supplied list. failedNodesMap optionally contains
 	// the list of failed nodes and failure reasons.
-	Filter(pod *api.Pod, nodes []*api.Node) (filteredNodes []*api.Node, failedNodesMap schedulerapi.FailedNodesMap, err error)
+	Filter(pod *v1.Pod, nodes []*v1.Node) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error)
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
 	// are used to compute the weighted score for an extender. The weighted scores are added to
 	// the scores computed  by Kubernetes scheduler. The total scores are used to do the host selection.
-	Prioritize(pod *api.Pod, nodes []*api.Node) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error)
+	Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error)
 }
 
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
 type ScheduleAlgorithm interface {
-	Schedule(*api.Pod, NodeLister) (selectedMachine string, err error)
+	Schedule(*v1.Pod, NodeLister) (selectedMachine string, err error)
 }

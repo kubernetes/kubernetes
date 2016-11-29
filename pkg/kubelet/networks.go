@@ -17,8 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -33,7 +33,7 @@ type networkHost struct {
 	kubelet *Kubelet
 }
 
-func (nh *networkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
+func (nh *networkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
 	return nh.kubelet.GetPodByName(name, namespace)
 }
 
@@ -71,7 +71,7 @@ func (c *criNetworkHost) GetNetNS(containerID string) (string, error) {
 // like host port and bandwidth shaping.
 type noOpLegacyHost struct{}
 
-func (n *noOpLegacyHost) GetPodByName(namespace, name string) (*api.Pod, bool) {
+func (n *noOpLegacyHost) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return nil, true
 }
 

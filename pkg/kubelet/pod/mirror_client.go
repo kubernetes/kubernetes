@@ -18,9 +18,9 @@ package pod
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -31,7 +31,7 @@ type MirrorClient interface {
 	// pod or returns an error.  The mirror pod will have the same annotations
 	// as the given pod as well as an extra annotation containing the hash of
 	// the static pod.
-	CreateMirrorPod(pod *api.Pod) error
+	CreateMirrorPod(pod *v1.Pod) error
 	// DeleteMirrorPod deletes the mirror pod with the given full name from
 	// the API server or returns an error.
 	DeleteMirrorPod(podFullName string) error
@@ -49,7 +49,7 @@ func NewBasicMirrorClient(apiserverClient clientset.Interface) MirrorClient {
 	return &basicMirrorClient{apiserverClient: apiserverClient}
 }
 
-func (mc *basicMirrorClient) CreateMirrorPod(pod *api.Pod) error {
+func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 	if mc.apiserverClient == nil {
 		return nil
 	}
@@ -81,30 +81,30 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 		glog.Errorf("Failed to parse a pod full name %q", podFullName)
 		return err
 	}
-	glog.V(4).Infof("Deleting a mirror pod %q", podFullName)
+	glog.V(2).Infof("Deleting a mirror pod %q", podFullName)
 	// TODO(random-liu): Delete the mirror pod with uid precondition in mirror pod manager
-	if err := mc.apiserverClient.Core().Pods(namespace).Delete(name, api.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
+	if err := mc.apiserverClient.Core().Pods(namespace).Delete(name, v1.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
 		glog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
 	}
 	return nil
 }
 
-func IsStaticPod(pod *api.Pod) bool {
+func IsStaticPod(pod *v1.Pod) bool {
 	source, err := kubetypes.GetPodSource(pod)
 	return err == nil && source != kubetypes.ApiserverSource
 }
 
-func IsMirrorPod(pod *api.Pod) bool {
+func IsMirrorPod(pod *v1.Pod) bool {
 	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return ok
 }
 
-func getHashFromMirrorPod(pod *api.Pod) (string, bool) {
+func getHashFromMirrorPod(pod *v1.Pod) (string, bool) {
 	hash, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return hash, ok
 }
 
-func getPodHash(pod *api.Pod) string {
+func getPodHash(pod *v1.Pod) string {
 	// The annotation exists for all static pods.
 	return pod.Annotations[kubetypes.ConfigHashAnnotationKey]
 }

@@ -18,9 +18,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/types:go_default_library",
@@ -37,7 +37,7 @@ go_test(
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",

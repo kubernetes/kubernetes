@@ -174,6 +174,8 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)
+	recoverFromConflictIfNeeded(ds.client, err)
+
 	if createResp != nil {
 		return createResp.ID, err
 	}

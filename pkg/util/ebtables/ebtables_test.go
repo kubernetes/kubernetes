@@ -17,9 +17,10 @@ limitations under the License.
 package ebtables
 
 import (
-	"k8s.io/kubernetes/pkg/util/exec"
 	"strings"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 func testEnsureChain(t *testing.T) {

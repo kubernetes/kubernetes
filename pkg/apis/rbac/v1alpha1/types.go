@@ -27,6 +27,24 @@ import (
 // 2. evaluation of RoleBindings in the namespace requested - short circuit on match
 // 3. deny by default
 
+const (
+	APIGroupAll    = "*"
+	ResourceAll    = "*"
+	VerbAll        = "*"
+	NonResourceAll = "*"
+
+	GroupKind          = "Group"
+	ServiceAccountKind = "ServiceAccount"
+	UserKind           = "User"
+
+	UserAll = "*"
+)
+
+// Authorization is calculated against
+// 1. evaluation of ClusterRoleBindings - short circuit on match
+// 2. evaluation of RoleBindings in the namespace requested - short circuit on match
+// 3. deny by default
+
 // PolicyRule holds information that describes a policy rule, but does not contain information
 // about who the rule applies to or which namespace the rule applies to.
 type PolicyRule struct {

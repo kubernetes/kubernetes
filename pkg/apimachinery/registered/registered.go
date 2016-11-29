@@ -26,8 +26,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -45,16 +45,16 @@ var (
 // isn't easy right now because there are so many callers of this package.
 type APIRegistrationManager struct {
 	// registeredGroupVersions stores all API group versions for which RegisterGroup is called.
-	registeredVersions map[unversioned.GroupVersion]struct{}
+	registeredVersions map[schema.GroupVersion]struct{}
 
 	// thirdPartyGroupVersions are API versions which are dynamically
 	// registered (and unregistered) via API calls to the apiserver
-	thirdPartyGroupVersions []unversioned.GroupVersion
+	thirdPartyGroupVersions []schema.GroupVersion
 
 	// enabledVersions represents all enabled API versions. It should be a
 	// subset of registeredVersions. Please call EnableVersions() to add
 	// enabled versions.
-	enabledVersions map[unversioned.GroupVersion]struct{}
+	enabledVersions map[schema.GroupVersion]struct{}
 
 	// map of group meta for all groups.
 	groupMetaMap map[string]*apimachinery.GroupMeta
@@ -63,7 +63,7 @@ type APIRegistrationManager struct {
 	// KUBE_API_VERSIONS environment variable. The install package of each group
 	// checks this list before add their versions to the latest package and
 	// Scheme.  This list is small and order matters, so represent as a slice
-	envRequestedVersions []unversioned.GroupVersion
+	envRequestedVersions []schema.GroupVersion
 }
 
 // NewAPIRegistrationManager constructs a new manager. The argument ought to be
@@ -71,16 +71,16 @@ type APIRegistrationManager struct {
 // wish to test.
 func NewAPIRegistrationManager(kubeAPIVersions string) (*APIRegistrationManager, error) {
 	m := &APIRegistrationManager{
-		registeredVersions:      map[unversioned.GroupVersion]struct{}{},
-		thirdPartyGroupVersions: []unversioned.GroupVersion{},
-		enabledVersions:         map[unversioned.GroupVersion]struct{}{},
+		registeredVersions:      map[schema.GroupVersion]struct{}{},
+		thirdPartyGroupVersions: []schema.GroupVersion{},
+		enabledVersions:         map[schema.GroupVersion]struct{}{},
 		groupMetaMap:            map[string]*apimachinery.GroupMeta{},
-		envRequestedVersions:    []unversioned.GroupVersion{},
+		envRequestedVersions:    []schema.GroupVersion{},
 	}
 
 	if len(kubeAPIVersions) != 0 {
 		for _, version := range strings.Split(kubeAPIVersions, ",") {
-			gv, err := unversioned.ParseGroupVersion(version)
+			gv, err := schema.ParseGroupVersion(version)
 			if err != nil {
 				return nil, fmt.Errorf("invalid api version: %s in KUBE_API_VERSIONS: %s.",
 					version, kubeAPIVersions)
@@ -122,7 +122,7 @@ var (
 )
 
 // RegisterVersions adds the given group versions to the list of registered group versions.
-func (m *APIRegistrationManager) RegisterVersions(availableVersions []unversioned.GroupVersion) {
+func (m *APIRegistrationManager) RegisterVersions(availableVersions []schema.GroupVersion) {
 	for _, v := range availableVersions {
 		m.registeredVersions[v] = struct{}{}
 	}
@@ -141,8 +141,8 @@ func (m *APIRegistrationManager) RegisterGroup(groupMeta apimachinery.GroupMeta)
 // EnableVersions adds the versions for the given group to the list of enabled versions.
 // Note that the caller should call RegisterGroup before calling this method.
 // The caller of this function is responsible to add the versions to scheme and RESTMapper.
-func (m *APIRegistrationManager) EnableVersions(versions ...unversioned.GroupVersion) error {
-	var unregisteredVersions []unversioned.GroupVersion
+func (m *APIRegistrationManager) EnableVersions(versions ...schema.GroupVersion) error {
+	var unregisteredVersions []schema.GroupVersion
 	for _, v := range versions {
 		if _, found := m.registeredVersions[v]; !found {
 			unregisteredVersions = append(unregisteredVersions, v)
@@ -158,7 +158,7 @@ func (m *APIRegistrationManager) EnableVersions(versions ...unversioned.GroupVer
 // IsAllowedVersion returns if the version is allowed by the KUBE_API_VERSIONS
 // environment variable. If the environment variable is empty, then it always
 // returns true.
-func (m *APIRegistrationManager) IsAllowedVersion(v unversioned.GroupVersion) bool {
+func (m *APIRegistrationManager) IsAllowedVersion(v schema.GroupVersion) bool {
 	if len(m.envRequestedVersions) == 0 {
 		return true
 	}
@@ -171,15 +171,15 @@ func (m *APIRegistrationManager) IsAllowedVersion(v unversioned.GroupVersion) bo
 }
 
 // IsEnabledVersion returns if a version is enabled.
-func (m *APIRegistrationManager) IsEnabledVersion(v unversioned.GroupVersion) bool {
+func (m *APIRegistrationManager) IsEnabledVersion(v schema.GroupVersion) bool {
 	_, found := m.enabledVersions[v]
 	return found
 }
 
 // EnabledVersions returns all enabled versions.  Groups are randomly ordered, but versions within groups
 // are priority order from best to worst
-func (m *APIRegistrationManager) EnabledVersions() []unversioned.GroupVersion {
-	ret := []unversioned.GroupVersion{}
+func (m *APIRegistrationManager) EnabledVersions() []schema.GroupVersion {
+	ret := []schema.GroupVersion{}
 	for _, groupMeta := range m.groupMetaMap {
 		for _, version := range groupMeta.GroupVersions {
 			if m.IsEnabledVersion(version) {
@@ -191,13 +191,13 @@ func (m *APIRegistrationManager) EnabledVersions() []unversioned.GroupVersion {
 }
 
 // EnabledVersionsForGroup returns all enabled versions for a group in order of best to worst
-func (m *APIRegistrationManager) EnabledVersionsForGroup(group string) []unversioned.GroupVersion {
+func (m *APIRegistrationManager) EnabledVersionsForGroup(group string) []schema.GroupVersion {
 	groupMeta, ok := m.groupMetaMap[group]
 	if !ok {
-		return []unversioned.GroupVersion{}
+		return []schema.GroupVersion{}
 	}
 
-	ret := []unversioned.GroupVersion{}
+	ret := []schema.GroupVersion{}
 	for _, version := range groupMeta.GroupVersions {
 		if m.IsEnabledVersion(version) {
 			ret = append(ret, version)
@@ -224,14 +224,14 @@ func (m *APIRegistrationManager) IsRegistered(group string) bool {
 }
 
 // IsRegisteredVersion returns if a version is registered.
-func (m *APIRegistrationManager) IsRegisteredVersion(v unversioned.GroupVersion) bool {
+func (m *APIRegistrationManager) IsRegisteredVersion(v schema.GroupVersion) bool {
 	_, found := m.registeredVersions[v]
 	return found
 }
 
 // RegisteredGroupVersions returns all registered group versions.
-func (m *APIRegistrationManager) RegisteredGroupVersions() []unversioned.GroupVersion {
-	ret := []unversioned.GroupVersion{}
+func (m *APIRegistrationManager) RegisteredGroupVersions() []schema.GroupVersion {
+	ret := []schema.GroupVersion{}
 	for groupVersion := range m.registeredVersions {
 		ret = append(ret, groupVersion)
 	}
@@ -239,7 +239,7 @@ func (m *APIRegistrationManager) RegisteredGroupVersions() []unversioned.GroupVe
 }
 
 // IsThirdPartyAPIGroupVersion returns true if the api version is a user-registered group/version.
-func (m *APIRegistrationManager) IsThirdPartyAPIGroupVersion(gv unversioned.GroupVersion) bool {
+func (m *APIRegistrationManager) IsThirdPartyAPIGroupVersion(gv schema.GroupVersion) bool {
 	for ix := range m.thirdPartyGroupVersions {
 		if m.thirdPartyGroupVersions[ix] == gv {
 			return true
@@ -252,9 +252,9 @@ func (m *APIRegistrationManager) IsThirdPartyAPIGroupVersion(gv unversioned.Grou
 // registers them in the API machinery and enables them.
 // Skips GroupVersions that are already registered.
 // Returns the list of GroupVersions that were skipped.
-func (m *APIRegistrationManager) AddThirdPartyAPIGroupVersions(gvs ...unversioned.GroupVersion) []unversioned.GroupVersion {
-	filteredGVs := []unversioned.GroupVersion{}
-	skippedGVs := []unversioned.GroupVersion{}
+func (m *APIRegistrationManager) AddThirdPartyAPIGroupVersions(gvs ...schema.GroupVersion) []schema.GroupVersion {
+	filteredGVs := []schema.GroupVersion{}
+	skippedGVs := []schema.GroupVersion{}
 	for ix := range gvs {
 		if !m.IsRegisteredVersion(gvs[ix]) {
 			filteredGVs = append(filteredGVs, gvs[ix])
@@ -274,7 +274,7 @@ func (m *APIRegistrationManager) AddThirdPartyAPIGroupVersions(gvs ...unversione
 }
 
 // InterfacesFor is a union meta.VersionInterfacesFunc func for all registered types
-func (m *APIRegistrationManager) InterfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+func (m *APIRegistrationManager) InterfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 	groupMeta, err := m.Group(version.Group)
 	if err != nil {
 		return nil, err
@@ -303,7 +303,7 @@ func (m *APIRegistrationManager) GroupOrDie(group string) *apimachinery.GroupMet
 //  1. legacy kube group preferred version, extensions preferred version, metrics perferred version, legacy
 //     kube any version, extensions any version, metrics any version, all other groups alphabetical preferred version,
 //     all other groups alphabetical.
-func (m *APIRegistrationManager) RESTMapper(versionPatterns ...unversioned.GroupVersion) meta.RESTMapper {
+func (m *APIRegistrationManager) RESTMapper(versionPatterns ...schema.GroupVersion) meta.RESTMapper {
 	unionMapper := meta.MultiRESTMapper{}
 	unionedGroups := sets.NewString()
 	for enabledVersion := range m.enabledVersions {
@@ -315,8 +315,8 @@ func (m *APIRegistrationManager) RESTMapper(versionPatterns ...unversioned.Group
 	}
 
 	if len(versionPatterns) != 0 {
-		resourcePriority := []unversioned.GroupVersionResource{}
-		kindPriority := []unversioned.GroupVersionKind{}
+		resourcePriority := []schema.GroupVersionResource{}
+		kindPriority := []schema.GroupVersionKind{}
 		for _, versionPriority := range versionPatterns {
 			resourcePriority = append(resourcePriority, versionPriority.WithResource(meta.AnyResource))
 			kindPriority = append(kindPriority, versionPriority.WithKind(meta.AnyKind))
@@ -326,8 +326,8 @@ func (m *APIRegistrationManager) RESTMapper(versionPatterns ...unversioned.Group
 	}
 
 	if len(m.envRequestedVersions) != 0 {
-		resourcePriority := []unversioned.GroupVersionResource{}
-		kindPriority := []unversioned.GroupVersionKind{}
+		resourcePriority := []schema.GroupVersionResource{}
+		kindPriority := []schema.GroupVersionKind{}
 
 		for _, versionPriority := range m.envRequestedVersions {
 			resourcePriority = append(resourcePriority, versionPriority.WithResource(meta.AnyResource))
@@ -357,9 +357,9 @@ func (m *APIRegistrationManager) RESTMapper(versionPatterns ...unversioned.Group
 
 // prioritiesForGroups returns the resource and kind priorities for a PriorityRESTMapper, preferring the preferred version of each group first,
 // then any non-preferred version of the group second.
-func (m *APIRegistrationManager) prioritiesForGroups(groups ...string) ([]unversioned.GroupVersionResource, []unversioned.GroupVersionKind) {
-	resourcePriority := []unversioned.GroupVersionResource{}
-	kindPriority := []unversioned.GroupVersionKind{}
+func (m *APIRegistrationManager) prioritiesForGroups(groups ...string) ([]schema.GroupVersionResource, []schema.GroupVersionKind) {
+	resourcePriority := []schema.GroupVersionResource{}
+	kindPriority := []schema.GroupVersionKind{}
 
 	for _, group := range groups {
 		availableVersions := m.EnabledVersionsForGroup(group)
@@ -369,8 +369,8 @@ func (m *APIRegistrationManager) prioritiesForGroups(groups ...string) ([]unvers
 		}
 	}
 	for _, group := range groups {
-		resourcePriority = append(resourcePriority, unversioned.GroupVersionResource{Group: group, Version: meta.AnyVersion, Resource: meta.AnyResource})
-		kindPriority = append(kindPriority, unversioned.GroupVersionKind{Group: group, Version: meta.AnyVersion, Kind: meta.AnyKind})
+		resourcePriority = append(resourcePriority, schema.GroupVersionResource{Group: group, Version: meta.AnyVersion, Resource: meta.AnyResource})
+		kindPriority = append(kindPriority, schema.GroupVersionKind{Group: group, Version: meta.AnyVersion, Kind: meta.AnyKind})
 	}
 
 	return resourcePriority, kindPriority
@@ -392,8 +392,8 @@ func (m *APIRegistrationManager) AllPreferredGroupVersions() string {
 
 // ValidateEnvRequestedVersions returns a list of versions that are requested in
 // the KUBE_API_VERSIONS environment variable, but not enabled.
-func (m *APIRegistrationManager) ValidateEnvRequestedVersions() []unversioned.GroupVersion {
-	var missingVersions []unversioned.GroupVersion
+func (m *APIRegistrationManager) ValidateEnvRequestedVersions() []schema.GroupVersion {
+	var missingVersions []schema.GroupVersion
 	for _, v := range m.envRequestedVersions {
 		if _, found := m.enabledVersions[v]; !found {
 			missingVersions = append(missingVersions, v)

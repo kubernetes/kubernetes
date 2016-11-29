@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -35,29 +35,29 @@ func TestLeastRequested(t *testing.T) {
 		"bar": "foo",
 		"baz": "blah",
 	}
-	machine1Spec := api.PodSpec{
+	machine1Spec := v1.PodSpec{
 		NodeName: "machine1",
 	}
-	machine2Spec := api.PodSpec{
+	machine2Spec := v1.PodSpec{
 		NodeName: "machine2",
 	}
-	noResources := api.PodSpec{
-		Containers: []api.Container{},
+	noResources := v1.PodSpec{
+		Containers: []v1.Container{},
 	}
-	cpuOnly := api.PodSpec{
+	cpuOnly := v1.PodSpec{
 		NodeName: "machine1",
-		Containers: []api.Container{
+		Containers: []v1.Container{
 			{
-				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("0"),
 					},
 				},
 			},
 			{
-				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
 						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("0"),
 					},
@@ -67,20 +67,20 @@ func TestLeastRequested(t *testing.T) {
 	}
 	cpuOnly2 := cpuOnly
 	cpuOnly2.NodeName = "machine2"
-	cpuAndMemory := api.PodSpec{
+	cpuAndMemory := v1.PodSpec{
 		NodeName: "machine2",
-		Containers: []api.Container{
+		Containers: []v1.Container{
 			{
-				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("2000"),
 					},
 				},
 			},
 			{
-				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
 						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("3000"),
 					},
@@ -89,9 +89,9 @@ func TestLeastRequested(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          *api.Pod
-		pods         []*api.Pod
-		nodes        []*api.Node
+		pod          *v1.Pod
+		pods         []*v1.Pod
+		nodes        []*v1.Node
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
@@ -107,8 +107,8 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Node2 Score: (10 + 10) / 2 = 10
 			*/
-			pod:          &api.Pod{Spec: noResources},
-			nodes:        []*api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			pod:          &v1.Pod{Spec: noResources},
+			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}},
 			test:         "nothing scheduled, nothing requested",
 		},
@@ -124,8 +124,8 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((10000 - 5000) *10) / 10000 = 5
 				Node2 Score: (5 + 5) / 2 = 5
 			*/
-			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []*api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+			pod:          &v1.Pod{Spec: cpuAndMemory},
+			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 3}, {Host: "machine2", Score: 5}},
 			test:         "nothing scheduled, resources requested, differently sized machines",
 		},
@@ -141,15 +141,15 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Node2 Score: (10 + 10) / 2 = 10
 			*/
-			pod:          &api.Pod{Spec: noResources},
-			nodes:        []*api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			pod:          &v1.Pod{Spec: noResources},
+			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}},
 			test:         "no resources requested, pods scheduled",
-			pods: []*api.Pod{
-				{Spec: machine1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: machine1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: machine2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: machine2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: machine1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: machine1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: machine2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: machine2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{
@@ -164,15 +164,15 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((20000 - 5000) *10) / 20000 = 7.5
 				Node2 Score: (4 + 7.5) / 2 = 5
 			*/
-			pod:          &api.Pod{Spec: noResources},
-			nodes:        []*api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+			pod:          &v1.Pod{Spec: noResources},
+			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 7}, {Host: "machine2", Score: 5}},
 			test:         "no resources requested, pods scheduled with resources",
-			pods: []*api.Pod{
-				{Spec: cpuOnly, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: cpuOnly, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: cpuOnly2, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: cpuAndMemory, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: cpuOnly, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: cpuOnly, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: cpuOnly2, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: cpuAndMemory, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{
@@ -187,11 +187,11 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((20000 - 10000) *10) / 20000 = 5
 				Node2 Score: (4 + 5) / 2 = 4
 			*/
-			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []*api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+			pod:          &v1.Pod{Spec: cpuAndMemory},
+			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 5}, {Host: "machine2", Score: 4}},
 			test:         "resources requested, pods scheduled with resources",
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
@@ -208,11 +208,11 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((50000 - 10000) *10) / 50000 = 8
 				Node2 Score: (4 + 8) / 2 = 6
 			*/
-			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []*api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
+			pod:          &v1.Pod{Spec: cpuAndMemory},
+			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 5}, {Host: "machine2", Score: 6}},
 			test:         "resources requested, pods scheduled with resources, differently sized machines",
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
@@ -229,21 +229,21 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((10000 - 5000) *10) / 10000 = 5
 				Node2 Score: (0 + 5) / 2 = 2
 			*/
-			pod:          &api.Pod{Spec: cpuOnly},
-			nodes:        []*api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			pod:          &v1.Pod{Spec: cpuOnly},
+			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 5}, {Host: "machine2", Score: 2}},
 			test:         "requested resources exceed node capacity",
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
 		},
 		{
-			pod:          &api.Pod{Spec: noResources},
-			nodes:        []*api.Node{makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
+			pod:          &v1.Pod{Spec: noResources},
+			nodes:        []*v1.Node{makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
 			test:         "zero node resources, pods scheduled with resources",
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},

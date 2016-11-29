@@ -19,8 +19,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
         "//pkg/types:go_default_library",
@@ -43,7 +43,7 @@ go_test(
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/mount:go_default_library",

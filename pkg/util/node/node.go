@@ -27,7 +27,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -52,7 +53,7 @@ func GetHostname(hostnameOverride string) string {
 
 // GetPreferredNodeAddress returns the address of the provided node, using the provided preference order.
 // If none of the preferred address types are found, an error is returned.
-func GetPreferredNodeAddress(node *api.Node, preferredAddressTypes []api.NodeAddressType) (string, error) {
+func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddressType) (string, error) {
 	for _, addressType := range preferredAddressTypes {
 		for _, address := range node.Status.Addresses {
 			if address.Type == addressType {
@@ -60,7 +61,7 @@ func GetPreferredNodeAddress(node *api.Node, preferredAddressTypes []api.NodeAdd
 			}
 		}
 		// If hostname was requested and no Hostname address was registered...
-		if addressType == api.NodeHostName {
+		if addressType == v1.NodeHostName {
 			// ...fall back to the kubernetes.io/hostname label for compatibility with kubelets before 1.5
 			if hostname, ok := node.Labels[unversioned.LabelHostname]; ok && len(hostname) > 0 {
 				return hostname, nil
@@ -74,7 +75,29 @@ func GetPreferredNodeAddress(node *api.Node, preferredAddressTypes []api.NodeAdd
 // 1. NodeInternalIP
 // 2. NodeExternalIP
 // 3. NodeLegacyHostIP
-func GetNodeHostIP(node *api.Node) (net.IP, error) {
+func GetNodeHostIP(node *v1.Node) (net.IP, error) {
+	addresses := node.Status.Addresses
+	addressMap := make(map[v1.NodeAddressType][]v1.NodeAddress)
+	for i := range addresses {
+		addressMap[addresses[i].Type] = append(addressMap[addresses[i].Type], addresses[i])
+	}
+	if addresses, ok := addressMap[v1.NodeInternalIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	if addresses, ok := addressMap[v1.NodeExternalIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	if addresses, ok := addressMap[v1.NodeLegacyHostIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
+}
+
+// InternalGetNodeHostIP returns the provided node's IP, based on the priority:
+// 1. NodeInternalIP
+// 2. NodeExternalIP
+// 3. NodeLegacyHostIP
+func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
 	addresses := node.Status.Addresses
 	addressMap := make(map[api.NodeAddressType][]api.NodeAddress)
 	for i := range addresses {
@@ -94,7 +117,7 @@ func GetNodeHostIP(node *api.Node) (net.IP, error) {
 
 // Helper function that builds a string identifier that is unique per failure-zone
 // Returns empty-string for no zone
-func GetZoneKey(node *api.Node) string {
+func GetZoneKey(node *v1.Node) string {
 	labels := node.Labels
 	if labels == nil {
 		return ""
@@ -114,9 +137,9 @@ func GetZoneKey(node *api.Node) string {
 }
 
 // SetNodeCondition updates specific node condition with patch operation.
-func SetNodeCondition(c clientset.Interface, node types.NodeName, condition api.NodeCondition) error {
-	generatePatch := func(condition api.NodeCondition) ([]byte, error) {
-		raw, err := json.Marshal(&[]api.NodeCondition{condition})
+func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.NodeCondition) error {
+	generatePatch := func(condition v1.NodeCondition) ([]byte, error) {
+		raw, err := json.Marshal(&[]v1.NodeCondition{condition})
 		if err != nil {
 			return nil, err
 		}

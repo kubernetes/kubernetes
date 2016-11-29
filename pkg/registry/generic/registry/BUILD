@@ -31,6 +31,7 @@ go_library(
         "//pkg/labels:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",

@@ -110,7 +110,7 @@ func TestTreeCache(t *testing.T) {
 		{"key3", []string{"p1", "p3"}},
 	} {
 		if _, ok := tc.GetEntry(testCase.k, testCase.p...); ok {
-			t.Error()
+			t.Error("path should not exist")
 		}
 	}
 }

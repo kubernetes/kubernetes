@@ -18,10 +18,10 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/policy/v1alpha1"
 	labels "k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
@@ -32,7 +32,7 @@ type FakePodDisruptionBudgets struct {
 	ns   string
 }
 
-var poddisruptionbudgetsResource = unversioned.GroupVersionResource{Group: "policy", Version: "v1alpha1", Resource: "poddisruptionbudgets"}
+var poddisruptionbudgetsResource = schema.GroupVersionResource{Group: "policy", Version: "v1alpha1", Resource: "poddisruptionbudgets"}
 
 func (c *FakePodDisruptionBudgets) Create(podDisruptionBudget *v1alpha1.PodDisruptionBudget) (result *v1alpha1.PodDisruptionBudget, err error) {
 	obj, err := c.Fake.

@@ -25,14 +25,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestResolvePortInt(t *testing.T) {
 	expected := 80
-	port, err := resolvePort(intstr.FromInt(expected), &api.Container{})
+	port, err := resolvePort(intstr.FromInt(expected), &v1.Container{})
 	if port != expected {
 		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
@@ -44,8 +44,8 @@ func TestResolvePortInt(t *testing.T) {
 func TestResolvePortString(t *testing.T) {
 	expected := 80
 	name := "foo"
-	container := &api.Container{
-		Ports: []api.ContainerPort{
+	container := &v1.Container{
+		Ports: []v1.ContainerPort{
 			{Name: name, ContainerPort: int32(expected)},
 		},
 	}
@@ -61,8 +61,8 @@ func TestResolvePortString(t *testing.T) {
 func TestResolvePortStringUnknown(t *testing.T) {
 	expected := int32(80)
 	name := "foo"
-	container := &api.Container{
-		Ports: []api.ContainerPort{
+	container := &v1.Container{
+		Ports: []v1.ContainerPort{
 			{Name: "bar", ContainerPort: expected},
 		},
 	}
@@ -93,21 +93,21 @@ func TestRunHandlerExec(t *testing.T) {
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
 
-	container := api.Container{
+	container := v1.Container{
 		Name: containerName,
-		Lifecycle: &api.Lifecycle{
-			PostStart: &api.Handler{
-				Exec: &api.ExecAction{
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.Handler{
+				Exec: &v1.ExecAction{
 					Command: []string{"ls", "-a"},
 				},
 			},
 		},
 	}
 
-	pod := api.Pod{}
+	pod := v1.Pod{}
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
-	pod.Spec.Containers = []api.Container{container}
+	pod.Spec.Containers = []v1.Container{container}
 	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -136,11 +136,11 @@ func TestRunHandlerHttp(t *testing.T) {
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
 
-	container := api.Container{
+	container := v1.Container{
 		Name: containerName,
-		Lifecycle: &api.Lifecycle{
-			PostStart: &api.Handler{
-				HTTPGet: &api.HTTPGetAction{
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.Handler{
+				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
 					Port: intstr.FromInt(8080),
 					Path: "bar",
@@ -148,10 +148,10 @@ func TestRunHandlerHttp(t *testing.T) {
 			},
 		},
 	}
-	pod := api.Pod{}
+	pod := v1.Pod{}
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
-	pod.Spec.Containers = []api.Container{container}
+	pod.Spec.Containers = []v1.Container{container}
 	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 
 	if err != nil {
@@ -169,16 +169,16 @@ func TestRunHandlerNil(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 
-	container := api.Container{
+	container := v1.Container{
 		Name: containerName,
-		Lifecycle: &api.Lifecycle{
-			PostStart: &api.Handler{},
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.Handler{},
 		},
 	}
-	pod := api.Pod{}
+	pod := v1.Pod{}
 	pod.ObjectMeta.Name = podName
 	pod.ObjectMeta.Namespace = podNamespace
-	pod.Spec.Containers = []api.Container{container}
+	pod.Spec.Containers = []v1.Container{container}
 	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expect error, but got nil")
@@ -194,11 +194,11 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
 	containerName := "containerFoo"
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
-	container := api.Container{
+	container := v1.Container{
 		Name: containerName,
-		Lifecycle: &api.Lifecycle{
-			PostStart: &api.Handler{
-				HTTPGet: &api.HTTPGetAction{
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.Handler{
+				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
 					Port: intstr.FromInt(8080),
 					Path: "bar",
@@ -206,10 +206,10 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 			},
 		},
 	}
-	pod := api.Pod{}
+	pod := v1.Pod{}
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
-	pod.Spec.Containers = []api.Container{container}
+	pod.Spec.Containers = []v1.Container{container}
 	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expected error: %v", expectedErr)

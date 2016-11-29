@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/node"
@@ -115,7 +116,7 @@ func NewStorage(opts generic.RESTOptions, kubeletClientConfig client.KubeletClie
 	proxyREST := &noderest.ProxyREST{Store: store, ProxyTransport: proxyTransport}
 
 	// Build a NodeGetter that looks up nodes using the REST handler
-	nodeGetter := client.NodeGetterFunc(func(nodeName string) (*api.Node, error) {
+	nodeGetter := client.NodeGetterFunc(func(nodeName string) (*v1.Node, error) {
 		obj, err := nodeREST.Get(api.NewContext(), nodeName)
 		if err != nil {
 			return nil, err
@@ -124,7 +125,13 @@ func NewStorage(opts generic.RESTOptions, kubeletClientConfig client.KubeletClie
 		if !ok {
 			return nil, fmt.Errorf("unexpected type %T", obj)
 		}
-		return node, nil
+		// TODO: Remove the conversion. Consider only return the NodeAddresses
+		externalNode := &v1.Node{}
+		err = v1.Convert_api_Node_To_v1_Node(node, externalNode, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert to v1.Node: %v", err)
+		}
+		return externalNode, nil
 	})
 	connectionInfoGetter, err := client.NewNodeConnectionInfoGetter(nodeGetter, kubeletClientConfig)
 	if err != nil {

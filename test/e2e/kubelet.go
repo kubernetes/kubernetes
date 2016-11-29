@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -98,7 +98,7 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRemove map[string]string) {
 	const maxRetries = 5
 	for nodeName := range nodeNames {
-		var node *api.Node
+		var node *v1.Node
 		var err error
 		for i := 0; i < maxRetries; i++ {
 			node, err = c.Core().Nodes().Get(nodeName)
@@ -137,19 +137,20 @@ var _ = framework.KubeDescribe("kubelet", func() {
 
 	BeforeEach(func() {
 		c = f.ClientSet
+		// Use node labels to restrict the pods to be assigned only to the
+		// nodes we observe initially.
+		nodeLabels = make(map[string]string)
+		nodeLabels["kubelet_cleanup"] = "true"
+
 		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()
 		// If there are a lot of nodes, we don't want to use all of them
 		// (if there are 1000 nodes in the cluster, starting 10 pods/node
 		// will take ~10 minutes today). And there is also deletion phase.
-		//
-		// Instead, we choose at most 10 nodes and will constraint pods
-		// that we are creating to be scheduled only on that nodes.
+		// Instead, we choose at most 10 nodes.
 		if numNodes > maxNodesToCheck {
 			numNodes = maxNodesToCheck
-			nodeLabels = make(map[string]string)
-			nodeLabels["kubelet_cleanup"] = "true"
 		}
 		for i := 0; i < numNodes; i++ {
 			nodeNames.Insert(nodes.Items[i].Name)
@@ -188,12 +189,13 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
 				Expect(framework.RunRC(testutils.RCConfig{
-					Client:       f.ClientSet,
-					Name:         rcName,
-					Namespace:    f.Namespace.Name,
-					Image:        framework.GetPauseImageName(f.ClientSet),
-					Replicas:     totalPods,
-					NodeSelector: nodeLabels,
+					Client:         f.ClientSet,
+					InternalClient: f.InternalClientset,
+					Name:           rcName,
+					Namespace:      f.Namespace.Name,
+					Image:          framework.GetPauseImageName(f.ClientSet),
+					Replicas:       totalPods,
+					NodeSelector:   nodeLabels,
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to
@@ -206,7 +208,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				}
 
 				By("Deleting the RC")
-				framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, rcName)
+				framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
 				// cache) and  returns a list of running pods. Some possible causes of

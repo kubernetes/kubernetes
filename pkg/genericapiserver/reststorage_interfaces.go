@@ -17,11 +17,11 @@ limitations under the License.
 package genericapiserver
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
-type RESTOptionsGetter func(resource unversioned.GroupResource) generic.RESTOptions
+type RESTOptionsGetter func(resource schema.GroupResource) generic.RESTOptions
 
 type RESTStorageProvider interface {
 	GroupName() string

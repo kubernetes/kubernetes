@@ -18,7 +18,7 @@ package dockertools
 
 import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -65,14 +65,14 @@ func NewFakeDockerManager(
 }
 
 type fakePodGetter struct {
-	pods map[types.UID]*api.Pod
+	pods map[types.UID]*v1.Pod
 }
 
 func newFakePodGetter() *fakePodGetter {
-	return &fakePodGetter{make(map[types.UID]*api.Pod)}
+	return &fakePodGetter{make(map[types.UID]*v1.Pod)}
 }
 
-func (f *fakePodGetter) GetPodByUID(uid types.UID) (*api.Pod, bool) {
+func (f *fakePodGetter) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	pod, found := f.pods[uid]
 	return pod, found
 }

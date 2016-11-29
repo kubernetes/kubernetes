@@ -18,33 +18,34 @@ package utils
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/api"
+
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type ContainerFailures struct {
-	status   *api.ContainerStateTerminated
+	status   *v1.ContainerStateTerminated
 	Restarts int
 }
 
 // PodRunningReady checks whether pod p's phase is running and it has a ready
 // condition of status true.
-func PodRunningReady(p *api.Pod) (bool, error) {
+func PodRunningReady(p *v1.Pod) (bool, error) {
 	// Check the phase is running.
-	if p.Status.Phase != api.PodRunning {
+	if p.Status.Phase != v1.PodRunning {
 		return false, fmt.Errorf("want pod '%s' on '%s' to be '%v' but was '%v'",
-			p.ObjectMeta.Name, p.Spec.NodeName, api.PodRunning, p.Status.Phase)
+			p.ObjectMeta.Name, p.Spec.NodeName, v1.PodRunning, p.Status.Phase)
 	}
 	// Check the ready condition is true.
 	if !PodReady(p) {
 		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
-			p.ObjectMeta.Name, p.Spec.NodeName, api.PodReady, api.ConditionTrue, p.Status.Conditions)
+			p.ObjectMeta.Name, p.Spec.NodeName, v1.PodReady, v1.ConditionTrue, p.Status.Conditions)
 	}
 	return true, nil
 }
 
-func PodRunningReadyOrSucceeded(p *api.Pod) (bool, error) {
+func PodRunningReadyOrSucceeded(p *v1.Pod) (bool, error) {
 	// Check if the phase is succeeded.
-	if p.Status.Phase == api.PodSucceeded {
+	if p.Status.Phase == v1.PodSucceeded {
 		return true, nil
 	}
 	return PodRunningReady(p)
@@ -54,7 +55,7 @@ func PodRunningReadyOrSucceeded(p *api.Pod) (bool, error) {
 // information for containers that have failed or been restarted.
 // A map is returned where the key is the containerID and the value is a
 // struct containing the restart and failure information
-func FailedContainers(pod *api.Pod) map[string]ContainerFailures {
+func FailedContainers(pod *v1.Pod) map[string]ContainerFailures {
 	var state ContainerFailures
 	states := make(map[string]ContainerFailures)
 
@@ -85,7 +86,7 @@ func FailedContainers(pod *api.Pod) map[string]ContainerFailures {
 // TerminatedContainers inspects all containers in a pod and returns a map
 // of "container name: termination reason", for all currently terminated
 // containers.
-func TerminatedContainers(pod *api.Pod) map[string]string {
+func TerminatedContainers(pod *v1.Pod) map[string]string {
 	states := make(map[string]string)
 	statuses := pod.Status.ContainerStatuses
 	if len(statuses) == 0 {
@@ -100,20 +101,20 @@ func TerminatedContainers(pod *api.Pod) map[string]string {
 }
 
 // PodNotReady checks whether pod p's has a ready condition of status false.
-func PodNotReady(p *api.Pod) (bool, error) {
+func PodNotReady(p *v1.Pod) (bool, error) {
 	// Check the ready condition is false.
 	if PodReady(p) {
 		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
-			p.ObjectMeta.Name, p.Spec.NodeName, api.PodReady, api.ConditionFalse, p.Status.Conditions)
+			p.ObjectMeta.Name, p.Spec.NodeName, v1.PodReady, v1.ConditionFalse, p.Status.Conditions)
 	}
 	return true, nil
 }
 
 // podReady returns whether pod has a condition of Ready with a status of true.
-// TODO: should be replaced with api.IsPodReady
-func PodReady(pod *api.Pod) bool {
+// TODO: should be replaced with v1.IsPodReady
+func PodReady(pod *v1.Pod) bool {
 	for _, cond := range pod.Status.Conditions {
-		if cond.Type == api.PodReady && cond.Status == api.ConditionTrue {
+		if cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue {
 			return true
 		}
 	}

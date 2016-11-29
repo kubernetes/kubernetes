@@ -181,7 +181,7 @@ func newLifecycleWithClock(c clientset.Interface, immortalNamespaces sets.String
 }
 
 func (l *lifecycle) SetInformerFactory(f informers.SharedInformerFactory) {
-	l.namespaceInformer = f.Namespaces().Informer()
+	l.namespaceInformer = f.InternalNamespaces().Informer()
 	l.SetReadyFunc(l.namespaceInformer.HasSynced)
 }
 

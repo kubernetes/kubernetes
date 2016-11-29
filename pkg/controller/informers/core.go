@@ -21,8 +21,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -45,7 +47,7 @@ func (f *podInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerType := reflect.TypeOf(&api.Pod{})
+	informerType := reflect.TypeOf(&v1.Pod{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
@@ -81,7 +83,7 @@ func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerType := reflect.TypeOf(&api.Namespace{})
+	informerType := reflect.TypeOf(&v1.Namespace{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
@@ -96,6 +98,42 @@ func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
 func (f *namespaceInformer) Lister() *cache.IndexerToNamespaceLister {
 	informer := f.Informer()
 	return &cache.IndexerToNamespaceLister{Indexer: informer.GetIndexer()}
+}
+
+//*****************************************************************************
+
+// InternalNamespaceInformer is type of SharedIndexInformer which watches and lists all namespaces.
+// Interface provides constructor for informer and lister for namsespaces
+type InternalNamespaceInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() coreinternallisters.NamespaceLister
+}
+
+type internalNamespaceInformer struct {
+	*sharedInformerFactory
+}
+
+// Informer checks whether internalNamespaceInformer exists in sharedInformerFactory and if not, it creates new informer of type
+// internalNamespaceInformer and connects it to sharedInformerFactory
+func (f *internalNamespaceInformer) Informer() cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informerType := reflect.TypeOf(&api.Namespace{})
+	informer, exists := f.informers[informerType]
+	if exists {
+		return informer
+	}
+	informer = NewInternalNamespaceInformer(f.internalclient, f.defaultResync)
+	f.informers[informerType] = informer
+
+	return informer
+}
+
+// Lister returns lister for internalNamespaceInformer
+func (f *internalNamespaceInformer) Lister() coreinternallisters.NamespaceLister {
+	informer := f.Informer()
+	return coreinternallisters.NewNamespaceLister(informer.GetIndexer())
 }
 
 //*****************************************************************************
@@ -117,7 +155,7 @@ func (f *nodeInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerType := reflect.TypeOf(&api.Node{})
+	informerType := reflect.TypeOf(&v1.Node{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
@@ -153,7 +191,7 @@ func (f *pvcInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerType := reflect.TypeOf(&api.PersistentVolumeClaim{})
+	informerType := reflect.TypeOf(&v1.PersistentVolumeClaim{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
@@ -189,7 +227,7 @@ func (f *pvInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerType := reflect.TypeOf(&api.PersistentVolume{})
+	informerType := reflect.TypeOf(&v1.PersistentVolume{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
@@ -212,7 +250,7 @@ func (f *pvInformer) Lister() *cache.StoreToPVFetcher {
 // Interface provides constructor for informer and lister for limit ranges.
 type LimitRangeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() coreinternallisters.LimitRangeLister
+	Lister() *cache.StoreToLimitRangeLister
 }
 
 type limitRangeInformer struct {
@@ -225,7 +263,7 @@ func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerType := reflect.TypeOf(&api.LimitRange{})
+	informerType := reflect.TypeOf(&v1.LimitRange{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
@@ -237,23 +275,61 @@ func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for limitRangeInformer
-func (f *limitRangeInformer) Lister() coreinternallisters.LimitRangeLister {
+func (f *limitRangeInformer) Lister() *cache.StoreToLimitRangeLister {
+	informer := f.Informer()
+	return &cache.StoreToLimitRangeLister{Indexer: informer.GetIndexer()}
+}
+
+//*****************************************************************************
+
+// InternalLimitRangeInformer is type of SharedIndexInformer which watches and lists all limit ranges.
+// Interface provides constructor for informer and lister for limit ranges.
+type InternalLimitRangeInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() coreinternallisters.LimitRangeLister
+}
+
+type internalLimitRangeInformer struct {
+	*sharedInformerFactory
+}
+
+// Informer checks whether pvcInformer exists in sharedInformerFactory and if not, it creates new informer of type
+// internalLimitRangeInformer and connects it to sharedInformerFactory
+func (f *internalLimitRangeInformer) Informer() cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informerType := reflect.TypeOf(&api.LimitRange{})
+	informer, exists := f.informers[informerType]
+	if exists {
+		return informer
+	}
+	informer = NewInternalLimitRangeInformer(f.internalclient, f.defaultResync)
+	f.informers[informerType] = informer
+
+	return informer
+}
+
+// Lister returns lister for internalLimitRangeInformer
+func (f *internalLimitRangeInformer) Lister() coreinternallisters.LimitRangeLister {
 	informer := f.Informer()
 	return coreinternallisters.NewLimitRangeLister(informer.GetIndexer())
 }
+
+//*****************************************************************************
 
 // NewPodInformer returns a SharedIndexInformer that lists and watches all pods
 func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return client.Core().Pods(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Core().Pods(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Core().Pods(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Core().Pods(v1.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Pod{},
+		&v1.Pod{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -265,14 +341,14 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Core().Nodes().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				return client.Core().Nodes().Watch(options)
 			},
 		},
-		&api.Node{},
+		&v1.Node{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
@@ -283,14 +359,14 @@ func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return client.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
 			},
 		},
-		&api.PersistentVolumeClaim{},
+		&v1.PersistentVolumeClaim{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -302,14 +378,14 @@ func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Core().PersistentVolumes().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				return client.Core().PersistentVolumes().Watch(options)
 			},
 		},
-		&api.PersistentVolume{},
+		&v1.PersistentVolume{},
 		resyncPeriod,
 		cache.Indexers{})
 
@@ -320,11 +396,33 @@ func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) cache
 func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Core().Namespaces().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				return client.Core().Namespaces().Watch(options)
+			},
+		},
+		&v1.Namespace{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
+}
+
+// NewInternalNamespaceInformer returns a SharedIndexInformer that lists and watches namespaces
+func NewInternalNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return client.Core().Namespaces().List(internalOptions)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return client.Core().Namespaces().Watch(internalOptions)
 			},
 		},
 		&api.Namespace{},
@@ -338,11 +436,33 @@ func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration
 func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return client.Core().LimitRanges(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Core().LimitRanges(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Core().LimitRanges(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Core().LimitRanges(v1.NamespaceAll).Watch(options)
+			},
+		},
+		&v1.LimitRange{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
+}
+
+// NewInternalLimitRangeInformer returns a SharedIndexInformer that lists and watches all LimitRanges
+func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return internalclient.Core().LimitRanges(v1.NamespaceAll).List(internalOptions)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				internalOptions := api.ListOptions{}
+				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
+				return internalclient.Core().LimitRanges(v1.NamespaceAll).Watch(internalOptions)
 			},
 		},
 		&api.LimitRange{},
@@ -371,7 +491,7 @@ func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerType := reflect.TypeOf(&api.ServiceAccount{})
+	informerType := reflect.TypeOf(&v1.ServiceAccount{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
@@ -392,14 +512,14 @@ func (f *serviceAccountInformer) Lister() *cache.StoreToServiceAccountLister {
 func NewServiceAccountInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return client.Core().ServiceAccounts(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Core().ServiceAccounts(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Core().ServiceAccounts(v1.NamespaceAll).Watch(options)
 			},
 		},
-		&api.ServiceAccount{},
+		&v1.ServiceAccount{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 

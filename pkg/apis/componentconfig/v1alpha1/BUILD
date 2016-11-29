@@ -31,6 +31,7 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/config:go_default_library",
     ],
 )

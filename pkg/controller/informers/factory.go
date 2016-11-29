@@ -21,9 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // SharedInformerFactory provides interface which holds unique informers for pods, nodes, namespaces, persistent volume
@@ -32,13 +33,15 @@ type SharedInformerFactory interface {
 	// Start starts informers that can start AFTER the API server and controllers have started
 	Start(stopCh <-chan struct{})
 
-	ForResource(unversioned.GroupResource) (GenericInformer, error)
+	ForResource(schema.GroupResource) (GenericInformer, error)
 
 	// when you update these, update generic.go/ForResource, same package
 
 	Pods() PodInformer
 	LimitRanges() LimitRangeInformer
+	InternalLimitRanges() InternalLimitRangeInformer
 	Namespaces() NamespaceInformer
+	InternalNamespaces() InternalNamespaceInformer
 	Nodes() NodeInformer
 	PersistentVolumeClaims() PVCInformer
 	PersistentVolumes() PVInformer
@@ -59,9 +62,11 @@ type SharedInformerFactory interface {
 }
 
 type sharedInformerFactory struct {
-	client        clientset.Interface
-	lock          sync.Mutex
-	defaultResync time.Duration
+	client clientset.Interface
+	// for admission plugins etc.
+	internalclient internalclientset.Interface
+	lock           sync.Mutex
+	defaultResync  time.Duration
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started
@@ -70,9 +75,10 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(client clientset.Interface, defaultResync time.Duration) SharedInformerFactory {
+func NewSharedInformerFactory(client clientset.Interface, internalclient internalclientset.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
 		client:           client,
+		internalclient:   internalclient,
 		defaultResync:    defaultResync,
 		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
 		startedInformers: make(map[reflect.Type]bool),
@@ -105,6 +111,11 @@ func (f *sharedInformerFactory) Nodes() NodeInformer {
 // Namespaces returns a SharedIndexInformer that lists and watches all namespaces
 func (f *sharedInformerFactory) Namespaces() NamespaceInformer {
 	return &namespaceInformer{sharedInformerFactory: f}
+}
+
+// InternalNamespaces returns a SharedIndexInformer that lists and watches all namespaces
+func (f *sharedInformerFactory) InternalNamespaces() InternalNamespaceInformer {
+	return &internalNamespaceInformer{sharedInformerFactory: f}
 }
 
 // PersistentVolumeClaims returns a SharedIndexInformer that lists and watches all persistent volume claims
@@ -154,6 +165,11 @@ func (f *sharedInformerFactory) RoleBindings() RoleBindingInformer {
 // LimitRanges returns a SharedIndexInformer that lists and watches all limit ranges.
 func (f *sharedInformerFactory) LimitRanges() LimitRangeInformer {
 	return &limitRangeInformer{sharedInformerFactory: f}
+}
+
+// InternalLimitRanges returns a SharedIndexInformer that lists and watches all limit ranges.
+func (f *sharedInformerFactory) InternalLimitRanges() InternalLimitRangeInformer {
+	return &internalLimitRangeInformer{sharedInformerFactory: f}
 }
 
 // StorageClasses returns a SharedIndexInformer that lists and watches all storage classes

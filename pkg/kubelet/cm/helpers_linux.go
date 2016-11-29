@@ -25,7 +25,7 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
@@ -83,7 +83,7 @@ func MilliCPUToShares(milliCPU int64) int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *api.Pod) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	// sum requests and limits, track if limits were applied for each resource.
 	cpuRequests := int64(0)
 	cpuLimits := int64(0)

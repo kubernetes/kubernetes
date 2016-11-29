@@ -18,9 +18,9 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -30,7 +30,7 @@ type FakeLimitRanges struct {
 	ns   string
 }
 
-var limitrangesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "limitranges"}
+var limitrangesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "limitranges"}
 
 func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.

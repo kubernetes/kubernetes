@@ -19,7 +19,7 @@ package sysctl
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -81,7 +81,7 @@ func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, er
 
 // Admit checks whether the runtime supports sysctls.
 func (w *runtimeAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(attrs.Pod.Annotations)
+	sysctls, unsafeSysctls, err := v1.SysctlsFromPodAnnotations(attrs.Pod.Annotations)
 	if err != nil {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,

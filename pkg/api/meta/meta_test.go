@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -218,18 +219,18 @@ type MyAPIObject struct {
 
 func (obj *MyAPIObject) GetListMeta() unversioned.List { return &obj.TypeMeta }
 
-func (obj *MyAPIObject) GetObjectKind() unversioned.ObjectKind { return obj }
-func (obj *MyAPIObject) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
+func (obj *MyAPIObject) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *MyAPIObject) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
 }
-func (obj *MyAPIObject) GroupVersionKind() unversioned.GroupVersionKind {
-	return unversioned.FromAPIVersionAndKind(obj.TypeMeta.APIVersion, obj.TypeMeta.Kind)
+func (obj *MyAPIObject) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.TypeMeta.APIVersion, obj.TypeMeta.Kind)
 }
 
 type MyIncorrectlyMarkedAsAPIObject struct{}
 
-func (obj *MyIncorrectlyMarkedAsAPIObject) GetObjectKind() unversioned.ObjectKind {
-	return unversioned.EmptyObjectKind
+func (obj *MyIncorrectlyMarkedAsAPIObject) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
 }
 
 func TestResourceVersionerOfAPI(t *testing.T) {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -148,14 +149,47 @@ type EventSinkImpl struct {
 	Interface EventInterface
 }
 
-func (e *EventSinkImpl) Create(event *api.Event) (*api.Event, error) {
-	return e.Interface.CreateWithEventNamespace(event)
+func (e *EventSinkImpl) Create(event *v1.Event) (*v1.Event, error) {
+	internalEvent := &api.Event{}
+	err := v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = e.Interface.CreateWithEventNamespace(internalEvent)
+	if err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
-func (e *EventSinkImpl) Update(event *api.Event) (*api.Event, error) {
-	return e.Interface.UpdateWithEventNamespace(event)
+func (e *EventSinkImpl) Update(event *v1.Event) (*v1.Event, error) {
+	internalEvent := &api.Event{}
+	err := v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = e.Interface.UpdateWithEventNamespace(internalEvent)
+	if err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
-func (e *EventSinkImpl) Patch(event *api.Event, data []byte) (*api.Event, error) {
-	return e.Interface.PatchWithEventNamespace(event, data)
+func (e *EventSinkImpl) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
+	internalEvent := &api.Event{}
+	err := v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	if err != nil {
+		return nil, err
+	}
+	internalEvent, err = e.Interface.PatchWithEventNamespace(internalEvent, data)
+	if err != nil {
+		return nil, err
+	}
+	externalEvent := &v1.Event{}
+	err = v1.Convert_api_Event_To_v1_Event(internalEvent, externalEvent, nil)
+	if err != nil {
+		// Patch succeeded, no need to report the failed conversion
+		return event, nil
+	}
+	return externalEvent, nil
 }

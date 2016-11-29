@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container) {
@@ -35,7 +35,7 @@ func serviceErrorHandler(s runtime.NegotiatedSerializer, serviceErr restful.Serv
 	errorNegotiated(
 		apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", serviceErr.Message, 0, false),
 		s,
-		unversioned.GroupVersion{},
+		schema.GroupVersion{},
 		response.ResponseWriter,
 		request.Request,
 	)

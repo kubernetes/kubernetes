@@ -38,13 +38,9 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/strings"
-	"k8s.io/kubernetes/pkg/version"
 )
-
-var serverVersion_1_5_0 = version.Info{
-	GitVersion: "v1.5.0",
-}
 
 func initTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -69,7 +65,7 @@ func defaultClientConfig() *restclient.Config {
 	}
 }
 
-func defaultClientConfigForVersion(version *unversioned.GroupVersion) *restclient.Config {
+func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Config {
 	return &restclient.Config{
 		APIPath: "/api",
 		ContentConfig: restclient.ContentConfig{

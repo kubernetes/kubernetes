@@ -16,10 +16,14 @@ limitations under the License.
 
 package unversioned
 
+import (
+	"k8s.io/client-go/pkg/runtime/schema"
+)
+
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = GroupVersion{Group: "", Version: ""}
+var SchemeGroupVersion = schema.GroupVersion{Group: "", Version: ""}
 
 // Kind takes an unqualified kind and returns a Group qualified GroupKind
-func Kind(kind string) GroupKind {
+func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }

@@ -23,10 +23,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/labels"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
@@ -46,7 +45,7 @@ type PodMetricsInfo map[string]float64
 type MetricsClient interface {
 	// GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace
-	GetResourceMetric(resource api.ResourceName, namespace string, selector labels.Selector) (PodResourceInfo, time.Time, error)
+	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodResourceInfo, time.Time, error)
 
 	// GetRawMetric gets the given metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace
@@ -63,8 +62,8 @@ const (
 var heapsterQueryStart = -5 * time.Minute
 
 type HeapsterMetricsClient struct {
-	services        unversionedcore.ServiceInterface
-	podsGetter      unversionedcore.PodsGetter
+	services        v1core.ServiceInterface
+	podsGetter      v1core.PodsGetter
 	heapsterScheme  string
 	heapsterService string
 	heapsterPort    string
@@ -80,7 +79,7 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
-func (h *HeapsterMetricsClient) GetResourceMetric(resource api.ResourceName, namespace string, selector labels.Selector) (PodResourceInfo, time.Time, error) {
+func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodResourceInfo, time.Time, error) {
 	metricPath := fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace)
 	params := map[string]string{"labelSelector": selector.String()}
 
@@ -132,7 +131,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource api.ResourceName, nam
 }
 
 func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
-	podList, err := h.podsGetter.Pods(namespace).List(api.ListOptions{LabelSelector: selector})
+	podList, err := h.podsGetter.Pods(namespace).List(v1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod list while fetching metrics: %v", err)
 	}

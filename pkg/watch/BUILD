@@ -22,8 +22,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/net:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/wait:go_default_library",
@@ -44,8 +44,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/wait:go_default_library",
     ],
 )

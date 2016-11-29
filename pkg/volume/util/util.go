@@ -22,9 +22,9 @@ import (
 	"path"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/storage"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -113,7 +113,7 @@ func PathExists(path string) (bool, error) {
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
-func GetSecretForPod(pod *api.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
+func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
 		return secret, fmt.Errorf("Cannot get kube client")
@@ -138,7 +138,7 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 	if err != nil {
 		return secret, err
 	}
-	if secrets.Type != api.SecretType(volumePluginName) {
+	if secrets.Type != v1.SecretType(volumePluginName) {
 		return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
 	}
 	for name, data := range secrets.Data {
@@ -147,7 +147,7 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 	return secret, nil
 }
 
-func GetClassForVolume(kubeClient clientset.Interface, pv *api.PersistentVolume) (*storage.StorageClass, error) {
+func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) (*storage.StorageClass, error) {
 	// TODO: replace with a real attribute after beta
 	className, found := pv.Annotations["volume.beta.kubernetes.io/storage-class"]
 	if !found {

@@ -21,7 +21,6 @@ import (
 
 	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -46,8 +45,8 @@ func TestEventSink(t *testing.T) {
 		return true, obj, nil
 	})
 
-	event := api.Event{
-		ObjectMeta: api.ObjectMeta{
+	event := api_v1.Event{
+		ObjectMeta: api_v1.ObjectMeta{
 			Name:      "bzium",
 			Namespace: "ns",
 		},

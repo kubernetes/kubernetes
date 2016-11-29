@@ -125,12 +125,18 @@ func TestReplicaSetController(t *testing.T) {
 	rs1, _ := kube1clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	kube1rswatch.Add(rs1)
 	rs1.Status.Replicas = *rs1.Spec.Replicas
+	rs1.Status.FullyLabeledReplicas = *rs1.Spec.Replicas
+	rs1.Status.ReadyReplicas = *rs1.Spec.Replicas
+	rs1.Status.AvailableReplicas = *rs1.Spec.Replicas
 	rs1, _ = kube1clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).UpdateStatus(rs1)
 	kube1rswatch.Modify(rs1)
 
 	rs2, _ := kube2clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	kube2rswatch.Add(rs2)
 	rs2.Status.Replicas = *rs2.Spec.Replicas
+	rs2.Status.FullyLabeledReplicas = *rs2.Spec.Replicas
+	rs2.Status.ReadyReplicas = *rs2.Spec.Replicas
+	rs2.Status.AvailableReplicas = *rs2.Spec.Replicas
 	rs2, _ = kube2clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).UpdateStatus(rs2)
 	kube2rswatch.Modify(rs2)
 
@@ -138,6 +144,9 @@ func TestReplicaSetController(t *testing.T) {
 	rs, _ = fedclientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	assert.Equal(t, *rs.Spec.Replicas, *rs1.Spec.Replicas+*rs2.Spec.Replicas)
 	assert.Equal(t, rs.Status.Replicas, rs1.Status.Replicas+rs2.Status.Replicas)
+	assert.Equal(t, rs.Status.FullyLabeledReplicas, rs1.Status.FullyLabeledReplicas+rs2.Status.FullyLabeledReplicas)
+	assert.Equal(t, rs.Status.ReadyReplicas, rs1.Status.ReadyReplicas+rs2.Status.ReadyReplicas)
+	assert.Equal(t, rs.Status.AvailableReplicas, rs1.Status.AvailableReplicas+rs2.Status.AvailableReplicas)
 
 	var replicas int32 = 20
 	rs.Spec.Replicas = &replicas
@@ -147,11 +156,17 @@ func TestReplicaSetController(t *testing.T) {
 
 	rs1, _ = kube1clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	rs1.Status.Replicas = *rs1.Spec.Replicas
+	rs1.Status.FullyLabeledReplicas = *rs1.Spec.Replicas
+	rs1.Status.ReadyReplicas = *rs1.Spec.Replicas
+	rs1.Status.AvailableReplicas = *rs1.Spec.Replicas
 	rs1, _ = kube1clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).UpdateStatus(rs1)
 	kube1rswatch.Modify(rs1)
 
 	rs2, _ = kube2clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	rs2.Status.Replicas = *rs2.Spec.Replicas
+	rs2.Status.FullyLabeledReplicas = *rs2.Spec.Replicas
+	rs2.Status.ReadyReplicas = *rs2.Spec.Replicas
+	rs2.Status.AvailableReplicas = *rs2.Spec.Replicas
 	rs2, _ = kube2clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).UpdateStatus(rs2)
 	kube2rswatch.Modify(rs2)
 
@@ -159,6 +174,9 @@ func TestReplicaSetController(t *testing.T) {
 	rs, _ = fedclientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	assert.Equal(t, *rs.Spec.Replicas, *rs1.Spec.Replicas+*rs2.Spec.Replicas)
 	assert.Equal(t, rs.Status.Replicas, rs1.Status.Replicas+rs2.Status.Replicas)
+	assert.Equal(t, rs.Status.FullyLabeledReplicas, rs1.Status.FullyLabeledReplicas+rs2.Status.FullyLabeledReplicas)
+	assert.Equal(t, rs.Status.ReadyReplicas, rs1.Status.ReadyReplicas+rs2.Status.ReadyReplicas)
+	assert.Equal(t, rs.Status.AvailableReplicas, rs1.Status.AvailableReplicas+rs2.Status.AvailableReplicas)
 }
 
 func newReplicaSetWithReplicas(name string, replicas int32) *extensionsv1.ReplicaSet {

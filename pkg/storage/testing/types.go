@@ -19,6 +19,7 @@ package testing
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type TestResource struct {
@@ -27,4 +28,4 @@ type TestResource struct {
 	Value                int `json:"value"`
 }
 
-func (obj *TestResource) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *TestResource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

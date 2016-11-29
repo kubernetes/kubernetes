@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -56,49 +57,49 @@ func TestExtractFromHttpBadness(t *testing.T) {
 func TestExtractInvalidPods(t *testing.T) {
 	var testCases = []struct {
 		desc string
-		pod  *api.Pod
+		pod  *v1.Pod
 	}{
 		{
 			desc: "No version",
-			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: ""}},
+			pod:  &v1.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: ""}},
 		},
 		{
 			desc: "Invalid version",
-			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: "v1betta2"}},
+			pod:  &v1.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: "v1betta2"}},
 		},
 		{
 			desc: "Invalid volume name",
-			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-				Spec: api.PodSpec{
-					Volumes: []api.Volume{{Name: "_INVALID_"}},
+			pod: &v1.Pod{
+				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{Name: "_INVALID_"}},
 				},
 			},
 		},
 		{
 			desc: "Duplicate volume names",
-			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-				Spec: api.PodSpec{
-					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
+			pod: &v1.Pod{
+				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
 			},
 		},
 		{
 			desc: "Unspecified container name",
-			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{Name: ""}},
+			pod: &v1.Pod{
+				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: ""}},
 				},
 			},
 		},
 		{
 			desc: "Invalid container name",
-			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{Name: "_INVALID_"}},
+			pod: &v1.Pod{
+				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "_INVALID_"}},
 				},
 			},
 		},
@@ -133,144 +134,144 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 	}{
 		{
 			desc: "Single pod",
-			pods: &api.Pod{
+			pods: &v1.Pod{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "foo",
 					UID:       "111",
 					Namespace: "mynamespace",
 				},
-				Spec: api.PodSpec{
+				Spec: v1.PodSpec{
 					NodeName:        string(nodeName),
-					Containers:      []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
-					SecurityContext: &api.PodSecurityContext{},
+					Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
+					SecurityContext: &v1.PodSecurityContext{},
 				},
-				Status: api.PodStatus{
-					Phase: api.PodPending,
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
 				},
 			},
 			expected: CreatePodUpdate(kubetypes.SET,
 				kubetypes.HTTPSource,
-				&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				&v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						UID:         "111",
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "mynamespace",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
 						SelfLink:    getSelfLink("foo-"+nodeName, "mynamespace"),
 					},
-					Spec: api.PodSpec{
+					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
-						RestartPolicy:                 api.RestartPolicyAlways,
-						DNSPolicy:                     api.DNSClusterFirst,
-						SecurityContext:               &api.PodSecurityContext{},
+						RestartPolicy:                 v1.RestartPolicyAlways,
+						DNSPolicy:                     v1.DNSClusterFirst,
+						SecurityContext:               &v1.PodSecurityContext{},
 						TerminationGracePeriodSeconds: &grace,
 
-						Containers: []api.Container{{
+						Containers: []v1.Container{{
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "Always",
 						}},
 					},
-					Status: api.PodStatus{
-						Phase: api.PodPending,
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
 					},
 				}),
 		},
 		{
 			desc: "Multiple pods",
-			pods: &api.PodList{
+			pods: &v1.PodList{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "PodList",
 					APIVersion: "",
 				},
-				Items: []api.Pod{
+				Items: []v1.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1.ObjectMeta{
 							Name: "foo",
 							UID:  "111",
 						},
-						Spec: api.PodSpec{
+						Spec: v1.PodSpec{
 							NodeName:        nodeName,
-							Containers:      []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
-							SecurityContext: &api.PodSecurityContext{},
+							Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
+							SecurityContext: &v1.PodSecurityContext{},
 						},
-						Status: api.PodStatus{
-							Phase: api.PodPending,
+						Status: v1.PodStatus{
+							Phase: v1.PodPending,
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1.ObjectMeta{
 							Name: "bar",
 							UID:  "222",
 						},
-						Spec: api.PodSpec{
+						Spec: v1.PodSpec{
 							NodeName:        nodeName,
-							Containers:      []api.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
-							SecurityContext: &api.PodSecurityContext{},
+							Containers:      []v1.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
+							SecurityContext: &v1.PodSecurityContext{},
 						},
-						Status: api.PodStatus{
-							Phase: api.PodPending,
+						Status: v1.PodStatus{
+							Phase: v1.PodPending,
 						},
 					},
 				},
 			},
 			expected: CreatePodUpdate(kubetypes.SET,
 				kubetypes.HTTPSource,
-				&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				&v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						UID:         "111",
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "default",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
 						SelfLink:    getSelfLink("foo-"+nodeName, kubetypes.NamespaceDefault),
 					},
-					Spec: api.PodSpec{
+					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
-						RestartPolicy:                 api.RestartPolicyAlways,
-						DNSPolicy:                     api.DNSClusterFirst,
+						RestartPolicy:                 v1.RestartPolicyAlways,
+						DNSPolicy:                     v1.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
-						SecurityContext:               &api.PodSecurityContext{},
+						SecurityContext:               &v1.PodSecurityContext{},
 
-						Containers: []api.Container{{
+						Containers: []v1.Container{{
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "Always",
 						}},
 					},
-					Status: api.PodStatus{
-						Phase: api.PodPending,
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
 					},
 				},
-				&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				&v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						UID:         "222",
 						Name:        "bar" + "-" + nodeName,
 						Namespace:   "default",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "222"},
 						SelfLink:    getSelfLink("bar-"+nodeName, kubetypes.NamespaceDefault),
 					},
-					Spec: api.PodSpec{
+					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
-						RestartPolicy:                 api.RestartPolicyAlways,
-						DNSPolicy:                     api.DNSClusterFirst,
+						RestartPolicy:                 v1.RestartPolicyAlways,
+						DNSPolicy:                     v1.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
-						SecurityContext:               &api.PodSecurityContext{},
+						SecurityContext:               &v1.PodSecurityContext{},
 
-						Containers: []api.Container{{
+						Containers: []v1.Container{{
 							Name:  "2",
 							Image: "bar:bartag",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "IfNotPresent",
 						}},
 					},
-					Status: api.PodStatus{
-						Phase: api.PodPending,
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
 					},
 				}),
 		},
@@ -304,7 +305,12 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
 		for _, pod := range update.Pods {
-			if errs := validation.ValidatePod(pod); len(errs) != 0 {
+			// TODO: remove the conversion when validation is performed on versioned objects.
+			internalPod := &api.Pod{}
+			if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+				t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
+			}
+			if errs := validation.ValidatePod(internalPod); len(errs) != 0 {
 				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, errs.ToAggregate())
 			}
 		}
@@ -312,19 +318,19 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 }
 
 func TestURLWithHeader(t *testing.T) {
-	pod := &api.Pod{
+	pod := &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 			Kind:       "Pod",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo",
 			UID:       "111",
 			Namespace: "mynamespace",
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			NodeName:   "localhost",
-			Containers: []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
+			Containers: []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
 		},
 	}
 	data, err := json.Marshal(pod)

@@ -28,7 +28,7 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -46,18 +46,18 @@ var (
 	portForwardPortToStdOutV = version.MustParse("v1.3.0-alpha.4")
 )
 
-func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *api.Pod {
-	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:   podName,
 			Labels: map[string]string{"name": podName},
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "portforwardtester",
 					Image: "gcr.io/google_containers/portforwardtester:1.0",
-					Env: []api.EnvVar{
+					Env: []v1.EnvVar{
 						{
 							Name:  "BIND_PORT",
 							Value: "80",
@@ -81,7 +81,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *a
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 }

@@ -21,8 +21,8 @@ import (
 	"net/url"
 	"reflect"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/conversion"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 // Scheme defines methods for serializing and deserializing API objects, a type
@@ -43,14 +43,14 @@ import (
 type Scheme struct {
 	// versionMap allows one to figure out the go type of an object with
 	// the given version and name.
-	gvkToType map[unversioned.GroupVersionKind]reflect.Type
+	gvkToType map[schema.GroupVersionKind]reflect.Type
 
 	// typeToGroupVersion allows one to find metadata for a given go object.
 	// The reflect.Type we index by should *not* be a pointer.
-	typeToGVK map[reflect.Type][]unversioned.GroupVersionKind
+	typeToGVK map[reflect.Type][]schema.GroupVersionKind
 
 	// unversionedTypes are transformed without conversion in ConvertToVersion.
-	unversionedTypes map[reflect.Type]unversioned.GroupVersionKind
+	unversionedTypes map[reflect.Type]schema.GroupVersionKind
 
 	// unversionedKinds are the names of kinds that can be created in the context of any group
 	// or version
@@ -80,9 +80,9 @@ type FieldLabelConversionFunc func(label, value string) (internalLabel, internal
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 func NewScheme() *Scheme {
 	s := &Scheme{
-		gvkToType:        map[unversioned.GroupVersionKind]reflect.Type{},
-		typeToGVK:        map[reflect.Type][]unversioned.GroupVersionKind{},
-		unversionedTypes: map[reflect.Type]unversioned.GroupVersionKind{},
+		gvkToType:        map[schema.GroupVersionKind]reflect.Type{},
+		typeToGVK:        map[reflect.Type][]schema.GroupVersionKind{},
+		unversionedTypes: map[reflect.Type]schema.GroupVersionKind{},
 		unversionedKinds: map[string]reflect.Type{},
 		cloner:           conversion.NewCloner(),
 		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
@@ -145,7 +145,7 @@ func (s *Scheme) Converter() *conversion.Converter {
 //
 // TODO: there is discussion about removing unversioned and replacing it with objects that are manifest into
 //   every version with particular schemas. Resolve this method at that point.
-func (s *Scheme) AddUnversionedTypes(version unversioned.GroupVersion, types ...Object) {
+func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Object) {
 	s.AddKnownTypes(version, types...)
 	for _, obj := range types {
 		t := reflect.TypeOf(obj).Elem()
@@ -162,7 +162,7 @@ func (s *Scheme) AddUnversionedTypes(version unversioned.GroupVersion, types ...
 // All objects passed to types should be pointers to structs. The name that go reports for
 // the struct becomes the "kind" field when encoding. Version may not be empty - use the
 // APIVersionInternal constant if you have a type that does not have a formal version.
-func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...Object) {
+func (s *Scheme) AddKnownTypes(gv schema.GroupVersion, types ...Object) {
 	if len(gv.Version) == 0 {
 		panic(fmt.Sprintf("version is required on all types: %s %v", gv, types[0]))
 	}
@@ -186,7 +186,7 @@ func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...Object) {
 // be encoded as. Useful for testing when you don't want to make multiple packages to define
 // your structs. Version may not be empty - use the APIVersionInternal constant if you have a
 // type that does not have a formal version.
-func (s *Scheme) AddKnownTypeWithName(gvk unversioned.GroupVersionKind, obj Object) {
+func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 	t := reflect.TypeOf(obj)
 	if len(gvk.Version) == 0 {
 		panic(fmt.Sprintf("version is required on all types: %s %v", gvk, t))
@@ -204,7 +204,7 @@ func (s *Scheme) AddKnownTypeWithName(gvk unversioned.GroupVersionKind, obj Obje
 }
 
 // KnownTypes returns the types known for the given version.
-func (s *Scheme) KnownTypes(gv unversioned.GroupVersion) map[string]reflect.Type {
+func (s *Scheme) KnownTypes(gv schema.GroupVersion) map[string]reflect.Type {
 	types := make(map[string]reflect.Type)
 	for gvk, t := range s.gvkToType {
 		if gv != gvk.GroupVersion() {
@@ -217,23 +217,23 @@ func (s *Scheme) KnownTypes(gv unversioned.GroupVersion) map[string]reflect.Type
 }
 
 // AllKnownTypes returns the all known types.
-func (s *Scheme) AllKnownTypes() map[unversioned.GroupVersionKind]reflect.Type {
+func (s *Scheme) AllKnownTypes() map[schema.GroupVersionKind]reflect.Type {
 	return s.gvkToType
 }
 
 // ObjectKind returns the group,version,kind of the go object and true if this object
 // is considered unversioned, or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectKind(obj Object) (unversioned.GroupVersionKind, bool, error) {
+func (s *Scheme) ObjectKind(obj Object) (schema.GroupVersionKind, bool, error) {
 	gvks, unversionedType, err := s.ObjectKinds(obj)
 	if err != nil {
-		return unversioned.GroupVersionKind{}, false, err
+		return schema.GroupVersionKind{}, false, err
 	}
 	return gvks[0], unversionedType, nil
 }
 
 // ObjectKinds returns all possible group,version,kind of the go object, true if the
 // object is considered unversioned, or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectKinds(obj Object) ([]unversioned.GroupVersionKind, bool, error) {
+func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error) {
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, false, err
@@ -242,7 +242,7 @@ func (s *Scheme) ObjectKinds(obj Object) ([]unversioned.GroupVersionKind, bool, 
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return nil, false, NewNotRegisteredErr(unversioned.GroupVersionKind{}, t)
+		return nil, false, NewNotRegisteredErr(schema.GroupVersionKind{}, t)
 	}
 	_, unversionedType := s.unversionedTypes[t]
 
@@ -251,7 +251,7 @@ func (s *Scheme) ObjectKinds(obj Object) ([]unversioned.GroupVersionKind, bool, 
 
 // Recognizes returns true if the scheme is able to handle the provided group,version,kind
 // of an object.
-func (s *Scheme) Recognizes(gvk unversioned.GroupVersionKind) bool {
+func (s *Scheme) Recognizes(gvk schema.GroupVersionKind) bool {
 	_, exists := s.gvkToType[gvk]
 	return exists
 }
@@ -272,7 +272,7 @@ func (s *Scheme) IsUnversioned(obj Object) (bool, bool) {
 
 // New returns a new API object of the given version and name, or an error if it hasn't
 // been registered. The version and kind fields must be specified.
-func (s *Scheme) New(kind unversioned.GroupVersionKind) (Object, error) {
+func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 	if t, exists := s.gvkToType[kind]; exists {
 		return reflect.New(t).Interface().(Object), nil
 	}
@@ -514,7 +514,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	}
 	kinds, ok := s.typeToGVK[t]
 	if !ok || len(kinds) == 0 {
-		return nil, NewNotRegisteredErr(unversioned.GroupVersionKind{}, t)
+		return nil, NewNotRegisteredErr(schema.GroupVersionKind{}, t)
 	}
 
 	gvk, ok := target.KindForGroupVersionKinds(kinds)
@@ -522,7 +522,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		// try to see if this type is listed as unversioned (for legacy support)
 		// TODO: when we move to server API versions, we should completely remove the unversioned concept
 		if unversionedKind, ok := s.unversionedTypes[t]; ok {
-			if gvk, ok := target.KindForGroupVersionKinds([]unversioned.GroupVersionKind{unversionedKind}); ok {
+			if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
 				return copyAndSetTargetKind(copy, s, in, gvk)
 			}
 			return copyAndSetTargetKind(copy, s, in, unversionedKind)
@@ -541,7 +541,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 
 	// type is unversioned, no conversion necessary
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
-		if gvk, ok := target.KindForGroupVersionKinds([]unversioned.GroupVersionKind{unversionedKind}); ok {
+		if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
 			return copyAndSetTargetKind(copy, s, in, gvk)
 		}
 		return copyAndSetTargetKind(copy, s, in, unversionedKind)
@@ -576,7 +576,7 @@ func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFl
 }
 
 // copyAndSetTargetKind performs a conditional copy before returning the object, or an error if copy was not successful.
-func copyAndSetTargetKind(copy bool, copier ObjectCopier, obj Object, kind unversioned.GroupVersionKind) (Object, error) {
+func copyAndSetTargetKind(copy bool, copier ObjectCopier, obj Object, kind schema.GroupVersionKind) (Object, error) {
 	if copy {
 		copied, err := copier.Copy(obj)
 		if err != nil {
@@ -589,11 +589,11 @@ func copyAndSetTargetKind(copy bool, copier ObjectCopier, obj Object, kind unver
 }
 
 // setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.
-func setTargetKind(obj Object, kind unversioned.GroupVersionKind) {
+func setTargetKind(obj Object, kind schema.GroupVersionKind) {
 	if kind.Version == APIVersionInternal {
 		// internal is a special case
 		// TODO: look at removing the need to special case this
-		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+		obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 		return
 	}
 	obj.GetObjectKind().SetGroupVersionKind(kind)

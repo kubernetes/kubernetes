@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
@@ -38,11 +37,13 @@ import (
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
@@ -258,7 +259,7 @@ func (c completedConfig) New() (*Master, error) {
 	m.InstallAPIs(c.Config.GenericConfig.APIResourceConfigSource, restOptionsFactory.NewFor, restStorageProviders...)
 
 	if c.Tunneler != nil {
-		m.installTunneler(c.Tunneler, coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
+		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
 	}
 
 	return m, nil
@@ -283,7 +284,7 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.
 	}
 }
 
-func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient coreclient.NodeInterface) {
+func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient corev1client.NodeInterface) {
 	tunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
 	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(tunneler)))
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
@@ -336,7 +337,7 @@ type restOptionsFactory struct {
 	storageDecorator        generic.StorageDecorator
 }
 
-func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.RESTOptions {
+func (f restOptionsFactory) NewFor(resource schema.GroupResource) generic.RESTOptions {
 	storageConfig, err := f.storageFactory.NewConfig(resource)
 	if err != nil {
 		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
@@ -352,15 +353,15 @@ func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.R
 }
 
 type nodeAddressProvider struct {
-	nodeClient coreclient.NodeInterface
+	nodeClient corev1client.NodeInterface
 }
 
 func (n nodeAddressProvider) externalAddresses() (addresses []string, err error) {
-	preferredAddressTypes := []api.NodeAddressType{
-		api.NodeExternalIP,
-		api.NodeLegacyHostIP,
+	preferredAddressTypes := []apiv1.NodeAddressType{
+		apiv1.NodeExternalIP,
+		apiv1.NodeLegacyHostIP,
 	}
-	nodes, err := n.nodeClient.List(api.ListOptions{})
+	nodes, err := n.nodeClient.List(apiv1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

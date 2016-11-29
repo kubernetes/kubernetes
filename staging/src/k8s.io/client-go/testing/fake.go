@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/rest"
@@ -221,7 +222,7 @@ type FakeDiscovery struct {
 func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
 	action := ActionImpl{
 		Verb:     "get",
-		Resource: unversioned.GroupVersionResource{Resource: "resource"},
+		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
 	c.Invokes(action, nil)
 	return c.Resources[groupVersion], nil
@@ -230,7 +231,7 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*un
 func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceList, error) {
 	action := ActionImpl{
 		Verb:     "get",
-		Resource: unversioned.GroupVersionResource{Resource: "resource"},
+		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
 	c.Invokes(action, nil)
 	return c.Resources, nil
@@ -243,7 +244,7 @@ func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
 func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := ActionImpl{}
 	action.Verb = "get"
-	action.Resource = unversioned.GroupVersionResource{Resource: "version"}
+	action.Resource = schema.GroupVersionResource{Resource: "version"}
 
 	c.Invokes(action, nil)
 	versionInfo := version.Get()

@@ -23,8 +23,8 @@ import (
 	"path"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
@@ -97,13 +97,13 @@ func (plugin *cinderPlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *cinderPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
+func (plugin *cinderPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
 	}
 }
 
-func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod.UID, &CinderDiskUtil{}, plugin.host.GetMounter())
 }
 
@@ -211,10 +211,10 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 		return nil, err
 	}
 	glog.V(4).Infof("Found volume %s mounted to %s", sourceName, mountPath)
-	cinderVolume := &api.Volume{
+	cinderVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			Cinder: &api.CinderVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			Cinder: &v1.CinderVolumeSource{
 				VolumeID: sourceName,
 			},
 		},
@@ -365,7 +365,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func makeGlobalPDName(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(cinderVolumePluginName), "mounts", devName)
+	return path.Join(host.GetPluginDir(cinderVolumePluginName), mount.MountsInGlobalPDPath, devName)
 }
 
 func (cd *cinderVolume) GetPath() string {
@@ -464,28 +464,28 @@ type cinderVolumeProvisioner struct {
 
 var _ volume.Provisioner = &cinderVolumeProvisioner{}
 
-func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
+func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	volumeID, sizeGB, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return nil, err
 	}
 
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	pv := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "cinder-dynamic-provisioner",
 			},
 		},
-		Spec: api.PersistentVolumeSpec{
+		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   c.options.PVC.Spec.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				Cinder: &api.CinderVolumeSource{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				Cinder: &v1.CinderVolumeSource{
 					VolumeID: volumeID,
 					FSType:   "ext4",
 					ReadOnly: false,
@@ -500,7 +500,7 @@ func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	return pv, nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.CinderVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (*v1.CinderVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.Cinder != nil {
 		return spec.Volume.Cinder, spec.Volume.Cinder.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&

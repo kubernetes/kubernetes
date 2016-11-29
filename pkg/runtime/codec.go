@@ -24,8 +24,8 @@ import (
 	"net/url"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // codec binds an encoder and decoder.
@@ -85,7 +85,7 @@ type DefaultingSerializer struct {
 }
 
 // Decode performs a decode and then allows the defaulter to act on the provided object.
-func (d DefaultingSerializer) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error) {
+func (d DefaultingSerializer) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
 	obj, gvk, err := d.Decoder.Decode(data, defaultGVK, into)
 	if err != nil {
 		return obj, gvk, err
@@ -96,7 +96,7 @@ func (d DefaultingSerializer) Decode(data []byte, defaultGVK *unversioned.GroupV
 
 // UseOrCreateObject returns obj if the canonical ObjectKind returned by the provided typer matches gvk, or
 // invokes the ObjectCreator to instantiate a new gvk. Returns an error if the typer cannot find the object.
-func UseOrCreateObject(t ObjectTyper, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {
+func UseOrCreateObject(t ObjectTyper, c ObjectCreater, gvk schema.GroupVersionKind, obj Object) (Object, error) {
 	if obj != nil {
 		kinds, _, err := t.ObjectKinds(obj)
 		if err != nil {
@@ -129,7 +129,7 @@ type NoopDecoder struct {
 
 var _ Serializer = NoopDecoder{}
 
-func (n NoopDecoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error) {
+func (n NoopDecoder) Decode(data []byte, gvk *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
 	return nil, nil, fmt.Errorf("decoding is not allowed for this codec: %v", reflect.TypeOf(n.Encoder))
 }
 
@@ -153,7 +153,7 @@ var _ ParameterCodec = &parameterCodec{}
 
 // DecodeParameters converts the provided url.Values into an object of type From with the kind of into, and then
 // converts that object to into (if necessary). Returns an error if the operation cannot be completed.
-func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversioned.GroupVersion, into Object) error {
+func (c *parameterCodec) DecodeParameters(parameters url.Values, from schema.GroupVersion, into Object) error {
 	if len(parameters) == 0 {
 		return nil
 	}
@@ -177,7 +177,7 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 
 // EncodeParameters converts the provided object into the to version, then converts that object to url.Values.
 // Returns an error if conversion is not possible.
-func (c *parameterCodec) EncodeParameters(obj Object, to unversioned.GroupVersion) (url.Values, error) {
+func (c *parameterCodec) EncodeParameters(obj Object, to schema.GroupVersion) (url.Values, error) {
 	gvks, _, err := c.typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, err
@@ -208,7 +208,7 @@ func (s base64Serializer) Encode(obj Object, stream io.Writer) error {
 	return err
 }
 
-func (s base64Serializer) Decode(data []byte, defaults *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error) {
+func (s base64Serializer) Decode(data []byte, defaults *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
 	out := make([]byte, base64.StdEncoding.DecodedLen(len(data)))
 	n, err := base64.StdEncoding.Decode(out, data)
 	if err != nil {
@@ -243,30 +243,30 @@ var (
 type internalGroupVersioner struct{}
 
 // KindForGroupVersionKinds returns an internal Kind if one is found, or converts the first provided kind to the internal version.
-func (internalGroupVersioner) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
+func (internalGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
 	for _, kind := range kinds {
 		if kind.Version == APIVersionInternal {
 			return kind, true
 		}
 	}
 	for _, kind := range kinds {
-		return unversioned.GroupVersionKind{Group: kind.Group, Version: APIVersionInternal, Kind: kind.Kind}, true
+		return schema.GroupVersionKind{Group: kind.Group, Version: APIVersionInternal, Kind: kind.Kind}, true
 	}
-	return unversioned.GroupVersionKind{}, false
+	return schema.GroupVersionKind{}, false
 }
 
 type disabledGroupVersioner struct{}
 
 // KindForGroupVersionKinds returns false for any input.
-func (disabledGroupVersioner) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
-	return unversioned.GroupVersionKind{}, false
+func (disabledGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
+	return schema.GroupVersionKind{}, false
 }
 
 // GroupVersioners implements GroupVersioner and resolves to the first exact match for any kind.
 type GroupVersioners []GroupVersioner
 
 // KindForGroupVersionKinds returns the first match of any of the group versioners, or false if no match occured.
-func (gvs GroupVersioners) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
+func (gvs GroupVersioners) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
 	for _, gv := range gvs {
 		target, ok := gv.KindForGroupVersionKinds(kinds)
 		if !ok {
@@ -274,22 +274,22 @@ func (gvs GroupVersioners) KindForGroupVersionKinds(kinds []unversioned.GroupVer
 		}
 		return target, true
 	}
-	return unversioned.GroupVersionKind{}, false
+	return schema.GroupVersionKind{}, false
 }
 
-// Assert that unversioned.GroupVersion and GroupVersions implement GroupVersioner
-var _ GroupVersioner = unversioned.GroupVersion{}
-var _ GroupVersioner = unversioned.GroupVersions{}
+// Assert that schema.GroupVersion and GroupVersions implement GroupVersioner
+var _ GroupVersioner = schema.GroupVersion{}
+var _ GroupVersioner = schema.GroupVersions{}
 var _ GroupVersioner = multiGroupVersioner{}
 
 type multiGroupVersioner struct {
-	target             unversioned.GroupVersion
-	acceptedGroupKinds []unversioned.GroupKind
+	target             schema.GroupVersion
+	acceptedGroupKinds []schema.GroupKind
 }
 
 // NewMultiGroupVersioner returns the provided group version for any kind that matches one of the provided group kinds.
 // Kind may be empty in the provided group kind, in which case any kind will match.
-func NewMultiGroupVersioner(gv unversioned.GroupVersion, groupKinds ...unversioned.GroupKind) GroupVersioner {
+func NewMultiGroupVersioner(gv schema.GroupVersion, groupKinds ...schema.GroupKind) GroupVersioner {
 	if len(groupKinds) == 0 || (len(groupKinds) == 1 && groupKinds[0].Group == gv.Group) {
 		return gv
 	}
@@ -298,7 +298,7 @@ func NewMultiGroupVersioner(gv unversioned.GroupVersion, groupKinds ...unversion
 
 // KindForGroupVersionKinds returns the target group version if any kind matches any of the original group kinds. It will
 // use the originating kind where possible.
-func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
+func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
 	for _, src := range kinds {
 		for _, kind := range v.acceptedGroupKinds {
 			if kind.Group != src.Group {
@@ -310,5 +310,5 @@ func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []unversioned.GroupV
 			return v.target.WithKind(src.Kind), true
 		}
 	}
-	return unversioned.GroupVersionKind{}, false
+	return schema.GroupVersionKind{}, false
 }

@@ -224,7 +224,7 @@ function create-etcd-opts() {
   cat <<EOF > ~/kube/default/etcd
 ETCD_OPTS="\
  -name infra\
- -listen-client-urls http://127.0.0.1:4001,http://${1}:4001\
+ --listen-client-urls=http://127.0.0.1:4001,http://${1}:4001\
  -advertise-client-urls http://${1}:4001"
 EOF
 }

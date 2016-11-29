@@ -19,21 +19,21 @@ package runtime
 import (
 	"errors"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type encodable struct {
 	E        Encoder `json:"-"`
 	obj      Object
-	versions []unversioned.GroupVersion
+	versions []schema.GroupVersion
 }
 
-func (e encodable) GetObjectKind() unversioned.ObjectKind { return e.obj.GetObjectKind() }
+func (e encodable) GetObjectKind() schema.ObjectKind { return e.obj.GetObjectKind() }
 
 // NewEncodable creates an object that will be encoded with the provided codec on demand.
 // Provided as a convenience for test cases dealing with internal objects.
-func NewEncodable(e Encoder, obj Object, versions ...unversioned.GroupVersion) Object {
+func NewEncodable(e Encoder, obj Object, versions ...schema.GroupVersion) Object {
 	if _, ok := obj.(*Unknown); ok {
 		return obj
 	}
@@ -52,7 +52,7 @@ func (re encodable) MarshalJSON() ([]byte, error) {
 
 // NewEncodableList creates an object that will be encoded with the provided codec on demand.
 // Provided as a convenience for test cases dealing with internal objects.
-func NewEncodableList(e Encoder, objects []Object, versions ...unversioned.GroupVersion) []Object {
+func NewEncodableList(e Encoder, objects []Object, versions ...schema.GroupVersion) []Object {
 	out := make([]Object, len(objects))
 	for i := range objects {
 		if _, ok := objects[i].(*Unknown); ok {

@@ -18,10 +18,10 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +31,7 @@ type FakeNetworkPolicies struct {
 	ns   string
 }
 
-var networkpoliciesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "networkpolicies"}
+var networkpoliciesResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "networkpolicies"}
 
 func (c *FakeNetworkPolicies) Create(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
 	obj, err := c.Fake.

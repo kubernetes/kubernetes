@@ -17,8 +17,8 @@ limitations under the License.
 package e2e_node
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -30,31 +30,31 @@ import (
 
 // getResourceList returns a ResourceList with the
 // specified cpu and memory resource values
-func getResourceList(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func getResourceList(cpu, memory string) v1.ResourceList {
+	res := v1.ResourceList{}
 	if cpu != "" {
-		res[api.ResourceCPU] = resource.MustParse(cpu)
+		res[v1.ResourceCPU] = resource.MustParse(cpu)
 	}
 	if memory != "" {
-		res[api.ResourceMemory] = resource.MustParse(memory)
+		res[v1.ResourceMemory] = resource.MustParse(memory)
 	}
 	return res
 }
 
 // getResourceRequirements returns a ResourceRequirements object
-func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
-	res := api.ResourceRequirements{}
+func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequirements {
+	res := v1.ResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
 	return res
 }
 
 // makePodToVerifyCgroups returns a pod that verifies the existence of the specified cgroups.
-func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *api.Pod {
+func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *v1.Pod {
 	// convert the names to their literal cgroupfs forms...
 	cgroupFsNames := []string{}
 	for _, cgroupName := range cgroupNames {
-		if framework.TestContext.CgroupDriver == "systemd" {
+		if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 			cgroupFsNames = append(cgroupFsNames, cm.ConvertCgroupNameToSystemd(cgroupName, true))
 		} else {
 			cgroupFsNames = append(cgroupFsNames, string(cgroupName))
@@ -68,18 +68,18 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *api.Pod {
 		command += localCommand
 	}
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyNever,
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
 				{
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Name:    "container" + string(uuid.NewUUID()),
 					Command: []string{"sh", "-c", command},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "sysfscgroup",
 							MountPath: "/tmp",
@@ -87,11 +87,11 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *api.Pod {
 					},
 				},
 			},
-			Volumes: []api.Volume{
+			Volumes: []v1.Volume{
 				{
 					Name: "sysfscgroup",
-					VolumeSource: api.VolumeSource{
-						HostPath: &api.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
 					},
 				},
 			},
@@ -101,23 +101,23 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *api.Pod {
 }
 
 // makePodToVerifyCgroupRemoved verfies the specified cgroup does not exist.
-func makePodToVerifyCgroupRemoved(cgroupName cm.CgroupName) *api.Pod {
+func makePodToVerifyCgroupRemoved(cgroupName cm.CgroupName) *v1.Pod {
 	cgroupFsName := string(cgroupName)
-	if framework.TestContext.CgroupDriver == "systemd" {
+	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		cgroupFsName = cm.ConvertCgroupNameToSystemd(cm.CgroupName(cgroupName), true)
 	}
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyOnFailure,
+			Containers: []v1.Container{
 				{
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Name:    "container" + string(uuid.NewUUID()),
 					Command: []string{"sh", "-c", "for i in `seq 1 10`; do if [ ! -d /tmp/memory/" + cgroupFsName + " ] && [ ! -d /tmp/cpu/" + cgroupFsName + " ]; then exit 0; else sleep 10; fi; done; exit 1"},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "sysfscgroup",
 							MountPath: "/tmp",
@@ -125,11 +125,11 @@ func makePodToVerifyCgroupRemoved(cgroupName cm.CgroupName) *api.Pod {
 					},
 				},
 			},
-			Volumes: []api.Volume{
+			Volumes: []v1.Volume{
 				{
 					Name: "sysfscgroup",
-					VolumeSource: api.VolumeSource{
-						HostPath: &api.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
 					},
 				},
 			},
@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
 			It("Top level QoS containers should have been created", func() {
-				if !framework.TestContext.CgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
 				cgroupsToVerify := []cm.CgroupName{cm.CgroupName(qos.Burstable), cm.CgroupName(qos.BestEffort)}
@@ -158,21 +158,21 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("Pod containers", func() {
 		Context("On scheduling a Guaranteed Pod", func() {
 			It("Pod containers should have been created under the cgroup-root", func() {
-				if !framework.TestContext.CgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
 				var (
-					guaranteedPod *api.Pod
+					guaranteedPod *v1.Pod
 					podUID        string
 				)
 				By("Creating a Guaranteed pod in Namespace", func() {
-					guaranteedPod = f.PodClient().Create(&api.Pod{
-						ObjectMeta: api.ObjectMeta{
+					guaranteedPod = f.PodClient().Create(&v1.Pod{
+						ObjectMeta: v1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Image:     framework.GetPauseImageName(f.ClientSet),
 									Name:      "container" + string(uuid.NewUUID()),
@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(guaranteedPod.Name, &api.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(guaranteedPod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
@@ -202,21 +202,21 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 		Context("On scheduling a BestEffort Pod", func() {
 			It("Pod containers should have been created under the BestEffort cgroup", func() {
-				if !framework.TestContext.CgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
 				var (
 					podUID        string
-					bestEffortPod *api.Pod
+					bestEffortPod *v1.Pod
 				)
 				By("Creating a BestEffort pod in Namespace", func() {
-					bestEffortPod = f.PodClient().Create(&api.Pod{
-						ObjectMeta: api.ObjectMeta{
+					bestEffortPod = f.PodClient().Create(&v1.Pod{
+						ObjectMeta: v1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Image:     framework.GetPauseImageName(f.ClientSet),
 									Name:      "container" + string(uuid.NewUUID()),
@@ -236,7 +236,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(bestEffortPod.Name, &api.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(bestEffortPod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("BestEffort/pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
@@ -246,21 +246,21 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 		Context("On scheduling a Burstable Pod", func() {
 			It("Pod containers should have been created under the Burstable cgroup", func() {
-				if !framework.TestContext.CgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
 				var (
 					podUID       string
-					burstablePod *api.Pod
+					burstablePod *v1.Pod
 				)
 				By("Creating a Burstable pod in Namespace", func() {
-					burstablePod = f.PodClient().Create(&api.Pod{
-						ObjectMeta: api.ObjectMeta{
+					burstablePod = f.PodClient().Create(&v1.Pod{
+						ObjectMeta: v1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Image:     framework.GetPauseImageName(f.ClientSet),
 									Name:      "container" + string(uuid.NewUUID()),
@@ -280,7 +280,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(burstablePod.Name, &api.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(burstablePod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("Burstable/pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)

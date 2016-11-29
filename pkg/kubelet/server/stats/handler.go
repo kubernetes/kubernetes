@@ -29,7 +29,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
 	"github.com/emicklei/go-restful"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
@@ -41,13 +41,13 @@ type StatsProvider interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
-	GetPodByName(namespace, name string) (*api.Pod, bool)
-	GetNode() (*api.Node, error)
+	GetPodByName(namespace, name string) (*v1.Pod, bool)
+	GetNode() (*v1.Node, error)
 	GetNodeConfig() cm.NodeConfig
 	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
-	GetPods() []*api.Pod
+	GetPods() []*v1.Pod
 }
 
 type handler struct {
@@ -197,7 +197,7 @@ func (h *handler) handlePodContainer(request *restful.Request, response *restful
 
 	// Default parameters.
 	params := map[string]string{
-		"namespace": api.NamespaceDefault,
+		"namespace": v1.NamespaceDefault,
 		"uid":       "",
 	}
 	for k, v := range request.PathParameters() {

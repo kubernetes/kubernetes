@@ -17,37 +17,37 @@ limitations under the License.
 package schedulercache
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // FakeCache is used for testing
 type FakeCache struct {
-	AssumeFunc func(*api.Pod)
+	AssumeFunc func(*v1.Pod)
 }
 
-func (f *FakeCache) AssumePod(pod *api.Pod) error {
+func (f *FakeCache) AssumePod(pod *v1.Pod) error {
 	f.AssumeFunc(pod)
 	return nil
 }
 
-func (f *FakeCache) ForgetPod(pod *api.Pod) error { return nil }
+func (f *FakeCache) ForgetPod(pod *v1.Pod) error { return nil }
 
-func (f *FakeCache) AddPod(pod *api.Pod) error { return nil }
+func (f *FakeCache) AddPod(pod *v1.Pod) error { return nil }
 
-func (f *FakeCache) UpdatePod(oldPod, newPod *api.Pod) error { return nil }
+func (f *FakeCache) UpdatePod(oldPod, newPod *v1.Pod) error { return nil }
 
-func (f *FakeCache) RemovePod(pod *api.Pod) error { return nil }
+func (f *FakeCache) RemovePod(pod *v1.Pod) error { return nil }
 
-func (f *FakeCache) AddNode(node *api.Node) error { return nil }
+func (f *FakeCache) AddNode(node *v1.Node) error { return nil }
 
-func (f *FakeCache) UpdateNode(oldNode, newNode *api.Node) error { return nil }
+func (f *FakeCache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 
-func (f *FakeCache) RemoveNode(node *api.Node) error { return nil }
+func (f *FakeCache) RemoveNode(node *v1.Node) error { return nil }
 
 func (f *FakeCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
 	return nil
 }
 
-func (f *FakeCache) List(s labels.Selector) ([]*api.Pod, error) { return nil, nil }
+func (f *FakeCache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }

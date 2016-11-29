@@ -29,8 +29,8 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/common/model"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubeletstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -157,7 +157,7 @@ func NewRuntimeOperationMonitor(c clientset.Interface) *RuntimeOperationMonitor 
 		client:          c,
 		nodesRuntimeOps: make(map[string]NodeRuntimeOperationErrorRate),
 	}
-	nodes, err := m.client.Core().Nodes().List(api.ListOptions{})
+	nodes, err := m.client.Core().Nodes().List(v1.ListOptions{})
 	if err != nil {
 		Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
 	}
@@ -695,7 +695,7 @@ func NewResourceMonitor(c clientset.Interface, containerNames []string, pollingI
 
 func (r *ResourceMonitor) Start() {
 	// It should be OK to monitor unschedulable Nodes
-	nodes, err := r.client.Core().Nodes().List(api.ListOptions{})
+	nodes, err := r.client.Core().Nodes().List(v1.ListOptions{})
 	if err != nil {
 		Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}

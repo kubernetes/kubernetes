@@ -95,7 +95,7 @@ func NewExists(c clientset.Interface) admission.Interface {
 }
 
 func (e *exists) SetInformerFactory(f informers.SharedInformerFactory) {
-	e.namespaceInformer = f.Namespaces().Informer()
+	e.namespaceInformer = f.InternalNamespaces().Informer()
 	e.SetReadyFunc(e.namespaceInformer.HasSynced)
 }
 

@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -45,16 +45,16 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 		By("creating the pod")
 		name := "pod-submit-remove-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
 					"time": value,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "nginx",
 						Image: "gcr.io/google_containers/nginx-slim:0.7",
@@ -65,12 +65,12 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options := api.ListOptions{LabelSelector: selector}
+		options := v1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
 		Expect(len(pods.Items)).To(Equal(0))
-		options = api.ListOptions{
-			LabelSelector:   selector,
+		options = v1.ListOptions{
+			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
 		w, err := podClient.Watch(options)
@@ -81,7 +81,7 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 
 		By("verifying the pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options = api.ListOptions{LabelSelector: selector}
+		options = v1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
 		Expect(len(pods.Items)).To(Equal(1))
@@ -159,13 +159,13 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 		By("verifying pod deletion was observed")
 		deleted := false
 		timeout := false
-		var lastPod *api.Pod
+		var lastPod *v1.Pod
 		timer := time.After(30 * time.Second)
 		for !deleted && !timeout {
 			select {
 			case event, _ := <-w.ResultChan():
 				if event.Type == watch.Deleted {
-					lastPod = event.Object.(*api.Pod)
+					lastPod = event.Object.(*v1.Pod)
 					deleted = true
 				}
 			case <-timer:
@@ -180,7 +180,7 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
 
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options = api.ListOptions{LabelSelector: selector}
+		options = v1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
 		Expect(len(pods.Items)).To(Equal(0))

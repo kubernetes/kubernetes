@@ -35,7 +35,7 @@ import (
 
 // newHandlerForTest returns the admission controller configured for testing.
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
-	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
+	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
 	handler := NewProvision(c)
 	plugins := []admission.Interface{handler}
 	pluginInitializer := admission.NewPluginInitializer(f, nil)

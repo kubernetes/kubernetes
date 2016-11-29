@@ -20,9 +20,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/labels:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
@@ -34,5 +34,5 @@ go_test(
     srcs = ["scheduler_interface_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
+    deps = ["//pkg/api/v1:go_default_library"],
 )

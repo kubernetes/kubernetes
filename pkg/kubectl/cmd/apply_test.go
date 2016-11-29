@@ -32,11 +32,11 @@ import (
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -188,12 +188,6 @@ func TestApplyObject(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/version" && m == "GET":
-				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-				if err != nil {
-					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-				}
-				return resp, nil
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
@@ -208,7 +202,6 @@ func TestApplyObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -237,12 +230,6 @@ func TestApplyRetry(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/version" && m == "GET":
-				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-				if err != nil {
-					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-				}
-				return resp, nil
 			case p == pathRC && m == "GET":
 				getCount++
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
@@ -250,7 +237,7 @@ func TestApplyRetry(t *testing.T) {
 			case p == pathRC && m == "PATCH":
 				if firstPatch {
 					firstPatch = false
-					statusErr := kubeerr.NewConflict(unversioned.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+					statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
 					bodyBytes, _ := json.Marshal(statusErr)
 					bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
 					return &http.Response{StatusCode: http.StatusConflict, Header: defaultHeader(), Body: bodyErr}, nil
@@ -266,7 +253,6 @@ func TestApplyRetry(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -296,12 +282,6 @@ func TestApplyNonExistObject(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/version" && m == "GET":
-				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-				if err != nil {
-					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-				}
-				return resp, nil
 			case p == "/api/v1/namespaces/test" && m == "GET":
 				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathNameRC && m == "GET":
@@ -316,7 +296,6 @@ func TestApplyNonExistObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -352,12 +331,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/version" && m == "GET":
-				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-				if err != nil {
-					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-				}
-				return resp, nil
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
@@ -379,7 +352,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)

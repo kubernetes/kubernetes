@@ -29,11 +29,11 @@ import (
 	"testing"
 	"text/template"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/stretchr/testify/mock"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -126,7 +126,7 @@ func NewFakeHost(kubeClient clientset.Interface, pods []*containertest.FakePod) 
 	return host
 }
 
-func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
+func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
 	return nil, false
 }
 

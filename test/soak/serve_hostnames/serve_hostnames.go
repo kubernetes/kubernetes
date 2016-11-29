@@ -33,7 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -88,9 +89,9 @@ func main() {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
 
-	var nodes *api.NodeList
+	var nodes *v1.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = client.Nodes().List(api.ListOptions{})
+		nodes, err = client.Nodes().List(v1.ListOptions{})
 		if err == nil {
 			break
 		}
@@ -112,7 +113,7 @@ func main() {
 	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
 
 	// Create the namespace
-	got, err := client.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{GenerateName: "serve-hostnames-"}})
+	got, err := client.Namespaces().Create(&v1.Namespace{ObjectMeta: v1.ObjectMeta{GenerateName: "serve-hostnames-"}})
 	if err != nil {
 		glog.Fatalf("Failed to create namespace: %v", err)
 	}
@@ -137,18 +138,18 @@ func main() {
 	// Create a service for these pods.
 	glog.Infof("Creating service %s/serve-hostnames", ns)
 	// Make several attempts to create a service.
-	var svc *api.Service
+	var svc *v1.Service
 	for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(2 * time.Second) {
 		t := time.Now()
-		svc, err = client.Services(ns).Create(&api.Service{
-			ObjectMeta: api.ObjectMeta{
+		svc, err = client.Services(ns).Create(&v1.Service{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "serve-hostnames",
 				Labels: map[string]string{
 					"name": "serve-hostname",
 				},
 			},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
 					Protocol:   "TCP",
 					Port:       9376,
 					TargetPort: intstr.FromInt(9376),
@@ -190,19 +191,19 @@ func main() {
 			for start := time.Now(); time.Since(start) < podCreateTimeout; time.Sleep(2 * time.Second) {
 				glog.Infof("Creating pod %s/%s on node %s", ns, podName, node.Name)
 				t := time.Now()
-				_, err = client.Pods(ns).Create(&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				_, err = client.Pods(ns).Create(&v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name: podName,
 						Labels: map[string]string{
 							"name": "serve-hostname",
 						},
 					},
-					Spec: api.PodSpec{
-						Containers: []api.Container{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
 							{
 								Name:  "serve-hostname",
 								Image: "gcr.io/google_containers/serve_hostname:v1.4",
-								Ports: []api.ContainerPort{{ContainerPort: 9376}},
+								Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 							},
 						},
 						NodeName: node.Name,
@@ -236,18 +237,18 @@ func main() {
 
 	glog.Info("Waiting for the serve-hostname pods to be ready")
 	for _, podName := range podNames {
-		var pod *api.Pod
+		var pod *v1.Pod
 		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 			pod, err = client.Pods(ns).Get(podName)
 			if err != nil {
 				glog.Warningf("Get pod %s/%s failed, ignoring for %v: %v", ns, podName, err, podStartTimeout)
 				continue
 			}
-			if pod.Status.Phase == api.PodRunning {
+			if pod.Status.Phase == v1.PodRunning {
 				break
 			}
 		}
-		if pod.Status.Phase != api.PodRunning {
+		if pod.Status.Phase != v1.PodRunning {
 			glog.Warningf("Gave up waiting on pod %s/%s to be running (saw %v)", ns, podName, pod.Status.Phase)
 		} else {
 			glog.Infof("%s/%s is running", ns, podName)

@@ -18,11 +18,11 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,7 +32,7 @@ type FakeCronJobs struct {
 	ns   string
 }
 
-var cronjobsResource = unversioned.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
+var cronjobsResource = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
 
 func (c *FakeCronJobs) Create(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.

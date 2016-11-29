@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -28,15 +28,15 @@ import (
 )
 
 // NodeAddresses returns the addresses of the specified instance.
-func (az *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
+func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	ip, err := az.getIPForMachine(name)
 	if err != nil {
 		return nil, err
 	}
 
-	return []api.NodeAddress{
-		{Type: api.NodeInternalIP, Address: ip},
-		{Type: api.NodeHostName, Address: string(name)},
+	return []v1.NodeAddress{
+		{Type: v1.NodeInternalIP, Address: ip},
+		{Type: v1.NodeHostName, Address: string(name)},
 	}, nil
 }
 

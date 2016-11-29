@@ -22,7 +22,7 @@ import (
 
 	dockercontainer "github.com/docker/engine-api/types/container"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -61,7 +61,15 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxI
 
 // modifyContainerConfig applies container security context config to dockercontainer.Config.
 func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config *dockercontainer.Config) {
-	config.User = sc.GetRunAsUser()
+	if sc == nil {
+		return
+	}
+	if sc.RunAsUser != nil {
+		config.User = strconv.FormatInt(sc.GetRunAsUser(), 10)
+	}
+	if sc.RunAsUsername != nil {
+		config.User = sc.GetRunAsUsername()
+	}
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
@@ -92,7 +100,7 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, sandboxID st
 	if sc.SelinuxOptions != nil {
 		hostConfig.SecurityOpt = securitycontext.ModifySecurityOptions(
 			hostConfig.SecurityOpt,
-			&api.SELinuxOptions{
+			&v1.SELinuxOptions{
 				User:  sc.SelinuxOptions.GetUser(),
 				Role:  sc.SelinuxOptions.GetRole(),
 				Type:  sc.SelinuxOptions.GetType(),

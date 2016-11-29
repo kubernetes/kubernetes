@@ -18,10 +18,10 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +31,7 @@ type FakeIngresses struct {
 	ns   string
 }
 
-var ingressesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "ingresses"}
+var ingressesResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "ingresses"}
 
 func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.

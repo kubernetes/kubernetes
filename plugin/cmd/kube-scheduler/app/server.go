@@ -26,9 +26,9 @@ import (
 	"os"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -122,9 +122,9 @@ func Run(s *options.SchedulerServer) error {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: s.SchedulerName})
+	config.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: s.SchedulerName})
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: leaderElectionClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: leaderElectionClient.Core().Events("")})
 
 	sched := scheduler.New(config)
 
@@ -147,7 +147,7 @@ func Run(s *options.SchedulerServer) error {
 
 	// TODO: enable other lock types
 	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: api.ObjectMeta{
+		EndpointsMeta: v1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-scheduler",
 		},

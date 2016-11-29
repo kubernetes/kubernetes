@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
@@ -49,7 +49,7 @@ func (ctrl *PersistentVolumeController) GetKubeClient() clientset.Interface {
 	return ctrl.kubeClient
 }
 
-func (ctrl *PersistentVolumeController) NewWrapperMounter(volName string, spec vol.Spec, pod *api.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
+func (ctrl *PersistentVolumeController) NewWrapperMounter(volName string, spec vol.Spec, pod *v1.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
 }
 
@@ -77,6 +77,6 @@ func (ctrl *PersistentVolumeController) GetHostIP() (net.IP, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.GetHostIP() is not implemented")
 }
 
-func (ctrl *PersistentVolumeController) GetNodeAllocatable() (api.ResourceList, error) {
-	return api.ResourceList{}, nil
+func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {
+	return v1.ResourceList{}, nil
 }

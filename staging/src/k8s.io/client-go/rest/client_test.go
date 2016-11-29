@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/apimachinery/registered"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/util/diff"
 	utiltesting "k8s.io/client-go/pkg/util/testing"
 )
@@ -51,7 +52,7 @@ type TestParam struct {
 func TestSerializer(t *testing.T) {
 	contentConfig := ContentConfig{
 		ContentType:          "application/json",
-		GroupVersion:         &unversioned.GroupVersion{Group: "other", Version: runtime.APIVersionInternal},
+		GroupVersion:         &schema.GroupVersion{Group: "other", Version: runtime.APIVersionInternal},
 		NegotiatedSerializer: api.Codecs,
 	}
 

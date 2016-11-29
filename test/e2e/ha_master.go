@@ -23,9 +23,10 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -63,8 +64,7 @@ func createNewRC(c clientset.Interface, ns string, name string) {
 func verifyNumberOfMasterReplicas(expected int) {
 	output, err := exec.Command("gcloud", "compute", "instances", "list",
 		"--project="+framework.TestContext.CloudConfig.ProjectID,
-		"--zones="+framework.TestContext.CloudConfig.Zone,
-		"--regexp="+framework.TestContext.CloudConfig.MasterName+"(-...)?",
+		"--regexp="+framework.GenerateMasterRegexp(framework.TestContext.CloudConfig.MasterName),
 		"--filter=status=RUNNING",
 		"--format=[no-heading]").CombinedOutput()
 	framework.Logf("%s", output)
@@ -73,7 +73,7 @@ func verifyNumberOfMasterReplicas(expected int) {
 	replicas := bytes.Count(output, newline)
 	framework.Logf("Num master replicas/expected: %d/%d", replicas, expected)
 	if replicas != expected {
-		framework.Failf("Wrong number of master replicas")
+		framework.Failf("Wrong number of master replicas %d expected %d", replicas, expected)
 	}
 }
 
@@ -131,6 +131,8 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 		for _, zone := range additionalReplicaZones {
 			removeMasterReplica(zone)
 		}
+		framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute)
+		verifyNumberOfMasterReplicas(1)
 	})
 
 	type Action int
@@ -151,6 +153,7 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 			additionalReplicaZones = removeZoneFromZones(additionalReplicaZones, zone)
 		}
 		verifyNumberOfMasterReplicas(len(additionalReplicaZones) + 1)
+		framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute)
 
 		// Verify that API server works correctly with HA master.
 		rcName := "ha-master-" + strconv.Itoa(len(existingRCs))
@@ -159,16 +162,19 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 		verifyRCs(c, ns, existingRCs)
 	}
 
-	It("pods survive addition/removal same zone [Slow]", func() {
+	It("survive addition/removal replicas same zone [Serial][Disruptive]", func() {
 		zone := framework.TestContext.CloudConfig.Zone
 		step(None, "")
-		step(AddReplica, zone)
-		step(AddReplica, zone)
-		step(RemoveReplica, zone)
-		step(RemoveReplica, zone)
+		numAdditionalReplicas := 2
+		for i := 0; i < numAdditionalReplicas; i++ {
+			step(AddReplica, zone)
+		}
+		for i := 0; i < numAdditionalReplicas; i++ {
+			step(RemoveReplica, zone)
+		}
 	})
 
-	It("pods survive addition/removal different zones [Slow]", func() {
+	It("survive addition/removal replicas different zones [Serial][Disruptive]", func() {
 		zone := framework.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)

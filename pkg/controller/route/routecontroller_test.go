@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -70,12 +70,12 @@ func TestIsResponsibleForRoute(t *testing.T) {
 
 func TestReconcile(t *testing.T) {
 	cluster := "my-k8s"
-	node1 := api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}}
-	node2 := api.Node{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}}
-	nodeNoCidr := api.Node{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: ""}}
+	node1 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24"}}
+	node2 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24"}}
+	nodeNoCidr := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: ""}}
 
 	testCases := []struct {
-		nodes                      []api.Node
+		nodes                      []v1.Node
 		initialRoutes              []*cloudprovider.Route
 		expectedRoutes             []*cloudprovider.Route
 		expectedNetworkUnavailable []bool
@@ -83,7 +83,7 @@ func TestReconcile(t *testing.T) {
 	}{
 		// 2 nodes, routes already there
 		{
-			nodes: []api.Node{
+			nodes: []v1.Node{
 				node1,
 				node2,
 			},
@@ -96,11 +96,11 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
 		// 2 nodes, one route already there
 		{
-			nodes: []api.Node{
+			nodes: []v1.Node{
 				node1,
 				node2,
 			},
@@ -112,11 +112,11 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
 		// 2 nodes, no routes yet
 		{
-			nodes: []api.Node{
+			nodes: []v1.Node{
 				node1,
 				node2,
 			},
@@ -126,11 +126,11 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
 		// 2 nodes, a few too many routes
 		{
-			nodes: []api.Node{
+			nodes: []v1.Node{
 				node1,
 				node2,
 			},
@@ -145,11 +145,11 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
 		// 2 nodes, 2 routes, but only 1 is right
 		{
-			nodes: []api.Node{
+			nodes: []v1.Node{
 				node1,
 				node2,
 			},
@@ -162,11 +162,11 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
 		// 2 nodes, one node without CIDR assigned.
 		{
-			nodes: []api.Node{
+			nodes: []v1.Node{
 				node1,
 				nodeNoCidr,
 			},
@@ -175,7 +175,7 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 			},
 			expectedNetworkUnavailable: []bool{true, false},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, nodeNoCidr}}),
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, nodeNoCidr}}),
 		},
 	}
 	for i, testCase := range testCases {
@@ -197,13 +197,13 @@ func TestReconcile(t *testing.T) {
 		}
 		for _, action := range testCase.clientset.Actions() {
 			if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
-				node := action.(core.UpdateAction).GetObject().(*api.Node)
-				_, condition := api.GetNodeCondition(&node.Status, api.NodeNetworkUnavailable)
+				node := action.(core.UpdateAction).GetObject().(*v1.Node)
+				_, condition := v1.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 				if condition == nil {
 					t.Errorf("%d. Missing NodeNetworkUnavailable condition for Node %v", i, node.Name)
 				} else {
 					check := func(index int) bool {
-						return (condition.Status == api.ConditionFalse) == testCase.expectedNetworkUnavailable[index]
+						return (condition.Status == v1.ConditionFalse) == testCase.expectedNetworkUnavailable[index]
 					}
 					index := -1
 					for j := range testCase.nodes {
@@ -217,7 +217,7 @@ func TestReconcile(t *testing.T) {
 					}
 					if !check(index) {
 						t.Errorf("%d. Invalid NodeNetworkUnavailable condition for Node %v, expected %v, got %v",
-							i, node.Name, testCase.expectedNetworkUnavailable[index], (condition.Status == api.ConditionFalse))
+							i, node.Name, testCase.expectedNetworkUnavailable[index], (condition.Status == v1.ConditionFalse))
 					}
 				}
 			}

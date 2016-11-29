@@ -22,7 +22,8 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -111,7 +112,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	// Find the pods of the rc we just created.
 	labelSelector := labels.SelectorFromSet(
 		labels.Set(map[string]string{"name": h.rcName}))
-	options := api.ListOptions{LabelSelector: labelSelector}
+	options := v1.ListOptions{LabelSelector: labelSelector.String()}
 	pods, err := h.client.Core().Pods(h.rcNamespace).List(options)
 	if err != nil {
 		return err
@@ -262,8 +263,8 @@ func simpleGET(c *http.Client, url, host string) (string, error) {
 }
 
 // rcFromManifest reads a .json/yaml file and returns the rc in it.
-func rcFromManifest(fileName string) *api.ReplicationController {
-	var controller api.ReplicationController
+func rcFromManifest(fileName string) *v1.ReplicationController {
+	var controller v1.ReplicationController
 	framework.Logf("Parsing rc from %v", fileName)
 	data := framework.ReadOrDie(fileName)
 
@@ -275,8 +276,8 @@ func rcFromManifest(fileName string) *api.ReplicationController {
 }
 
 // svcFromManifest reads a .json/yaml file and returns the rc in it.
-func svcFromManifest(fileName string) *api.Service {
-	var svc api.Service
+func svcFromManifest(fileName string) *v1.Service {
+	var svc v1.Service
 	framework.Logf("Parsing service from %v", fileName)
 	data := framework.ReadOrDie(fileName)
 

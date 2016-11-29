@@ -160,9 +160,8 @@ message LinuxSandboxSecurityContext {
     optional NamespaceOption namespace_options = 1;
     // Optional SELinux context to be applied.
     optional SELinuxOption selinux_options = 2;
-    // User to run the entrypoint of the sandbox process. Can be either UID or
-    // user name.
-    optional string run_as_user = 3;
+    // UID to run sandbox processes as, when applicable.
+    optional int64 run_as_user = 3;
     // If set, the root filesystem of the sandbox is read-only.
     optional bool readonly_rootfs = 4;
     // List of groups applied to the first process run in the sandbox, in
@@ -256,7 +255,18 @@ message PodSandboxConfig {
     //      * runtime/default: the default profile for the container runtime
     //      * unconfined: unconfined profile, ie, no seccomp sandboxing
     //      * localhost/<profile-name>: the profile installed to the node's
-    //        local seccomp profile root
+    //        local seccomp profile root. Note that profile root is set in
+    //        kubelet, and it is not passed in CRI yet, see https://issues.k8s.io/36997.
+    //
+    // 3. Sysctls
+    //
+    //      key: security.alpha.kubernetes.io/sysctls
+    //      description: list of safe sysctls which are set for the sandbox.
+    //      value: comma separated list of sysctl_name=value key-value pairs.
+    //
+    //      key: security.alpha.kubernetes.io/unsafe-sysctls
+    //      description: list of unsafe sysctls which are set for the sandbox.
+    //      value: comma separated list of sysctl_name=value key-value pairs.
     //
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
@@ -441,15 +451,18 @@ message LinuxContainerSecurityContext {
     optional NamespaceOption namespace_options = 3;
     // SELinux context to be optionally applied.
     optional SELinuxOption selinux_options = 4;
-    // The user to run the the container process as. Can be either UID or user
-    // name.
-    // Defaults to user specified in image metadata if unspecified.
-    optional string run_as_user = 5;
+    // UID to run the container process as. Only one of run_as_user and
+    // run_as_username can be specified at a time.
+    optional int64 run_as_user = 5;
+    // User name to run the container process as. If specified, the user MUST
+    // exist in the container image (i.e. in the /etc/passwd inside the image),
+    // and be resolved there by the runtime; otherwise, the runtime MUST error.
+    optional string run_as_username = 6;
     // If set, the root filesystem of the container is read-only.
-    optional bool readonly_rootfs = 6;
+    optional bool readonly_rootfs = 7;
     // List of groups applied to the first process run in the container, in
     // addition to the container's primary GID.
-    repeated int64 supplemental_groups = 7;
+    repeated int64 supplemental_groups = 8;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
@@ -761,8 +774,13 @@ message Image {
     repeated string repo_digests = 3;
     // Size of the image in bytes.
     optional uint64 size = 4;
-    // User that will run the command(s).
-    optional string user = 5;
+    // UID that will run the command(s). This is used as a default if no user is
+    // specified when creating the container. UID and the following user name
+    // are mutually exclusive.
+    optional int64 uid = 5;
+    // User name that will run the command(s). This is used if UID is not set
+    // and no user is specified when creating container.
+    optional string username = 6;
 }
 
 message ListImagesResponse {

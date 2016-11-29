@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -44,7 +44,7 @@ type FakeRuntime struct {
 	PodList           []*FakePod
 	AllPodList        []*FakePod
 	ImageList         []Image
-	APIPodStatus      api.PodStatus
+	APIPodStatus      v1.PodStatus
 	PodStatus         PodStatus
 	StartedPods       []string
 	KilledPods        []string
@@ -133,7 +133,7 @@ func (f *FakeRuntime) ClearCalls() {
 	f.CalledFunctions = []string{}
 	f.PodList = []*FakePod{}
 	f.AllPodList = []*FakePod{}
-	f.APIPodStatus = api.PodStatus{}
+	f.APIPodStatus = v1.PodStatus{}
 	f.StartedPods = []string{}
 	f.KilledPods = []string{}
 	f.StartedContainers = []string{}
@@ -236,7 +236,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
+func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ v1.PodStatus, _ *PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -252,7 +252,7 @@ func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []a
 	return
 }
 
-func (f *FakeRuntime) KillPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -264,7 +264,7 @@ func (f *FakeRuntime) KillPod(pod *api.Pod, runningPod Pod, gracePeriodOverride 
 	return f.Err
 }
 
-func (f *FakeRuntime) RunContainerInPod(container api.Container, pod *api.Pod, volumeMap map[string]volume.VolumePlugin) error {
+func (f *FakeRuntime) RunContainerInPod(container v1.Container, pod *v1.Pod, volumeMap map[string]volume.VolumePlugin) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -281,14 +281,14 @@ func (f *FakeRuntime) RunContainerInPod(container api.Container, pod *api.Pod, v
 	return f.Err
 }
 
-func (f *FakeRuntime) KillContainerInPod(container api.Container, pod *api.Pod) error {
+func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "KillContainerInPod")
 	f.KilledContainers = append(f.KilledContainers, container.Name)
 
-	var containers []api.Container
+	var containers []v1.Container
 	for _, c := range pod.Spec.Containers {
 		if c.Name == container.Name {
 			continue
@@ -336,7 +336,7 @@ func (f *FakeDirectStreamingRuntime) AttachContainer(containerID ContainerID, st
 	return f.Err
 }
 
-func (f *FakeRuntime) GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
+func (f *FakeRuntime) GetContainerLogs(pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -344,7 +344,7 @@ func (f *FakeRuntime) GetContainerLogs(pod *api.Pod, containerID ContainerID, lo
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []api.Secret) error {
+func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret) error {
 	f.Lock()
 	defer f.Unlock()
 

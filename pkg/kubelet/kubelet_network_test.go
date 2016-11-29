@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 )
 
@@ -137,7 +137,7 @@ func TestParseResolvConf(t *testing.T) {
 }
 
 func TestCleanupBandwidthLimits(t *testing.T) {
-	testPod := func(name, ingress string) *api.Pod {
+	testPod := func(name, ingress string) *v1.Pod {
 		pod := podWithUidNameNs("", name, "")
 
 		if len(ingress) != 0 {
@@ -150,18 +150,18 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 	// TODO(random-liu): We removed the test case for pod status not cached here. We should add a higher
 	// layer status getter function and test that function instead.
 	tests := []struct {
-		status           *api.PodStatus
-		pods             []*api.Pod
+		status           *v1.PodStatus
+		pods             []*v1.Pod
 		inputCIDRs       []string
 		expectResetCIDRs []string
 		name             string
 	}{
 		{
-			status: &api.PodStatus{
+			status: &v1.PodStatus{
 				PodIP: "1.2.3.4",
-				Phase: api.PodRunning,
+				Phase: v1.PodRunning,
 			},
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				testPod("foo", "10M"),
 				testPod("bar", ""),
 			},
@@ -170,11 +170,11 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			name:             "pod running",
 		},
 		{
-			status: &api.PodStatus{
+			status: &v1.PodStatus{
 				PodIP: "1.2.3.4",
-				Phase: api.PodFailed,
+				Phase: v1.PodFailed,
 			},
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				testPod("foo", "10M"),
 				testPod("bar", ""),
 			},
@@ -183,11 +183,11 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			name:             "pod not running",
 		},
 		{
-			status: &api.PodStatus{
+			status: &v1.PodStatus{
 				PodIP: "1.2.3.4",
-				Phase: api.PodFailed,
+				Phase: v1.PodFailed,
 			},
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				testPod("foo", ""),
 				testPod("bar", ""),
 			},

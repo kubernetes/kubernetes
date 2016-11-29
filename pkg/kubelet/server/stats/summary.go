@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -100,7 +100,7 @@ func (sp *summaryProviderImpl) Get() (*stats.Summary, error) {
 // summaryBuilder aggregates the datastructures provided by cadvisor into a Summary result
 type summaryBuilder struct {
 	fsResourceAnalyzer fsResourceAnalyzerInterface
-	node               *api.Node
+	node               *v1.Node
 	nodeConfig         cm.NodeConfig
 	rootFsInfo         cadvisorapiv2.FsInfo
 	imageFsInfo        cadvisorapiv2.FsInfo

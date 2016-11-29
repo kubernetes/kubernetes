@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
@@ -95,14 +95,14 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 			// Update the deployment conditions with a message for the new replica set that
 			// was successfully deployed. If the condition already exists, we ignore this update.
 			msg := fmt.Sprintf("Replica set %q has successfully progressed.", newRS.Name)
-			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionTrue, util.NewRSAvailableReason, msg)
+			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, util.NewRSAvailableReason, msg)
 			util.SetDeploymentCondition(&newStatus, *condition)
 
 		case util.DeploymentProgressing(d, &newStatus):
 			// If there is any progress made, continue by not checking if the deployment failed. This
 			// behavior emulates the rolling updater progressDeadline check.
 			msg := fmt.Sprintf("Replica set %q is progressing.", newRS.Name)
-			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionTrue, util.ReplicaSetUpdatedReason, msg)
+			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, util.ReplicaSetUpdatedReason, msg)
 			// Update the current Progressing condition or add a new one if it doesn't exist.
 			// If a Progressing condition with status=true already exists, we should update
 			// everything but lastTransitionTime. SetDeploymentCondition already does that but
@@ -111,7 +111,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 			// update with the same reason and change just lastUpdateTime iff we notice any
 			// progress. That's why we handle it here.
 			if currentCond != nil {
-				if currentCond.Status == api.ConditionTrue {
+				if currentCond.Status == v1.ConditionTrue {
 					condition.LastTransitionTime = currentCond.LastTransitionTime
 				}
 				util.RemoveDeploymentCondition(&newStatus, extensions.DeploymentProgressing)
@@ -122,7 +122,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 			// Update the deployment with a timeout condition. If the condition already exists,
 			// we ignore this update.
 			msg := fmt.Sprintf("Replica set %q has timed out progressing.", newRS.Name)
-			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionFalse, util.TimedOutReason, msg)
+			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionFalse, util.TimedOutReason, msg)
 			util.SetDeploymentCondition(&newStatus, *condition)
 		}
 	}

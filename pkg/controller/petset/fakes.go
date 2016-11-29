@@ -22,11 +22,11 @@ import (
 
 	inf "gopkg.in/inf.v0"
 
-	"k8s.io/kubernetes/pkg/api"
-	api_pod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/api/v1"
+	api_pod "k8s.io/kubernetes/pkg/api/v1/pod"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -36,34 +36,34 @@ func dec(i int64, exponent int) *inf.Dec {
 	return inf.NewDec(i, inf.Scale(-exponent))
 }
 
-func newPVC(name string) api.PersistentVolumeClaim {
-	return api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+func newPVC(name string) v1.PersistentVolumeClaim {
+	return v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+		Spec: v1.PersistentVolumeClaimSpec{
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},
 	}
 }
 
-func newStatefulSetWithVolumes(replicas int, name string, petMounts []api.VolumeMount, podMounts []api.VolumeMount) *apps.StatefulSet {
+func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMount, podMounts []v1.VolumeMount) *apps.StatefulSet {
 	mounts := append(petMounts, podMounts...)
-	claims := []api.PersistentVolumeClaim{}
+	claims := []v1.PersistentVolumeClaim{}
 	for _, m := range petMounts {
 		claims = append(claims, newPVC(m.Name))
 	}
 
-	vols := []api.Volume{}
+	vols := []v1.Volume{}
 	for _, m := range podMounts {
-		vols = append(vols, api.Volume{
+		vols = append(vols, v1.Volume{
 			Name: m.Name,
-			VolumeSource: api.VolumeSource{
-				HostPath: &api.HostPathVolumeSource{
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
 					Path: fmt.Sprintf("/tmp/%v", m.Name),
 				},
 			},
@@ -75,19 +75,19 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []api.Volume
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1beta1",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 			UID:       types.UID("test"),
 		},
 		Spec: apps.StatefulSetSpec{
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			Replicas: int32(replicas),
-			Template: api.PodTemplateSpec{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:         "nginx",
 							Image:        "nginx",
@@ -103,16 +103,16 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []api.Volume
 	}
 }
 
-func runningPod(ns, name string) *api.Pod {
-	p := &api.Pod{Status: api.PodStatus{Phase: api.PodRunning}}
+func runningPod(ns, name string) *v1.Pod {
+	p := &v1.Pod{Status: v1.PodStatus{Phase: v1.PodRunning}}
 	p.Namespace = ns
 	p.Name = name
 	return p
 }
 
-func newPodList(ps *apps.StatefulSet, num int) []*api.Pod {
+func newPodList(ps *apps.StatefulSet, num int) []*v1.Pod {
 	// knownPods are pods in the system
-	knownPods := []*api.Pod{}
+	knownPods := []*v1.Pod{}
 	for i := 0; i < num; i++ {
 		k, _ := newPCB(fmt.Sprintf("%v", i), ps)
 		knownPods = append(knownPods, k.pod)
@@ -121,16 +121,16 @@ func newPodList(ps *apps.StatefulSet, num int) []*api.Pod {
 }
 
 func newStatefulSet(replicas int) *apps.StatefulSet {
-	petMounts := []api.VolumeMount{
+	petMounts := []v1.VolumeMount{
 		{Name: "datadir", MountPath: "/tmp/zookeeper"},
 	}
-	podMounts := []api.VolumeMount{
+	podMounts := []v1.VolumeMount{
 		{Name: "home", MountPath: "/home"},
 	}
 	return newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
 }
 
-func checkPodForMount(pod *api.Pod, mountName string) error {
+func checkPodForMount(pod *v1.Pod, mountName string) error {
 	for _, c := range pod.Spec.Containers {
 		for _, v := range c.VolumeMounts {
 			if v.Name == mountName {
@@ -144,7 +144,7 @@ func checkPodForMount(pod *api.Pod, mountName string) error {
 func newFakePetClient() *fakePetClient {
 	return &fakePetClient{
 		pets:             []*pcb{},
-		claims:           []api.PersistentVolumeClaim{},
+		claims:           []v1.PersistentVolumeClaim{},
 		recorder:         &record.FakeRecorder{},
 		petHealthChecker: &defaultPetHealthChecker{},
 	}
@@ -152,7 +152,7 @@ func newFakePetClient() *fakePetClient {
 
 type fakePetClient struct {
 	pets          []*pcb
-	claims        []api.PersistentVolumeClaim
+	claims        []v1.PersistentVolumeClaim
 	petsCreated   int
 	petsDeleted   int
 	claimsCreated int
@@ -168,7 +168,7 @@ func (f *fakePetClient) Delete(p *pcb) error {
 	for i, pet := range f.pets {
 		if p.pod.Name == pet.pod.Name {
 			found = true
-			f.recorder.Eventf(pet.parent, api.EventTypeNormal, "SuccessfulDelete", "pod: %v", pet.pod.Name)
+			f.recorder.Eventf(pet.parent, v1.EventTypeNormal, "SuccessfulDelete", "pod: %v", pet.pod.Name)
 			continue
 		}
 		pets = append(pets, f.pets[i])
@@ -199,7 +199,7 @@ func (f *fakePetClient) Create(p *pcb) error {
 			return fmt.Errorf("Create failed: pod %v already exists", p.pod.Name)
 		}
 	}
-	f.recorder.Eventf(p.parent, api.EventTypeNormal, "SuccessfulCreate", "pod: %v", p.pod.Name)
+	f.recorder.Eventf(p.parent, v1.EventTypeNormal, "SuccessfulCreate", "pod: %v", p.pod.Name)
 	f.pets = append(f.pets, p)
 	f.petsCreated++
 	return nil
@@ -226,8 +226,8 @@ func (f *fakePetClient) Update(expected, wanted *pcb) error {
 	return nil
 }
 
-func (f *fakePetClient) getPodList() []*api.Pod {
-	p := []*api.Pod{}
+func (f *fakePetClient) getPodList() []*v1.Pod {
+	p := []*v1.Pod{}
 	for i, pet := range f.pets {
 		if pet.pod == nil {
 			continue
@@ -251,10 +251,10 @@ func (f *fakePetClient) setHealthy(index int) error {
 	if len(f.pets) <= index {
 		return fmt.Errorf("Index out of range, len %v index %v", len(f.pets), index)
 	}
-	f.pets[index].pod.Status.Phase = api.PodRunning
+	f.pets[index].pod.Status.Phase = v1.PodRunning
 	f.pets[index].pod.Annotations[StatefulSetInitAnnotation] = "true"
-	f.pets[index].pod.Status.Conditions = []api.PodCondition{
-		{Type: api.PodReady, Status: api.ConditionTrue},
+	f.pets[index].pod.Status.Conditions = []v1.PodCondition{
+		{Type: v1.PodReady, Status: v1.ConditionTrue},
 	}
 	return nil
 }
@@ -262,7 +262,7 @@ func (f *fakePetClient) setHealthy(index int) error {
 // isHealthy is a convenience wrapper around the default health checker.
 // The first invocation returns not-healthy, but marks the pet healthy so
 // subsequent invocations see it as healthy.
-func (f *fakePetClient) isHealthy(pod *api.Pod) bool {
+func (f *fakePetClient) isHealthy(pod *v1.Pod) bool {
 	if f.petHealthChecker.isHealthy(pod) {
 		return true
 	}
@@ -280,11 +280,11 @@ func (f *fakePetClient) setDeletionTimestamp(index int) error {
 // SyncPVCs fakes pvc syncing.
 func (f *fakePetClient) SyncPVCs(pet *pcb) error {
 	v := pet.pvcs
-	updateClaims := map[string]api.PersistentVolumeClaim{}
+	updateClaims := map[string]v1.PersistentVolumeClaim{}
 	for i, update := range v {
 		updateClaims[update.Name] = v[i]
 	}
-	claimList := []api.PersistentVolumeClaim{}
+	claimList := []v1.PersistentVolumeClaim{}
 	for i, existing := range f.claims {
 		if update, ok := updateClaims[existing.Name]; ok {
 			claimList = append(claimList, update)
@@ -296,7 +296,7 @@ func (f *fakePetClient) SyncPVCs(pet *pcb) error {
 	for _, remaining := range updateClaims {
 		claimList = append(claimList, remaining)
 		f.claimsCreated++
-		f.recorder.Eventf(pet.parent, api.EventTypeNormal, "SuccessfulCreate", "pvc: %v", remaining.Name)
+		f.recorder.Eventf(pet.parent, v1.EventTypeNormal, "SuccessfulCreate", "pvc: %v", remaining.Name)
 	}
 	f.claims = claimList
 	return nil
@@ -309,12 +309,12 @@ func (f *fakePetClient) DeletePVCs(pet *pcb) error {
 	for _, c := range claimsToDelete {
 		deleteClaimNames.Insert(c.Name)
 	}
-	pvcs := []api.PersistentVolumeClaim{}
+	pvcs := []v1.PersistentVolumeClaim{}
 	for i, existing := range f.claims {
 		if deleteClaimNames.Has(existing.Name) {
 			deleteClaimNames.Delete(existing.Name)
 			f.claimsDeleted++
-			f.recorder.Eventf(pet.parent, api.EventTypeNormal, "SuccessfulDelete", "pvc: %v", existing.Name)
+			f.recorder.Eventf(pet.parent, v1.EventTypeNormal, "SuccessfulDelete", "pvc: %v", existing.Name)
 			continue
 		}
 		pvcs = append(pvcs, f.claims[i])

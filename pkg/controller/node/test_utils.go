@@ -26,8 +26,9 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/clock"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -43,14 +44,14 @@ type FakeNodeHandler struct {
 	*fake.Clientset
 
 	// Input: Hooks determine if request is valid or not
-	CreateHook func(*FakeNodeHandler, *api.Node) bool
-	Existing   []*api.Node
+	CreateHook func(*FakeNodeHandler, *v1.Node) bool
+	Existing   []*v1.Node
 
 	// Output
-	CreatedNodes        []*api.Node
-	DeletedNodes        []*api.Node
-	UpdatedNodes        []*api.Node
-	UpdatedNodeStatuses []*api.Node
+	CreatedNodes        []*v1.Node
+	DeletedNodes        []*v1.Node
+	UpdatedNodes        []*v1.Node
+	UpdatedNodeStatuses []*v1.Node
 	RequestCount        int
 
 	// Synchronization
@@ -59,29 +60,29 @@ type FakeNodeHandler struct {
 }
 
 type FakeLegacyHandler struct {
-	unversionedcore.CoreInterface
+	v1core.CoreV1Interface
 	n *FakeNodeHandler
 }
 
-func (c *FakeNodeHandler) getUpdatedNodesCopy() []*api.Node {
+func (c *FakeNodeHandler) getUpdatedNodesCopy() []*v1.Node {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	updatedNodesCopy := make([]*api.Node, len(c.UpdatedNodes), len(c.UpdatedNodes))
+	updatedNodesCopy := make([]*v1.Node, len(c.UpdatedNodes), len(c.UpdatedNodes))
 	for i, ptr := range c.UpdatedNodes {
 		updatedNodesCopy[i] = ptr
 	}
 	return updatedNodesCopy
 }
 
-func (c *FakeNodeHandler) Core() unversionedcore.CoreInterface {
+func (c *FakeNodeHandler) Core() v1core.CoreV1Interface {
 	return &FakeLegacyHandler{c.Clientset.Core(), c}
 }
 
-func (m *FakeLegacyHandler) Nodes() unversionedcore.NodeInterface {
+func (m *FakeLegacyHandler) Nodes() v1core.NodeInterface {
 	return m.n
 }
 
-func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
+func (m *FakeNodeHandler) Create(node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -101,7 +102,7 @@ func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
 	}
 }
 
-func (m *FakeNodeHandler) Get(name string) (*api.Node, error) {
+func (m *FakeNodeHandler) Get(name string) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -122,13 +123,13 @@ func (m *FakeNodeHandler) Get(name string) (*api.Node, error) {
 	return nil, nil
 }
 
-func (m *FakeNodeHandler) List(opts api.ListOptions) (*api.NodeList, error) {
+func (m *FakeNodeHandler) List(opts v1.ListOptions) (*v1.NodeList, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
 		m.lock.Unlock()
 	}()
-	var nodes []*api.Node
+	var nodes []*v1.Node
 	for i := 0; i < len(m.UpdatedNodes); i++ {
 		if !contains(m.UpdatedNodes[i], m.DeletedNodes) {
 			nodes = append(nodes, m.UpdatedNodes[i])
@@ -144,14 +145,14 @@ func (m *FakeNodeHandler) List(opts api.ListOptions) (*api.NodeList, error) {
 			nodes = append(nodes, m.CreatedNodes[i])
 		}
 	}
-	nodeList := &api.NodeList{}
+	nodeList := &v1.NodeList{}
 	for _, node := range nodes {
 		nodeList.Items = append(nodeList.Items, *node)
 	}
 	return nodeList, nil
 }
 
-func (m *FakeNodeHandler) Delete(id string, opt *api.DeleteOptions) error {
+func (m *FakeNodeHandler) Delete(id string, opt *v1.DeleteOptions) error {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -164,11 +165,11 @@ func (m *FakeNodeHandler) Delete(id string, opt *api.DeleteOptions) error {
 	return nil
 }
 
-func (m *FakeNodeHandler) DeleteCollection(opt *api.DeleteOptions, listOpts api.ListOptions) error {
+func (m *FakeNodeHandler) DeleteCollection(opt *v1.DeleteOptions, listOpts v1.ListOptions) error {
 	return nil
 }
 
-func (m *FakeNodeHandler) Update(node *api.Node) (*api.Node, error) {
+func (m *FakeNodeHandler) Update(node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -185,7 +186,7 @@ func (m *FakeNodeHandler) Update(node *api.Node) (*api.Node, error) {
 	return node, nil
 }
 
-func (m *FakeNodeHandler) UpdateStatus(node *api.Node) (*api.Node, error) {
+func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -196,23 +197,23 @@ func (m *FakeNodeHandler) UpdateStatus(node *api.Node) (*api.Node, error) {
 	return node, nil
 }
 
-func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*api.Node, error) {
+func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
 	m.RequestCount++
-	return &api.Node{}, nil
+	return &v1.Node{}, nil
 }
 
-func (m *FakeNodeHandler) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (m *FakeNodeHandler) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return watch.NewFake(), nil
 }
 
-func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (*api.Node, error) {
+func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
 	return nil, nil
 }
 
 // FakeRecorder is used as a fake during testing.
 type FakeRecorder struct {
-	source api.EventSource
-	events []*api.Event
+	source v1.EventSource
+	events []*v1.Event
 	clock  clock.Clock
 }
 
@@ -228,7 +229,7 @@ func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp unversioned.Time
 }
 
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp unversioned.Time, eventtype, reason, message string) {
-	ref, err := api.GetReference(obj)
+	ref, err := v1.GetReference(obj)
 	if err != nil {
 		return
 	}
@@ -240,15 +241,15 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp unversioned.T
 	}
 }
 
-func (f *FakeRecorder) makeEvent(ref *api.ObjectReference, eventtype, reason, message string) *api.Event {
+func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, message string) *v1.Event {
 	fmt.Println("make event")
 	t := unversioned.Time{Time: f.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
-		namespace = api.NamespaceDefault
+		namespace = v1.NamespaceDefault
 	}
-	return &api.Event{
-		ObjectMeta: api.ObjectMeta{
+	return &v1.Event{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace: namespace,
 		},
@@ -264,41 +265,41 @@ func (f *FakeRecorder) makeEvent(ref *api.ObjectReference, eventtype, reason, me
 
 func NewFakeRecorder() *FakeRecorder {
 	return &FakeRecorder{
-		source: api.EventSource{Component: "nodeControllerTest"},
-		events: []*api.Event{},
+		source: v1.EventSource{Component: "nodeControllerTest"},
+		events: []*v1.Event{},
 		clock:  clock.NewFakeClock(time.Now()),
 	}
 }
 
-func newNode(name string) *api.Node {
-	return &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: name},
-		Spec: api.NodeSpec{
+func newNode(name string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: v1.ObjectMeta{Name: name},
+		Spec: v1.NodeSpec{
 			ExternalID: name,
 		},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 			},
 		},
 	}
 }
 
-func newPod(name, host string) *api.Pod {
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func newPod(name, host string) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: "default",
 			Name:      name,
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			NodeName: host,
 		},
-		Status: api.PodStatus{
-			Conditions: []api.PodCondition{
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
 				{
-					Type:   api.PodReady,
-					Status: api.ConditionTrue,
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
 				},
 			},
 		},
@@ -307,7 +308,7 @@ func newPod(name, host string) *api.Pod {
 	return pod
 }
 
-func contains(node *api.Node, nodes []*api.Node) bool {
+func contains(node *v1.Node, nodes []*v1.Node) bool {
 	for i := 0; i < len(nodes); i++ {
 		if node.Name == nodes[i].Name {
 			return true
@@ -318,7 +319,7 @@ func contains(node *api.Node, nodes []*api.Node) bool {
 
 // Returns list of zones for all Nodes stored in FakeNodeHandler
 func getZones(nodeHandler *FakeNodeHandler) []string {
-	nodes, _ := nodeHandler.List(api.ListOptions{})
+	nodes, _ := nodeHandler.List(v1.ListOptions{})
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
 		zones.Insert(utilnode.GetZoneKey(&node))

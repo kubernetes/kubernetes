@@ -21,11 +21,11 @@ import (
 	"net"
 	"strings"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -102,7 +102,7 @@ type PodNetworkStatus struct {
 type LegacyHost interface {
 	// Get the pod structure by its name, namespace
 	// Only used for hostport management and bw shaping
-	GetPodByName(namespace, name string) (*api.Pod, bool)
+	GetPodByName(namespace, name string) (*v1.Pod, bool)
 
 	// GetKubeClient returns a client interface
 	// Only used in testing

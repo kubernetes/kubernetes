@@ -18,7 +18,8 @@ package serviceaccount
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"
@@ -40,10 +41,10 @@ type clientGetter struct {
 func NewGetterFromClient(c clientset.Interface) serviceaccount.ServiceAccountTokenGetter {
 	return clientGetter{c}
 }
-func (c clientGetter) GetServiceAccount(namespace, name string) (*api.ServiceAccount, error) {
+func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
 	return c.client.Core().ServiceAccounts(namespace).Get(name)
 }
-func (c clientGetter) GetSecret(namespace, name string) (*api.Secret, error) {
+func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 	return c.client.Core().Secrets(namespace).Get(name)
 }
 
@@ -58,13 +59,27 @@ type registryGetter struct {
 func NewGetterFromRegistries(serviceAccounts serviceaccountregistry.Registry, secrets secret.Registry) serviceaccount.ServiceAccountTokenGetter {
 	return &registryGetter{serviceAccounts, secrets}
 }
-func (r *registryGetter) GetServiceAccount(namespace, name string) (*api.ServiceAccount, error) {
+func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
 	ctx := api.WithNamespace(api.NewContext(), namespace)
-	return r.serviceAccounts.GetServiceAccount(ctx, name)
+	internalServiceAccount, err := r.serviceAccounts.GetServiceAccount(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	v1ServiceAccount := v1.ServiceAccount{}
+	err = v1.Convert_api_ServiceAccount_To_v1_ServiceAccount(internalServiceAccount, &v1ServiceAccount, nil)
+	return &v1ServiceAccount, err
+
 }
-func (r *registryGetter) GetSecret(namespace, name string) (*api.Secret, error) {
+func (r *registryGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 	ctx := api.WithNamespace(api.NewContext(), namespace)
-	return r.secrets.GetSecret(ctx, name)
+	internalSecret, err := r.secrets.GetSecret(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	v1Secret := v1.Secret{}
+	err = v1.Convert_api_Secret_To_v1_Secret(internalSecret, &v1Secret, nil)
+	return &v1Secret, err
+
 }
 
 // NewGetterFromStorageInterface returns a ServiceAccountTokenGetter that

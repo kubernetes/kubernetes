@@ -29,15 +29,15 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/storage"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
+	"k8s.io/kubernetes/pkg/api/v1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	fcache "k8s.io/kubernetes/pkg/client/testing/cache"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -77,13 +77,13 @@ type controllerTest struct {
 	// Name of the test, for logging
 	name string
 	// Initial content of controller volume cache.
-	initialVolumes []*api.PersistentVolume
+	initialVolumes []*v1.PersistentVolume
 	// Expected content of controller volume cache at the end of the test.
-	expectedVolumes []*api.PersistentVolume
+	expectedVolumes []*v1.PersistentVolume
 	// Initial content of controller claim cache.
-	initialClaims []*api.PersistentVolumeClaim
+	initialClaims []*v1.PersistentVolumeClaim
 	// Expected content of controller claim cache at the end of the test.
-	expectedClaims []*api.PersistentVolumeClaim
+	expectedClaims []*v1.PersistentVolumeClaim
 	// Expected events - any event with prefix will pass, we don't check full
 	// event message.
 	expectedEvents []string
@@ -99,8 +99,8 @@ const testNamespace = "default"
 const mockPluginName = "kubernetes.io/mock-volume"
 
 var versionConflictError = errors.New("VersionError")
-var novolumes []*api.PersistentVolume
-var noclaims []*api.PersistentVolumeClaim
+var novolumes []*v1.PersistentVolume
+var noclaims []*v1.PersistentVolumeClaim
 var noevents = []string{}
 var noerrors = []reactorError{}
 
@@ -121,8 +121,8 @@ var noerrors = []reactorError{}
 //   reactorError, it return appropriate error and removes the reactorError from
 //   the list.
 type volumeReactor struct {
-	volumes              map[string]*api.PersistentVolume
-	claims               map[string]*api.PersistentVolumeClaim
+	volumes              map[string]*v1.PersistentVolume
+	claims               map[string]*v1.PersistentVolumeClaim
 	changedObjects       []interface{}
 	changedSinceLastSync int
 	ctrl                 *PersistentVolumeController
@@ -167,7 +167,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 	switch {
 	case action.Matches("create", "persistentvolumes"):
 		obj := action.(core.UpdateAction).GetObject()
-		volume := obj.(*api.PersistentVolume)
+		volume := obj.(*v1.PersistentVolume)
 
 		// check the volume does not exist
 		_, found := r.volumes[volume.Name]
@@ -187,7 +187,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 
 	case action.Matches("update", "persistentvolumes"):
 		obj := action.(core.UpdateAction).GetObject()
-		volume := obj.(*api.PersistentVolume)
+		volume := obj.(*v1.PersistentVolume)
 
 		// Check and bump object version
 		storedVolume, found := r.volumes[volume.Name]
@@ -214,7 +214,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 
 	case action.Matches("update", "persistentvolumeclaims"):
 		obj := action.(core.UpdateAction).GetObject()
-		claim := obj.(*api.PersistentVolumeClaim)
+		claim := obj.(*v1.PersistentVolumeClaim)
 
 		// Check and bump object version
 		storedClaim, found := r.claims[claim.Name]
@@ -300,12 +300,12 @@ func (r *volumeReactor) injectReactError(action core.Action) error {
 
 // checkVolumes compares all expectedVolumes with set of volumes at the end of
 // the test and reports differences.
-func (r *volumeReactor) checkVolumes(expectedVolumes []*api.PersistentVolume) error {
+func (r *volumeReactor) checkVolumes(expectedVolumes []*v1.PersistentVolume) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	expectedMap := make(map[string]*api.PersistentVolume)
-	gotMap := make(map[string]*api.PersistentVolume)
+	expectedMap := make(map[string]*v1.PersistentVolume)
+	gotMap := make(map[string]*v1.PersistentVolume)
 	// Clear any ResourceVersion from both sets
 	for _, v := range expectedVolumes {
 		v.ResourceVersion = ""
@@ -315,7 +315,7 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*api.PersistentVolume) er
 		// We must clone the volume because of golang race check - it was
 		// written by the controller without any locks on it.
 		clone, _ := conversion.NewCloner().DeepCopy(v)
-		v = clone.(*api.PersistentVolume)
+		v = clone.(*v1.PersistentVolume)
 		v.ResourceVersion = ""
 		if v.Spec.ClaimRef != nil {
 			v.Spec.ClaimRef.ResourceVersion = ""
@@ -332,12 +332,12 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*api.PersistentVolume) er
 
 // checkClaims compares all expectedClaims with set of claims at the end of the
 // test and reports differences.
-func (r *volumeReactor) checkClaims(expectedClaims []*api.PersistentVolumeClaim) error {
+func (r *volumeReactor) checkClaims(expectedClaims []*v1.PersistentVolumeClaim) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	expectedMap := make(map[string]*api.PersistentVolumeClaim)
-	gotMap := make(map[string]*api.PersistentVolumeClaim)
+	expectedMap := make(map[string]*v1.PersistentVolumeClaim)
+	gotMap := make(map[string]*v1.PersistentVolumeClaim)
 	for _, c := range expectedClaims {
 		c.ResourceVersion = ""
 		expectedMap[c.Name] = c
@@ -346,7 +346,7 @@ func (r *volumeReactor) checkClaims(expectedClaims []*api.PersistentVolumeClaim)
 		// We must clone the claim because of golang race check - it was
 		// written by the controller without any locks on it.
 		clone, _ := conversion.NewCloner().DeepCopy(c)
-		c = clone.(*api.PersistentVolumeClaim)
+		c = clone.(*v1.PersistentVolumeClaim)
 		c.ResourceVersion = ""
 		gotMap[c.Name] = c
 	}
@@ -407,8 +407,8 @@ func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeCo
 	return err
 }
 
-// popChange returns one recorded updated object, either *api.PersistentVolume
-// or *api.PersistentVolumeClaim. Returns nil when there are no changes.
+// popChange returns one recorded updated object, either *v1.PersistentVolume
+// or *v1.PersistentVolumeClaim. Returns nil when there are no changes.
 func (r *volumeReactor) popChange() interface{} {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -420,11 +420,11 @@ func (r *volumeReactor) popChange() interface{} {
 	// For debugging purposes, print the queue
 	for _, obj := range r.changedObjects {
 		switch obj.(type) {
-		case *api.PersistentVolume:
-			vol, _ := obj.(*api.PersistentVolume)
+		case *v1.PersistentVolume:
+			vol, _ := obj.(*v1.PersistentVolume)
 			glog.V(4).Infof("reactor queue: %s", vol.Name)
-		case *api.PersistentVolumeClaim:
-			claim, _ := obj.(*api.PersistentVolumeClaim)
+		case *v1.PersistentVolumeClaim:
+			claim, _ := obj.(*v1.PersistentVolumeClaim)
 			glog.V(4).Infof("reactor queue: %s", claim.Name)
 		}
 	}
@@ -504,7 +504,7 @@ func (r *volumeReactor) waitTest(test controllerTest) error {
 
 // deleteVolumeEvent simulates that a volume has been deleted in etcd and
 // the controller receives 'volume deleted' event.
-func (r *volumeReactor) deleteVolumeEvent(volume *api.PersistentVolume) {
+func (r *volumeReactor) deleteVolumeEvent(volume *v1.PersistentVolume) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -514,13 +514,13 @@ func (r *volumeReactor) deleteVolumeEvent(volume *api.PersistentVolume) {
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
 	clone, _ := conversion.NewCloner().DeepCopy(volume)
-	volumeClone := clone.(*api.PersistentVolume)
+	volumeClone := clone.(*v1.PersistentVolume)
 	r.volumeSource.Delete(volumeClone)
 }
 
 // deleteClaimEvent simulates that a claim has been deleted in etcd and the
 // controller receives 'claim deleted' event.
-func (r *volumeReactor) deleteClaimEvent(claim *api.PersistentVolumeClaim) {
+func (r *volumeReactor) deleteClaimEvent(claim *v1.PersistentVolumeClaim) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -530,13 +530,13 @@ func (r *volumeReactor) deleteClaimEvent(claim *api.PersistentVolumeClaim) {
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
 	clone, _ := conversion.NewCloner().DeepCopy(claim)
-	claimClone := clone.(*api.PersistentVolumeClaim)
+	claimClone := clone.(*v1.PersistentVolumeClaim)
 	r.claimSource.Delete(claimClone)
 }
 
 // addVolumeEvent simulates that a volume has been added in etcd and the
 // controller receives 'volume added' event.
-func (r *volumeReactor) addVolumeEvent(volume *api.PersistentVolume) {
+func (r *volumeReactor) addVolumeEvent(volume *v1.PersistentVolume) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -548,7 +548,7 @@ func (r *volumeReactor) addVolumeEvent(volume *api.PersistentVolume) {
 
 // modifyVolumeEvent simulates that a volume has been modified in etcd and the
 // controller receives 'volume modified' event.
-func (r *volumeReactor) modifyVolumeEvent(volume *api.PersistentVolume) {
+func (r *volumeReactor) modifyVolumeEvent(volume *v1.PersistentVolume) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -556,13 +556,13 @@ func (r *volumeReactor) modifyVolumeEvent(volume *api.PersistentVolume) {
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
 	clone, _ := conversion.NewCloner().DeepCopy(volume)
-	volumeClone := clone.(*api.PersistentVolume)
+	volumeClone := clone.(*v1.PersistentVolume)
 	r.volumeSource.Modify(volumeClone)
 }
 
 // addClaimEvent simulates that a claim has been deleted in etcd and the
 // controller receives 'claim added' event.
-func (r *volumeReactor) addClaimEvent(claim *api.PersistentVolumeClaim) {
+func (r *volumeReactor) addClaimEvent(claim *v1.PersistentVolumeClaim) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -574,8 +574,8 @@ func (r *volumeReactor) addClaimEvent(claim *api.PersistentVolumeClaim) {
 
 func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource *fcache.FakePVControllerSource, claimSource *fcache.FakePVCControllerSource, errors []reactorError) *volumeReactor {
 	reactor := &volumeReactor{
-		volumes:      make(map[string]*api.PersistentVolume),
-		claims:       make(map[string]*api.PersistentVolumeClaim),
+		volumes:      make(map[string]*v1.PersistentVolume),
+		claims:       make(map[string]*v1.PersistentVolumeClaim),
 		ctrl:         ctrl,
 		volumeSource: volumeSource,
 		claimSource:  claimSource,
@@ -614,29 +614,29 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 }
 
 // newVolume returns a new volume with given attributes
-func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase api.PersistentVolumePhase, reclaimPolicy api.PersistentVolumeReclaimPolicy, annotations ...string) *api.PersistentVolume {
-	volume := api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v1.PersistentVolumePhase, reclaimPolicy v1.PersistentVolumeReclaimPolicy, annotations ...string) *v1.PersistentVolume {
+	volume := v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            name,
 			ResourceVersion: "1",
 		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(capacity),
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(capacity),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 			},
-			AccessModes:                   []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
+			AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 			PersistentVolumeReclaimPolicy: reclaimPolicy,
 		},
-		Status: api.PersistentVolumeStatus{
+		Status: v1.PersistentVolumeStatus{
 			Phase: phase,
 		},
 	}
 
 	if boundToClaimName != "" {
-		volume.Spec.ClaimRef = &api.ObjectReference{
+		volume.Spec.ClaimRef = &v1.ObjectReference{
 			Kind:       "PersistentVolumeClaim",
 			APIVersion: "v1",
 			UID:        types.UID(boundToClaimUID),
@@ -665,7 +665,7 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 // withLabels applies the given labels to the first volume in the array and
 // returns the array.  Meant to be used to compose volumes specified inline in
 // a test.
-func withLabels(labels map[string]string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
+func withLabels(labels map[string]string, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
 	volumes[0].Labels = labels
 	return volumes
 }
@@ -673,7 +673,7 @@ func withLabels(labels map[string]string, volumes []*api.PersistentVolume) []*ap
 // withLabelSelector sets the label selector of the first claim in the array
 // to be MatchLabels of the given label set and returns the array.  Meant
 // to be used to compose claims specified inline in a test.
-func withLabelSelector(labels map[string]string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+func withLabelSelector(labels map[string]string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
 	claims[0].Spec.Selector = &unversioned.LabelSelector{
 		MatchLabels: labels,
 	}
@@ -684,9 +684,9 @@ func withLabelSelector(labels map[string]string, claims []*api.PersistentVolumeC
 // withExpectedCapacity sets the claim.Spec.Capacity of the first claim in the
 // array to given value and returns the array.  Meant to be used to compose
 // claims specified inline in a test.
-func withExpectedCapacity(capacity string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
-	claims[0].Status.Capacity = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(capacity),
+func withExpectedCapacity(capacity string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Status.Capacity = v1.ResourceList{
+		v1.ResourceName(v1.ResourceStorage): resource.MustParse(capacity),
 	}
 
 	return claims
@@ -695,14 +695,14 @@ func withExpectedCapacity(capacity string, claims []*api.PersistentVolumeClaim) 
 // withMessage saves given message into volume.Status.Message of the first
 // volume in the array and returns the array.  Meant to be used to compose
 // volumes specified inline in a test.
-func withMessage(message string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
+func withMessage(message string, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
 	volumes[0].Status.Message = message
 	return volumes
 }
 
 // volumeWithClass saves given class into storage.StorageClassAnnotation annotation.
 // Meant to be used to compose claims specified inline in a test.
-func volumeWithClass(className string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
+func volumeWithClass(className string, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
 	if volumes[0].Annotations == nil {
 		volumes[0].Annotations = map[string]string{storageutil.StorageClassAnnotation: className}
 	} else {
@@ -713,35 +713,35 @@ func volumeWithClass(className string, volumes []*api.PersistentVolume) []*api.P
 
 // newVolumeArray returns array with a single volume that would be returned by
 // newVolume() with the same parameters.
-func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, phase api.PersistentVolumePhase, reclaimPolicy api.PersistentVolumeReclaimPolicy, annotations ...string) []*api.PersistentVolume {
-	return []*api.PersistentVolume{
+func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, phase v1.PersistentVolumePhase, reclaimPolicy v1.PersistentVolumeReclaimPolicy, annotations ...string) []*v1.PersistentVolume {
+	return []*v1.PersistentVolume{
 		newVolume(name, capacity, boundToClaimUID, boundToClaimName, phase, reclaimPolicy, annotations...),
 	}
 }
 
 // newClaim returns a new claim with given attributes
-func newClaim(name, claimUID, capacity, boundToVolume string, phase api.PersistentVolumeClaimPhase, annotations ...string) *api.PersistentVolumeClaim {
-	claim := api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.PersistentVolumeClaimPhase, annotations ...string) *v1.PersistentVolumeClaim {
+	claim := v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            name,
 			Namespace:       testNamespace,
 			UID:             types.UID(claimUID),
 			ResourceVersion: "1",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse(capacity),
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(capacity),
 				},
 			},
 			VolumeName: boundToVolume,
 		},
-		Status: api.PersistentVolumeClaimStatus{
+		Status: v1.PersistentVolumeClaimStatus{
 			Phase: phase,
 		},
 	}
-	// Make sure api.GetReference(claim) works
+	// Make sure v1.GetReference(claim) works
 	claim.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", name)
 
 	if len(annotations) > 0 {
@@ -759,7 +759,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase api.Persiste
 	}
 
 	// Bound claims must have proper Status.
-	if phase == api.ClaimBound {
+	if phase == v1.ClaimBound {
 		claim.Status.AccessModes = claim.Spec.AccessModes
 		// For most of the tests it's enough to copy claim's requested capacity,
 		// individual tests can adjust it using withExpectedCapacity()
@@ -771,15 +771,15 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase api.Persiste
 
 // newClaimArray returns array with a single claim that would be returned by
 // newClaim() with the same parameters.
-func newClaimArray(name, claimUID, capacity, boundToVolume string, phase api.PersistentVolumeClaimPhase, annotations ...string) []*api.PersistentVolumeClaim {
-	return []*api.PersistentVolumeClaim{
+func newClaimArray(name, claimUID, capacity, boundToVolume string, phase v1.PersistentVolumeClaimPhase, annotations ...string) []*v1.PersistentVolumeClaim {
+	return []*v1.PersistentVolumeClaim{
 		newClaim(name, claimUID, capacity, boundToVolume, phase, annotations...),
 	}
 }
 
 // claimWithClass saves given class into storage.StorageClassAnnotation annotation.
 // Meant to be used to compose claims specified inline in a test.
-func claimWithClass(className string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+func claimWithClass(className string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
 	if claims[0].Annotations == nil {
 		claims[0].Annotations = map[string]string{storageutil.StorageClassAnnotation: className}
 	} else {
@@ -790,7 +790,7 @@ func claimWithClass(className string, claims []*api.PersistentVolumeClaim) []*ap
 
 // claimWithAnnotation saves given annotation into given claims.
 // Meant to be used to compose claims specified inline in a test.
-func claimWithAnnotation(name, value string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
 	if claims[0].Annotations == nil {
 		claims[0].Annotations = map[string]string{name: value}
 	} else {
@@ -1041,8 +1041,8 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 
 			// There were some changes, process them
 			switch obj.(type) {
-			case *api.PersistentVolumeClaim:
-				claim := obj.(*api.PersistentVolumeClaim)
+			case *v1.PersistentVolumeClaim:
+				claim := obj.(*v1.PersistentVolumeClaim)
 				// Simulate "claim updated" event
 				ctrl.claims.Update(claim)
 				err = ctrl.syncClaim(claim)
@@ -1058,8 +1058,8 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				}
 				// Process generated changes
 				continue
-			case *api.PersistentVolume:
-				volume := obj.(*api.PersistentVolume)
+			case *v1.PersistentVolume:
+				volume := obj.(*v1.PersistentVolume)
 				// Simulate "volume updated" event
 				ctrl.volumes.store.Update(volume)
 				err = ctrl.syncVolume(volume)
@@ -1128,7 +1128,7 @@ func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string
 	return nil, nil
 }
 
-func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *api.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
+func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *v1.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
 	return nil, fmt.Errorf("Mounter is not supported by this plugin")
 }
 
@@ -1149,12 +1149,12 @@ func (plugin *mockVolumePlugin) NewProvisioner(options vol.VolumeOptions) (vol.P
 	}
 }
 
-func (plugin *mockVolumePlugin) Provision() (*api.PersistentVolume, error) {
+func (plugin *mockVolumePlugin) Provision() (*v1.PersistentVolume, error) {
 	if len(plugin.provisionCalls) <= plugin.provisionCallCounter {
 		return nil, fmt.Errorf("Mock plugin error: unexpected provisioner call %d", plugin.provisionCallCounter)
 	}
 
-	var pv *api.PersistentVolume
+	var pv *v1.PersistentVolume
 	call := plugin.provisionCalls[plugin.provisionCallCounter]
 	if !reflect.DeepEqual(call.expectedParameters, plugin.provisionOptions.Parameters) {
 		glog.Errorf("invalid provisioner call, expected options: %+v, got: %+v", call.expectedParameters, plugin.provisionOptions.Parameters)
@@ -1162,20 +1162,20 @@ func (plugin *mockVolumePlugin) Provision() (*api.PersistentVolume, error) {
 	}
 	if call.ret == nil {
 		// Create a fake PV with known GCE volume (to match expected volume)
-		capacity := plugin.provisionOptions.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+		capacity := plugin.provisionOptions.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 		accessModes := plugin.provisionOptions.PVC.Spec.AccessModes
-		pv = &api.PersistentVolume{
-			ObjectMeta: api.ObjectMeta{
+		pv = &v1.PersistentVolume{
+			ObjectMeta: v1.ObjectMeta{
 				Name: plugin.provisionOptions.PVName,
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): capacity,
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): capacity,
 				},
 				AccessModes:                   accessModes,
 				PersistentVolumeReclaimPolicy: plugin.provisionOptions.PersistentVolumeReclaimPolicy,
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				},
 			},
 		}

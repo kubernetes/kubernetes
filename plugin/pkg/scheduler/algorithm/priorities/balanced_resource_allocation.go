@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -37,7 +37,7 @@ const (
 
 // Also used in most/least_requested nad metadata.
 // TODO: despaghettify it
-func getNonZeroRequests(pod *api.Pod) *schedulercache.Resource {
+func getNonZeroRequests(pod *v1.Pod) *schedulercache.Resource {
 	result := &schedulercache.Resource{}
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
@@ -48,7 +48,7 @@ func getNonZeroRequests(pod *api.Pod) *schedulercache.Resource {
 	return result
 }
 
-func calculateBalancedResourceAllocation(pod *api.Pod, podRequests *schedulercache.Resource, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func calculateBalancedResourceAllocation(pod *v1.Pod, podRequests *schedulercache.Resource, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
@@ -104,7 +104,7 @@ func fractionOfCapacity(requested, capacity int64) float64 {
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocationMap(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func BalancedResourceAllocationMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	var nonZeroRequest *schedulercache.Resource
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
 		nonZeroRequest = priorityMeta.nonZeroRequest

@@ -40,7 +40,7 @@ import (
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -397,7 +397,7 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 	return getAddressByServer(srv)
 }
 
-func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, error) {
+func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, error) {
 	glog.V(2).Infof("NodeAddresses(%v) called", nodeName)
 	serverName := mapNodeNameToServerName(nodeName)
 	ip, err := probeNodeAddress(i.compute, serverName)
@@ -409,10 +409,10 @@ func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, e
 
 	// net.ParseIP().String() is to maintain compatibility with the old code
 	parsedIP := net.ParseIP(ip).String()
-	return []api.NodeAddress{
-		{Type: api.NodeLegacyHostIP, Address: parsedIP},
-		{Type: api.NodeInternalIP, Address: parsedIP},
-		{Type: api.NodeExternalIP, Address: parsedIP},
+	return []v1.NodeAddress{
+		{Type: v1.NodeLegacyHostIP, Address: parsedIP},
+		{Type: v1.NodeInternalIP, Address: parsedIP},
+		{Type: v1.NodeExternalIP, Address: parsedIP},
 	}, nil
 }
 

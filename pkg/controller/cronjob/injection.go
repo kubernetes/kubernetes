@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -41,7 +41,7 @@ type realSJControl struct {
 var _ sjControlInterface = &realSJControl{}
 
 func (c *realSJControl) UpdateStatus(sj *batch.CronJob) (*batch.CronJob, error) {
-	return c.KubeClient.Batch().CronJobs(sj.Namespace).UpdateStatus(sj)
+	return c.KubeClient.BatchV2alpha1().CronJobs(sj.Namespace).UpdateStatus(sj)
 }
 
 // fakeSJControl is the default implementation of sjControlInterface.
@@ -97,19 +97,19 @@ func copyAnnotations(template *batch.JobTemplateSpec) labels.Set {
 }
 
 func (r realJobControl) GetJob(namespace, name string) (*batch.Job, error) {
-	return r.KubeClient.Batch().Jobs(namespace).Get(name)
+	return r.KubeClient.BatchV2alpha1().Jobs(namespace).Get(name)
 }
 
 func (r realJobControl) UpdateJob(namespace string, job *batch.Job) (*batch.Job, error) {
-	return r.KubeClient.Batch().Jobs(namespace).Update(job)
+	return r.KubeClient.BatchV2alpha1().Jobs(namespace).Update(job)
 }
 
 func (r realJobControl) CreateJob(namespace string, job *batch.Job) (*batch.Job, error) {
-	return r.KubeClient.Batch().Jobs(namespace).Create(job)
+	return r.KubeClient.BatchV2alpha1().Jobs(namespace).Create(job)
 }
 
 func (r realJobControl) DeleteJob(namespace string, name string) error {
-	return r.KubeClient.Batch().Jobs(namespace).Delete(name, nil)
+	return r.KubeClient.BatchV2alpha1().Jobs(namespace).Delete(name, nil)
 }
 
 type fakeJobControl struct {
@@ -176,7 +176,7 @@ func (f *fakeJobControl) Clear() {
 // created as an interface to allow testing.
 type podControlInterface interface {
 	// ListPods list pods
-	ListPods(namespace string, opts api.ListOptions) (*api.PodList, error)
+	ListPods(namespace string, opts v1.ListOptions) (*v1.PodList, error)
 	// DeleteJob deletes the pod identified by name.
 	// TODO: delete by UID?
 	DeletePod(namespace string, name string) error
@@ -190,7 +190,7 @@ type realPodControl struct {
 
 var _ podControlInterface = &realPodControl{}
 
-func (r realPodControl) ListPods(namespace string, opts api.ListOptions) (*api.PodList, error) {
+func (r realPodControl) ListPods(namespace string, opts v1.ListOptions) (*v1.PodList, error) {
 	return r.KubeClient.Core().Pods(namespace).List(opts)
 }
 
@@ -200,17 +200,17 @@ func (r realPodControl) DeletePod(namespace string, name string) error {
 
 type fakePodControl struct {
 	sync.Mutex
-	Pods          []api.Pod
+	Pods          []v1.Pod
 	DeletePodName []string
 	Err           error
 }
 
 var _ podControlInterface = &fakePodControl{}
 
-func (f *fakePodControl) ListPods(namespace string, opts api.ListOptions) (*api.PodList, error) {
+func (f *fakePodControl) ListPods(namespace string, opts v1.ListOptions) (*v1.PodList, error) {
 	f.Lock()
 	defer f.Unlock()
-	return &api.PodList{Items: f.Pods}, nil
+	return &v1.PodList{Items: f.Pods}, nil
 }
 
 func (f *fakePodControl) DeletePod(namespace string, name string) error {

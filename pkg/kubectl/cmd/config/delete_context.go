@@ -67,7 +67,7 @@ func runDeleteContext(out io.Writer, configAccess clientcmd.ConfigAccess, cmd *c
 		return err
 	}
 
-	fmt.Fprintf(out, "deleted context %s from %s", name, configFile)
+	fmt.Fprintf(out, "deleted context %s from %s\n", name, configFile)
 
 	return nil
 }

@@ -56,7 +56,7 @@ function replicate-master-instance() {
   ETCD_CA_KEY="$(echo "${kube_env}" | grep "ETCD_CA_KEY" |  sed "s/^.*: '//" | sed "s/'$//")"
   ETCD_CA_CERT="$(echo "${kube_env}" | grep "ETCD_CA_CERT" |  sed "s/^.*: '//" | sed "s/'$//")"
 
-  create-etcd-certs "${ETCD_CA_CERT}" "${ETCD_CA_KEY}"
+  create-etcd-certs "${REPLICA_NAME}" "${ETCD_CA_CERT}" "${ETCD_CA_KEY}"
 
   kube_env="$(echo "${kube_env}" | grep -v "ETCD_PEER_KEY")"
   kube_env="$(echo -e "${kube_env}\nETCD_PEER_KEY: '${ETCD_PEER_KEY_BASE64}'")"

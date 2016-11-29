@@ -25,9 +25,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
@@ -95,7 +96,7 @@ func newFakeDisruptionController() (*DisruptionController, *pdbStates) {
 		broadcaster: record.NewBroadcaster(),
 	}
 
-	dc.recorder = dc.broadcaster.NewRecorder(api.EventSource{Component: "disruption_test"})
+	dc.recorder = dc.broadcaster.NewRecorder(v1.EventSource{Component: "disruption_test"})
 
 	return dc, ps
 }
@@ -115,11 +116,11 @@ func newSelFooBar() *unversioned.LabelSelector {
 func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*policy.PodDisruptionBudget, string) {
 
 	pdb := &policy.PodDisruptionBudget{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-		ObjectMeta: api.ObjectMeta{
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       v1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
@@ -136,21 +137,21 @@ func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*pol
 	return pdb, pdbName
 }
 
-func newPod(t *testing.T, name string) (*api.Pod, string) {
-	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-		ObjectMeta: api.ObjectMeta{
+func newPod(t *testing.T, name string) (*v1.Pod, string) {
+	pod := &v1.Pod{
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Annotations:     make(map[string]string),
 			Name:            name,
-			Namespace:       api.NamespaceDefault,
+			Namespace:       v1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
-		Spec: api.PodSpec{},
-		Status: api.PodStatus{
-			Conditions: []api.PodCondition{
-				{Type: api.PodReady, Status: api.ConditionTrue},
+		Spec: v1.PodSpec{},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{Type: v1.PodReady, Status: v1.ConditionTrue},
 			},
 		},
 	}
@@ -163,18 +164,18 @@ func newPod(t *testing.T, name string) (*api.Pod, string) {
 	return pod, podName
 }
 
-func newReplicationController(t *testing.T, size int32) (*api.ReplicationController, string) {
-	rc := &api.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-		ObjectMeta: api.ObjectMeta{
+func newReplicationController(t *testing.T, size int32) (*v1.ReplicationController, string) {
+	rc := &v1.ReplicationController{
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       v1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: size,
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: &size,
 			Selector: fooBar(),
 		},
 	}
@@ -189,16 +190,16 @@ func newReplicationController(t *testing.T, size int32) (*api.ReplicationControl
 
 func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
 	d := &extensions.Deployment{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-		ObjectMeta: api.ObjectMeta{
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       v1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas: size,
+			Replicas: &size,
 			Selector: newSelFooBar(),
 		},
 	}
@@ -213,16 +214,16 @@ func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
 
 func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
 	rs := &extensions.ReplicaSet{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-		ObjectMeta: api.ObjectMeta{
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       v1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: size,
+			Replicas: &size,
 			Selector: newSelFooBar(),
 		},
 	}
@@ -274,7 +275,7 @@ func TestUnavailable(t *testing.T) {
 	dc.sync(pdbName)
 
 	// Add three pods, verifying that the counts go up at each step.
-	pods := []*api.Pod{}
+	pods := []*v1.Pod{}
 	for i := int32(0); i < 4; i++ {
 		ps.VerifyPdbStatus(t, pdbName, 0, i, 3, i, map[string]unversioned.Time{})
 		pod, _ := newPod(t, fmt.Sprintf("yo-yo-yo %d", i))
@@ -285,7 +286,7 @@ func TestUnavailable(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 1, 4, 3, 4, map[string]unversioned.Time{})
 
 	// Now set one pod as unavailable
-	pods[0].Status.Conditions = []api.PodCondition{}
+	pods[0].Status.Conditions = []v1.PodCondition{}
 	update(t, dc.podLister.Indexer, pods[0])
 	dc.sync(pdbName)
 
@@ -387,7 +388,7 @@ func TestReplicationController(t *testing.T) {
 	// about the RC.  This is a known bug.  TODO(mml): file issue
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]unversioned.Time{})
 
-	pods := []*api.Pod{}
+	pods := []*v1.Pod{}
 
 	for i := int32(0); i < 3; i++ {
 		pod, _ := newPod(t, fmt.Sprintf("foobar %d", i))
@@ -439,7 +440,7 @@ func TestTwoControllers(t *testing.T) {
 
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]unversioned.Time{})
 
-	pods := []*api.Pod{}
+	pods := []*v1.Pod{}
 
 	unavailablePods := collectionSize - minimumOne - 1
 	for i := int32(1); i <= collectionSize; i++ {
@@ -447,7 +448,7 @@ func TestTwoControllers(t *testing.T) {
 		pods = append(pods, pod)
 		pod.Labels = rcLabels
 		if i <= unavailablePods {
-			pod.Status.Conditions = []api.PodCondition{}
+			pod.Status.Conditions = []v1.PodCondition{}
 		}
 		add(t, dc.podLister.Indexer, pod)
 		dc.sync(pdbName)
@@ -480,7 +481,7 @@ func TestTwoControllers(t *testing.T) {
 		pods = append(pods, pod)
 		pod.Labels = dLabels
 		if i <= unavailablePods {
-			pod.Status.Conditions = []api.PodCondition{}
+			pod.Status.Conditions = []v1.PodCondition{}
 		}
 		add(t, dc.podLister.Indexer, pod)
 		dc.sync(pdbName)
@@ -498,17 +499,17 @@ func TestTwoControllers(t *testing.T) {
 	// but if we bring down two, it's not.  Then we make the pod ready again and
 	// verify that a disruption is permitted again.
 	ps.VerifyPdbStatus(t, pdbName, 2, 2+minimumTwo, minimumTwo, 2*collectionSize, map[string]unversioned.Time{})
-	pods[collectionSize-1].Status.Conditions = []api.PodCondition{}
+	pods[collectionSize-1].Status.Conditions = []v1.PodCondition{}
 	update(t, dc.podLister.Indexer, pods[collectionSize-1])
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 1, 1+minimumTwo, minimumTwo, 2*collectionSize, map[string]unversioned.Time{})
 
-	pods[collectionSize-2].Status.Conditions = []api.PodCondition{}
+	pods[collectionSize-2].Status.Conditions = []v1.PodCondition{}
 	update(t, dc.podLister.Indexer, pods[collectionSize-2])
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, minimumTwo, minimumTwo, 2*collectionSize, map[string]unversioned.Time{})
 
-	pods[collectionSize-1].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
+	pods[collectionSize-1].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
 	update(t, dc.podLister.Indexer, pods[collectionSize-1])
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 1, 1+minimumTwo, minimumTwo, 2*collectionSize, map[string]unversioned.Time{})

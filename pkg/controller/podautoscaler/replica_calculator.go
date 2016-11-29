@@ -21,8 +21,8 @@ import (
 	"math"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -30,10 +30,10 @@ import (
 
 type ReplicaCalculator struct {
 	metricsClient metricsclient.MetricsClient
-	podsGetter    unversionedcore.PodsGetter
+	podsGetter    v1core.PodsGetter
 }
 
-func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podsGetter unversionedcore.PodsGetter) *ReplicaCalculator {
+func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podsGetter v1core.PodsGetter) *ReplicaCalculator {
 	return &ReplicaCalculator{
 		metricsClient: metricsClient,
 		podsGetter:    podsGetter,
@@ -42,13 +42,13 @@ func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podsGetter 
 
 // GetResourceReplicas calculates the desired replica count based on a target resource utilization percentage
 // of the given resource for pods matching the given selector in the given namespace, and the current replica count
-func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUtilization int32, resource api.ResourceName, namespace string, selector labels.Selector) (replicaCount int32, utilization int32, timestamp time.Time, err error) {
+func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUtilization int32, resource v1.ResourceName, namespace string, selector labels.Selector) (replicaCount int32, utilization int32, timestamp time.Time, err error) {
 	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector)
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
 	}
 
-	podList, err := c.podsGetter.Pods(namespace).List(api.ListOptions{LabelSelector: selector})
+	podList, err := c.podsGetter.Pods(namespace).List(v1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}
@@ -74,7 +74,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 		requests[pod.Name] = podSum
 
-		if pod.Status.Phase != api.PodRunning || !api.IsPodReady(&pod) {
+		if pod.Status.Phase != v1.PodRunning || !v1.IsPodReady(&pod) {
 			// save this pod name for later, but pretend it doesn't exist for now
 			unreadyPods.Insert(pod.Name)
 			delete(metrics, pod.Name)
@@ -156,7 +156,7 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUtili
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric  %s: %v", metricName, err)
 	}
 
-	podList, err := c.podsGetter.Pods(namespace).List(api.ListOptions{LabelSelector: selector})
+	podList, err := c.podsGetter.Pods(namespace).List(v1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}
@@ -170,7 +170,7 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUtili
 	missingPods := sets.NewString()
 
 	for _, pod := range podList.Items {
-		if pod.Status.Phase != api.PodRunning || !api.IsPodReady(&pod) {
+		if pod.Status.Phase != v1.PodRunning || !v1.IsPodReady(&pod) {
 			// save this pod name for later, but pretend it doesn't exist for now
 			unreadyPods.Insert(pod.Name)
 			delete(metrics, pod.Name)

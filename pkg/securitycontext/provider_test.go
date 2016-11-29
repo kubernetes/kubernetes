@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
-	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestModifyContainerConfig(t *testing.T) {
@@ -33,13 +33,13 @@ func TestModifyContainerConfig(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		podSc    *api.PodSecurityContext
-		sc       *api.SecurityContext
+		podSc    *v1.PodSecurityContext
+		sc       *v1.SecurityContext
 		expected *dockercontainer.Config
 	}{
 		{
 			name: "container.SecurityContext.RunAsUser set",
-			sc: &api.SecurityContext{
+			sc: &v1.SecurityContext{
 				RunAsUser: &uid,
 			},
 			expected: &dockercontainer.Config{
@@ -48,12 +48,12 @@ func TestModifyContainerConfig(t *testing.T) {
 		},
 		{
 			name:     "no RunAsUser value set",
-			sc:       &api.SecurityContext{},
+			sc:       &v1.SecurityContext{},
 			expected: &dockercontainer.Config{},
 		},
 		{
 			name: "pod.Spec.SecurityContext.RunAsUser set",
-			podSc: &api.PodSecurityContext{
+			podSc: &v1.PodSecurityContext{
 				RunAsUser: &uid,
 			},
 			expected: &dockercontainer.Config{
@@ -62,10 +62,10 @@ func TestModifyContainerConfig(t *testing.T) {
 		},
 		{
 			name: "container.SecurityContext.RunAsUser overrides pod.Spec.SecurityContext.RunAsUser",
-			podSc: &api.PodSecurityContext{
+			podSc: &v1.PodSecurityContext{
 				RunAsUser: &uid,
 			},
-			sc: &api.SecurityContext{
+			sc: &v1.SecurityContext{
 				RunAsUser: &overrideUid,
 			},
 			expected: &dockercontainer.Config{
@@ -75,9 +75,9 @@ func TestModifyContainerConfig(t *testing.T) {
 	}
 
 	provider := NewSimpleSecurityContextProvider()
-	dummyContainer := &api.Container{}
+	dummyContainer := &v1.Container{}
 	for _, tc := range cases {
-		pod := &api.Pod{Spec: api.PodSpec{SecurityContext: tc.podSc}}
+		pod := &v1.Pod{Spec: v1.PodSpec{SecurityContext: tc.podSc}}
 		dummyContainer.SecurityContext = tc.sc
 		dockerCfg := &dockercontainer.Config{}
 
@@ -91,7 +91,7 @@ func TestModifyContainerConfig(t *testing.T) {
 
 func TestModifyHostConfig(t *testing.T) {
 	priv := true
-	setPrivSC := &api.SecurityContext{}
+	setPrivSC := &v1.SecurityContext{}
 	setPrivSC.Privileged = &priv
 	setPrivHC := &dockercontainer.HostConfig{
 		Privileged: true,
@@ -115,8 +115,8 @@ func TestModifyHostConfig(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		podSc    *api.PodSecurityContext
-		sc       *api.SecurityContext
+		podSc    *v1.PodSecurityContext
+		sc       *v1.SecurityContext
 		expected *dockercontainer.HostConfig
 	}{
 		{
@@ -131,21 +131,21 @@ func TestModifyHostConfig(t *testing.T) {
 		},
 		{
 			name: "container.SecurityContext.Capabilities",
-			sc: &api.SecurityContext{
+			sc: &v1.SecurityContext{
 				Capabilities: inputCapabilities(),
 			},
 			expected: setCapsHC,
 		},
 		{
 			name: "container.SecurityContext.SELinuxOptions",
-			sc: &api.SecurityContext{
+			sc: &v1.SecurityContext{
 				SELinuxOptions: inputSELinuxOptions(),
 			},
 			expected: setSELinuxHC,
 		},
 		{
 			name: "pod.Spec.SecurityContext.SELinuxOptions",
-			podSc: &api.PodSecurityContext{
+			podSc: &v1.PodSecurityContext{
 				SELinuxOptions: inputSELinuxOptions(),
 			},
 			expected: setSELinuxHC,
@@ -159,10 +159,10 @@ func TestModifyHostConfig(t *testing.T) {
 	}
 
 	provider := NewSimpleSecurityContextProvider()
-	dummyContainer := &api.Container{}
+	dummyContainer := &v1.Container{}
 
 	for _, tc := range cases {
-		pod := &api.Pod{Spec: api.PodSpec{SecurityContext: tc.podSc}}
+		pod := &v1.Pod{Spec: v1.PodSpec{SecurityContext: tc.podSc}}
 		dummyContainer.SecurityContext = tc.sc
 		dockerCfg := &dockercontainer.HostConfig{}
 
@@ -175,7 +175,7 @@ func TestModifyHostConfig(t *testing.T) {
 }
 
 func TestModifyHostConfigPodSecurityContext(t *testing.T) {
-	supplementalGroupsSC := &api.PodSecurityContext{}
+	supplementalGroupsSC := &v1.PodSecurityContext{}
 	supplementalGroupsSC.SupplementalGroups = []int64{2222}
 	supplementalGroupHC := fullValidHostConfig()
 	supplementalGroupHC.GroupAdd = []string{"2222"}
@@ -189,7 +189,7 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	extraSupplementalGroup := []int64{1234}
 
 	testCases := map[string]struct {
-		securityContext         *api.PodSecurityContext
+		securityContext         *v1.PodSecurityContext
 		expected                *dockercontainer.HostConfig
 		extraSupplementalGroups []int64
 	}{
@@ -204,12 +204,12 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 			extraSupplementalGroups: nil,
 		},
 		"FSGroup": {
-			securityContext:         &api.PodSecurityContext{FSGroup: &fsGroup},
+			securityContext:         &v1.PodSecurityContext{FSGroup: &fsGroup},
 			expected:                fsGroupHC,
 			extraSupplementalGroups: nil,
 		},
 		"FSGroup + SupplementalGroups": {
-			securityContext: &api.PodSecurityContext{
+			securityContext: &v1.PodSecurityContext{
 				SupplementalGroups: []int64{2222},
 				FSGroup:            &fsGroup,
 			},
@@ -229,10 +229,10 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	}
 
 	provider := NewSimpleSecurityContextProvider()
-	dummyContainer := &api.Container{}
+	dummyContainer := &v1.Container{}
 	dummyContainer.SecurityContext = fullValidSecurityContext()
-	dummyPod := &api.Pod{
-		Spec: apitesting.DeepEqualSafePodSpec(),
+	dummyPod := &v1.Pod{
+		Spec: apitesting.V1DeepEqualSafePodSpec(),
 	}
 
 	for k, v := range testCases {
@@ -277,9 +277,9 @@ func TestModifySecurityOption(t *testing.T) {
 	}
 }
 
-func overridePodSecurityContext() *api.PodSecurityContext {
-	return &api.PodSecurityContext{
-		SELinuxOptions: &api.SELinuxOptions{
+func overridePodSecurityContext() *v1.PodSecurityContext {
+	return &v1.PodSecurityContext{
+		SELinuxOptions: &v1.SELinuxOptions{
 			User:  "user2",
 			Role:  "role2",
 			Type:  "type2",
@@ -288,30 +288,30 @@ func overridePodSecurityContext() *api.PodSecurityContext {
 	}
 }
 
-func fullValidPodSecurityContext() *api.PodSecurityContext {
-	return &api.PodSecurityContext{
+func fullValidPodSecurityContext() *v1.PodSecurityContext {
+	return &v1.PodSecurityContext{
 		SELinuxOptions: inputSELinuxOptions(),
 	}
 }
 
-func fullValidSecurityContext() *api.SecurityContext {
+func fullValidSecurityContext() *v1.SecurityContext {
 	priv := true
-	return &api.SecurityContext{
+	return &v1.SecurityContext{
 		Privileged:     &priv,
 		Capabilities:   inputCapabilities(),
 		SELinuxOptions: inputSELinuxOptions(),
 	}
 }
 
-func inputCapabilities() *api.Capabilities {
-	return &api.Capabilities{
-		Add:  []api.Capability{"addCapA", "addCapB"},
-		Drop: []api.Capability{"dropCapA", "dropCapB"},
+func inputCapabilities() *v1.Capabilities {
+	return &v1.Capabilities{
+		Add:  []v1.Capability{"addCapA", "addCapB"},
+		Drop: []v1.Capability{"dropCapA", "dropCapB"},
 	}
 }
 
-func inputSELinuxOptions() *api.SELinuxOptions {
-	return &api.SELinuxOptions{
+func inputSELinuxOptions() *v1.SELinuxOptions {
+	return &v1.SELinuxOptions{
 		User:  "user",
 		Role:  "role",
 		Type:  "type",

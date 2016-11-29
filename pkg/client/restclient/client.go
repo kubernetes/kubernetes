@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
@@ -48,7 +48,7 @@ type Interface interface {
 	Patch(pt api.PatchType) *Request
 	Get() *Request
 	Delete() *Request
-	APIVersion() unversioned.GroupVersion
+	APIVersion() schema.GroupVersion
 }
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
@@ -100,7 +100,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	base.Fragment = ""
 
 	if config.GroupVersion == nil {
-		config.GroupVersion = &unversioned.GroupVersion{}
+		config.GroupVersion = &schema.GroupVersion{}
 	}
 	if len(config.ContentType) == 0 {
 		config.ContentType = "application/json"
@@ -173,7 +173,7 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 		info = mediaTypes[0]
 	}
 
-	internalGV := unversioned.GroupVersions{
+	internalGV := schema.GroupVersions{
 		{
 			Group:   config.GroupVersion.Group,
 			Version: runtime.APIVersionInternal,
@@ -253,6 +253,6 @@ func (c *RESTClient) Delete() *Request {
 }
 
 // APIVersion returns the APIVersion this RESTClient is expected to use.
-func (c *RESTClient) APIVersion() unversioned.GroupVersion {
+func (c *RESTClient) APIVersion() schema.GroupVersion {
 	return *c.contentConfig.GroupVersion
 }

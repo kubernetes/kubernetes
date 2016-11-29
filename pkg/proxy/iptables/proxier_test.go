@@ -260,7 +260,7 @@ func TestExecConntrackTool(t *testing.T) {
 func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, protocol api.Protocol, onlyNodeLocalEndpoints bool) *serviceInfo {
 	return &serviceInfo{
 		sessionAffinityType:    api.ServiceAffinityNone, // default
-		stickyMaxAgeSeconds:    180,                     // TODO: paramaterize this in the API.
+		stickyMaxAgeMinutes:    180,                     // TODO: paramaterize this in the API.
 		clusterIP:              ip,
 		protocol:               protocol,
 		onlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
@@ -696,9 +696,22 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	}
 }
 
+func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	// set cluster CIDR to empty before test
+	fp.clusterCIDR = ""
+	onlyLocalNodePorts(t, fp, ipt)
+}
+
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
+	onlyLocalNodePorts(t, fp, ipt)
+}
+
+func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTables) {
+	shouldLBTOSVCRuleExist := len(fp.clusterCIDR) > 0
 	svcName := "svc1"
 	svcIP := net.IPv4(10, 20, 30, 41)
 
@@ -724,9 +737,17 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
 
+	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
 	lbRules := ipt.GetRules(lbChain)
 	if hasJump(lbRules, nonLocalEpChain, "", "") {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, nonLocalEp), lbRules, t)
+	}
+	if hasJump(lbRules, svcChain, "", "") != shouldLBTOSVCRuleExist {
+		prefix := "Did not find "
+		if !shouldLBTOSVCRuleExist {
+			prefix = "Found "
+		}
+		errorf(fmt.Sprintf("%s jump from lb chain %v to svc %v", prefix, lbChain, svcChain), lbRules, t)
 	}
 	if !hasJump(lbRules, localEpChain, "", "") {
 		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, nonLocalEp), lbRules, t)

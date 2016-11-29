@@ -17,8 +17,8 @@ limitations under the License.
 package serializer
 
 import (
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/runtime/serializer/json"
 	"k8s.io/client-go/pkg/runtime/serializer/recognizer"
 	"k8s.io/client-go/pkg/runtime/serializer/versioning"
@@ -162,8 +162,8 @@ func (f CodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
 //
 // TODO: make this call exist only in pkg/api, and initialize it with the set of default versions.
 //   All other callers will be forced to request a Codec directly.
-func (f CodecFactory) LegacyCodec(version ...unversioned.GroupVersion) runtime.Codec {
-	return versioning.NewDefaultingCodecForScheme(f.scheme, f.legacySerializer, f.universal, unversioned.GroupVersions(version), runtime.InternalGroupVersioner)
+func (f CodecFactory) LegacyCodec(version ...schema.GroupVersion) runtime.Codec {
+	return versioning.NewDefaultingCodecForScheme(f.scheme, f.legacySerializer, f.universal, schema.GroupVersions(version), runtime.InternalGroupVersioner)
 }
 
 // UniversalDeserializer can convert any stored data recognized by this factory into a Go object that satisfies
@@ -181,12 +181,12 @@ func (f CodecFactory) UniversalDeserializer() runtime.Decoder {
 //
 // TODO: the decoder will eventually be removed in favor of dealing with objects in their versioned form
 // TODO: only accept a group versioner
-func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) runtime.Decoder {
+func (f CodecFactory) UniversalDecoder(versions ...schema.GroupVersion) runtime.Decoder {
 	var versioner runtime.GroupVersioner
 	if len(versions) == 0 {
 		versioner = runtime.InternalGroupVersioner
 	} else {
-		versioner = unversioned.GroupVersions(versions)
+		versioner = schema.GroupVersions(versions)
 	}
 	return f.CodecForVersions(nil, f.universal, nil, versioner)
 }

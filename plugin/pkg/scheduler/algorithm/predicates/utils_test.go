@@ -19,7 +19,7 @@ package predicates
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -30,9 +30,9 @@ func ExampleFindLabelsInSet() {
 	labelSubset["label2"] = "value2"
 	// Lets make believe that these pods are on the cluster.
 	// Utility functions will inspect their labels, filter them, and so on.
-	nsPods := []*api.Pod{
+	nsPods := []*v1.Pod{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      "pod1",
 				Namespace: "ns1",
 				Labels: map[string]string{
@@ -43,14 +43,14 @@ func ExampleFindLabelsInSet() {
 			},
 		}, // first pod which will be used via the utilities
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      "pod2",
 				Namespace: "ns1",
 			},
 		},
 
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "pod3ThatWeWontSee",
 			},
 		},

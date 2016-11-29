@@ -31,8 +31,8 @@ import (
 	"github.com/mesos/mesos-go/detector"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -52,7 +52,7 @@ type mesosClient struct {
 type slaveNode struct {
 	hostname       string
 	kubeletRunning bool
-	resources      *api.NodeResources
+	resources      *v1.NodeResources
 }
 
 type mesosState struct {
@@ -315,12 +315,12 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			continue
 		}
 		node := &slaveNode{hostname: slave.Hostname}
-		cap := api.ResourceList{}
+		cap := v1.ResourceList{}
 		if slave.Resources != nil && len(slave.Resources) > 0 {
 			// attempt to translate CPU (cores) and memory (MB) resources
 			if cpu, found := slave.Resources["cpus"]; found {
 				if cpuNum, ok := cpu.(float64); ok {
-					cap[api.ResourceCPU] = *resource.NewQuantity(int64(cpuNum), resource.DecimalSI)
+					cap[v1.ResourceCPU] = *resource.NewQuantity(int64(cpuNum), resource.DecimalSI)
 				} else {
 					log.Warningf("unexpected slave cpu resource type %T: %v", cpu, cpu)
 				}
@@ -329,7 +329,7 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			}
 			if mem, found := slave.Resources["mem"]; found {
 				if memNum, ok := mem.(float64); ok {
-					cap[api.ResourceMemory] = *resource.NewQuantity(int64(memNum), resource.BinarySI)
+					cap[v1.ResourceMemory] = *resource.NewQuantity(int64(memNum), resource.BinarySI)
 				} else {
 					log.Warningf("unexpected slave mem resource type %T: %v", mem, mem)
 				}
@@ -338,7 +338,7 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			}
 		}
 		if len(cap) > 0 {
-			node.resources = &api.NodeResources{
+			node.resources = &v1.NodeResources{
 				Capacity: cap,
 			}
 			log.V(4).Infof("node %q reporting capacity %v", node.hostname, cap)

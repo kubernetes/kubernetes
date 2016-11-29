@@ -19,10 +19,10 @@ package rest
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	path "k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -111,14 +111,14 @@ func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime
 }
 
 // objectMetaAndKind retrieves kind and ObjectMeta from a runtime object, or returns an error.
-func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.ObjectMeta, unversioned.GroupVersionKind, error) {
+func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.ObjectMeta, schema.GroupVersionKind, error) {
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
+		return nil, schema.GroupVersionKind{}, errors.NewInternalError(err)
 	}
 	kinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
-		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
+		return nil, schema.GroupVersionKind{}, errors.NewInternalError(err)
 	}
 	return objectMeta, kinds[0], nil
 }

@@ -19,7 +19,8 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -38,7 +39,7 @@ func NewReplicationControllerEvaluator(kubeClient clientset.Interface) quota.Eva
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceReplicationControllers),
 		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceReplicationControllers),
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ReplicationControllers(namespace).List(options)
 			if err != nil {
 				return nil, err

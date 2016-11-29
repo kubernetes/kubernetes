@@ -20,8 +20,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/labels:go_default_library",
@@ -46,8 +46,8 @@ go_test(
         "skip",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/util/codeinspector:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",

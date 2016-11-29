@@ -21,10 +21,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -38,14 +38,14 @@ func TestIgnoreClusterName(t *testing.T) {
 	_, s := framework.RunAMaster(config)
 	defer s.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	etcdClient := framework.NewEtcdClient()
 	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(),
 		prefix+"/namespaces/", false, etcdtest.DeserializationCacheSize)
 	ctx := context.TODO()
 
-	ns := api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
 			Name:        "test-namespace",
 			ClusterName: "cluster-name-to-ignore",
 		},
@@ -55,7 +55,7 @@ func TestIgnoreClusterName(t *testing.T) {
 	assert.Equal(t, ns.Name, nsNew.Name)
 	assert.Empty(t, nsNew.ClusterName)
 
-	nsEtcd := api.Namespace{}
+	nsEtcd := v1.Namespace{}
 	err = etcdStorage.Get(ctx, ns.Name, &nsEtcd, false)
 	assert.Nil(t, err)
 	assert.Equal(t, ns.Name, nsEtcd.Name)
@@ -66,7 +66,7 @@ func TestIgnoreClusterName(t *testing.T) {
 	assert.Equal(t, ns.Name, nsNew.Name)
 	assert.Empty(t, nsNew.ClusterName)
 
-	nsEtcd = api.Namespace{}
+	nsEtcd = v1.Namespace{}
 	err = etcdStorage.Get(ctx, ns.Name, &nsEtcd, false)
 	assert.Nil(t, err)
 	assert.Equal(t, ns.Name, nsEtcd.Name)

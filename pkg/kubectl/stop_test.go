@@ -33,6 +33,7 @@ import (
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -438,7 +439,7 @@ func TestDeploymentStop(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplate(&deployment)
+	template := deploymentutil.GetNewReplicaSetTemplateInternal(&deployment)
 	tests := []struct {
 		Name            string
 		Objs            []runtime.Object
@@ -579,7 +580,7 @@ func service() *api.Service {
 func TestSimpleStop(t *testing.T) {
 	tests := []struct {
 		fake        *reaperFake
-		kind        unversioned.GroupKind
+		kind        schema.GroupKind
 		actions     []testcore.Action
 		expectError bool
 		test        string
@@ -675,7 +676,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplate(deployment)
+	template := deploymentutil.GetNewReplicaSetTemplateInternal(deployment)
 
 	fake := fake.NewSimpleClientset(
 		deployment,

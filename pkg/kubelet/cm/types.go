@@ -17,7 +17,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -86,15 +86,15 @@ type QOSContainersInfo struct {
 // containers for the pod.
 type PodContainerManager interface {
 	// GetPodContainerName returns the CgroupName identifer, and its literal cgroupfs form on the host.
-	GetPodContainerName(*api.Pod) (CgroupName, string)
+	GetPodContainerName(*v1.Pod) (CgroupName, string)
 
 	// EnsureExists takes a pod as argument and makes sure that
 	// pod cgroup exists if qos cgroup hierarchy flag is enabled.
 	// If the pod cgroup doesen't already exist this method creates it.
-	EnsureExists(*api.Pod) error
+	EnsureExists(*v1.Pod) error
 
 	// Exists returns true if the pod cgroup exists.
-	Exists(*api.Pod) bool
+	Exists(*v1.Pod) bool
 
 	// Destroy takes a pod Cgroup name as argument and destroys the pod's container.
 	Destroy(name CgroupName) error

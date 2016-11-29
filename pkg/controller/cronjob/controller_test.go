@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/api/v1"
+	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -75,7 +75,7 @@ func justAfterThePriorHour() time.Time {
 // returns a cronJob with some fields filled in.
 func cronJob() batch.CronJob {
 	return batch.CronJob{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:              "mycronjob",
 			Namespace:         "snazzycats",
 			UID:               types.UID("1a2b3c"),
@@ -86,7 +86,7 @@ func cronJob() batch.CronJob {
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
 				},
@@ -101,14 +101,14 @@ func jobSpec() batch.JobSpec {
 	return batch.JobSpec{
 		Parallelism: &one,
 		Completions: &one,
-		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+		Template: v1.PodTemplateSpec{
+			ObjectMeta: v1.ObjectMeta{
 				Labels: map[string]string{
 					"foo": "bar",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{Image: "foo/bar"},
 				},
 			},
@@ -118,10 +118,10 @@ func jobSpec() batch.JobSpec {
 
 func newJob(UID string) batch.Job {
 	return batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       types.UID(UID),
 			Name:      "foobar",
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/myjob",
 		},
 		Spec: jobSpec(),
@@ -213,7 +213,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			job.UID = "1234"
 			job.Namespace = ""
 			if tc.stillActive {
-				sj.Status.Active = []api.ObjectReference{{UID: job.UID}}
+				sj.Status.Active = []v1.ObjectReference{{UID: job.UID}}
 				js = append(js, *job)
 			}
 		} else {
@@ -271,7 +271,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 // TestSyncOne_Status tests sj.UpdateStatus in SyncOne
 func TestSyncOne_Status(t *testing.T) {
 	finishedJob := newJob("1")
-	finishedJob.Status.Conditions = append(finishedJob.Status.Conditions, batch.JobCondition{Type: batch.JobComplete, Status: api.ConditionTrue})
+	finishedJob.Status.Conditions = append(finishedJob.Status.Conditions, batch.JobCondition{Type: batch.JobComplete, Status: v1.ConditionTrue})
 	unexpectedJob := newJob("2")
 
 	testCases := map[string]struct {
@@ -360,7 +360,7 @@ func TestSyncOne_Status(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s: test setup error: failed to get job's ref: %v.", name, err)
 			}
-			sj.Status.Active = []api.ObjectReference{*ref}
+			sj.Status.Active = []v1.ObjectReference{*ref}
 			jobs = append(jobs, finishedJob)
 		}
 		if tc.hasUnexpectedJob {

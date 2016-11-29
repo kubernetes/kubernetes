@@ -20,10 +20,10 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type Ignored struct {
@@ -34,8 +34,8 @@ type IgnoredList struct {
 	Items []Ignored
 }
 
-func (obj *Ignored) GetObjectKind() unversioned.ObjectKind     { return unversioned.EmptyObjectKind }
-func (obj *IgnoredList) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *Ignored) GetObjectKind() schema.ObjectKind     { return schema.EmptyObjectKind }
+func (obj *IgnoredList) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 func TestSelectionPredicate(t *testing.T) {
 	table := map[string]struct {

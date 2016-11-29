@@ -19,6 +19,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/user:go_default_library",
@@ -40,9 +41,9 @@ go_test(
     srcs = ["jwt_test.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5/fake:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/serviceaccount:go_default_library",
     ],

@@ -22,9 +22,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -76,7 +77,7 @@ type SAControllerClientBuilder struct {
 
 	// CoreClient is used to provision service accounts if needed and watch for their associated tokens
 	// to construct a controller client
-	CoreClient unversionedcore.CoreInterface
+	CoreClient v1core.CoreV1Interface
 
 	// Namespace is the namespace used to host the service accounts that will back the
 	// controllers.  It must be highly privileged namespace which normal users cannot inspect.
@@ -96,26 +97,26 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 		// check to see if the namespace exists.  If it isn't a NotFound, just try to create the SA.
 		// It'll probably fail, but perhaps that will have a better message.
 		if _, err := b.CoreClient.Namespaces().Get(b.Namespace); apierrors.IsNotFound(err) {
-			_, err = b.CoreClient.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: b.Namespace}})
+			_, err = b.CoreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: v1.ObjectMeta{Name: b.Namespace}})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return nil, err
 			}
 		}
 
 		sa, err = b.CoreClient.ServiceAccounts(b.Namespace).Create(
-			&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Namespace: b.Namespace, Name: name}})
+			&v1.ServiceAccount{ObjectMeta: v1.ObjectMeta{Namespace: b.Namespace, Name: name}})
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	lw := &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
+		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)}).String()
 			return b.CoreClient.Secrets(b.Namespace).List(options)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
+		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)}).String()
 			return b.CoreClient.Secrets(b.Namespace).Watch(options)
 		},
 	}
@@ -128,13 +129,13 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 				return false, fmt.Errorf("error watching")
 
 			case watch.Added, watch.Modified:
-				secret := event.Object.(*api.Secret)
+				secret := event.Object.(*v1.Secret)
 				if !serviceaccount.IsServiceAccountToken(secret, sa) ||
-					len(secret.Data[api.ServiceAccountTokenKey]) == 0 {
+					len(secret.Data[v1.ServiceAccountTokenKey]) == 0 {
 					return false, nil
 				}
 				// TODO maybe verify the token is valid
-				clientConfig.BearerToken = string(secret.Data[api.ServiceAccountTokenKey])
+				clientConfig.BearerToken = string(secret.Data[v1.ServiceAccountTokenKey])
 				restclient.AddUserAgent(clientConfig, serviceaccount.MakeUsername(b.Namespace, name))
 				return true, nil
 

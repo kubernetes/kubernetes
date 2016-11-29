@@ -30,7 +30,7 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 	"k8s.io/kubernetes/pkg/util/clock"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type calledDetail struct {
@@ -580,7 +580,7 @@ type FakeDockerPuller struct {
 }
 
 // Pull records the image pull attempt, and optionally injects an error.
-func (f *FakeDockerPuller) Pull(image string, secrets []api.Secret) (err error) {
+func (f *FakeDockerPuller) Pull(image string, secrets []v1.Secret) (err error) {
 	f.Lock()
 	defer f.Unlock()
 	f.ImagesPulled = append(f.ImagesPulled, image)

@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 
 	"github.com/emicklei/go-restful"
@@ -115,7 +116,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 // getResourceKind returns the external group version kind registered for the given storage
 // object. If the storage object is a subresource and has an override supplied for it, it returns
 // the group version kind supplied in the override.
-func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (unversioned.GroupVersionKind, error) {
+func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schema.GroupVersionKind, error) {
 	if fqKindToRegister, ok := a.group.SubresourceGroupVersionKind[path]; ok {
 		return fqKindToRegister, nil
 	}
@@ -123,12 +124,12 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (unver
 	object := storage.New()
 	fqKinds, _, err := a.group.Typer.ObjectKinds(object)
 	if err != nil {
-		return unversioned.GroupVersionKind{}, err
+		return schema.GroupVersionKind{}, err
 	}
 
 	// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
 	// we're trying to register here
-	fqKindToRegister := unversioned.GroupVersionKind{}
+	fqKindToRegister := schema.GroupVersionKind{}
 	for _, fqKind := range fqKinds {
 		if fqKind.Group == a.group.GroupVersion.Group {
 			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
@@ -141,7 +142,7 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (unver
 		}
 	}
 	if fqKindToRegister.Empty() {
-		return unversioned.GroupVersionKind{}, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
+		return schema.GroupVersionKind{}, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
 	}
 	return fqKindToRegister, nil
 }
@@ -274,7 +275,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var (
 		getOptions             runtime.Object
 		versionedGetOptions    runtime.Object
-		getOptionsInternalKind unversioned.GroupVersionKind
+		getOptionsInternalKind schema.GroupVersionKind
 		getSubpath             bool
 	)
 	if isGetterWithOptions {
@@ -303,7 +304,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var (
 		connectOptions             runtime.Object
 		versionedConnectOptions    runtime.Object
-		connectOptionsInternalKind unversioned.GroupVersionKind
+		connectOptionsInternalKind schema.GroupVersionKind
 		connectSubpath             bool
 	)
 	if isConnecter {

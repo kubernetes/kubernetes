@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -139,5 +140,72 @@ func TestCmdTokenSource(t *testing.T) {
 		if !reflect.DeepEqual(tok, tc.tok) {
 			t.Errorf("%s got token %v, want %v", tc.name, tok, tc.tok)
 		}
+	}
+}
+
+type fakePersister struct {
+	lk    sync.Mutex
+	cache map[string]string
+}
+
+func (f *fakePersister) Persist(cache map[string]string) error {
+	f.lk.Lock()
+	defer f.lk.Unlock()
+	f.cache = map[string]string{}
+	for k, v := range cache {
+		f.cache[k] = v
+	}
+	return nil
+}
+
+func (f *fakePersister) read() map[string]string {
+	ret := map[string]string{}
+	f.lk.Lock()
+	for k, v := range f.cache {
+		ret[k] = v
+	}
+	return ret
+}
+
+type fakeTokenSource struct {
+	token *oauth2.Token
+	err   error
+}
+
+func (f *fakeTokenSource) Token() (*oauth2.Token, error) {
+	return f.token, f.err
+}
+
+func TestCachedTokenSource(t *testing.T) {
+	tok := &oauth2.Token{AccessToken: "fakeaccesstoken"}
+	persister := &fakePersister{}
+	source := &fakeTokenSource{
+		token: tok,
+		err:   nil,
+	}
+	cache := map[string]string{
+		"foo": "bar",
+		"baz": "bazinga",
+	}
+	ts, err := newCachedTokenSource("fakeaccesstoken", "", persister, source, cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			_, err := ts.Token()
+			if err != nil {
+				t.Errorf("unexpected error: %s", err)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	cache["access-token"] = "fakeaccesstoken"
+	cache["expiry"] = tok.Expiry.Format(time.RFC3339Nano)
+	if got := persister.read(); !reflect.DeepEqual(got, cache) {
+		t.Errorf("got cache %v, want %v", got, cache)
 	}
 }

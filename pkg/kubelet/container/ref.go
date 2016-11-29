@@ -19,25 +19,25 @@ package container
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 var ImplicitContainerPrefix string = "implicitly required container "
 
-// GenerateContainerRef returns an *api.ObjectReference which references the given container
+// GenerateContainerRef returns an *v1.ObjectReference which references the given container
 // within the given pod. Returns an error if the reference can't be constructed or the
 // container doesn't actually belong to the pod.
 //
 // This function will return an error if the provided Pod does not have a selfLink,
 // but we expect selfLink to be populated at all call sites for the function.
-func GenerateContainerRef(pod *api.Pod, container *api.Container) (*api.ObjectReference, error) {
+func GenerateContainerRef(pod *v1.Pod, container *v1.Container) (*v1.ObjectReference, error) {
 	fieldPath, err := fieldPath(pod, container)
 	if err != nil {
 		// TODO: figure out intelligent way to refer to containers that we implicitly
 		// start (like the pod infra container). This is not a good way, ugh.
 		fieldPath = ImplicitContainerPrefix + container.Name
 	}
-	ref, err := api.GetPartialReference(pod, fieldPath)
+	ref, err := v1.GetPartialReference(pod, fieldPath)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func GenerateContainerRef(pod *api.Pod, container *api.Container) (*api.ObjectRe
 
 // fieldPath returns a fieldPath locating container within pod.
 // Returns an error if the container isn't part of the pod.
-func fieldPath(pod *api.Pod, container *api.Container) (string, error) {
+func fieldPath(pod *v1.Pod, container *v1.Container) (string, error) {
 	for i := range pod.Spec.Containers {
 		here := &pod.Spec.Containers[i]
 		if here.Name == container.Name {

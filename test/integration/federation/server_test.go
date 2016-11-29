@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
@@ -80,7 +81,7 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 var securePort = 6443 + 2
 var insecurePort = 8080 + 2
 var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
-var groupVersions = []unversioned.GroupVersion{
+var groupVersions = []schema.GroupVersion{
 	fed_v1b1.SchemeGroupVersion,
 	ext_v1b1.SchemeGroupVersion,
 }

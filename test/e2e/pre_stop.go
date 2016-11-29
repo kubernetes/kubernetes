@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -36,16 +36,16 @@ type State struct {
 
 func testPreStop(c clientset.Interface, ns string) {
 	// This is the server that will receive the preStop notification
-	podDescr := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	podDescr := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "server",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "server",
 					Image: "gcr.io/google_containers/nettest:1.7",
-					Ports: []api.ContainerPort{{ContainerPort: 8080}},
+					Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 				},
 			},
 		},
@@ -69,19 +69,19 @@ func testPreStop(c clientset.Interface, ns string) {
 	podOut, err := c.Core().Pods(ns).Get(podDescr.Name)
 	framework.ExpectNoError(err, "getting pod info")
 
-	preStopDescr := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	preStopDescr := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "tester",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:    "tester",
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"sleep", "600"},
-					Lifecycle: &api.Lifecycle{
-						PreStop: &api.Handler{
-							Exec: &api.ExecAction{
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.Handler{
+							Exec: &v1.ExecAction{
 								Command: []string{
 									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s:8080/write", podOut.Status.PodIP),
 								},

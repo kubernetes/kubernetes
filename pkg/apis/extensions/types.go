@@ -124,7 +124,6 @@ type ThirdPartyResource struct {
 	Description string `json:"description,omitempty"`
 
 	// Versions are versions for this third party object
-	// +optional
 	Versions []APIVersion `json:"versions,omitempty"`
 }
 
@@ -143,7 +142,6 @@ type ThirdPartyResourceList struct {
 // TODO: we should consider merge this struct with GroupVersion in unversioned.go
 type APIVersion struct {
 	// Name of this version (e.g. 'v1').
-	// +optional
 	Name string `json:"name,omitempty"`
 }
 

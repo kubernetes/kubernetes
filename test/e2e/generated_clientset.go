@@ -121,7 +121,7 @@ func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
 var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, delete pods, watch pods", func() {
-		podClient := f.ClientSet_1_5.Core().Pods(f.Namespace.Name)
+		podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 		By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -240,7 +240,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs", func() {
 		var enabled bool
-		groupList, err := f.ClientSet_1_5.Discovery().ServerGroups()
+		groupList, err := f.ClientSet.Discovery().ServerGroups()
 		ExpectNoError(err)
 		for _, group := range groupList.Groups {
 			if group.Name == v2alpha1.GroupName {
@@ -256,7 +256,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 			framework.Logf("%s is not enabled, test skipped", v2alpha1.SchemeGroupVersion)
 			return
 		}
-		cronJobClient := f.ClientSet_1_5.BatchV2alpha1().CronJobs(f.Namespace.Name)
+		cronJobClient := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name)
 		By("constructing the cronJob")
 		name := "cronjob" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())

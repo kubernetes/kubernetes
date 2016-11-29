@@ -23,12 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/labels"
@@ -76,7 +75,7 @@ type testCase struct {
 
 	namespace    string
 	selector     labels.Selector
-	resourceName api.ResourceName
+	resourceName v1.ResourceName
 	metricName   string
 }
 
@@ -93,10 +92,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &api.PodList{}
+		obj := &v1.PodList{}
 		for i := 0; i < tc.replicas; i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-			pod := buildPod(namespace, podName, podLabels, api.PodRunning, "1024")
+			pod := buildPod(namespace, podName, podLabels, v1.PodRunning, "1024")
 			obj.Items = append(obj.Items, pod)
 		}
 		return true, obj, nil
@@ -161,30 +160,30 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	return fakeClient
 }
 
-func buildPod(namespace, podName string, podLabels map[string]string, phase api.PodPhase, request string) api.Pod {
-	return api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func buildPod(namespace, podName string, podLabels map[string]string, phase v1.PodPhase, request string) v1.Pod {
+	return v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      podName,
 			Namespace: namespace,
 			Labels:    podLabels,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceCPU: resource.MustParse(request),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse(request),
 						},
 					},
 				},
 			},
 		},
-		Status: api.PodStatus{
+		Status: v1.PodStatus{
 			Phase: phase,
-			Conditions: []api.PodCondition{
+			Conditions: []v1.PodCondition{
 				{
-					Type:   api.PodReady,
-					Status: api.ConditionTrue,
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
 				},
 			},
 		},
@@ -231,7 +230,7 @@ func TestCPU(t *testing.T) {
 		desiredResourceValues: PodResourceInfo{
 			"test-pod-0": 5000, "test-pod-1": 5000, "test-pod-2": 5000,
 		},
-		resourceName:       api.ResourceCPU,
+		resourceName:       v1.ResourceCPU,
 		targetTimestamp:    1,
 		reportedPodMetrics: [][]int64{{5000}, {5000}, {5000}},
 	}
@@ -271,7 +270,7 @@ func TestCPUMoreMetrics(t *testing.T) {
 			"test-pod-0": 5000, "test-pod-1": 5000, "test-pod-2": 5000,
 			"test-pod-3": 5000, "test-pod-4": 5000,
 		},
-		resourceName:       api.ResourceCPU,
+		resourceName:       v1.ResourceCPU,
 		targetTimestamp:    10,
 		reportedPodMetrics: [][]int64{{1000, 2000, 2000}, {5000}, {1000, 1000, 1000, 2000}, {4000, 1000}, {5000}},
 	}
@@ -284,7 +283,7 @@ func TestCPUMissingMetrics(t *testing.T) {
 		desiredResourceValues: PodResourceInfo{
 			"test-pod-0": 4000,
 		},
-		resourceName:       api.ResourceCPU,
+		resourceName:       v1.ResourceCPU,
 		reportedPodMetrics: [][]int64{{4000}},
 	}
 	tc.runTest(t)
@@ -314,7 +313,7 @@ func TestQpsSuperfluousMetrics(t *testing.T) {
 func TestCPUEmptyMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		resourceName:          api.ResourceCPU,
+		resourceName:          v1.ResourceCPU,
 		desiredError:          fmt.Errorf("no metrics returned from heapster"),
 		reportedMetricsPoints: [][]metricPoint{},
 		reportedPodMetrics:    [][]int64{},
@@ -338,7 +337,7 @@ func TestQpsEmptyEntries(t *testing.T) {
 func TestCPUZeroReplicas(t *testing.T) {
 	tc := testCase{
 		replicas:           0,
-		resourceName:       api.ResourceCPU,
+		resourceName:       v1.ResourceCPU,
 		desiredError:       fmt.Errorf("no metrics returned from heapster"),
 		reportedPodMetrics: [][]int64{},
 	}
@@ -348,7 +347,7 @@ func TestCPUZeroReplicas(t *testing.T) {
 func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc := testCase{
 		replicas:     3,
-		resourceName: api.ResourceCPU,
+		resourceName: v1.ResourceCPU,
 		desiredResourceValues: PodResourceInfo{
 			"test-pod-0": 100, "test-pod-1": 700,
 		},

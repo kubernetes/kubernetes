@@ -28,26 +28,28 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestFinalized(t *testing.T) {
-	testNamespace := &api.Namespace{
-		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{"a", "b"},
+	testNamespace := &v1.Namespace{
+		Spec: v1.NamespaceSpec{
+			Finalizers: []v1.FinalizerName{"a", "b"},
 		},
 	}
 	if finalized(testNamespace) {
 		t.Errorf("Unexpected result, namespace is not finalized")
 	}
-	testNamespace.Spec.Finalizers = []api.FinalizerName{}
+	testNamespace.Spec.Finalizers = []v1.FinalizerName{}
 	if !finalized(testNamespace) {
 		t.Errorf("Expected object to be finalized")
 	}
@@ -55,16 +57,16 @@ func TestFinalized(t *testing.T) {
 
 func TestFinalizeNamespaceFunc(t *testing.T) {
 	mockClient := &fake.Clientset{}
-	testNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	testNamespace := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
 		},
-		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{"kubernetes", "other"},
+		Spec: v1.NamespaceSpec{
+			Finalizers: []v1.FinalizerName{"kubernetes", "other"},
 		},
 	}
-	finalizeNamespace(mockClient, testNamespace, api.FinalizerKubernetes)
+	finalizeNamespace(mockClient, testNamespace, v1.FinalizerKubernetes)
 	actions := mockClient.Actions()
 	if len(actions) != 1 {
 		t.Errorf("Expected 1 mock client action, but got %v", len(actions))
@@ -72,7 +74,7 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 	if !actions[0].Matches("create", "namespaces") || actions[0].GetSubresource() != "finalize" {
 		t.Errorf("Expected finalize-namespace action %v", actions[0])
 	}
-	finalizers := actions[0].(core.CreateAction).GetObject().(*api.Namespace).Spec.Finalizers
+	finalizers := actions[0].(core.CreateAction).GetObject().(*v1.Namespace).Spec.Finalizers
 	if len(finalizers) != 1 {
 		t.Errorf("There should be a single finalizer remaining")
 	}
@@ -84,28 +86,28 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIVersions) {
 	now := unversioned.Now()
 	namespaceName := "test"
-	testNamespacePendingFinalize := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	testNamespacePendingFinalize := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
 			Name:              namespaceName,
 			ResourceVersion:   "1",
 			DeletionTimestamp: &now,
 		},
-		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{"kubernetes"},
+		Spec: v1.NamespaceSpec{
+			Finalizers: []v1.FinalizerName{"kubernetes"},
 		},
-		Status: api.NamespaceStatus{
-			Phase: api.NamespaceTerminating,
+		Status: v1.NamespaceStatus{
+			Phase: v1.NamespaceTerminating,
 		},
 	}
-	testNamespaceFinalizeComplete := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	testNamespaceFinalizeComplete := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
 			Name:              namespaceName,
 			ResourceVersion:   "1",
 			DeletionTimestamp: &now,
 		},
-		Spec: api.NamespaceSpec{},
-		Status: api.NamespaceStatus{
-			Phase: api.NamespaceTerminating,
+		Spec: v1.NamespaceSpec{},
+		Status: v1.NamespaceStatus{
+			Phase: v1.NamespaceTerminating,
 		},
 	}
 
@@ -114,7 +116,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	groupVersionResources := testGroupVersionResources()
 	for _, groupVersionResource := range groupVersionResources {
 		urlPath := path.Join([]string{
-			dynamic.LegacyAPIPathResolverFunc(unversioned.GroupVersionKind{Group: groupVersionResource.Group, Version: groupVersionResource.Version}),
+			dynamic.LegacyAPIPathResolverFunc(schema.GroupVersionKind{Group: groupVersionResource.Group, Version: groupVersionResource.Version}),
 			groupVersionResource.Group,
 			groupVersionResource.Version,
 			"namespaces",
@@ -126,9 +128,10 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	}
 
 	scenarios := map[string]struct {
-		testNamespace          *api.Namespace
+		testNamespace          *v1.Namespace
 		kubeClientActionSet    sets.String
 		dynamicClientActionSet sets.String
+		gvrError               error
 	}{
 		"pending-finalize": {
 			testNamespace: testNamespacePendingFinalize,
@@ -148,6 +151,15 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 			),
 			dynamicClientActionSet: sets.NewString(),
 		},
+		"groupVersionResourceErr": {
+			testNamespace: testNamespaceFinalizeComplete,
+			kubeClientActionSet: sets.NewString(
+				strings.Join([]string{"get", "namespaces", ""}, "-"),
+				strings.Join([]string{"delete", "namespaces", ""}, "-"),
+			),
+			dynamicClientActionSet: sets.NewString(),
+			gvrError:               fmt.Errorf("test error"),
+		},
 	}
 
 	for scenario, testInput := range scenarios {
@@ -158,7 +170,11 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
 		clientPool := dynamic.NewClientPool(clientConfig, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 
-		err := syncNamespace(mockClient, clientPool, &operationNotSupportedCache{m: make(map[operationKey]bool)}, groupVersionResources, testInput.testNamespace, api.FinalizerKubernetes)
+		fn := func() ([]schema.GroupVersionResource, error) {
+			return groupVersionResources, nil
+		}
+
+		err := syncNamespace(mockClient, clientPool, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testInput.testNamespace, v1.FinalizerKubernetes)
 		if err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
@@ -188,14 +204,14 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 func TestRetryOnConflictError(t *testing.T) {
 	mockClient := &fake.Clientset{}
 	numTries := 0
-	retryOnce := func(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error) {
+	retryOnce := func(kubeClient clientset.Interface, namespace *v1.Namespace) (*v1.Namespace, error) {
 		numTries++
 		if numTries <= 1 {
 			return namespace, errors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("ERROR!"))
 		}
 		return namespace, nil
 	}
-	namespace := &api.Namespace{}
+	namespace := &v1.Namespace{}
 	_, err := retryOnConflictError(mockClient, namespace, retryOnce)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -215,19 +231,22 @@ func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
 	mockClient := &fake.Clientset{}
-	testNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	testNamespace := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
 		},
-		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{"kubernetes"},
+		Spec: v1.NamespaceSpec{
+			Finalizers: []v1.FinalizerName{"kubernetes"},
 		},
-		Status: api.NamespaceStatus{
-			Phase: api.NamespaceActive,
+		Status: v1.NamespaceStatus{
+			Phase: v1.NamespaceActive,
 		},
 	}
-	err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, testGroupVersionResources(), testNamespace, api.FinalizerKubernetes)
+	fn := func() ([]schema.GroupVersionResource, error) {
+		return testGroupVersionResources(), nil
+	}
+	err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testNamespace, v1.FinalizerKubernetes)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
@@ -277,10 +296,10 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 }
 
 // testGroupVersionResources returns a mocked up set of resources across different api groups for testing namespace controller.
-func testGroupVersionResources() []unversioned.GroupVersionResource {
-	results := []unversioned.GroupVersionResource{}
-	results = append(results, unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
-	results = append(results, unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "services"})
-	results = append(results, unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
+func testGroupVersionResources() []schema.GroupVersionResource {
+	results := []schema.GroupVersionResource{}
+	results = append(results, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
+	results = append(results, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"})
+	results = append(results, schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
 	return results
 }

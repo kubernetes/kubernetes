@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
@@ -57,14 +57,14 @@ type ObjectTestExternal struct {
 	Items []runtime.RawExtension `json:"items,omitempty"`
 }
 
-func (obj *ObjectTest) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
-func (obj *ObjectTestExternal) GetObjectKind() unversioned.ObjectKind   { return &obj.TypeMeta }
-func (obj *EmbeddedTest) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
-func (obj *EmbeddedTestExternal) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ObjectTest) GetObjectKind() schema.ObjectKind           { return &obj.TypeMeta }
+func (obj *ObjectTestExternal) GetObjectKind() schema.ObjectKind   { return &obj.TypeMeta }
+func (obj *EmbeddedTest) GetObjectKind() schema.ObjectKind         { return &obj.TypeMeta }
+func (obj *EmbeddedTestExternal) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
-	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
+	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Group: "test.group", Version: "v1test"}
 	externalGVK := externalGV.WithKind("ObjectTest")
 
 	s := runtime.NewScheme()
@@ -99,8 +99,8 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 }
 
 func TestArrayOfRuntimeObject(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
-	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
+	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Group: "test.group", Version: "v1test"}
 
 	s := runtime.NewScheme()
 	s.AddKnownTypes(internalGV, &EmbeddedTest{})
@@ -174,8 +174,8 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 }
 
 func TestNestedObject(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
-	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
+	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Group: "test.group", Version: "v1test"}
 	embeddedTestExternalGVK := externalGV.WithKind("EmbeddedTest")
 
 	s := runtime.NewScheme()
@@ -250,8 +250,8 @@ func TestNestedObject(t *testing.T) {
 
 // TestDeepCopyOfRuntimeObject checks to make sure that runtime.Objects's can be passed through DeepCopy with fidelity
 func TestDeepCopyOfRuntimeObject(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
-	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
+	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Group: "test.group", Version: "v1test"}
 	embeddedTestExternalGVK := externalGV.WithKind("EmbeddedTest")
 
 	s := runtime.NewScheme()

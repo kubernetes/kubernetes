@@ -20,10 +20,10 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
@@ -52,7 +52,7 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 	req, err := client.Create(&certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
-		ObjectMeta: api.ObjectMeta{GenerateName: "csr-"},
+		ObjectMeta: v1.ObjectMeta{GenerateName: "csr-"},
 
 		// TODO: For now, this is a request for a certificate with allowed usage of "TLS Web Client Authentication".
 		// Need to figure out whether/how to surface the allowed usage in the spec.
@@ -65,10 +65,10 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 
 	// Make a default timeout = 3600s.
 	var defaultTimeoutSeconds int64 = 3600
-	resultCh, err := client.Watch(api.ListOptions{
+	resultCh, err := client.Watch(v1.ListOptions{
 		Watch:          true,
 		TimeoutSeconds: &defaultTimeoutSeconds,
-		FieldSelector:  fields.OneTermEqualSelector("metadata.name", req.Name),
+		FieldSelector:  fields.OneTermEqualSelector("metadata.name", req.Name).String(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)

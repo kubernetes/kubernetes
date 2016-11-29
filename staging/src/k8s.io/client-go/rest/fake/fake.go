@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/testapi"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/apimachinery/registered"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/rest"
 )
@@ -78,7 +78,7 @@ func (c *RESTClient) Verb(verb string) *rest.Request {
 	return c.request(verb)
 }
 
-func (c *RESTClient) APIVersion() unversioned.GroupVersion {
+func (c *RESTClient) APIVersion() schema.GroupVersion {
 	return *(testapi.Default.GroupVersion())
 }
 
@@ -99,7 +99,7 @@ func (c *RESTClient) request(verb string) *rest.Request {
 	}
 	ns := c.NegotiatedSerializer
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	internalVersion := unversioned.GroupVersion{
+	internalVersion := schema.GroupVersion{
 		Group:   registered.GroupOrDie(groupName).GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}

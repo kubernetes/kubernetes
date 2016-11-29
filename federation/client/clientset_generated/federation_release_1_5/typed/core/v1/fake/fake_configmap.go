@@ -18,10 +18,10 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +31,7 @@ type FakeConfigMaps struct {
 	ns   string
 }
 
-var configmapsResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+var configmapsResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
 
 func (c *FakeConfigMaps) Create(configMap *v1.ConfigMap) (result *v1.ConfigMap, err error) {
 	obj, err := c.Fake.

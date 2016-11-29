@@ -28,8 +28,6 @@ import (
 	federationcache "k8s.io/kubernetes/federation/client/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
@@ -105,8 +103,9 @@ type ServiceController struct {
 	federationName   string
 	// serviceDnsSuffix is the DNS suffix we use when publishing service DNS names
 	serviceDnsSuffix string
-	// zoneName is used to identify the zone in which to put records
+	// zoneName and zoneID are used to identify the zone in which to put records
 	zoneName string
+	zoneID   string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
 	dnsZones     dnsprovider.Zones
 	serviceCache *serviceCache
@@ -140,11 +139,11 @@ type ServiceController struct {
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 
 func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
-	federationName, serviceDnsSuffix, zoneName string) *ServiceController {
+	federationName, serviceDnsSuffix, zoneName string, zoneID string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: UserAgentName})
+	recorder := broadcaster.NewRecorder(v1.EventSource{Component: UserAgentName})
 
 	s := &ServiceController{
 		dns:              dns,
@@ -152,6 +151,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		federationName:   federationName,
 		serviceDnsSuffix: serviceDnsSuffix,
 		zoneName:         zoneName,
+		zoneID:           zoneID,
 		serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 		clusterCache: &clusterClientCache{
 			rwlock:    sync.Mutex{},
@@ -164,13 +164,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	}
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return s.federationClient.Core().Services(v1.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},
@@ -189,13 +187,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return s.federationClient.Federation().Clusters().List(versionedOptions)
+			ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+				return s.federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return s.federationClient.Federation().Clusters().Watch(versionedOptions)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return s.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
 		&v1beta1.Cluster{},
@@ -279,8 +275,8 @@ func (s *ServiceController) init() error {
 	if s.federationName == "" {
 		return fmt.Errorf("ServiceController should not be run without federationName.")
 	}
-	if s.zoneName == "" {
-		return fmt.Errorf("ServiceController should not be run without zoneName.")
+	if s.zoneName == "" && s.zoneID == "" {
+		return fmt.Errorf("ServiceController must be run with either zoneName or zoneID.")
 	}
 	if s.serviceDnsSuffix == "" {
 		// TODO: Is this the right place to do defaulting?
@@ -297,7 +293,14 @@ func (s *ServiceController) init() error {
 		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records.")
 	}
 	s.dnsZones = zones
-	if _, err := getDnsZone(s.zoneName, s.dnsZones); err != nil {
+	matchingZones, err := getDnsZones(s.zoneName, s.zoneID, s.dnsZones)
+	if err != nil {
+		return fmt.Errorf("error querying for DNS zones: %v", err)
+	}
+	if len(matchingZones) == 0 {
+		if s.zoneName == "" {
+			return fmt.Errorf("ServiceController must be run with zoneName to create zone automatically.")
+		}
 		glog.Infof("DNS zone %q not found.  Creating DNS zone %q.", s.zoneName, s.zoneName)
 		managedZone, err := s.dnsZones.New(s.zoneName)
 		if err != nil {
@@ -309,6 +312,9 @@ func (s *ServiceController) init() error {
 		}
 		glog.Infof("DNS zone %q successfully created.  Note that DNS resolution will not work until you have registered this name with "+
 			"a DNS registrar and they have changed the authoritative name servers for your domain to point to your DNS provider.", zone.Name())
+	}
+	if len(matchingZones) > 1 {
+		return fmt.Errorf("Multiple matching DNS zones found for %q; please specify zoneID", s.zoneName)
 	}
 	return nil
 }

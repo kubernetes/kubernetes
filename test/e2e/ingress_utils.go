@@ -38,12 +38,13 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -280,16 +281,16 @@ func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host
 	}
 	cert := c.Bytes()
 	key := k.Bytes()
-	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+	secret := &v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
 			Name: tls.SecretName,
 		},
 		Data: map[string][]byte{
-			api.TLSCertKey:       cert,
-			api.TLSPrivateKeyKey: key,
+			v1.TLSCertKey:       cert,
+			v1.TLSPrivateKeyKey: key,
 		},
 	}
-	var s *api.Secret
+	var s *v1.Secret
 	if s, err = kubeClient.Core().Secrets(ing.Namespace).Get(tls.SecretName); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
 		framework.Logf("Updating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
@@ -841,8 +842,8 @@ type GCEIngressController struct {
 	rcPath       string
 	UID          string
 	staticIPName string
-	rc           *api.ReplicationController
-	svc          *api.Service
+	rc           *v1.ReplicationController
+	svc          *v1.Service
 	c            clientset.Interface
 	cloud        framework.CloudConfig
 }
@@ -854,8 +855,8 @@ func newTestJig(c clientset.Interface) *testJig {
 // NginxIngressController manages implementation details of Ingress on Nginx.
 type NginxIngressController struct {
 	ns         string
-	rc         *api.ReplicationController
-	pod        *api.Pod
+	rc         *v1.ReplicationController
+	pod        *v1.Pod
 	c          clientset.Interface
 	externalIP string
 }
@@ -874,7 +875,7 @@ func (cont *NginxIngressController) init() {
 	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
-	pods, err := cont.c.Core().Pods(cont.ns).List(api.ListOptions{LabelSelector: sel})
+	pods, err := cont.c.Core().Pods(cont.ns).List(v1.ListOptions{LabelSelector: sel.String()})
 	ExpectNoError(err)
 	if len(pods.Items) == 0 {
 		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)

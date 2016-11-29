@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	fcache "k8s.io/kubernetes/pkg/client/testing/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -51,7 +51,7 @@ func Example() {
 	cfg := &Config{
 		Queue:            fifo,
 		ListerWatcher:    source,
-		ObjectType:       &api.Pod{},
+		ObjectType:       &v1.Pod{},
 		FullResyncPeriod: time.Millisecond * 100,
 		RetryOnError:     false,
 
@@ -101,7 +101,7 @@ func Example() {
 	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
-		source.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: name}})
+		source.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: name}})
 	}
 
 	// Let's wait for the controller to process the things we just added.
@@ -130,7 +130,7 @@ func ExampleNewInformer() {
 	// logs anything deleted.
 	_, controller := NewInformer(
 		source,
-		&api.Pod{},
+		&v1.Pod{},
 		time.Millisecond*100,
 		ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
@@ -158,7 +158,7 @@ func ExampleNewInformer() {
 	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
-		source.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: name}})
+		source.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: name}})
 	}
 
 	// Let's wait for the controller to process the things we just added.
@@ -206,7 +206,7 @@ func TestHammerController(t *testing.T) {
 	// Make a controller which just logs all the changes it gets.
 	_, controller := NewInformer(
 		source,
-		&api.Pod{},
+		&v1.Pod{},
 		time.Millisecond*100,
 		ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { recordFunc("add", obj) },
@@ -253,7 +253,7 @@ func TestHammerController(t *testing.T) {
 					name = l[r.Intn(len(l))]
 				}
 
-				pod := &api.Pod{}
+				pod := &v1.Pod{}
 				f.Fuzz(pod)
 				pod.ObjectMeta.Name = name
 				pod.ObjectMeta.Namespace = "default"
@@ -315,9 +315,9 @@ func TestUpdate(t *testing.T) {
 		pair{FROM, FROM}: true,
 	}
 
-	pod := func(name, check string, final bool) *api.Pod {
-		p := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+	pod := func(name, check string, final bool) *v1.Pod {
+		p := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name:   name,
 				Labels: map[string]string{"check": check},
 			},
@@ -327,7 +327,7 @@ func TestUpdate(t *testing.T) {
 		}
 		return p
 	}
-	deletePod := func(p *api.Pod) bool {
+	deletePod := func(p *v1.Pod) bool {
 		return p.Labels["final"] == "true"
 	}
 
@@ -350,20 +350,20 @@ func TestUpdate(t *testing.T) {
 	watchCh := make(chan struct{})
 	_, controller := NewInformer(
 		&testLW{
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
 				close(watchCh)
 				return watch, err
 			},
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return source.List(options)
 			},
 		},
-		&api.Pod{},
+		&v1.Pod{},
 		0,
 		ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				o, n := oldObj.(*api.Pod), newObj.(*api.Pod)
+				o, n := oldObj.(*v1.Pod), newObj.(*v1.Pod)
 				from, to := o.Labels["check"], n.Labels["check"]
 				if !allowedTransitions[pair{from, to}] {
 					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)

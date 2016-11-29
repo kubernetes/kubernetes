@@ -25,14 +25,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type nodeMutationFunc func(t *testing.T, n *api.Node, nodeStore cache.Store, c clientset.Interface)
+type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeStore cache.Store, c clientset.Interface)
 
 type nodeStateManager struct {
 	makeSchedulable   nodeMutationFunc
@@ -57,16 +57,16 @@ func TestUnschedulableNodes(t *testing.T) {
 	ns := framework.CreateTestingNamespace("unschedulable-nodes", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
-	schedulerConfigFactory := factory.NewConfigFactory(clientSet, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: clientSet.Core().Events(ns.Name)})
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: v1.DefaultSchedulerName})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: clientSet.Core().Events(ns.Name)})
 	scheduler.New(schedulerConfig).Run()
 
 	defer close(schedulerConfig.StopEverything)
@@ -94,7 +94,7 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 // Wait till the passFunc confirms that the object it expects to see is in the store.
 // Used to observe reflected events.
 func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n interface{}) bool) error {
-	nodes := []*api.Node{}
+	nodes := []*v1.Node{}
 	err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
 		if n, _, err := s.GetByKey(key); err == nil && passFunc(n) {
 			return true, nil
@@ -105,7 +105,7 @@ func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n 
 				if n == nil {
 					nodes = append(nodes, nil)
 				} else {
-					nodes = append(nodes, n.(*api.Node))
+					nodes = append(nodes, n.(*v1.Node))
 				}
 			}
 			return false, nil
@@ -120,33 +120,33 @@ func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n 
 	return err
 }
 
-func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *api.Namespace, nodeStore cache.Store) {
+func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Namespace, nodeStore cache.Store) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.Core().Nodes().DeleteCollection(nil, api.ListOptions{})
+	defer cs.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
 
-	goodCondition := api.NodeCondition{
-		Type:              api.NodeReady,
-		Status:            api.ConditionTrue,
+	goodCondition := v1.NodeCondition{
+		Type:              v1.NodeReady,
+		Status:            v1.ConditionTrue,
 		Reason:            fmt.Sprintf("schedulable condition"),
 		LastHeartbeatTime: unversioned.Time{time.Now()},
 	}
-	badCondition := api.NodeCondition{
-		Type:              api.NodeReady,
-		Status:            api.ConditionUnknown,
+	badCondition := v1.NodeCondition{
+		Type:              v1.NodeReady,
+		Status:            v1.ConditionUnknown,
 		Reason:            fmt.Sprintf("unschedulable condition"),
 		LastHeartbeatTime: unversioned.Time{time.Now()},
 	}
 	// Create a new schedulable node, since we're first going to apply
 	// the unschedulable condition and verify that pods aren't scheduled.
-	node := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "node-scheduling-test-node"},
-		Spec:       api.NodeSpec{Unschedulable: false},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+	node := &v1.Node{
+		ObjectMeta: v1.ObjectMeta{Name: "node-scheduling-test-node"},
+		Spec:       v1.NodeSpec{Unschedulable: false},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 			},
-			Conditions: []api.NodeCondition{goodCondition},
+			Conditions: []v1.NodeCondition{goodCondition},
 		},
 	}
 	nodeKey, err := cache.MetaNamespaceKeyFunc(node)
@@ -166,7 +166,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *api.Name
 	nodeModifications := []nodeStateManager{
 		// Test node.Spec.Unschedulable=true/false
 		{
-			makeUnSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c clientset.Interface) {
+			makeUnSchedulable: func(t *testing.T, n *v1.Node, s cache.Store, c clientset.Interface) {
 				n.Spec.Unschedulable = true
 				if _, err := c.Core().Nodes().Update(n); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=true: %v", err)
@@ -176,19 +176,19 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *api.Name
 					// Nodes that are unschedulable or that are not ready or
 					// have their disk full (Node.Spec.Conditions) are exluded
 					// based on NodeConditionPredicate, a separate check
-					return node != nil && node.(*api.Node).Spec.Unschedulable == true
+					return node != nil && node.(*v1.Node).Spec.Unschedulable == true
 				})
 				if err != nil {
 					t.Fatalf("Failed to observe reflected update for setting unschedulable=true: %v", err)
 				}
 			},
-			makeSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c clientset.Interface) {
+			makeSchedulable: func(t *testing.T, n *v1.Node, s cache.Store, c clientset.Interface) {
 				n.Spec.Unschedulable = false
 				if _, err := c.Core().Nodes().Update(n); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=false: %v", err)
 				}
 				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
-					return node != nil && node.(*api.Node).Spec.Unschedulable == false
+					return node != nil && node.(*v1.Node).Spec.Unschedulable == false
 				})
 				if err != nil {
 					t.Fatalf("Failed to observe reflected update for setting unschedulable=false: %v", err)
@@ -197,35 +197,35 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *api.Name
 		},
 		// Test node.Status.Conditions=ConditionTrue/Unknown
 		{
-			makeUnSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c clientset.Interface) {
-				n.Status = api.NodeStatus{
-					Capacity: api.ResourceList{
-						api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+			makeUnSchedulable: func(t *testing.T, n *v1.Node, s cache.Store, c clientset.Interface) {
+				n.Status = v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 					},
-					Conditions: []api.NodeCondition{badCondition},
+					Conditions: []v1.NodeCondition{badCondition},
 				}
 				if _, err = c.Core().Nodes().UpdateStatus(n); err != nil {
 					t.Fatalf("Failed to update node with bad status condition: %v", err)
 				}
 				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
-					return node != nil && node.(*api.Node).Status.Conditions[0].Status == api.ConditionUnknown
+					return node != nil && node.(*v1.Node).Status.Conditions[0].Status == v1.ConditionUnknown
 				})
 				if err != nil {
 					t.Fatalf("Failed to observe reflected update for status condition update: %v", err)
 				}
 			},
-			makeSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c clientset.Interface) {
-				n.Status = api.NodeStatus{
-					Capacity: api.ResourceList{
-						api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+			makeSchedulable: func(t *testing.T, n *v1.Node, s cache.Store, c clientset.Interface) {
+				n.Status = v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 					},
-					Conditions: []api.NodeCondition{goodCondition},
+					Conditions: []v1.NodeCondition{goodCondition},
 				}
 				if _, err = c.Core().Nodes().UpdateStatus(n); err != nil {
 					t.Fatalf("Failed to update node with healthy status condition: %v", err)
 				}
 				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
-					return node != nil && node.(*api.Node).Status.Conditions[0].Status == api.ConditionTrue
+					return node != nil && node.(*v1.Node).Status.Conditions[0].Status == v1.ConditionTrue
 				})
 				if err != nil {
 					t.Fatalf("Failed to observe reflected update for status condition update: %v", err)
@@ -245,10 +245,10 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *api.Name
 
 		// Create the new pod, note that this needs to happen post unschedulable
 		// modification or we have a race in the test.
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: "node-scheduling-test-pod"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{{Name: "container", Image: e2e.GetPauseImageName(cs)}},
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{Name: "node-scheduling-test-pod"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(cs)}},
 			},
 		}
 		myPod, err := cs.Core().Pods(ns.Name).Create(pod)
@@ -282,7 +282,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *api.Name
 			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
 		}
 
-		err = cs.Core().Pods(ns.Name).Delete(myPod.Name, api.NewDeleteOptions(0))
+		err = cs.Core().Pods(ns.Name).Delete(myPod.Name, v1.NewDeleteOptions(0))
 		if err != nil {
 			t.Errorf("Failed to delete pod: %v", err)
 		}
@@ -322,30 +322,30 @@ func TestMultiScheduler(t *testing.T) {
 			- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 shoule NOT be scheduled
 	*/
 	// 1. create and start default-scheduler
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer clientSet.Core().Nodes().DeleteCollection(nil, api.ListOptions{})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
 
-	schedulerConfigFactory := factory.NewConfigFactory(clientSet, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: clientSet.Core().Events(ns.Name)})
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: v1.DefaultSchedulerName})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: clientSet.Core().Events(ns.Name)})
 	scheduler.New(schedulerConfig).Run()
 	// default-scheduler will be stopped later
 
 	// 2. create a node
-	node := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "node-multi-scheduler-test-node"},
-		Spec:       api.NodeSpec{Unschedulable: false},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+	node := &v1.Node{
+		ObjectMeta: v1.ObjectMeta{Name: "node-multi-scheduler-test-node"},
+		Spec:       v1.NodeSpec{Unschedulable: false},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 			},
 		},
 	}
@@ -397,16 +397,16 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	clientSet2 := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientSet2 := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
-	schedulerConfigFactory2 := factory.NewConfigFactory(clientSet2, "foo-scheduler", api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	schedulerConfigFactory2 := factory.NewConfigFactory(clientSet2, "foo-scheduler", v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster2 := record.NewBroadcaster()
-	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(api.EventSource{Component: "foo-scheduler"})
-	eventBroadcaster2.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: clientSet2.Core().Events(ns.Name)})
+	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(v1.EventSource{Component: "foo-scheduler"})
+	eventBroadcaster2.StartRecordingToSink(&v1core.EventSinkImpl{Interface: clientSet2.Core().Events(ns.Name)})
 	scheduler.New(schedulerConfig2).Run()
 
 	defer close(schedulerConfig2.StopEverything)
@@ -421,11 +421,11 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	//	7. delete the pods that were scheduled by the default scheduler, and stop the default scheduler
-	err = clientSet.Core().Pods(ns.Name).Delete(testPodNoAnnotation.Name, api.NewDeleteOptions(0))
+	err = clientSet.Core().Pods(ns.Name).Delete(testPodNoAnnotation.Name, v1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
-	err = clientSet.Core().Pods(ns.Name).Delete(testPodWithAnnotationFitsDefault.Name, api.NewDeleteOptions(0))
+	err = clientSet.Core().Pods(ns.Name).Delete(testPodWithAnnotationFitsDefault.Name, v1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
@@ -469,11 +469,11 @@ func TestMultiScheduler(t *testing.T) {
 	*/
 }
 
-func createPod(client clientset.Interface, name string, annotation map[string]string) *api.Pod {
-	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name, Annotations: annotation},
-		Spec: api.PodSpec{
-			Containers: []api.Container{{Name: "container", Image: e2e.GetPauseImageName(client)}},
+func createPod(client clientset.Interface, name string, annotation map[string]string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{Name: name, Annotations: annotation},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(client)}},
 		},
 	}
 }
@@ -487,33 +487,33 @@ func TestAllocatable(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	// 1. create and start default-scheduler
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer clientSet.Core().Nodes().DeleteCollection(nil, api.ListOptions{})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
 
-	schedulerConfigFactory := factory.NewConfigFactory(clientSet, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: clientSet.Core().Events(ns.Name)})
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: v1.DefaultSchedulerName})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: clientSet.Core().Events(ns.Name)})
 	scheduler.New(schedulerConfig).Run()
 	// default-scheduler will be stopped later
 	defer close(schedulerConfig.StopEverything)
 
 	// 2. create a node without allocatable awareness
-	node := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "node-allocatable-scheduler-test-node"},
-		Spec:       api.NodeSpec{Unschedulable: false},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
-				api.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
+	node := &v1.Node{
+		ObjectMeta: v1.ObjectMeta{Name: "node-allocatable-scheduler-test-node"},
+		Spec:       v1.NodeSpec{Unschedulable: false},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+				v1.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
 			},
 		},
 	}
@@ -524,17 +524,17 @@ func TestAllocatable(t *testing.T) {
 	}
 
 	// 3. create resource pod which requires less than Capacity
-	podResource := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "pod-test-allocatable"},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+	podResource := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{Name: "pod-test-allocatable"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "container",
 					Image: e2e.GetPauseImageName(clientSet),
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceCPU:    *resource.NewMilliQuantity(20, resource.DecimalSI),
-							api.ResourceMemory: *resource.NewQuantity(20, resource.BinarySI),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(20, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(20, resource.BinarySI),
 						},
 					},
 				},
@@ -556,16 +556,16 @@ func TestAllocatable(t *testing.T) {
 	}
 
 	// 5. Change the node status to allocatable aware, note that Allocatable is less than Pod's requirement
-	allocNode.Status = api.NodeStatus{
-		Capacity: api.ResourceList{
-			api.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
-			api.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
+	allocNode.Status = v1.NodeStatus{
+		Capacity: v1.ResourceList{
+			v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
 		},
-		Allocatable: api.ResourceList{
-			api.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
-			api.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(10, resource.BinarySI),
+		Allocatable: v1.ResourceList{
+			v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(10, resource.BinarySI),
 		},
 	}
 
@@ -573,7 +573,7 @@ func TestAllocatable(t *testing.T) {
 		t.Fatalf("Failed to update node with Status.Allocatable: %v", err)
 	}
 
-	if err := clientSet.Core().Pods(ns.Name).Delete(podResource.Name, &api.DeleteOptions{}); err != nil {
+	if err := clientSet.Core().Pods(ns.Name).Delete(podResource.Name, &v1.DeleteOptions{}); err != nil {
 		t.Fatalf("Failed to remove first resource pod: %v", err)
 	}
 

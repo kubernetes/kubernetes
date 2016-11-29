@@ -18,11 +18,11 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,7 +32,7 @@ type FakeJobs struct {
 	ns   string
 }
 
-var jobsResource = unversioned.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "jobs"}
+var jobsResource = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "jobs"}
 
 func (c *FakeJobs) Create(job *v2alpha1.Job) (result *v2alpha1.Job, err error) {
 	obj, err := c.Fake.

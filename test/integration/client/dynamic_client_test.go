@@ -22,12 +22,11 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -41,7 +40,7 @@ func TestDynamicClient(t *testing.T) {
 	ns := framework.CreateTestingNamespace("dynamic-client", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	gv := &registered.GroupOrDie(api.GroupName).GroupVersion
+	gv := &registered.GroupOrDie(v1.GroupName).GroupVersion
 	config := &restclient.Config{
 		Host:          s.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
@@ -73,12 +72,12 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// Create a Pod with the normal client
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "test",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "test",
 					Image: "test-image",
@@ -108,7 +107,7 @@ func TestDynamicClient(t *testing.T) {
 
 	got, err := unstructuredToPod(unstructuredList.Items[0])
 	if err != nil {
-		t.Fatalf("unexpected error converting Unstructured to api.Pod: %v", err)
+		t.Fatalf("unexpected error converting Unstructured to v1.Pod: %v", err)
 	}
 
 	if !reflect.DeepEqual(actual, got) {
@@ -123,7 +122,7 @@ func TestDynamicClient(t *testing.T) {
 
 	got, err = unstructuredToPod(unstruct)
 	if err != nil {
-		t.Fatalf("unexpected error converting Unstructured to api.Pod: %v", err)
+		t.Fatalf("unexpected error converting Unstructured to v1.Pod: %v", err)
 	}
 
 	if !reflect.DeepEqual(actual, got) {
@@ -136,7 +135,7 @@ func TestDynamicClient(t *testing.T) {
 		t.Fatalf("unexpected error when deleting pod: %v", err)
 	}
 
-	list, err := client.Core().Pods(ns.Name).List(api.ListOptions{})
+	list, err := client.Core().Pods(ns.Name).List(v1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}
@@ -146,12 +145,14 @@ func TestDynamicClient(t *testing.T) {
 	}
 }
 
-func unstructuredToPod(obj *runtime.Unstructured) (*api.Pod, error) {
+func unstructuredToPod(obj *runtime.Unstructured) (*v1.Pod, error) {
 	json, err := runtime.Encode(runtime.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
-	pod := new(api.Pod)
+	pod := new(v1.Pod)
 	err = runtime.DecodeInto(testapi.Default.Codec(), json, pod)
+	pod.Kind = ""
+	pod.APIVersion = ""
 	return pod, err
 }

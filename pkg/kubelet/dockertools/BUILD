@@ -30,6 +30,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -48,6 +49,7 @@ go_library(
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/types:go_default_library",
@@ -101,6 +103,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/credentialprovider:go_default_library",

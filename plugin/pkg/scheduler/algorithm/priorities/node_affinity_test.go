@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -33,7 +33,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 	label5 := map[string]string{"foo": "bar", "key": "value", "az": "az1"}
 
 	affinity1 := map[string]string{
-		api.AffinityAnnotationKey: `
+		v1.AffinityAnnotationKey: `
 		{"nodeAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [
 			{
 				"weight": 2,
@@ -50,7 +50,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 	}
 
 	affinity2 := map[string]string{
-		api.AffinityAnnotationKey: `
+		v1.AffinityAnnotationKey: `
 		{"nodeAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [
 			{
 				"weight": 2,
@@ -91,63 +91,63 @@ func TestNodeAffinityPriority(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod          *api.Pod
-		nodes        []*api.Node
+		pod          *v1.Pod
+		nodes        []*v1.Node
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Annotations: map[string]string{},
 				},
 			},
-			nodes: []*api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			nodes: []*v1.Node{
+				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			test:         "all machines are same priority as NodeAffinity is nil",
 		},
 		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Annotations: affinity1,
 				},
 			},
-			nodes: []*api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label4}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			nodes: []*v1.Node{
+				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label4}},
+				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			test:         "no machine macthes preferred scheduling requirements in NodeAffinity of pod so all machines' priority is zero",
 		},
 		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Annotations: affinity1,
 				},
 			},
-			nodes: []*api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			nodes: []*v1.Node{
+				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			test:         "only machine1 matches the preferred scheduling requirements of pod",
 		},
 		{
-			pod: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Annotations: affinity2,
 				},
 			},
-			nodes: []*api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine5", Labels: label5}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
+			nodes: []*v1.Node{
+				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: v1.ObjectMeta{Name: "machine5", Labels: label5}},
+				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine5", Score: 10}, {Host: "machine2", Score: 3}},
 			test:         "all machines matches the preferred scheduling requirements of pod but with different priorities ",

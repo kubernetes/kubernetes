@@ -26,10 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -67,7 +67,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "create",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject().(*api.Endpoints), nil
+						return true, action.(core.CreateAction).GetObject().(*v1.Endpoints), nil
 					},
 				},
 			},
@@ -83,8 +83,8 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{
+						return true, &v1.Endpoints{
+							ObjectMeta: v1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 							},
@@ -94,7 +94,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "update",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject().(*api.Endpoints), nil
+						return true, action.(core.CreateAction).GetObject().(*v1.Endpoints), nil
 					},
 				},
 			},
@@ -112,8 +112,8 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{
+						return true, &v1.Endpoints{
+							ObjectMeta: v1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -126,7 +126,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "update",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject().(*api.Endpoints), nil
+						return true, action.(core.CreateAction).GetObject().(*v1.Endpoints), nil
 					},
 				},
 			},
@@ -146,8 +146,8 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{
+						return true, &v1.Endpoints{
+							ObjectMeta: v1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -172,8 +172,8 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{
+						return true, &v1.Endpoints{
+							ObjectMeta: v1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -186,7 +186,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "update",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject().(*api.Endpoints), nil
+						return true, action.(core.CreateAction).GetObject().(*v1.Endpoints), nil
 					},
 				},
 			},
@@ -205,7 +205,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		var reportedLeader string
 
 		lock := rl.EndpointsLock{
-			EndpointsMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"},
+			EndpointsMeta: v1.ObjectMeta{Namespace: "foo", Name: "bar"},
 			LockConfig: rl.ResourceLockConfig{
 				Identity:      "baz",
 				EventRecorder: &record.FakeRecorder{},

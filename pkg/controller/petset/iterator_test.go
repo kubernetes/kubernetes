@@ -21,14 +21,14 @@ import (
 
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestPetQueueCreates(t *testing.T) {
 	replicas := 3
 	ps := newStatefulSet(replicas)
-	q := NewPetQueue(ps, []*api.Pod{})
+	q := NewPetQueue(ps, []*v1.Pod{})
 	for i := 0; i < replicas; i++ {
 		pet, _ := newPCB(fmt.Sprintf("%v", i), ps)
 		q.enqueue(pet)
@@ -107,7 +107,7 @@ func TestStatefulSetIteratorRelist(t *testing.T) {
 	knownPods := newPodList(ps, 5)
 	for i := range knownPods {
 		knownPods[i].Spec.NodeName = fmt.Sprintf("foo-node-%v", i)
-		knownPods[i].Status.Phase = api.PodRunning
+		knownPods[i].Status.Phase = v1.PodRunning
 	}
 	pi := NewStatefulSetIterator(ps, knownPods)
 
@@ -128,7 +128,7 @@ func TestStatefulSetIteratorRelist(t *testing.T) {
 	}
 
 	// Scale to 0 should delete all pods in system
-	ps.Spec.Replicas = 0
+	*(ps.Spec.Replicas) = 0
 	pi = NewStatefulSetIterator(ps, knownPods)
 	i = 0
 	for pi.Next() {
@@ -143,7 +143,7 @@ func TestStatefulSetIteratorRelist(t *testing.T) {
 	}
 
 	// Relist with 0 replicas should no-op
-	pi = NewStatefulSetIterator(ps, []*api.Pod{})
+	pi = NewStatefulSetIterator(ps, []*v1.Pod{})
 	if pi.Next() != false {
 		t.Errorf("Unexpected iteration without any replicas or pods in system")
 	}

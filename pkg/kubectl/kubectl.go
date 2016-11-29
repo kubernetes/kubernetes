@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 const (
@@ -56,11 +56,11 @@ type OutputVersionMapper struct {
 	// output versions takes a list of preferred GroupVersions. Only the first
 	// hit for a given group will have effect.  This allows different output versions
 	// depending upon the group of the kind being requested
-	OutputVersions []unversioned.GroupVersion
+	OutputVersions []schema.GroupVersion
 }
 
 // RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
-func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+func (m OutputVersionMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
 	for _, preferredVersion := range m.OutputVersions {
 		if gk.Group == preferredVersion.Group {
 			mapping, err := m.RESTMapper.RESTMapping(gk, preferredVersion.Version)

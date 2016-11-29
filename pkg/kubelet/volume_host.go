@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
@@ -72,14 +72,14 @@ func (kvh *kubeletVolumeHost) GetPodPluginDir(podUID types.UID, pluginName strin
 	return kvh.kubelet.getPodPluginDir(podUID, pluginName)
 }
 
-func (kvh *kubeletVolumeHost) GetKubeClient() internalclientset.Interface {
+func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 	return kvh.kubelet.kubeClient
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(
 	volName string,
 	spec volume.Spec,
-	pod *api.Pod,
+	pod *v1.Pod,
 	opts volume.VolumeOptions) (volume.Mounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
@@ -125,7 +125,7 @@ func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
 	return kvh.kubelet.GetHostIP()
 }
 
-func (kvh *kubeletVolumeHost) GetNodeAllocatable() (api.ResourceList, error) {
+func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	node, err := kvh.kubelet.getNodeAnyWay()
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)

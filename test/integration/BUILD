@@ -19,7 +19,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/core/v1:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//test/integration/framework:go_default_library",

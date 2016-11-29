@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -72,7 +72,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		uid := int64(1001)
 		gid := int64(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
-		pod.Spec.SecurityContext = &api.PodSecurityContext{
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			RunAsUser: &uid,
 			FSGroup:   &gid,
 		}
@@ -98,7 +98,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key1=\"value1\"\n"))
 
 		//modify labels
-		podClient.Update(podName, func(pod *api.Pod) {
+		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Labels["key3"] = "value3"
 		})
 
@@ -127,7 +127,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"bar\"\n"))
 
 		//modify annotations
-		podClient.Update(podName, func(pod *api.Pod) {
+		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Annotations["builder"] = "foo"
 		})
 
@@ -189,15 +189,15 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 
 })
 
-func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMode *int32) *api.Pod {
+func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMode *int32) *v1.Pod {
 	pod := downwardAPIVolumeBasePod(name, nil, nil)
 
-	pod.Spec.Containers = []api.Container{
+	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
 			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--file_mode=" + filePath},
-			VolumeMounts: []api.VolumeMount{
+			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
 					MountPath: "/etc",
@@ -215,15 +215,15 @@ func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMod
 	return pod
 }
 
-func downwardAPIVolumePodForSimpleTest(name string, filePath string) *api.Pod {
+func downwardAPIVolumePodForSimpleTest(name string, filePath string) *v1.Pod {
 	pod := downwardAPIVolumeBasePod(name, nil, nil)
 
-	pod.Spec.Containers = []api.Container{
+	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
 			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--file_content=" + filePath},
-			VolumeMounts: []api.VolumeMount{
+			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
 					MountPath: "/etc",
@@ -236,35 +236,35 @@ func downwardAPIVolumePodForSimpleTest(name string, filePath string) *api.Pod {
 	return pod
 }
 
-func downwardAPIVolumeForContainerResources(name string, filePath string) *api.Pod {
+func downwardAPIVolumeForContainerResources(name string, filePath string) *v1.Pod {
 	pod := downwardAPIVolumeBasePod(name, nil, nil)
 	pod.Spec.Containers = downwardAPIVolumeBaseContainers("client-container", filePath)
 	return pod
 }
 
-func downwardAPIVolumeForDefaultContainerResources(name string, filePath string) *api.Pod {
+func downwardAPIVolumeForDefaultContainerResources(name string, filePath string) *v1.Pod {
 	pod := downwardAPIVolumeBasePod(name, nil, nil)
 	pod.Spec.Containers = downwardAPIVolumeDefaultBaseContainer("client-container", filePath)
 	return pod
 }
 
-func downwardAPIVolumeBaseContainers(name, filePath string) []api.Container {
-	return []api.Container{
+func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
+	return []v1.Container{
 		{
 			Name:    name,
 			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--file_content=" + filePath},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("250m"),
-					api.ResourceMemory: resource.MustParse("32Mi"),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("250m"),
+					v1.ResourceMemory: resource.MustParse("32Mi"),
 				},
-				Limits: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("1250m"),
-					api.ResourceMemory: resource.MustParse("64Mi"),
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1250m"),
+					v1.ResourceMemory: resource.MustParse("64Mi"),
 				},
 			},
-			VolumeMounts: []api.VolumeMount{
+			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
 					MountPath: "/etc",
@@ -276,13 +276,13 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []api.Container {
 
 }
 
-func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []api.Container {
-	return []api.Container{
+func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container {
+	return []v1.Container{
 		{
 			Name:    name,
 			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--file_content=" + filePath},
-			VolumeMounts: []api.VolumeMount{
+			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
 					MountPath: "/etc",
@@ -293,15 +293,15 @@ func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []api.Containe
 
 }
 
-func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[string]string, filePath string) *api.Pod {
+func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[string]string, filePath string) *v1.Pod {
 	pod := downwardAPIVolumeBasePod(name, labels, annotations)
 
-	pod.Spec.Containers = []api.Container{
+	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
 			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
-			VolumeMounts: []api.VolumeMount{
+			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
 					MountPath: "/etc",
@@ -315,51 +315,51 @@ func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[stri
 	return pod
 }
 
-func downwardAPIVolumeBasePod(name string, labels, annotations map[string]string) *api.Pod {
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func downwardAPIVolumeBasePod(name string, labels, annotations map[string]string) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:        name,
 			Labels:      labels,
 			Annotations: annotations,
 		},
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
 				{
 					Name: "podinfo",
-					VolumeSource: api.VolumeSource{
-						DownwardAPI: &api.DownwardAPIVolumeSource{
-							Items: []api.DownwardAPIVolumeFile{
+					VolumeSource: v1.VolumeSource{
+						DownwardAPI: &v1.DownwardAPIVolumeSource{
+							Items: []v1.DownwardAPIVolumeFile{
 								{
 									Path: "podname",
-									FieldRef: &api.ObjectFieldSelector{
+									FieldRef: &v1.ObjectFieldSelector{
 										APIVersion: "v1",
 										FieldPath:  "metadata.name",
 									},
 								},
 								{
 									Path: "cpu_limit",
-									ResourceFieldRef: &api.ResourceFieldSelector{
+									ResourceFieldRef: &v1.ResourceFieldSelector{
 										ContainerName: "client-container",
 										Resource:      "limits.cpu",
 									},
 								},
 								{
 									Path: "cpu_request",
-									ResourceFieldRef: &api.ResourceFieldSelector{
+									ResourceFieldRef: &v1.ResourceFieldSelector{
 										ContainerName: "client-container",
 										Resource:      "requests.cpu",
 									},
 								},
 								{
 									Path: "memory_limit",
-									ResourceFieldRef: &api.ResourceFieldSelector{
+									ResourceFieldRef: &v1.ResourceFieldSelector{
 										ContainerName: "client-container",
 										Resource:      "limits.memory",
 									},
 								},
 								{
 									Path: "memory_request",
-									ResourceFieldRef: &api.ResourceFieldSelector{
+									ResourceFieldRef: &v1.ResourceFieldSelector{
 										ContainerName: "client-container",
 										Resource:      "requests.memory",
 									},
@@ -369,18 +369,18 @@ func downwardAPIVolumeBasePod(name string, labels, annotations map[string]string
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 
 	return pod
 }
 
-func applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations map[string]string, pod *api.Pod) {
+func applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations map[string]string, pod *v1.Pod) {
 	if len(labels) > 0 {
-		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, api.DownwardAPIVolumeFile{
+		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, v1.DownwardAPIVolumeFile{
 			Path: "labels",
-			FieldRef: &api.ObjectFieldSelector{
+			FieldRef: &v1.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.labels",
 			},
@@ -388,9 +388,9 @@ func applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations map[string]st
 	}
 
 	if len(annotations) > 0 {
-		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, api.DownwardAPIVolumeFile{
+		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, v1.DownwardAPIVolumeFile{
 			Path: "annotations",
-			FieldRef: &api.ObjectFieldSelector{
+			FieldRef: &v1.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.annotations",
 			},

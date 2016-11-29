@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -392,7 +394,7 @@ func TestAnnotateErrors(t *testing.T) {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdAnnotate(f, buf)
@@ -430,12 +432,6 @@ func TestAnnotateObject(t *testing.T) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
-				case "/version":
-					resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
 				case "/namespaces/test/pods/foo":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
 				default:
@@ -457,7 +453,7 @@ func TestAnnotateObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -486,12 +482,6 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
-				case "/version":
-					resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
 				case "/namespaces/test/replicationcontrollers/cassandra":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
 				default:
@@ -513,7 +503,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -542,7 +532,7 @@ func TestAnnotateLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -572,12 +562,6 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
-				case "/version":
-					resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
 				case "/namespaces/test/pods":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
 				default:
@@ -601,7 +585,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)

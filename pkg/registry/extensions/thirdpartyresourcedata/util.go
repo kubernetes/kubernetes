@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
-func ExtractGroupVersionKind(list *extensions.ThirdPartyResourceList) ([]unversioned.GroupVersion, []unversioned.GroupVersionKind, error) {
-	gvs := []unversioned.GroupVersion{}
-	gvks := []unversioned.GroupVersionKind{}
+func ExtractGroupVersionKind(list *extensions.ThirdPartyResourceList) ([]schema.GroupVersion, []schema.GroupVersionKind, error) {
+	gvs := []schema.GroupVersion{}
+	gvks := []schema.GroupVersionKind{}
 	for ix := range list.Items {
 		rsrc := &list.Items[ix]
 		kind, group, err := ExtractApiGroupAndKind(rsrc)
@@ -34,9 +34,9 @@ func ExtractGroupVersionKind(list *extensions.ThirdPartyResourceList) ([]unversi
 			return nil, nil, err
 		}
 		for _, version := range rsrc.Versions {
-			gv := unversioned.GroupVersion{Group: group, Version: version.Name}
+			gv := schema.GroupVersion{Group: group, Version: version.Name}
 			gvs = append(gvs, gv)
-			gvks = append(gvks, unversioned.GroupVersionKind{Group: group, Version: version.Name, Kind: kind})
+			gvks = append(gvks, schema.GroupVersionKind{Group: group, Version: version.Name, Kind: kind})
 		}
 	}
 	return gvs, gvks, nil

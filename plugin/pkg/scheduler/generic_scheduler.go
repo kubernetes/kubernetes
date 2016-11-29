@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -39,7 +39,7 @@ import (
 type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
 
 type FitError struct {
-	Pod              *api.Pod
+	Pod              *v1.Pod
 	FailedPredicates FailedPredicateMap
 }
 
@@ -89,7 +89,7 @@ type genericScheduler struct {
 // Schedule tries to schedule the given pod to one of node in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.
-func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeLister) (string, error) {
+func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
 	var trace *util.Trace
 	if pod != nil {
 		trace = util.NewTrace(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
@@ -160,14 +160,14 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
 func findNodesThatFit(
-	pod *api.Pod,
+	pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
-	nodes []*api.Node,
+	nodes []*v1.Node,
 	predicateFuncs map[string]algorithm.FitPredicate,
 	extenders []algorithm.SchedulerExtender,
 	metadataProducer algorithm.MetadataProducer,
-) ([]*api.Node, FailedPredicateMap, error) {
-	var filtered []*api.Node
+) ([]*v1.Node, FailedPredicateMap, error) {
+	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
 
 	if len(predicateFuncs) == 0 {
@@ -175,7 +175,7 @@ func findNodesThatFit(
 	} else {
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
-		filtered = make([]*api.Node, len(nodes))
+		filtered = make([]*v1.Node, len(nodes))
 		errs := []error{}
 		var predicateResultLock sync.Mutex
 		var filteredLen int32
@@ -202,7 +202,7 @@ func findNodesThatFit(
 		workqueue.Parallelize(16, len(nodes), checkNode)
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
-			return []*api.Node{}, FailedPredicateMap{}, errors.NewAggregate(errs)
+			return []*v1.Node{}, FailedPredicateMap{}, errors.NewAggregate(errs)
 		}
 	}
 
@@ -210,7 +210,7 @@ func findNodesThatFit(
 		for _, extender := range extenders {
 			filteredList, failedMap, err := extender.Filter(pod, filtered)
 			if err != nil {
-				return []*api.Node{}, FailedPredicateMap{}, err
+				return []*v1.Node{}, FailedPredicateMap{}, err
 			}
 
 			for failedNodeName, failedMsg := range failedMap {
@@ -229,7 +229,7 @@ func findNodesThatFit(
 }
 
 // Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
-func podFitsOnNode(pod *api.Pod, meta interface{}, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, []algorithm.PredicateFailureReason, error) {
+func podFitsOnNode(pod *v1.Pod, meta interface{}, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, []algorithm.PredicateFailureReason, error) {
 	var failedPredicates []algorithm.PredicateFailureReason
 	for _, predicate := range predicateFuncs {
 		fit, reasons, err := predicate(pod, meta, info)
@@ -251,11 +251,11 @@ func podFitsOnNode(pod *api.Pod, meta interface{}, info *schedulercache.NodeInfo
 // The node scores returned by the priority function are multiplied by the weights to get weighted scores
 // All scores are finally combined (added) to get the total weighted scores of all nodes
 func PrioritizeNodes(
-	pod *api.Pod,
+	pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
 	meta interface{},
 	priorityConfigs []algorithm.PriorityConfig,
-	nodes []*api.Node,
+	nodes []*v1.Node,
 	extenders []algorithm.SchedulerExtender,
 ) (schedulerapi.HostPriorityList, error) {
 	// If no priority configs are provided, then the EqualPriority function is applied
@@ -381,7 +381,7 @@ func PrioritizeNodes(
 }
 
 // EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-func EqualPriorityMap(_ *api.Pod, _ interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func EqualPriorityMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")

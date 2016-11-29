@@ -23,7 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -40,9 +40,9 @@ const (
 )
 
 type PrivilegedPodTestConfig struct {
-	privilegedPod *api.Pod
+	privilegedPod *v1.Pod
 	f             *framework.Framework
-	hostExecPod   *api.Pod
+	hostExecPod   *v1.Pod
 }
 
 var _ = framework.KubeDescribe("PrivilegedPod", func() {
@@ -96,21 +96,21 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 	return output
 }
 
-func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
+func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *v1.Pod {
 	isPrivileged := true
 	notPrivileged := false
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      privilegedPodName,
 			Namespace: config.f.Namespace.Name,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:            privilegedContainerName,
 					Image:           privilegedContainerImage,
-					ImagePullPolicy: api.PullIfNotPresent,
-					SecurityContext: &api.SecurityContext{Privileged: &isPrivileged},
+					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{Privileged: &isPrivileged},
 					Command: []string{
 						"/netexec",
 						fmt.Sprintf("--http-port=%d", privilegedHttpPort),
@@ -120,8 +120,8 @@ func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
 				{
 					Name:            notPrivilegedContainerName,
 					Image:           privilegedContainerImage,
-					ImagePullPolicy: api.PullIfNotPresent,
-					SecurityContext: &api.SecurityContext{Privileged: &notPrivileged},
+					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{Privileged: &notPrivileged},
 					Command: []string{
 						"/netexec",
 						fmt.Sprintf("--http-port=%d", notPrivilegedHttpPort),

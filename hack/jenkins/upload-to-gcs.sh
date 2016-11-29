@@ -281,13 +281,15 @@ function upload_artifacts_and_build_result() {
   echo -e "\n\n\n*** View logs and artifacts at ${results_url} ***\n\n"
 }
 
-if [[ -n "${JENKINS_BUILD_STARTED:-}" ]]; then
-  upload_version
-elif [[ -n "${JENKINS_BUILD_FINISHED:-}" ]]; then
-  upload_artifacts_and_build_result ${JENKINS_BUILD_FINISHED}
-  update_job_result_cache ${JENKINS_BUILD_FINISHED}
-else
-  echo "Called without JENKINS_BUILD_STARTED or JENKINS_BUILD_FINISHED set."
-  echo "Assuming a legacy invocation."
-  upload_artifacts_and_build_result "[UNSET]"
+if [[ -z "${BOOTSTRAP_MIGRATION:-}" ]]; then
+  if [[ -n "${JENKINS_BUILD_STARTED:-}" ]]; then
+    upload_version
+  elif [[ -n "${JENKINS_BUILD_FINISHED:-}" ]]; then
+    upload_artifacts_and_build_result ${JENKINS_BUILD_FINISHED}
+    update_job_result_cache ${JENKINS_BUILD_FINISHED}
+  else
+    echo "ERROR: Called without JENKINS_BUILD_STARTED or JENKINS_BUILD_FINISHED set."
+    echo "ERROR: this should not happen"
+    exit 1
+  fi
 fi

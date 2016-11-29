@@ -128,7 +128,7 @@ as well as for scale and functionality testing.
 
 ## Questions
 
-For questions on running this app, you can ask on [Slack](../../docs/troubleshooting.md#slack).
+For questions on running this app, you can ask on [Slack](http://slack.kubernetes.io).
 
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
 

@@ -19,6 +19,7 @@ package testing
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type Simple struct {
@@ -30,7 +31,7 @@ type Simple struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
-func (obj *Simple) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *Simple) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleRoot struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -41,7 +42,7 @@ type SimpleRoot struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
-func (obj *SimpleRoot) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *SimpleRoot) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleGetOptions struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -57,7 +58,7 @@ func (SimpleGetOptions) SwaggerDoc() map[string]string {
 	}
 }
 
-func (obj *SimpleGetOptions) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *SimpleGetOptions) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleList struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -66,4 +67,4 @@ type SimpleList struct {
 	Items []Simple `json:"items,omitempty"`
 }
 
-func (obj *SimpleList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *SimpleList) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

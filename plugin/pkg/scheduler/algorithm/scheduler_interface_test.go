@@ -19,7 +19,7 @@ package algorithm
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // Some functions used by multiple scheduler tests.
@@ -31,7 +31,7 @@ type schedulerTester struct {
 }
 
 // Call if you know exactly where pod should get scheduled.
-func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
+func (st *schedulerTester) expectSchedule(pod *v1.Pod, expected string) {
 	actual, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
 		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
@@ -43,7 +43,7 @@ func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
 }
 
 // Call if you can't predict where pod will be scheduled.
-func (st *schedulerTester) expectSuccess(pod *api.Pod) {
+func (st *schedulerTester) expectSuccess(pod *v1.Pod) {
 	_, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
 		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
@@ -52,7 +52,7 @@ func (st *schedulerTester) expectSuccess(pod *api.Pod) {
 }
 
 // Call if pod should *not* schedule.
-func (st *schedulerTester) expectFailure(pod *api.Pod) {
+func (st *schedulerTester) expectFailure(pod *v1.Pod) {
 	_, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err == nil {
 		st.t.Error("Unexpected non-error")

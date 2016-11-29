@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -77,14 +77,14 @@ func (plugin *fcPlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *fcPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
-		api.ReadOnlyMany,
+func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+		v1.ReadOnlyMany,
 	}
 }
 
-func (plugin *fcPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *fcPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &FCUtil{}, plugin.host.GetMounter())
 }
@@ -142,10 +142,10 @@ func (plugin *fcPlugin) execCommand(command string, args []string) ([]byte, erro
 }
 
 func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	fcVolume := &api.Volume{
+	fcVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			FC: &api.FCVolumeSource{},
+		VolumeSource: v1.VolumeSource{
+			FC: &v1.FCVolumeSource{},
 		},
 	}
 	return volume.NewSpecFromVolume(fcVolume), nil
@@ -225,7 +225,7 @@ func (c *fcDiskUnmounter) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.FCVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (*v1.FCVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.FC != nil {
 		return spec.Volume.FC, spec.Volume.FC.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&

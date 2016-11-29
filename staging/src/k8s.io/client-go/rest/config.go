@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	certutil "k8s.io/client-go/pkg/util/cert"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/pkg/version"
@@ -150,7 +151,7 @@ type ContentConfig struct {
 	// GroupVersion is the API version to talk to. Must be provided when initializing
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
-	GroupVersion *unversioned.GroupVersion
+	GroupVersion *schema.GroupVersion
 	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
 	// supported media types.
 	NegotiatedSerializer runtime.NegotiatedSerializer

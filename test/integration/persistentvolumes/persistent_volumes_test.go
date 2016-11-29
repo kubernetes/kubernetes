@@ -27,13 +27,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/storage"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
@@ -122,15 +122,15 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	ctrl.Run(stopCh)
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and recycled.
-	pv := createPV("fake-pv-recycler", "/tmp/foo", "10G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRecycle)
-	pvc := createPVC("fake-pvc-recycler", ns.Name, "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	pv := createPV("fake-pv-recycler", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRecycle)
+	pvc := createPVC("fake-pvc-recycler", ns.Name, "5G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 
 	_, err := testClient.PersistentVolumes().Create(pv)
 	if err != nil {
@@ -145,9 +145,9 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	glog.V(2).Infof("TestPersistentVolumeRecycler pvc created")
 
 	// wait until the controller pairs the volume and claim
-	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
+	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, v1.VolumeBound)
 	glog.V(2).Infof("TestPersistentVolumeRecycler pv bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, v1.ClaimBound)
 	glog.V(2).Infof("TestPersistentVolumeRecycler pvc bound")
 
 	// deleting a claim releases the volume, after which it can be recycled
@@ -156,9 +156,9 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	}
 	glog.V(2).Infof("TestPersistentVolumeRecycler pvc deleted")
 
-	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeReleased)
+	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, v1.VolumeReleased)
 	glog.V(2).Infof("TestPersistentVolumeRecycler pv released")
-	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeAvailable)
+	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, v1.VolumeAvailable)
 	glog.V(2).Infof("TestPersistentVolumeRecycler pv available")
 }
 
@@ -176,15 +176,15 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	ctrl.Run(stopCh)
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and deleted.
-	pv := createPV("fake-pv-deleter", "/tmp/foo", "10G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimDelete)
-	pvc := createPVC("fake-pvc-deleter", ns.Name, "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	pv := createPV("fake-pv-deleter", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimDelete)
+	pvc := createPVC("fake-pvc-deleter", ns.Name, "5G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 
 	_, err := testClient.PersistentVolumes().Create(pv)
 	if err != nil {
@@ -196,9 +196,9 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
 	}
 	glog.V(2).Infof("TestPersistentVolumeDeleter pvc created")
-	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
+	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, v1.VolumeBound)
 	glog.V(2).Infof("TestPersistentVolumeDeleter pv bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, v1.ClaimBound)
 	glog.V(2).Infof("TestPersistentVolumeDeleter pvc bound")
 
 	// deleting a claim releases the volume, after which it can be recycled
@@ -207,7 +207,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	}
 	glog.V(2).Infof("TestPersistentVolumeDeleter pvc deleted")
 
-	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeReleased)
+	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, v1.VolumeReleased)
 	glog.V(2).Infof("TestPersistentVolumeDeleter pv released")
 
 	for {
@@ -235,22 +235,22 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	ctrl.Run(stopCh)
 	defer close(stopCh)
 
-	pv := createPV("fake-pv-race", "/tmp/foo", "10G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRetain)
-	pvc := createPVC("fake-pvc-race", ns.Name, "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	pv := createPV("fake-pv-race", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
+	pvc := createPVC("fake-pvc-race", ns.Name, "5G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 	counter := 0
 	maxClaims := 100
-	claims := []*api.PersistentVolumeClaim{}
+	claims := []*v1.PersistentVolumeClaim{}
 	for counter <= maxClaims {
 		counter += 1
 		clone, _ := conversion.NewCloner().DeepCopy(pvc)
-		newPvc, _ := clone.(*api.PersistentVolumeClaim)
-		newPvc.ObjectMeta = api.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
+		newPvc, _ := clone.(*v1.PersistentVolumeClaim)
+		newPvc.ObjectMeta = v1.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
 		claim, err := testClient.PersistentVolumeClaims(ns.Name).Create(newPvc)
 		if err != nil {
 			t.Fatalf("Error creating newPvc: %v", err)
@@ -262,7 +262,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	// putting a bind manually on a pv should only match the claim it is bound to
 	rand.Seed(time.Now().Unix())
 	claim := claims[rand.Intn(maxClaims-1)]
-	claimRef, err := api.GetReference(claim)
+	claimRef, err := v1.GetReference(claim)
 	if err != nil {
 		t.Fatalf("Unexpected error getting claimRef: %v", err)
 	}
@@ -275,9 +275,9 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	}
 	glog.V(2).Infof("TestPersistentVolumeBindRace pv created, pre-bound to %s", claim.Name)
 
-	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
+	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, v1.VolumeBound)
 	glog.V(2).Infof("TestPersistentVolumeBindRace pv bound")
-	waitForAnyPersistentVolumeClaimPhase(watchPVC, api.ClaimBound)
+	waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
 	glog.V(2).Infof("TestPersistentVolumeBindRace pvc bound")
 
 	pv, err = testClient.PersistentVolumes().Get(pv.Name)
@@ -306,7 +306,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	controller.Run(stopCh)
@@ -314,8 +314,8 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 
 	var (
 		err     error
-		modes   = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
-		reclaim = api.PersistentVolumeReclaimRetain
+		modes   = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+		reclaim = v1.PersistentVolumeReclaimRetain
 
 		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
 		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
@@ -347,9 +347,9 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	}
 	t.Log("claim created")
 
-	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
+	waitForAnyPersistentVolumePhase(watchPV, v1.VolumeBound)
 	t.Log("volume bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, v1.ClaimBound)
 	t.Log("claim bound")
 
 	pv, err := testClient.PersistentVolumes().Get("pv-false")
@@ -386,7 +386,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	controller.Run(stopCh)
@@ -394,8 +394,8 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 
 	var (
 		err     error
-		modes   = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
-		reclaim = api.PersistentVolumeReclaimRetain
+		modes   = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+		reclaim = v1.PersistentVolumeReclaimRetain
 
 		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
 		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
@@ -446,9 +446,9 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	}
 	t.Log("claim created")
 
-	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
+	waitForAnyPersistentVolumePhase(watchPV, v1.VolumeBound)
 	t.Log("volume bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, v1.ClaimBound)
 	t.Log("claim bound")
 
 	pv, err := testClient.PersistentVolumes().Get("pv-false")
@@ -485,28 +485,28 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	controller.Run(stopCh)
 	defer close(stopCh)
 
 	maxPVs := getObjectCount()
-	pvs := make([]*api.PersistentVolume, maxPVs)
+	pvs := make([]*v1.PersistentVolume, maxPVs)
 	for i := 0; i < maxPVs; i++ {
 		// This PV will be claimed, released, and deleted
 		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), strconv.Itoa(i)+"G",
-			[]api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRetain)
+			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
 	}
 
-	pvc := createPVC("pvc-2", ns.Name, strconv.Itoa(maxPVs/2)+"G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	pvc := createPVC("pvc-2", ns.Name, strconv.Itoa(maxPVs/2)+"G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 
 	for i := 0; i < maxPVs; i++ {
 		_, err := testClient.PersistentVolumes().Create(pvs[i])
 		if err != nil {
 			t.Errorf("Failed to create PersistentVolume %d: %v", i, err)
 		}
-		waitForPersistentVolumePhase(testClient, pvs[i].Name, watchPV, api.VolumeAvailable)
+		waitForPersistentVolumePhase(testClient, pvs[i].Name, watchPV, v1.VolumeAvailable)
 	}
 	t.Log("volumes created")
 
@@ -517,9 +517,9 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	t.Log("claim created")
 
 	// wait until the binder pairs the claim with a volume
-	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
+	waitForAnyPersistentVolumePhase(watchPV, v1.VolumeBound)
 	t.Log("volume bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, v1.ClaimBound)
 	t.Log("claim bound")
 
 	// only one PV is bound
@@ -533,14 +533,14 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 			continue
 		}
 		// found a bounded PV
-		p := pv.Spec.Capacity[api.ResourceStorage]
+		p := pv.Spec.Capacity[v1.ResourceStorage]
 		pvCap := p.Value()
 		expectedCap := resource.MustParse(strconv.Itoa(maxPVs/2) + "G")
 		expectedCapVal := expectedCap.Value()
 		if pv.Spec.ClaimRef.Name != pvc.Name || pvCap != expectedCapVal {
 			t.Fatalf("Bind mismatch! Expected %s capacity %d but got %s capacity %d", pvc.Name, expectedCapVal, pv.Spec.ClaimRef.Name, pvCap)
 		}
-		t.Logf("claim bounded to %s capacity %v", pv.Name, pv.Spec.Capacity[api.ResourceStorage])
+		t.Logf("claim bounded to %s capacity %v", pv.Name, pv.Spec.Capacity[v1.ResourceStorage])
 		bound += 1
 	}
 	t.Log("volumes checked")
@@ -555,7 +555,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	}
 	t.Log("claim deleted")
 
-	waitForAnyPersistentVolumePhase(watchPV, api.VolumeReleased)
+	waitForAnyPersistentVolumePhase(watchPV, v1.VolumeReleased)
 	t.Log("volumes released")
 }
 
@@ -574,20 +574,20 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	controllerStopCh := make(chan struct{})
 	binder.Run(controllerStopCh)
 	defer close(controllerStopCh)
 
 	objCount := getObjectCount()
-	pvs := make([]*api.PersistentVolume, objCount)
-	pvcs := make([]*api.PersistentVolumeClaim, objCount)
+	pvs := make([]*v1.PersistentVolume, objCount)
+	pvcs := make([]*v1.PersistentVolumeClaim, objCount)
 	for i := 0; i < objCount; i++ {
 		// This PV will be claimed, released, and deleted
 		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), "1G",
-			[]api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRetain)
-		pvcs[i] = createPVC("pvc-"+strconv.Itoa(i), ns.Name, "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
+		pvcs[i] = createPVC("pvc-"+strconv.Itoa(i), ns.Name, "1G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 	}
 
 	// Create PVs first
@@ -603,7 +603,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	}()
 	// Wait for them to get Available
 	for i := 0; i < objCount; i++ {
-		waitForAnyPersistentVolumePhase(watchPV, api.VolumeAvailable)
+		waitForAnyPersistentVolumePhase(watchPV, v1.VolumeAvailable)
 		glog.V(1).Infof("%d volumes available", i+1)
 	}
 	glog.V(2).Infof("TestPersistentVolumeMultiPVsPVCs: volumes are Available")
@@ -643,7 +643,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 				// Modify PVC
 				i := rand.Intn(objCount)
 				name := "pvc-" + strconv.Itoa(i)
-				pvc, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Get(name)
+				pvc, err := testClient.PersistentVolumeClaims(v1.NamespaceDefault).Get(name)
 				if err != nil {
 					// Silently ignore error, the PVC may have be already
 					// deleted or not exists yet.
@@ -655,7 +655,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 				} else {
 					pvc.Annotations["TestAnnotation"] = fmt.Sprint(rand.Int())
 				}
-				_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Update(pvc)
+				_, err = testClient.PersistentVolumeClaims(v1.NamespaceDefault).Update(pvc)
 				if err != nil {
 					// Silently ignore error, the PVC may have been updated by
 					// the controller.
@@ -684,12 +684,12 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 
 	// wait until the binder pairs all claims
 	for i := 0; i < objCount; i++ {
-		waitForAnyPersistentVolumeClaimPhase(watchPVC, api.ClaimBound)
+		waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
 		glog.V(1).Infof("%d claims bound", i+1)
 	}
 	// wait until the binder pairs all volumes
 	for i := 0; i < objCount; i++ {
-		waitForPersistentVolumePhase(testClient, pvs[i].Name, watchPV, api.VolumeBound)
+		waitForPersistentVolumePhase(testClient, pvs[i].Name, watchPV, v1.VolumeBound)
 		glog.V(1).Infof("%d claims bound", i+1)
 	}
 
@@ -738,13 +738,13 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 	defer watchPVC.Stop()
 
 	// Create *bound* volumes and PVCs
-	pvs := make([]*api.PersistentVolume, objCount)
-	pvcs := make([]*api.PersistentVolumeClaim, objCount)
+	pvs := make([]*v1.PersistentVolume, objCount)
+	pvcs := make([]*v1.PersistentVolumeClaim, objCount)
 	for i := 0; i < objCount; i++ {
 		pvName := "pv-startup-" + strconv.Itoa(i)
 		pvcName := "pvc-startup-" + strconv.Itoa(i)
 
-		pvc := createPVC(pvcName, ns.Name, "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+		pvc := createPVC(pvcName, ns.Name, "1G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 		pvc.Annotations = map[string]string{"annBindCompleted": ""}
 		pvc.Spec.VolumeName = pvName
 		newPVC, err := testClient.PersistentVolumeClaims(ns.Name).Create(pvc)
@@ -752,7 +752,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 			t.Fatalf("Cannot create claim %q: %v", pvc.Name, err)
 		}
 		// Save Bound status as a separate transaction
-		newPVC.Status.Phase = api.ClaimBound
+		newPVC.Status.Phase = v1.ClaimBound
 		newPVC, err = testClient.PersistentVolumeClaims(ns.Name).UpdateStatus(newPVC)
 		if err != nil {
 			t.Fatalf("Cannot update claim status %q: %v", pvc.Name, err)
@@ -761,11 +761,11 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 		// Drain watchPVC with all events generated by the PVC until it's bound
 		// We don't want to catch "PVC craated with Status.Phase == Pending"
 		// later in this test.
-		waitForAnyPersistentVolumeClaimPhase(watchPVC, api.ClaimBound)
+		waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
 
 		pv := createPV(pvName, "/tmp/foo"+strconv.Itoa(i), "1G",
-			[]api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRetain)
-		claimRef, err := api.GetReference(newPVC)
+			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
+		claimRef, err := v1.GetReference(newPVC)
 		if err != nil {
 			glog.V(3).Infof("unexpected error getting claim reference: %v", err)
 			return
@@ -776,7 +776,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 			t.Fatalf("Cannot create volume %q: %v", pv.Name, err)
 		}
 		// Save Bound status as a separate transaction
-		newPV.Status.Phase = api.VolumeBound
+		newPV.Status.Phase = v1.VolumeBound
 		newPV, err = testClient.PersistentVolumes().UpdateStatus(newPV)
 		if err != nil {
 			t.Fatalf("Cannot update volume status %q: %v", pv.Name, err)
@@ -785,7 +785,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 		// Drain watchPV with all events generated by the PV until it's bound
 		// We don't want to catch "PV craated with Status.Phase == Pending"
 		// later in this test.
-		waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
+		waitForAnyPersistentVolumePhase(watchPV, v1.VolumeBound)
 	}
 
 	// Start the controller when all PVs and PVCs are already saved in etcd
@@ -801,20 +801,20 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 	for !finished {
 		select {
 		case volumeEvent := <-watchPV.ResultChan():
-			volume, ok := volumeEvent.Object.(*api.PersistentVolume)
+			volume, ok := volumeEvent.Object.(*v1.PersistentVolume)
 			if !ok {
 				continue
 			}
-			if volume.Status.Phase != api.VolumeBound {
+			if volume.Status.Phase != v1.VolumeBound {
 				t.Errorf("volume %s unexpectedly changed state to %s", volume.Name, volume.Status.Phase)
 			}
 
 		case claimEvent := <-watchPVC.ResultChan():
-			claim, ok := claimEvent.Object.(*api.PersistentVolumeClaim)
+			claim, ok := claimEvent.Object.(*v1.PersistentVolumeClaim)
 			if !ok {
 				continue
 			}
-			if claim.Status.Phase != api.ClaimBound {
+			if claim.Status.Phase != v1.ClaimBound {
 				t.Errorf("claim %s unexpectedly changed state to %s", claim.Name, claim.Status.Phase)
 			}
 
@@ -862,14 +862,14 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
-	defer testClient.Storage().StorageClasses().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Storage().StorageClasses().DeleteCollection(nil, v1.ListOptions{})
 
 	storageClass := storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "gold",
 		},
 		Provisioner: provisionerPluginName,
@@ -881,9 +881,9 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	defer close(stopCh)
 
 	objCount := getObjectCount()
-	pvcs := make([]*api.PersistentVolumeClaim, objCount)
+	pvcs := make([]*v1.PersistentVolumeClaim, objCount)
 	for i := 0; i < objCount; i++ {
-		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), ns.Name, "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), ns.Name, "1G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 		pvc.Annotations = map[string]string{
 			storageutil.StorageClassAnnotation: "gold",
 		}
@@ -901,13 +901,13 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// Wait until the controller provisions and binds all of them
 	for i := 0; i < objCount; i++ {
-		waitForAnyPersistentVolumeClaimPhase(watchPVC, api.ClaimBound)
+		waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
 		glog.V(1).Infof("%d claims bound", i+1)
 	}
 	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: claims are bound")
 
 	// check that we have enough bound PVs
-	pvList, err := testClient.PersistentVolumes().List(api.ListOptions{})
+	pvList, err := testClient.PersistentVolumes().List(v1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list volumes: %s", err)
 	}
@@ -916,7 +916,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	}
 	for i := 0; i < objCount; i++ {
 		pv := &pvList.Items[i]
-		if pv.Status.Phase != api.VolumeBound {
+		if pv.Status.Phase != v1.VolumeBound {
 			t.Fatalf("Expected volume %s to be bound, is %s instead", pv.Name, pv.Status.Phase)
 		}
 		glog.V(2).Infof("PV %q is bound to PVC %q", pv.Name, pv.Spec.ClaimRef.Name)
@@ -930,7 +930,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	// Wait for the PVs to get deleted by listing remaining volumes
 	// (delete events were unreliable)
 	for {
-		volumes, err := testClient.PersistentVolumes().List(api.ListOptions{})
+		volumes, err := testClient.PersistentVolumes().List(v1.ListOptions{})
 		if err != nil {
 			t.Fatalf("Failed to list volumes: %v", err)
 		}
@@ -959,7 +959,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	controller.Run(stopCh)
@@ -967,11 +967,11 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 
 	// This PV will be claimed, released, and deleted
 	pv_rwo := createPV("pv-rwo", "/tmp/foo", "10G",
-		[]api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRetain)
+		[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
 	pv_rwm := createPV("pv-rwm", "/tmp/bar", "10G",
-		[]api.PersistentVolumeAccessMode{api.ReadWriteMany}, api.PersistentVolumeReclaimRetain)
+		[]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}, v1.PersistentVolumeReclaimRetain)
 
-	pvc := createPVC("pvc-rwm", ns.Name, "5G", []api.PersistentVolumeAccessMode{api.ReadWriteMany})
+	pvc := createPVC("pvc-rwm", ns.Name, "5G", []v1.PersistentVolumeAccessMode{v1.ReadWriteMany})
 
 	_, err := testClient.PersistentVolumes().Create(pv_rwm)
 	if err != nil {
@@ -990,9 +990,9 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	t.Log("claim created")
 
 	// wait until the controller pairs the volume and claim
-	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
+	waitForAnyPersistentVolumePhase(watchPV, v1.VolumeBound)
 	t.Log("volume bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, v1.ClaimBound)
 	t.Log("claim bound")
 
 	// only RWM PV is bound
@@ -1020,11 +1020,11 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	}
 	t.Log("claim deleted")
 
-	waitForAnyPersistentVolumePhase(watchPV, api.VolumeReleased)
+	waitForAnyPersistentVolumePhase(watchPV, v1.VolumeReleased)
 	t.Log("volume released")
 }
 
-func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w watch.Interface, phase api.PersistentVolumePhase) {
+func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w watch.Interface, phase v1.PersistentVolumePhase) {
 	// Check if the volume is already in requested phase
 	volume, err := client.Core().PersistentVolumes().Get(pvName)
 	if err == nil && volume.Status.Phase == phase {
@@ -1034,7 +1034,7 @@ func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w 
 	// Wait for the phase
 	for {
 		event := <-w.ResultChan()
-		volume, ok := event.Object.(*api.PersistentVolume)
+		volume, ok := event.Object.(*v1.PersistentVolume)
 		if !ok {
 			continue
 		}
@@ -1045,7 +1045,7 @@ func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w 
 	}
 }
 
-func waitForPersistentVolumeClaimPhase(client *clientset.Clientset, claimName, namespace string, w watch.Interface, phase api.PersistentVolumeClaimPhase) {
+func waitForPersistentVolumeClaimPhase(client *clientset.Clientset, claimName, namespace string, w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
 	// Check if the claim is already in requested phase
 	claim, err := client.Core().PersistentVolumeClaims(namespace).Get(claimName)
 	if err == nil && claim.Status.Phase == phase {
@@ -1055,7 +1055,7 @@ func waitForPersistentVolumeClaimPhase(client *clientset.Clientset, claimName, n
 	// Wait for the phase
 	for {
 		event := <-w.ResultChan()
-		claim, ok := event.Object.(*api.PersistentVolumeClaim)
+		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
 		if !ok {
 			continue
 		}
@@ -1066,10 +1066,10 @@ func waitForPersistentVolumeClaimPhase(client *clientset.Clientset, claimName, n
 	}
 }
 
-func waitForAnyPersistentVolumePhase(w watch.Interface, phase api.PersistentVolumePhase) {
+func waitForAnyPersistentVolumePhase(w watch.Interface, phase v1.PersistentVolumePhase) {
 	for {
 		event := <-w.ResultChan()
-		volume, ok := event.Object.(*api.PersistentVolume)
+		volume, ok := event.Object.(*v1.PersistentVolume)
 		if !ok {
 			continue
 		}
@@ -1080,10 +1080,10 @@ func waitForAnyPersistentVolumePhase(w watch.Interface, phase api.PersistentVolu
 	}
 }
 
-func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase api.PersistentVolumeClaimPhase) {
+func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
 	for {
 		event := <-w.ResultChan()
-		claim, ok := event.Object.(*api.PersistentVolumeClaim)
+		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
 		if !ok {
 			continue
 		}
@@ -1094,18 +1094,18 @@ func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase api.Persisten
 	}
 }
 
-func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeriod time.Duration) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController, watch.Interface, watch.Interface) {
+func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPeriod time.Duration) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController, watch.Interface, watch.Interface) {
 	// Use higher QPS and Burst, there is a test for race conditions which
 	// creates many objects and default values were too low.
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
@@ -1134,11 +1134,11 @@ func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeri
 			EnableDynamicProvisioning: true,
 		})
 
-	watchPV, err := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	watchPV, err := testClient.PersistentVolumes().Watch(v1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to watch PersistentVolumes: %v", err)
 	}
-	watchPVC, err := testClient.PersistentVolumeClaims(ns.Name).Watch(api.ListOptions{})
+	watchPVC, err := testClient.PersistentVolumeClaims(ns.Name).Watch(v1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to watch PersistentVolumeClaimss: %v", err)
 	}
@@ -1146,26 +1146,26 @@ func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeri
 	return testClient, ctrl, watchPV, watchPVC
 }
 
-func createPV(name, path, cap string, mode []api.PersistentVolumeAccessMode, reclaim api.PersistentVolumeReclaimPolicy) *api.PersistentVolume {
-	return &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{Name: name},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource:        api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: path}},
-			Capacity:                      api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(cap)},
+func createPV(name, path, cap string, mode []v1.PersistentVolumeAccessMode, reclaim v1.PersistentVolumeReclaimPolicy) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{Name: name},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource:        v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: path}},
+			Capacity:                      v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(cap)},
 			AccessModes:                   mode,
 			PersistentVolumeReclaimPolicy: reclaim,
 		},
 	}
 }
 
-func createPVC(name, namespace, cap string, mode []api.PersistentVolumeAccessMode) *api.PersistentVolumeClaim {
-	return &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+func createPVC(name, namespace, cap string, mode []v1.PersistentVolumeAccessMode) *v1.PersistentVolumeClaim {
+	return &v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(cap)}},
+		Spec: v1.PersistentVolumeClaimSpec{
+			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(cap)}},
 			AccessModes: mode,
 		},
 	}

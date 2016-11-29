@@ -21,14 +21,14 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func TestImageLocalityPriority(t *testing.T) {
-	test_40_250 := api.PodSpec{
-		Containers: []api.Container{
+	test_40_250 := v1.PodSpec{
+		Containers: []v1.Container{
 			{
 				Image: "gcr.io/40",
 			},
@@ -38,8 +38,8 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
-	test_40_140 := api.PodSpec{
-		Containers: []api.Container{
+	test_40_140 := v1.PodSpec{
+		Containers: []v1.Container{
 			{
 				Image: "gcr.io/40",
 			},
@@ -49,8 +49,8 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
-	test_min_max := api.PodSpec{
-		Containers: []api.Container{
+	test_min_max := v1.PodSpec{
+		Containers: []v1.Container{
 			{
 				Image: "gcr.io/10",
 			},
@@ -60,8 +60,8 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
-	node_40_140_2000 := api.NodeStatus{
-		Images: []api.ContainerImage{
+	node_40_140_2000 := v1.NodeStatus{
+		Images: []v1.ContainerImage{
 			{
 				Names: []string{
 					"gcr.io/40",
@@ -86,8 +86,8 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
-	node_250_10 := api.NodeStatus{
-		Images: []api.ContainerImage{
+	node_250_10 := v1.NodeStatus{
+		Images: []v1.ContainerImage{
 			{
 				Names: []string{
 					"gcr.io/250",
@@ -105,9 +105,9 @@ func TestImageLocalityPriority(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod          *api.Pod
-		pods         []*api.Pod
-		nodes        []*api.Node
+		pod          *v1.Pod
+		pods         []*v1.Pod
+		nodes        []*v1.Node
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
@@ -121,8 +121,8 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node2
 			// Image: gcr.io/250 250MB
 			// Score: (250M-23M)/97.7M + 1 = 3
-			pod:          &api.Pod{Spec: test_40_250},
-			nodes:        []*api.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
+			pod:          &v1.Pod{Spec: test_40_250},
+			nodes:        []*v1.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 3}},
 			test:         "two images spread on two nodes, prefer the larger image one",
 		},
@@ -136,8 +136,8 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node2
 			// Image: not present
 			// Score: 0
-			pod:          &api.Pod{Spec: test_40_140},
-			nodes:        []*api.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
+			pod:          &v1.Pod{Spec: test_40_140},
+			nodes:        []*v1.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 2}, {Host: "machine2", Score: 0}},
 			test:         "two images on one node, prefer this node",
 		},
@@ -151,8 +151,8 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node2
 			// Image: gcr.io/10 10MB
 			// Score: 10 < min score = 0
-			pod:          &api.Pod{Spec: test_min_max},
-			nodes:        []*api.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
+			pod:          &v1.Pod{Spec: test_min_max},
+			nodes:        []*v1.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}},
 			test:         "if exceed limit, use limit",
 		},
@@ -174,9 +174,9 @@ func TestImageLocalityPriority(t *testing.T) {
 	}
 }
 
-func makeImageNode(node string, status api.NodeStatus) *api.Node {
-	return &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: node},
+func makeImageNode(node string, status v1.NodeStatus) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: v1.ObjectMeta{Name: node},
 		Status:     status,
 	}
 }

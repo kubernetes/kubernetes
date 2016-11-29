@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -27,7 +28,7 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -35,6 +36,10 @@ import (
 
 const (
 	annotationPrefix = "annotation."
+)
+
+var (
+	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
 )
 
 // apiVersion implements kubecontainer.Version interface by implementing
@@ -230,7 +235,7 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
 func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, error) {
 	var results map[string]string
 
-	sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(annotations)
+	sysctls, unsafeSysctls, err := v1.SysctlsFromPodAnnotations(annotations)
 	if err != nil {
 		return nil, err
 	}
@@ -263,4 +268,49 @@ func (f *dockerFilter) Add(key, value string) {
 
 func (f *dockerFilter) AddLabel(key, value string) {
 	f.Add("label", fmt.Sprintf("%s=%s", key, value))
+}
+
+// getUserFromImageUser gets uid or user name of the image user.
+// If user is numeric, it will be treated as uid; or else, it is treated as user name.
+func getUserFromImageUser(imageUser string) (*int64, *string) {
+	user := dockertools.GetUserFromImageUser(imageUser)
+	// return both nil if user is not specified in the image.
+	if user == "" {
+		return nil, nil
+	}
+	// user could be either uid or user name. Try to interpret as numeric uid.
+	uid, err := strconv.ParseInt(user, 10, 64)
+	if err != nil {
+		// If user is non numeric, assume it's user name.
+		return nil, &user
+	}
+	// If user is a numeric uid.
+	return &uid, nil
+}
+
+// See #33189. If the previous attempt to create a sandbox container name FOO
+// failed due to "device or resource busy", it is possbile that docker did
+// not clean up properly and has inconsistent internal state. Docker would
+// not report the existence of FOO, but would complain if user wants to
+// create a new container named FOO. To work around this, we parse the error
+// message to identify failure caused by naming conflict, and try to remove
+// the old container FOO.
+// TODO(#33189): Monitor the tests to see if the fix is sufficent.
+func recoverFromConflictIfNeeded(client dockertools.DockerInterface, err error) {
+	if err == nil {
+		return
+	}
+
+	matches := conflictRE.FindStringSubmatch(err.Error())
+	if len(matches) != 2 {
+		return
+	}
+
+	id := matches[1]
+	glog.Warningf("Unable to create pod sandbox due to conflict. Attempting to remove sandbox %q", id)
+	if err := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
+		glog.Errorf("Failed to remove the conflicting sandbox container: %v", err)
+	} else {
+		glog.V(2).Infof("Successfully removed conflicting sandbox %q", id)
+	}
 }

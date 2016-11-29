@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -92,13 +91,11 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 		}
 		cachedClusterClient.endpointStore.Store, cachedClusterClient.endpointController = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-					versionedOptions := util.VersionizeV1ListOptions(options)
-					return clientset.Core().Endpoints(v1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+					return clientset.Core().Endpoints(v1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := util.VersionizeV1ListOptions(options)
-					return clientset.Core().Endpoints(v1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Endpoints(v1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Endpoints{},
@@ -118,13 +115,11 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 
 		cachedClusterClient.serviceStore.Indexer, cachedClusterClient.serviceController = cache.NewIndexerInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-					versionedOptions := util.VersionizeV1ListOptions(options)
-					return clientset.Core().Services(v1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+					return clientset.Core().Services(v1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := util.VersionizeV1ListOptions(options)
-					return clientset.Core().Services(v1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Services(v1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Service{},

@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	serviceapi "k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/v1"
+	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/types"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -229,20 +229,20 @@ func getTestPublicIP() network.PublicIPAddress {
 	return pip
 }
 
-func getTestService(identifier string, requestedPorts ...int32) api.Service {
-	ports := []api.ServicePort{}
+func getTestService(identifier string, requestedPorts ...int32) v1.Service {
+	ports := []v1.ServicePort{}
 	for _, port := range requestedPorts {
-		ports = append(ports, api.ServicePort{
+		ports = append(ports, v1.ServicePort{
 			Name:     fmt.Sprintf("port-%d", port),
-			Protocol: api.ProtocolTCP,
+			Protocol: v1.ProtocolTCP,
 			Port:     port,
 			NodePort: getBackendPort(port),
 		})
 	}
 
-	svc := api.Service{
-		Spec: api.ServiceSpec{
-			Type:  api.ServiceTypeLoadBalancer,
+	svc := v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:  v1.ServiceTypeLoadBalancer,
 			Ports: ports,
 		},
 	}
@@ -253,7 +253,7 @@ func getTestService(identifier string, requestedPorts ...int32) api.Service {
 	return svc
 }
 
-func getTestLoadBalancer(services ...api.Service) network.LoadBalancer {
+func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
 	rules := []network.LoadBalancingRule{}
 	probes := []network.Probe{}
 
@@ -286,14 +286,14 @@ func getTestLoadBalancer(services ...api.Service) network.LoadBalancer {
 	return lb
 }
 
-func getServiceSourceRanges(service *api.Service) []string {
+func getServiceSourceRanges(service *v1.Service) []string {
 	if len(service.Spec.LoadBalancerSourceRanges) == 0 {
 		return []string{"Internet"}
 	}
 	return service.Spec.LoadBalancerSourceRanges
 }
 
-func getTestSecurityGroup(services ...api.Service) network.SecurityGroup {
+func getTestSecurityGroup(services ...v1.Service) network.SecurityGroup {
 	rules := []network.SecurityRule{}
 
 	for _, service := range services {
@@ -322,7 +322,7 @@ func getTestSecurityGroup(services ...api.Service) network.SecurityGroup {
 	return sg
 }
 
-func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, services ...api.Service) {
+func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, services ...v1.Service) {
 	expectedRuleCount := 0
 	for _, svc := range services {
 		for _, wantedRule := range svc.Spec.Ports {
@@ -381,7 +381,7 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 	}
 }
 
-func validateSecurityGroup(t *testing.T, securityGroup network.SecurityGroup, services ...api.Service) {
+func validateSecurityGroup(t *testing.T, securityGroup network.SecurityGroup, services ...v1.Service) {
 	expectedRuleCount := 0
 	for _, svc := range services {
 		for _, wantedRule := range svc.Spec.Ports {
@@ -455,7 +455,7 @@ func TestSecurityRulePriorityFailsIfExhausted(t *testing.T) {
 }
 
 func TestProtocolTranslationTCP(t *testing.T) {
-	proto := api.ProtocolTCP
+	proto := v1.ProtocolTCP
 	transportProto, securityGroupProto, probeProto, err := getProtocolsFromKubernetesProtocol(proto)
 	if err != nil {
 		t.Error(err)
@@ -473,7 +473,7 @@ func TestProtocolTranslationTCP(t *testing.T) {
 }
 
 func TestProtocolTranslationUDP(t *testing.T) {
-	proto := api.ProtocolUDP
+	proto := v1.ProtocolUDP
 	_, _, _, err := getProtocolsFromKubernetesProtocol(proto)
 	if err == nil {
 		t.Error("Expected an error. UDP is unsupported.")

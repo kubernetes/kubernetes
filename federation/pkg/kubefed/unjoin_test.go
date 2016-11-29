@@ -159,7 +159,7 @@ func TestUnjoinFederation(t *testing.T) {
 func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 	urlPrefix := "/clusters/"
 
-	cluster := fakeCluster(name, server)
+	cluster := fakeCluster(name, name, server)
 	if secret != "" {
 		cluster.Spec.SecretRef.Name = secret
 	}

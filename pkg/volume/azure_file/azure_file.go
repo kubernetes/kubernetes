@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -77,19 +77,19 @@ func (plugin *azureFilePlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *azureFilePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
-		api.ReadOnlyMany,
-		api.ReadWriteMany,
+func (plugin *azureFilePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+		v1.ReadOnlyMany,
+		v1.ReadWriteMany,
 	}
 }
 
-func (plugin *azureFilePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *azureFilePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod, &azureSvc{}, plugin.host.GetMounter())
 }
 
-func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, util azureUtil, mounter mount.Interface) (volume.Mounter, error) {
+func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, util azureUtil, mounter mount.Interface) (volume.Mounter, error) {
 	source, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -118,17 +118,17 @@ func (plugin *azureFilePlugin) newUnmounterInternal(volName string, podUID types
 	return &azureFileUnmounter{&azureFile{
 		volName:         volName,
 		mounter:         mounter,
-		pod:             &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: podUID}},
 		plugin:          plugin,
 		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil
 }
 
 func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
-	azureVolume := &api.Volume{
+	azureVolume := &v1.Volume{
 		Name: volName,
-		VolumeSource: api.VolumeSource{
-			AzureFile: &api.AzureFileVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			AzureFile: &v1.AzureFileVolumeSource{
 				SecretName: volName,
 				ShareName:  volName,
 			},
@@ -140,7 +140,7 @@ func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*
 // azureFile volumes represent mount of an AzureFile share.
 type azureFile struct {
 	volName string
-	pod     *api.Pod
+	pod     *v1.Pod
 	mounter mount.Interface
 	plugin  *azureFilePlugin
 	volume.MetricsProvider
@@ -268,7 +268,7 @@ func (c *azureFileUnmounter) TearDownAt(dir string) error {
 }
 
 func getVolumeSource(
-	spec *volume.Spec) (*api.AzureFileVolumeSource, bool, error) {
+	spec *volume.Spec) (*v1.AzureFileVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.AzureFile != nil {
 		return spec.Volume.AzureFile, spec.Volume.AzureFile.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&

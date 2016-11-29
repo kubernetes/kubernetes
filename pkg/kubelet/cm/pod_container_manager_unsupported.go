@@ -19,7 +19,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -28,15 +28,15 @@ type unsupportedPodContainerManager struct {
 
 var _ PodContainerManager = &unsupportedPodContainerManager{}
 
-func (m *unsupportedPodContainerManager) Exists(_ *api.Pod) bool {
+func (m *unsupportedPodContainerManager) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *unsupportedPodContainerManager) EnsureExists(_ *api.Pod) error {
+func (m *unsupportedPodContainerManager) EnsureExists(_ *v1.Pod) error {
 	return nil
 }
 
-func (m *unsupportedPodContainerManager) GetPodContainerName(_ *api.Pod) (CgroupName, string) {
+func (m *unsupportedPodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
 	return "", ""
 }
 

@@ -380,15 +380,18 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 	// Find the entry to replace.
 	l.tunnelsLock.Lock()
-	defer l.tunnelsLock.Unlock()
 	for i, entry := range l.entries {
 		if entry.Tunnel == e.Tunnel {
 			l.entries = append(l.entries[:i], l.entries[i+1:]...)
 			l.adding[e.Address] = true
-			go l.createAndAddTunnel(e.Address)
-			return
+			break
 		}
 	}
+	l.tunnelsLock.Unlock()
+	if err := e.Tunnel.Close(); err != nil {
+		glog.Infof("Failed to close removed tunnel: %v", err)
+	}
+	go l.createAndAddTunnel(e.Address)
 }
 
 func (l *SSHTunnelList) Dial(net, addr string) (net.Conn, error) {

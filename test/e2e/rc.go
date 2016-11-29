@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -51,21 +51,21 @@ var _ = framework.KubeDescribe("ReplicationController", func() {
 	})
 })
 
-func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string) *api.ReplicationController {
+func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string) *v1.ReplicationController {
 	zero := int64(0)
-	return &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
+	return &v1.ReplicationController{
+		ObjectMeta: v1.ObjectMeta{
 			Name: rsName,
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: rcPodLabels,
 				},
-				Spec: api.PodSpec{
+				Spec: v1.PodSpec{
 					TerminationGracePeriodSeconds: &zero,
-					Containers: []api.Container{
+					Containers: []v1.Container{
 						{
 							Name:  imageName,
 							Image: image,
@@ -89,25 +89,25 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating replication controller %s", name))
-	controller, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
+	controller, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(&v1.ReplicationController{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Selector: map[string]string{
 				"name": name,
 			},
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{"name": name},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  name,
 							Image: image,
-							Ports: []api.ContainerPort{{ContainerPort: 9376}},
+							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 						},
 					},
 				},
@@ -118,7 +118,7 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()
@@ -169,7 +169,7 @@ func rcConditionCheck(f *framework.Framework) {
 		if err != nil {
 			return false, err
 		}
-		podQuota := quota.Status.Hard[api.ResourcePods]
+		podQuota := quota.Status.Hard[v1.ResourcePods]
 		quantity := resource.MustParse("2")
 		return (&podQuota).Cmp(quantity) == 0, nil
 	})
@@ -197,7 +197,7 @@ func rcConditionCheck(f *framework.Framework) {
 		}
 		conditions = rc.Status.Conditions
 
-		cond := replication.GetCondition(rc.Status, api.ReplicationControllerReplicaFailure)
+		cond := replication.GetCondition(rc.Status, v1.ReplicationControllerReplicaFailure)
 		return cond != nil, nil
 	})
 	if err == wait.ErrWaitTimeout {
@@ -206,8 +206,9 @@ func rcConditionCheck(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Scaling down rc %q to satisfy pod quota", name))
-	rc, err = framework.UpdateReplicationControllerWithRetries(c, namespace, name, func(update *api.ReplicationController) {
-		update.Spec.Replicas = 2
+	rc, err = framework.UpdateReplicationControllerWithRetries(c, namespace, name, func(update *v1.ReplicationController) {
+		x := int32(2)
+		update.Spec.Replicas = &x
 	})
 	Expect(err).NotTo(HaveOccurred())
 
@@ -225,7 +226,7 @@ func rcConditionCheck(f *framework.Framework) {
 		}
 		conditions = rc.Status.Conditions
 
-		cond := replication.GetCondition(rc.Status, api.ReplicationControllerReplicaFailure)
+		cond := replication.GetCondition(rc.Status, v1.ReplicationControllerReplicaFailure)
 		return cond == nil, nil
 	})
 	if err == wait.ErrWaitTimeout {

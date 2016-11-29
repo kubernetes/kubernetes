@@ -18,10 +18,10 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	v1 "k8s.io/client-go/pkg/apis/batch/v1"
 	labels "k8s.io/client-go/pkg/labels"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
@@ -32,7 +32,7 @@ type FakeJobs struct {
 	ns   string
 }
 
-var jobsResource = unversioned.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
+var jobsResource = schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
 
 func (c *FakeJobs) Create(job *v1.Job) (result *v1.Job, err error) {
 	obj, err := c.Fake.

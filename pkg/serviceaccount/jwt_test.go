@@ -22,9 +22,9 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -164,21 +164,21 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	expectedUserUID := "12345"
 
 	// Related API objects
-	serviceAccount := &api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+	serviceAccount := &v1.ServiceAccount{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "my-service-account",
 			UID:       "12345",
 			Namespace: "test",
 		},
 	}
-	rsaSecret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+	rsaSecret := &v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "my-rsa-secret",
 			Namespace: "test",
 		},
 	}
-	ecdsaSecret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+	ecdsaSecret := &v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "my-ecdsa-secret",
 			Namespace: "test",
 		},

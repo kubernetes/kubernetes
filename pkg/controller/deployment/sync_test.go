@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	testclient "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
@@ -261,7 +261,7 @@ func TestScale(t *testing.T) {
 		}
 
 		if test.newRS != nil {
-			desiredReplicas := test.oldDeployment.Spec.Replicas
+			desiredReplicas := *(test.oldDeployment.Spec.Replicas)
 			if desired, ok := test.desiredReplicasAnnotations[test.newRS.Name]; ok {
 				desiredReplicas = desired
 			}
@@ -272,7 +272,7 @@ func TestScale(t *testing.T) {
 			if rs == nil {
 				continue
 			}
-			desiredReplicas := test.oldDeployment.Spec.Replicas
+			desiredReplicas := *(test.oldDeployment.Spec.Replicas)
 			if desired, ok := test.desiredReplicasAnnotations[rs.Name]; ok {
 				desiredReplicas = desired
 			}
@@ -289,22 +289,22 @@ func TestScale(t *testing.T) {
 		// no update action for it.
 		nameToSize := make(map[string]int32)
 		if test.newRS != nil {
-			nameToSize[test.newRS.Name] = test.newRS.Spec.Replicas
+			nameToSize[test.newRS.Name] = *(test.newRS.Spec.Replicas)
 		}
 		for i := range test.oldRSs {
 			rs := test.oldRSs[i]
-			nameToSize[rs.Name] = rs.Spec.Replicas
+			nameToSize[rs.Name] = *(rs.Spec.Replicas)
 		}
 		// Get all the UPDATE actions and update nameToSize with all the updated sizes.
 		for _, action := range fake.Actions() {
 			rs := action.(testclient.UpdateAction).GetObject().(*extensions.ReplicaSet)
 			if !test.wasntUpdated[rs.Name] {
-				nameToSize[rs.Name] = rs.Spec.Replicas
+				nameToSize[rs.Name] = *(rs.Spec.Replicas)
 			}
 		}
 
-		if test.expectedNew != nil && test.newRS != nil && test.expectedNew.Spec.Replicas != nameToSize[test.newRS.Name] {
-			t.Errorf("%s: expected new replicas: %d, got: %d", test.name, test.expectedNew.Spec.Replicas, nameToSize[test.newRS.Name])
+		if test.expectedNew != nil && test.newRS != nil && *(test.expectedNew.Spec.Replicas) != nameToSize[test.newRS.Name] {
+			t.Errorf("%s: expected new replicas: %d, got: %d", test.name, *(test.expectedNew.Spec.Replicas), nameToSize[test.newRS.Name])
 			continue
 		}
 		if len(test.expectedOld) != len(test.oldRSs) {
@@ -314,8 +314,8 @@ func TestScale(t *testing.T) {
 		for n := range test.oldRSs {
 			rs := test.oldRSs[n]
 			expected := test.expectedOld[n]
-			if expected.Spec.Replicas != nameToSize[rs.Name] {
-				t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, expected.Spec.Replicas, nameToSize[rs.Name])
+			if *(expected.Spec.Replicas) != nameToSize[rs.Name] {
+				t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, *(expected.Spec.Replicas), nameToSize[rs.Name])
 			}
 		}
 	}
@@ -371,7 +371,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		fake := &fake.Clientset{}
-		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+		informers := informers.NewSharedInformerFactory(fake, nil, controller.NoResyncPeriodFunc())
 		controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
 
 		controller.eventRecorder = &record.FakeRecorder{}

@@ -46,6 +46,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -180,11 +181,11 @@ func (fn ResourcePrinterFunc) AfterPrint(io.Writer, string) error {
 type VersionedPrinter struct {
 	printer   ResourcePrinter
 	converter runtime.ObjectConvertor
-	versions  []unversioned.GroupVersion
+	versions  []schema.GroupVersion
 }
 
 // NewVersionedPrinter wraps a printer to convert objects to a known API version prior to printing.
-func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConvertor, versions ...unversioned.GroupVersion) ResourcePrinter {
+func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConvertor, versions ...schema.GroupVersion) ResourcePrinter {
 	return &VersionedPrinter{
 		printer:   printer,
 		converter: converter,
@@ -201,7 +202,7 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	if len(p.versions) == 0 {
 		return fmt.Errorf("no version specified, object cannot be converted")
 	}
-	converted, err := p.converter.ConvertToVersion(obj, unversioned.GroupVersions(p.versions))
+	converted, err := p.converter.ConvertToVersion(obj, schema.GroupVersions(p.versions))
 	if err != nil {
 		return err
 	}
@@ -2396,7 +2397,7 @@ func printUnstructured(unstructured *runtime.Unstructured, w io.Writer, options 
 	}
 	if objAPIVersion, ok := unstructured.Object["apiVersion"]; ok {
 		if str, ok := objAPIVersion.(string); ok {
-			version, err := unversioned.ParseGroupVersion(str)
+			version, err := schema.ParseGroupVersion(str)
 			if err != nil {
 				return err
 			}

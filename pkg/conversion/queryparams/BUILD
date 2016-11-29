@@ -26,5 +26,6 @@ go_test(
     deps = [
         "//pkg/api/unversioned:go_default_library",
         "//pkg/conversion/queryparams:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
     ],
 )

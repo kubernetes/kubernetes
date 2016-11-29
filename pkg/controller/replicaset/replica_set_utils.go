@@ -26,8 +26,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -62,7 +63,7 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs exte
 	var getErr error
 	for i, rs := 0, &rs; ; i++ {
 		glog.V(4).Infof(fmt.Sprintf("Updating replica count for ReplicaSet: %s/%s, ", rs.Namespace, rs.Name) +
-			fmt.Sprintf("replicas %d->%d (need %d), ", rs.Status.Replicas, newStatus.Replicas, rs.Spec.Replicas) +
+			fmt.Sprintf("replicas %d->%d (need %d), ", rs.Status.Replicas, newStatus.Replicas, *(rs.Spec.Replicas)) +
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rs.Status.FullyLabeledReplicas, newStatus.FullyLabeledReplicas) +
 			fmt.Sprintf("readyReplicas %d->%d, ", rs.Status.ReadyReplicas, newStatus.ReadyReplicas) +
 			fmt.Sprintf("availableReplicas %d->%d, ", rs.Status.AvailableReplicas, newStatus.AvailableReplicas) +
@@ -95,7 +96,7 @@ func (o overlappingReplicaSets) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
 
-func calculateStatus(rs extensions.ReplicaSet, filteredPods []*api.Pod, manageReplicasErr error) extensions.ReplicaSetStatus {
+func calculateStatus(rs extensions.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) extensions.ReplicaSetStatus {
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replica set, the matching pods may have more
@@ -110,9 +111,9 @@ func calculateStatus(rs extensions.ReplicaSet, filteredPods []*api.Pod, manageRe
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++
 		}
-		if api.IsPodReady(pod) {
+		if v1.IsPodReady(pod) {
 			readyReplicasCount++
-			if api.IsPodAvailable(pod, rs.Spec.MinReadySeconds, unversioned.Now()) {
+			if v1.IsPodAvailable(pod, rs.Spec.MinReadySeconds, unversioned.Now()) {
 				availableReplicasCount++
 			}
 		}
@@ -121,12 +122,12 @@ func calculateStatus(rs extensions.ReplicaSet, filteredPods []*api.Pod, manageRe
 	failureCond := GetCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
 	if manageReplicasErr != nil && failureCond == nil {
 		var reason string
-		if diff := len(filteredPods) - int(rs.Spec.Replicas); diff < 0 {
+		if diff := len(filteredPods) - int(*(rs.Spec.Replicas)); diff < 0 {
 			reason = "FailedCreate"
 		} else if diff > 0 {
 			reason = "FailedDelete"
 		}
-		cond := NewReplicaSetCondition(extensions.ReplicaSetReplicaFailure, api.ConditionTrue, reason, manageReplicasErr.Error())
+		cond := NewReplicaSetCondition(extensions.ReplicaSetReplicaFailure, v1.ConditionTrue, reason, manageReplicasErr.Error())
 		SetCondition(&newStatus, cond)
 	} else if manageReplicasErr == nil && failureCond != nil {
 		RemoveCondition(&newStatus, extensions.ReplicaSetReplicaFailure)
@@ -140,7 +141,7 @@ func calculateStatus(rs extensions.ReplicaSet, filteredPods []*api.Pod, manageRe
 }
 
 // NewReplicaSetCondition creates a new replica set condition.
-func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status api.ConditionStatus, reason, msg string) extensions.ReplicaSetCondition {
+func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status v1.ConditionStatus, reason, msg string) extensions.ReplicaSetCondition {
 	return extensions.ReplicaSetCondition{
 		Type:               condType,
 		Status:             status,

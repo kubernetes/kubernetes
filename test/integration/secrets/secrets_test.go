@@ -23,9 +23,9 @@ package secrets
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -42,7 +42,7 @@ func TestSecrets(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("secret", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -51,10 +51,10 @@ func TestSecrets(t *testing.T) {
 }
 
 // DoTestSecrets test secrets for one api version.
-func DoTestSecrets(t *testing.T, client clientset.Interface, ns *api.Namespace) {
+func DoTestSecrets(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 	// Make a secret object.
-	s := api.Secret{
-		ObjectMeta: api.ObjectMeta{
+	s := v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "secret",
 			Namespace: ns.Name,
 		},
@@ -69,27 +69,27 @@ func DoTestSecrets(t *testing.T, client clientset.Interface, ns *api.Namespace) 
 	defer deleteSecretOrErrorf(t, client, s.Namespace, s.Name)
 
 	// Template for pods that use a secret.
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "XXX",
 			Namespace: ns.Name,
 		},
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
 				{
 					Name: "secvol",
-					VolumeSource: api.VolumeSource{
-						Secret: &api.SecretVolumeSource{
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
 							SecretName: "secret",
 						},
 					},
 				},
 			},
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "fake-name",
 					Image: "fakeimage",
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "secvol",
 							MountPath: "/fake/path",

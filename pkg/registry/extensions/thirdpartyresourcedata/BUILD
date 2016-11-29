@@ -34,6 +34,7 @@ go_library(
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/util/validation/field:go_default_library",
         "//pkg/util/yaml:go_default_library",
@@ -60,6 +61,7 @@ go_test(
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/watch/versioned:go_default_library",
     ],
 )

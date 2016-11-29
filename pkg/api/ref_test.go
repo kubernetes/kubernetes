@@ -22,18 +22,19 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type FakeAPIObject struct{}
 
-func (obj *FakeAPIObject) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *FakeAPIObject) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 type ExtensionAPIObject struct {
 	unversioned.TypeMeta
 	ObjectMeta
 }
 
-func (obj *ExtensionAPIObject) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ExtensionAPIObject) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 func TestGetReference(t *testing.T) {
 

@@ -18,10 +18,10 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
+	schema "k8s.io/kubernetes/pkg/runtime/schema"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +31,7 @@ type FakeStatefulSets struct {
 	ns   string
 }
 
-var statefulsetsResource = unversioned.GroupVersionResource{Group: "apps", Version: "", Resource: "statefulsets"}
+var statefulsetsResource = schema.GroupVersionResource{Group: "apps", Version: "", Resource: "statefulsets"}
 
 func (c *FakeStatefulSets) Create(statefulSet *apps.StatefulSet) (result *apps.StatefulSet, err error) {
 	obj, err := c.Fake.

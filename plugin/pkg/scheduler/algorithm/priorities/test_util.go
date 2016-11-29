@@ -17,22 +17,22 @@ limitations under the License.
 package priorities
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-func makeNode(node string, milliCPU, memory int64) *api.Node {
-	return &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: node},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+func makeNode(node string, milliCPU, memory int64) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: v1.ObjectMeta{Name: node},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
 				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 				"memory": *resource.NewQuantity(memory, resource.BinarySI),
 			},
-			Allocatable: api.ResourceList{
+			Allocatable: v1.ResourceList{
 				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 				"memory": *resource.NewQuantity(memory, resource.BinarySI),
 			},
@@ -41,7 +41,7 @@ func makeNode(node string, milliCPU, memory int64) *api.Node {
 }
 
 func priorityFunction(mapFn algorithm.PriorityMapFunction, reduceFn algorithm.PriorityReduceFunction) algorithm.PriorityFunction {
-	return func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
+	return func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 		result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 		for i := range nodes {
 			hostResult, err := mapFn(pod, nil, nodeNameToInfo[nodes[i].Name])

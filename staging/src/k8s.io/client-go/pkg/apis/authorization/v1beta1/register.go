@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	versionedwatch "k8s.io/client-go/pkg/watch/versioned"
 )
 
@@ -27,7 +27,7 @@ import (
 const GroupName = "authorization.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1beta1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
 
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
@@ -50,6 +50,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func (obj *LocalSubjectAccessReview) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *SubjectAccessReview) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
-func (obj *SelfSubjectAccessReview) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }
+func (obj *LocalSubjectAccessReview) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
+func (obj *SubjectAccessReview) GetObjectKind() schema.ObjectKind      { return &obj.TypeMeta }
+func (obj *SelfSubjectAccessReview) GetObjectKind() schema.ObjectKind  { return &obj.TypeMeta }

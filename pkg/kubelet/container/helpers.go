@@ -25,8 +25,8 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -39,25 +39,25 @@ import (
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
-	Run(containerID ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) (string, error)
+	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error)
 }
 
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*RunContainerOptions, error)
-	GetClusterDNS(pod *api.Pod) (dnsServers []string, dnsSearches []string, err error)
+	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*RunContainerOptions, error)
+	GetClusterDNS(pod *v1.Pod) (dnsServers []string, dnsSearches []string, err error)
 	GetPodDir(podUID types.UID) string
-	GeneratePodHostNameAndDomain(pod *api.Pod) (hostname string, hostDomain string, err error)
+	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
-	GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64
+	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *PodStatus) bool {
+func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
 	// Get latest container status.
 	status := podStatus.FindContainerStatusByName(container.Name)
 	// If the container was never started before, we should start it.
@@ -74,11 +74,11 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 		return true
 	}
 	// Check RestartPolicy for dead container
-	if pod.Spec.RestartPolicy == api.RestartPolicyNever {
+	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
 		glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
 		return false
 	}
-	if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
+	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
 		// Check the exit code.
 		if status.ExitCode == 0 {
 			glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
@@ -90,7 +90,7 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 
 // HashContainer returns the hash of the container. It is used to compare
 // the running container with its desired spec.
-func HashContainer(container *api.Container) uint64 {
+func HashContainer(container *v1.Container) uint64 {
 	hash := adler32.New()
 	hashutil.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
@@ -107,7 +107,7 @@ func EnvVarsToMap(envs []EnvVar) map[string]string {
 	return result
 }
 
-func ExpandContainerCommandAndArgs(container *api.Container, envs []EnvVar) (command []string, args []string) {
+func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {
 	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
 
 	if len(container.Command) != 0 {
@@ -136,11 +136,11 @@ type innerEventRecorder struct {
 	recorder record.EventRecorder
 }
 
-func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*api.ObjectReference, bool) {
+func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {
 	if object == nil {
 		return nil, false
 	}
-	if ref, ok := object.(*api.ObjectReference); ok {
+	if ref, ok := object.(*v1.ObjectReference); ok {
 		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
 			return ref, true
 		}
@@ -168,8 +168,8 @@ func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp
 }
 
 // Pod must not be nil.
-func IsHostNetworkPod(pod *api.Pod) bool {
-	return pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork
+func IsHostNetworkPod(pod *v1.Pod) bool {
+	return pod.Spec.HostNetwork
 }
 
 // TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon

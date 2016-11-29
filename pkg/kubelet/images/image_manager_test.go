@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -31,8 +31,8 @@ import (
 )
 
 func TestParallelPuller(t *testing.T) {
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
 			UID:             "bar",
@@ -42,7 +42,7 @@ func TestParallelPuller(t *testing.T) {
 
 	cases := []struct {
 		containerImage  string
-		policy          api.PullPolicy
+		policy          v1.PullPolicy
 		calledFunctions []string
 		inspectErr      error
 		pullerErr       error
@@ -50,7 +50,7 @@ func TestParallelPuller(t *testing.T) {
 	}{
 		{ // pull missing image
 			containerImage:  "missing_image",
-			policy:          api.PullIfNotPresent,
+			policy:          v1.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       nil,
@@ -58,35 +58,35 @@ func TestParallelPuller(t *testing.T) {
 
 		{ // image present, don't pull
 			containerImage:  "present_image",
-			policy:          api.PullIfNotPresent,
+			policy:          v1.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{nil, nil, nil}},
 		// image present, pull it
 		{containerImage: "present_image",
-			policy:          api.PullAlways,
+			policy:          v1.PullAlways,
 			calledFunctions: []string{"IsImagePresent", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{nil, nil, nil}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
-			policy:          api.PullNever,
+			policy:          v1.PullNever,
 			calledFunctions: []string{"IsImagePresent"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{ErrImageNeverPull, ErrImageNeverPull, ErrImageNeverPull}},
 		// missing image, unable to inspect
 		{containerImage: "missing_image",
-			policy:          api.PullIfNotPresent,
+			policy:          v1.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent"},
 			inspectErr:      errors.New("unknown inspectError"),
 			pullerErr:       nil,
 			expectedErr:     []error{ErrImageInspect, ErrImageInspect, ErrImageInspect}},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
-			policy:          api.PullIfNotPresent,
+			policy:          v1.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       errors.New("404"),
@@ -94,7 +94,7 @@ func TestParallelPuller(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		container := &api.Container{
+		container := &v1.Container{
 			Name:            "container_name",
 			Image:           c.containerImage,
 			ImagePullPolicy: c.policy,
@@ -122,8 +122,8 @@ func TestParallelPuller(t *testing.T) {
 }
 
 func TestSerializedPuller(t *testing.T) {
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
 			UID:             "bar",
@@ -133,7 +133,7 @@ func TestSerializedPuller(t *testing.T) {
 
 	cases := []struct {
 		containerImage  string
-		policy          api.PullPolicy
+		policy          v1.PullPolicy
 		calledFunctions []string
 		inspectErr      error
 		pullerErr       error
@@ -141,7 +141,7 @@ func TestSerializedPuller(t *testing.T) {
 	}{
 		{ // pull missing image
 			containerImage:  "missing_image",
-			policy:          api.PullIfNotPresent,
+			policy:          v1.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       nil,
@@ -149,35 +149,35 @@ func TestSerializedPuller(t *testing.T) {
 
 		{ // image present, don't pull
 			containerImage:  "present_image",
-			policy:          api.PullIfNotPresent,
+			policy:          v1.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{nil, nil, nil}},
 		// image present, pull it
 		{containerImage: "present_image",
-			policy:          api.PullAlways,
+			policy:          v1.PullAlways,
 			calledFunctions: []string{"IsImagePresent", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{nil, nil, nil}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
-			policy:          api.PullNever,
+			policy:          v1.PullNever,
 			calledFunctions: []string{"IsImagePresent"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{ErrImageNeverPull, ErrImageNeverPull, ErrImageNeverPull}},
 		// missing image, unable to inspect
 		{containerImage: "missing_image",
-			policy:          api.PullIfNotPresent,
+			policy:          v1.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent"},
 			inspectErr:      errors.New("unknown inspectError"),
 			pullerErr:       nil,
 			expectedErr:     []error{ErrImageInspect, ErrImageInspect, ErrImageInspect}},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
-			policy:          api.PullIfNotPresent,
+			policy:          v1.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       errors.New("404"),
@@ -185,7 +185,7 @@ func TestSerializedPuller(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		container := &api.Container{
+		container := &v1.Container{
 			Name:            "container_name",
 			Image:           c.containerImage,
 			ImagePullPolicy: c.policy,

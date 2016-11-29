@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestParseRuntimeConfig(t *testing.T) {
@@ -155,7 +155,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *ResourceConfig {
 				config := NewResourceConfig()
-				config.DisableResources(unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
+				config.DisableResources(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
 				return config
 			},
 			err: true,

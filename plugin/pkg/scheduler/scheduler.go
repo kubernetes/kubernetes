@@ -19,7 +19,7 @@ package scheduler
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -31,11 +31,11 @@ import (
 
 // Binder knows how to write a binding.
 type Binder interface {
-	Bind(binding *api.Binding) error
+	Bind(binding *v1.Binding) error
 }
 
 type PodConditionUpdater interface {
-	Update(pod *api.Pod, podCondition *api.PodCondition) error
+	Update(pod *v1.Pod, podCondition *v1.PodCondition) error
 }
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -60,11 +60,11 @@ type Config struct {
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func() *api.Pod
+	NextPod func() *v1.Pod
 
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
-	Error func(*api.Pod, error)
+	Error func(*v1.Pod, error)
 
 	// Recorder is the EventRecorder to use
 	Recorder record.EventRecorder
@@ -96,11 +96,11 @@ func (s *Scheduler) scheduleOne() {
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
 		s.config.Error(pod, err)
-		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
-		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
-			Type:   api.PodScheduled,
-			Status: api.ConditionFalse,
-			Reason: api.PodReasonUnschedulable,
+		s.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
+		s.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+			Type:   v1.PodScheduled,
+			Status: v1.ConditionFalse,
+			Reason: v1.PodReasonUnschedulable,
 		})
 		return
 	}
@@ -114,14 +114,21 @@ func (s *Scheduler) scheduleOne() {
 	assumed.Spec.NodeName = dest
 	if err := s.config.SchedulerCache.AssumePod(&assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
+		// TODO: This means that a given pod is already in cache (which means it
+		// is either assumed or already added). This is most probably result of a
+		// BUG in retrying logic. As a temporary workaround (which doesn't fully
+		// fix the problem, but should reduce its impact), we simply return here,
+		// as binding doesn't make sense anyway.
+		// This should be fixed properly though.
+		return
 	}
 
 	go func() {
 		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 
-		b := &api.Binding{
-			ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
-			Target: api.ObjectReference{
+		b := &v1.Binding{
+			ObjectMeta: v1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+			Target: v1.ObjectReference{
 				Kind: "Node",
 				Name: dest,
 			},
@@ -137,15 +144,15 @@ func (s *Scheduler) scheduleOne() {
 				glog.Errorf("scheduler cache ForgetPod failed: %v", err)
 			}
 			s.config.Error(pod, err)
-			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
-			s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
-				Type:   api.PodScheduled,
-				Status: api.ConditionFalse,
+			s.config.Recorder.Eventf(pod, v1.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
+			s.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+				Type:   v1.PodScheduled,
+				Status: v1.ConditionFalse,
 				Reason: "BindingRejected",
 			})
 			return
 		}
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
-		s.config.Recorder.Eventf(pod, api.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+		s.config.Recorder.Eventf(pod, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 	}()
 }

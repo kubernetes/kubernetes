@@ -20,21 +20,21 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
-func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []api.Toleration) (intolerableTaints int) {
+func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
 	for i := range taints {
 		taint := &taints[i]
 		// check only on taints that have effect PreferNoSchedule
-		if taint.Effect != api.TaintEffectPreferNoSchedule {
+		if taint.Effect != v1.TaintEffectPreferNoSchedule {
 			continue
 		}
 
-		if !api.TaintToleratedByTolerations(taint, tolerations) {
+		if !v1.TaintToleratedByTolerations(taint, tolerations) {
 			intolerableTaints++
 		}
 	}
@@ -42,18 +42,18 @@ func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []ap
 }
 
 // getAllTolerationEffectPreferNoSchedule gets the list of all Toleration with Effect PreferNoSchedule
-func getAllTolerationPreferNoSchedule(tolerations []api.Toleration) (tolerationList []api.Toleration) {
+func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationList []v1.Toleration) {
 	for i := range tolerations {
 		toleration := &tolerations[i]
-		if len(toleration.Effect) == 0 || toleration.Effect == api.TaintEffectPreferNoSchedule {
+		if len(toleration.Effect) == 0 || toleration.Effect == v1.TaintEffectPreferNoSchedule {
 			tolerationList = append(tolerationList, *toleration)
 		}
 	}
 	return
 }
 
-func getTolerationListFromPod(pod *api.Pod) ([]api.Toleration, error) {
-	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.Annotations)
+func getTolerationListFromPod(pod *v1.Pod) ([]v1.Toleration, error) {
+	tolerations, err := v1.GetTolerationsFromPodAnnotations(pod.Annotations)
 	if err != nil {
 		return nil, err
 	}
@@ -61,13 +61,13 @@ func getTolerationListFromPod(pod *api.Pod) ([]api.Toleration, error) {
 }
 
 // ComputeTaintTolerationPriority prepares the priority list for all the nodes based on the number of intolerable taints on the node
-func ComputeTaintTolerationPriorityMap(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
-	var tolerationList []api.Toleration
+	var tolerationList []v1.Toleration
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
 		tolerationList = priorityMeta.podTolerations
 	} else {
@@ -78,7 +78,7 @@ func ComputeTaintTolerationPriorityMap(pod *api.Pod, meta interface{}, nodeInfo 
 		}
 	}
 
-	taints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	taints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
 	if err != nil {
 		return schedulerapi.HostPriority{}, err
 	}
@@ -88,7 +88,7 @@ func ComputeTaintTolerationPriorityMap(pod *api.Pod, meta interface{}, nodeInfo 
 	}, nil
 }
 
-func ComputeTaintTolerationPriorityReduce(pod *api.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
+func ComputeTaintTolerationPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
 	var maxCount int
 	for i := range result {
 		if result[i].Score > maxCount {

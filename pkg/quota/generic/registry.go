@@ -17,8 +17,8 @@ limitations under the License.
 package generic
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // Ensure it implements the required interface
@@ -27,10 +27,10 @@ var _ quota.Registry = &GenericRegistry{}
 // GenericRegistry implements Registry
 type GenericRegistry struct {
 	// internal evaluators by group kind
-	InternalEvaluators map[unversioned.GroupKind]quota.Evaluator
+	InternalEvaluators map[schema.GroupKind]quota.Evaluator
 }
 
 // Evaluators returns the map of evaluators by groupKind
-func (r *GenericRegistry) Evaluators() map[unversioned.GroupKind]quota.Evaluator {
+func (r *GenericRegistry) Evaluators() map[schema.GroupKind]quota.Evaluator {
 	return r.InternalEvaluators
 }

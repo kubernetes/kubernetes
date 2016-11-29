@@ -133,7 +133,7 @@ type FederatedReplicaSetPreferences struct {
 	// +optional
 	Rebalance bool `json:"rebalance,omitempty"`
 
-	// A mapping between cluser names and preferences regarding local replicasets in these clusters.
+	// A mapping between cluster names and preferences regarding local ReplicaSet in these clusters.
 	// "*" (if provided) applies to all clusters if an explicit mapping is not provided. If there is no
 	// "*" that clusters without explicit preferences should not have any replicas scheduled.
 	// +optional

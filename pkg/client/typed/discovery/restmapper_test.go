@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -69,43 +70,43 @@ func TestRESTMapper(t *testing.T) {
 	restMapper := NewRESTMapper(resources, nil)
 
 	kindTCs := []struct {
-		input unversioned.GroupVersionResource
-		want  unversioned.GroupVersionKind
+		input schema.GroupVersionResource
+		want  schema.GroupVersionKind
 	}{
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Version:  "v1",
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionKind{
+			want: schema.GroupVersionKind{
 				Version: "v1",
 				Kind:    "Pod",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Version:  "v2",
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionKind{
+			want: schema.GroupVersionKind{
 				Version: "v2",
 				Kind:    "Pod",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionKind{
+			want: schema.GroupVersionKind{
 				Version: "v1",
 				Kind:    "Pod",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Resource: "jobs",
 			},
-			want: unversioned.GroupVersionKind{
+			want: schema.GroupVersionKind{
 				Group:   "extensions",
 				Version: "v1beta",
 				Kind:    "Job",
@@ -126,43 +127,43 @@ func TestRESTMapper(t *testing.T) {
 	}
 
 	resourceTCs := []struct {
-		input unversioned.GroupVersionResource
-		want  unversioned.GroupVersionResource
+		input schema.GroupVersionResource
+		want  schema.GroupVersionResource
 	}{
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Version:  "v1",
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionResource{
+			want: schema.GroupVersionResource{
 				Version:  "v1",
 				Resource: "pods",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Version:  "v2",
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionResource{
+			want: schema.GroupVersionResource{
 				Version:  "v2",
 				Resource: "pods",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionResource{
+			want: schema.GroupVersionResource{
 				Version:  "v1",
 				Resource: "pods",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Resource: "jobs",
 			},
-			want: unversioned.GroupVersionResource{
+			want: schema.GroupVersionResource{
 				Group:    "extensions",
 				Version:  "v1beta",
 				Resource: "jobs",
@@ -191,7 +192,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.False(cdc.fresh, "should NOT be fresh after instantiation")
 	assert.Zero(cdc.invalidateCalls, "should not have called Invalidate()")
 
-	gvk, err := m.KindFor(unversioned.GroupVersionResource{
+	gvk, err := m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "foo",
@@ -201,7 +202,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.Equal(cdc.invalidateCalls, 1, "should have called Invalidate() once")
 	assert.Equal(gvk.Kind, "Foo")
 
-	gvk, err = m.KindFor(unversioned.GroupVersionResource{
+	gvk, err = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "foo",
@@ -209,7 +210,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again")
 
-	gvk, err = m.KindFor(unversioned.GroupVersionResource{
+	gvk, err = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "bar",
@@ -218,7 +219,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
 
 	cdc.fresh = false
-	gvk, err = m.KindFor(unversioned.GroupVersionResource{
+	gvk, err = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "bar",
@@ -286,7 +287,7 @@ func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersi
 		}, nil
 	}
 
-	return nil, errors.NewNotFound(unversioned.GroupResource{}, "")
+	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerResources() (map[string]*unversioned.APIResourceList, error) {
@@ -299,9 +300,9 @@ func (c *fakeCachedDiscoveryInterface) ServerResources() (map[string]*unversione
 	return map[string]*unversioned.APIResourceList{}, nil
 }
 
-func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]schema.GroupVersionResource, error) {
 	if c.enabledA {
-		return []unversioned.GroupVersionResource{
+		return []schema.GroupVersionResource{
 			{
 				Group:    "a",
 				Version:  "v1",
@@ -309,17 +310,17 @@ func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]unversioned
 			},
 		}, nil
 	}
-	return []unversioned.GroupVersionResource{}, nil
+	return []schema.GroupVersionResource{}, nil
 }
 
-func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
-	return []unversioned.GroupVersionResource{}, nil
+func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResources() ([]schema.GroupVersionResource, error) {
+	return []schema.GroupVersionResource{}, nil
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
 	return &version.Info{}, nil
 }
 
-func (c *fakeCachedDiscoveryInterface) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+func (c *fakeCachedDiscoveryInterface) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	return &swagger.ApiDeclaration{}, nil
 }

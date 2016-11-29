@@ -19,13 +19,13 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-func CalculateNodePreferAvoidPodsPriorityMap(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
@@ -43,7 +43,7 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *api.Pod, meta interface{}, nod
 		return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil
 	}
 
-	avoids, err := api.GetAvoidPodsFromNodeAnnotations(node.Annotations)
+	avoids, err := v1.GetAvoidPodsFromNodeAnnotations(node.Annotations)
 	if err != nil {
 		// If we cannot get annotation, assume it's schedulable there.
 		return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil

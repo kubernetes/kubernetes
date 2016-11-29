@@ -24,6 +24,7 @@ package k8s.io.kubernetes.pkg.api.v1;
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -1465,6 +1466,13 @@ message NodeProxyOptions {
   optional string path = 1;
 }
 
+// NodeResources is an object for conveying resource information about a node.
+// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+message NodeResources {
+  // Capacity represents the available resources of a node
+  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> capacity = 1;
+}
+
 // A node selector represents the union of the results of one or more label queries
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
@@ -1514,7 +1522,7 @@ message NodeSpec {
   optional string providerID = 3;
 
   // Unschedulable controls node schedulability of new pods. By default, node is schedulable.
-  // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"`
+  // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"
   // +optional
   optional bool unschedulable = 4;
 }
@@ -3358,6 +3366,12 @@ message ServiceStatus {
   // if one is present.
   // +optional
   optional LoadBalancerStatus loadBalancer = 1;
+}
+
+message Sysctl {
+  optional string name = 1;
+
+  optional string value = 2;
 }
 
 // TCPSocketAction describes an action based on opening a socket

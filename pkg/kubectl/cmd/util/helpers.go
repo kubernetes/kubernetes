@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -521,7 +522,7 @@ func RecordChangeCause(obj runtime.Object, changeCause string) error {
 
 // ChangeResourcePatch creates a strategic merge patch between the origin input resource info
 // and the annotated with change-cause input resource info.
-func ChangeResourcePatch(info *resource.Info, changeCause string, smPatchVersion strategicpatch.StrategicMergePatchVersion) ([]byte, error) {
+func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
 	oldData, err := json.Marshal(info.Object)
 	if err != nil {
 		return nil, err
@@ -533,7 +534,7 @@ func ChangeResourcePatch(info *resource.Info, changeCause string, smPatchVersion
 	if err != nil {
 		return nil, err
 	}
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object, smPatchVersion)
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object)
 }
 
 // containsChangeCause checks if input resource info contains change-cause annotation.
@@ -614,7 +615,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 
 // MaybeConvertObject attempts to convert an object to a specific group/version.  If the object is
 // a third party resource it is simply passed through.
-func MaybeConvertObject(obj runtime.Object, gv unversioned.GroupVersion, converter runtime.ObjectConvertor) (runtime.Object, error) {
+func MaybeConvertObject(obj runtime.Object, gv schema.GroupVersion, converter runtime.ObjectConvertor) (runtime.Object, error) {
 	switch obj.(type) {
 	case *extensions.ThirdPartyResourceData:
 		// conversion is not supported for 3rd party objects
@@ -688,7 +689,7 @@ func PrintFilterCount(hiddenObjNum int, resource string, options *kubectl.PrintO
 
 // ObjectListToVersionedObject receives a list of api objects and a group version
 // and squashes the list's items into a single versioned runtime.Object.
-func ObjectListToVersionedObject(objects []runtime.Object, version unversioned.GroupVersion) (runtime.Object, error) {
+func ObjectListToVersionedObject(objects []runtime.Object, version schema.GroupVersion) (runtime.Object, error) {
 	objectList := &api.List{Items: objects}
 	converted, err := resource.TryConvert(api.Scheme, objectList, version, registered.GroupOrDie(api.GroupName).GroupVersion)
 	if err != nil {
@@ -724,14 +725,4 @@ func RequireNoArguments(c *cobra.Command, args []string) {
 	if len(args) > 0 {
 		CheckErr(UsageError(c, fmt.Sprintf(`unknown command %q`, strings.Join(args, " "))))
 	}
-}
-
-// GetServerSupportedSMPatchVersionFromFactory is a wrapper of GetServerSupportedSMPatchVersion(),
-// It takes a Factory, returns the max version the server supports.
-func GetServerSupportedSMPatchVersionFromFactory(f Factory) (strategicpatch.StrategicMergePatchVersion, error) {
-	clientSet, err := f.ClientSet()
-	if err != nil {
-		return strategicpatch.Unknown, err
-	}
-	return strategicpatch.GetServerSupportedSMPatchVersion(clientSet.Discovery())
 }

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	// Import solely to initialize client auth plugins.
@@ -49,7 +50,7 @@ func MatchesServerVersion(client DiscoveryInterface) error {
 //   preference.
 // - If version is provided and the server does not support it,
 //   return an error.
-func NegotiateVersion(client DiscoveryInterface, requiredGV *unversioned.GroupVersion, clientRegisteredGVs []unversioned.GroupVersion) (*unversioned.GroupVersion, error) {
+func NegotiateVersion(client DiscoveryInterface, requiredGV *schema.GroupVersion, clientRegisteredGVs []schema.GroupVersion) (*schema.GroupVersion, error) {
 	clientVersions := sets.String{}
 	for _, gv := range clientRegisteredGVs {
 		clientVersions.Insert(gv.String())

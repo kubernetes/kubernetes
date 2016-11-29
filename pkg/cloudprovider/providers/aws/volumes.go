@@ -18,9 +18,10 @@ package aws
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
 	"net/url"
 	"strings"
+
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 // awsVolumeID represents the ID of the volume in the AWS API, e.g. vol-12345678a

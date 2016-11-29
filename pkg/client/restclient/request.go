@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/net"
@@ -333,10 +334,10 @@ func (r resourceTypeToFieldMapping) filterField(resourceType, field, value strin
 	return fMapping.filterField(field, value)
 }
 
-type versionToResourceToFieldMapping map[unversioned.GroupVersion]resourceTypeToFieldMapping
+type versionToResourceToFieldMapping map[schema.GroupVersion]resourceTypeToFieldMapping
 
 // filterField transforms the given field/value selector for the given groupVersion and resource
-func (v versionToResourceToFieldMapping) filterField(groupVersion *unversioned.GroupVersion, resourceType, field, value string) (newField, newValue string, err error) {
+func (v versionToResourceToFieldMapping) filterField(groupVersion *schema.GroupVersion, resourceType, field, value string) (newField, newValue string, err error) {
 	rMapping, ok := v[*groupVersion]
 	if !ok {
 		// no groupVersion overrides registered, default to identity mapping
@@ -1001,7 +1002,7 @@ func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool,
 	return errors.NewGenericServerResponse(
 		statusCode,
 		method,
-		unversioned.GroupResource{
+		schema.GroupResource{
 			Group:    r.content.GroupVersion.Group,
 			Resource: r.resource,
 		},
@@ -1146,7 +1147,7 @@ func (r Result) Error() error {
 
 	// attempt to convert the body into a Status object
 	// to be backwards compatible with old servers that do not return a version, default to "v1"
-	out, _, err := r.decoder.Decode(r.body, &unversioned.GroupVersionKind{Version: "v1"}, nil)
+	out, _, err := r.decoder.Decode(r.body, &schema.GroupVersionKind{Version: "v1"}, nil)
 	if err != nil {
 		glog.V(5).Infof("body was not decodable (unable to check for Status): %v", err)
 		return r.err

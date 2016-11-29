@@ -41,9 +41,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	aws_credentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/types"
@@ -878,17 +878,17 @@ func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (c *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
+func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	if c.selfAWSInstance.nodeName == name || len(name) == 0 {
-		addresses := []api.NodeAddress{}
+		addresses := []v1.NodeAddress{}
 
 		internalIP, err := c.metadata.GetMetadata("local-ipv4")
 		if err != nil {
 			return nil, err
 		}
-		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: internalIP})
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
 		// Legacy compatibility: the private ip was the legacy host ip
-		addresses = append(addresses, api.NodeAddress{Type: api.NodeLegacyHostIP, Address: internalIP})
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeLegacyHostIP, Address: internalIP})
 
 		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
@@ -896,7 +896,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 			// but the AWS client masks all failures with the same error description.
 			glog.V(2).Info("Could not determine public IP from AWS metadata.")
 		} else {
-			addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: externalIP})
+			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: externalIP})
 		}
 
 		return addresses, nil
@@ -906,7 +906,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 		return nil, fmt.Errorf("getInstanceByNodeName failed for %q with %v", name, err)
 	}
 
-	addresses := []api.NodeAddress{}
+	addresses := []v1.NodeAddress{}
 
 	if !isNilOrEmpty(instance.PrivateIpAddress) {
 		ipAddress := *instance.PrivateIpAddress
@@ -914,10 +914,10 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 		if ip == nil {
 			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
-		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: ip.String()})
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
 
 		// Legacy compatibility: the private ip was the legacy host ip
-		addresses = append(addresses, api.NodeAddress{Type: api.NodeLegacyHostIP, Address: ip.String()})
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeLegacyHostIP, Address: ip.String()})
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
@@ -927,7 +927,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 		if ip == nil {
 			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
-		addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: ip.String()})
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: ip.String()})
 	}
 
 	return addresses, nil
@@ -1042,7 +1042,7 @@ func (c *Cloud) getAllZones() (sets.String, error) {
 	// We don't currently cache this; it is currently used only in volume
 	// creation which is expected to be a comparatively rare occurrence.
 
-	// TODO: Caching / expose api.Nodes to the cloud provider?
+	// TODO: Caching / expose v1.Nodes to the cloud provider?
 	// TODO: We could also query for subnets, I think
 
 	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
@@ -2464,7 +2464,7 @@ func getPortSets(annotation string) (ports *portSets) {
 
 // buildListener creates a new listener from the given port, adding an SSL certificate
 // if indicated by the appropriate annotations.
-func buildListener(port api.ServicePort, annotations map[string]string, sslPorts *portSets) (*elb.Listener, error) {
+func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts *portSets) (*elb.Listener, error) {
 	loadBalancerPort := int64(port.Port)
 	portName := strings.ToLower(port.Name)
 	instancePort := int64(port.NodePort)
@@ -2499,12 +2499,12 @@ func buildListener(port api.ServicePort, annotations map[string]string, sslPorts
 }
 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
-func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, hosts []string) (*v1.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v, %v)",
 		clusterName, apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
 
-	if apiService.Spec.SessionAffinity != api.ServiceAffinityNone {
+	if apiService.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", apiService.Spec.SessionAffinity)
 	}
@@ -2517,7 +2517,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, 
 	listeners := []*elb.Listener{}
 	portList := getPortSets(annotations[ServiceAnnotationLoadBalancerSSLPorts])
 	for _, port := range apiService.Spec.Ports {
-		if port.Protocol != api.ProtocolTCP {
+		if port.Protocol != v1.ProtocolTCP {
 			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
 		}
 		if port.NodePort == 0 {
@@ -2773,7 +2773,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, 
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
-func (c *Cloud) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
@@ -2788,13 +2788,13 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *api.Service) (*api.
 	return status, true, nil
 }
 
-func toStatus(lb *elb.LoadBalancerDescription) *api.LoadBalancerStatus {
-	status := &api.LoadBalancerStatus{}
+func toStatus(lb *elb.LoadBalancerDescription) *v1.LoadBalancerStatus {
+	status := &v1.LoadBalancerStatus{}
 
 	if !isNilOrEmpty(lb.DNSName) {
-		var ingress api.LoadBalancerIngress
+		var ingress v1.LoadBalancerIngress
 		ingress.Hostname = orEmpty(lb.DNSName)
-		status.Ingress = []api.LoadBalancerIngress{ingress}
+		status.Ingress = []v1.LoadBalancerIngress{ingress}
 	}
 
 	return status
@@ -2989,7 +2989,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 }
 
 // EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
-func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
+func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
@@ -3085,7 +3085,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *api.Servi
 }
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
-func (c *Cloud) UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error {
+func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, hosts []string) error {
 	hostSet := sets.NewString(hosts...)
 	instances, err := c.getInstancesByNodeNamesCached(hostSet)
 	if err != nil {

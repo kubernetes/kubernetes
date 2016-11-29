@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -66,7 +67,7 @@ type Store struct {
 	NewListFunc func() runtime.Object
 
 	// Used for error reporting
-	QualifiedResource unversioned.GroupResource
+	QualifiedResource schema.GroupResource
 
 	// Used for listing/watching; should not include trailing "/"
 	KeyRootFunc func(ctx api.Context) string
@@ -317,7 +318,7 @@ func (e *Store) shouldDelete(ctx api.Context, key string, obj, existing runtime.
 
 func (e *Store) deleteForEmptyFinalizers(ctx api.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
 	out := e.NewFunc()
-	glog.V(6).Infof("going to delete %s from regitry, triggered by update", name)
+	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
 	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
@@ -414,7 +415,7 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 				// TODO: The Invalid error should has a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
-				qualifiedKind := unversioned.GroupKind{Group: e.QualifiedResource.Group, Kind: e.QualifiedResource.Resource}
+				qualifiedKind := schema.GroupKind{Group: e.QualifiedResource.Group, Kind: e.QualifiedResource.Resource}
 				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newVersion, "must be specified for an update")}
 				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
 			}

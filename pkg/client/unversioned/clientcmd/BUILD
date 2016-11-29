@@ -25,12 +25,12 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/auth:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/latest:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/homedir:go_default_library",
         "//pkg/util/validation:go_default_library",

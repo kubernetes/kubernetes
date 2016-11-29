@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -420,7 +421,11 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 			return 0, 0, err
 		}
 		for _, pod := range pods.Items {
-			if !deploymentutil.IsPodAvailable(&pod, minReadySeconds, r.nowFn().Time) {
+			v1Pod := &v1.Pod{}
+			if err := v1.Convert_api_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
+				return 0, 0, err
+			}
+			if !deploymentutil.IsPodAvailable(v1Pod, minReadySeconds, r.nowFn().Time) {
 				continue
 			}
 			switch controller.Name {

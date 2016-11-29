@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -36,7 +36,7 @@ const (
 )
 
 type RunPodResult struct {
-	Pod *api.Pod
+	Pod *v1.Pod
 	Err error
 }
 
@@ -66,9 +66,9 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 }
 
 // runOnce runs a given set of pods and returns their status.
-func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
+func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
 	ch := make(chan RunPodResult)
-	admitted := []*api.Pod{}
+	admitted := []*v1.Pod{}
 	for _, pod := range pods {
 		// Check if we can admit the pod.
 		if ok, reason, message := kl.canAdmitPod(admitted, pod); !ok {
@@ -78,7 +78,7 @@ func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results [
 		}
 
 		admitted = append(admitted, pod)
-		go func(pod *api.Pod) {
+		go func(pod *v1.Pod) {
 			err := kl.runPod(pod, retryDelay)
 			ch <- RunPodResult{pod, err}
 		}(pod)
@@ -105,7 +105,7 @@ func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results [
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
+func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
@@ -145,7 +145,7 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod *api.Pod, status *kubecontainer.PodStatus) bool {
+func (kl *Kubelet) isPodRunning(pod *v1.Pod, status *kubecontainer.PodStatus) bool {
 	for _, c := range pod.Spec.Containers {
 		cs := status.FindContainerStatusByName(c.Name)
 		if cs == nil || cs.State != kubecontainer.ContainerStateRunning {

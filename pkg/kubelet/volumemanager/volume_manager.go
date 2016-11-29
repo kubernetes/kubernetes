@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -101,7 +101,7 @@ type VolumeManager interface {
 	// actual state of the world).
 	// An error is returned if all volumes are not attached and mounted within
 	// the duration defined in podAttachAndMountTimeout.
-	WaitForAttachAndMount(pod *api.Pod) error
+	WaitForAttachAndMount(pod *v1.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
 	// referenced by the specified pod that are successfully attached and
@@ -113,7 +113,7 @@ type VolumeManager interface {
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
-	GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64
+	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 
 	// GetVolumesInUse returns a list of all volumes that implement the volume.Attacher
 	// interface and are currently in use according to the actual and desired
@@ -124,7 +124,7 @@ type VolumeManager interface {
 	// has been unmounted (as indicated in actual state of world).
 	// TODO(#27653): VolumesInUse should be handled gracefully on kubelet'
 	// restarts.
-	GetVolumesInUse() []api.UniqueVolumeName
+	GetVolumesInUse() []v1.UniqueVolumeName
 
 	// ReconcilerStatesHasBeenSynced returns true only after the actual states in reconciler
 	// has been synced at least once after kubelet starts so that it is safe to update mounted
@@ -133,11 +133,11 @@ type VolumeManager interface {
 
 	// VolumeIsAttached returns true if the given volume is attached to this
 	// node.
-	VolumeIsAttached(volumeName api.UniqueVolumeName) bool
+	VolumeIsAttached(volumeName v1.UniqueVolumeName) bool
 
 	// Marks the specified volume as having successfully been reported as "in
 	// use" in the nodes's volume status.
-	MarkVolumesAsReportedInUse(volumesReportedAsInUse []api.UniqueVolumeName)
+	MarkVolumesAsReportedInUse(volumesReportedAsInUse []v1.UniqueVolumeName)
 }
 
 // NewVolumeManager returns a new concrete instance implementing the
@@ -151,7 +151,7 @@ func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
 	nodeName k8stypes.NodeName,
 	podManager pod.Manager,
-	kubeClient internalclientset.Interface,
+	kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
 	kubeContainerRuntime kubecontainer.Runtime,
 	mounter mount.Interface,
@@ -199,7 +199,7 @@ func NewVolumeManager(
 type volumeManager struct {
 	// kubeClient is the kube API client used by DesiredStateOfWorldPopulator to
 	// communicate with the API server to fetch PV and PVC objects
-	kubeClient internalclientset.Interface
+	kubeClient clientset.Interface
 
 	// volumePluginMgr is the volume plugin manager used to access volume
 	// plugins. It must be pre-initialized.
@@ -255,7 +255,7 @@ func (vm *volumeManager) GetMountedVolumesForPod(
 	return podVolumes
 }
 
-func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	podName := volumehelper.GetUniquePodName(pod)
 	supplementalGroups := sets.NewString()
 
@@ -278,7 +278,7 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 
 	return result
 }
 
-func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
+func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 	// Report volumes in desired state of world and actual state of world so
 	// that volumes are marked in use as soon as the decision is made that the
 	// volume *should* be attached to this node until it is safely unmounted.
@@ -286,12 +286,12 @@ func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
 	mountedVolumes := vm.actualStateOfWorld.GetGloballyMountedVolumes()
 	volumesToReportInUse :=
 		make(
-			[]api.UniqueVolumeName,
+			[]v1.UniqueVolumeName,
 			0, /* len */
 			len(desiredVolumes)+len(mountedVolumes) /* cap */)
 	desiredVolumesMap :=
 		make(
-			map[api.UniqueVolumeName]bool,
+			map[v1.UniqueVolumeName]bool,
 			len(desiredVolumes)+len(mountedVolumes) /* cap */)
 
 	for _, volume := range desiredVolumes {
@@ -317,16 +317,16 @@ func (vm *volumeManager) ReconcilerStatesHasBeenSynced() bool {
 }
 
 func (vm *volumeManager) VolumeIsAttached(
-	volumeName api.UniqueVolumeName) bool {
+	volumeName v1.UniqueVolumeName) bool {
 	return vm.actualStateOfWorld.VolumeExists(volumeName)
 }
 
 func (vm *volumeManager) MarkVolumesAsReportedInUse(
-	volumesReportedAsInUse []api.UniqueVolumeName) {
+	volumesReportedAsInUse []v1.UniqueVolumeName) {
 	vm.desiredStateOfWorld.MarkVolumesReportedInUse(volumesReportedAsInUse)
 }
 
-func (vm *volumeManager) WaitForAttachAndMount(pod *api.Pod) error {
+func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	expectedVolumes := getExpectedVolumes(pod)
 	if len(expectedVolumes) == 0 {
 		// No volumes to verify
@@ -402,7 +402,7 @@ func filterUnmountedVolumes(
 
 // getExpectedVolumes returns a list of volumes that must be mounted in order to
 // consider the volume setup step for this pod satisfied.
-func getExpectedVolumes(pod *api.Pod) []string {
+func getExpectedVolumes(pod *v1.Pod) []string {
 	expectedVolumes := []string{}
 	if pod == nil {
 		return expectedVolumes
@@ -418,7 +418,7 @@ func getExpectedVolumes(pod *api.Pod) []string {
 // getExtraSupplementalGid returns the value of an extra supplemental GID as
 // defined by an annotation on a volume and a boolean indicating whether the
 // volume defined a GID that the pod doesn't already request.
-func getExtraSupplementalGid(volumeGidValue string, pod *api.Pod) (int64, bool) {
+func getExtraSupplementalGid(volumeGidValue string, pod *v1.Pod) (int64, bool) {
 	if volumeGidValue == "" {
 		return 0, false
 	}

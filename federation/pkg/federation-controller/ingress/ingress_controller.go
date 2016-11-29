@@ -48,7 +48,7 @@ const (
 	allClustersKey = ".ALL_CLUSTERS"
 	// TODO: Get the constants below directly from the Kubernetes Ingress Controller constants - but thats in a separate repo
 	staticIPNameKeyWritable = "kubernetes.io/ingress.global-static-ip-name" // The writable annotation on Ingress to tell the controller to use a specific, named, static IP
-	staticIPNameKeyReadonly = "static-ip"                                   // The readonly key via which the cluster's Ingress Controller communicates which static IP it used.  If staticIPNameKeyWritable above is specified, it is used.
+	staticIPNameKeyReadonly = "ingress.kubernetes.io/static-ip"             // The readonly key via which the cluster's Ingress Controller communicates which static IP it used.  If staticIPNameKeyWritable above is specified, it is used.
 	uidAnnotationKey        = "kubernetes.io/ingress.uid"                   // The annotation on federation clusters, where we store the ingress UID
 	uidConfigMapName        = "ingress-uid"                                 // Name of the config-map and key the ingress controller stores its uid in.
 	uidConfigMapNamespace   = "kube-system"
@@ -108,7 +108,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	glog.V(4).Infof("->NewIngressController V(4)")
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-ingress-controller"})
+	recorder := broadcaster.NewRecorder(v1.EventSource{Component: "federated-ingress-controller"})
 	ic := &IngressController{
 		federatedApiClient:    client,
 		ingressReviewDelay:    time.Second * 10,
@@ -129,13 +129,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	// Start informer in federated API servers on ingresses that should be federated.
 	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions_v1beta1.Ingress{},
@@ -152,13 +150,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
+					ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
+					WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
 					},
 				},
 				&extensions_v1beta1.Ingress{},
@@ -187,19 +183,17 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			glog.V(4).Infof("Returning new informer for cluster %q", cluster.Name)
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
+					ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(versionedOptions) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(versionedOptions) // as above
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(options) // as above
 					},
 				},
 				&v1.ConfigMap{},
@@ -735,7 +729,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		if !clusterIngressFound {
 			glog.V(4).Infof("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
 			// We can't supply server-created fields when creating a new object.
-			desiredIngress.ObjectMeta = util.DeepCopyObjectMeta(baseIngress.ObjectMeta)
+			desiredIngress.ObjectMeta = util.DeepCopyRelevantObjectMeta(baseIngress.ObjectMeta)
 			ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "CreateInCluster",
 				"Creating ingress in cluster %s", cluster.Name)
 
@@ -766,6 +760,9 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			if (!baseIPAnnotationExists && clusterIPNameExists) || (!baseLBStatusExists && clusterLBStatusExists) { // copy the IP name from the readonly annotation on the cluster ingress, to the writable annotation on the federated ingress
 				glog.V(4).Infof(logStr, "Transferring")
 				if !baseIPAnnotationExists && clusterIPNameExists {
+					if baseIngress.ObjectMeta.Annotations == nil {
+						baseIngress.ObjectMeta.Annotations = make(map[string]string)
+					}
 					baseIngress.ObjectMeta.Annotations[staticIPNameKeyWritable] = clusterIPName
 					glog.V(4).Infof("Attempting to update base federated ingress annotations: %v", baseIngress)
 					if updatedFedIngress, err := ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Update(baseIngress); err != nil {

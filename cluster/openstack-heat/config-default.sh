@@ -37,6 +37,8 @@ EXTERNAL_NETWORK=${EXTERNAL_NETWORK:-public}
 
 LBAAS_VERSION=${LBAAS_VERSION:-}
 
+FIXED_NETWORK_CIDR=${FIXED_NETWORK_CIDR:-10.0.0.0/24}
+
 SWIFT_SERVER_URL=${SWIFT_SERVER_URL:-}
 
 # Flag indicates if new image must be created. If 'false' then image with IMAGE_ID will be used.

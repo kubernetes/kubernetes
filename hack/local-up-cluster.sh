@@ -36,7 +36,7 @@ SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 EXPERIMENTAL_CGROUPS_PER_QOS=${EXPERIMENTAL_CGROUPS_PER_QOS:-false}
 # this is not defaulted to preserve backward compatibility.
 # if EXPERIMENTAL_CGROUPS_PER_QOS is enabled, recommend setting to /
-CGROUP_ROOT=${CGROUP_ROOT:""}
+CGROUP_ROOT=${CGROUP_ROOT:-""}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 

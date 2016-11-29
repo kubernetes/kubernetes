@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // LocationStreamer is a resource that streams the contents of a particular
@@ -39,8 +39,8 @@ type LocationStreamer struct {
 // a LocationStreamer must implement a rest.ResourceStreamer
 var _ rest.ResourceStreamer = &LocationStreamer{}
 
-func (obj *LocationStreamer) GetObjectKind() unversioned.ObjectKind {
-	return unversioned.EmptyObjectKind
+func (obj *LocationStreamer) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
 }
 
 // InputStream returns a stream with the contents of the URL location. If no location is provided,
