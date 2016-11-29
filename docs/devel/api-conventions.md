@@ -563,6 +563,26 @@ Strategic Merge Patch also supports special operations as listed below.
 
 ### List Operations
 
+#### List of Scalars
+We use parallel lists when deleting items from a merging list of scalars.
+
+To add items in the finalizers list which is a merging list of strings:
+
+```yaml
+finalizers:
+  - a/a
+  - b/b
+```
+
+To delete items in a merging list using a parallel list
+
+```yaml
+$deleteFromScalarList/finalizers:
+  - c/c
+  - d/d
+```
+
+#### List of Maps
 To override the container list to be strictly replaced, regardless of the
 default:
 
