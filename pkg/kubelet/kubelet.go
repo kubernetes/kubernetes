@@ -1911,22 +1911,32 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
+		existingPods := kl.podManager.GetPods()
+		// Always add the pod to the pod manager. Kubelet relies on the pod
+		// manager as the source of truth for the desired state. If a pod does
+		// not exist in the pod manager, it means that it has been deleted in
+		// the apiserver and no action (other than cleanup) is required.
+		kl.podManager.AddPod(pod)
+
 		if kubepod.IsMirrorPod(pod) {
-			kl.podManager.AddPod(pod)
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
-		// Note that allPods excludes the new pod.
-		allPods := kl.podManager.GetPods()
-		// We failed pods that we rejected, so activePods include all admitted
-		// pods that are alive.
-		activePods := kl.filterOutTerminatedPods(allPods)
-		// Check if we can admit the pod; if not, reject it.
-		if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
-			kl.rejectPod(pod, reason, message)
-			continue
+
+		if !kl.podIsTerminated(pod) {
+			// Only go through the admission process if the pod is not
+			// terminated.
+
+			// We failed pods that we rejected, so activePods include all admitted
+			// pods that are alive.
+			activePods := kl.filterOutTerminatedPods(existingPods)
+
+			// Check if we can admit the pod; if not, reject it.
+			if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+				kl.rejectPod(pod, reason, message)
+				continue
+			}
 		}
-		kl.podManager.AddPod(pod)
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
 		kl.probeManager.AddPod(pod)
