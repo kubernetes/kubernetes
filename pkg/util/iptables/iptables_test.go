@@ -470,7 +470,7 @@ func TestCheckRuleWithoutCheckPresent(t *testing.T) {
 :PREROUTING ACCEPT [2136997:197881818]
 :POSTROUTING ACCEPT [4284525:258542680]
 :OUTPUT ACCEPT [5901660:357267963]
--A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
+-A PREROUTING -m addrtype --dst-type LOCAL -m mark --mark 0x00004000/0x00004000 -j DOCKER
 COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 
@@ -487,7 +487,12 @@ COMMIT
 		},
 	}
 	runner := &runner{exec: &fexec}
-	exists, err := runner.checkRuleWithoutCheck(TableNAT, ChainPrerouting, "-m", "addrtype", "-j", "DOCKER", "--dst-type", "LOCAL")
+	exists, err := runner.checkRuleWithoutCheck(
+		TableNAT, ChainPrerouting,
+		"-m", "addrtype",
+		"-m", "mark", "--mark", "0x4000/0x4000",
+		"-j", "DOCKER",
+		"--dst-type", "LOCAL")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
