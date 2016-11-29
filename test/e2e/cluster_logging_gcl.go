@@ -31,12 +31,20 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	increaseFluentdVerbosityCommand = "sudo sed -i 's/-q/-vv/g' /etc/kubernetes/manifests/fluentd-gcp.yaml;" +
+		" sudo sed -i 's/-q/-vv/g' /etc/kubernetes/manifests/fluentd-gcp-gci.yaml"
+)
+
 var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 	f := framework.NewDefaultFramework("gcl-logging")
 
 	BeforeEach(func() {
 		// TODO (crassirostris): Expand to GKE once the test is stable
 		framework.SkipUnlessProviderIs("gce")
+
+		// TODO (crassirostris): Remove once the test is stable
+		increaseFluentdVerbosity(f)
 	})
 
 	It("should check that logs from containers are ingested in GCL", func() {
@@ -133,4 +141,37 @@ func readFilteredEntriesFromGcl(filter string) ([]string, error) {
 	}
 
 	return result, nil
+}
+
+func increaseFluentdVerbosity(f *framework.Framework) error {
+	masters, nodeList := framework.GetMasterAndWorkerNodesOrDie(f.ClientSet)
+
+	for master := range masters {
+		if err := increaseFluentdVerbosityOnNode(f, master); err != nil {
+			return err
+		}
+	}
+
+	for _, node := range nodeList.Items {
+		if err := increaseFluentdVerbosityOnNode(f, node.Name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func increaseFluentdVerbosityOnNode(f *framework.Framework, nodeName string) error {
+	argList := []string{"compute",
+		"ssh",
+		nodeName,
+		"--project",
+		framework.TestContext.CloudConfig.ProjectID,
+		"--zone",
+		framework.TestContext.CloudConfig.Zone,
+		"--command",
+		increaseFluentdVerbosityCommand,
+	}
+
+	return exec.Command("gcloud", argList...).Run()
 }
