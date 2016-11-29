@@ -153,7 +153,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	printAll := false
 	filterFuncs := f.DefaultResourceFilterFunc()
 	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
 
@@ -176,14 +175,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 
 		return cmdutil.UsageError(cmd, usageString)
-	}
-
-	// determine if args contains "all"
-	for _, a := range args {
-		if a == "all" {
-			printAll = true
-			break
-		}
 	}
 
 	// always show resources when getting by name or filename
@@ -423,7 +414,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	w := kubectl.GetNewTabWriter(out)
 	filteredResourceCount := 0
 
-	if cmdutil.MustPrintWithKinds(objs, infos, sorter, printAll) {
+	if resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter) {
 		showKind = true
 	}
 
