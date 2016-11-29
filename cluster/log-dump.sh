@@ -22,13 +22,16 @@ set -o nounset
 set -o pipefail
 
 readonly report_dir="${1:-_artifacts}"
-# Enable LOG_DUMP_USE_KUBECTL to dump logs from a running cluster. In
-# this mode, this script is standalone and doesn't use any of the bash
-# provider infrastructure. Instead, the cluster is expected to have
-# one node with the `kube-apiserver` image that we assume to be the
-# master, and the LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER variables
-# must be set for auth.
-readonly use_kubectl="${LOG_DUMP_USE_KUBECTL:-}"
+
+# In order to more trivially extend log-dump for custom deployments,
+# check for a function named log_dump_custom_get_instances. If it's
+# defined, we assume the function can me called with one argument, the
+# role, which is either "master" or "node".
+if [[ $(type -t log_dump_custom_get_instances) == "function" ]]; then
+  readonly use_custom_instance_list=yes
+else
+  readonly use_custom_instance_list=
+fi
 
 readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws"
@@ -50,22 +53,22 @@ readonly max_scp_processes=25
 readonly ips_and_images='{range .items[*]}{@.status.addresses[?(@.type == "ExternalIP")].address} {@.status.images[*].names[*]}{"\n"}{end}'
 
 function setup() {
-  if [[ -z "${use_kubectl}" ]]; then
+  if [[ -z "${use_custom_instance_list}" ]]; then
     KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
     : ${KUBE_CONFIG_FILE:="config-test.sh"}
     source "${KUBE_ROOT}/cluster/kube-util.sh"
     detect-project &> /dev/null
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
-    echo "LOG_DUMP_SSH_KEY not set, but required by LOG_DUMP_USE_KUBECTL"
+    echo "LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances"
     exit 1
   elif [[ -z "${LOG_DUMP_SSH_USER:-}" ]]; then
-    echo "LOG_DUMP_SSH_USER not set, but required by LOG_DUMP_USE_KUBECTL"
+    echo "LOG_DUMP_SSH_USER not set, but required when using log_dump_custom_get_instances"
     exit 1
   fi
 }
 
 function log-dump-ssh() {
-  if [[ -z "${use_kubectl}" ]]; then
+  if [[ -n "${use_custom_instance_list}" ]]; then
     ssh-to-node "$@"
     return
   fi
@@ -92,7 +95,7 @@ function copy-logs-from-node() {
     # Comma delimit (even the singleton, or scp does the wrong thing), surround by braces.
     local -r scp_files="{$(printf "%s," "${files[@]}")}"
 
-    if [[ -n "${use_kubectl}" ]]; then
+    if [[ -n "${use_custom_instance_list}" ]]; then
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${LOG_DUMP_SSH_KEY}" "${LOG_DUMP_SSH_USER}@${node}:${scp_files}" "${dir}" > /dev/null || true
     else
       case "${KUBERNETES_PROVIDER}" in
@@ -116,7 +119,7 @@ function save-logs() {
     local -r node_name="${1}"
     local -r dir="${2}"
     local files="${3}"
-    if [[ -n "${use_kubectl}" ]]; then
+    if [[ -n "${use_custom_instance_list}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
         files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
       fi
@@ -144,18 +147,10 @@ function save-logs() {
     copy-logs-from-node "${node_name}" "${dir}" "${files}"
 }
 
-function kubectl-guess-master() {
-  kubectl get node -ojsonpath --template="${ips_and_images}" | grep kube-apiserver | cut -f1 -d" "
-}
-
-function kubectl-guess-nodes() {
-  kubectl get node -ojsonpath --template="${ips_and_images}" | grep -v kube-apiserver | cut -f1 -d" "
-}
-
-function dump_master() {
-  local master_name
-  if [[ -n "${use_kubectl}" ]]; then
-    master_name=$(kubectl-guess-master)
+function dump_masters() {
+  local master_names
+  if [[ -n "${use_custom_instance_list}" ]]; then
+    master_names=( $(log_dump_custom_get_instances master) )
   elif [[ ! "${master_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
     return
@@ -164,18 +159,39 @@ function dump_master() {
       echo "Master not detected. Is the cluster up?"
       return
     fi
-    master_name="${MASTER_NAME}"
+    master_names=( "${MASTER_NAME}" )
   fi
 
-  readonly master_dir="${report_dir}/${master_name}"
-  mkdir -p "${master_dir}"
-  save-logs "${master_name}" "${master_dir}" "${master_logfiles}"
+  if [[ "${#master_names[@]}" == 0 ]]; then
+    echo "No masters found?"
+    return
+  fi
+
+  proc=${max_scp_processes}
+  for master_name in "${master_names[@]}"; do
+    master_dir="${report_dir}/${master_name}"
+    mkdir -p "${master_dir}"
+    save-logs "${master_name}" "${master_dir}" "${master_logfiles}" &
+
+    # We don't want to run more than ${max_scp_processes} at a time, so
+    # wait once we hit that many nodes. This isn't ideal, since one might
+    # take much longer than the others, but it should help.
+    proc=$((proc - 1))
+    if [[ proc -eq 0 ]]; then
+      proc=${max_scp_processes}
+      wait
+    fi
+  done
+  # Wait for any remaining processes.
+  if [[ proc -gt 0 && proc -lt ${max_scp_processes} ]]; then
+    wait
+  fi
 }
 
 function dump_nodes() {
   local node_names
-  if [[ -n "${use_kubectl}" ]]; then
-    node_names=( $(kubectl-guess-nodes) )
+  if [[ -n "${use_custom_instance_list}" ]]; then
+    node_names=( $(log_dump_custom_get_instances node) )
   elif [[ ! "${node_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Node SSH not supported for ${KUBERNETES_PROVIDER}"
     return
@@ -186,6 +202,11 @@ function dump_nodes() {
       return
     fi
     node_names=( "${NODE_NAMES[@]}" )
+  fi
+
+  if [[ "${#node_names[@]}" == 0 ]]; then
+    echo "No nodes found?"
+    return
   fi
 
   proc=${max_scp_processes}
@@ -213,5 +234,5 @@ function dump_nodes() {
 
 setup
 echo "Dumping master and node logs to ${report_dir}"
-dump_master
+dump_masters
 dump_nodes
