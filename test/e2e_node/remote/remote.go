@@ -34,28 +34,9 @@ import (
 var testTimeoutSeconds = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
 
-const (
-	archiveName  = "e2e_node_test.tar.gz"
-	CNIRelease   = "07a8a28637e97b22eb8dfe710eeae1344f69d16e"
-	CNIDirectory = "cni"
-)
+const archiveName = "e2e_node_test.tar.gz"
 
-var CNIURL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNIRelease)
-
-// CreateTestArchive builds the local source and creates a tar archive e2e_node_test.tar.gz containing
-// the binaries k8s required for node e2e tests
-func CreateTestArchive() (string, error) {
-	// Build the executables
-	if err := builder.BuildGo(); err != nil {
-		return "", fmt.Errorf("failed to build the depedencies: %v", err)
-	}
-
-	// Make sure we can find the newly built binaries
-	buildOutputDir, err := builder.GetK8sBuildOutputDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to locate kubernetes build output directory %v", err)
-	}
-
+func CreateTestArchive(suite TestSuite) (string, error) {
 	glog.Infof("Building archive...")
 	tardir, err := ioutil.TempDir("", "node-e2e-archive")
 	if err != nil {
@@ -63,47 +44,14 @@ func CreateTestArchive() (string, error) {
 	}
 	defer os.RemoveAll(tardir)
 
-	// Copy binaries
-	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo"}
-	for _, bin := range requiredBins {
-		source := filepath.Join(buildOutputDir, bin)
-		if _, err := os.Stat(source); err != nil {
-			return "", fmt.Errorf("failed to locate test binary %s: %v", bin, err)
-		}
-		out, err := exec.Command("cp", source, filepath.Join(tardir, bin)).CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("failed to copy %q: %v Output: %q", bin, err, out)
-		}
-	}
-
-	// Include the GCI mounter artifacts in the deployed tarball
-	k8sDir, err := builder.GetK8sRootDir()
+	// Call the suite function to setup the test package.
+	err = suite.SetupTestPackage(tardir)
 	if err != nil {
-		return "", fmt.Errorf("Could not find K8s root dir! Err: %v", err)
-	}
-	localSource := "cluster/gce/gci/mounter/mounter"
-	source := filepath.Join(k8sDir, localSource)
-
-	// Require the GCI mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
-	if _, err := os.Stat(source); err != nil {
-		return "", fmt.Errorf("Could not find GCI mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
-	}
-
-	bindir := "cluster/gce/gci/mounter"
-	bin := "mounter"
-	destdir := filepath.Join(tardir, bindir)
-	dest := filepath.Join(destdir, bin)
-	out, err := exec.Command("mkdir", "-p", filepath.Join(tardir, bindir)).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to create directory %q for GCI mounter script. Err: %v. Output:\n%s", destdir, err, out)
-	}
-	out, err = exec.Command("cp", source, dest).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy GCI mounter script to the archive bin. Err: %v. Output:\n%s", err, out)
+		return "", fmt.Errorf("failed to setup test package %q: %v", tardir, err)
 	}
 
 	// Build the tar
-	out, err = exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
+	out, err := exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to build tar %v.  Output:\n%s", err, out)
 	}
@@ -114,6 +62,12 @@ func CreateTestArchive() (string, error) {
 	}
 	return filepath.Join(dir, archiveName), nil
 }
+
+const (
+	CNIRelease   = "07a8a28637e97b22eb8dfe710eeae1344f69d16e"
+	CNIDirectory = "cni"
+	CNIURL       = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-" + CNIRelease + ".tar.gz"
+)
 
 // Returns the command output, whether the exit was ok, and any errors
 func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string, testArgs string, ginkgoFlags string) (string, bool, error) {
