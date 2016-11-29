@@ -29,7 +29,7 @@ type Interface interface {
 	// This is only valid for drivers which support attach & detach.
 	//
 	// TODO specific struct instead
-	Attach(volume *api.FlexVolume) (*api.FlexVolumeAttachement, error)
+	Attach(req *api.AttachRequest) (*api.FlexVolumeAttachement, error)
 
 	// Wait for attach
 	//
@@ -38,7 +38,7 @@ type Interface interface {
 	// This is only valid for drivers which support attach & detach.
 	//
 	// TODO specific struct instead
-	WaitForAttach(volume *api.FlexVolume) (*api.FlexVolumeAttachement, error)
+	WaitForAttach(req *api.AttachRequest) (*api.FlexVolumeAttachement, error)
 
 	// Detach a volume
 	//
@@ -47,7 +47,7 @@ type Interface interface {
 	// This call only valid for drivers which support attach & detach.
 	//
 	// TODO specific struct instead
-	Detach(volume *api.FlexVolume) error
+	Detach(req *api.DetachRequest) error
 
 	// Wait for detach
 	//
@@ -56,7 +56,7 @@ type Interface interface {
 	// This is only valid for drivers which support attach & detach.
 	//
 	// TODO specific struct instead
-	WaitForDetach(volume *api.FlexVolume) error
+	WaitForDetach(req *api.DetachRequest) error
 
 	// Mount a volume
 	//
