@@ -412,6 +412,27 @@ func (vs Verbs) String() string {
 	return fmt.Sprintf("%v", []string(vs))
 }
 
+// CodecEncodeSelf is part of the codec.Selfer interface.
+func (c *Verbs) CodecEncodeSelf(encoder *codec.Encoder) {
+	encoder.Encode(c)
+}
+
+// CodecDecodeSelf is part of the codec.Selfer interface. It is overwritten here to make sure
+// that an empty verbs list is not decoded as nil. On the other hand, an undefined verbs list
+// will lead to nil because this decoding for Verbs is not invoked.
+//
+// TODO(sttts): this is due to a ugorji regression: https://github.com/ugorji/go/issues/119. Remove the
+// workaround when the regression is fixed.
+func (c *Verbs) CodecDecodeSelf(decoder *codec.Decoder) {
+	m := []string{}
+	decoder.Decode(&m)
+	if len(m) == 0 {
+		*c = []string{}
+	} else {
+		*c = m
+	}
+}
+
 // APIResourceList is a list of APIResource, it is used to expose the name of the
 // resources supported in a specific group and version, and if the resource
 // is namespaced.
