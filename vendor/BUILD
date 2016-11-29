@@ -9400,6 +9400,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/google/gofuzz",
+        "//vendor:github.com/ugorji/go/codec",
         "//vendor:k8s.io/client-go/pkg/conversion",
         "//vendor:k8s.io/client-go/pkg/genericapiserver/openapi/common",
         "//vendor:k8s.io/client-go/pkg/labels",
@@ -10805,6 +10806,7 @@ go_library(
     deps = [
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/golang/glog",
         "//vendor:github.com/google/gofuzz",
         "//vendor:k8s.io/client-go/pkg/genericapiserver/openapi/common",
     ],

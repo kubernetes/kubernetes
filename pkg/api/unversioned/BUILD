@@ -38,6 +38,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/google/gofuzz",
+        "//vendor:github.com/ugorji/go/codec",
     ],
 )
 
