@@ -467,7 +467,7 @@ func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, r
 		},
 		&api.LimitRange{},
 		resyncPeriod,
-		cache.Indexers{})
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	return sharedIndexInformer
 }
