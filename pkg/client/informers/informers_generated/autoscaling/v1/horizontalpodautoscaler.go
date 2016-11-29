@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// HorizontalPodAutoscalerInformer TODO
+// HorizontalPodAutoscalerInformer provides access to a shared informer and lister for
+// HorizontalPodAutoscalers.
 type HorizontalPodAutoscalerInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1.HorizontalPodAutoscalerLister

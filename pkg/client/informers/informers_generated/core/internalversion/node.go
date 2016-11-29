@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// NodeInformer TODO
+// NodeInformer provides access to a shared informer and lister for
+// Nodes.
 type NodeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.NodeLister

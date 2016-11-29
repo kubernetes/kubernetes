@@ -29,7 +29,8 @@ import (
 	time "time"
 )
 
-// ServiceInformer TODO
+// ServiceInformer provides access to a shared informer and lister for
+// Services.
 type ServiceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1.ServiceLister

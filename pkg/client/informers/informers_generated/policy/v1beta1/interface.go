@@ -22,9 +22,9 @@ import (
 	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 )
 
-// Interface TODO
+// Interface provides access to all the informers in this group version.
 type Interface interface {
-	// TODO
+	// PodDisruptionBudgets returns a PodDisruptionBudgetInformer.
 	PodDisruptionBudgets() PodDisruptionBudgetInformer
 }
 
@@ -32,12 +32,12 @@ type version struct {
 	interfaces.SharedInformerFactory
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f interfaces.SharedInformerFactory) Interface {
 	return &version{f}
 }
 
-// PodDisruptionBudgets TODO
+// PodDisruptionBudgets returns a PodDisruptionBudgetInformer.
 func (v *version) PodDisruptionBudgets() PodDisruptionBudgetInformer {
 	return &podDisruptionBudgetInformer{factory: v.SharedInformerFactory}
 }

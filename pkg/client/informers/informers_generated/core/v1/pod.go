@@ -29,7 +29,8 @@ import (
 	time "time"
 )
 
-// PodInformer TODO
+// PodInformer provides access to a shared informer and lister for
+// Pods.
 type PodInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1.PodLister

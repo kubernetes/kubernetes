@@ -22,15 +22,15 @@ import (
 	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 )
 
-// Interface TODO
+// Interface provides access to all the informers in this group version.
 type Interface interface {
-	// TODO
+	// ClusterRoles returns a ClusterRoleInformer.
 	ClusterRoles() ClusterRoleInformer
-	// TODO
+	// ClusterRoleBindings returns a ClusterRoleBindingInformer.
 	ClusterRoleBindings() ClusterRoleBindingInformer
-	// TODO
+	// Roles returns a RoleInformer.
 	Roles() RoleInformer
-	// TODO
+	// RoleBindings returns a RoleBindingInformer.
 	RoleBindings() RoleBindingInformer
 }
 
@@ -38,27 +38,27 @@ type version struct {
 	interfaces.SharedInformerFactory
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f interfaces.SharedInformerFactory) Interface {
 	return &version{f}
 }
 
-// ClusterRoles TODO
+// ClusterRoles returns a ClusterRoleInformer.
 func (v *version) ClusterRoles() ClusterRoleInformer {
 	return &clusterRoleInformer{factory: v.SharedInformerFactory}
 }
 
-// ClusterRoleBindings TODO
+// ClusterRoleBindings returns a ClusterRoleBindingInformer.
 func (v *version) ClusterRoleBindings() ClusterRoleBindingInformer {
 	return &clusterRoleBindingInformer{factory: v.SharedInformerFactory}
 }
 
-// Roles TODO
+// Roles returns a RoleInformer.
 func (v *version) Roles() RoleInformer {
 	return &roleInformer{factory: v.SharedInformerFactory}
 }
 
-// RoleBindings TODO
+// RoleBindings returns a RoleBindingInformer.
 func (v *version) RoleBindings() RoleBindingInformer {
 	return &roleBindingInformer{factory: v.SharedInformerFactory}
 }

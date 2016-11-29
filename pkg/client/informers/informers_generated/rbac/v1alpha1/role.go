@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// RoleInformer TODO
+// RoleInformer provides access to a shared informer and lister for
+// Roles.
 type RoleInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1alpha1.RoleLister

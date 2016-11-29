@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// DaemonSetInformer TODO
+// DaemonSetInformer provides access to a shared informer and lister for
+// DaemonSets.
 type DaemonSetInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.DaemonSetLister

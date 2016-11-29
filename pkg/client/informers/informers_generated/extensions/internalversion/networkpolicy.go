@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// NetworkPolicyInformer TODO
+// NetworkPolicyInformer provides access to a shared informer and lister for
+// NetworkPolicies.
 type NetworkPolicyInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.NetworkPolicyLister

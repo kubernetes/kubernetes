@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// CronJobInformer TODO
+// CronJobInformer provides access to a shared informer and lister for
+// CronJobs.
 type CronJobInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.CronJobLister

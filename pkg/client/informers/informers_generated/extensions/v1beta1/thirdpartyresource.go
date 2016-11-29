@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// ThirdPartyResourceInformer TODO
+// ThirdPartyResourceInformer provides access to a shared informer and lister for
+// ThirdPartyResources.
 type ThirdPartyResourceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1beta1.ThirdPartyResourceLister

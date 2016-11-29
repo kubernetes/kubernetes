@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// PodSecurityPolicyInformer TODO
+// PodSecurityPolicyInformer provides access to a shared informer and lister for
+// PodSecurityPolicies.
 type PodSecurityPolicyInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1beta1.PodSecurityPolicyLister

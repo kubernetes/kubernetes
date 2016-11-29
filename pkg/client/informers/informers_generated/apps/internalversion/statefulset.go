@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// StatefulSetInformer TODO
+// StatefulSetInformer provides access to a shared informer and lister for
+// StatefulSets.
 type StatefulSetInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.StatefulSetLister

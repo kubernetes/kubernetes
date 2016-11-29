@@ -27,7 +27,7 @@ import (
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
-// genericGenerator TODO
+// genericGenerator generates the generic informer.
 type genericGenerator struct {
 	generator.DefaultGen
 	outputPackage        string
@@ -92,7 +92,7 @@ func (g *genericGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 	sw := generator.NewSnippetWriter(w, c, "{{", "}}")
 
 	groups := []group{}
-	resourceFunctions := make(map[*version]*types.Type)
+	schemeGVs := make(map[*version]*types.Type)
 
 	orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 	for _, groupVersions := range g.groupVersions {
@@ -106,7 +106,7 @@ func (g *genericGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 				Name:      namer.IC(v.NonEmpty()),
 				Resources: orderer.OrderTypes(g.typesForGroupVersion[gv]),
 			}
-			resourceFunctions[version] = c.Universe.Function(types.Name{Package: g.typesForGroupVersion[gv][0].Name.Package, Name: "Resource"})
+			schemeGVs[version] = c.Universe.Variable(types.Name{Package: g.typesForGroupVersion[gv][0].Name.Package, Name: "SchemeGroupVersion"})
 			group.Versions = append(group.Versions, version)
 		}
 		sort.Sort(versionSort(group.Versions))
@@ -115,12 +115,13 @@ func (g *genericGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 	sort.Sort(groupSort(groups))
 
 	m := map[string]interface{}{
-		"cacheGenericLister":       c.Universe.Type(cacheGenericLister),
-		"cacheNewGenericLister":    c.Universe.Function(cacheNewGenericLister),
-		"cacheSharedIndexInformer": c.Universe.Type(cacheSharedIndexInformer),
-		"groups":                   groups,
-		"resourceFunctions":        resourceFunctions,
-		"schemaGroupResource":      c.Universe.Type(schemaGroupResource),
+		"cacheGenericLister":         c.Universe.Type(cacheGenericLister),
+		"cacheNewGenericLister":      c.Universe.Function(cacheNewGenericLister),
+		"cacheSharedIndexInformer":   c.Universe.Type(cacheSharedIndexInformer),
+		"groups":                     groups,
+		"schemeGVs":                  schemeGVs,
+		"schemaGroupResource":        c.Universe.Type(schemaGroupResource),
+		"schemaGroupVersionResource": c.Universe.Type(schemaGroupVersionResource),
 	}
 
 	sw.Do(genericInformer, m)
@@ -142,10 +143,12 @@ type genericInformer struct {
 	resource {{.schemaGroupResource|raw}}
 }
 
+// Informer returns the SharedIndexInformer.
 func (f *genericInformer) Informer() {{.cacheSharedIndexInformer|raw}} {
 	return f.informer
 }
 
+// Lister returns the GenericLister.
 func (f *genericInformer) Lister() {{.cacheGenericLister|raw}} {
 	return {{.cacheNewGenericLister|raw}}(f.Informer().GetIndexer(), f.resource)
 }
@@ -154,14 +157,14 @@ func (f *genericInformer) Lister() {{.cacheGenericLister|raw}} {
 var forResource = `
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
-func (f *sharedInformerFactory) ForResource(resource {{.schemaGroupResource|raw}}) (GenericInformer, error) {
+func (f *sharedInformerFactory) ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error) {
 	switch resource {
 		{{range $group := .groups -}}
 			{{range $version := .Versions -}}
 		// Group={{$group.Name}}, Version={{.Name}}
 				{{range .Resources -}}
-	case {{index $.resourceFunctions $version|raw}}("{{.|allLowercasePlural}}"):
-		return &genericInformer{resource: resource, informer: f.{{$group.Name}}().{{$version.Name}}().{{.|publicPlural}}().Informer()}, nil
+	case {{index $.schemeGVs $version|raw}}.WithResource("{{.|allLowercasePlural}}"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.{{$group.Name}}().{{$version.Name}}().{{.|publicPlural}}().Informer()}, nil
 				{{end}}
 			{{end}}
 		{{end -}}

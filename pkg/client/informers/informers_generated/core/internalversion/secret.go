@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// SecretInformer TODO
+// SecretInformer provides access to a shared informer and lister for
+// Secrets.
 type SecretInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.SecretLister

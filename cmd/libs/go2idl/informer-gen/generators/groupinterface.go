@@ -27,7 +27,7 @@ import (
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
-// groupInterfaceGenerator TODO
+// groupInterfaceGenerator generates the per-group interface file.
 type groupInterfaceGenerator struct {
 	generator.DefaultGen
 	outputPackage string
@@ -88,10 +88,10 @@ func (g *groupInterfaceGenerator) GenerateType(c *generator.Context, t *types.Ty
 }
 
 var groupTemplate = `
-// Interface TODO
+// Interface provides access to each of this group's versions.
 type Interface interface {
 	$range .versions -$
-		// TODO
+		// $.Name$ provides access to shared informers for resources in $.Name$.
 		$.Name$() $.Interface|raw$
 	$end$
 }
@@ -100,13 +100,13 @@ type group struct {
 	$.interfacesSharedInformerFactory|raw$
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f $.interfacesSharedInformerFactory|raw$) Interface {
 	return &group{f}
 }
 
 $range .versions$
-// $.Name$ TODO
+// $.Name$ returns a new $.Interface|raw$.
 func (g *group) $.Name$() $.Interface|raw$ {
 	return $.New|raw$(g.SharedInformerFactory)
 }

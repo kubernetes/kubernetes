@@ -22,39 +22,39 @@ import (
 	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 )
 
-// Interface TODO
+// Interface provides access to all the informers in this group version.
 type Interface interface {
-	// TODO
+	// ComponentStatuses returns a ComponentStatusInformer.
 	ComponentStatuses() ComponentStatusInformer
-	// TODO
+	// ConfigMaps returns a ConfigMapInformer.
 	ConfigMaps() ConfigMapInformer
-	// TODO
+	// Endpoints returns a EndpointsInformer.
 	Endpoints() EndpointsInformer
-	// TODO
+	// Events returns a EventInformer.
 	Events() EventInformer
-	// TODO
+	// LimitRanges returns a LimitRangeInformer.
 	LimitRanges() LimitRangeInformer
-	// TODO
+	// Namespaces returns a NamespaceInformer.
 	Namespaces() NamespaceInformer
-	// TODO
+	// Nodes returns a NodeInformer.
 	Nodes() NodeInformer
-	// TODO
+	// PersistentVolumes returns a PersistentVolumeInformer.
 	PersistentVolumes() PersistentVolumeInformer
-	// TODO
+	// PersistentVolumeClaims returns a PersistentVolumeClaimInformer.
 	PersistentVolumeClaims() PersistentVolumeClaimInformer
-	// TODO
+	// Pods returns a PodInformer.
 	Pods() PodInformer
-	// TODO
+	// PodTemplates returns a PodTemplateInformer.
 	PodTemplates() PodTemplateInformer
-	// TODO
+	// ReplicationControllers returns a ReplicationControllerInformer.
 	ReplicationControllers() ReplicationControllerInformer
-	// TODO
+	// ResourceQuotas returns a ResourceQuotaInformer.
 	ResourceQuotas() ResourceQuotaInformer
-	// TODO
+	// Secrets returns a SecretInformer.
 	Secrets() SecretInformer
-	// TODO
+	// Services returns a ServiceInformer.
 	Services() ServiceInformer
-	// TODO
+	// ServiceAccounts returns a ServiceAccountInformer.
 	ServiceAccounts() ServiceAccountInformer
 }
 
@@ -62,87 +62,87 @@ type version struct {
 	interfaces.SharedInformerFactory
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f interfaces.SharedInformerFactory) Interface {
 	return &version{f}
 }
 
-// ComponentStatuses TODO
+// ComponentStatuses returns a ComponentStatusInformer.
 func (v *version) ComponentStatuses() ComponentStatusInformer {
 	return &componentStatusInformer{factory: v.SharedInformerFactory}
 }
 
-// ConfigMaps TODO
+// ConfigMaps returns a ConfigMapInformer.
 func (v *version) ConfigMaps() ConfigMapInformer {
 	return &configMapInformer{factory: v.SharedInformerFactory}
 }
 
-// Endpoints TODO
+// Endpoints returns a EndpointsInformer.
 func (v *version) Endpoints() EndpointsInformer {
 	return &endpointsInformer{factory: v.SharedInformerFactory}
 }
 
-// Events TODO
+// Events returns a EventInformer.
 func (v *version) Events() EventInformer {
 	return &eventInformer{factory: v.SharedInformerFactory}
 }
 
-// LimitRanges TODO
+// LimitRanges returns a LimitRangeInformer.
 func (v *version) LimitRanges() LimitRangeInformer {
 	return &limitRangeInformer{factory: v.SharedInformerFactory}
 }
 
-// Namespaces TODO
+// Namespaces returns a NamespaceInformer.
 func (v *version) Namespaces() NamespaceInformer {
 	return &namespaceInformer{factory: v.SharedInformerFactory}
 }
 
-// Nodes TODO
+// Nodes returns a NodeInformer.
 func (v *version) Nodes() NodeInformer {
 	return &nodeInformer{factory: v.SharedInformerFactory}
 }
 
-// PersistentVolumes TODO
+// PersistentVolumes returns a PersistentVolumeInformer.
 func (v *version) PersistentVolumes() PersistentVolumeInformer {
 	return &persistentVolumeInformer{factory: v.SharedInformerFactory}
 }
 
-// PersistentVolumeClaims TODO
+// PersistentVolumeClaims returns a PersistentVolumeClaimInformer.
 func (v *version) PersistentVolumeClaims() PersistentVolumeClaimInformer {
 	return &persistentVolumeClaimInformer{factory: v.SharedInformerFactory}
 }
 
-// Pods TODO
+// Pods returns a PodInformer.
 func (v *version) Pods() PodInformer {
 	return &podInformer{factory: v.SharedInformerFactory}
 }
 
-// PodTemplates TODO
+// PodTemplates returns a PodTemplateInformer.
 func (v *version) PodTemplates() PodTemplateInformer {
 	return &podTemplateInformer{factory: v.SharedInformerFactory}
 }
 
-// ReplicationControllers TODO
+// ReplicationControllers returns a ReplicationControllerInformer.
 func (v *version) ReplicationControllers() ReplicationControllerInformer {
 	return &replicationControllerInformer{factory: v.SharedInformerFactory}
 }
 
-// ResourceQuotas TODO
+// ResourceQuotas returns a ResourceQuotaInformer.
 func (v *version) ResourceQuotas() ResourceQuotaInformer {
 	return &resourceQuotaInformer{factory: v.SharedInformerFactory}
 }
 
-// Secrets TODO
+// Secrets returns a SecretInformer.
 func (v *version) Secrets() SecretInformer {
 	return &secretInformer{factory: v.SharedInformerFactory}
 }
 
-// Services TODO
+// Services returns a ServiceInformer.
 func (v *version) Services() ServiceInformer {
 	return &serviceInformer{factory: v.SharedInformerFactory}
 }
 
-// ServiceAccounts TODO
+// ServiceAccounts returns a ServiceAccountInformer.
 func (v *version) ServiceAccounts() ServiceAccountInformer {
 	return &serviceAccountInformer{factory: v.SharedInformerFactory}
 }

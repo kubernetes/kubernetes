@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// PersistentVolumeClaimInformer TODO
+// PersistentVolumeClaimInformer provides access to a shared informer and lister for
+// PersistentVolumeClaims.
 type PersistentVolumeClaimInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.PersistentVolumeClaimLister

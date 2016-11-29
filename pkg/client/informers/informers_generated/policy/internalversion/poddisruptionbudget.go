@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// PodDisruptionBudgetInformer TODO
+// PodDisruptionBudgetInformer provides access to a shared informer and lister for
+// PodDisruptionBudgets.
 type PodDisruptionBudgetInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.PodDisruptionBudgetLister

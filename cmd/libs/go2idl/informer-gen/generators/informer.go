@@ -120,7 +120,8 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 }
 
 var typeInformerInterface = `
-// $.type|public$Informer TODO
+// $.type|public$Informer provides access to a shared informer and lister for
+// $.type|publicPlural$.
 type $.type|public$Informer interface {
 	Informer() $.cacheSharedIndexInformer|raw$
 	Lister() $.lister|raw$

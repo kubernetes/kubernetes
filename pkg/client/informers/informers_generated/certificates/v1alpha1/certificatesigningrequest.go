@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// CertificateSigningRequestInformer TODO
+// CertificateSigningRequestInformer provides access to a shared informer and lister for
+// CertificateSigningRequests.
 type CertificateSigningRequestInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1alpha1.CertificateSigningRequestLister

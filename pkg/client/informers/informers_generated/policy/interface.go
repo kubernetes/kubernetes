@@ -24,11 +24,11 @@ import (
 	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 )
 
-// Interface TODO
+// Interface provides access to each of this group's versions.
 type Interface interface {
-	// TODO
+	// InternalVersion provides access to shared informers for resources in InternalVersion.
 	InternalVersion() internalversion.Interface
-	// TODO
+	// V1beta1 provides access to shared informers for resources in V1beta1.
 	V1beta1() v1beta1.Interface
 }
 
@@ -36,17 +36,17 @@ type group struct {
 	interfaces.SharedInformerFactory
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f interfaces.SharedInformerFactory) Interface {
 	return &group{f}
 }
 
-// InternalVersion TODO
+// InternalVersion returns a new internalversion.Interface.
 func (g *group) InternalVersion() internalversion.Interface {
 	return internalversion.New(g.SharedInformerFactory)
 }
 
-// V1beta1 TODO
+// V1beta1 returns a new v1beta1.Interface.
 func (g *group) V1beta1() v1beta1.Interface {
 	return v1beta1.New(g.SharedInformerFactory)
 }

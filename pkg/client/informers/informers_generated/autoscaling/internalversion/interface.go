@@ -22,9 +22,9 @@ import (
 	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 )
 
-// Interface TODO
+// Interface provides access to all the informers in this group version.
 type Interface interface {
-	// TODO
+	// HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
 	HorizontalPodAutoscalers() HorizontalPodAutoscalerInformer
 }
 
@@ -32,12 +32,12 @@ type version struct {
 	interfaces.SharedInformerFactory
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f interfaces.SharedInformerFactory) Interface {
 	return &version{f}
 }
 
-// HorizontalPodAutoscalers TODO
+// HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
 func (v *version) HorizontalPodAutoscalers() HorizontalPodAutoscalerInformer {
 	return &horizontalPodAutoscalerInformer{factory: v.SharedInformerFactory}
 }

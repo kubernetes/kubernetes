@@ -22,9 +22,9 @@ import (
 	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 )
 
-// Interface TODO
+// Interface provides access to all the informers in this group version.
 type Interface interface {
-	// TODO
+	// StorageClasses returns a StorageClassInformer.
 	StorageClasses() StorageClassInformer
 }
 
@@ -32,12 +32,12 @@ type version struct {
 	interfaces.SharedInformerFactory
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f interfaces.SharedInformerFactory) Interface {
 	return &version{f}
 }
 
-// StorageClasses TODO
+// StorageClasses returns a StorageClassInformer.
 func (v *version) StorageClasses() StorageClassInformer {
 	return &storageClassInformer{factory: v.SharedInformerFactory}
 }

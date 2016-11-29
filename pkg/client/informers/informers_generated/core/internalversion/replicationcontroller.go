@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// ReplicationControllerInformer TODO
+// ReplicationControllerInformer provides access to a shared informer and lister for
+// ReplicationControllers.
 type ReplicationControllerInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.ReplicationControllerLister

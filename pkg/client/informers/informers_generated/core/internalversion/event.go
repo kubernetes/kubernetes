@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// EventInformer TODO
+// EventInformer provides access to a shared informer and lister for
+// Events.
 type EventInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.EventLister

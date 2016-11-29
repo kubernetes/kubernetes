@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// ClusterRoleBindingInformer TODO
+// ClusterRoleBindingInformer provides access to a shared informer and lister for
+// ClusterRoleBindings.
 type ClusterRoleBindingInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1alpha1.ClusterRoleBindingLister

@@ -29,7 +29,8 @@ import (
 	time "time"
 )
 
-// ResourceQuotaInformer TODO
+// ResourceQuotaInformer provides access to a shared informer and lister for
+// ResourceQuotas.
 type ResourceQuotaInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1.ResourceQuotaLister

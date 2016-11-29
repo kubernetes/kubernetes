@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// ReplicaSetInformer TODO
+// ReplicaSetInformer provides access to a shared informer and lister for
+// ReplicaSets.
 type ReplicaSetInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.ReplicaSetLister

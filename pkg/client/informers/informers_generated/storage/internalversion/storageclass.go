@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// StorageClassInformer TODO
+// StorageClassInformer provides access to a shared informer and lister for
+// StorageClasses.
 type StorageClassInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.StorageClassLister

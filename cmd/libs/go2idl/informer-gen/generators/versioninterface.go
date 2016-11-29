@@ -24,7 +24,7 @@ import (
 	"k8s.io/gengo/types"
 )
 
-// versionInterfaceGenerator TODO
+// versionInterfaceGenerator generates the per-version interface file.
 type versionInterfaceGenerator struct {
 	generator.DefaultGen
 	outputPackage string
@@ -68,10 +68,10 @@ func (g *versionInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 }
 
 var versionTemplate = `
-// Interface TODO
+// Interface provides access to all the informers in this group version.
 type Interface interface {
 	$range .types -$
-		// TODO
+		// $.|publicPlural$ returns a $.|public$Informer.
 		$.|publicPlural$() $.|public$Informer
 	$end$
 }
@@ -80,13 +80,13 @@ type version struct {
 	$.interfacesSharedInformerFactory|raw$
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f $.interfacesSharedInformerFactory|raw$) Interface {
 	return &version{f}
 }
 
 $range .types$
-// $.|publicPlural$ TODO
+// $.|publicPlural$ returns a $.|public$Informer.
 func (v *version) $.|publicPlural$() $.|public$Informer {
 	return &$.|private$Informer{factory: v.SharedInformerFactory}
 }

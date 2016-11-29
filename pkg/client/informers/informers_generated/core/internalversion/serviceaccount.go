@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// ServiceAccountInformer TODO
+// ServiceAccountInformer provides access to a shared informer and lister for
+// ServiceAccounts.
 type ServiceAccountInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.ServiceAccountLister

@@ -130,6 +130,8 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
   }
 }
 
+// InternalInformerFor returns the SharedIndexInformer for obj using an internal
+// client.
 func (f *sharedInformerFactory) InternalInformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInternalInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
   f.lock.Lock()
   defer f.lock.Unlock()
@@ -145,6 +147,8 @@ func (f *sharedInformerFactory) InternalInformerFor(obj {{.runtimeObject|raw}}, 
   return informer
 }
 
+// VersionedInformerFor returns the SharedIndexInformer for obj using a
+// versioned client.
 func (f *sharedInformerFactory) VersionedInformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewVersionedInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
   f.lock.Lock()
   defer f.lock.Unlock()
@@ -162,7 +166,8 @@ func (f *sharedInformerFactory) VersionedInformerFor(obj {{.runtimeObject|raw}},
 `
 
 var sharedInformerFactoryInterface = `
-// SharedInformerFactory TODO
+// SharedInformerFactory provides shared informers for resources in all known
+// API group versions.
 type SharedInformerFactory interface {
   {{.interfacesSharedInformerFactory|raw}}
 

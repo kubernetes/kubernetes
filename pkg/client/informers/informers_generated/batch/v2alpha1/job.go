@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// JobInformer TODO
+// JobInformer provides access to a shared informer and lister for
+// Jobs.
 type JobInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v2alpha1.JobLister

@@ -36,6 +36,7 @@ var (
 	reflectType                        = types.Name{Package: "reflect", Name: "Type"}
 	runtimeObject                      = types.Name{Package: "k8s.io/kubernetes/pkg/runtime", Name: "Object"}
 	schemaGroupResource                = types.Name{Package: "k8s.io/kubernetes/pkg/runtime/schema", Name: "GroupResource"}
+	schemaGroupVersionResource         = types.Name{Package: "k8s.io/kubernetes/pkg/runtime/schema", Name: "GroupVersionResource"}
 	syncMutex                          = types.Name{Package: "sync", Name: "Mutex"}
 	timeDuration                       = types.Name{Package: "time", Name: "Duration"}
 	v1ListOptions                      = types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"}

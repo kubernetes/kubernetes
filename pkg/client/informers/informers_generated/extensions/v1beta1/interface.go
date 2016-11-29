@@ -22,21 +22,21 @@ import (
 	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 )
 
-// Interface TODO
+// Interface provides access to all the informers in this group version.
 type Interface interface {
-	// TODO
+	// DaemonSets returns a DaemonSetInformer.
 	DaemonSets() DaemonSetInformer
-	// TODO
+	// Deployments returns a DeploymentInformer.
 	Deployments() DeploymentInformer
-	// TODO
+	// Ingresses returns a IngressInformer.
 	Ingresses() IngressInformer
-	// TODO
+	// Jobs returns a JobInformer.
 	Jobs() JobInformer
-	// TODO
+	// PodSecurityPolicies returns a PodSecurityPolicyInformer.
 	PodSecurityPolicies() PodSecurityPolicyInformer
-	// TODO
+	// ReplicaSets returns a ReplicaSetInformer.
 	ReplicaSets() ReplicaSetInformer
-	// TODO
+	// ThirdPartyResources returns a ThirdPartyResourceInformer.
 	ThirdPartyResources() ThirdPartyResourceInformer
 }
 
@@ -44,42 +44,42 @@ type version struct {
 	interfaces.SharedInformerFactory
 }
 
-// New TODO
+// New returns a new Interface.
 func New(f interfaces.SharedInformerFactory) Interface {
 	return &version{f}
 }
 
-// DaemonSets TODO
+// DaemonSets returns a DaemonSetInformer.
 func (v *version) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{factory: v.SharedInformerFactory}
 }
 
-// Deployments TODO
+// Deployments returns a DeploymentInformer.
 func (v *version) Deployments() DeploymentInformer {
 	return &deploymentInformer{factory: v.SharedInformerFactory}
 }
 
-// Ingresses TODO
+// Ingresses returns a IngressInformer.
 func (v *version) Ingresses() IngressInformer {
 	return &ingressInformer{factory: v.SharedInformerFactory}
 }
 
-// Jobs TODO
+// Jobs returns a JobInformer.
 func (v *version) Jobs() JobInformer {
 	return &jobInformer{factory: v.SharedInformerFactory}
 }
 
-// PodSecurityPolicies TODO
+// PodSecurityPolicies returns a PodSecurityPolicyInformer.
 func (v *version) PodSecurityPolicies() PodSecurityPolicyInformer {
 	return &podSecurityPolicyInformer{factory: v.SharedInformerFactory}
 }
 
-// ReplicaSets TODO
+// ReplicaSets returns a ReplicaSetInformer.
 func (v *version) ReplicaSets() ReplicaSetInformer {
 	return &replicaSetInformer{factory: v.SharedInformerFactory}
 }
 
-// ThirdPartyResources TODO
+// ThirdPartyResources returns a ThirdPartyResourceInformer.
 func (v *version) ThirdPartyResources() ThirdPartyResourceInformer {
 	return &thirdPartyResourceInformer{factory: v.SharedInformerFactory}
 }

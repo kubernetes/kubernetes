@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// DeploymentInformer TODO
+// DeploymentInformer provides access to a shared informer and lister for
+// Deployments.
 type DeploymentInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.DeploymentLister

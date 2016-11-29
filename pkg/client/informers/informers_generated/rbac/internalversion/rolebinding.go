@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// RoleBindingInformer TODO
+// RoleBindingInformer provides access to a shared informer and lister for
+// RoleBindings.
 type RoleBindingInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.RoleBindingLister

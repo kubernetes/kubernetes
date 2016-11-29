@@ -29,7 +29,8 @@ import (
 	time "time"
 )
 
-// ConfigMapInformer TODO
+// ConfigMapInformer provides access to a shared informer and lister for
+// ConfigMaps.
 type ConfigMapInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1.ConfigMapLister

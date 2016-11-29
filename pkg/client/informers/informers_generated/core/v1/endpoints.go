@@ -29,7 +29,8 @@ import (
 	time "time"
 )
 
-// EndpointsInformer TODO
+// EndpointsInformer provides access to a shared informer and lister for
+// Endpoints.
 type EndpointsInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1.EndpointsLister

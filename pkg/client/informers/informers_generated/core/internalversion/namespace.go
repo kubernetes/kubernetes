@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// NamespaceInformer TODO
+// NamespaceInformer provides access to a shared informer and lister for
+// Namespaces.
 type NamespaceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.NamespaceLister

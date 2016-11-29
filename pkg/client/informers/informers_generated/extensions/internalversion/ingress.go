@@ -31,7 +31,8 @@ import (
 	time "time"
 )
 
-// IngressInformer TODO
+// IngressInformer provides access to a shared informer and lister for
+// Ingresses.
 type IngressInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.IngressLister

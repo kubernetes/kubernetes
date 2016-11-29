@@ -29,7 +29,8 @@ import (
 	time "time"
 )
 
-// PodTemplateInformer TODO
+// PodTemplateInformer provides access to a shared informer and lister for
+// PodTemplates.
 type PodTemplateInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1.PodTemplateLister

@@ -30,7 +30,8 @@ import (
 	time "time"
 )
 
-// ComponentStatusInformer TODO
+// ComponentStatusInformer provides access to a shared informer and lister for
+// ComponentStatuses.
 type ComponentStatusInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() internalversion.ComponentStatusLister

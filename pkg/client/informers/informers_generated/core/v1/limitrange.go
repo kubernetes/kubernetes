@@ -29,7 +29,8 @@ import (
 	time "time"
 )
 
-// LimitRangeInformer TODO
+// LimitRangeInformer provides access to a shared informer and lister for
+// LimitRanges.
 type LimitRangeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() v1.LimitRangeLister
