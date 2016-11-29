@@ -62,6 +62,18 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for package aliases... "
+if ! hack/verify-pkg-names.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Some package aliase break go conventions. To fix these errors, "
+  echo "do not use capitalizaed or underlined characters in pkg aliases. "
+  echo "Refer to https://blog.golang.org/package-names for more info."
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 echo -ne "Checking for files that need boilerplate... "
 files=($(git diff --cached --name-only --diff-filter ACM))
 # We always make sure there is one file in the files list. Some tools check
