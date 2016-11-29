@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,8 +57,8 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *a
 			Containers: []api.Container{
 				{
 					Name:  "portforwardtester",
-					Image: "gcr.io/google_containers/portforwardtester:1.0",
-					Env: []api.EnvVar{
+					Image: "gcr.io/google_containers/portforwardtester:1.2",
+					Env: []v1.EnvVar{
 						{
 							Name:  "BIND_PORT",
 							Value: "80",
