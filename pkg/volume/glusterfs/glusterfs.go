@@ -573,10 +573,16 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *v1.GlusterfsVolumeSource
 		return nil, 0, fmt.Errorf("failed to create endpoint/service %v", err)
 	}
 	glog.V(3).Infof("glusterfs: dynamic ep %v and svc : %v ", endpoint, service)
+	readOnlyAccess := true
+	for _, access := range p.options.PVC.Spec.AccessModes {
+		if access == "ReadWriteOnce" || access == "ReadWriteMany" {
+			readOnlyAccess = false
+		}
+	}
 	return &v1.GlusterfsVolumeSource{
 		EndpointsName: endpoint.Name,
 		Path:          volume.Name,
-		ReadOnly:      false,
+		ReadOnly:      readOnlyAccess,
 	}, sz, nil
 }
 
