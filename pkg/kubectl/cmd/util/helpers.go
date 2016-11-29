@@ -632,10 +632,6 @@ func MaybeConvertObject(obj runtime.Object, gv schema.GroupVersion, converter ru
 func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort, printAll bool) bool {
 	var lastMap *meta.RESTMapping
 
-	if len(infos) == 1 && printAll {
-		return true
-	}
-
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		if sorter != nil {
@@ -651,7 +647,7 @@ func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *k
 		lastMap = mapping
 	}
 
-	return false
+	return printAll
 }
 
 // FilterResourceList receives a list of runtime objects.
