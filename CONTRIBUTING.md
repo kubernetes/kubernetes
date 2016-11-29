@@ -25,9 +25,9 @@ couple of legal hurdles.
 
 The Cloud Native Computing Foundation (CNCF) CLA [must be signed](https://github.com/kubernetes/community/blob/master/CLA.md) by all contributors.
 Please fill out either the individual or corporate Contributor License
-Agreement (CLA). 
+Agreement (CLA).
 
-Once you are CLA'ed, we'll be able to accept your pull requests. For any issues that you face during this process, 
+Once you are CLA'ed, we'll be able to accept your pull requests. For any issues that you face during this process,
 please add a comment [here](https://github.com/kubernetes/kubernetes/issues/27796) explaining the issue and we will help get it sorted out.
 
 ***NOTE***: Only original source code from you and other people that have
