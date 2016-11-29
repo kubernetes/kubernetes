@@ -27,12 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *StatusREST, storagetesting.TestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, policy.GroupName)
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "poddisruptionbudgets"}
 	podDisruptionBudgetStorage, statusStorage := NewREST(restOptions)
@@ -86,7 +85,8 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
-	key := etcdtest.AddPrefix("/poddisruptionbudgets/" + api.NamespaceDefault + "/foo")
+	//key := etcdtest.AddPrefix("/poddisruptionbudgets/" + api.NamespaceDefault + "/foo")
+	key := "/poddisruptionbudgets/" + api.NamespaceDefault + "/foo"
 	validPodDisruptionBudget := validNewPodDisruptionBudget()
 	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)

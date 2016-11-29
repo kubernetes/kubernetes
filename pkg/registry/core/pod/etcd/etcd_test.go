@@ -33,11 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
-func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, storagetesting.TestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
 	storage := NewStorage(restOptions, nil, nil, nil)
@@ -145,7 +145,7 @@ func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime
 	return storage.NewKeyNotFoundError(key, 0)
 }
 
-func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdTestServer) {
+func newFailDeleteStorage(t *testing.T, called *bool) (*REST, storagetesting.TestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
 	storage := NewStorage(restOptions, nil, nil, nil)

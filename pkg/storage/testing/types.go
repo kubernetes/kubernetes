@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime/schema"
+	"testing"
 )
 
 type TestResource struct {
@@ -29,3 +30,8 @@ type TestResource struct {
 }
 
 func (obj *TestResource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
+
+type TestServer interface {
+	// Terminate will shutdown the running storage server
+	Terminate(t *testing.T)
+}
