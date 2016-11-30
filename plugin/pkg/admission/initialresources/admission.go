@@ -109,26 +109,8 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 func (ir initialResources) estimateContainer(pod *api.Pod, c *api.Container, message string) []string {
 	var annotations []string
 	req := c.Resources.Requests
-	lim := c.Resources.Limits
-	var cpu, mem *resource.Quantity
-	var err error
-	if _, ok := req[api.ResourceCPU]; !ok {
-		if _, ok2 := lim[api.ResourceCPU]; !ok2 {
-			cpu, err = ir.getEstimation(api.ResourceCPU, c, pod.ObjectMeta.Namespace)
-			if err != nil {
-				glog.Errorf("Error while trying to estimate resources: %v", err)
-			}
-		}
-	}
-	if _, ok := req[api.ResourceMemory]; !ok {
-		if _, ok2 := lim[api.ResourceMemory]; !ok2 {
-			mem, err = ir.getEstimation(api.ResourceMemory, c, pod.ObjectMeta.Namespace)
-			if err != nil {
-				glog.Errorf("Error while trying to estimate resources: %v", err)
-			}
-		}
-	}
-
+	cpu := ir.getEstimationIfNeeded(api.ResourceCPU, c, pod.ObjectMeta.Namespace)
+	mem := ir.getEstimationIfNeeded(api.ResourceMemory, c, pod.ObjectMeta.Namespace)
 	// If Requests doesn't exits and an estimation was made, create Requests.
 	if req == nil && (cpu != nil || mem != nil) {
 		c.Resources.Requests = api.ResourceList{}
@@ -153,6 +135,23 @@ func (ir initialResources) estimateContainer(pod *api.Pod, c *api.Container, mes
 	return annotations
 }
 
+// getEstimationIfNeeded estimates compute resource for container if its corresponding
+// Request(min amount) and Limit(max amount) both are not specified.
+func (ir initialResources) getEstimationIfNeeded(kind api.ResourceName, c *api.Container, ns string) *resource.Quantity {
+	requests := c.Resources.Requests
+	limits := c.Resources.Limits
+	var quantity *resource.Quantity
+	var err error
+	if _, requestFound := requests[kind]; !requestFound {
+		if _, limitFound := limits[kind]; !limitFound {
+			quantity, err = ir.getEstimation(kind, c, ns)
+			if err != nil {
+				glog.Errorf("Error while trying to estimate resources: %v", err)
+			}
+		}
+	}
+	return quantity
+}
 func (ir initialResources) getEstimation(kind api.ResourceName, c *api.Container, ns string) (*resource.Quantity, error) {
 	end := time.Now()
 	start := end.Add(-week)
