@@ -268,7 +268,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		container       *v1.Container          // the container to use
 		masterServiceNs string                 // the namespace to read master service info from
 		nilLister       bool                   // whether the lister should be nil
+		configMap       *v1.ConfigMap          // an optional ConfigMap to pull from
 		expectedEnvs    []kubecontainer.EnvVar // a set of expected environment vars
+		expectedError   bool                   // does the test fail
 	}{
 		{
 			name: "api server = Y, kubelet = Y",
@@ -605,6 +607,132 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "configmap",
+			ns:   "test1",
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}},
+					},
+					{
+						Prefix:       "p_",
+						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}},
+					},
+				},
+				Env: []v1.EnvVar{
+					{
+						Name:  "TEST_LITERAL",
+						Value: "test-test-test",
+					},
+					{
+						Name:  "EXPANSION_TEST",
+						Value: "$(REPLACE_ME)",
+					},
+					{
+						Name:  "DUPE_TEST",
+						Value: "ENV_VAR",
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       false,
+			configMap: &v1.ConfigMap{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"REPLACE_ME": "FROM_CONFIG_MAP",
+					"DUPE_TEST":  "CONFIG_MAP",
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "TEST_LITERAL",
+					Value: "test-test-test",
+				},
+				{
+					Name:  "TEST_SERVICE_HOST",
+					Value: "1.2.3.3",
+				},
+				{
+					Name:  "TEST_SERVICE_PORT",
+					Value: "8083",
+				},
+				{
+					Name:  "TEST_PORT",
+					Value: "tcp://1.2.3.3:8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP",
+					Value: "tcp://1.2.3.3:8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_PORT",
+					Value: "8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_ADDR",
+					Value: "1.2.3.3",
+				},
+				{
+					Name:  "REPLACE_ME",
+					Value: "FROM_CONFIG_MAP",
+				},
+				{
+					Name:  "EXPANSION_TEST",
+					Value: "FROM_CONFIG_MAP",
+				},
+				{
+					Name:  "DUPE_TEST",
+					Value: "ENV_VAR",
+				},
+				{
+					Name:  "p_REPLACE_ME",
+					Value: "FROM_CONFIG_MAP",
+				},
+				{
+					Name:  "p_DUPE_TEST",
+					Value: "CONFIG_MAP",
+				},
+			},
+		},
+		{
+			name: "configmap_missing",
+			ns:   "test1",
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}}},
+				},
+			},
+			masterServiceNs: "nothing",
+			expectedError:   true,
+		},
+		{
+			name: "configmap_invalid_keys",
+			ns:   "test1",
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}}},
+				},
+			},
+			masterServiceNs: "nothing",
+			configMap: &v1.ConfigMap{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"-1234": "abc",
+				},
+			},
+			expectedError: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -616,6 +744,14 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		} else {
 			kl.serviceLister = testServiceLister{services}
 		}
+
+		testKubelet.fakeKubeClient.AddReactor("get", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+			var err error
+			if tc.configMap == nil {
+				err = errors.New("no configmap defined")
+			}
+			return true, tc.configMap, err
+		})
 
 		testPod := &v1.Pod{
 			ObjectMeta: v1.ObjectMeta{
@@ -630,11 +766,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		podIP := "1.2.3.4"
 
 		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP)
-		assert.NoError(t, err, "[%s]", tc.name)
+		if tc.expectedError {
+			assert.Error(t, err, tc.name)
+		} else {
+			assert.NoError(t, err, "[%s]", tc.name)
 
-		sort.Sort(envs(result))
-		sort.Sort(envs(tc.expectedEnvs))
-		assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
+			sort.Sort(envs(result))
+			sort.Sort(envs(tc.expectedEnvs))
+			assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
+		}
 	}
 }
 
