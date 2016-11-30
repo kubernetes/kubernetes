@@ -648,6 +648,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeReady)
 		} else {
 			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeNotReady)
+			glog.Infof("Node became not ready: %+v", newNodeReadyCondition)
 		}
 	}
 }
