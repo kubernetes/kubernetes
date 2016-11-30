@@ -3,6 +3,7 @@
 ### Supported
 
    * [Go](https://github.com/kubernetes/client-go)
+   * [Python] (https://github.com/kubernetes-incubator/client-python)
 
 ### User Contributed
 
