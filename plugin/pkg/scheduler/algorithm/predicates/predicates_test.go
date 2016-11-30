@@ -807,18 +807,23 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["bar", "value2"]
-								}]
-							}]
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar", "value2"},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -830,18 +835,23 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "kernel-version",
-									"operator": "Gt",
-									"values": ["0204"]
-								}]
-							}]
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "kernel-version",
+												Operator: v1.NodeSelectorOpGt,
+												Values:   []string{"0204"},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -854,18 +864,23 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "mem-type",
-									"operator": "NotIn",
-									"values": ["DDR", "DDR2"]
-								}]
-							}]
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "mem-type",
+												Operator: v1.NodeSelectorOpNotIn,
+												Values:   []string{"DDR", "DDR2"},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -877,17 +892,22 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "GPU",
-									"operator": "Exists"
-								}]
-							}]
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "GPU",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -899,18 +919,23 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -922,12 +947,13 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": null
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: nil,
+							},
+						},
 					},
 				},
 			},
@@ -939,12 +965,13 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": []
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{},
+							},
+						},
 					},
 				},
 			},
@@ -954,31 +981,54 @@ func TestPodFitsSelector(t *testing.T) {
 			fits: false,
 			test: "Pod with an empty []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
 		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{}, {}]
-						}}}`,
+		/*
+			{
+				pod: &v1.Pod{
+						ObjectMeta: v1.ObjectMeta{
+							Annotations: map[string]string{
+								v1.AffinityAnnotationKey: `
+								{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+									"nodeSelectorTerms": [{}, {}]
+								}}}`,
+							},
+						},
+					Spec: v1.PodSpec{
+						Affinity: &v1.Affinity{
+							NodeAffinity: &v1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+									NodeSelectorTerms: []v1.NodeSelectorTerm{
+										{
+											MatchExpressions: {},
+										},
+										{
+											MatchExpressions: {},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
+				labels: map[string]string{
+					"foo": "bar",
+				},
+				fits: false,
+				test: "Pod with invalid NodeSelectTerms in affinity will match no objects and won't schedule onto the node",
 			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: false,
-			test: "Pod with invalid NodeSelectTerms in affinity will match no objects and won't schedule onto the node",
-		},
+		*/
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{"matchExpressions": [{}]}]
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -989,13 +1039,7 @@ func TestPodFitsSelector(t *testing.T) {
 			test: "Pod with empty MatchExpressions is not a valid value will match no objects and won't schedule onto the node",
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"some-key": "some-value",
-					},
-				},
-			},
+			pod: &v1.Pod{},
 			labels: map[string]string{
 				"foo": "bar",
 			},
@@ -1004,11 +1048,11 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": null
-						}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: nil,
+						},
 					},
 				},
 			},
@@ -1020,21 +1064,26 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "GPU",
-									"operator": "Exists"
-								}, {
-									"key": "GPU",
-									"operator": "NotIn",
-									"values": ["AMD", "INTER"]
-								}]
-							}]
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "GPU",
+												Operator: v1.NodeSelectorOpExists,
+											}, {
+												Key:      "GPU",
+												Operator: v1.NodeSelectorOpNotIn,
+												Values:   []string{"AMD", "INTER"},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1046,21 +1095,26 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "GPU",
-									"operator": "Exists"
-								}, {
-									"key": "GPU",
-									"operator": "In",
-									"values": ["AMD", "INTER"]
-								}]
-							}]
-						}}}`,
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "GPU",
+												Operator: v1.NodeSelectorOpExists,
+											}, {
+												Key:      "GPU",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"AMD", "INTER"},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1072,27 +1126,32 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [
-								{
-									"matchExpressions": [{
-										"key": "foo",
-										"operator": "In",
-										"values": ["bar", "value2"]
-									}]
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar", "value2"},
+											},
+										},
+									},
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "diffkey",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"wrong", "value2"},
+											},
+										},
+									},
 								},
-								{
-									"matchExpressions": [{
-										"key": "diffkey",
-										"operator": "In",
-										"values": ["wrong", "value2"]
-									}]
-								}
-							]
-						}}}`,
+							},
+						},
 					},
 				},
 			},
@@ -1140,22 +1199,25 @@ func TestPodFitsSelector(t *testing.T) {
 		//		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "Exists"
-								}]
-							}]
-						}}}`,
-					},
-				},
 				Spec: v1.PodSpec{
 					NodeSelector: map[string]string{
 						"foo": "bar",
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1168,22 +1230,25 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "Exists"
-								}]
-							}]
-						}}}`,
-					},
-				},
 				Spec: v1.PodSpec{
 					NodeSelector: map[string]string{
 						"foo": "bar",
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -2545,17 +2610,6 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					Annotations: map[string]string{
 						v1.AffinityAnnotationKey: `
 						{
-							"nodeAffinity": {
-								"requiredDuringSchedulingIgnoredDuringExecution": {
-									"nodeSelectorTerms": [{
-										"matchExpressions": [{
-											"key": "hostname",
-											"operator": "NotIn",
-											"values": ["h1"]
-										}]
-									}]
-								}
-							},
 							"podAffinity": {
 								"requiredDuringSchedulingIgnoredDuringExecution": [{
 									"labelSelector": {
@@ -2569,6 +2623,25 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 								}]
 							}
 						}`,
+					},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "hostname",
+												Operator: v1.NodeSelectorOpNotIn,
+												Values:   []string{"h1"},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -2722,10 +2795,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			if !fits && !reflect.DeepEqual(reasons, affinityExpectedFailureReasons) {
 				t.Errorf("%s: unexpected failure reasons: %v", test.test, reasons)
 			}
-			affinity, err := v1.GetAffinityFromPodAnnotations(test.pod.ObjectMeta.Annotations)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", test.test, err)
-			}
+			affinity := test.pod.Spec.Affinity
 			if affinity != nil && affinity.NodeAffinity != nil {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)

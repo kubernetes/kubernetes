@@ -1811,6 +1811,29 @@ func validateImagePullSecrets(imagePullSecrets []api.LocalObjectReference, fldPa
 	return allErrors
 }
 
+// validateAffinity checks if given affinities are valid
+func validateAffinity(affinity *api.Affinity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if affinity != nil {
+		if na := affinity.NodeAffinity; na != nil {
+			// TODO: Uncomment the next three lines once RequiredDuringSchedulingRequiredDuringExecution is implemented.
+			// if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
+			//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+			// }
+
+			if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+				allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+			}
+
+			if len(na.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
+				allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+			}
+		}
+	}
+	return allErrs
+}
+
 func validateTaintEffect(effect *api.TaintEffect, allowEmpty bool, fldPath *field.Path) field.ErrorList {
 	if !allowEmpty && len(*effect) == 0 {
 		return field.ErrorList{field.Required(fldPath, "")}
@@ -1890,6 +1913,7 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
 	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"))...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
+	allErrs = append(allErrs, validateAffinity(spec.Affinity, fldPath.Child("affinity"))...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
@@ -2116,22 +2140,6 @@ func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *fi
 	}
 
 	affinityFldPath := fldPath.Child(api.AffinityAnnotationKey)
-	if affinity.NodeAffinity != nil {
-		na := affinity.NodeAffinity
-		naFldPath := affinityFldPath.Child("nodeAffinity")
-		// TODO: Uncomment the next three lines once RequiredDuringSchedulingRequiredDuringExecution is implemented.
-		// if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
-		//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, naFldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
-		// }
-
-		if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, naFldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
-		}
-
-		if len(na.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
-			allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, naFldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
-		}
-	}
 	if affinity.PodAffinity != nil {
 		allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, affinityFldPath.Child("podAffinity"))...)
 	}

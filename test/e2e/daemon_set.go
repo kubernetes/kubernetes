@@ -209,17 +209,22 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon with a node affinity %s", dsName)
-		affinity := map[string]string{
-			v1.AffinityAnnotationKey: fmt.Sprintf(`
-				{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-					"nodeSelectorTerms": [{
-						"matchExpressions": [{
-							"key": "%s",
-							"operator": "In",
-							"values": ["%s"]
-					}]
-				}]
-			}}}`, daemonsetColorLabel, nodeSelector[daemonsetColorLabel]),
+		affinity := &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      daemonsetColorLabel,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{nodeSelector[daemonsetColorLabel]},
+								},
+							},
+						},
+					},
+				},
+			},
 		}
 		_, err := c.Extensions().DaemonSets(ns).Create(&extensions.DaemonSet{
 			ObjectMeta: v1.ObjectMeta{
@@ -229,10 +234,10 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 				Selector: &metav1.LabelSelector{MatchLabels: complexLabel},
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
-						Labels:      complexLabel,
-						Annotations: affinity,
+						Labels: complexLabel,
 					},
 					Spec: v1.PodSpec{
+						Affinity: affinity,
 						Containers: []v1.Container{
 							{
 								Name:  dsName,
