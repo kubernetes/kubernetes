@@ -553,19 +553,23 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 	addNodes(manager.nodeStore.Store, 0, 4, nil)
 	addNodes(manager.nodeStore.Store, 4, 3, simpleNodeLabel)
 	daemon := newDaemonSet("foo")
-	affinity := map[string]string{
-		v1.AffinityAnnotationKey: fmt.Sprintf(`
-			{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-				"nodeSelectorTerms": [{
-					"matchExpressions": [{
-						"key": "color",
-						"operator": "In",
-						"values": ["%s"]
-				}]
-			}]
-		}}}`, simpleNodeLabel["color"]),
+	daemon.Spec.Template.Spec.Affinity = &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "color",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{simpleNodeLabel["color"]},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
-	daemon.Spec.Template.ObjectMeta.Annotations = affinity
 	manager.dsStore.Add(daemon)
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 3, 0)
 }

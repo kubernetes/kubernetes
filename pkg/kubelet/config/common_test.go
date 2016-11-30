@@ -54,6 +54,7 @@ func TestDecodeSinglePod(t *testing.T) {
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext: &v1.PodSecurityContext{},
+			Affinity:        &v1.Affinity{},
 		},
 	}
 	json, err := runtime.Encode(testapi.Default.Codec(), pod)
@@ -114,6 +115,7 @@ func TestDecodePodList(t *testing.T) {
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext: &v1.PodSecurityContext{},
+			Affinity:        &v1.Affinity{},
 		},
 	}
 	podList := &v1.PodList{
