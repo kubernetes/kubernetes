@@ -99,11 +99,17 @@ func TestIngressController(t *testing.T) {
 	t.Log("Running Ingress Controller")
 	ingressController.Run(stop)
 
+	// TODO: Here we are creating the ingress with first cluster annotation.
+	// Add another test without that annotation when
+	// https://github.com/kubernetes/kubernetes/issues/36540 is fixed.
 	ing1 := extensions_v1beta1.Ingress{
 		ObjectMeta: api_v1.ObjectMeta{
 			Name:      "test-ingress",
 			Namespace: "mynamespace",
 			SelfLink:  "/api/v1/namespaces/mynamespace/ingress/test-ingress",
+			Annotations: map[string]string{
+				firstClusterAnnotation: cluster1.Name,
+			},
 		},
 		Status: extensions_v1beta1.IngressStatus{
 			LoadBalancer: api_v1.LoadBalancerStatus{
@@ -181,7 +187,6 @@ func TestIngressController(t *testing.T) {
 	*/
 	// Test add cluster
 	t.Log("Adding a second cluster")
-	ing1.Annotations = make(map[string]string)
 	ing1.Annotations[staticIPNameKeyWritable] = "foo" // Make sure that the base object has a static IP name first.
 	fedIngressWatch.Modify(&ing1)
 	clusterWatch.Add(cluster2)
