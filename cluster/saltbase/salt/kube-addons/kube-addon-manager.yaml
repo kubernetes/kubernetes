@@ -10,7 +10,7 @@ spec:
   containers:
   - name: kube-addon-manager
     # When updating version also bump it in cluster/images/hyperkube/static-pods/addon-manager.json
-    image: gcr.io/google-containers/kube-addon-manager:v6.0
+    image: gcr.io/google-containers/kube-addon-manager:v6.1
     command:
     - /bin/bash
     - -c
