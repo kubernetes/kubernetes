@@ -75,6 +75,16 @@ type ExportOptions struct {
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
 }
 
+// GetOptions is the standard query options to the standard REST get call.
+type GetOptions struct {
+	TypeMeta `json:",inline"`
+	// When specified:
+	// - if unset, then the result is returned from remote storage based on quorum-read flag;
+	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
+	// - if set to non zero, then the result is at least as fresh as given rv.
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+}
+
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline"`
