@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v2alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_HorizontalPodAutoscaler,
 	)
@@ -33,6 +34,16 @@ func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
 		obj.Spec.MinReplicas = &minReplicas
 	}
 
-	// NB: we apply a default for CPU utilization in conversion because
-	// we need access to the annotations to properly apply the default.
+	if len(obj.Spec.Metrics) == 0 {
+		utilizationDefaultVal := int32(autoscaling.DefaultCPUUtilization)
+		obj.Spec.Metrics = []MetricSpec{
+			{
+				Type: ResourceMetricSourceType,
+				Resource: &ResourceMetricSource{
+					Name: v1.ResourceCPU,
+					TargetAverageUtilization: &utilizationDefaultVal,
+				},
+			},
+		}
+	}
 }
