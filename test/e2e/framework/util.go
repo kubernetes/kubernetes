@@ -2757,6 +2757,32 @@ func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selecto
 	return
 }
 
+// Wait for exact amount of matching pods to become running and ready.
+// Return the list of matching pods.
+func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label labels.Selector, num int, timeout time.Duration) (pods *v1.PodList, err error) {
+	var current int
+	err = wait.Poll(Poll, timeout,
+		func() (bool, error) {
+			pods, err := WaitForPodsWithLabel(c, ns, label)
+			if err != nil {
+				Logf("Failed to list pods: %v", err)
+				return false, nil
+			}
+			current = 0
+			for _, pod := range pods.Items {
+				if flag, err := testutils.PodRunningReady(&pod); err == nil && flag == true {
+					current++
+				}
+			}
+			if current != num {
+				Logf("Got %v pods running and ready, expect: %v", current, num)
+				return false, nil
+			}
+			return true, nil
+		})
+	return pods, err
+}
+
 // DeleteRCAndPods a Replication Controller and all pods it spawned
 func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
 	By(fmt.Sprintf("deleting replication controller %s in namespace %s", name, ns))
