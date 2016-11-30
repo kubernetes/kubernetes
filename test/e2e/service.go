@@ -516,8 +516,9 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 		host := hosts[0]
 
-		By("verifying REJECT in iptables nat table")
-		cmd := fmt.Sprintf(`iptables-save -t filter | grep REJECT | grep '\s--dport %d\s' | grep '\s-d %s/32\s'`, servicePort, serviceIp)
+		By("verifying REJECT in iptables filter table")
+
+		cmd := fmt.Sprintf(`sudo iptables-save -t filter | grep REJECT | grep '\s--dport %d\s' | grep '\s-d %s/32\s'`, servicePort, serviceIp)
 		result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			framework.LogSSHResult(result)
@@ -551,8 +552,8 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 		host := hosts[0]
 
-		By("verifying REJECT in iptables nat table")
-		cmd := fmt.Sprintf(`iptables-save -t filter | grep REJECT | grep '\s--dport %d\s'`, nodePort)
+		By("verifying REJECT in iptables filter table")
+		cmd := fmt.Sprintf(`sudo iptables-save -t filter | grep REJECT | grep '\s--dport %d\s'`, nodePort)
 		result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			framework.LogSSHResult(result)
