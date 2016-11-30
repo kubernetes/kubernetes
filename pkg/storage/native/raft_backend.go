@@ -69,7 +69,7 @@ func NewRaftBackend(raft *raft.Raft, fsm *FSM) *RaftBackend {
 var _ StorageServiceServer = &RaftBackend{}
 
 func (s *RaftBackend) DoOperation(ctx context.Context, op *StorageOperation) (result *StorageOperationResult, err error) {
-	glog.V(2).Infof("request %s %s", op.OpType, op.Path)
+	glog.V(4).Infof("request %s %s", op.OpType, op.Path)
 	switch op.OpType {
 	case StorageOperationType_DELETE:
 		result, err = s.opDelete(ctx, op)
@@ -91,7 +91,7 @@ func (s *RaftBackend) DoOperation(ctx context.Context, op *StorageOperation) (re
 }
 
 func (s *RaftBackend) Watch(request *WatchRequest, sink StorageService_WatchServer) error {
-	glog.V(2).Infof("Watch on %s", request.Path)
+	glog.V(4).Infof("Watch on %s", request.Path)
 	path := request.Path
 	recursive := request.Recursive
 	if recursive {
@@ -107,7 +107,7 @@ func (s *RaftBackend) Watch(request *WatchRequest, sink StorageService_WatchServ
 		wasApplied, err := s.readableLog.WaitLog(position, entry)
 
 		if sink.Context().Err() != nil {
-			glog.V(2).Infof("Watch closed: %v", sink.Context().Err())
+			glog.V(4).Infof("Watch closed: %v", sink.Context().Err())
 			// TODO: I don't think we return error here
 			return nil
 		}
@@ -135,7 +135,7 @@ func (s *RaftBackend) Watch(request *WatchRequest, sink StorageService_WatchServ
 			}
 
 			if matches {
-				glog.V(2).Infof("Watch on %s found event: %s %s", request.Path, entry.Op.OpType, entry.Op.Path)
+				glog.V(4).Infof("Watch on %s found event: %s %s", request.Path, entry.Op.OpType, entry.Op.Path)
 
 				err := sink.Send(&WatchEvent{
 					Op: entry.Op,

@@ -74,8 +74,6 @@ func (l *simpleReadableLog) init(log raft.LogStore) {
 	l.log = log
 }
 
-var _ ReadableLog = &simpleReadableLog{}
-
 func (l *simpleReadableLog) publishApplied(lsn LSN, wasApplied bool) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
@@ -117,6 +115,14 @@ func (l *simpleReadableLog) WaitLog(lsn LSN, dest *RaftLogEntry) (bool, error) {
 		return wasApplied, err
 	}
 
+	if dest.Op == nil {
+		glog.Warning("log entry had no op @%x: %v", lsn, dest.Op)
+	} else if dest.Op.ItemData == nil {
+		glog.Warning("log entry had no ItemData @%x: %v", lsn, dest.Op)
+	} else {
+		dest.Op.ItemData.Lsn = uint64(lsn)
+	}
+
 	return wasApplied, nil
 }
 
@@ -130,25 +136,23 @@ func (s *FSM) Apply(l *raft.Log) interface{} {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	// TODO: Should these be atomic?
-
 	lsn := LSN(l.Index)
 	s.lastLSN = lsn
 
-	glog.V(2).Infof("Apply %s %s", c.Op.OpType, c.Op.Path)
+	glog.V(4).Infof("Apply %x %s %s", lsn, c.Op.OpType, c.Op.Path)
 
 	var result *StorageOperationResult
 	var wasApplied bool
 
 	switch c.Op.OpType {
 	case StorageOperationType_CREATE:
-		result, wasApplied = s.opCreate(c.Op)
+		result, wasApplied = s.opCreate(lsn, c.Op)
 	case StorageOperationType_DELETE:
-		result, wasApplied = s.opDelete(c.Op)
+		result, wasApplied = s.opDelete(lsn, c.Op)
 	case StorageOperationType_UPDATE:
-		result, wasApplied = s.opUpdate(c.Op)
+		result, wasApplied = s.opUpdate(lsn, c.Op)
 	default:
-		panic(fmt.Sprintf("unrecognized command op: %s", c.Op))
+		panic(fmt.Sprintf("unrecognized command op @%x: %s", lsn, c.Op))
 	}
 
 	response := &RaftLogEntryResult{}
@@ -160,27 +164,19 @@ func (s *FSM) Apply(l *raft.Log) interface{} {
 	return response
 }
 
-func (s *FSM) opCreate(op *StorageOperation) (*StorageOperationResult, bool) {
+func (s *FSM) opCreate(lsn LSN, op *StorageOperation) (*StorageOperationResult, bool) {
 	bucket, k := splitPath(op.Path)
 
 	b := s.root.resolveBucket(bucket, true)
 	existing, found := b.items[k]
 	if found {
-		glog.V(2).Infof("response %s %s: ALREADY_EXISTS", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: ALREADY_EXISTS", op.OpType, op.Path)
 
 		return &StorageOperationResult{
 			ItemData:  toProto(existing),
 			ErrorCode: ErrorCode_ALREADY_EXISTS,
 		}, false
 	}
-
-	//s.lastLSN++
-	//lsn := s.lastLSN
-
-	lsn := s.lastLSN
-
-	//log := &logEntry{lsn: lsn}
-	//log.items = []logItem{{b.path + k, watch.Added, item.data}}
 
 	expiry := uint64(0)
 	if op.ItemData.Ttl != 0 {
@@ -195,14 +191,11 @@ func (s *FSM) opCreate(op *StorageOperation) (*StorageOperationResult, bool) {
 		expiry: expiry,
 	}
 
-	// Note we send the notifications before returning ... should be interesting :-)
-	//s.log.append(log)
-
 	if expiry != 0 && s.expiryManager != nil {
 		s.expiryManager.add(op.Path, expiry)
 	}
 
-	glog.V(2).Infof("response %s %s: OK", op.OpType, op.Path)
+	glog.V(4).Infof("response %s %s: OK", op.OpType, op.Path)
 
 	return &StorageOperationResult{
 		ItemData: &ItemData{
@@ -216,46 +209,36 @@ func (s *FSM) opCreate(op *StorageOperation) (*StorageOperationResult, bool) {
 
 }
 
-func (s *FSM) opDelete(op *StorageOperation) (*StorageOperationResult, bool) {
+func (s *FSM) opDelete(lsn LSN, op *StorageOperation) (*StorageOperationResult, bool) {
 	bucket, k := splitPath(op.Path)
 
 	b := s.root.resolveBucket(bucket, false)
 	if b == nil {
-		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 		return &StorageOperationResult{ErrorCode: ErrorCode_NOT_FOUND}, false
 	}
 	oldItem, found := b.items[k]
 	if !found {
-		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 		return &StorageOperationResult{ErrorCode: ErrorCode_NOT_FOUND}, false
 	}
 
 	if op.PreconditionUid != "" && types.UID(op.PreconditionUid) != oldItem.uid {
-		glog.V(2).Infof("response %s %s: PRECONDITION_NOT_MET_UID", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: PRECONDITION_NOT_MET_UID", op.OpType, op.Path)
 		return &StorageOperationResult{ItemData: toProto(oldItem), ErrorCode: ErrorCode_PRECONDITION_NOT_MET_UID}, false
 	}
 
 	if op.PreconditionLsn != 0 && LSN(op.PreconditionLsn) != oldItem.lsn {
-		glog.V(2).Infof("response %s %s: PRECONDITION_NOT_MET_LSN", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: PRECONDITION_NOT_MET_LSN", op.OpType, op.Path)
 		return &StorageOperationResult{ItemData: toProto(oldItem), ErrorCode: ErrorCode_PRECONDITION_NOT_MET_LSN}, false
 	}
 
-	//oldItem := item
-
-	//s.lastLSN++
-	//lsn := s.lastLSN
-	//log := &logEntry{lsn: lsn}
-	//log.items = []logItem{{b.path + k, watch.Deleted, oldItem.data}}
-	//
-	//// Note we send the notifications before returning ... should be interesting :-)
-	//s.log.append(log)
-
 	delete(b.items, k)
 
-	glog.V(2).Infof("response %s %s: OK", op.OpType, op.Path)
+	glog.V(4).Infof("response %s %s: OK", op.OpType, op.Path)
 	return &StorageOperationResult{
 		ItemData:   toProto(oldItem),
-		CurrentLsn: uint64(s.lastLSN),
+		CurrentLsn: uint64(lsn),
 	}, true
 }
 
@@ -281,29 +264,24 @@ func toProto(i itemData) *ItemData {
 
 // response will be the new item if we swapped,
 // or the existing item if err==errorLSNMismatch
-func (s *FSM) opUpdate(op *StorageOperation) (*StorageOperationResult, bool) {
+func (s *FSM) opUpdate(lsn LSN, op *StorageOperation) (*StorageOperationResult, bool) {
 	bucket, k := splitPath(op.Path)
 
 	b := s.root.resolveBucket(bucket, true)
 	oldItem, found := b.items[k]
 	if !found {
-		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 		return &StorageOperationResult{ErrorCode: ErrorCode_NOT_FOUND}, false
 	}
 	if op.PreconditionLsn != 0 && LSN(op.PreconditionLsn) != oldItem.lsn {
-		glog.V(2).Infof("response %s %s: PRECONDITION_NOT_MET_LSN", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: PRECONDITION_NOT_MET_LSN", op.OpType, op.Path)
 		return &StorageOperationResult{ItemData: toProto(oldItem), ErrorCode: ErrorCode_PRECONDITION_NOT_MET_LSN}, false
 	}
 
 	if op.PreconditionUid != "" && types.UID(op.PreconditionUid) != oldItem.uid {
-		glog.V(2).Infof("response %s %s: PRECONDITION_NOT_MET_UID", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: PRECONDITION_NOT_MET_UID", op.OpType, op.Path)
 		return &StorageOperationResult{ItemData: toProto(oldItem), ErrorCode: ErrorCode_PRECONDITION_NOT_MET_UID}, false
 	}
-
-	//s.lastLSN++
-	lsn := s.lastLSN
-	//log := &logEntry{lsn: lsn}
-	//log.items = []logItem{{b.path + k, watch.Modified, newItem.data}}
 
 	expiry := uint64(0)
 	if op.ItemData.Ttl != 0 {
@@ -318,14 +296,11 @@ func (s *FSM) opUpdate(op *StorageOperation) (*StorageOperationResult, bool) {
 		expiry: expiry,
 	}
 
-	// Note we send the notifications before returning ... should be interesting :-)
-	//s.log.append(log)
-
 	if expiry != 0 && s.expiryManager != nil {
 		s.expiryManager.add(op.Path, expiry)
 	}
 
-	glog.V(2).Infof("response %s %s: OK", op.OpType, op.Path)
+	glog.V(4).Infof("response %s %s: OK", op.OpType, op.Path)
 	return &StorageOperationResult{
 		ItemData: &ItemData{
 			Uid:  op.ItemData.Uid,
@@ -345,7 +320,7 @@ func (s *FSM) opGet(ctx context.Context, op *StorageOperation) (*StorageOperatio
 
 	b := s.root.resolveBucket(bucket, false)
 	if b == nil {
-		glog.V(2).Infof("response %s %s: NOT_FOUND (bucket)", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: NOT_FOUND (bucket)", op.OpType, op.Path)
 
 		return &StorageOperationResult{
 			ErrorCode:  ErrorCode_NOT_FOUND,
@@ -354,7 +329,7 @@ func (s *FSM) opGet(ctx context.Context, op *StorageOperation) (*StorageOperatio
 	}
 	item, found := b.items[k]
 	if !found {
-		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 
 		return &StorageOperationResult{
 			ErrorCode:  ErrorCode_NOT_FOUND,
@@ -379,7 +354,7 @@ func (s *FSM) opGet(ctx context.Context, op *StorageOperation) (*StorageOperatio
 		resultItemData.Ttl = ttl
 	}
 
-	glog.V(2).Infof("response %s %s: OK", op.OpType, op.Path)
+	glog.V(4).Infof("response %s %s (@%x): OK", op.OpType, op.Path, resultItemData.Lsn)
 
 	return &StorageOperationResult{
 		ItemData:   resultItemData,
@@ -400,7 +375,7 @@ func (s *FSM) rawGet(path string, dest *itemData) bool {
 	var found bool
 	*dest, found = b.items[k]
 
-	glog.V(2).Infof("rawGet %s: found=%v", path, found)
+	glog.V(4).Infof("rawGet %s: found=%v", path, found)
 
 	return found
 }
@@ -409,11 +384,9 @@ func (s *FSM) opList(ctx context.Context, op *StorageOperation) (*StorageOperati
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	bucket := op.Path
-
-	b := s.root.resolveBucket(bucket, false)
+	b := s.root.resolveBucket(op.Path, false)
 	if b == nil {
-		glog.V(2).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
+		glog.V(4).Infof("response %s %s: NOT_FOUND", op.OpType, op.Path)
 		return &StorageOperationResult{
 			ErrorCode:  ErrorCode_NOT_FOUND,
 			CurrentLsn: uint64(s.lastLSN),
@@ -424,10 +397,23 @@ func (s *FSM) opList(ctx context.Context, op *StorageOperation) (*StorageOperati
 		CurrentLsn: uint64(s.lastLSN),
 	}
 
-	if len(b.items) != 0 {
-		now := uint64(time.Now().Unix())
+	now := uint64(time.Now().Unix())
 
-		result.ItemList = make([]*ItemData, 0, len(b.items))
+	// Note we always do a fully recursive list
+	var countBucket func(b *bucket)
+	count := 0
+	countBucket = func(b *bucket) {
+		count += len(b.items)
+		for _, childBucket := range b.children {
+			countBucket(childBucket)
+		}
+	}
+	countBucket(b)
+
+	result.ItemList = make([]*ItemData, 0, count)
+
+	var processBucket func(b *bucket)
+	processBucket = func(b *bucket) {
 		for p, item := range b.items {
 			resultItemData := &ItemData{
 				Data: item.data,
@@ -448,18 +434,23 @@ func (s *FSM) opList(ctx context.Context, op *StorageOperation) (*StorageOperati
 
 			result.ItemList = append(result.ItemList, resultItemData)
 		}
-
-		// For compatability with etcd, we sort by path
-		sort.Sort(ByPath(result.ItemList))
-
-		// But we don't need to return the paths
-		// TODO: This is annoying, particularly as we hold the lock
-		for _, item := range result.ItemList {
-			item.Path = ""
+		for _, childBucket := range b.children {
+			processBucket(childBucket)
 		}
 	}
 
-	glog.V(2).Infof("response %s %s: %d items", op.OpType, op.Path, len(result.ItemList))
+	processBucket(b)
+
+	// For compatibility with etcd, we sort by path
+	sort.Sort(ByPath(result.ItemList))
+
+	// But we don't need to return the paths
+	// TODO: This is annoying, particularly as we hold the lock
+	for _, item := range result.ItemList {
+		item.Path = ""
+	}
+
+	glog.V(4).Infof("response %s %s: %d items", op.OpType, op.Path, len(result.ItemList))
 
 	return result, nil
 }
@@ -470,11 +461,11 @@ func (s *FSM) enableExpiryManager(backend *RaftBackend, enable bool) *expiryMana
 
 	if !enable {
 		if s.expiryManager != nil {
-			glog.V(2).Infof("enableExpiryManager enabled=%v", enable)
+			glog.V(4).Infof("enableExpiryManager enabled=%v", enable)
 			s.expiryManager = nil
 		}
 	} else if s.expiryManager == nil {
-		glog.V(2).Infof("enableExpiryManager enabled=%v", enable)
+		glog.V(4).Infof("enableExpiryManager enabled=%v", enable)
 		var expiringItems []expiringItem
 
 		var addFn func(b *bucket)
@@ -498,7 +489,7 @@ func (s *FSM) enableExpiryManager(backend *RaftBackend, enable bool) *expiryMana
 }
 
 func (s *FSM) Snapshot() (raft.FSMSnapshot, error) {
-	glog.V(2).Infof("Snapshot")
+	glog.V(4).Infof("Snapshot")
 
 	// Snapshot is used to support log compaction. This call should
 	// return an FSMSnapshot which can be used to save a point-in-time
@@ -521,6 +512,7 @@ func (s *FSM) Snapshot() (raft.FSMSnapshot, error) {
 			countFn(c)
 		}
 	}
+	countFn(s.root)
 
 	items := make([]ItemData, 0, count)
 	var addFn func(b *bucket)
@@ -550,7 +542,7 @@ func (s *FSM) Snapshot() (raft.FSMSnapshot, error) {
 }
 
 func (s *FSM) Restore(in io.ReadCloser) error {
-	glog.V(2).Infof("Restore")
+	glog.V(4).Infof("Restore")
 	//// Restore is used to restore an FSM from a snapshot. It is not called
 	//// concurrently with any other command. The FSM must discard all previous
 	//// state.

@@ -47,7 +47,7 @@ type store struct {
 }
 
 func NewStore(prefix string, codec runtime.Codec, backend StorageServiceClient) *store {
-	glog.Infof("building native store prefix=%q", prefix)
+	glog.V(4).Infof("building native store prefix=%q", prefix)
 
 	if prefix == "" {
 		prefix = "/"
@@ -387,6 +387,7 @@ func (s *store) GuaranteedUpdate(
 		}
 
 		if origState.rev == 0 {
+			glog.Infof("Object was %v", suggestion[0])
 			glog.Fatalf("origState.rev unexpectedly 0")
 		}
 	} else {
@@ -460,7 +461,7 @@ func (s *store) GuaranteedUpdate(
 
 		var result *StorageOperationResult
 		if doCreate {
-			glog.Infof("Trying create of %s", p)
+			glog.V(6).Infof("Trying create of %s", p)
 
 			op := &StorageOperation{
 				OpType:   StorageOperationType_CREATE,
@@ -471,7 +472,7 @@ func (s *store) GuaranteedUpdate(
 		} else {
 			// response will be the new item if we swapped,
 			// or the existing item if err==errorLSNMismatch
-			glog.Infof("Trying update of %s with lsn %d", p, origState.rev)
+			glog.V(6).Infof("Trying update of %s with lsn %d", p, origState.rev)
 
 			if origState.rev == 0 {
 				glog.Fatalf("origState.rev unexpectedly 0")
@@ -628,7 +629,10 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 		return err
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	versioner.UpdateObject(objPtr, uint64(rev))
+	err = versioner.UpdateObject(objPtr, uint64(rev))
+	if err != nil {
+		glog.V(2).Infof("ignoring error setting version on object %T: %v", objPtr, err)
+	}
 	return nil
 }
 
