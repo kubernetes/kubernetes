@@ -55,6 +55,8 @@ type NamespaceController struct {
 	opCache *operationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
 	finalizerToken v1.FinalizerName
+	// ownerGraph describes the ownership relation between GroupVersionResources, learnt by observation of the OwnerReferences
+	ownerGraph ownerGraph
 }
 
 // NewNamespaceController creates a new NamespaceController
@@ -212,7 +214,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return err
 	}
 	namespace := obj.(*v1.Namespace)
-	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.discoverResourcesFn, namespace, nm.finalizerToken)
+	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, &nm.ownerGraph, nm.discoverResourcesFn, namespace, nm.finalizerToken)
 }
 
 // Run starts observing the system with the specified number of workers.
