@@ -473,7 +473,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		// fall back to legacy IPs
 		config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeLegacyHostIP)
 	}
-	Expect(len(config.ExternalAddrs)).To(BeNumerically(">=", 2), fmt.Sprintf("At least two nodes necessary with an external or LegacyHostIP"))
+	SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
 
 	By("Creating the service on top of the pods in kubernetes")
