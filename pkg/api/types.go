@@ -1133,6 +1133,25 @@ type SecretKeySelector struct {
 	Key string
 }
 
+type EnvFromSource struct {
+	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+	// +optional
+	Prefix string
+	// The ConfigMap to select from.
+	//+optional
+	ConfigMapRef *ConfigMapEnvSource
+}
+
+// ConfigMapEnvSource selects a ConfigMap to populate the environment
+// variables with.
+//
+// The contents of the target ConfigMap's Data field will represent the
+// key-value pairs as environment variables.
+type ConfigMapEnvSource struct {
+	// The ConfigMap to select from.
+	LocalObjectReference
+}
+
 // HTTPHeader describes a custom header to be used in HTTP probes
 type HTTPHeader struct {
 	// The header field name
@@ -1276,6 +1295,8 @@ type Container struct {
 	Ports []ContainerPort
 	// +optional
 	Env []EnvVar
+	// +optional
+	EnvFrom []EnvFromSource
 	// Compute resource requirements.
 	// +optional
 	Resources ResourceRequirements
