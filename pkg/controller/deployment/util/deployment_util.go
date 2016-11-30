@@ -422,7 +422,7 @@ func MaxUnavailable(deployment extensions.Deployment) int32 {
 	return maxUnavailable
 }
 
-// MinAvailable returns the minimum vailable pods of a given deployment
+// MinAvailable returns the minimum available pods of a given deployment
 func MinAvailable(deployment *extensions.Deployment) int32 {
 	if !IsRollingUpdate(deployment) {
 		return int32(0)
