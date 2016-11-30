@@ -27,12 +27,14 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -46,9 +48,9 @@ const (
 	smallRCSize       = 5
 	mediumRCSize      = 30
 	bigRCSize         = 250
-	smallRCGroupName  = "load-small-rc"
-	mediumRCGroupName = "load-medium-rc"
-	bigRCGroupName    = "load-big-rc"
+	smallRCGroupName  = "load-small"
+	mediumRCGroupName = "load-medium"
+	bigRCGroupName    = "load-big"
 	smallRCBatchSize  = 30
 	mediumRCBatchSize = 5
 	bigRCBatchSize    = 1
@@ -66,7 +68,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	var clientset clientset.Interface
 	var nodeCount int
 	var ns string
-	var configs []*testutils.RCConfig
+	var configs []testutils.RunObjectConfig
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
@@ -117,12 +119,16 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		podsPerNode int
 		image       string
 		command     []string
+		// What kind of resource we want to create
+		kind schema.GroupKind
 	}
 
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
-		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4"},
+		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController")},
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("ReplicaSet")},
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment")},
 	}
 
 	for _, testArg := range loadTests {
@@ -130,7 +136,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		if testArg.podsPerNode == 30 {
 			feature = "Performance"
 		}
-		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node", feature, testArg.podsPerNode)
+		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v", feature, testArg.podsPerNode, testArg.kind)
 		itArg := testArg
 
 		It(name, func() {
@@ -140,7 +146,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			framework.ExpectNoError(err)
 
 			totalPods := itArg.podsPerNode * nodeCount
-			configs = generateRCConfigs(totalPods, itArg.image, itArg.command, namespaces)
+			configs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind)
 			var services []*v1.Service
 			// Read the environment variable to see if we want to create services
 			createServices := os.Getenv("CREATE_SERVICES")
@@ -173,7 +179,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			// We may want to revisit it in the future.
 			framework.Logf("Starting to create ReplicationControllers...")
 			creatingTime := time.Duration(totalPods/throughput) * time.Second
-			createAllRC(configs, creatingTime)
+			createAllResources(configs, creatingTime)
 			By("============================================================================")
 
 			// We would like to spread scaling replication controllers over time
@@ -182,11 +188,11 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			// The expected number of created/deleted pods is less than totalPods/3.
 			scalingTime := time.Duration(totalPods/(3*throughput)) * time.Second
 			framework.Logf("Starting to scale ReplicationControllers first time...")
-			scaleAllRC(configs, scalingTime)
+			scaleAllResources(configs, scalingTime)
 			By("============================================================================")
 
 			framework.Logf("Starting to scale ReplicationControllers second time...")
-			scaleAllRC(configs, scalingTime)
+			scaleAllResources(configs, scalingTime)
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
@@ -194,7 +200,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			// We may want to revisit it in the future.
 			deletingTime := time.Duration(totalPods/throughput) * time.Second
 			framework.Logf("Starting to delete ReplicationControllers...")
-			deleteAllRC(configs, deletingTime)
+			deleteAllResources(configs, deletingTime)
 			if createServices == "true" {
 				framework.Logf("Starting to delete services...")
 				for _, service := range services {
@@ -259,7 +265,7 @@ func createClients(numberOfClients int) ([]*clientset.Clientset, []*internalclie
 	return clients, internalClients, nil
 }
 
-func computeRCCounts(total int) (int, int, int) {
+func computePodCounts(total int) (int, int, int) {
 	// Small RCs owns ~0.5 of total number of pods, medium and big RCs ~0.25 each.
 	// For example for 3000 pods (100 nodes, 30 pods per node) there are:
 	//  - 300 small RCs each 5 pods
@@ -273,13 +279,13 @@ func computeRCCounts(total int) (int, int, int) {
 	return smallRCCount, mediumRCCount, bigRCCount
 }
 
-func generateRCConfigs(totalPods int, image string, command []string, nss []*v1.Namespace) []*testutils.RCConfig {
-	configs := make([]*testutils.RCConfig, 0)
+func generateConfigs(totalPods int, image string, command []string, nss []*v1.Namespace, kind schema.GroupKind) []testutils.RunObjectConfig {
+	configs := make([]testutils.RunObjectConfig, 0)
 
-	smallRCCount, mediumRCCount, bigRCCount := computeRCCounts(totalPods)
-	configs = append(configs, generateRCConfigsForGroup(nss, smallRCGroupName, smallRCSize, smallRCCount, image, command)...)
-	configs = append(configs, generateRCConfigsForGroup(nss, mediumRCGroupName, mediumRCSize, mediumRCCount, image, command)...)
-	configs = append(configs, generateRCConfigsForGroup(nss, bigRCGroupName, bigRCSize, bigRCCount, image, command)...)
+	smallRCCount, mediumRCCount, bigRCCount := computePodCounts(totalPods)
+	configs = append(configs, generateConfigsForGroup(nss, smallRCGroupName, smallRCSize, smallRCCount, image, command, kind)...)
+	configs = append(configs, generateConfigsForGroup(nss, mediumRCGroupName, mediumRCSize, mediumRCCount, image, command, kind)...)
+	configs = append(configs, generateConfigsForGroup(nss, bigRCGroupName, bigRCSize, bigRCCount, image, command, kind)...)
 
 	// Create a number of clients to better simulate real usecase
 	// where not everyone is using exactly the same client.
@@ -288,18 +294,18 @@ func generateRCConfigs(totalPods int, image string, command []string, nss []*v1.
 	framework.ExpectNoError(err)
 
 	for i := 0; i < len(configs); i++ {
-		configs[i].Client = clients[i%len(clients)]
-		configs[i].InternalClient = internalClients[i%len(internalClients)]
+		configs[i].SetClient(clients[i%len(clients)])
+		configs[i].SetInternalClient(internalClients[i%len(internalClients)])
 	}
 
 	return configs
 }
 
-func generateRCConfigsForGroup(
-	nss []*v1.Namespace, groupName string, size, count int, image string, command []string) []*testutils.RCConfig {
-	configs := make([]*testutils.RCConfig, 0, count)
+func generateConfigsForGroup(
+	nss []*v1.Namespace, groupName string, size, count int, image string, command []string, kind schema.GroupKind) []testutils.RunObjectConfig {
+	configs := make([]testutils.RunObjectConfig, 0, count)
 	for i := 1; i <= count; i++ {
-		config := &testutils.RCConfig{
+		baseConfig := &testutils.RCConfig{
 			Client:         nil, // this will be overwritten later
 			InternalClient: nil, // this will be overwritten later
 			Name:           groupName + "-" + strconv.Itoa(i),
@@ -311,20 +317,32 @@ func generateRCConfigsForGroup(
 			CpuRequest:     10,       // 0.01 core
 			MemRequest:     26214400, // 25MB
 		}
+		var config testutils.RunObjectConfig
+		switch kind {
+		case api.Kind("ReplicationController"):
+			config = baseConfig
+		case extensions.Kind("ReplicaSet"):
+			framework.Logf("Creating ReplicaSet")
+			config = &testutils.ReplicaSetConfig{RCConfig: *baseConfig}
+		case extensions.Kind("Deployment"):
+			config = &testutils.DeploymentConfig{RCConfig: *baseConfig}
+		default:
+			framework.Failf("Unsupported kind for config creation: %v", kind)
+		}
 		configs = append(configs, config)
 	}
 	return configs
 }
 
-func generateServicesForConfigs(configs []*testutils.RCConfig) []*v1.Service {
+func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Service {
 	services := make([]*v1.Service, 0, len(configs))
 	for _, config := range configs {
-		serviceName := config.Name + "-svc"
-		labels := map[string]string{"name": config.Name}
+		serviceName := config.GetName() + "-svc"
+		labels := map[string]string{"name": config.GetName()}
 		service := &v1.Service{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      serviceName,
-				Namespace: config.Namespace,
+				Namespace: config.GetNamespace(),
 			},
 			Spec: v1.ServiceSpec{
 				Selector: labels,
@@ -343,69 +361,67 @@ func sleepUpTo(d time.Duration) {
 	time.Sleep(time.Duration(rand.Int63n(d.Nanoseconds())))
 }
 
-func createAllRC(configs []*testutils.RCConfig, creatingTime time.Duration) {
+func createAllResources(configs []testutils.RunObjectConfig, creatingTime time.Duration) {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
-		go createRC(&wg, config, creatingTime)
+		go createResource(&wg, config, creatingTime)
 	}
 	wg.Wait()
 }
 
-func createRC(wg *sync.WaitGroup, config *testutils.RCConfig, creatingTime time.Duration) {
+func createResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, creatingTime time.Duration) {
 	defer GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(creatingTime)
-	framework.ExpectNoError(framework.RunRC(*config), fmt.Sprintf("creating rc %s", config.Name))
+	framework.ExpectNoError(config.Run(), fmt.Sprintf("creating %v %s", config.GetKind(), config.GetName()))
 }
 
-func scaleAllRC(configs []*testutils.RCConfig, scalingTime time.Duration) {
+func scaleAllResources(configs []testutils.RunObjectConfig, scalingTime time.Duration) {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
-		go scaleRC(&wg, config, scalingTime)
+		go scaleResource(&wg, config, scalingTime)
 	}
 	wg.Wait()
 }
 
 // Scales RC to a random size within [0.5*size, 1.5*size] and lists all the pods afterwards.
 // Scaling happens always based on original size, not the current size.
-func scaleRC(wg *sync.WaitGroup, config *testutils.RCConfig, scalingTime time.Duration) {
+func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scalingTime time.Duration) {
 	defer GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(scalingTime)
-	newSize := uint(rand.Intn(config.Replicas) + config.Replicas/2)
-	framework.ExpectNoError(framework.ScaleRC(config.Client, config.InternalClient, config.Namespace, config.Name, newSize, true),
-		fmt.Sprintf("scaling rc %s for the first time", config.Name))
-	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
-	options := v1.ListOptions{
-		LabelSelector:   selector.String(),
-		ResourceVersion: "0",
-	}
-	_, err := config.Client.Core().Pods(config.Namespace).List(options)
-	framework.ExpectNoError(err, fmt.Sprintf("listing pods from rc %v", config.Name))
+	newSize := uint(rand.Intn(config.GetReplicas()) + config.GetReplicas()/2)
+	framework.ExpectNoError(framework.ScaleResource(
+		config.GetClient(), config.GetInternalClient(), config.GetNamespace(), config.GetName(), newSize, true, config.GetKind()),
+		fmt.Sprintf("scaling rc %s for the first time", config.GetName()))
 }
 
-func deleteAllRC(configs []*testutils.RCConfig, deletingTime time.Duration) {
+func deleteAllResources(configs []testutils.RunObjectConfig, deletingTime time.Duration) {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
-		go deleteRC(&wg, config, deletingTime)
+		go deleteResource(&wg, config, deletingTime)
 	}
 	wg.Wait()
 }
 
-func deleteRC(wg *sync.WaitGroup, config *testutils.RCConfig, deletingTime time.Duration) {
+func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deletingTime time.Duration) {
 	defer GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(deletingTime)
-	if framework.TestContext.GarbageCollectorEnabled {
-		framework.ExpectNoError(framework.DeleteRCAndWaitForGC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+	if framework.TestContext.GarbageCollectorEnabled && config.GetKind() != extensions.Kind("Deployment") {
+		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
+			config.GetClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
+			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 	} else {
-		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, config.InternalClient, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+		framework.ExpectNoError(framework.DeleteResourceAndPods(
+			config.GetClient(), config.GetInternalClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
+			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 	}
 }
 

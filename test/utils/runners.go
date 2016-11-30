@@ -52,6 +52,11 @@ type RunObjectConfig interface {
 	GetName() string
 	GetNamespace() string
 	GetKind() schema.GroupKind
+	GetClient() clientset.Interface
+	GetInternalClient() internalclientset.Interface
+	SetClient(clientset.Interface)
+	SetInternalClient(internalclientset.Interface)
+	GetReplicas() int
 }
 
 type RCConfig struct {
@@ -336,6 +341,26 @@ func (config *RCConfig) GetNamespace() string {
 
 func (config *RCConfig) GetKind() schema.GroupKind {
 	return api.Kind("ReplicationController")
+}
+
+func (config *RCConfig) GetClient() clientset.Interface {
+	return config.Client
+}
+
+func (config *RCConfig) GetInternalClient() internalclientset.Interface {
+	return config.InternalClient
+}
+
+func (config *RCConfig) SetClient(c clientset.Interface) {
+	config.Client = c
+}
+
+func (config *RCConfig) SetInternalClient(c internalclientset.Interface) {
+	config.InternalClient = c
+}
+
+func (config *RCConfig) GetReplicas() int {
+	return config.Replicas
 }
 
 func (config *RCConfig) create() error {
