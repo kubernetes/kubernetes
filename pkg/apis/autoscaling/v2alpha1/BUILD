@@ -9,17 +9,20 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["storage_autoscaling.go"],
+    srcs = [
+        "defaults.go",
+        "doc.go",
+        "register.go",
+        "types.go",
+    ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/autoscaling/v1:go_default_library",
-        "//pkg/apis/autoscaling/v2alpha1:go_default_library",
-        "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic",
-        "//vendor:k8s.io/apiserver/pkg/registry/rest",
-        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 
