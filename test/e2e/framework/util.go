@@ -2618,9 +2618,29 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) 
 	}
 }
 
-func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string, size uint, wait bool) error {
-	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
-	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), internalClientset)
+func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Scaler, error) {
+	switch kind {
+	case api.Kind("ReplicationController"):
+		return kubectl.ScalerFor(api.Kind("ReplicationController"), internalClientset)
+	case extensionsinternal.Kind("ReplicaSet"):
+		return kubectl.ScalerFor(extensionsinternal.Kind("ReplicaSet"), internalClientset)
+	case extensionsinternal.Kind("Deployment"):
+		return kubectl.ScalerFor(extensionsinternal.Kind("Deployment"), internalClientset)
+	default:
+		return nil, fmt.Errorf("Unsupported kind for getting Scaler: %v", kind)
+	}
+}
+
+func ScaleResource(
+	clientset clientset.Interface,
+	internalClientset internalclientset.Interface,
+	ns, name string,
+	size uint,
+	wait bool,
+	kind schema.GroupKind,
+) error {
+	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
+	scaler, err := getScalerForKind(internalClientset, kind)
 	if err != nil {
 		return err
 	}
@@ -2632,12 +2652,12 @@ func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.
 	if !wait {
 		return nil
 	}
-	return WaitForRCPodsRunning(clientset, ns, name)
+	return WaitForControlledPodsRunning(clientset, ns, name, kind)
 }
 
 // Wait up to 10 minutes for pods to become Running.
-func WaitForRCPodsRunning(c clientset.Interface, ns, rcName string) error {
-	rc, err := c.Core().ReplicationControllers(ns).Get(rcName)
+func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind schema.GroupKind) error {
+	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
 		return err
 	}
@@ -2647,39 +2667,17 @@ func WaitForRCPodsRunning(c clientset.Interface, ns, rcName string) error {
 	}
 	err = testutils.WaitForPodsWithLabelRunning(c, ns, selector)
 	if err != nil {
-		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", rcName, err)
+		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", name, err)
 	}
 	return nil
+}
+
+func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string, size uint, wait bool) error {
+	return ScaleResource(clientset, internalClientset, ns, name, size, wait, api.Kind("ReplicationController"))
 }
 
 func ScaleDeployment(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string, size uint, wait bool) error {
-	By(fmt.Sprintf("Scaling Deployment %s in namespace %s to %d", name, ns, size))
-	scaler, err := kubectl.ScalerFor(extensionsinternal.Kind("Deployment"), internalClientset)
-	if err != nil {
-		return err
-	}
-	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
-	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
-		return fmt.Errorf("error while scaling Deployment %s to %d replicas: %v", name, size, err)
-	}
-	if !wait {
-		return nil
-	}
-	return WaitForDeploymentPodsRunning(clientset, ns, name)
-}
-
-func WaitForDeploymentPodsRunning(c clientset.Interface, ns, name string) error {
-	deployment, err := c.Extensions().Deployments(ns).Get(name)
-	if err != nil {
-		return err
-	}
-	selector := labels.SelectorFromSet(labels.Set(deployment.Spec.Selector.MatchLabels))
-	err = testutils.WaitForPodsWithLabelRunning(c, ns, selector)
-	if err != nil {
-		return fmt.Errorf("Error while waiting for Deployment %s pods to be running: %v", name, err)
-	}
-	return nil
+	return ScaleResource(clientset, internalClientset, ns, name, size, wait, extensionsinternal.Kind("Deployment"))
 }
 
 // Returns true if all the specified pods are scheduled, else returns false.

@@ -756,6 +756,6 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 	}
 	_, err := c.Core().ReplicationControllers(ns).Create(rc)
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(framework.WaitForRCPodsRunning(c, ns, name))
+	framework.ExpectNoError(framework.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
 	framework.Logf("Found pod '%s' running", name)
 }

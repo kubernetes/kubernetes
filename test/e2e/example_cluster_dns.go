@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
@@ -90,7 +91,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 
 		// wait for objects
 		for _, ns := range namespaces {
-			framework.WaitForRCPodsRunning(c, ns.Name, backendRcName)
+			framework.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
 			framework.WaitForService(c, ns.Name, backendSvcName, true, framework.Poll, framework.ServiceStartTimeout)
 		}
 		// it is not enough that pods are running because they may be set to running, but
