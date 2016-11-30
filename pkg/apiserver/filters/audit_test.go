@@ -74,10 +74,9 @@ func (*fakeHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func TestAudit(t *testing.T) {
 	var buf bytes.Buffer
 
-	attributeGetter := NewRequestAttributeGetter(&fakeRequestContextMapper{
+	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{
 		user: &user.DefaultInfo{Name: "admin"},
-	})
-	handler := WithAudit(&fakeHTTPHandler{}, attributeGetter, &buf)
+	}, &buf)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
