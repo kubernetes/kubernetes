@@ -131,7 +131,7 @@ function save-logs() {
       esac
     fi
 
-    if log-dump-ssh "${node_name}" "sudo systemctl status kubelet.service" &> /dev/null; then
+    if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" > "${dir}/kube-node-configuration.log" || true
         log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u kubelet.service" > "${dir}/kubelet.log" || true
