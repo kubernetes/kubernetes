@@ -213,7 +213,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		if len(newNodesSet) > 1 {
 			By(fmt.Sprintf("Spotted following new nodes in %s: %v", minMig, newNodesSet))
 			glog.Infof("Usually only 1 new node is expected, investigating")
-			glog.Infof("Kubectl:%s\n", framework.RunKubectlOrDie("kubectl get nodes -o yaml"))
+			glog.Infof("Kubectl:%s\n", framework.RunKubectlOrDie("get", "nodes", "-o", "json"))
 			if output, err := exec.Command("gcloud", "compute", "instances", "list",
 				"--project="+framework.TestContext.CloudConfig.ProjectID,
 				"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err != nil {
