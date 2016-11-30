@@ -981,16 +981,18 @@ run_save_config_tests() {
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
   [[ "$(kubectl get hpa.v1beta1.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
-  # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1 and autoscaling/v1 APIs
+  # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1, autoscaling/v1, and autoscaling/v2alpha1 APIs
   output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'autoscaling/v1'
+  kube::test::if_has_string "${output_message}" 'autoscaling/v2alpha1'
   output_message=$(kubectl get hpa.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get hpa.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'autoscaling/v2alpha1'
+  output_message=$(kubectl get hpa.v1.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'
   # tests kubectl group prefix matching
   output_message=$(kubectl get hpa.autoscal -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'autoscaling/v1'
+  kube::test::if_has_string "${output_message}" 'autoscaling/v2alpha1'
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the rc reaper.
   kubectl delete hpa frontend "${kube_flags[@]}"
@@ -1057,7 +1059,7 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/replicationcontrollers 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/services 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/apps/v1beta1/namespaces/default/statefulsets 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/autoscaling/v1/namespaces/default/horizontalpodautoscalers 200"
+  kube::test::if_has_string "${output_message}" "/apis/autoscaling/v2alpha1/namespaces/default/horizontalpodautoscalers 200"
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"

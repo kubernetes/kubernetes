@@ -11,6 +11,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "defaults.go",
         "doc.go",
         "generated.pb.go",
@@ -24,6 +25,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/ugorji/go/codec",
