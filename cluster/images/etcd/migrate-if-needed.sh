@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -100,7 +100,7 @@ fi
 # Returns 0 if etcd was successfully started, non-0 otherwise.
 start_etcd() {
   # Use random ports, so that apiserver cannot connect to etcd.
-  ETCD_PORT=18629
+  ETCD_PORT=2379
   ETCD_PEER_PORT=2380
   # Avoid collisions between etcd and event-etcd.
   case "${DATA_DIRECTORY}" in
@@ -120,6 +120,7 @@ start_etcd() {
   ${ETCD_CMD} \
     --name="etcd-$(hostname)" \
     --debug \
+    --force-new-cluster \
     --data-dir=${DATA_DIRECTORY} \
     --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
     --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
@@ -230,7 +231,7 @@ if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
   rm -rf "${ROLLBACK_BACKUP_DIR}"
   mkdir -p "${ROLLBACK_BACKUP_DIR}"
   cp -r "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
-  rm -rf "${DATA_DIRECTORY}"/member/snap/*.snap
+  #rm -rf "${DATA_DIRECTORY}"/member/snap/*.snap
   echo "Performing etcd3 -> etcd2 rollback"
   ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
   if [ "$?" -ne "0" ]; then
