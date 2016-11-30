@@ -30,10 +30,11 @@ Documentation for other releases can be found at [releases.K8s.io](http://releas
 We describe a proposal for retrieving component related configurations (componentconfigs and otherwise) that govern the behavior of any one of the Kubernetes (K8s) components.
 
 We propose several important changes:
+
 * adding new authenticated protected path to a component api:
     * `/configs`
     * Discussions to be held with SIG-Auth individuals about making such a path secured, but we will invoke that similar discussions around metrics have taken place.
-* helping complete the migration of flags to things thaht belong into componentconfigs
+* helping complete the migration of flags to things that belong into componentconfigs
 
 ## Background
 
@@ -47,7 +48,7 @@ By necessity Kubernetes is a stateful thing made up of components who have been 
 
 Components will have either a path indicated by annotations that can point to how to retrieve the configurations or through a well known component api path, as discussed below.
 
-### Component API changes
+### Component API Changes
 
 Components (like kubelet) have endpoints that can be altered to include an endpoint such as
 
@@ -57,11 +58,11 @@ Components (like kubelet) have endpoints that can be altered to include an endpo
 
 similar to /metrics endpoints for K8s components and likely to be authenticated in much the same way.
 
-By way of an HTTP GET the output would be:
+By way of an `HTTP GET` the output would be:
 
 ```
 {
-    "kind": "configurations-list",
+    "kind": "configuration-list",
     "metadata": {
         "component": "kubelet",
         "id": "818B908B-D053-CB11-BC8B-EEA826EBA090",
