@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -783,6 +784,20 @@ func (proxier *Proxier) execConntrackTool(parameters ...string) error {
 	return nil
 }
 
+type servicePortNameArray []proxy.ServicePortName
+
+func (a servicePortNameArray) Len() int {
+	return len(a)
+}
+
+func (a servicePortNameArray) Less(i, j int) bool {
+	return a[i].String() < a[j].String()
+}
+
+func (a servicePortNameArray) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // assumes proxier.mu is held
@@ -923,8 +938,16 @@ func (proxier *Proxier) syncProxyRules() {
 	// Accumulate the set of local ports that we will be holding open once this update is complete
 	replacementPortsMap := map[localPort]closeable{}
 
+	// Sort serviceMap keys to ensure consistent order of iptables rules
+	keys := make(servicePortNameArray, 0, len(proxier.serviceMap))
+	for k := range proxier.serviceMap {
+		keys = append(keys, k)
+	}
+	sort.Sort(keys)
+
 	// Build rules for each service.
-	for svcName, svcInfo := range proxier.serviceMap {
+	for _, svcName := range keys {
+		svcInfo := proxier.serviceMap[svcName]
 		protocol := strings.ToLower(string(svcInfo.protocol))
 
 		// Create the per-service chain, retaining counters if possible.
