@@ -262,7 +262,7 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		if !kubeerr.IsAlreadyExists(err) {
 			return nil, err
 		}
-		if errGet := e.Storage.Get(ctx, key, out, false); errGet != nil {
+		if errGet := e.Storage.Get(ctx, key, "", out, false); errGet != nil {
 			return nil, err
 		}
 		accessor, errGetAcc := meta.Accessor(out)
@@ -483,7 +483,8 @@ func (e *Store) Get(ctx api.Context, name string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
+	// TODO: Once we pass GetOptions to this method, pass the ResourceVersion from it.
+	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.QualifiedResource, name)
 	}
 	if e.Decorator != nil {
@@ -695,7 +696,7 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 	}
 
 	obj := e.NewFunc()
-	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
+	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
 		return nil, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 	// support older consumers of delete by treating "nil" as delete immediately

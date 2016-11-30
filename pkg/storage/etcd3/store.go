@@ -96,7 +96,7 @@ func (s *store) Versioner() storage.Versioner {
 }
 
 // Get implements storage.Interface.Get.
-func (s *store) Get(ctx context.Context, key string, out runtime.Object, ignoreNotFound bool) error {
+func (s *store) Get(ctx context.Context, key string, resourceVersion string, out runtime.Object, ignoreNotFound bool) error {
 	key = keyWithPrefix(s.pathPrefix, key)
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	if err != nil {

@@ -345,8 +345,48 @@ func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion stri
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error {
-	return c.storage.Get(ctx, key, objPtr, ignoreNotFound)
+func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error {
+	if resourceVersion == "" {
+		// If resourceVersion is not specified, serve it from underlying
+		// storage (for backward compatibility).
+		return c.storage.Get(ctx, key, resourceVersion, objPtr, ignoreNotFound)
+	}
+
+	// If resourceVersion is specified, serve it from cache.
+	// It's guaranteed that the returned value is at least that
+	// fresh as the given resourceVersion.
+	getRV, err := ParseListResourceVersion(resourceVersion)
+	if err != nil {
+		return err
+	}
+
+	// Do not create a trace - it's not for free and there are tons
+	// of Get requests. We can add it if it will be really needed.
+	c.ready.wait()
+
+	objVal, err := conversion.EnforcePtr(objPtr)
+	if err != nil {
+		return err
+	}
+
+	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(getRV, key, nil)
+	if err != nil {
+		return fmt.Errorf("failed to wait for fresh get: %v", err)
+	}
+
+	if exists {
+		elem, ok := obj.(*storeElement)
+		if !ok {
+			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
+		}
+		objVal.Set(reflect.ValueOf(elem.Object).Elem())
+	} else {
+		objVal.Set(reflect.Zero(objVal.Type()))
+		if !ignoreNotFound {
+			return NewKeyNotFoundError(key, int64(readResourceVersion))
+		}
+	}
+	return nil
 }
 
 // Implements storage.Interface.
@@ -384,7 +424,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
 	if err != nil {
-		return fmt.Errorf("failed to wait for fresh list: %v", err)
+		return fmt.Errorf("failed to wait for fresh get: %v", err)
 	}
 	trace.Step("Got from cache")
 
