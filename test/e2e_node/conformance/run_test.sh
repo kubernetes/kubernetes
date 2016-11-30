@@ -23,9 +23,6 @@
 # TODO(random-liu): Use standard installer to install kubelet.
 # TODO(random-liu): Use standard tool to start kubelet in production way (such
 # as systemd, supervisord etc.)
-# TODO(random-liu): Initialize kubelet with standard configmap after dynamic
-# configuration landing, so that all test could get the current kubelet
-# configuration and react accordingly.
 
 # Refresh sudo credentials if not running on GCE.
 if ! ping -c 1 -q metadata.google.internal &> /dev/null; then
@@ -42,6 +39,10 @@ FOCUS=${FOCUS:-""}
 # flaky and serial test.
 SKIP=${SKIP:-""}
 
+# TEST_ARGS is the test arguments. It could be used to override default test
+# arguments in the container.
+TEST_ARGS=${TEST_ARGS:-""}
+
 # REGISTRY is the image registry for node test image.
 REGISTRY=${REGISTRY:-"gcr.io/google_containers"}
 
@@ -50,7 +51,7 @@ REGISTRY=${REGISTRY:-"gcr.io/google_containers"}
 ARCH=${ARCH:-"amd64"}
 
 # VERSION is the version of the test container image.
-VERSION=${VERSION:-"0.1"}
+VERSION=${VERSION:-"0.2"}
 
 # KUBELET_BIN is the kubelet binary name. If it is not specified, use the
 # default binary name "kubelet".
@@ -95,7 +96,7 @@ wait_kubelet() {
       echo "Kubelet is ready"
       break
     fi
-    if [ $cur -eq $maxRetry]; then
+    if [ $cur -eq $maxRetry ]; then
       echo "Health check exceeds max retry"
       exit 1
     fi
@@ -119,17 +120,20 @@ kill_kubelet() {
 run_test() {
   env=""
   if [ ! -z "$FOCUS" ]; then
-    env="$env -e FOCUS=$FOCUS"
+    env="$env -e FOCUS=\"$FOCUS\""
   fi
   if [ ! -z "$SKIP" ]; then
-    env="$env -e SKIP=$SKIP"
+    env="$env -e SKIP=\"$SKIP\""
+  fi
+  if [ ! -z "$TEST_ARGS" ]; then
+    env="$env -e TEST_ARGS=\"$TEST_ARGS\""
   fi
   # The test assumes that inside the container:
-  # * kubelet manifest path is mounted to /etc/manifest;
+  # * kubelet manifest path is mounted to the same path;
   # * log collect directory is mounted to /var/result;
   # * root file system is mounted to /rootfs.
-  sudo docker run -it --rm --privileged=true --net=host  -v /:/rootfs \
-    -v $config_dir:/etc/manifest -v $LOG_DIR:/var/result $env $REGISTRY/node-test-$ARCH:$VERSION
+  sudo sh -c "docker run -it --rm --privileged=true --net=host -v /:/rootfs \
+    -v $config_dir:$config_dir -v $LOG_DIR:/var/result ${env} $REGISTRY/node-test-$ARCH:$VERSION"
 }
 
 # Check whether kubelet is running. If kubelet is running, tell the user to stop
