@@ -320,6 +320,9 @@ type KubeletConfiguration struct {
 	// requests - pull, logs, exec and attach.
 	// +optional
 	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout,omitempty"`
+	// imagePullingStuckTimeout is the stuck timeout for pulling image
+	// +optional
+	ImagePullingStuckTimeout unversioned.Duration `json:"imagePullingStuckTimeout,omitempty"`
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	// +optional

@@ -368,6 +368,8 @@ type KubeletConfiguration struct {
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout"`
+	// imagePullingStuckTimeout is the stuck timeout for pulling image
+	ImagePullingStuckTimeout unversioned.Duration `json:"imagePullingStuckTimeout,omitempty"`
 	// rktPath is the  path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath"`

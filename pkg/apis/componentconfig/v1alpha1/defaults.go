@@ -213,6 +213,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.RuntimeRequestTimeout == zeroDuration {
 		obj.RuntimeRequestTimeout = unversioned.Duration{Duration: 2 * time.Minute}
 	}
+	if obj.ImagePullingStuckTimeout == zeroDuration {
+		obj.ImagePullingStuckTimeout = unversioned.Duration{Duration: 1 * time.Minute}
+	}
 	if obj.CPUCFSQuota == nil {
 		obj.CPUCFSQuota = boolVar(true)
 	}
