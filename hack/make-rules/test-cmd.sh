@@ -1282,7 +1282,7 @@ __EOF__
 
   ## check --request-timeout value with invalid time unit
   output_message=$(! kubectl get pod valid-pod --request-timeout="1p" 2>&1)
-  kube::test::if_has_string "${output_message}" 'Invalid value for option'
+  kube::test::if_has_string "${output_message}" 'Invalid timeout value'
 
   # cleanup
   kubectl delete pods valid-pod "${kube_flags[@]}"
