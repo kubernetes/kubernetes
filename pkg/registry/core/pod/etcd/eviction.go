@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
+	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -83,7 +84,16 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 
 		// If it was false already, or if it becomes false during the course of our retries,
 		// raise an error marked as a 429.
-		ok, err := r.checkAndDecrement(pod.Namespace, pod.Name, pdb)
+		var ok bool
+		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			pdbs, e := r.getPodDisruptionBudgets(ctx, pod)
+			if e != nil {
+				return e
+			}
+			pdb = pdbs[0]
+			ok, e = r.checkAndDecrement(pod.Namespace, pod.Name, pdb)
+			return e
+		})
 		if err != nil {
 			return nil, err
 		}
