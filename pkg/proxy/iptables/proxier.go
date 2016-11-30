@@ -40,7 +40,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/features"
@@ -204,11 +203,9 @@ type Proxier struct {
 	// modified by Proxier.
 	// nil until we have seen an OnEndpointsUpdate event.
 	allEndpoints []*api.Endpoints
-	throttle     flowcontrol.RateLimiter
+	throttle     *syncThrottle
 
 	// These are effectively const and do not need the mutex to be held.
-	syncPeriod     time.Duration
-	minSyncPeriod  time.Duration
 	iptables       utiliptables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
@@ -317,21 +314,11 @@ func NewProxier(ipt utiliptables.Interface,
 	healthChecker := globalHealthChecker{}
 	go healthcheck.Run()
 
-	var throttle flowcontrol.RateLimiter
-	// Defaulting back to not limit sync rate when minSyncPeriod is 0.
-	if minSyncPeriod != 0 {
-		syncsPerSecond := float32(time.Second) / float32(minSyncPeriod)
-		// The average use case will process 2 updates in short succession
-		throttle = flowcontrol.NewTokenBucketRateLimiter(syncsPerSecond, 2)
-	}
-
 	return &Proxier{
 		serviceMap:     make(proxyServiceMap),
 		endpointsMap:   make(proxyEndpointMap),
 		portsMap:       make(map[localPort]closeable),
-		syncPeriod:     syncPeriod,
-		minSyncPeriod:  minSyncPeriod,
-		throttle:       throttle,
+		throttle:       newSyncThrottle(minSyncPeriod, syncPeriod),
 		iptables:       ipt,
 		masqueradeAll:  masqueradeAll,
 		masqueradeMark: masqueradeMark,
@@ -435,15 +422,16 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 func (proxier *Proxier) Sync() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
+	proxier.throttle.resetTimer()
 	proxier.syncProxyRules()
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
-	t := time.NewTicker(proxier.syncPeriod)
-	defer t.Stop()
+	proxier.throttle.resetTimer()
+	defer proxier.throttle.stopTimer()
 	for {
-		<-t.C
+		<-proxier.throttle.timer.C
 		glog.V(6).Infof("Periodic sync")
 		proxier.Sync()
 	}
@@ -762,12 +750,11 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 // The only other iptables rules are those that are setup in iptablesInit()
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
-	if proxier.throttle != nil {
-		proxier.throttle.Accept()
+	if !proxier.throttle.allowSync() {
+		return
 	}
-	start := time.Now()
 	defer func() {
-		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
+		glog.V(4).Infof("syncProxyRules took %v", proxier.throttle.timeElapsedSinceLastSync())
 	}()
 	// don't sync rules till we've received services and endpoints
 	if proxier.allEndpoints == nil || !proxier.haveReceivedServiceUpdate {
