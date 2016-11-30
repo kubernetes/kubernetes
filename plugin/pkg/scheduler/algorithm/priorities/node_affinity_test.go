@@ -32,62 +32,72 @@ func TestNodeAffinityPriority(t *testing.T) {
 	label4 := map[string]string{"abc": "az11", "def": "az22"}
 	label5 := map[string]string{"foo": "bar", "key": "value", "az": "az1"}
 
-	affinity1 := map[string]string{
-		v1.AffinityAnnotationKey: `
-		{"nodeAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [
-			{
-				"weight": 2,
-				"preference": {
-					"matchExpressions": [
-						{
-							"key": "foo",
-							"operator": "In", "values": ["bar"]
-						}
-					]
-				}
-			}
-		]}}`,
+	affinity1 := &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{{
+				Weight: 2,
+				Preference: v1.NodeSelectorTerm{
+					MatchExpressions: []v1.NodeSelectorRequirement{{
+						Key:      "foo",
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{"bar"},
+					}},
+				},
+			}},
+		},
 	}
 
-	affinity2 := map[string]string{
-		v1.AffinityAnnotationKey: `
-		{"nodeAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [
-			{
-				"weight": 2,
-				"preference": {"matchExpressions": [
-					{
-						"key": "foo",
-						"operator": "In", "values": ["bar"]
-					}
-				]}
-			},
-			{
-				"weight": 4,
-				"preference": {"matchExpressions": [
-					{
-						"key": "key",
-						"operator": "In", "values": ["value"]
-					}
-				]}
-			},
-			{
-				"weight": 5,
-				"preference": {"matchExpressions": [
-					{
-						"key": "foo",
-						"operator": "In", "values": ["bar"]
+	affinity2 := &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
+				{
+					Weight: 2,
+					Preference: v1.NodeSelectorTerm{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
 					},
-					{
-						"key": "key",
-						"operator": "In", "values": ["value"]
+				},
+				{
+					Weight: 4,
+					Preference: v1.NodeSelectorTerm{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "key",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"value"},
+							},
+						},
 					},
-					{
-						"key": "az",
-						"operator": "In", "values": ["az1"]
-					}
-				]}
-			}
-		]}}`,
+				},
+				{
+					Weight: 5,
+					Preference: v1.NodeSelectorTerm{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+							{
+								Key:      "key",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"value"},
+							},
+							{
+								Key:      "az",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"az1"},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	tests := []struct {
@@ -112,8 +122,8 @@ func TestNodeAffinityPriority(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: affinity1,
+				Spec: v1.PodSpec{
+					Affinity: affinity1,
 				},
 			},
 			nodes: []*v1.Node{
@@ -126,8 +136,8 @@ func TestNodeAffinityPriority(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: affinity1,
+				Spec: v1.PodSpec{
+					Affinity: affinity1,
 				},
 			},
 			nodes: []*v1.Node{
@@ -140,8 +150,8 @@ func TestNodeAffinityPriority(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: affinity2,
+				Spec: v1.PodSpec{
+					Affinity: affinity2,
 				},
 			},
 			nodes: []*v1.Node{
