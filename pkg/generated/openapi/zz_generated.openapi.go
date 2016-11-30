@@ -9767,7 +9767,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"unschedulable": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"",
+							Description: "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
