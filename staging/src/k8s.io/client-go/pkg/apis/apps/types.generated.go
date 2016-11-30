@@ -1547,7 +1547,7 @@ func (x codecSelfer1234) decSliceStatefulSet(v *[]StatefulSet, d *codec1978.Deco
 
 			yyrg127 := len(yyv127) > 0
 			yyv2127 := yyv127
-			yyrl127, yyrt127 = z.DecInferLen(yyl127, z.DecBasicHandle().MaxInitLen, 776)
+			yyrl127, yyrt127 = z.DecInferLen(yyl127, z.DecBasicHandle().MaxInitLen, 784)
 			if yyrt127 {
 				if yyrl127 <= cap(yyv127) {
 					yyv127 = yyv127[:yyrl127]
