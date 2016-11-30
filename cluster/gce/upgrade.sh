@@ -33,7 +33,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 function usage() {
   echo "!!! EXPERIMENTAL !!!"
   echo ""
-  echo "${0} [-M|-N|-P] -l -o | <version number or publication>"
+  echo "${0} [-M|-N|-P|-o] -l | <version number or publication>"
   echo "  Upgrades master and nodes by default"
   echo "  -M:  Upgrade master only"
   echo "  -N:  Upgrade nodes only"
@@ -357,6 +357,12 @@ while getopts ":MNPlho" opt; do
   esac
 done
 shift $((OPTIND-1))
+
+if [[ $# -gt 1 ]]; then
+  echo "Error: Only one parameter (<version number or publication>) may be passed after the set of flags!" >&2
+  usage
+  exit 1
+fi
 
 if [[ $# -lt 1 ]] && [[ "${local_binaries}" == "false" ]]; then
   usage
