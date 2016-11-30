@@ -2660,6 +2660,15 @@ func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 		}
 		out.Hostname = in.Hostname
 		out.Subdomain = in.Subdomain
+		if in.Affinity != nil {
+			in, out := &in.Affinity, &out.Affinity
+			*out = new(Affinity)
+			if err := DeepCopy_v1_Affinity(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.Affinity = nil
+		}
 		return nil
 	}
 }
