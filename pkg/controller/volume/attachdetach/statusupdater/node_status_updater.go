@@ -59,6 +59,8 @@ type nodeStatusUpdater struct {
 }
 
 func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
+	// TODO: investigate right behavior if nodeName is empty
+	// kubernetes/kubernetes/issues/37777
 	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached()
 	for nodeName, attachedVolumes := range nodesToUpdate {
 		nodeObj, exists, err := nsu.nodeInformer.GetStore().GetByKey(string(nodeName))
