@@ -125,6 +125,17 @@ func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) 
 	return pm.GetMetadata(p, nodeInfo)
 }
 
+func TestErrorMessageForMissingNode(t *testing.T) {
+	pod := &v1.Pod{}
+	// no node information
+	nodeInfo := &schedulercache.NodeInfo{}
+	detailedNodeMessage := "node not found: &NodeInfo{"
+	_, _, errMsg := PodFitsResources(pod, PredicateMetadata(pod, nil), nodeInfo)
+	if !strings.Contains(fmt.Sprintf("%v", errMsg), detailedNodeMessage) {
+		t.Errorf("Didnt see '%v' inside of the error message '%v' ", detailedNodeMessage, errMsg)
+	}
+}
+
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
 		pod      *v1.Pod
