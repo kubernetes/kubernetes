@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiluuid "k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -62,6 +63,8 @@ type DensityTestConfig struct {
 	InternalClientset internalclientset.Interface
 	PollInterval      time.Duration
 	PodCount          int
+	// What kind of resource we want to create
+	kind schema.GroupKind
 }
 
 func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceConstraint {
@@ -194,13 +197,13 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 	wg := sync.WaitGroup{}
 	wg.Add(len(dtc.Configs))
 	for i := range dtc.Configs {
-		rcConfig := dtc.Configs[i]
+		config := dtc.Configs[i]
 		go func() {
 			defer GinkgoRecover()
 			// Call wg.Done() in defer to avoid blocking whole test
 			// in case of error from RunRC.
 			defer wg.Done()
-			framework.ExpectNoError(rcConfig.Run())
+			framework.ExpectNoError(config.Run())
 		}()
 	}
 	logStopCh := make(chan struct{})
@@ -237,21 +240,21 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 
 func cleanupDensityTest(dtc DensityTestConfig) {
 	defer GinkgoRecover()
-	By("Deleting ReplicationController")
+	By("Deleting created Collections")
 	// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
 	for i := range dtc.Configs {
-		rcName := dtc.Configs[i].GetName()
-		rc, err := dtc.ClientSet.Core().ReplicationControllers(dtc.Configs[i].GetNamespace()).Get(rcName)
-		if err == nil && *(rc.Spec.Replicas) != 0 {
-			if framework.TestContext.GarbageCollectorEnabled {
-				By("Cleaning up only the replication controller, garbage collector will clean up the pods")
-				err := framework.DeleteRCAndWaitForGC(dtc.ClientSet, dtc.Configs[i].GetNamespace(), rcName)
-				framework.ExpectNoError(err)
-			} else {
-				By("Cleaning up the replication controller and pods")
-				err := framework.DeleteRCAndPods(dtc.ClientSet, dtc.InternalClientset, dtc.Configs[i].GetNamespace(), rcName)
-				framework.ExpectNoError(err)
-			}
+		name := dtc.Configs[i].GetName()
+		namespace := dtc.Configs[i].GetNamespace()
+		kind := dtc.Configs[i].GetKind()
+		// TODO: Remove Deployment guard once GC is implemented for Deployments.
+		if framework.TestContext.GarbageCollectorEnabled && kind != extensions.Kind("Deployment") {
+			By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
+			err := framework.DeleteResourceAndWaitForGC(dtc.ClientSet, kind, namespace, name)
+			framework.ExpectNoError(err)
+		} else {
+			By(fmt.Sprintf("Cleaning up the %v and pods", kind))
+			err := framework.DeleteResourceAndPods(dtc.ClientSet, dtc.InternalClientset, kind, dtc.Configs[i].GetNamespace(), name)
+			framework.ExpectNoError(err)
 		}
 	}
 }
@@ -353,6 +356,8 @@ var _ = framework.KubeDescribe("Density", func() {
 		podsPerNode    int
 		// Controls how often the apiserver is polled for pods
 		interval time.Duration
+		// What kind of resource we should be creating. Default: ReplicationController
+		kind schema.GroupKind
 	}
 
 	densityTests := []Density{
@@ -362,18 +367,29 @@ var _ = framework.KubeDescribe("Density", func() {
 		{podsPerNode: 50, runLatencyTest: false},
 		{podsPerNode: 95, runLatencyTest: true},
 		{podsPerNode: 100, runLatencyTest: false},
+		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("ReplicaSet")},
 	}
 
 	for _, testArg := range densityTests {
 		feature := "ManualPerformance"
+		if testArg.kind.Empty() {
+			testArg.kind = api.Kind("ReplicationController")
+		}
+		if testArg.kind != extensions.Kind("Deployment") && testArg.kind != extensions.Kind("ReplicaSet") && testArg.kind != api.Kind("ReplicationController") {
+			framework.Failf("Unknown resource type: %v", testArg.kind)
+		}
+
 		switch testArg.podsPerNode {
 		case 30:
-			feature = "Performance"
+			if testArg.kind == api.Kind("ReplicationController") {
+				feature = "Performance"
+			}
 		case 95:
 			feature = "HighDensityPerformance"
 		}
 
-		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node", feature, testArg.podsPerNode)
+		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v", feature, testArg.podsPerNode, testArg.kind)
 		itArg := testArg
 		It(name, func() {
 			nodePreparer := framework.NewE2ETestNodePreparer(
@@ -407,7 +423,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			for i := 0; i < numberOfCollections; i++ {
 				name := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				nsName := namespaces[i].Name
-				configs[i] = &testutils.RCConfig{
+				baseConfig := &testutils.RCConfig{
 					Client:               clients[i],
 					InternalClient:       internalClients[i],
 					Image:                framework.GetPauseImageName(f.ClientSet),
@@ -423,6 +439,17 @@ var _ = framework.KubeDescribe("Density", func() {
 					MaxContainerFailures: &MaxContainerFailures,
 					Silent:               true,
 				}
+				switch itArg.kind {
+				case api.Kind("ReplicationController"):
+					configs[i] = baseConfig
+				case extensions.Kind("ReplicaSet"):
+					framework.Logf("Creating ReplicaSet")
+					configs[i] = &testutils.ReplicaSetConfig{RCConfig: *baseConfig}
+				case extensions.Kind("Deployment"):
+					configs[i] = &testutils.DeploymentConfig{RCConfig: *baseConfig}
+				default:
+					framework.Failf("Unsupported kind: %v", itArg.kind)
+				}
 			}
 
 			dConfig := DensityTestConfig{
@@ -431,6 +458,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				Configs:           configs,
 				PodCount:          totalPods,
 				PollInterval:      DensityPollInterval,
+				kind:              itArg.kind,
 			}
 			e2eStartupTime = runDensityTest(dConfig)
 			if itArg.runLatencyTest {
