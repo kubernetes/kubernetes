@@ -39,10 +39,30 @@ type KeystoneAuthenticator struct {
 
 // AuthenticatePassword checks the username, password via keystone call
 func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(username string, password string) (user.Info, bool, error) {
-	opts := gophercloud.AuthOptions{
+	urlSplits := strings.Split(keystoneAuthenticator.authURL, "/")
+	var opts gophercloud.AuthOptions
+	opts = gophercloud.AuthOptions{
 		IdentityEndpoint: keystoneAuthenticator.authURL,
 		Username:         username,
 		Password:         password,
+	}
+	if urlSplits[len(urlSplits)-1] == "v3" {
+		// username has a format of name@domain.
+		userAndDomain := strings.Split(username, "@")
+		var uname, dname string
+		if len(userAndDomain) == 1 {
+			uname = username
+			dname = "default"
+		} else {
+			uname = userAndDomain[0]
+			dname = userAndDomain[1]
+		}
+		opts = gophercloud.AuthOptions{
+			IdentityEndpoint: keystoneAuthenticator.authURL,
+			Username:         uname,
+			Password:         password,
+			DomainName:       dname,
+		}
 	}
 
 	_, err := keystoneAuthenticator.AuthenticatedClient(opts)
