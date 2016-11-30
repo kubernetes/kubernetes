@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	"time"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -494,6 +495,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	return &Proxier{
 		exec:                        &exec.FakeExec{},
 		serviceMap:                  make(map[proxy.ServicePortName]*serviceInfo),
+		throttle:                    newSyncThrottle(0, time.Second*10),
 		iptables:                    ipt,
 		endpointsMap:                make(map[proxy.ServicePortName][]*endpointsInfo),
 		clusterCIDR:                 "10.0.0.0/24",

@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["proxier.go"],
+    srcs = [
+        "proxier.go",
+        "syncthrottle.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -35,7 +38,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["proxier_test.go"],
+    srcs = [
+        "proxier_test.go",
+        "synchthrottle_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
