@@ -517,8 +517,36 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			minReplicas := int32(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
-			targetCpu := int32(c.RandUint64())
-			s.TargetCPUUtilizationPercentage = &targetCpu
+
+			// NB: since this is used for round-tripping, we can only fuzz
+			// fields that round-trip successfully, so only the resource source
+			// type is usable here
+			targetUtilization := int32(c.RandUint64())
+			s.Metrics = []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						TargetAverageUtilization: &targetUtilization,
+					},
+				},
+			}
+		},
+		func(s *autoscaling.HorizontalPodAutoscalerStatus, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			// NB: since this is used for round-tripping, we can only fuzz
+			// fields that round-trip successfully, so only the resource status
+			// type is usable here
+			currentUtilization := int32(c.RandUint64())
+			s.CurrentMetrics = []autoscaling.MetricStatus{
+				{
+					Type: autoscaling.ResourceSourceType,
+					Resource: &autoscaling.ResourceMetricStatus{
+						Name: api.ResourceCPU,
+						CurrentAverageUtilization: &currentUtilization,
+					},
+				},
+			}
 		},
 		func(psp *extensions.PodSecurityPolicySpec, c fuzz.Continue) {
 			c.FuzzNoCustom(psp) // fuzz self without calling this function again
