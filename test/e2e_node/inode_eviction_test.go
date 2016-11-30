@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 			},
 		},
 	}
-	evictionTestTimeout := 10 * time.Minute
+	evictionTestTimeout := 30 * time.Minute
 	testCondition := "Disk Pressure due to Inodes"
 
 	runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasInodePressure)
