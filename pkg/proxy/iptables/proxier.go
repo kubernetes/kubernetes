@@ -169,6 +169,8 @@ type Proxier struct {
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
 	throttle                    flowcontrol.RateLimiter
+	timer                       *time.Timer
+	lastSync                    time.Time
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod     time.Duration
@@ -408,14 +410,16 @@ func (proxier *Proxier) Sync() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	proxier.syncProxyRules()
+	proxier.timer.Stop()
+	proxier.timer.Reset(proxier.syncPeriod)
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
-	t := time.NewTicker(proxier.syncPeriod)
-	defer t.Stop()
+	proxier.timer = time.NewTimer(proxier.syncPeriod)
+	defer proxier.timer.Stop()
 	for {
-		<-t.C
+		<-proxier.timer.C
 		glog.V(6).Infof("Periodic sync")
 		proxier.Sync()
 	}
@@ -788,11 +792,25 @@ func (proxier *Proxier) execConntrackTool(parameters ...string) error {
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
 	if proxier.throttle != nil {
-		proxier.throttle.Accept()
+		// NOTE: using non-blocking TryAccept.
+		// All other updates should update the datastructure
+		// and do the appropriate thing to batch when we are not syncing.
+		// Lastly, the sync timer will be set to ensure we catch the last update.
+		if proxier.throttle.TryAccept() == false {
+			duration := time.Since(proxier.lastSync)
+			if duration < proxier.minSyncPeriod {
+				glog.V(4).Infof("Attempting to sych too often.  Duration: %v, min period: %v", duration, proxier.minSyncPeriod)
+				proxier.timer.Reset(proxier.minSyncPeriod - duration)
+				return
+			} else {
+				// This should not occur but extra checking never hurts.
+				glog.V(2).Infof("Ignoring throttle duration: %v expired", duration)
+			}
+		}
 	}
-	start := time.Now()
+	proxier.lastSync = time.Now()
 	defer func() {
-		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
+		glog.V(4).Infof("syncProxyRules took %v", time.Since(proxier.lastSync))
 	}()
 	// don't sync rules till we've received services and endpoints
 	if !proxier.haveReceivedEndpointsUpdate || !proxier.haveReceivedServiceUpdate {
