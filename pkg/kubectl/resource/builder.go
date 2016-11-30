@@ -804,18 +804,35 @@ func HasNames(args []string) (bool, error) {
 	return hasCombinedTypes || len(args) > 1, nil
 }
 
-// HasMultipleTypes returns true if the provided args contain resource names
+// HasMultipleTypes returns true if the provided args contain multiple resource kinds
 func HasMultipleTypes(args []string) bool {
-	typesList := args[0]
+	args = normalizeMultipleResourcesArgs(args)
+	rKinds := sets.NewString()
 	for _, arg := range args {
 		if arg == "all" {
 			return true
 		}
-		if strings.ContainsAny(arg, ",") {
-			typesList = arg
-			break
+		rTuple, found, err := splitResourceTypeName(arg)
+		if err != nil {
+			continue
 		}
+
+		// if tuple not found, assume arg is of the form "type1,type2,...".
+		// Since SplitResourceArgument returns a unique list of kinds,
+		// return true here if len(uniqueList) > 1
+		if !found {
+			if strings.Contains(arg, ",") {
+				splitArgs := SplitResourceArgument(arg)
+				if len(splitArgs) > 1 {
+					return true
+				}
+			}
+			continue
+		}
+		if rKinds.Has(rTuple.Resource) {
+			continue
+		}
+		rKinds.Insert(rTuple.Resource)
 	}
-	resTypes := strings.Split(typesList, ",")
-	return (len(resTypes) > 1)
+	return (rKinds.Len() > 1)
 }

@@ -153,7 +153,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	printAll := resource.HasMultipleTypes(args)
+	mixedResourceKinds := resource.HasMultipleTypes(args)
 	filterFuncs := f.DefaultResourceFilterFunc()
 	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
 
@@ -415,7 +415,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	w := kubectl.GetNewTabWriter(out)
 	filteredResourceCount := 0
 
-	if cmdutil.MustPrintWithKinds(objs, infos, sorter, printAll) {
+	if mixedResourceKinds || cmdutil.MustPrintWithKinds(objs, infos, sorter) {
 		showKind = true
 	}
 
