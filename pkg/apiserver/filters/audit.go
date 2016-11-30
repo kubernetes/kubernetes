@@ -18,6 +18,7 @@ package filters
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -28,6 +29,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
+	"k8s.io/kubernetes/pkg/api"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
@@ -86,12 +88,17 @@ var _ http.Hijacker = &fancyResponseWriterDelegator{}
 // 2. the response line containing:
 //    - the unique id from 1
 //    - response code
-func WithAudit(handler http.Handler, attributeGetter RequestAttributeGetter, out io.Writer) http.Handler {
+func WithAudit(handler http.Handler, requestContextMapper api.RequestContextMapper, out io.Writer) http.Handler {
 	if out == nil {
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		attribs, err := attributeGetter.GetAttribs(req)
+		ctx, ok := requestContextMapper.Get(req)
+		if !ok {
+			internalError(w, req, errors.New("no context found for request"))
+			return
+		}
+		attribs, err := GetAuthorizerAttributes(ctx)
 		if err != nil {
 			internalError(w, req, err)
 			return
