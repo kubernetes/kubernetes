@@ -349,9 +349,9 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 
 	if err != nil {
 		// Timeout expired
-		ummountedVolumes :=
+		unmountedVolumes :=
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
-		if len(ummountedVolumes) == 0 {
+		if len(unmountedVolumes) == 0 {
 			return nil
 		}
 
@@ -359,7 +359,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			"timeout expired waiting for volumes to attach/mount for pod %q/%q. list of unattached/unmounted volumes=%v",
 			pod.Name,
 			pod.Namespace,
-			ummountedVolumes)
+			unmountedVolumes)
 	}
 
 	glog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
