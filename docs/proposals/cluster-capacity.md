@@ -27,7 +27,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# DRAFT: Cluster capacity analysis
+# Cluster capacity analysis
 
 @ingvagabund
 
@@ -43,14 +43,14 @@ Or, carry different steps that lead to increase of available resources.
 Cluster capacity consists of capacities of individual cluster nodes.
 Capacity covers cpu, memory, disk space and other resources.
 
-Goal is to analyse remaining allocatable resources and estimate available capacity that is still consumable.
+Goal is to analyze remaining allocatable resources and estimate available capacity that is still consumable.
 
 ## Motivation and use cases
 
 Scheduler decides on which node a pod gets scheduled.
 The decision depends on many factors such as available cpu, memory, disk, volumes, etc.
-As long as enough resources is available, pods are scheduled.
-On the other hand, when a pod can not be scheduled due to insufficient resources,
+As long as enough resources are available, pods are scheduled.
+On the other hand, when a pod cannot be scheduled due to insufficient resources,
 admin is usually made aware too late.
 With knowledge of the current cluster capacity admin can be warned in advance.
 Which can result in addition of new nodes (horizontal scaling) or increase of resources of existing nodes (vertical scaling) before any pod becomes pending.
@@ -158,9 +158,9 @@ Still, the autoscaling is another indicator of insufficient resources which can 
 
 Assuming the following:
 
-* predicting remaining cluster capacity on pod bases (e.g. "How many pods of a given shape I can schedule")
+* estimating remaining cluster capacity on pod bases (e.g. "How many pods of a given shape I can schedule")
 * seeing the scheduling algorithms as blackboxes, using the same configuration
-* prediction must not change the state of the cluster
+* analysis must not change the state of the cluster
 * provide general framework usable for any scheduling algorithm
 
 Scheduling process uses two sets of functions: predicates and priority functions.
@@ -170,29 +170,35 @@ Both predicates and priority functions may need to query the current state of th
 Queries can include node's free cpu and memory, volume claims, annotations, etc.
 Once a pod gets scheduled on a node, it can change its free resources and change the decision basis of the next scheduling iteration.
 
-Thus, when designing the predictor, one has to take into account the current cluster state and compute its next without changing the current one.
+Thus, when running the analysis, one has to take into account the current cluster state and compute its next state without changing the current one.
 I.e. simulate the pod scheduling and binding. The simulation consists of (not exclusively in this order):
 
-* estimation of the current cluster state (node info, available volume claims, etc.)
+* calculation of the current cluster state (node info, available volume claims, etc.)
 * execution of one scheduling iteration
 * update of scheduler caches based on scheduled pod
 
 Some consumed resources do not have to be specified in the pod (e.g. volume claims).
 These kind of consumed resources must be simulated accordingly.
 
-Once the current state is captured, prediction is no longer dependent on the cluster state.
+Once the current state is captured, analysis is no longer dependent on the cluster state.
 Thus, the estimation does not have to correspond to the real scheduling since:
 
 * some nodes can be deleted, some nodes can be evacuated, some nodes can be re-labeled/re-annotated
 * some pods can get evicted in the time of analysis
 * remaining capacity of nodes can increase/decrease
 
-Scheduler does not have to be aware of all node constraints.
-For instance, Kubelet admission controller can have more knowledge not reported in node status.
+Scheduler does not have to be aware of all system constraints.
+Admission controller has additional knowledge not available to the Scheduler that can change the pod requirements (or reject it).
+For instance, [resource quota](http://kubernetes.io/docs/admin/resourcequota/) admission can influence a number of pods that can be scheduled [per namespace](http://kubernetes.io/docs/admin/resourcequota/#object-count-quota).
+Or limit the maximal consumption of memory across all pods.
+Though, this limitation is artificial and independent of limitation of the underlying system (e.g. amount of cores or memory of each node,
+maximal number of GCE persistent disks per cloud), it needs to be taken into account when estimating remaining allocatable namespace scoped resources.
+
+Example: In a cluster with a capacity of 32 GiB RAM, and 16 cores, let team A use 20 Gib and 10 cores, let B use 10GiB and 4 cores, and hold 2GiB and 2 cores in reserve for future allocation.
 
 ### Future aspects to consider
 
-One could take into account [shared resources](http://kubernetes.io/docs/user-guide/compute-resources/#planned-improvements) when predicting free capacity (with fragmentation) as well.
+One could take into account [shared resources](http://kubernetes.io/docs/user-guide/compute-resources/#planned-improvements) when estimating free capacity (with fragmentation) as well.
 Currently, limit and requests are supported for cpu and memory resource types only.
 In future, the types can be extended to node disk space resources and custom [resource types](../../docs/design/resources.md#resource-types).
 
@@ -203,14 +209,6 @@ Or consider compressible vs. incompressible resources.
 
 Allow cluster resources to be subdivided (https://github.com/kubernetes/kubernetes/issues/442).
 
-#### Resource quota
-
-[Resource quota](http://kubernetes.io/docs/admin/resourcequota/) can influence number of pods that can be scheduled [per namespace](http://kubernetes.io/docs/admin/resourcequota/#object-count-quota) as well.
-Though, this limitation is artificial and independent of limitation of the underlying system (e.g. amount of cores or memory of each node,
-maximal number of GCE persistent disks per cloud), it can be taken into account in future implementations.
-
-Example: In a cluster with a capacity of 32 GiB RAM, and 16 cores, let team A use 20 Gib and 10 cores, let B use 10GiB and 4 cores, and hold 2GiB and 2 cores in reserve for future allocation.
-
 #### Federated scheduling
 
 Out of scope of the document.
@@ -219,23 +217,22 @@ Can be implemented as an aggregation of cluster capacities of individual sub-clu
 #### Multiple schedulers
 
 Different workloads may require different schedulers.
-For that reason, Kubernetes allows to specify [multiple schedulers](https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/multiple-schedulers.md) and annotate each pod with one of the schedulers.
+For that reason, Kubernetes allows to specify [multiple schedulers](multiple-schedulers.md) and annotate each pod with one of the schedulers.
 
 #### Scheduler extensions
 
-Scheduler can extend its predicates/priority functions by delegating to [external processes](https://github.com/kubernetes/kubernetes/blob/master/docs/design/scheduler_extender.md).
+Scheduler can extend its predicates/priority functions by delegating to [external processes](../../docs/design/scheduler_extender.md).
 As the extensions are part of a scheduling algorithm, there is no need to consider them.
 
 ## Implementation
 
 Goals:
 
-* Build the implementation over the existing code.
-* Run the final implementation as a self-standing application in a pod (under `kube-system` namespace).
-* Provide REST-API to query questions like "approximately how many more pods could i schedule with this shape?"
-* Integrate the cluster capacity into ``kubectl`` (e.g. ``kubectl cluster-capacity``)
+* Build the implementation over the existing code
+* Run the final implementation as a self-standing application in a pod
+* Provide REST-API to query questions such as "approximately how many more instances of a pod I can still schedule?"
 
-### Code analysis
+### Code analysis of the default scheduler
 
 Currently, each iteration of the default scheduler implementation consists of the following [steps](../../plugin/pkg/scheduler/scheduler.go#L93):
 
@@ -277,98 +274,46 @@ Once the scheduler decides what node to schedule a pod on, the pod is bind to th
 Once the pod is scheduled on a node, the Kubelet runs the pod and updates node info that is periodically sent to the Apiserver.
 The node info is then reflected in the scheduler cache and the process is repeated.
 
-### Prediction
+### Cluster capacity analysis framework
 
-As all the caches are outside of any scheduling algorithm, the prediction is scheduling algorithm independent.
-Thus, based on the configuration, administrator can use various algorithms while keeping the same predictive framework.
+As all the caches are outside of any scheduling algorithm, the analysis is scheduling algorithm independent.
+Thus, based on the configuration, administrator can use various algorithms while keeping the same framework.
 The only requirements for any scheduling algorithm is to implement ``ScheduleAlgorithm`` [interface](../../plugin/pkg/scheduler/algorithm/scheduler_interface.go).
 
 As all the caches are populated via reflectors and informers, the current state can be captured the same way as is done in the scheduler factory.
-Once populated, all reflectors and informers are stopped since the predication is done independently of the cluster state.
+Once populated, all reflectors and informers are stopped since the analysis is done independently of the cluster state.
 
-At this point the prediction starts:
+At this point the analysis starts:
 
 1. schedule a pod (with provided scheduling algorithm)
-1. simulate deployment of the pod through the Kubelet (i.e. compute all resources consumed by the pod, including volume claims, etc.)
-1. recompute status of the cluster stored in caches
-1. update caches
+1. simulate deployment of the pod through the Apiserver and the Kubelet
+1. recompute status of the cluster stored in the local caches
 
-#### Scheduler
+#### Scheduler interactions
 
-For purposes of the prediction we need light-weighted version of the [scheduler](../../plugin/pkg/scheduler/scheduler.go).
-No need for metrics, event recorder or pod updater.
-The binding can hide the actual computation of consumed resources.
+Assuming every scheduler is created by the default scheduler factory, the scheduler interaction consists of:
 
-```Go
-type Scheduler struct {
-	config *Config
-}
+* invocation of ``Bind`` method from ``Binder`` [interface](https://github.com/kubernetes/kubernetes/blob/09bb156116aed4542d66d51b052e1a7357ea57e8/plugin/pkg/scheduler/scheduler.go#L33)
+* invocation of ``Update`` method from ``PodConditionUpdater`` [interface](https://github.com/kubernetes/kubernetes/blob/09bb156116aed4542d66d51b052e1a7357ea57e8/plugin/pkg/scheduler/scheduler.go#L37)
+* invocation of methods from ``EventRecorder`` [interface](https://github.com/kubernetes/kubernetes/blob/09bb156116aed4542d66d51b052e1a7357ea57e8/pkg/client/record/event.go#L55)
+* metrics transmitting
+* requests sent (received) to (from) Apiserver through REST Client [interface](https://github.com/kubernetes/kubernetes/blob/09bb156116aed4542d66d51b052e1a7357ea57e8/pkg/client/restclient/client.go#L43)
 
-type Config struct {
-	// It is expected that changes made via SchedulerCache will be observed
-	// by NodeLister and Algorithm.
-	SchedulerCache schedulercache.Cache
-	NodeLister     algorithm.NodeLister
-	Algorithm      algorithm.ScheduleAlgorithm
-	Binder         Binder
+The ``Binder`` is used to publish selected node to Apiserver.
+The ``PodConditionUpdater`` is used to update condition in pod's status (e.g. in case of an scheduling error).
+The ``EventRecorder`` is used to publish an error during scheduling (e.g. binding failed, no node suitable for a pod, etc.).
+The metrics are currently out of scope of the framework.
+The REST Client is the core component responsible for communication between Scheduler and Apiserver.
+All data send to ``Binder``, ``PodConditionUpdater`` and ``EventRecorder`` are translated into REST requests.
 
-	// NextPod always returns a pod, never blocking as the pod is taken
-	// from a predefined sequence of pods that is repeated forever
-	NextPod func() *api.Pod
-}
+Thus, to carry the analysis, the communication needs to be intercepted and all the requests need to be translated into data operations (over local caches) and framework operations.
+The ``Binder`` corresponds to successfull scheduling and is translated into local caches operation (pod addition).
+Based on the ``PodConditionUpdater`` condition, the update request can correspond to a scheduling error which causes termination of the analysis.
+The ``EventRecorder`` provides a reason of scheduling error (e.g. insufficient resources, node selector mismatch, etc.).
+Among other things, the REST Client is used to capture current nodes, pods, volumes, services and other objects in the cluster.
+The create a closed computation, all the objects a scheduler needs are collected from the local caches instead of from the Apiserver.
 
-// New returns a new scheduler.
-func New(c *Config) *Scheduler {
-	s := &Scheduler{
-		config: c,
-	}
-	return s
-}
-
-// Run begins watching and scheduling. It starts a goroutine and returns immediately.
-func (s *Scheduler) Run() int {
-	pods_scheduled := 0
-
-	while(s.scheduleOne()) {
-		pods_scheduled++
-	}
-
-	return pods_scheduled
-}
-
-func (s *Scheduler) scheduleOne() bool {
-	pod := s.config.NextPod()
-
-	glog.V(3).Infof("Attempting to predict pod scheduling: %v/%v", pod.Namespace, pod.Name)
-	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister)
-	if err != nil {
-		glog.V(1).Infof("Failed to schedule pod: %v/%v, due to: %q", pod.Namespace, pod.Name, err)
-		return false
-	}
-
-	b := &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
-		Target: api.ObjectReference{
-			Kind: "Node",
-			Name: dest,
-		},
-	}
-
-	// Binding consists of recomputation of cached resources and objects
-	err := s.config.Binder.Bind(b)
-	if err != nil {
-		glog.V(1).Infof("Failed to simulated pod binding: %v/%v, due to %q", pod.Namespace, pod.Name, err)
-		return false
-	}
-
-	return true
-}
-```
-
-It is possible to use the same scheduler and use empty event recorder and metrics.
-[Pod updater](../../plugin/pkg/scheduler/factory/factory.go#L593) delegates requests to client.
-
-#### Binding and local client
+#### Binding and local REST client in detail
 
 When a pod is scheduled, scheduler's caches are populated with the current state of the cluster.
 The population is done through client querying the Apiserver.
@@ -378,21 +323,19 @@ Kubelet reflects the new pod and reports the state back to the Apiserver.
 As scheduler's caches are continuously updated (through functions implementing ``Watch`` and ``List`` interface),
 node statuses (consumed resources, volume claims, etc.) are updated and the process starts over.
 
-As the prediction works with the caches captured before prediction,
+As the framework works with the caches captured before analysis,
 there is no communication with the Apiserver nor with the Kubelet.
 Thus, the client implementing the same API has to be introduced.
 Aim of the client is to provide:
 
-* lister and watcher for each affected object so the caches can be continuously updated the same way
-* recomputation of the cluster state simulating the Kubelet's behaviour (e.g. increasing node's cpu or memory)
+* lister and watcher for each affected object so the caches can be continuously updated identically
+* recomputation of the cluster state simulating the Kubelet's behaviour
 
 At the same time, all operations are carried over local caches (different from the scheduler ones).
 The binding process delegates pod to [client](../../plugin/pkg/scheduler/factory/factory.go#L336).
 Thus, it is simulated as a part of the recomputation.
 
-As the Kubelet uses scheduler's [NodeInfo.addPod](../../plugin/pkg/scheduler/schedulercache/node_info.go#L171) to compute the overall consumption of resources, the recomputation can reuse the same code.
-
-Before the prediction starts, all the predictor caches need to be populated.
+Before the analysis starts, all the framework caches need to be populated.
 By default, every scheduler configuration is built from the [config factory](../../plugin/pkg/scheduler/factory/factory.go#L100).
 The factory provides various ways how to build the configuration.
 Building process also [initialize](../../plugin/pkg/scheduler/factory/factory.go#L387) reflectors and informers responsible for caches population and updates.
@@ -408,22 +351,22 @@ Each reflector and informer has its own cache and use exactly one of the followi
 * `createReplicaSetLW`
 
 Thus, when implementing the local client, all the caches need to be populated with the current state
-using exactly the same ListerWatchers per predictor cache.
+using exactly the same ListerWatchers per object cache.
 Once the caches are populated, all the reflectors and informers are terminated.
 Thus, the local client can return content of the caches to simulate communication with the Apiserver.
 
 At this point the factory can build the configuration pointing to the local client.
-Scheduler gets created and the prediction can start.
+Scheduler gets created and the analysis can start.
 At the end of each scheduling iteration the binding process is converted to cache update.
 Normally, each binding results in watch event once the pod gets run on kubelet and node status gets reflected in the Apiserver.
-Thus, as a part of updating the predictor caches, watch event is generated (e.g. in the [RestClient](../../pkg/watch/streamwatcher.go#L114) it corresponds to sending an item to a channel).
+Thus, as a part of updating the framework caches, watch event is generated (e.g. in the [RestClient](../../pkg/watch/streamwatcher.go#L114) it corresponds to sending an item to a channel).
 
 From the point of view of the scheduler the local client behaves the same way as any client,
 i.e. it provides ``Listers``/``Watchers`` implementing ``List`` and ``Watch`` interface
 
 ## Examples
 
-**Expected output** (still very sci-fi, ``kubectl cluster-capacity`` is only illustrative, the command can change):
+**Expected output** (``kubectl cluster-capacity`` is only illustrative, the command can change):
 
 ```
 $ kubectl cluster-capacity -f pod.json
@@ -448,14 +391,23 @@ Or report a reason which prevented the next pod from being scheduled.
 Additionally, it may be useful to put boundaries on the number of scheduling iterations depending on cluster size or performance cost.
 In some situation it is sufficient to simulate scheduling of ``N`` instances of the pod and stop.
 
+## Current scope of the framework
+
+* the current analysis is limited to the Scheduler component and the admission controller (subset of the Apiserver component) only
+* there is no interaction with Kubelet
+* during the analysis there is no interaction with any Kubernetes daemon
+
+In future, the scope can be extended to cover more components (or its parts) of the Kubernetes control plane.
+
 ## Roadmap
 
-1. implement the local client, prediction framework, REST API, limit considered resources for cpu, memory and gpu
-1. extend considered resources, extend prediction
+1. implement the local client, framework, REST API, limit considered resources to cpu, memory and gpu
+1. extend considered resources (e.g. with volumes handling), extend analysis (e.g. with taints and tolerations, node pressure)
 
 ## Future
 
 * Take re-scheduler into account with possible de-fragmentation
+* Integrate preemptive scheduling into the framework
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/cluster-capacity.md?pixel)]()
