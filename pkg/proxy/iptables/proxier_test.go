@@ -23,6 +23,7 @@ import (
 	"net"
 	"reflect"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -511,6 +512,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	return &Proxier{
 		exec:                        &exec.FakeExec{},
 		serviceMap:                  make(map[proxy.ServicePortName]*serviceInfo),
+		throttle:                    newSyncThrottle(0, time.Second*10),
 		iptables:                    ipt,
 		endpointsMap:                make(map[proxy.ServicePortName]endpointsInfoSlice),
 		clusterCIDR:                 "10.0.0.0/24",
