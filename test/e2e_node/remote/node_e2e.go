@@ -21,11 +21,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
 )
 
+// NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
 func InitNodeE2ERemote() TestSuite {
@@ -33,12 +37,7 @@ func InitNodeE2ERemote() TestSuite {
 	return &NodeE2ERemote{}
 }
 
-const (
-	localGCIMounterPath = "cluster/gce/gci/mounter/mounter"
-	CNIRelease          = "07a8a28637e97b22eb8dfe710eeae1344f69d16e"
-	CNIDirectory        = "cni"
-	CNIURL              = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-" + CNIRelease + ".tar.gz"
-)
+const localGCIMounterPath = "cluster/gce/gci/mounter/mounter"
 
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
 func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
@@ -71,8 +70,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
 	if err != nil {
 		return fmt.Errorf("Could not find K8s root dir! Err: %v", err)
 	}
-	localSource := "cluster/gce/gci/mounter/mounter"
-	source := filepath.Join(k8sDir, localSource)
+	source := filepath.Join(k8sDir, localGCIMounterPath)
 
 	// Require the GCI mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
 	if _, err := os.Stat(source); err != nil {
@@ -94,7 +92,73 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
 	return nil
 }
 
+// updateGCIMounterPath updates kubelet flags to set gci mounter path. This will only take effect for
+// GCI image.
+func updateGCIMounterPath(args, host, workspace string) (string, error) {
+	// Determine if tests will run on a GCI node.
+	output, err := SSH(host, "cat", "/etc/os-release")
+	if err != nil {
+		return args, fmt.Errorf("issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
+	}
+	if !strings.Contains(output, "ID=gci") {
+		// This is not a GCI image
+		return args, nil
+	}
+
+	// If we are testing on a GCI node, we chmod 544 the mounter and specify a different mounter path in the test args.
+	// We do this here because the local var `workspace` tells us which /tmp/node-e2e-%d is relevant to the current test run.
+
+	// Determine if the GCI mounter script exists locally.
+	k8sDir, err := builder.GetK8sRootDir()
+	if err != nil {
+		return args, fmt.Errorf("could not find K8s root dir! Err: %v", err)
+	}
+	source := filepath.Join(k8sDir, localGCIMounterPath)
+
+	// Require the GCI mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
+	if _, err = os.Stat(source); err != nil {
+		return args, fmt.Errorf("could not find GCI mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
+	}
+
+	glog.Infof("GCI node and GCI mounter both detected, modifying --experimental-mounter-path accordingly")
+	// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
+	// here will tell us to update the remote test runner.
+	mounterPath := filepath.Join(workspace, localGCIMounterPath)
+	output, err = SSH(host, "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
+	if err != nil {
+		return args, fmt.Errorf("unabled to chmod 544 GCI mounter script. Err: %v, Output:\n%s", err, output)
+	}
+	// Insert args at beginning of test args, so any values from command line take precedence
+	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
+	return args, nil
+}
+
 // RunTest runs test on the node.
-func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testArgs, ginkgoFlags string, timeout time.Duration) (string, error) {
-	return "", fmt.Errorf("not implemented")
+func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testArgs, ginkgoArgs string, timeout time.Duration) (string, error) {
+	// Install the cni plugin.
+	if err := installCNI(host, workspace); err != nil {
+		return "", err
+	}
+
+	// Configure iptables firewall rules
+	if err := configureFirewall(host); err != nil {
+		return "", err
+	}
+
+	// Kill any running node processes
+	cleanupNodeProcesses(host)
+
+	testArgs, err := updateGCIMounterPath(testArgs, host, workspace)
+	if err != nil {
+		return "", err
+	}
+
+	// Run the tests
+	glog.Infof("Starting tests on %q", host)
+	cmd := getSSHCommand(" && ",
+		fmt.Sprintf("cd %s", workspace),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s %s",
+			timeout.Seconds(), ginkgoArgs, host, results, junitFilePrefix, testArgs),
+	)
+	return SSH(host, "sh", "-c", cmd)
 }

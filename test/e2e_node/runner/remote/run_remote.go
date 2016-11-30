@@ -382,7 +382,7 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, ginkgoFlags
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(path, host, deleteFiles, junitFilePrefix, *testArgs, ginkgoFlagsStr)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, junitFilePrefix, *testArgs, ginkgoFlagsStr)
 	return &TestResult{
 		output: output,
 		err:    err,
