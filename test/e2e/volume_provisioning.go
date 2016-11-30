@@ -250,6 +250,7 @@ func newStorageClass() *storage.StorageClass {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name: "fast",
+			Description: "fast service used by gold members",
 		},
 		Provisioner: pluginName,
 	}
