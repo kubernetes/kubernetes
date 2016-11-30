@@ -25,7 +25,7 @@ import (
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
+	// "k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -45,7 +45,7 @@ func TestSecretController(t *testing.T) {
 	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
 	RegisterFakeList("secrets", &fakeClient.Fake, &api_v1.SecretList{Items: []api_v1.Secret{}})
 	secretWatch := RegisterFakeWatch("secrets", &fakeClient.Fake)
-	secretUpdateChan := RegisterFakeCopyOnUpdate("secrets", &fakeClient.Fake, secretWatch)
+	// secretUpdateChan := RegisterFakeCopyOnUpdate("secrets", &fakeClient.Fake, secretWatch)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
 	cluster1Client := &fake_kubeclientset.Clientset{}
@@ -95,12 +95,16 @@ func TestSecretController(t *testing.T) {
 
 	// Test add federated secret.
 	secretWatch.Add(&secret1)
-	// There should be 2 updates to add both the finalizers.
-	updatedSecret := GetSecretFromChan(secretUpdateChan)
-	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	updatedSecret = GetSecretFromChan(secretUpdateChan)
-	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, api_v1.FinalizerOrphan))
-	secret1 = *updatedSecret
+	/*
+		        // TODO: Uncomment this once we have figured out why this is flaky.
+		        // Ref https://github.com/kubernetes/kubernetes/issues/36540
+			// There should be 2 updates to add both the finalizers.
+			updatedSecret := GetSecretFromChan(secretUpdateChan)
+			assert.True(t, secretController.hasFinalizerFunc(updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
+			updatedSecret = GetSecretFromChan(secretUpdateChan)
+			assert.True(t, secretController.hasFinalizerFunc(updatedSecret, api_v1.FinalizerOrphan))
+			secret1 = *updatedSecret
+	*/
 
 	// Verify that the secret is created in underlying cluster1.
 	createdSecret := GetSecretFromChan(cluster1CreateChan)
