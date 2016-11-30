@@ -240,6 +240,18 @@ func (adc *attachDetachController) podDelete(obj interface{}) {
 
 func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	node, ok := obj.(*v1.Node)
+	// TODO: investigate if nodeName is empty then if we can return
+	if node == nil || !ok {
+		return
+	}
+	nodeName := types.NodeName(node.Name)
+	adc.nodeUpdate(nil, obj)
+	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+}
+
+func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
+	node, ok := newObj.(*v1.Node)
+	// TODO: investigate if nodeName is empty then if we can return
 	if node == nil || !ok {
 		return
 	}
@@ -250,13 +262,7 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
-
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
-}
-
-func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
-	// The flow for update is the same as add.
-	adc.nodeAdd(newObj)
 }
 
 func (adc *attachDetachController) nodeDelete(obj interface{}) {

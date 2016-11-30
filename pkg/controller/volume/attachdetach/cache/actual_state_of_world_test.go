@@ -1094,6 +1094,17 @@ func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volumeName), node2Name, devicePath2, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
+func Test_SetNodeStatusUpdateNeededError(t *testing.T) {
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	nodeName := types.NodeName("node-1")
+	asw.SetNodeStatusUpdateNeeded(nodeName)
+	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
+	if len(nodesToUpdateStatusFor) != 0 {
+		t.Fatalf("nodesToUpdateStatusFor should be empty as nodeName does not exist")
+	}
+}
+
 func verifyAttachedVolume(
 	t *testing.T,
 	attachedVolumes []AttachedVolume,
