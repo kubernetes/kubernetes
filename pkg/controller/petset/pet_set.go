@@ -133,6 +133,7 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 			},
 			DeleteFunc: psc.enqueueStatefulSet,
 		},
+		nil,
 	)
 	// TODO: Watch volumes
 	psc.podStoreSynced = psc.podController.HasSynced

@@ -137,6 +137,7 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 			UpdateFunc: dc.updateDb,
 			DeleteFunc: dc.removeDb,
 		},
+		nil,
 	)
 	dc.pdbLister.Store = dc.pdbStore
 
@@ -153,6 +154,7 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 		30*time.Second,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	dc.rcLister.Indexer = dc.rcIndexer
@@ -170,6 +172,7 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 		30*time.Second,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 	dc.rsStore = dc.rsLister.Indexer
 
@@ -186,6 +189,7 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 		30*time.Second,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	dc.dLister.Indexer = dc.dIndexer

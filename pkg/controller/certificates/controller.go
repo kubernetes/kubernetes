@@ -122,6 +122,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 				cc.enqueueCertificateRequest(obj)
 			},
 		},
+		nil,
 	)
 	cc.syncHandler = cc.maybeSignCertificate
 	return cc, nil

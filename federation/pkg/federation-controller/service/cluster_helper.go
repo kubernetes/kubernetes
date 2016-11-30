@@ -111,6 +111,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 					cc.enqueueEndpoint(obj, clusterName)
 				},
 			},
+			nil,
 		)
 
 		cachedClusterClient.serviceStore.Indexer, cachedClusterClient.serviceController = cache.NewIndexerInformer(
@@ -149,6 +150,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 				},
 			},
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+			nil,
 		)
 		cc.clientMap[clusterName] = cachedClusterClient
 		go cachedClusterClient.serviceController.Run(wait.NeverStop)

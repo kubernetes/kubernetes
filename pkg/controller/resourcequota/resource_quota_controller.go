@@ -127,6 +127,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 			DeleteFunc: rq.enqueueResourceQuota,
 		},
 		cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	for _, groupKindToReplenish := range options.GroupKindsToReplenish {

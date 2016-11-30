@@ -26,6 +26,8 @@ import (
 	"github.com/golang/glog"
 )
 
+var ErrStopped = errors.New("stopped")
+
 // NewDeltaFIFO returns a Store which can be used process changes to items.
 //
 // keyFunc is used to figure out what key an object should have. (It's
@@ -48,7 +50,7 @@ import (
 //                 fix.
 //
 // Also see the comment on DeltaFIFO.
-func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyListerGetter) *DeltaFIFO {
+func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyListerGetter, stopCh <-chan struct{}) *DeltaFIFO {
 	f := &DeltaFIFO{
 		items:           map[string]Deltas{},
 		queue:           []string{},
@@ -57,6 +59,15 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyL
 		knownObjects:    knownObjects,
 	}
 	f.cond.L = &f.lock
+	if stopCh != nil {
+		go func() {
+			<-stopCh
+			f.lock.Lock()
+			f.stopped = true
+			f.cond.Broadcast()
+			f.lock.Unlock()
+		}()
+	}
 	return f
 }
 
@@ -118,6 +129,9 @@ type DeltaFIFO struct {
 	// purpose of figuring out which items have been deleted
 	// when Replace() or Delete() is called.
 	knownObjects KeyListerGetter
+
+	// whether the optional stop channel has been triggered
+	stopped bool
 }
 
 var (
@@ -403,8 +417,12 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	for {
-		for len(f.queue) == 0 {
+		if f.stopped {
+			return nil, ErrStopped
+		}
+		if len(f.queue) == 0 {
 			f.cond.Wait()
+			continue
 		}
 		id := f.queue[0]
 		f.queue = f.queue[1:]

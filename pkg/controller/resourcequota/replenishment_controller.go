@@ -160,6 +160,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 				UpdateFunc: ServiceReplenishmentUpdateFunc(options),
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			nil,
 		)
 	case api.Kind("ReplicationController"):
 		// TODO move to informer when defined
@@ -177,6 +178,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 			cache.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			nil,
 		)
 	case api.Kind("PersistentVolumeClaim"):
 		if r.sharedInformerFactory != nil {
@@ -200,6 +202,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 			cache.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			nil,
 		)
 	case api.Kind("Secret"):
 		// TODO move to informer when defined
@@ -217,6 +220,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 			cache.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			nil,
 		)
 	case api.Kind("ConfigMap"):
 		// TODO move to informer when defined
@@ -234,6 +238,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 			cache.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			nil,
 		)
 	default:
 		return nil, NewUnhandledGroupKindError(options.GroupKind)

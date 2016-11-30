@@ -130,6 +130,9 @@ func (c *Controller) processLoop() {
 	for {
 		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
 		if err != nil {
+			if err == ErrStopped {
+				return
+			}
 			if c.config.RetryOnError {
 				// This is the safe way to re-enqueue.
 				c.config.Queue.AddIfNotPresent(obj)
@@ -218,6 +221,7 @@ func NewInformer(
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
+	stopCh <-chan struct{},
 ) (Store, *Controller) {
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
@@ -225,7 +229,7 @@ func NewInformer(
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState, stopCh)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -284,6 +288,7 @@ func NewIndexerInformer(
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
 	indexers Indexers,
+	stopCh <-chan struct{},
 ) (Indexer, *Controller) {
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
@@ -291,7 +296,7 @@ func NewIndexerInformer(
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState, stopCh)
 
 	cfg := &Config{
 		Queue:            fifo,

@@ -88,6 +88,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer cache.SharedIndexInfor
 		&v1.Node{},
 		controller.NoResyncPeriodFunc(),
 		cache.ResourceEventHandlerFuncs{},
+		nil,
 	)
 
 	return gcc

@@ -81,6 +81,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterNam
 		&v1.Node{},
 		controller.NoResyncPeriodFunc(),
 		cache.ResourceEventHandlerFuncs{},
+		nil,
 	)
 
 	return rc

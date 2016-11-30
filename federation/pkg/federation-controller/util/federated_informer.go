@@ -226,6 +226,7 @@ func NewFederatedInformer(
 				}
 			},
 		},
+		nil,
 	)
 	return federatedInformer
 }

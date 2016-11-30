@@ -112,7 +112,9 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 		},
 		&api_v1.Namespace{},
 		controller.NoResyncPeriodFunc(),
-		util.NewTriggerOnAllChanges(func(obj runtime.Object) { nc.deliverNamespaceObj(obj, 0, false) }))
+		util.NewTriggerOnAllChanges(func(obj runtime.Object) { nc.deliverNamespaceObj(obj, 0, false) }),
+		nil,
+	)
 
 	// Federated informer on namespaces in members of federation.
 	nc.namespaceFederatedInformer = util.NewFederatedInformer(
@@ -133,7 +135,9 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 				// would be just confirmation that some namespace opration succeeded.
 				util.NewTriggerOnMetaAndSpecChanges(
 					func(obj runtime.Object) { nc.deliverNamespaceObj(obj, nc.namespaceReviewDelay, false) },
-				))
+				),
+				nil,
+			)
 		},
 		&util.ClusterLifecycleHandlerFuncs{
 			ClusterAvailable: func(cluster *federation_api.Cluster) {

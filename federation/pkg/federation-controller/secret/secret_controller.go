@@ -113,7 +113,9 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 		},
 		&api_v1.Secret{},
 		controller.NoResyncPeriodFunc(),
-		util.NewTriggerOnAllChanges(func(obj pkg_runtime.Object) { secretcontroller.deliverSecretObj(obj, 0, false) }))
+		util.NewTriggerOnAllChanges(func(obj pkg_runtime.Object) { secretcontroller.deliverSecretObj(obj, 0, false) }),
+		nil,
+	)
 
 	// Federated informer on secrets in members of federation.
 	secretcontroller.secretFederatedInformer = util.NewFederatedInformer(
@@ -136,7 +138,9 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 					func(obj pkg_runtime.Object) {
 						secretcontroller.deliverSecretObj(obj, secretcontroller.secretReviewDelay, false)
 					},
-				))
+				),
+				nil,
+			)
 		},
 
 		&util.ClusterLifecycleHandlerFuncs{
