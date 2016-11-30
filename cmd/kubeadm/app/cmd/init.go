@@ -196,7 +196,11 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	// validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
 	if err != nil {
-		return nil, err
+		if cfg.KubernetesVersion != kubeadmapiext.DefaultKubernetesVersion {
+			return nil, err
+		} else {
+			ver = kubeadmapiext.DefaultKubernetesFallbackVersion
+		}
 	}
 	cfg.KubernetesVersion = ver
 	fmt.Println("Using Kubernetes version:", ver)
