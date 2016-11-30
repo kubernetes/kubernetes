@@ -20,12 +20,12 @@ import (
 	"testing"
 	"time"
 
-	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefederationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -39,18 +39,18 @@ func TestFederatedInformer(t *testing.T) {
 	fakeFederationClient := &fakefederationclientset.Clientset{}
 
 	// Add a single cluster to federation and remove it when needed.
-	cluster := federation_api.Cluster{
-		ObjectMeta: api_v1.ObjectMeta{
+	cluster := federationapi.Cluster{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name: "mycluster",
 		},
-		Status: federation_api.ClusterStatus{
-			Conditions: []federation_api.ClusterCondition{
-				{Type: federation_api.ClusterReady, Status: api_v1.ConditionTrue},
+		Status: federationapi.ClusterStatus{
+			Conditions: []federationapi.ClusterCondition{
+				{Type: federationapi.ClusterReady, Status: apiv1.ConditionTrue},
 			},
 		},
 	}
 	fakeFederationClient.AddReactor("list", "clusters", func(action core.Action) (bool, runtime.Object, error) {
-		return true, &federation_api.ClusterList{Items: []federation_api.Cluster{cluster}}, nil
+		return true, &federationapi.ClusterList{Items: []federationapi.Cluster{cluster}}, nil
 	})
 	deleteChan := make(chan struct{})
 	fakeFederationClient.AddWatchReactor("clusters", func(action core.Action) (bool, watch.Interface, error) {
@@ -62,32 +62,32 @@ func TestFederatedInformer(t *testing.T) {
 		return true, fakeWatch, nil
 	})
 
-	fakeKubeClient := &fake_kubeclientset.Clientset{}
+	fakeKubeClient := &fakekubeclientset.Clientset{}
 	// There is a single service ns1/s1 in cluster mycluster.
-	service := api_v1.Service{
-		ObjectMeta: api_v1.ObjectMeta{
+	service := apiv1.Service{
+		ObjectMeta: apiv1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      "s1",
 		},
 	}
 	fakeKubeClient.AddReactor("list", "services", func(action core.Action) (bool, runtime.Object, error) {
-		return true, &api_v1.ServiceList{Items: []api_v1.Service{service}}, nil
+		return true, &apiv1.ServiceList{Items: []apiv1.Service{service}}, nil
 	})
 	fakeKubeClient.AddWatchReactor("services", func(action core.Action) (bool, watch.Interface, error) {
 		return true, watch.NewFake(), nil
 	})
 
-	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	targetInformerFactory := func(cluster *federationapi.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api_v1.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Services(api_v1.NamespaceAll).List(options)
+				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+					return clientset.Core().Services(apiv1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Services(api_v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Services(apiv1.NamespaceAll).Watch(options)
 				},
 			},
-			&api_v1.Service{},
+			&apiv1.Service{},
 			10*time.Second,
 			cache.ResourceEventHandlerFuncs{})
 	}
@@ -95,25 +95,25 @@ func TestFederatedInformer(t *testing.T) {
 	addedClusters := make(chan string, 1)
 	deletedClusters := make(chan string, 1)
 	lifecycle := ClusterLifecycleHandlerFuncs{
-		ClusterAvailable: func(cluster *federation_api.Cluster) {
+		ClusterAvailable: func(cluster *federationapi.Cluster) {
 			addedClusters <- cluster.Name
 			close(addedClusters)
 		},
-		ClusterUnavailable: func(cluster *federation_api.Cluster, _ []interface{}) {
+		ClusterUnavailable: func(cluster *federationapi.Cluster, _ []interface{}) {
 			deletedClusters <- cluster.Name
 			close(deletedClusters)
 		},
 	}
 
 	informer := NewFederatedInformer(fakeFederationClient, targetInformerFactory, &lifecycle).(*federatedInformerImpl)
-	informer.clientFactory = func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
+	informer.clientFactory = func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		return fakeKubeClient, nil
 	}
 	assert.NotNil(t, informer)
 	informer.Start()
 
 	// Wait until mycluster is synced.
-	for !informer.GetTargetStore().ClustersSynced([]*federation_api.Cluster{&cluster}) {
+	for !informer.GetTargetStore().ClustersSynced([]*federationapi.Cluster{&cluster}) {
 		time.Sleep(time.Millisecond * 100)
 	}
 	readyClusters, err := informer.GetReadyClusters()
@@ -131,7 +131,7 @@ func TestFederatedInformer(t *testing.T) {
 
 	// All checked, lets delete the cluster.
 	deleteChan <- struct{}{}
-	for !informer.GetTargetStore().ClustersSynced([]*federation_api.Cluster{}) {
+	for !informer.GetTargetStore().ClustersSynced([]*federationapi.Cluster{}) {
 		time.Sleep(time.Millisecond * 100)
 	}
 	readyClusters, err = informer.GetReadyClusters()

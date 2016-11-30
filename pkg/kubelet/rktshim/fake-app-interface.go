@@ -23,8 +23,8 @@ import (
 	"math/rand"
 	"time"
 
-	kubeletApi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubeletapi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 )
 
@@ -61,7 +61,7 @@ type FakeRuntime struct {
 
 type FakeRuntimeConfig struct{}
 
-func NewFakeRuntime() (kubeletApi.ContainerManager, error) {
+func NewFakeRuntime() (kubeletapi.ContainerManager, error) {
 	return &FakeRuntime{Containers: make(containerRegistry)}, nil
 }
 
@@ -78,23 +78,23 @@ func newCharacterStreams(in io.Reader, out io.Writer, err io.Writer) characterSt
 }
 
 type fakeContainer struct {
-	Config *runtimeApi.ContainerConfig
+	Config *runtimeapi.ContainerConfig
 
-	Status runtimeApi.ContainerStatus
+	Status runtimeapi.ContainerStatus
 
-	State runtimeApi.ContainerState
+	State runtimeapi.ContainerState
 
 	Streams characterStreams
 }
 
 func (c *fakeContainer) Start() {
-	c.State = runtimeApi.ContainerState_CONTAINER_RUNNING
+	c.State = runtimeapi.ContainerState_CONTAINER_RUNNING
 
 	c.Status.State = &c.State
 }
 
 func (c *fakeContainer) Stop() {
-	c.State = runtimeApi.ContainerState_CONTAINER_EXITED
+	c.State = runtimeapi.ContainerState_CONTAINER_EXITED
 
 	c.Status.State = &c.State
 
@@ -115,7 +115,7 @@ func (c *fakeContainer) Exec(cmd []string, in io.Reader, out, err io.WriteCloser
 
 type containerRegistry map[string]*fakeContainer
 
-func (r *FakeRuntime) CreateContainer(pid string, cfg *runtimeApi.ContainerConfig, sandboxCfg *runtimeApi.PodSandboxConfig) (string, error) {
+func (r *FakeRuntime) CreateContainer(pid string, cfg *runtimeapi.ContainerConfig, sandboxCfg *runtimeapi.PodSandboxConfig) (string, error) {
 	// TODO(tmrts): allow customization
 	containerIDLength := 8
 
@@ -135,11 +135,11 @@ func (r *FakeRuntime) StartContainer(id string) error {
 		return ErrContainerNotFound
 	}
 	switch c.State {
-	case runtimeApi.ContainerState_CONTAINER_EXITED:
+	case runtimeapi.ContainerState_CONTAINER_EXITED:
 		fallthrough
-	case runtimeApi.ContainerState_CONTAINER_CREATED:
+	case runtimeapi.ContainerState_CONTAINER_CREATED:
 		c.Start()
-	case runtimeApi.ContainerState_CONTAINER_UNKNOWN:
+	case runtimeapi.ContainerState_CONTAINER_UNKNOWN:
 		// TODO(tmrts): add timeout to Start API or generalize timeout somehow
 		//<-time.After(time.Duration(timeout) * time.Second)
 		fallthrough
@@ -157,9 +157,9 @@ func (r *FakeRuntime) StopContainer(id string, timeout int64) error {
 	}
 
 	switch c.State {
-	case runtimeApi.ContainerState_CONTAINER_RUNNING:
-		c.State = runtimeApi.ContainerState_CONTAINER_EXITED // This state might not be the best one
-	case runtimeApi.ContainerState_CONTAINER_UNKNOWN:
+	case runtimeapi.ContainerState_CONTAINER_RUNNING:
+		c.State = runtimeapi.ContainerState_CONTAINER_EXITED // This state might not be the best one
+	case runtimeapi.ContainerState_CONTAINER_UNKNOWN:
 		<-time.After(time.Duration(timeout) * time.Second)
 		fallthrough
 	default:
@@ -181,12 +181,12 @@ func (r *FakeRuntime) RemoveContainer(id string) error {
 	return nil
 }
 
-func (r *FakeRuntime) ListContainers(*runtimeApi.ContainerFilter) ([]*runtimeApi.Container, error) {
-	list := []*runtimeApi.Container{}
+func (r *FakeRuntime) ListContainers(*runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+	list := []*runtimeapi.Container{}
 
 	// TODO(tmrts): apply the filter
 	for _, c := range r.Containers {
-		list = append(list, &runtimeApi.Container{
+		list = append(list, &runtimeapi.Container{
 			Id:       c.Status.Id,
 			Metadata: c.Config.Metadata,
 			Labels:   c.Config.Labels,
@@ -198,10 +198,10 @@ func (r *FakeRuntime) ListContainers(*runtimeApi.ContainerFilter) ([]*runtimeApi
 	return list, nil
 }
 
-func (r *FakeRuntime) ContainerStatus(id string) (*runtimeApi.ContainerStatus, error) {
+func (r *FakeRuntime) ContainerStatus(id string) (*runtimeapi.ContainerStatus, error) {
 	c, ok := r.Containers[id]
 	if !ok {
-		return &runtimeApi.ContainerStatus{}, ErrContainerNotFound
+		return &runtimeapi.ContainerStatus{}, ErrContainerNotFound
 	}
 
 	return &c.Status, nil
@@ -214,7 +214,7 @@ func (r *FakeRuntime) ExecSync(containerID string, cmd []string, timeout time.Du
 	}
 
 	// TODO(tmrts): Validate the assumption that container has to be running for exec to work.
-	if c.State != runtimeApi.ContainerState_CONTAINER_RUNNING {
+	if c.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
 		return nil, nil, ErrInvalidContainerStateTransition
 	}
 
@@ -225,16 +225,16 @@ func (r *FakeRuntime) ExecSync(containerID string, cmd []string, timeout time.Du
 	return stdoutBuffer.Bytes(), stderrBuffer.Bytes(), err
 }
 
-func (r *FakeRuntime) Exec(req *runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
+func (r *FakeRuntime) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	url := "http://" + FakeStreamingHost + ":" + FakeStreamingPort + "/exec/" + req.GetContainerId()
-	return &runtimeApi.ExecResponse{
+	return &runtimeapi.ExecResponse{
 		Url: &url,
 	}, nil
 }
 
-func (r *FakeRuntime) Attach(req *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
+func (r *FakeRuntime) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	url := "http://" + FakeStreamingHost + ":" + FakeStreamingPort + "/attach/" + req.GetContainerId()
-	return &runtimeApi.AttachResponse{
+	return &runtimeapi.AttachResponse{
 		Url: &url,
 	}, nil
 }

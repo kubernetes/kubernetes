@@ -23,9 +23,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
-	controller_util "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	controllerutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -35,15 +35,15 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-func newCluster(clusterName string, serverUrl string) *federation_v1beta1.Cluster {
-	cluster := federation_v1beta1.Cluster{
+func newCluster(clusterName string, serverUrl string) *federationv1beta1.Cluster {
+	cluster := federationv1beta1.Cluster{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:  uuid.NewUUID(),
 			Name: clusterName,
 		},
-		Spec: federation_v1beta1.ClusterSpec{
-			ServerAddressByClientCIDRs: []federation_v1beta1.ServerAddressByClientCIDR{
+		Spec: federationv1beta1.ClusterSpec{
+			ServerAddressByClientCIDRs: []federationv1beta1.ServerAddressByClientCIDR{
 				{
 					ClientCIDR:    "0.0.0.0/0",
 					ServerAddress: serverUrl,
@@ -54,13 +54,13 @@ func newCluster(clusterName string, serverUrl string) *federation_v1beta1.Cluste
 	return &cluster
 }
 
-func newClusterList(cluster *federation_v1beta1.Cluster) *federation_v1beta1.ClusterList {
-	clusterList := federation_v1beta1.ClusterList{
+func newClusterList(cluster *federationv1beta1.Cluster) *federationv1beta1.ClusterList {
+	clusterList := federationv1beta1.ClusterList{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
 		ListMeta: unversioned.ListMeta{
 			SelfLink: "foobar",
 		},
-		Items: []federation_v1beta1.Cluster{},
+		Items: []federationv1beta1.Cluster{},
 	}
 	clusterList.Items = append(clusterList.Items, *cluster)
 	return &clusterList
@@ -68,7 +68,7 @@ func newClusterList(cluster *federation_v1beta1.Cluster) *federation_v1beta1.Clu
 
 // init a fake http handler, simulate a federation apiserver, response the "DELETE" "PUT" "GET" "UPDATE"
 // when "canBeGotten" is false, means that user can not get the cluster cluster from apiserver
-func createHttptestFakeHandlerForFederation(clusterList *federation_v1beta1.ClusterList, canBeGotten bool) *http.HandlerFunc {
+func createHttptestFakeHandlerForFederation(clusterList *federationv1beta1.ClusterList, canBeGotten bool) *http.HandlerFunc {
 	fakeHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clusterListString, _ := json.Marshal(*clusterList)
 		w.Header().Set("Content-Type", "application/json")
@@ -125,8 +125,8 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 	federationClientSet := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 
 	// Override KubeconfigGetterForCluster to avoid having to setup service accounts and mount files with secret tokens.
-	originalGetter := controller_util.KubeconfigGetterForCluster
-	controller_util.KubeconfigGetterForCluster = func(c *federation_v1beta1.Cluster) clientcmd.KubeconfigGetter {
+	originalGetter := controllerutil.KubeconfigGetterForCluster
+	controllerutil.KubeconfigGetterForCluster = func(c *federationv1beta1.Cluster) clientcmd.KubeconfigGetter {
 		return func() (*clientcmdapi.Config, error) {
 			return &clientcmdapi.Config{}, nil
 		}
@@ -141,11 +141,11 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 	if !found {
 		t.Errorf("Failed to Update Cluster Status")
 	} else {
-		if (clusterStatus.Conditions[1].Status != v1.ConditionFalse) || (clusterStatus.Conditions[1].Type != federation_v1beta1.ClusterOffline) {
+		if (clusterStatus.Conditions[1].Status != v1.ConditionFalse) || (clusterStatus.Conditions[1].Type != federationv1beta1.ClusterOffline) {
 			t.Errorf("Failed to Update Cluster Status")
 		}
 	}
 
 	// Reset KubeconfigGetterForCluster
-	controller_util.KubeconfigGetterForCluster = originalGetter
+	controllerutil.KubeconfigGetterForCluster = originalGetter
 }

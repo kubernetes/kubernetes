@@ -21,13 +21,13 @@ import (
 	"testing"
 	"time"
 
-	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -36,29 +36,29 @@ import (
 )
 
 func TestConfigMapController(t *testing.T) {
-	cluster1 := NewCluster("cluster1", api_v1.ConditionTrue)
-	cluster2 := NewCluster("cluster2", api_v1.ConditionTrue)
+	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
+	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
-	fakeClient := &fake_fedclientset.Clientset{}
-	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
-	RegisterFakeList("configmaps", &fakeClient.Fake, &api_v1.ConfigMapList{Items: []api_v1.ConfigMap{}})
+	fakeClient := &fakefedclientset.Clientset{}
+	RegisterFakeList("clusters", &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
+	RegisterFakeList("configmaps", &fakeClient.Fake, &apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}})
 	configmapWatch := RegisterFakeWatch("configmaps", &fakeClient.Fake)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
-	cluster1Client := &fake_kubeclientset.Clientset{}
+	cluster1Client := &fakekubeclientset.Clientset{}
 	cluster1Watch := RegisterFakeWatch("configmaps", &cluster1Client.Fake)
-	RegisterFakeList("configmaps", &cluster1Client.Fake, &api_v1.ConfigMapList{Items: []api_v1.ConfigMap{}})
+	RegisterFakeList("configmaps", &cluster1Client.Fake, &apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}})
 	cluster1CreateChan := RegisterFakeCopyOnCreate("configmaps", &cluster1Client.Fake, cluster1Watch)
 	cluster1UpdateChan := RegisterFakeCopyOnUpdate("configmaps", &cluster1Client.Fake, cluster1Watch)
 
-	cluster2Client := &fake_kubeclientset.Clientset{}
+	cluster2Client := &fakekubeclientset.Clientset{}
 	cluster2Watch := RegisterFakeWatch("configmaps", &cluster2Client.Fake)
-	RegisterFakeList("configmaps", &cluster2Client.Fake, &api_v1.ConfigMapList{Items: []api_v1.ConfigMap{}})
+	RegisterFakeList("configmaps", &cluster2Client.Fake, &apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate("configmaps", &cluster2Client.Fake, cluster2Watch)
 
 	configmapController := NewConfigMapController(fakeClient)
 	informer := ToFederatedInformerForTestOnly(configmapController.configmapFederatedInformer)
-	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
+	informer.SetClientFactory(func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
 			return cluster1Client, nil
@@ -77,8 +77,8 @@ func TestConfigMapController(t *testing.T) {
 	stop := make(chan struct{})
 	configmapController.Run(stop)
 
-	configmap1 := &api_v1.ConfigMap{
-		ObjectMeta: api_v1.ObjectMeta{
+	configmap1 := &apiv1.ConfigMap{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "ns",
 			SelfLink:  "/api/v1/namespaces/ns/configmaps/test-configmap",
@@ -136,7 +136,7 @@ func TestConfigMapController(t *testing.T) {
 	close(stop)
 }
 
-func GetConfigMapFromChan(c chan runtime.Object) *api_v1.ConfigMap {
-	configmap := GetObjectFromChan(c).(*api_v1.ConfigMap)
+func GetConfigMapFromChan(c chan runtime.Object) *apiv1.ConfigMap {
+	configmap := GetObjectFromChan(c).(*apiv1.ConfigMap)
 	return configmap
 }

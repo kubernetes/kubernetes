@@ -19,9 +19,9 @@ package eventsink
 import (
 	"testing"
 
-	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
+	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -29,7 +29,7 @@ import (
 )
 
 func TestEventSink(t *testing.T) {
-	fakeFederationClient := &fake_fedclientset.Clientset{}
+	fakeFederationClient := &fakefedclientset.Clientset{}
 	createdChan := make(chan runtime.Object, 100)
 	fakeFederationClient.AddReactor("create", "events", func(action core.Action) (bool, runtime.Object, error) {
 		createAction := action.(core.CreateAction)
@@ -45,8 +45,8 @@ func TestEventSink(t *testing.T) {
 		return true, obj, nil
 	})
 
-	event := api_v1.Event{
-		ObjectMeta: api_v1.ObjectMeta{
+	event := apiv1.Event{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      "bzium",
 			Namespace: "ns",
 		},
@@ -54,7 +54,7 @@ func TestEventSink(t *testing.T) {
 	sink := NewFederatedEventSink(fakeFederationClient)
 	eventUpdated, err := sink.Create(&event)
 	assert.NoError(t, err)
-	eventV1 := GetObjectFromChan(createdChan).(*api_v1.Event)
+	eventV1 := GetObjectFromChan(createdChan).(*apiv1.Event)
 	assert.NotNil(t, eventV1)
 	// Just some simple sanity checks.
 	assert.Equal(t, event.Name, eventV1.Name)
@@ -62,7 +62,7 @@ func TestEventSink(t *testing.T) {
 
 	eventUpdated, err = sink.Update(&event)
 	assert.NoError(t, err)
-	eventV1 = GetObjectFromChan(updateChan).(*api_v1.Event)
+	eventV1 = GetObjectFromChan(updateChan).(*apiv1.Event)
 	assert.NotNil(t, eventV1)
 	// Just some simple sanity checks.
 	assert.Equal(t, event.Name, eventV1.Name)

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	fake_internal "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	fakeinternal "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/controller"
@@ -281,7 +281,7 @@ func TestSyncStatefulSetBlockedPet(t *testing.T) {
 }
 
 type fakeClient struct {
-	fake_internal.Clientset
+	fakeinternal.Clientset
 	statefulsetClient *fakeStatefulSetClient
 }
 
