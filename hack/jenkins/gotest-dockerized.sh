@@ -45,5 +45,5 @@ docker run --rm=true \
   -e "KUBE_VERIFY_GIT_BRANCH=${KUBE_VERIFY_GIT_BRANCH:-}" \
   -e "REPO_DIR=${REPO_DIR}" \
   -e "HOST_ARTIFACTS_DIR=${HOST_ARTIFACTS_DIR}" \
-  -i gcr.io/k8s-testimages/kubekins-test:1.4-v20161130-412b6b7 \
+  -i gcr.io/k8s-testimages/kubekins-test:1.4-v20161130-8958f82 \
   bash -c "cd kubernetes && ${KUBE_TEST_SCRIPT:-./hack/jenkins/test-dockerized.sh}"
