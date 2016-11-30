@@ -14,25 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+// +k8s:deepcopy-gen=package,register
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/autoscaling
+// +k8s:openapi-gen=true
 
-import (
-	"k8s.io/apimachinery/pkg/runtime"
-)
-
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_HorizontalPodAutoscaler,
-	)
-}
-
-func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
-	if obj.Spec.MinReplicas == nil {
-		minReplicas := int32(1)
-		obj.Spec.MinReplicas = &minReplicas
-	}
-
-	// NB: we apply a default for CPU utilization in conversion because
-	// we need access to the annotations to properly apply the default.
-}
+package v2alpha1 // import "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
