@@ -96,5 +96,13 @@ func RunStop(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer
 		return r.Err()
 	}
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-	return ReapResult(r, f, out, false, cmdutil.GetFlagBool(cmd, "ignore-not-found"), cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper, false)
+	gracePeriod := cmdutil.GetFlagInt(cmd, "grace-period")
+	waitForDeletion := false
+	if gracePeriod == 0 {
+		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
+		// into --grace-period=1 and wait until the object is successfully deleted.
+		gracePeriod = 1
+		waitForDeletion = true
+	}
+	return ReapResult(r, f, out, false, cmdutil.GetFlagBool(cmd, "ignore-not-found"), cmdutil.GetFlagDuration(cmd, "timeout"), gracePeriod, waitForDeletion, shortOutput, mapper, false)
 }
