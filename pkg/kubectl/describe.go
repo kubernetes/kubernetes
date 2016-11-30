@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/apis/federation"
-	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -2320,7 +2320,7 @@ func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 }
 
 type ClusterDescriber struct {
-	fed_clientset.Interface
+	fedclientset.Interface
 }
 
 func (d *ClusterDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {

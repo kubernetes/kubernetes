@@ -42,7 +42,7 @@ import (
 	"github.com/kardianos/osext"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
-	more_reporters "github.com/onsi/ginkgo/reporters"
+	morereporters "github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 )
@@ -110,7 +110,7 @@ func TestE2eNode(t *testing.T) {
 			// Configure a junit reporter to write to the directory
 			junitFile := fmt.Sprintf("junit_%s%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
 			junitPath := path.Join(reportDir, junitFile)
-			reporters = append(reporters, more_reporters.NewJUnitReporter(junitPath))
+			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
 	}
 	RunSpecsWithDefaultAndCustomReporters(t, "E2eNode Suite", reporters)

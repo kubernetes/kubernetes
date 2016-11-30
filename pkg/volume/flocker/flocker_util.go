@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/volume"
 
-	flockerApi "github.com/clusterhq/flocker-go"
+	flockerapi "github.com/clusterhq/flocker-go"
 	"github.com/golang/glog"
 )
 
@@ -75,7 +75,7 @@ func (util *FlockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID 
 	requestBytes := capacity.Value()
 	volumeSizeGB = int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 
-	createOptions := &flockerApi.CreateDatasetOptions{
+	createOptions := &flockerapi.CreateDatasetOptions{
 		MaximumSize: requestBytes,
 		Metadata: map[string]string{
 			"type": "k8s-dynamic-prov",

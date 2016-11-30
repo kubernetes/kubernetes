@@ -19,17 +19,17 @@ package configmap
 import (
 	"time"
 
-	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
@@ -79,7 +79,7 @@ type ConfigMapController struct {
 func NewConfigMapController(client federationclientset.Interface) *ConfigMapController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api_v1.EventSource{Component: "federated-configmaps-controller"})
+	recorder := broadcaster.NewRecorder(apiv1.EventSource{Component: "federated-configmaps-controller"})
 
 	configmapcontroller := &ConfigMapController{
 		federatedApiClient:    client,
@@ -98,43 +98,43 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	// Start informer on federated API servers on configmaps that should be federated.
 	configmapcontroller.configmapInformerStore, configmapcontroller.configmapInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api_v1.ListOptions) (pkg_runtime.Object, error) {
-				return client.Core().ConfigMaps(api_v1.NamespaceAll).List(options)
+			ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {
+				return client.Core().ConfigMaps(apiv1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
-				return client.Core().ConfigMaps(api_v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+				return client.Core().ConfigMaps(apiv1.NamespaceAll).Watch(options)
 			},
 		},
-		&api_v1.ConfigMap{},
+		&apiv1.ConfigMap{},
 		controller.NoResyncPeriodFunc(),
-		util.NewTriggerOnAllChanges(func(obj pkg_runtime.Object) { configmapcontroller.deliverConfigMapObj(obj, 0, false) }))
+		util.NewTriggerOnAllChanges(func(obj pkgruntime.Object) { configmapcontroller.deliverConfigMapObj(obj, 0, false) }))
 
 	// Federated informer on configmaps in members of federation.
 	configmapcontroller.configmapFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options api_v1.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Core().ConfigMaps(api_v1.NamespaceAll).List(options)
+					ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {
+						return targetClient.Core().ConfigMaps(apiv1.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
-						return targetClient.Core().ConfigMaps(api_v1.NamespaceAll).Watch(options)
+					WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+						return targetClient.Core().ConfigMaps(apiv1.NamespaceAll).Watch(options)
 					},
 				},
-				&api_v1.ConfigMap{},
+				&apiv1.ConfigMap{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
 				// would be just confirmation that some configmap opration succeeded.
 				util.NewTriggerOnAllChanges(
-					func(obj pkg_runtime.Object) {
+					func(obj pkgruntime.Object) {
 						configmapcontroller.deliverConfigMapObj(obj, configmapcontroller.configmapReviewDelay, false)
 					},
 				))
 		},
 
 		&util.ClusterLifecycleHandlerFuncs{
-			ClusterAvailable: func(cluster *federation_api.Cluster) {
+			ClusterAvailable: func(cluster *federationapi.Cluster) {
 				// When new cluster becomes available process all the configmaps again.
 				configmapcontroller.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(configmapcontroller.clusterAvailableDelay))
 			},
@@ -143,19 +143,19 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 
 	// Federated updater along with Create/Update/Delete operations.
 	configmapcontroller.federatedUpdater = util.NewFederatedUpdater(configmapcontroller.configmapFederatedInformer,
-		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
-			configmap := obj.(*api_v1.ConfigMap)
+		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			configmap := obj.(*apiv1.ConfigMap)
 			_, err := client.Core().ConfigMaps(configmap.Namespace).Create(configmap)
 			return err
 		},
-		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
-			configmap := obj.(*api_v1.ConfigMap)
+		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			configmap := obj.(*apiv1.ConfigMap)
 			_, err := client.Core().ConfigMaps(configmap.Namespace).Update(configmap)
 			return err
 		},
-		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
-			configmap := obj.(*api_v1.ConfigMap)
-			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &api_v1.DeleteOptions{})
+		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			configmap := obj.(*apiv1.ConfigMap)
+			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &apiv1.DeleteOptions{})
 			return err
 		})
 	return configmapcontroller
@@ -179,7 +179,7 @@ func (configmapcontroller *ConfigMapController) Run(stopChan <-chan struct{}) {
 }
 
 func (configmapcontroller *ConfigMapController) deliverConfigMapObj(obj interface{}, delay time.Duration, failed bool) {
-	configmap := obj.(*api_v1.ConfigMap)
+	configmap := obj.(*apiv1.ConfigMap)
 	configmapcontroller.deliverConfigMap(types.NamespacedName{Namespace: configmap.Namespace, Name: configmap.Name}, delay, failed)
 }
 
@@ -220,7 +220,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMapsOnClusterChan
 		configmapcontroller.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(configmapcontroller.clusterAvailableDelay))
 	}
 	for _, obj := range configmapcontroller.configmapInformerStore.List() {
-		configmap := obj.(*api_v1.ConfigMap)
+		configmap := obj.(*apiv1.ConfigMap)
 		configmapcontroller.deliverConfigMap(types.NamespacedName{Namespace: configmap.Namespace, Name: configmap.Name},
 			configmapcontroller.smallDelay, false)
 	}
@@ -247,7 +247,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 		glog.V(8).Infof("Skipping not federated config map: %s", key)
 		return
 	}
-	baseConfigMap := baseConfigMapObj.(*api_v1.ConfigMap)
+	baseConfigMap := baseConfigMapObj.(*apiv1.ConfigMap)
 
 	clusters, err := configmapcontroller.configmapFederatedInformer.GetReadyClusters()
 	if err != nil {
@@ -266,7 +266,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 		}
 
 		// Do not modify data.
-		desiredConfigMap := &api_v1.ConfigMap{
+		desiredConfigMap := &apiv1.ConfigMap{
 			ObjectMeta: util.DeepCopyRelevantObjectMeta(baseConfigMap.ObjectMeta),
 			Data:       baseConfigMap.Data,
 		}
@@ -281,7 +281,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 				ClusterName: cluster.Name,
 			})
 		} else {
-			clusterConfigMap := clusterConfigMapObj.(*api_v1.ConfigMap)
+			clusterConfigMap := clusterConfigMapObj.(*apiv1.ConfigMap)
 
 			// Update existing configmap, if needed.
 			if !util.ConfigMapEquivalent(desiredConfigMap, clusterConfigMap) {

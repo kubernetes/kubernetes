@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
-	flockerApi "github.com/clusterhq/flocker-go"
+	flockerapi "github.com/clusterhq/flocker-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,14 +37,14 @@ const datasetOneID = "11111111-1111-1111-1111-111111111100"
 const nodeOneID = "11111111-1111-1111-1111-111111111111"
 const nodeTwoID = "22222222-2222-2222-2222-222222222222"
 
-var _ flockerApi.Clientable = &fakeFlockerClient{}
+var _ flockerapi.Clientable = &fakeFlockerClient{}
 
 type fakeFlockerClient struct {
 	DatasetID string
 	Primary   string
 	Deleted   bool
 	Metadata  map[string]string
-	Nodes     []flockerApi.NodeState
+	Nodes     []flockerapi.NodeState
 	Error     error
 }
 
@@ -54,7 +54,7 @@ func newFakeFlockerClient() *fakeFlockerClient {
 		Primary:   nodeOneID,
 		Deleted:   false,
 		Metadata:  map[string]string{"Name": "dataset-one"},
-		Nodes: []flockerApi.NodeState{
+		Nodes: []flockerapi.NodeState{
 			{
 				Host: "1.2.3.4",
 				UUID: nodeOneID,
@@ -67,13 +67,13 @@ func newFakeFlockerClient() *fakeFlockerClient {
 	}
 }
 
-func (c *fakeFlockerClient) CreateDataset(options *flockerApi.CreateDatasetOptions) (*flockerApi.DatasetState, error) {
+func (c *fakeFlockerClient) CreateDataset(options *flockerapi.CreateDatasetOptions) (*flockerapi.DatasetState, error) {
 
 	if c.Error != nil {
 		return nil, c.Error
 	}
 
-	return &flockerApi.DatasetState{
+	return &flockerapi.DatasetState{
 		DatasetID: c.DatasetID,
 	}, nil
 }
@@ -84,8 +84,8 @@ func (c *fakeFlockerClient) DeleteDataset(datasetID string) error {
 	return nil
 }
 
-func (c *fakeFlockerClient) GetDatasetState(datasetID string) (*flockerApi.DatasetState, error) {
-	return &flockerApi.DatasetState{}, nil
+func (c *fakeFlockerClient) GetDatasetState(datasetID string) (*flockerapi.DatasetState, error) {
+	return &flockerapi.DatasetState{}, nil
 }
 
 func (c *fakeFlockerClient) GetDatasetID(metaName string) (datasetID string, err error) {
@@ -99,12 +99,12 @@ func (c *fakeFlockerClient) GetPrimaryUUID() (primaryUUID string, err error) {
 	return
 }
 
-func (c *fakeFlockerClient) ListNodes() (nodes []flockerApi.NodeState, err error) {
+func (c *fakeFlockerClient) ListNodes() (nodes []flockerapi.NodeState, err error) {
 	return c.Nodes, nil
 }
 
-func (c *fakeFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerApi.DatasetState, error) {
-	return &flockerApi.DatasetState{}, nil
+func (c *fakeFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerapi.DatasetState, error) {
+	return &flockerapi.DatasetState{}, nil
 }
 
 type fakeFlockerUtil struct {
@@ -301,7 +301,7 @@ func TestIsReadOnly(t *testing.T) {
 
 type mockFlockerClient struct {
 	datasetID, primaryUUID, path string
-	datasetState                 *flockerApi.DatasetState
+	datasetState                 *flockerapi.DatasetState
 }
 
 func newMockFlockerClient(mockDatasetID, mockPrimaryUUID, mockPath string) *mockFlockerClient {
@@ -309,7 +309,7 @@ func newMockFlockerClient(mockDatasetID, mockPrimaryUUID, mockPath string) *mock
 		datasetID:   mockDatasetID,
 		primaryUUID: mockPrimaryUUID,
 		path:        mockPath,
-		datasetState: &flockerApi.DatasetState{
+		datasetState: &flockerapi.DatasetState{
 			Path:      mockPath,
 			DatasetID: mockDatasetID,
 			Primary:   mockPrimaryUUID,
@@ -317,10 +317,10 @@ func newMockFlockerClient(mockDatasetID, mockPrimaryUUID, mockPath string) *mock
 	}
 }
 
-func (m mockFlockerClient) CreateDataset(metaName string) (*flockerApi.DatasetState, error) {
+func (m mockFlockerClient) CreateDataset(metaName string) (*flockerapi.DatasetState, error) {
 	return m.datasetState, nil
 }
-func (m mockFlockerClient) GetDatasetState(datasetID string) (*flockerApi.DatasetState, error) {
+func (m mockFlockerClient) GetDatasetState(datasetID string) (*flockerapi.DatasetState, error) {
 	return m.datasetState, nil
 }
 func (m mockFlockerClient) GetDatasetID(metaName string) (string, error) {
@@ -329,7 +329,7 @@ func (m mockFlockerClient) GetDatasetID(metaName string) (string, error) {
 func (m mockFlockerClient) GetPrimaryUUID() (string, error) {
 	return m.primaryUUID, nil
 }
-func (m mockFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerApi.DatasetState, error) {
+func (m mockFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerapi.DatasetState, error) {
 	return m.datasetState, nil
 }
 

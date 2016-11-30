@@ -19,7 +19,7 @@ package testing
 import (
 	"sync"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 )
 
@@ -28,14 +28,14 @@ type FakeImageService struct {
 
 	FakeImageSize uint64
 	Called        []string
-	Images        map[string]*runtimeApi.Image
+	Images        map[string]*runtimeapi.Image
 }
 
 func (r *FakeImageService) SetFakeImages(images []string) {
 	r.Lock()
 	defer r.Unlock()
 
-	r.Images = make(map[string]*runtimeApi.Image)
+	r.Images = make(map[string]*runtimeapi.Image)
 	for _, image := range images {
 		r.Images[image] = r.makeFakeImage(image)
 	}
@@ -51,25 +51,25 @@ func (r *FakeImageService) SetFakeImageSize(size uint64) {
 func NewFakeImageService() *FakeImageService {
 	return &FakeImageService{
 		Called: make([]string, 0),
-		Images: make(map[string]*runtimeApi.Image),
+		Images: make(map[string]*runtimeapi.Image),
 	}
 }
 
-func (r *FakeImageService) makeFakeImage(image string) *runtimeApi.Image {
-	return &runtimeApi.Image{
+func (r *FakeImageService) makeFakeImage(image string) *runtimeapi.Image {
+	return &runtimeapi.Image{
 		Id:       &image,
 		Size_:    &r.FakeImageSize,
 		RepoTags: []string{image},
 	}
 }
 
-func (r *FakeImageService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeApi.Image, error) {
+func (r *FakeImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "ListImages")
 
-	images := make([]*runtimeApi.Image, 0)
+	images := make([]*runtimeapi.Image, 0)
 	for _, img := range r.Images {
 		if filter != nil && filter.Image != nil {
 			if !sliceutils.StringInSlice(filter.Image.GetImage(), img.RepoTags) {
@@ -82,7 +82,7 @@ func (r *FakeImageService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtim
 	return images, nil
 }
 
-func (r *FakeImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.Image, error) {
+func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -91,7 +91,7 @@ func (r *FakeImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi
 	return r.Images[image.GetImage()], nil
 }
 
-func (r *FakeImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
+func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -107,7 +107,7 @@ func (r *FakeImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeA
 	return nil
 }
 
-func (r *FakeImageService) RemoveImage(image *runtimeApi.ImageSpec) error {
+func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	r.Lock()
 	defer r.Unlock()
 

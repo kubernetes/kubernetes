@@ -25,7 +25,7 @@ import (
 
 	"testing"
 
-	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -59,12 +59,12 @@ func marshallBody(metrics interface{}) (io.ReadCloser, error) {
 	return ioutil.NopCloser(bytes.NewReader(result)), nil
 }
 
-func testNodeMetricsData() (*metrics_api.NodeMetricsList, *api.NodeList) {
-	metrics := &metrics_api.NodeMetricsList{
+func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
+	metrics := &metricsapi.NodeMetricsList{
 		ListMeta: unversioned.ListMeta{
 			ResourceVersion: "1",
 		},
-		Items: []metrics_api.NodeMetrics{
+		Items: []metricsapi.NodeMetrics{
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
 				Window:     unversioned.Duration{Duration: time.Minute},
@@ -115,16 +115,16 @@ func testNodeMetricsData() (*metrics_api.NodeMetricsList, *api.NodeList) {
 	return metrics, nodes
 }
 
-func testPodMetricsData() *metrics_api.PodMetricsList {
-	return &metrics_api.PodMetricsList{
+func testPodMetricsData() *metricsapi.PodMetricsList {
+	return &metricsapi.PodMetricsList{
 		ListMeta: unversioned.ListMeta{
 			ResourceVersion: "2",
 		},
-		Items: []metrics_api.PodMetrics{
+		Items: []metricsapi.PodMetrics{
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "pod1", Namespace: "test", ResourceVersion: "10"},
 				Window:     unversioned.Duration{Duration: time.Minute},
-				Containers: []metrics_api.ContainerMetrics{
+				Containers: []metricsapi.ContainerMetrics{
 					{
 						Name: "container1-1",
 						Usage: v1.ResourceList{
@@ -146,7 +146,7 @@ func testPodMetricsData() *metrics_api.PodMetricsList {
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "pod2", Namespace: "test", ResourceVersion: "11"},
 				Window:     unversioned.Duration{Duration: time.Minute},
-				Containers: []metrics_api.ContainerMetrics{
+				Containers: []metricsapi.ContainerMetrics{
 					{
 						Name: "container2-1",
 						Usage: v1.ResourceList{
@@ -176,7 +176,7 @@ func testPodMetricsData() *metrics_api.PodMetricsList {
 			{
 				ObjectMeta: v1.ObjectMeta{Name: "pod3", Namespace: "test", ResourceVersion: "12"},
 				Window:     unversioned.Duration{Duration: time.Minute},
-				Containers: []metrics_api.ContainerMetrics{
+				Containers: []metricsapi.ContainerMetrics{
 					{
 						Name: "container3-1",
 						Usage: v1.ResourceList{

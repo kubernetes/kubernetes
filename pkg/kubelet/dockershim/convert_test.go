@@ -22,18 +22,18 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/stretchr/testify/assert"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 func TestConvertDockerStatusToRuntimeAPIState(t *testing.T) {
 	testCases := []struct {
 		input    string
-		expected runtimeApi.ContainerState
+		expected runtimeapi.ContainerState
 	}{
-		{input: "Up 5 hours", expected: runtimeApi.ContainerState_CONTAINER_RUNNING},
-		{input: "Exited (0) 2 hours ago", expected: runtimeApi.ContainerState_CONTAINER_EXITED},
-		{input: "Created", expected: runtimeApi.ContainerState_CONTAINER_CREATED},
-		{input: "Random string", expected: runtimeApi.ContainerState_CONTAINER_UNKNOWN},
+		{input: "Up 5 hours", expected: runtimeapi.ContainerState_CONTAINER_RUNNING},
+		{input: "Exited (0) 2 hours ago", expected: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{input: "Created", expected: runtimeapi.ContainerState_CONTAINER_CREATED},
+		{input: "Random string", expected: runtimeapi.ContainerState_CONTAINER_UNKNOWN},
 	}
 
 	for _, test := range testCases {

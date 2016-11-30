@@ -19,30 +19,30 @@ package kuberuntime
 import (
 	"time"
 
-	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // instrumentedRuntimeService wraps the RuntimeService and records the operations
 // and errors metrics.
 type instrumentedRuntimeService struct {
-	service internalApi.RuntimeService
+	service internalapi.RuntimeService
 }
 
 // Creates an instrumented RuntimeInterface from an existing RuntimeService.
-func NewInstrumentedRuntimeService(service internalApi.RuntimeService) internalApi.RuntimeService {
+func NewInstrumentedRuntimeService(service internalapi.RuntimeService) internalapi.RuntimeService {
 	return &instrumentedRuntimeService{service: service}
 }
 
 // instrumentedImageManagerService wraps the ImageManagerService and records the operations
 // and errors metrics.
 type instrumentedImageManagerService struct {
-	service internalApi.ImageManagerService
+	service internalapi.ImageManagerService
 }
 
 // Creates an instrumented ImageManagerService from an existing ImageManagerService.
-func NewInstrumentedImageManagerService(service internalApi.ImageManagerService) internalApi.ImageManagerService {
+func NewInstrumentedImageManagerService(service internalapi.ImageManagerService) internalapi.ImageManagerService {
 	return &instrumentedImageManagerService{service: service}
 }
 
@@ -59,7 +59,7 @@ func recordError(operation string, err error) {
 	}
 }
 
-func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeApi.VersionResponse, error) {
+func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeapi.VersionResponse, error) {
 	const operation = "version"
 	defer recordOperation(operation, time.Now())
 
@@ -68,7 +68,7 @@ func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeApi.Ver
 	return out, err
 }
 
-func (in instrumentedRuntimeService) Status() (*runtimeApi.RuntimeStatus, error) {
+func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 	const operation = "status"
 	defer recordOperation(operation, time.Now())
 
@@ -77,7 +77,7 @@ func (in instrumentedRuntimeService) Status() (*runtimeApi.RuntimeStatus, error)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
+func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
 
@@ -113,7 +113,7 @@ func (in instrumentedRuntimeService) RemoveContainer(containerID string) error {
 	return err
 }
 
-func (in instrumentedRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*runtimeApi.Container, error) {
+func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	const operation = "list_containers"
 	defer recordOperation(operation, time.Now())
 
@@ -122,7 +122,7 @@ func (in instrumentedRuntimeService) ListContainers(filter *runtimeApi.Container
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error) {
+func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error) {
 	const operation = "container_status"
 	defer recordOperation(operation, time.Now())
 
@@ -140,7 +140,7 @@ func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, 
 	return stdout, stderr, err
 }
 
-func (in instrumentedRuntimeService) Exec(req *runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
+func (in instrumentedRuntimeService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	const operation = "exec"
 	defer recordOperation(operation, time.Now())
 
@@ -149,7 +149,7 @@ func (in instrumentedRuntimeService) Exec(req *runtimeApi.ExecRequest) (*runtime
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) Attach(req *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
+func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	const operation = "attach"
 	defer recordOperation(operation, time.Now())
 
@@ -158,7 +158,7 @@ func (in instrumentedRuntimeService) Attach(req *runtimeApi.AttachRequest) (*run
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
+func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (string, error) {
 	const operation = "run_podsandbox"
 	defer recordOperation(operation, time.Now())
 
@@ -185,7 +185,7 @@ func (in instrumentedRuntimeService) RemovePodSandbox(podSandboxID string) error
 	return err
 }
 
-func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error) {
+func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodSandboxStatus, error) {
 	const operation = "podsandbox_status"
 	defer recordOperation(operation, time.Now())
 
@@ -194,7 +194,7 @@ func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*run
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error) {
+func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
 	const operation = "list_podsandbox"
 	defer recordOperation(operation, time.Now())
 
@@ -203,7 +203,7 @@ func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandbo
 	return out, err
 }
 
-func (in instrumentedRuntimeService) PortForward(req *runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
+func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	const operation = "port_forward"
 	defer recordOperation(operation, time.Now())
 
@@ -212,7 +212,7 @@ func (in instrumentedRuntimeService) PortForward(req *runtimeApi.PortForwardRequ
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
+func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig) error {
 	const operation = "update_runtime_config"
 	defer recordOperation(operation, time.Now())
 
@@ -221,7 +221,7 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeA
 	return err
 }
 
-func (in instrumentedImageManagerService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeApi.Image, error) {
+func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	const operation = "list_images"
 	defer recordOperation(operation, time.Now())
 
@@ -230,7 +230,7 @@ func (in instrumentedImageManagerService) ListImages(filter *runtimeApi.ImageFil
 	return out, err
 }
 
-func (in instrumentedImageManagerService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.Image, error) {
+func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	const operation = "image_status"
 	defer recordOperation(operation, time.Now())
 
@@ -239,7 +239,7 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeApi.ImageSpe
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
+func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 
@@ -248,7 +248,7 @@ func (in instrumentedImageManagerService) PullImage(image *runtimeApi.ImageSpec,
 	return err
 }
 
-func (in instrumentedImageManagerService) RemoveImage(image *runtimeApi.ImageSpec) error {
+func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	const operation = "remove_image"
 	defer recordOperation(operation, time.Now())
 

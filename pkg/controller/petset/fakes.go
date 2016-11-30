@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	api_pod "k8s.io/kubernetes/pkg/api/v1/pod"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/types"
@@ -211,8 +211,8 @@ func (f *fakePetClient) Update(expected, wanted *pcb) error {
 	pets := []*pcb{}
 	for i, pet := range f.pets {
 		if wanted.pod.Name == pet.pod.Name {
-			f.pets[i].pod.Annotations[api_pod.PodHostnameAnnotation] = wanted.pod.Annotations[api_pod.PodHostnameAnnotation]
-			f.pets[i].pod.Annotations[api_pod.PodSubdomainAnnotation] = wanted.pod.Annotations[api_pod.PodSubdomainAnnotation]
+			f.pets[i].pod.Annotations[apipod.PodHostnameAnnotation] = wanted.pod.Annotations[apipod.PodHostnameAnnotation]
+			f.pets[i].pod.Annotations[apipod.PodSubdomainAnnotation] = wanted.pod.Annotations[apipod.PodSubdomainAnnotation]
 			f.pets[i].pod.Spec = wanted.pod.Spec
 			found = true
 		}

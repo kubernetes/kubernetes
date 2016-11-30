@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
-	flockerApi "github.com/clusterhq/flocker-go"
+	flockerapi "github.com/clusterhq/flocker-go"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -50,7 +50,7 @@ type flockerVolume struct {
 	// dataset uuid
 	datasetUUID string
 	//pod           *v1.Pod
-	flockerClient flockerApi.Clientable
+	flockerClient flockerapi.Clientable
 	manager       volumeManager
 	plugin        *flockerPlugin
 	mounter       mount.Interface
@@ -229,7 +229,7 @@ func (b *flockerVolumeMounter) SetUp(fsGroup *int64) error {
 
 // newFlockerClient uses environment variables and pod attributes to return a
 // flocker client capable of talking with the Flocker control service.
-func (p *flockerPlugin) newFlockerClient(hostIP string) (*flockerApi.Client, error) {
+func (p *flockerPlugin) newFlockerClient(hostIP string) (*flockerapi.Client, error) {
 	host := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
 	port, err := env.GetEnvAsIntOrFallback("FLOCKER_CONTROL_SERVICE_PORT", defaultPort)
 
@@ -240,11 +240,11 @@ func (p *flockerPlugin) newFlockerClient(hostIP string) (*flockerApi.Client, err
 	keyPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
 	certPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
 
-	c, err := flockerApi.NewClient(host, port, hostIP, caCertPath, keyPath, certPath)
+	c, err := flockerapi.NewClient(host, port, hostIP, caCertPath, keyPath, certPath)
 	return c, err
 }
 
-func (b *flockerVolumeMounter) newFlockerClient() (*flockerApi.Client, error) {
+func (b *flockerVolumeMounter) newFlockerClient() (*flockerapi.Client, error) {
 
 	hostIP, err := b.plugin.host.GetHostIP()
 	if err != nil {

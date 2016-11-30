@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -46,13 +46,13 @@ const sandboxMinGCAge time.Duration = 30 * time.Second
 
 // containerGC is the manager of garbage collection.
 type containerGC struct {
-	client    internalApi.RuntimeService
+	client    internalapi.RuntimeService
 	manager   *kubeGenericRuntimeManager
 	podGetter podGetter
 }
 
 // NewContainerGC creates a new containerGC.
-func NewContainerGC(client internalApi.RuntimeService, podGetter podGetter, manager *kubeGenericRuntimeManager) *containerGC {
+func NewContainerGC(client internalapi.RuntimeService, podGetter podGetter, manager *kubeGenericRuntimeManager) *containerGC {
 	return &containerGC{
 		client:    client,
 		manager:   manager,
@@ -161,7 +161,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 	newestGCTime := time.Now().Add(-minAge)
 	for _, container := range containers {
 		// Prune out running containers.
-		if container.GetState() == runtimeApi.ContainerState_CONTAINER_RUNNING {
+		if container.GetState() == runtimeapi.ContainerState_CONTAINER_RUNNING {
 			continue
 		}
 
@@ -256,7 +256,7 @@ func (cgc *containerGC) evictSandboxes(minAge time.Duration) error {
 	newestGCTime := time.Now().Add(-minAge)
 	for _, sandbox := range sandboxes {
 		// Prune out ready sandboxes.
-		if sandbox.GetState() == runtimeApi.PodSandboxState_SANDBOX_READY {
+		if sandbox.GetState() == runtimeapi.PodSandboxState_SANDBOX_READY {
 			continue
 		}
 

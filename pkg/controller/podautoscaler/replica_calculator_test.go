@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -131,15 +131,15 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		var heapsterRawMemResponse []byte
 
 		if tc.resource != nil {
-			metrics := metrics_api.PodMetricsList{}
+			metrics := metricsapi.PodMetricsList{}
 			for i, resValue := range tc.resource.levels {
-				podMetric := metrics_api.PodMetrics{
+				podMetric := metricsapi.PodMetrics{
 					ObjectMeta: v1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: testNamespace,
 					},
 					Timestamp: unversioned.Time{Time: tc.timestamp},
-					Containers: []metrics_api.ContainerMetrics{
+					Containers: []metricsapi.ContainerMetrics{
 						{
 							Name: "container1",
 							Usage: v1.ResourceList{

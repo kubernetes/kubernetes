@@ -21,18 +21,18 @@ import (
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
-	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-// RemoteImageService is a gRPC implementation of internalApi.ImageManagerService.
+// RemoteImageService is a gRPC implementation of internalapi.ImageManagerService.
 type RemoteImageService struct {
 	timeout     time.Duration
-	imageClient runtimeApi.ImageServiceClient
+	imageClient runtimeapi.ImageServiceClient
 }
 
-// NewRemoteImageService creates a new internalApi.ImageManagerService.
-func NewRemoteImageService(addr string, connectionTimout time.Duration) (internalApi.ImageManagerService, error) {
+// NewRemoteImageService creates a new internalapi.ImageManagerService.
+func NewRemoteImageService(addr string, connectionTimout time.Duration) (internalapi.ImageManagerService, error) {
 	glog.V(3).Infof("Connecting to image service %s", addr)
 	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dial))
 	if err != nil {
@@ -42,16 +42,16 @@ func NewRemoteImageService(addr string, connectionTimout time.Duration) (interna
 
 	return &RemoteImageService{
 		timeout:     connectionTimout,
-		imageClient: runtimeApi.NewImageServiceClient(conn),
+		imageClient: runtimeapi.NewImageServiceClient(conn),
 	}, nil
 }
 
 // ListImages lists available images.
-func (r *RemoteImageService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeApi.Image, error) {
+func (r *RemoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
-	resp, err := r.imageClient.ListImages(ctx, &runtimeApi.ListImagesRequest{
+	resp, err := r.imageClient.ListImages(ctx, &runtimeapi.ListImagesRequest{
 		Filter: filter,
 	})
 	if err != nil {
@@ -63,11 +63,11 @@ func (r *RemoteImageService) ListImages(filter *runtimeApi.ImageFilter) ([]*runt
 }
 
 // ImageStatus returns the status of the image.
-func (r *RemoteImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.Image, error) {
+func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
-	resp, err := r.imageClient.ImageStatus(ctx, &runtimeApi.ImageStatusRequest{
+	resp, err := r.imageClient.ImageStatus(ctx, &runtimeapi.ImageStatusRequest{
 		Image: image,
 	})
 	if err != nil {
@@ -79,11 +79,11 @@ func (r *RemoteImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeA
 }
 
 // PullImage pulls an image with authentication config.
-func (r *RemoteImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
+func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
-	_, err := r.imageClient.PullImage(ctx, &runtimeApi.PullImageRequest{
+	_, err := r.imageClient.PullImage(ctx, &runtimeapi.PullImageRequest{
 		Image: image,
 		Auth:  auth,
 	})
@@ -96,11 +96,11 @@ func (r *RemoteImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtim
 }
 
 // RemoveImage removes the image.
-func (r *RemoteImageService) RemoveImage(image *runtimeApi.ImageSpec) error {
+func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
-	_, err := r.imageClient.RemoveImage(ctx, &runtimeApi.RemoveImageRequest{
+	_, err := r.imageClient.RemoveImage(ctx, &runtimeapi.RemoveImageRequest{
 		Image: image,
 	})
 	if err != nil {
