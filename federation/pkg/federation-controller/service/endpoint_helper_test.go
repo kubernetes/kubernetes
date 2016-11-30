@@ -33,7 +33,7 @@ var fakeServiceController = ServiceController{
 	dnsZones:         fakeDnsZones,
 	federationName:   "fed1",
 	zoneName:         "example.com",
-	serviceDnsSuffix: "federation.example.com",
+	serviceDNSSuffix: "federation.example.com",
 	serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 	clusterCache: &clusterClientCache{
 		clientMap: make(map[string]*clusterCache),
