@@ -5373,12 +5373,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"affinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the pod's scheduling constraints",
+							Ref:         spec.MustCreateRef("#/definitions/v1.Affinity"),
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
 		},
 		Dependencies: []string{
-			"v1.Container", "v1.LocalObjectReference", "v1.PodSecurityContext", "v1.Volume"},
+			"v1.Affinity", "v1.Container", "v1.LocalObjectReference", "v1.PodSecurityContext", "v1.Volume"},
 	},
 	"v1.PodStatus": {
 		Schema: spec.Schema{
