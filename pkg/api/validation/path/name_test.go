@@ -130,3 +130,40 @@ func TestValidatePathSegmentName(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateWithMutliErrors(t *testing.T) {
+	testcases := map[string]struct {
+		Name        string
+		Prefix      bool
+		ExpectedMsg string
+	}{
+		"slash,percent": {
+			Name:        "foo//bar%",
+			Prefix:      false,
+			ExpectedMsg: "/%",
+		},
+		"slash,percent,prefix": {
+			Name:        "foo//bar%",
+			Prefix:      true,
+			ExpectedMsg: "/%",
+		},
+	}
+
+	for k, tc := range testcases {
+		msgs := ValidatePathSegmentName(tc.Name, tc.Prefix)
+		if len(tc.ExpectedMsg) == 0 && len(msgs) > 0 {
+			t.Errorf("%s: expected no message, got %v", k, msgs)
+		}
+		if len(tc.ExpectedMsg) > 0 && len(msgs) == 0 {
+			t.Errorf("%s: expected error message, got none", k)
+		}
+		if len(tc.ExpectedMsg) > 0 {
+			for i := 0; i < len(tc.ExpectedMsg); i++ {
+				v := string(tc.ExpectedMsg[i])
+				if !strings.Contains(msgs[i], v) {
+					t.Errorf("%s: expected message containing %q, got %v", k, v, msgs[i])
+				}
+			}
+		}
+	}
+}
