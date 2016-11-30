@@ -50,11 +50,12 @@ func (b *BitSet) Get(k uint64) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	base := k / chunkSize
+	base := (k / chunkSize) * chunkSize
 	chunk := b.chunks[base]
 	if chunk == nil {
 		return false
 	}
+
 	offset := (k - base) / 8
 	mask := byte(1) << ((k - base) % 8)
 	return (chunk.bits[offset] & mask) != byte(0)
@@ -64,7 +65,7 @@ func (b *BitSet) Put(k uint64, v bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	base := k / chunkSize
+	base := (k / chunkSize) * chunkSize
 
 	chunk := b.chunks[base]
 	if chunk == nil {

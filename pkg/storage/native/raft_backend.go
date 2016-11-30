@@ -256,8 +256,14 @@ func (s *RaftBackend) opDelete(ctx context.Context, op *StorageOperation) (*Stor
 				attempt++
 				continue
 
+			case ErrorCode_NOT_FOUND:
+				return &StorageOperationResult{
+					ErrorCode:  deleteResult.ErrorCode,
+					CurrentLsn: deleteResult.CurrentLsn,
+				}, nil
+
 			default:
-				return nil, fmt.Errorf("unexpected error code: %v", getResult.ErrorCode)
+				return nil, fmt.Errorf("unexpected error code: %v", deleteResult.ErrorCode)
 			}
 		}
 
