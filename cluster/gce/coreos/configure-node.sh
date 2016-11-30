@@ -167,6 +167,11 @@ function configure-master-addons() {
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR}" == "true" ]]; then
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/node-problem-detector  ${addon_dir}/node-problem-detector
   fi
+  if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "storage-class/gce"
+  fi
+
+  evaluate-manifests-dir ${MANIFESTS_DIR}/addons/storage-class/gce ${addon_dir}/storage-class
 }
 
 function configure-master-components() {
