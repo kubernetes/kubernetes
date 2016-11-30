@@ -52,6 +52,11 @@ type RunObjectConfig interface {
 	GetName() string
 	GetNamespace() string
 	GetKind() schema.GroupKind
+	GetClient() clientset.Interface
+	GetInternalClient() internalclientset.Interface
+	SetClient(clientset.Interface)
+	SetInternalClient(internalclientset.Interface)
+	GetReplicas() int
 }
 
 type RCConfig struct {
@@ -218,6 +223,26 @@ func (config *DeploymentConfig) GetKind() schema.GroupKind {
 	return extensionsinternal.Kind("Deployment")
 }
 
+func (config *DeploymentConfig) GetClient() clientset.Interface {
+	return config.RCConfig.GetClient()
+}
+
+func (config *DeploymentConfig) GetInternalClient() internalclientset.Interface {
+	return config.RCConfig.GetInternalClient()
+}
+
+func (config *DeploymentConfig) SetClient(c clientset.Interface) {
+	config.RCConfig.SetClient(c)
+}
+
+func (config *DeploymentConfig) SetInternalClient(c internalclientset.Interface) {
+	config.RCConfig.SetInternalClient(c)
+}
+
+func (config *DeploymentConfig) GetReplicas() int {
+	return config.RCConfig.GetReplicas()
+}
+
 func (config *DeploymentConfig) create() error {
 	deployment := &extensions.Deployment{
 		ObjectMeta: v1.ObjectMeta{
@@ -286,6 +311,26 @@ func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
 	return extensionsinternal.Kind("ReplicaSet")
 }
 
+func (config *ReplicaSetConfig) GetClient() clientset.Interface {
+	return config.RCConfig.GetClient()
+}
+
+func (config *ReplicaSetConfig) GetInternalClient() internalclientset.Interface {
+	return config.RCConfig.GetInternalClient()
+}
+
+func (config *ReplicaSetConfig) SetClient(c clientset.Interface) {
+	config.RCConfig.SetClient(c)
+}
+
+func (config *ReplicaSetConfig) SetInternalClient(c internalclientset.Interface) {
+	config.RCConfig.SetInternalClient(c)
+}
+
+func (config *ReplicaSetConfig) GetReplicas() int {
+	return config.RCConfig.GetReplicas()
+}
+
 func (config *ReplicaSetConfig) create() error {
 	rs := &extensions.ReplicaSet{
 		ObjectMeta: v1.ObjectMeta{
@@ -352,6 +397,26 @@ func (config *RCConfig) GetNamespace() string {
 
 func (config *RCConfig) GetKind() schema.GroupKind {
 	return api.Kind("ReplicationController")
+}
+
+func (config *RCConfig) GetClient() clientset.Interface {
+	return config.Client
+}
+
+func (config *RCConfig) GetInternalClient() internalclientset.Interface {
+	return config.InternalClient
+}
+
+func (config *RCConfig) SetClient(c clientset.Interface) {
+	config.Client = c
+}
+
+func (config *RCConfig) SetInternalClient(c internalclientset.Interface) {
+	config.InternalClient = c
+}
+
+func (config *RCConfig) GetReplicas() int {
+	return config.Replicas
 }
 
 func (config *RCConfig) create() error {
