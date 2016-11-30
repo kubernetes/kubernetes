@@ -181,7 +181,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 			update.OnCompleteFunc(err)
 		}
 		if err != nil {
-			glog.Errorf("Error syncing pod %s, skipping: %v", update.Pod.UID, err)
+			glog.Errorf("Error syncing pod %s (%s/%s), skipping: %v", update.Pod.UID, update.Pod.Namespace, update.Pod.Name, err)
 			p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "Error syncing pod, skipping: %v", err)
 		}
 		p.wrapUp(update.Pod.UID, err)
