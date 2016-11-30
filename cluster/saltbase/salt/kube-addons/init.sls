@@ -177,3 +177,13 @@ addon-dir-create:
     - user: root
     - group: root
     - mode: 755
+
+{% if pillar.get('enable_default_storage_class', '').lower() == 'true' and grains['cloud'] is defined and grains['cloud'] in ['aws', 'gce', 'openstack'] %}
+/etc/kubernetes/addons/storage-class/default.yaml:
+  file.managed:
+    - source: salt://kube-addons/storage-class/{{ grains['cloud'] }}/default.yaml
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: True
+{% endif %}
