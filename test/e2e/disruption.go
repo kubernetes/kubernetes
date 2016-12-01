@@ -36,6 +36,7 @@ import (
 // awhile to guarantee that we've been patient waiting for something ordinary
 // to happen: a pod to get scheduled and move into Ready
 const schedulingTimeout = 10 * time.Minute
+const bigClusterSize = 7
 
 var _ = framework.KubeDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
@@ -71,12 +72,13 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 	})
 
 	evictionCases := []struct {
-		description    string
-		minAvailable   intstr.IntOrString
-		podCount       int
-		replicaSetSize int32
-		shouldDeny     bool
-		exclusive      bool
+		description        string
+		minAvailable       intstr.IntOrString
+		podCount           int
+		replicaSetSize     int32
+		shouldDeny         bool
+		exclusive          bool
+		skipForBigClusters bool
 	}{
 		{
 			description:  "no PDB",
@@ -105,6 +107,8 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			replicaSetSize: 10,
 			exclusive:      true,
 			shouldDeny:     true,
+			// This tests assumes that there is less than replicaSetSize nodes in the cluster.
+			skipForBigClusters: true,
 		},
 	}
 	for i := range evictionCases {
@@ -114,6 +118,15 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			expectation = "should not allow an eviction"
 		}
 		It(fmt.Sprintf("evictions: %s => %s", c.description, expectation), func() {
+
+			nodeList, err := cs.Core().Nodes().List(v1.ListOptions{})
+			ExpectNoError(err)
+			// Some tests are not suited to be run on large clusters.
+			if c.skipForBigClusters && len(nodeList.Items) >= bigClusterSize {
+				framework.Skipf("The cluster is too big for this test")
+				return // just for clarity
+			}
+
 			createPodsOrDie(cs, ns, c.podCount)
 			if c.replicaSetSize > 0 {
 				createReplicaSetOrDie(cs, ns, c.replicaSetSize, c.exclusive)
@@ -125,7 +138,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 
 			// Locate a running pod.
 			var pod v1.Pod
-			err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
+			err = wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
 				podList, err := cs.Pods(ns).List(v1.ListOptions{})
 				if err != nil {
 					return false, err
