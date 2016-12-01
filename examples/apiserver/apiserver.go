@@ -36,6 +36,8 @@ import (
 
 	// Install the testgroup API
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -93,20 +95,21 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	if errs := serverOptions.InsecureServing.Validate("insecure-port"); len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)
 	}
+	if err := serverOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(serverOptions.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
+		glog.Fatalf("Error creating self-signed certificates: %v", err)
+	}
 
-	config := genericapiserver.NewConfig().
+	config, err := genericapiserver.NewConfig().
 		ApplyOptions(serverOptions.GenericServerRunOptions).
-		ApplySecureServingOptions(serverOptions.SecureServing).
 		ApplyInsecureServingOptions(serverOptions.InsecureServing).
 		ApplyAuthenticationOptions(serverOptions.Authentication).
-		Complete()
-	if err := config.MaybeGenerateServingCerts(); err != nil {
-		// this wasn't treated as fatal for this process before
-		fmt.Printf("Error creating cert: %v", err)
+		ApplySecureServingOptions(serverOptions.SecureServing)
+	if err != nil {
+		return fmt.Errorf("failed to configure https: %s", err)
 	}
 
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
-	s, err := config.New()
+	s, err := config.Complete().New()
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}
