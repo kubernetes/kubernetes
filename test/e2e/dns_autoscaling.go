@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
 	DNSParams_3 := DNSParamsLinear{map[string]string{"linear": "{\"nodesPerReplica\": 3, \"coresPerReplica\": 3}"}, 3.0, 3.0}
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
 
 		Expect(len(framework.GetReadySchedulableNodesOrDie(c).Items)).NotTo(BeZero())
