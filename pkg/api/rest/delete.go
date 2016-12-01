@@ -80,7 +80,15 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 		// if we are already being deleted, we may only shorten the deletion grace period
 		// this means the object was gracefully deleted previously but deletionGracePeriodSeconds was not set,
 		// so we force deletion immediately
-		if objectMeta.DeletionGracePeriodSeconds == nil {
+		// IMPORTANT:
+		// The deletion operation happens in two phases.
+		// 1. Update to set DeletionGracePeriodSeconds and DeletionTimestamp
+		// 2. Delete the object from storage.
+		// If the update succeeds, but the delete fails (network error, internal storage error, etc.),
+		// a resource was previously left in a state that was non-recoverable.  We
+		// check if the existing stored resource has a grace period as 0 and if so
+		// attempt to delete immediately in order to recover from this scenario.
+		if objectMeta.DeletionGracePeriodSeconds == nil || *objectMeta.DeletionGracePeriodSeconds == 0 {
 			return false, false, nil
 		}
 		// only a shorter grace period may be provided by a user
