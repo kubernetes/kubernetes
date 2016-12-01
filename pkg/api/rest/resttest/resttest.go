@@ -1168,6 +1168,12 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 		t.Errorf("unexpected number of items: %v", len(items))
 	}
 	if !api.Semantic.DeepEqual(existing, items) {
+		for i, o := range existing {
+			t.Errorf("expected @%d: %#v", i, o)
+		}
+		for i, o := range items {
+			t.Errorf("actual @%d: %#v", i, o)
+		}
 		t.Errorf("expected: %#v, got: %#v", existing, items)
 	}
 }

@@ -23,14 +23,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 
 	"golang.org/x/net/context"
 )
 
-func newStorage(t *testing.T) (*Etcd, *etcdtesting.EtcdTestServer, allocator.Interface, *storagebackend.Config) {
+func newStorage(t *testing.T) (*Etcd, storagetesting.TestServer, allocator.Interface, *storagebackend.Config) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
 	etcd := NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
@@ -45,7 +44,7 @@ func validNewRangeAllocation() *api.RangeAllocation {
 
 func key() string {
 	s := "/ranges/serviceips"
-	return etcdtest.AddPrefix(s)
+	return s //etcdtest.AddPrefix(s)
 }
 
 func TestEmpty(t *testing.T) {

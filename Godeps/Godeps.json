@@ -119,6 +119,10 @@
 			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
 		},
 		{
+			"ImportPath": "github.com/armon/go-metrics",
+			"Rev": "97c69685293dce4c0a2d0b19535179bbc976e4d2"
+		},
+		{
 			"ImportPath": "github.com/asaskevich/govalidator",
 			"Comment": "v4-12-g593d645",
 			"Rev": "593d64559f7600f29581a3ee42177f5dbded27a9"
@@ -983,6 +987,11 @@
 			"Rev": "e18d7aa8f8c624c915db340349aad4c49b10d173"
 		},
 		{
+			"ImportPath": "github.com/gogo/protobuf/io",
+			"Comment": "v0.2-33-ge18d7aa",
+			"Rev": "e18d7aa8f8c624c915db340349aad4c49b10d173"
+		},
+		{
 			"ImportPath": "github.com/gogo/protobuf/plugin/compare",
 			"Comment": "v0.2-33-ge18d7aa",
 			"Rev": "e18d7aa8f8c624c915db340349aad4c49b10d173"
@@ -1374,6 +1383,10 @@
 			"Rev": "f52d055dc48aec25854ed7d31862f78913cf17d1"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/go-msgpack/codec",
+			"Rev": "fa3f63826f7c23912c15263591e65d54d080b458"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 		},
@@ -1416,6 +1429,14 @@
 		{
 			"ImportPath": "github.com/hashicorp/hcl/json/token",
 			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/raft",
+			"Rev": "5f09c4ffdbcd2a53768e78c47717415de12b6728"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/raft-boltdb",
+			"Rev": "a8adffd05b79e3d8b1817d46bbe387a112265b3e"
 		},
 		{
 			"ImportPath": "github.com/hawkular/hawkular-client-go/metrics",

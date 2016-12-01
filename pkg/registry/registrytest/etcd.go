@@ -31,13 +31,21 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	//etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	nativetesting "k8s.io/kubernetes/pkg/storage/native/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
-func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcdtesting.EtcdTestServer) {
-	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, storagetesting.TestServer) {
+	return NewNativeEmbeddedStorage(t, group)
+	//server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	//config.Codec = testapi.Groups[group].StorageCodec()
+	//return config, server
+}
+
+func NewNativeEmbeddedStorage(t *testing.T, group string) (*storagebackend.Config, storagetesting.TestServer) {
+	server, config := nativetesting.NewUnsecuredNativeTestClientServer(t)
 	config.Codec = testapi.Groups[group].StorageCodec()
 	return config, server
 }
