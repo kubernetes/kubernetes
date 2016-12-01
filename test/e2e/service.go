@@ -499,7 +499,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		jig := NewServiceTestJig(cs, serviceName)
 		servicePort := 8080
 		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
-		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
+		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
 		defer func() {
 			framework.Logf("Cleaning up the clusterip test service")
 			err := cs.Core().Services(ns).Delete(serviceName, nil)
@@ -532,10 +532,10 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		jig := NewServiceTestJig(cs, serviceName)
-		service := jig.CreateTCPServiceOrFail(ns, func(svc *api.Service) {
-			svc.Spec.Type = api.ServiceTypeNodePort
+		service := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(service, api.ServiceTypeNodePort)
+		jig.SanityCheckService(service, v1.ServiceTypeNodePort)
 		defer func() {
 			framework.Logf("Cleaning up the nodeport reject test service")
 			err := cs.Core().Services(ns).Delete(serviceName, nil)
