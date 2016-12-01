@@ -38,6 +38,7 @@ import (
 // ControllerClientBuilder allow syou to get clients and configs for controllers
 type ControllerClientBuilder interface {
 	Config(name string) (*restclient.Config, error)
+	ConfigOrDie(name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
 }
@@ -50,7 +51,15 @@ type SimpleControllerClientBuilder struct {
 
 func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	clientConfig := *b.ClientConfig
-	return &clientConfig, nil
+	return restclient.AddUserAgent(&clientConfig, name), nil
+}
+
+func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
+	clientConfig, err := b.Config(name)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	return clientConfig
 }
 
 func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface, error) {
@@ -58,7 +67,7 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 	if err != nil {
 		return nil, err
 	}
-	return clientset.NewForConfig(restclient.AddUserAgent(clientConfig, name))
+	return clientset.NewForConfig(clientConfig)
 }
 
 func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
@@ -148,6 +157,14 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	}
 
 	return clientConfig, nil
+}
+
+func (b SAControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
+	clientConfig, err := b.Config(name)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	return clientConfig
 }
 
 func (b SAControllerClientBuilder) Client(name string) (clientset.Interface, error) {
