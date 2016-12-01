@@ -370,7 +370,7 @@ func (h *handler) cleanupHostportMap(containerPortMap map[v1.ContainerPort]targe
 	for containerPort := range containerPortMap {
 		hp := hostport{
 			port:     containerPort.HostPort,
-			protocol: string(containerPort.Protocol),
+			protocol: strings.ToLower(string(containerPort.Protocol)),
 		}
 		currentHostports[hp] = true
 	}
@@ -379,6 +379,7 @@ func (h *handler) cleanupHostportMap(containerPortMap map[v1.ContainerPort]targe
 	for hp, socket := range h.hostPortMap {
 		if _, ok := currentHostports[hp]; !ok {
 			socket.Close()
+			glog.V(3).Infof("Closed local port %s", hp.String())
 			delete(h.hostPortMap, hp)
 		}
 	}
