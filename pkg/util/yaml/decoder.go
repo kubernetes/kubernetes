@@ -268,6 +268,7 @@ func (r *YAMLByteReader) Read() ([]byte, error) {
 			buffer.Write(lineByte)
 		}
 	}
+	r.bytes = make([]byte, 0)
 	return buffer.Bytes(), nil
 }
 
