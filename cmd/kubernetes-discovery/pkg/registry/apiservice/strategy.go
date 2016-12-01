@@ -36,7 +36,7 @@ type apiServerStrategy struct {
 	kapi.NameGenerator
 }
 
-var strategy = apiServerStrategy{kapi.Scheme, kapi.SimpleNameGenerator}
+var Strategy = apiServerStrategy{kapi.Scheme, kapi.SimpleNameGenerator}
 
 func (apiServerStrategy) NamespaceScoped() bool {
 	return false
@@ -71,19 +71,21 @@ func (apiServerStrategy) ValidateUpdate(ctx kapi.Context, obj, old runtime.Objec
 	return validation.ValidateAPIServiceUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	apiserver, ok := obj.(*apiregistration.APIService)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a APIService.")
+	}
+	return labels.Set(apiserver.ObjectMeta.Labels), APIServiceToSelectableFields(apiserver), nil
+}
+
 // MatchAPIService is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
 func MatchAPIService(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			apiserver, ok := obj.(*apiregistration.APIService)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a APIService.")
-			}
-			return labels.Set(apiserver.ObjectMeta.Labels), APIServiceToSelectableFields(apiserver), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

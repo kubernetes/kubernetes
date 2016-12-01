@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,33 +17,34 @@ limitations under the License.
 package etcd
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/core/secret"
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration"
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/registry/apiservice"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// rest implements a RESTStorage for API services against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against secrets.
+// NewREST returns a RESTStorage object that will work against API services.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		NewFunc:     func() runtime.Object { return &api.Secret{} },
-		NewListFunc: func() runtime.Object { return &api.SecretList{} },
+		NewFunc:     func() runtime.Object { return &apiregistration.APIService{} },
+		NewListFunc: func() runtime.Object { return &apiregistration.APIServiceList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.Secret).Name, nil
+			return obj.(*apiregistration.APIService).Name, nil
 		},
-		PredicateFunc:     secret.Matcher,
-		QualifiedResource: api.Resource("secrets"),
+		PredicateFunc:     apiservice.MatchAPIService,
+		QualifiedResource: apiregistration.Resource("apiservices"),
 
-		CreateStrategy: secret.Strategy,
-		UpdateStrategy: secret.Strategy,
-		DeleteStrategy: secret.Strategy,
+		CreateStrategy: apiservice.Strategy,
+		UpdateStrategy: apiservice.Strategy,
+		DeleteStrategy: apiservice.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: secret.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: apiservice.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

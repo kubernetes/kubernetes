@@ -22,11 +22,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for jobs against etcd
@@ -35,55 +33,23 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against Jobs.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &batch.JobList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Jobs),
-		&batch.Job{},
-		prefix,
-		job.Strategy,
-		newListFunc,
-		job.GetAttrs,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		NewFunc: func() runtime.Object { return &batch.Job{} },
-
-		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
-		// Produces a path that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix
-		KeyRootFunc: func(ctx api.Context) string {
-			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		// Produces a path that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-		// Retrieve the name field of a job
+		NewFunc:     func() runtime.Object { return &batch.Job{} },
+		NewListFunc: func() runtime.Object { return &batch.JobList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*batch.Job).Name, nil
 		},
-		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           job.MatchJob,
-		QualifiedResource:       batch.Resource("jobs"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     job.MatchJob,
+		QualifiedResource: batch.Resource("jobs"),
 
-		// Used to validate job creation
 		CreateStrategy: job.Strategy,
-
-		// Used to validate job updates
 		UpdateStrategy: job.Strategy,
 		DeleteStrategy: job.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
+	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: job.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 
 	statusStore := *store

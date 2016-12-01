@@ -104,12 +104,13 @@ const AllResources = "*"
 // specialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
 // TODO: move out of this package, it is not generic
 var specialDefaultResourcePrefixes = map[schema.GroupResource]string{
-	schema.GroupResource{Group: "", Resource: "replicationControllers"}: "controllers",
-	schema.GroupResource{Group: "", Resource: "replicationcontrollers"}: "controllers",
-	schema.GroupResource{Group: "", Resource: "endpoints"}:              "services/endpoints",
-	schema.GroupResource{Group: "", Resource: "nodes"}:                  "minions",
-	schema.GroupResource{Group: "", Resource: "services"}:               "services/specs",
-	schema.GroupResource{Group: "extensions", Resource: "ingresses"}:    "ingress",
+	schema.GroupResource{Group: "", Resource: "replicationControllers"}:        "controllers",
+	schema.GroupResource{Group: "", Resource: "replicationcontrollers"}:        "controllers",
+	schema.GroupResource{Group: "", Resource: "endpoints"}:                     "services/endpoints",
+	schema.GroupResource{Group: "", Resource: "nodes"}:                         "minions",
+	schema.GroupResource{Group: "", Resource: "services"}:                      "services/specs",
+	schema.GroupResource{Group: "extensions", Resource: "ingresses"}:           "ingress",
+	schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
 }
 
 func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {

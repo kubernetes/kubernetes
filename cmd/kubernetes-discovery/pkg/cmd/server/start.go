@@ -122,7 +122,7 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 
 	config := apiserver.Config{
 		GenericConfig:     genericAPIServerConfig,
-		RESTOptionsGetter: restOptionsFactory{storageConfig: &o.Etcd.StorageConfig},
+		RESTOptionsGetter: &restOptionsFactory{storageConfig: &o.Etcd.StorageConfig},
 	}
 
 	server, err := config.Complete().New()
@@ -149,12 +149,12 @@ type restOptionsFactory struct {
 	storageConfig *storagebackend.Config
 }
 
-func (f restOptionsFactory) NewFor(resource schema.GroupResource) generic.RESTOptions {
+func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	return generic.RESTOptions{
 		StorageConfig:           f.storageConfig,
 		Decorator:               registry.StorageWithCacher,
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: false,
 		ResourcePrefix:          f.storageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
-	}
+	}, nil
 }
