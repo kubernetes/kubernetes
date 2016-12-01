@@ -30,7 +30,7 @@ import (
 )
 
 func installFederationAPIs(g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {
-	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(restOptionsFactory.NewFor(federation.Resource("clusters")))
+	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(restOptionsFactory.NewFor)
 	federationResources := map[string]rest.Storage{
 		"clusters":        clusterStorage,
 		"clusters/status": clusterStatusStorage,

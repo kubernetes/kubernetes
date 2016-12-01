@@ -27,3 +27,9 @@ type RESTStorageProvider interface {
 	GroupName() string
 	NewRESTStorage(apiResourceConfigSource APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (APIGroupInfo, bool)
 }
+
+func RESTOptionsToGetter(opts *generic.RESTOptions) RESTOptionsGetter {
+	return func(schema.GroupResource) generic.RESTOptions {
+		return *opts
+	}
+}

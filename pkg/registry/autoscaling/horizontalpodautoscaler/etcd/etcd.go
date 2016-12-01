@@ -20,12 +20,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 type REST struct {
@@ -33,54 +33,22 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.HorizontalPodAutoscalers),
-		&autoscaling.HorizontalPodAutoscaler{},
-		prefix,
-		horizontalpodautoscaler.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
-		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
-		// Produces a path that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		// Produces a path that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-		// Retrieve the name field of an autoscaler
+		NewFunc:     func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
+		NewListFunc: func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*autoscaling.HorizontalPodAutoscaler).Name, nil
 		},
-		// Used to match objects based on labels/fields for list
-		PredicateFunc:           horizontalpodautoscaler.MatchAutoscaler,
-		QualifiedResource:       autoscaling.Resource("horizontalpodautoscalers"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     horizontalpodautoscaler.MatchAutoscaler,
+		QualifiedResource: autoscaling.Resource("horizontalpodautoscalers"),
 
-		// Used to validate autoscaler creation
 		CreateStrategy: horizontalpodautoscaler.Strategy,
-
-		// Used to validate autoscaler updates
 		UpdateStrategy: horizontalpodautoscaler.Strategy,
 		DeleteStrategy: horizontalpodautoscaler.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
+
 	statusStore := *store
 	statusStore.UpdateStrategy = horizontalpodautoscaler.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}

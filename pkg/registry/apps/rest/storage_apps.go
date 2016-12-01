@@ -44,7 +44,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
-		statefulsetStorage, statefulsetStatusStorage := statefulsetetcd.NewREST(restOptionsGetter(apps.Resource("statefulsets")))
+		statefulsetStorage, statefulsetStatusStorage := statefulsetetcd.NewREST(restOptionsGetter)
 		storage["statefulsets"] = statefulsetStorage
 		storage["statefulsets/status"] = statefulsetStatusStorage
 	}

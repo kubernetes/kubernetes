@@ -24,6 +24,7 @@ import (
 	// Ensure that autoscaling/v1 package is initialized.
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -33,8 +34,8 @@ import (
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, autoscaling.GroupName)
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
-	horizontalPodAutoscalerStorage, statusStorage := NewREST(restOptions)
+	restOptions := &generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
+	horizontalPodAutoscalerStorage, statusStorage := NewREST(genericapiserver.RESTOptionsToGetter(restOptions))
 	return horizontalPodAutoscalerStorage, statusStorage, server
 }
 

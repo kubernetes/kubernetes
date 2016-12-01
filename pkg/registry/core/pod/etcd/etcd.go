@@ -28,14 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -58,45 +58,22 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.PodList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Pods),
-		&api.Pod{},
-		prefix,
-		pod.Strategy,
-		newListFunc,
-		pod.NodeNameTriggerFunc,
-	)
-
+func NewStorage(optsGetter genericapiserver.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
+		NewListFunc: func() runtime.Object { return &api.PodList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Pod).Name, nil
 		},
-		PredicateFunc:           pod.MatchPod,
-		QualifiedResource:       api.Resource("pods"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     pod.MatchPod,
+		QualifiedResource: api.Resource("pods"),
 
 		CreateStrategy:      pod.Strategy,
 		UpdateStrategy:      pod.Strategy,
 		DeleteStrategy:      pod.Strategy,
 		ReturnDeletedObject: true,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, pod.NodeNameTriggerFunc)
 
 	statusStore := *store
 	statusStore.UpdateStrategy = pod.StatusStrategy

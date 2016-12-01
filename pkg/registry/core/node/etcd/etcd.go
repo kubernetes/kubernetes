@@ -24,13 +24,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/node"
 	noderest "k8s.io/kubernetes/pkg/registry/core/node/rest"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 // NodeStorage includes storage for nodes and all sub resources
@@ -68,44 +68,22 @@ func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedOb
 }
 
 // NewStorage returns a NodeStorage object that will work against nodes.
-func NewStorage(opts generic.RESTOptions, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.NodeList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Nodes),
-		&api.Node{},
-		prefix,
-		node.Strategy,
-		newListFunc,
-		node.NodeNameTriggerFunc)
-
+func NewStorage(optsGetter genericapiserver.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return prefix
-		},
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, name)
-		},
+		NewListFunc: func() runtime.Object { return &api.NodeList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
 		},
-		PredicateFunc:           node.MatchNode,
-		QualifiedResource:       api.Resource("nodes"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     node.MatchNode,
+		QualifiedResource: api.Resource("nodes"),
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,
 		DeleteStrategy: node.Strategy,
 		ExportStrategy: node.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, node.NodeNameTriggerFunc)
 
 	statusStore := *store
 	statusStore.UpdateStrategy = node.StatusStrategy

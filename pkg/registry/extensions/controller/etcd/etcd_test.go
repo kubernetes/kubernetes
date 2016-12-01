@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/storage"
@@ -33,13 +34,13 @@ import (
 
 func newStorage(t *testing.T) (*ScaleREST, *etcdtesting.EtcdTestServer, storage.Interface, factory.DestroyFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "controllers"}
+	restOptions := &generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "controllers"}
 	s, d := generic.NewRawStorage(etcdStorage)
 	destroyFunc := func() {
 		d()
 		server.Terminate(t)
 	}
-	return NewStorage(restOptions).Scale, server, s, destroyFunc
+	return NewStorage(genericapiserver.RESTOptionsToGetter(restOptions)).Scale, server, s, destroyFunc
 }
 
 var validPodTemplate = api.PodTemplate{

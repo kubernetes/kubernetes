@@ -25,12 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/registry/core/controller"
 	"k8s.io/kubernetes/pkg/registry/core/controller/etcd"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 )
 
 // Container includes dummy storage for RC pods and experimental storage for Scale.
@@ -39,9 +39,9 @@ type ContainerStorage struct {
 	Scale                 *ScaleREST
 }
 
-func NewStorage(opts generic.RESTOptions) ContainerStorage {
+func NewStorage(optsGetter genericapiserver.RESTOptionsGetter) ContainerStorage {
 	// scale does not set status, only updates spec so we ignore the status
-	controllerREST, _ := etcd.NewREST(opts)
+	controllerREST, _ := etcd.NewREST(optsGetter)
 	rcRegistry := controller.NewRegistry(controllerREST)
 
 	return ContainerStorage{

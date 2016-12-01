@@ -17,14 +17,13 @@ limitations under the License.
 package etcd
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
-	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 // REST implements a RESTStorage for RoleBinding against etcd
@@ -33,44 +32,21 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against RoleBinding objects.
-func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &rbac.RoleBindingList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.RoleBindings),
-		&rbac.RoleBinding{},
-		prefix,
-		rolebinding.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) *REST {
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &rbac.RoleBinding{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, id)
-		},
+		NewListFunc: func() runtime.Object { return &rbac.RoleBindingList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*rbac.RoleBinding).Name, nil
 		},
-		PredicateFunc:           rolebinding.Matcher,
-		QualifiedResource:       rbac.Resource("rolebindings"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     rolebinding.Matcher,
+		QualifiedResource: rbac.Resource("rolebindings"),
 
 		CreateStrategy: rolebinding.Strategy,
 		UpdateStrategy: rolebinding.Strategy,
 		DeleteStrategy: rolebinding.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
 
 	return &REST{store}
 }

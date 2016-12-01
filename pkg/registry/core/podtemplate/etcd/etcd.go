@@ -18,12 +18,12 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/core/podtemplate"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 type REST struct {
@@ -31,36 +31,15 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against pod templates.
-func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.PodTemplateList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.PodTemplates),
-		&api.PodTemplate{},
-		prefix,
-		podtemplate.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) *REST {
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.PodTemplate{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
+		NewListFunc: func() runtime.Object { return &api.PodTemplateList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.PodTemplate).Name, nil
 		},
-		PredicateFunc:           podtemplate.MatchPodTemplate,
-		QualifiedResource:       api.Resource("podtemplates"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     podtemplate.MatchPodTemplate,
+		QualifiedResource: api.Resource("podtemplates"),
 
 		CreateStrategy: podtemplate.Strategy,
 		UpdateStrategy: podtemplate.Strategy,
@@ -68,9 +47,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		ExportStrategy: podtemplate.Strategy,
 
 		ReturnDeletedObject: true,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
 	return &REST{store}
 }

@@ -31,10 +31,10 @@ import (
 )
 
 func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {
-	replicaSetStorage := replicasetetcd.NewStorage(restOptionsFactory.NewFor(extensions.Resource("replicasets")))
-	deploymentStorage := deploymentetcd.NewStorage(restOptionsFactory.NewFor(extensions.Resource("deployments")))
-	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptionsFactory.NewFor(extensions.Resource("ingresses")))
-	daemonSetStorage, daemonSetStatusStorage := daemonsetetcd.NewREST(restOptionsFactory.NewFor(extensions.Resource("daemonsets")))
+	replicaSetStorage := replicasetetcd.NewStorage(restOptionsFactory.NewFor)
+	deploymentStorage := deploymentetcd.NewStorage(restOptionsFactory.NewFor)
+	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptionsFactory.NewFor)
+	daemonSetStorage, daemonSetStatusStorage := daemonsetetcd.NewREST(restOptionsFactory.NewFor)
 
 	extensionsResources := map[string]rest.Storage{
 		"replicasets":          replicaSetStorage.ReplicaSet,

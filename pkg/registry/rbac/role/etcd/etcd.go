@@ -17,14 +17,13 @@ limitations under the License.
 package etcd
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
-	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/rbac/role"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 // REST implements a RESTStorage for Role against etcd
@@ -33,44 +32,21 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against Role objects.
-func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &rbac.RoleList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Roles),
-		&rbac.Role{},
-		prefix,
-		role.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) *REST {
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &rbac.Role{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, id)
-		},
+		NewListFunc: func() runtime.Object { return &rbac.RoleList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*rbac.Role).Name, nil
 		},
-		PredicateFunc:           role.Matcher,
-		QualifiedResource:       rbac.Resource("roles"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     role.Matcher,
+		QualifiedResource: rbac.Resource("roles"),
 
 		CreateStrategy: role.Strategy,
 		UpdateStrategy: role.Strategy,
 		DeleteStrategy: role.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
 
 	return &REST{store}
 }

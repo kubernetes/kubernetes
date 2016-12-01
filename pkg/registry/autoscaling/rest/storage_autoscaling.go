@@ -44,7 +44,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
-		hpaStorage, hpaStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptionsGetter(autoscaling.Resource("horizontalpodautoscalers")))
+		hpaStorage, hpaStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptionsGetter)
 		storage["horizontalpodautoscalers"] = hpaStorage
 		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 	}

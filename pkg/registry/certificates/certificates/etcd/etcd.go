@@ -20,14 +20,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 // REST implements a RESTStorage for CertificateSigningRequest against etcd
@@ -36,46 +34,21 @@ type REST struct {
 }
 
 // NewREST returns a registry which will store CertificateSigningRequest in the given helper
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *ApprovalREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &certificates.CertificateSigningRequestList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.CertificateSigningRequests),
-		&certificates.CertificateSigningRequest{},
-		prefix,
-		csrregistry.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST) {
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &certificates.CertificateSigningRequest{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return prefix
-		},
-		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, id)
-		},
+		NewListFunc: func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*certificates.CertificateSigningRequest).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-			return csrregistry.Matcher(label, field)
-		},
-		QualifiedResource:       certificates.Resource("certificatesigningrequests"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     csrregistry.Matcher,
+		QualifiedResource: certificates.Resource("certificatesigningrequests"),
 
 		CreateStrategy: csrregistry.Strategy,
 		UpdateStrategy: csrregistry.Strategy,
 		DeleteStrategy: csrregistry.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
 
 	// Subresources use the same store and creation strategy, which only
 	// allows empty subs. Updates to an existing subresource are handled by

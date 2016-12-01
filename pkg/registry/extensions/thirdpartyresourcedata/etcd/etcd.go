@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -34,7 +35,9 @@ type REST struct {
 }
 
 // NewREST returns a registry which will store ThirdPartyResourceData in the given helper
-func NewREST(opts generic.RESTOptions, group, kind string) *REST {
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter, group, kind string) *REST {
+	resource := extensions.Resource("thirdpartyresourcedatas")
+	opts := optsGetter(resource)
 	prefix := "/ThirdPartyResourceData/" + group + "/" + strings.ToLower(kind) + "s"
 
 	// We explicitly do NOT do any decoration here yet.
@@ -53,7 +56,7 @@ func NewREST(opts generic.RESTOptions, group, kind string) *REST {
 			return obj.(*extensions.ThirdPartyResourceData).Name, nil
 		},
 		PredicateFunc:           thirdpartyresourcedata.Matcher,
-		QualifiedResource:       extensions.Resource("thirdpartyresourcedatas"),
+		QualifiedResource:       resource,
 		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 		CreateStrategy:          thirdpartyresourcedata.Strategy,

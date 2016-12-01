@@ -26,13 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/controller"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 // ControllerStorage includes dummy storage for Replication Controllers and for Scale subresource.
@@ -42,8 +42,8 @@ type ControllerStorage struct {
 	Scale      *ScaleREST
 }
 
-func NewStorage(opts generic.RESTOptions) ControllerStorage {
-	controllerREST, statusREST := NewREST(opts)
+func NewStorage(optsGetter genericapiserver.RESTOptionsGetter) ControllerStorage {
+	controllerREST, statusREST := NewREST(optsGetter)
 	controllerRegistry := controller.NewRegistry(controllerREST)
 
 	return ControllerStorage{
@@ -58,56 +58,22 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.ReplicationControllerList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Controllers),
-		&api.ReplicationController{},
-		prefix,
-		controller.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &api.ReplicationController{} },
-
-		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
-		// Produces a path that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		// Produces a path that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-		// Retrieve the name field of a replication controller
+		NewFunc:     func() runtime.Object { return &api.ReplicationController{} },
+		NewListFunc: func() runtime.Object { return &api.ReplicationControllerList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.ReplicationController).Name, nil
 		},
-		// Used to match objects based on labels/fields for list and watch
 		PredicateFunc:     controller.MatchController,
 		QualifiedResource: api.Resource("replicationcontrollers"),
 
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
-
-		// Used to validate controller creation
 		CreateStrategy: controller.Strategy,
-
-		// Used to validate controller updates
 		UpdateStrategy: controller.Strategy,
 		DeleteStrategy: controller.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
+
 	statusStore := *store
 	statusStore.UpdateStrategy = controller.StatusStrategy
 

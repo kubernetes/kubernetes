@@ -19,6 +19,7 @@ package etcd
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -31,7 +32,9 @@ type REST struct {
 }
 
 // NewREST returns a registry which will store ThirdPartyResource in the given helper
-func NewREST(opts generic.RESTOptions) *REST {
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) *REST {
+	resource := extensions.Resource("thirdpartyresources")
+	opts := optsGetter(resource)
 	prefix := "/" + opts.ResourcePrefix
 
 	// We explicitly do NOT do any decoration here yet.
@@ -50,7 +53,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 			return obj.(*extensions.ThirdPartyResource).Name, nil
 		},
 		PredicateFunc:           thirdpartyresource.Matcher,
-		QualifiedResource:       extensions.Resource("thirdpartyresources"),
+		QualifiedResource:       resource,
 		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 		CreateStrategy:          thirdpartyresource.Strategy,

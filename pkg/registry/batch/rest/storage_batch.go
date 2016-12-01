@@ -55,7 +55,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter(batch.Resource("jobs")))
+		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter)
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
 	}
@@ -67,12 +67,12 @@ func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource genericapis
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter(batch.Resource("jobs")))
+		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter)
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("cronjobs")) {
-		cronJobsStorage, cronJobsStatusStorage := cronjobetcd.NewREST(restOptionsGetter(batch.Resource("cronjobs")))
+		cronJobsStorage, cronJobsStatusStorage := cronjobetcd.NewREST(restOptionsGetter)
 		storage["cronjobs"] = cronJobsStorage
 		storage["cronjobs/status"] = cronJobsStatusStorage
 		storage["scheduledjobs"] = cronJobsStorage

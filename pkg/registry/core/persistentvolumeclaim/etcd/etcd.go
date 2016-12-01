@@ -19,12 +19,12 @@ package etcd
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 type REST struct {
@@ -32,45 +32,22 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against persistent volume claims.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.PersistentVolumeClaimList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.PersistentVolumeClaims),
-		&api.PersistentVolumeClaim{},
-		prefix,
-		persistentvolumeclaim.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
+		NewListFunc: func() runtime.Object { return &api.PersistentVolumeClaimList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.PersistentVolumeClaim).Name, nil
 		},
-		PredicateFunc:           persistentvolumeclaim.MatchPersistentVolumeClaim,
-		QualifiedResource:       api.Resource("persistentvolumeclaims"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     persistentvolumeclaim.MatchPersistentVolumeClaim,
+		QualifiedResource: api.Resource("persistentvolumeclaims"),
 
 		CreateStrategy:      persistentvolumeclaim.Strategy,
 		UpdateStrategy:      persistentvolumeclaim.Strategy,
 		DeleteStrategy:      persistentvolumeclaim.Strategy,
 		ReturnDeletedObject: true,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
 
 	statusStore := *store
 	statusStore.UpdateStrategy = persistentvolumeclaim.StatusStrategy

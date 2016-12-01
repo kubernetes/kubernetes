@@ -20,12 +20,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	ingress "k8s.io/kubernetes/pkg/registry/extensions/ingress"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 // rest implements a RESTStorage for replication controllers against etcd
@@ -34,55 +34,22 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &extensions.IngressList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Ingress),
-		&extensions.Ingress{},
-		prefix,
-		ingress.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &extensions.Ingress{} },
-
-		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
-		// Produces a ingress that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		// Produces a ingress that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-		// Retrieve the name field of a replication controller
+		NewFunc:     func() runtime.Object { return &extensions.Ingress{} },
+		NewListFunc: func() runtime.Object { return &extensions.IngressList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensions.Ingress).Name, nil
 		},
-		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           ingress.MatchIngress,
-		QualifiedResource:       extensions.Resource("ingresses"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     ingress.MatchIngress,
+		QualifiedResource: extensions.Resource("ingresses"),
 
-		// Used to validate controller creation
 		CreateStrategy: ingress.Strategy,
-
-		// Used to validate controller updates
 		UpdateStrategy: ingress.Strategy,
 		DeleteStrategy: ingress.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
+
 	statusStore := *store
 	statusStore.UpdateStrategy = ingress.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}

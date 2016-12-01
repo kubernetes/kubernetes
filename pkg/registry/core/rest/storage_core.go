@@ -119,38 +119,38 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 	restStorage := LegacyRESTStorage{}
 
-	podTemplateStorage := podtemplateetcd.NewREST(restOptionsGetter(api.Resource("podTemplates")))
+	podTemplateStorage := podtemplateetcd.NewREST(restOptionsGetter)
 
-	eventStorage := eventetcd.NewREST(restOptionsGetter(api.Resource("events")), uint64(c.EventTTL.Seconds()))
-	limitRangeStorage := limitrangeetcd.NewREST(restOptionsGetter(api.Resource("limitRanges")))
+	eventStorage := eventetcd.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+	limitRangeStorage := limitrangeetcd.NewREST(restOptionsGetter)
 
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(restOptionsGetter(api.Resource("resourceQuotas")))
-	secretStorage := secretetcd.NewREST(restOptionsGetter(api.Resource("secrets")))
-	serviceAccountStorage := serviceaccountetcd.NewREST(restOptionsGetter(api.Resource("serviceAccounts")))
-	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(restOptionsGetter(api.Resource("persistentVolumes")))
-	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(restOptionsGetter(api.Resource("persistentVolumeClaims")))
-	configMapStorage := configmapetcd.NewREST(restOptionsGetter(api.Resource("configMaps")))
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(restOptionsGetter)
+	secretStorage := secretetcd.NewREST(restOptionsGetter)
+	serviceAccountStorage := serviceaccountetcd.NewREST(restOptionsGetter)
+	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(restOptionsGetter)
+	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(restOptionsGetter)
+	configMapStorage := configmapetcd.NewREST(restOptionsGetter)
 
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(restOptionsGetter(api.Resource("namespaces")))
+	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(restOptionsGetter)
 	restStorage.NamespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
-	endpointsStorage := endpointsetcd.NewREST(restOptionsGetter(api.Resource("endpoints")))
+	endpointsStorage := endpointsetcd.NewREST(restOptionsGetter)
 	restStorage.EndpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, err := nodeetcd.NewStorage(restOptionsGetter(api.Resource("nodes")), c.KubeletClientConfig, c.ProxyTransport)
+	nodeStorage, err := nodeetcd.NewStorage(restOptionsGetter, c.KubeletClientConfig, c.ProxyTransport)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 	restStorage.NodeRegistry = node.NewRegistry(nodeStorage.Node)
 
 	podStorage := podetcd.NewStorage(
-		restOptionsGetter(api.Resource("pods")),
+		restOptionsGetter,
 		nodeStorage.KubeletConnectionInfo,
 		c.ProxyTransport,
 		podDisruptionClient,
 	)
 
-	serviceRESTStorage, serviceStatusStorage := serviceetcd.NewREST(restOptionsGetter(api.Resource("services")))
+	serviceRESTStorage, serviceStatusStorage := serviceetcd.NewREST(restOptionsGetter)
 	restStorage.ServiceRegistry = service.NewRegistry(serviceRESTStorage)
 
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
@@ -183,7 +183,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	})
 	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage := controlleretcd.NewStorage(restOptionsGetter(api.Resource("replicationControllers")))
+	controllerStorage := controlleretcd.NewStorage(restOptionsGetter)
 
 	serviceRest := service.NewStorage(restStorage.ServiceRegistry, restStorage.EndpointRegistry, ServiceClusterIPAllocator, ServiceNodePortAllocator, c.ProxyTransport)
 

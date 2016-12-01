@@ -19,12 +19,12 @@ package etcd
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/core/service"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 type REST struct {
@@ -32,45 +32,23 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against services.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.ServiceList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Services),
-		&api.Service{},
-		prefix,
-		service.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.Service{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
+		NewListFunc: func() runtime.Object { return &api.ServiceList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Service).Name, nil
 		},
-		PredicateFunc:           service.MatchServices,
-		QualifiedResource:       api.Resource("services"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     service.MatchServices,
+		QualifiedResource: api.Resource("services"),
 
 		CreateStrategy: service.Strategy,
 		UpdateStrategy: service.Strategy,
 		DeleteStrategy: service.Strategy,
 		ExportStrategy: service.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
+
 	statusStore := *store
 	statusStore.UpdateStrategy = service.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}

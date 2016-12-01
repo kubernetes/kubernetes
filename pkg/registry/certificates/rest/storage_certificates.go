@@ -44,7 +44,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("certificatesigningrequests")) {
-		csrStorage, csrStatusStorage, csrApprovalStorage := certificateetcd.NewREST(restOptionsGetter(certificates.Resource("certificatesigningrequests")))
+		csrStorage, csrStatusStorage, csrApprovalStorage := certificateetcd.NewREST(restOptionsGetter)
 		storage["certificatesigningrequests"] = csrStorage
 		storage["certificatesigningrequests/status"] = csrStatusStorage
 		storage["certificatesigningrequests/approval"] = csrApprovalStorage

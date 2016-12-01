@@ -22,7 +22,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -65,53 +64,53 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 	storage := map[string]rest.Storage{}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
-		hpaStorage, hpaStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptionsGetter(extensions.Resource("horizontalpodautoscalers")))
+		hpaStorage, hpaStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptionsGetter)
 		storage["horizontalpodautoscalers"] = hpaStorage
 		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 
-		controllerStorage := expcontrolleretcd.NewStorage(restOptionsGetter(api.Resource("replicationControllers")))
+		controllerStorage := expcontrolleretcd.NewStorage(restOptionsGetter)
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("thirdpartyresources")) {
-		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptionsGetter(extensions.Resource("thirdpartyresources")))
+		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptionsGetter)
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
-		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptionsGetter(extensions.Resource("daemonsets")))
+		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptionsGetter)
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
-		deploymentStorage := deploymentetcd.NewStorage(restOptionsGetter(extensions.Resource("deployments")))
+		deploymentStorage := deploymentetcd.NewStorage(restOptionsGetter)
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter(extensions.Resource("jobs")))
+		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter)
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
-		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptionsGetter(extensions.Resource("ingresses")))
+		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptionsGetter)
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("podsecuritypolicy")) {
-		podSecurityExtensionsStorage := pspetcd.NewREST(restOptionsGetter(extensions.Resource("podsecuritypolicy")))
+		podSecurityExtensionsStorage := pspetcd.NewREST(restOptionsGetter)
 		storage["podSecurityPolicies"] = podSecurityExtensionsStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
-		replicaSetStorage := replicasetetcd.NewStorage(restOptionsGetter(extensions.Resource("replicasets")))
+		replicaSetStorage := replicasetetcd.NewStorage(restOptionsGetter)
 		storage["replicasets"] = replicaSetStorage.ReplicaSet
 		storage["replicasets/status"] = replicaSetStorage.Status
 		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
-		networkExtensionsStorage := networkpolicyetcd.NewREST(restOptionsGetter(extensions.Resource("networkpolicies")))
+		networkExtensionsStorage := networkpolicyetcd.NewREST(restOptionsGetter)
 		storage["networkpolicies"] = networkExtensionsStorage
 	}
 

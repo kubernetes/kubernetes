@@ -20,12 +20,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/batch/cronjob"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/restoptions"
 )
 
 // REST implements a RESTStorage for scheduled jobs against etcd
@@ -34,55 +34,21 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against CronJobs.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &batch.CronJobList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.CronJobs),
-		&batch.CronJob{},
-		prefix,
-		cronjob.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter genericapiserver.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &batch.CronJob{} },
-
-		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
-		// Produces a path that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		// Produces a path that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-		// Retrieve the name field of a scheduled job
+		NewFunc:     func() runtime.Object { return &batch.CronJob{} },
+		NewListFunc: func() runtime.Object { return &batch.CronJobList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*batch.CronJob).Name, nil
 		},
-		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           cronjob.MatchCronJob,
-		QualifiedResource:       batch.Resource("cronjobs"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     cronjob.MatchCronJob,
+		QualifiedResource: batch.Resource("cronjobs"),
 
-		// Used to validate scheduled job creation
 		CreateStrategy: cronjob.Strategy,
-
-		// Used to validate scheduled job updates
 		UpdateStrategy: cronjob.Strategy,
 		DeleteStrategy: cronjob.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	restoptions.ApplyOptions(optsGetter, store, storage.NoTriggerPublisher)
 
 	statusStore := *store
 	statusStore.UpdateStrategy = cronjob.StatusStrategy

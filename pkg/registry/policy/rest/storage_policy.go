@@ -42,7 +42,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 	version := policyapiv1beta1.SchemeGroupVersion
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("poddisruptionbudgets")) {
-		poddisruptionbudgetStorage, poddisruptionbudgetStatusStorage := poddisruptionbudgetetcd.NewREST(restOptionsGetter(policy.Resource("poddisruptionbudgets")))
+		poddisruptionbudgetStorage, poddisruptionbudgetStatusStorage := poddisruptionbudgetetcd.NewREST(restOptionsGetter)
 		storage["poddisruptionbudgets"] = poddisruptionbudgetStorage
 		storage["poddisruptionbudgets/status"] = poddisruptionbudgetStatusStorage
 	}
