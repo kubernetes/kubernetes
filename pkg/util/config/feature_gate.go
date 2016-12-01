@@ -61,7 +61,7 @@ var (
 		appArmor:                                    {true, beta},
 		dynamicKubeletConfig:                        {false, alpha},
 		dynamicVolumeProvisioning:                   {true, alpha},
-		streamingProxyRedirects:                     {false, alpha},
+		streamingProxyRedirects:                     {true, beta},
 		experimentalHostUserNamespaceDefaultingGate: {false, alpha},
 	}
 
