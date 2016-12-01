@@ -188,8 +188,6 @@ spec:
   replicas: 3
   template:
     metadata:
-      annotations:
-        pod.alpha.kubernetes.io/initialized: "true"
       labels:
         app: cassandra
     spec:
@@ -398,16 +396,13 @@ functionality, like a Deployment, ReplicaSet, Replication Controller, or Job.
 
 ## Step 4: Delete Cassandra StatefulSet
 
-There are some limitations with the Alpha release of PetSet in 1.3. From the [documentation](http://kubernetes.io/docs/user-guide/petset/):
-
-"Deleting the StatefulSet will not delete any pods. You will either have to manually scale it down to 0 pods first, or delete the pods yourself.
-Deleting and/or scaling a StatefulSet down will not delete the volumes associated with the StatefulSet. This is done to ensure safety first, your data is more valuable than an auto purge of all related StatefulSet resources. Deleting the Persistent Volume Claims will result in a deletion of the associated volumes."
+Deleting and/or scaling a StatefulSet down will not delete the volumes associated with the StatefulSet. This is done to ensure safety first, your data is more valuable than an auto purge of all related StatefulSet resources. Deleting the Persistent Volume Claims may result in a deletion of the associated volumes, depending on the storage class and reclaim policy. You should never assume ability to access a volume after claim deletion.
 
 Use the following commands to delete the StatefulSet.
 
 ```console
 $ grace=$(kubectl get po cassandra-0 --template '{{.spec.terminationGracePeriodSeconds}}') \
-  && kubectl delete statefulset,po -l app=cassandra \
+  && kubectl delete statefulset -l app=cassandra \
   && echo "Sleeping $grace" \
   && sleep $grace \
   && kubectl delete pvc -l app=cassandra
