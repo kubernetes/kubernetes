@@ -236,6 +236,11 @@ func run(deploy deployer) error {
 		}
 		// Start the cluster using this version.
 		if err := xmlWrap("Up", deploy.Up); err != nil {
+			if *dump != "" {
+				xmlWrap("DumpClusterLogs", func() error {
+					return DumpClusterLogs(*dump)
+				})
+			}
 			return fmt.Errorf("starting e2e cluster: %s", err)
 		}
 		if *dump != "" {
