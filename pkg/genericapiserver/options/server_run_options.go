@@ -74,7 +74,6 @@ type ServerRunOptions struct {
 	// for testing). This is not actually exposed as a flag.
 	DefaultStorageVersions string
 	TargetRAMMB            int
-	TLSCAFile              string
 	WatchCacheSizes        []string
 }
 
