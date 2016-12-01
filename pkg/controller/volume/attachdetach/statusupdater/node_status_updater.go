@@ -91,6 +91,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 				clonedNode)
 		}
 
+		// TODO: Change to pkg/util/node.UpdateNodeStatus.
 		oldData, err := json.Marshal(node)
 		if err != nil {
 			return fmt.Errorf(
