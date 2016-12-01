@@ -82,7 +82,7 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 		}
 	}
 	minString, found := params["min"]
-	min := -1
+	min := 1
 	var err error
 	if found {
 		if min, err = strconv.Atoi(minString); err != nil {
@@ -98,7 +98,7 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 		return nil, err
 	}
 	cpuString, found := params["cpu-percent"]
-	cpu := -1
+	cpu := 80
 	if found {
 		if cpu, err = strconv.Atoi(cpuString); err != nil {
 			return nil, err
@@ -118,13 +118,12 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 			MaxReplicas: int32(max),
 		},
 	}
-	if min > 0 {
-		v := int32(min)
-		scaler.Spec.MinReplicas = &v
-	}
-	if cpu >= 0 {
-		c := int32(cpu)
-		scaler.Spec.TargetCPUUtilizationPercentage = &c
-	}
+
+	v := int32(min)
+	scaler.Spec.MinReplicas = &v
+
+	c := int32(cpu)
+	scaler.Spec.TargetCPUUtilizationPercentage = &c
+
 	return &scaler, nil
 }
