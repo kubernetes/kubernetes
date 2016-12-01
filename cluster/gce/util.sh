@@ -1383,7 +1383,7 @@ function kube-down() {
     --format "value(zone)" | wc -l)
 
   # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
-  if [[ "${REMAINING_MASTER_COUNT}" == "1" ]]; then
+  if [[ "${REMAINING_MASTER_COUNT}" -eq 1 ]]; then
     if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
       detect-master
       local REMAINING_REPLICA_NAME="$(get-all-replica-names)"
@@ -1404,7 +1404,7 @@ function kube-down() {
   fi
 
   # If there are no more remaining master replicas, we should delete all remaining network resources.
-  if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
+  if [[ "${REMAINING_MASTER_COUNT}" -eq 0 ]]; then
     # Delete firewall rule for the master, etcd servers, and nodes.
     delete-firewall-rules "${MASTER_NAME}-https" "${MASTER_NAME}-etcd" "${NODE_TAG}-all"
     # Delete the master's reserved IP
@@ -1438,7 +1438,7 @@ function kube-down() {
   fi
 
   # If there are no more remaining master replicas: delete routes, pd for influxdb and update kubeconfig
-  if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
+  if [[ "${REMAINING_MASTER_COUNT}" -eq 0 ]]; then
     # Delete routes.
     local -a routes
     # Clean up all routes w/ names like "<cluster-name>-<node-GUID>"
@@ -1491,9 +1491,9 @@ function kube-down() {
     # - 1: fatal error - cluster won't be working correctly
     # - 2: weak error - something went wrong, but cluster probably will be working correctly
     # We just print an error message in case 2).
-    if [[ "${validate_result}" == "1" ]]; then
+    if [[ "${validate_result}" -eq 1 ]]; then
       exit 1
-    elif [[ "${validate_result}" == "2" ]]; then
+    elif [[ "${validate_result}" -eq 2 ]]; then
       echo "...ignoring non-fatal errors in validate-cluster" >&2
     fi
   fi
