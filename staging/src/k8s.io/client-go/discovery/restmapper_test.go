@@ -290,31 +290,34 @@ func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersi
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
-func (c *fakeCachedDiscoveryInterface) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (c *fakeCachedDiscoveryInterface) ServerResources() ([]*unversioned.APIResourceList, error) {
 	if c.enabledA {
 		av1, _ := c.ServerResourcesForGroupVersion("a/v1")
-		return map[string]*unversioned.APIResourceList{
-			"a/v1": av1,
-		}, nil
+		return []*unversioned.APIResourceList{av1}, nil
 	}
-	return map[string]*unversioned.APIResourceList{}, nil
+	return []*unversioned.APIResourceList{}, nil
 }
 
-func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]schema.GroupVersionResource, error) {
+func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]*unversioned.APIResourceList, error) {
 	if c.enabledA {
-		return []schema.GroupVersionResource{
+		return []*unversioned.APIResourceList{
 			{
-				Group:    "a",
-				Version:  "v1",
-				Resource: "foo",
+				GroupVersion: "a/v1",
+				APIResources: []unversioned.APIResource{
+					{
+						Name:  "foo",
+						Kind:  "Foo",
+						Verbs: []string{},
+					},
+				},
 			},
 		}, nil
 	}
-	return []schema.GroupVersionResource{}, nil
+	return nil, nil
 }
 
-func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResources() ([]schema.GroupVersionResource, error) {
-	return []schema.GroupVersionResource{}, nil
+func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResources() ([]*unversioned.APIResourceList, error) {
+	return nil, nil
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {

@@ -108,3 +108,49 @@ func NegotiateVersion(client DiscoveryInterface, requiredGV *schema.GroupVersion
 	return nil, fmt.Errorf("failed to negotiate an api version; server supports: %v, client supports: %v",
 		serverVersions, clientVersions)
 }
+
+// ToGroupVersionResources converts APIResourceLists to the GroupVersionResources.
+func ToGroupVersionResources(rls []*unversioned.APIResourceList) ([]schema.GroupVersionResource, error) {
+	gvrs := []schema.GroupVersionResource{}
+	for _, rl := range rls {
+		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
+		if err != nil {
+			return nil, err
+		}
+		for i := range rl.APIResources {
+			gvrs = append(gvrs, schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: rl.APIResources[i].Name})
+		}
+	}
+	return gvrs, nil
+}
+
+// FilteredBy filters by the given predicate.
+func FilteredBy(pred ResourcePredicate, rls []*unversioned.APIResourceList) []*unversioned.APIResourceList {
+	result := []*unversioned.APIResourceList{}
+	for _, rl := range rls {
+		filtered := *rl
+		filtered.APIResources = nil
+		for i := range rl.APIResources {
+			if pred.Match(&rl.APIResources[i]) {
+				filtered.APIResources = append(filtered.APIResources, rl.APIResources[i])
+			}
+		}
+		if filtered.APIResources != nil {
+			result = append(result, &filtered)
+		}
+	}
+	return result
+}
+
+type ResourcePredicate interface {
+	Match(r *unversioned.APIResource) bool
+}
+
+// AllVerbs returns a predicate matching a resource iff all verbs are supported.
+type AllVerbsPredicate struct {
+	Verbs []string
+}
+
+func (p AllVerbsPredicate) Match(r *unversioned.APIResource) bool {
+	return sets.NewString([]string(r.Verbs)...).HasAll(p.Verbs...)
+}

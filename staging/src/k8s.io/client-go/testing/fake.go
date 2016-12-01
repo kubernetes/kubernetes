@@ -45,7 +45,7 @@ type Fake struct {
 	// for every request in the order they are tried.
 	ProxyReactionChain []ProxyReactor
 
-	Resources map[string]*unversioned.APIResourceList
+	Resources []*unversioned.APIResourceList
 }
 
 // Reactor is an interface to allow the composition of reaction functions.
@@ -225,10 +225,16 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*un
 		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
 	c.Invokes(action, nil)
-	return c.Resources[groupVersion], nil
+	for _, rl := range c.Resources {
+		if rl.GroupVersion == groupVersion {
+			return rl, nil
+		}
+	}
+
+	return nil, fmt.Errorf("GroupVersion %q not found", groupVersion)
 }
 
-func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (c *FakeDiscovery) ServerResources() ([]*unversioned.APIResourceList, error) {
 	action := ActionImpl{
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "resource"},

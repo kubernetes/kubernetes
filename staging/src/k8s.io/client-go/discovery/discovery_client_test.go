@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/client-go/pkg/util/sets"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 )
@@ -141,14 +142,14 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
 	// ServerResources should not return an error even if server returns error at /api/v1.
-	resourceMap, err := client.ServerResources()
+	serverResources, err := client.ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, found := resourceMap["v1"]; !found {
-		t.Errorf("missing v1 in resource map")
+	gvs := groupVersions(serverResources)
+	if !sets.NewString(gvs...).Has("v1") {
+		t.Errorf("missing v1 in resource list: %v", serverResources)
 	}
-
 }
 
 func TestGetServerResources(t *testing.T) {
@@ -161,7 +162,7 @@ func TestGetServerResources(t *testing.T) {
 		},
 	}
 	beta := unversioned.APIResourceList{
-		GroupVersion: "extensions/v1",
+		GroupVersion: "extensions/v1beta1",
 		APIResources: []unversioned.APIResource{
 			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 			{Name: "ingresses", Namespaced: true, Kind: "Ingress"},
@@ -249,13 +250,14 @@ func TestGetServerResources(t *testing.T) {
 		}
 	}
 
-	resourceMap, err := client.ServerResources()
+	serverResources, err := client.ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	serverGroupVersions := sets.NewString(groupVersions(serverResources)...)
 	for _, api := range []string{"v1", "extensions/v1beta1"} {
-		if _, found := resourceMap[api]; !found {
-			t.Errorf("missing expected api: %s", api)
+		if !serverGroupVersions.Has(api) {
+			t.Errorf("missing expected api %q in %v", api, serverResources)
 		}
 	}
 }
@@ -332,12 +334,12 @@ func TestServerPreferredResources(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		resourcesList *unversioned.APIResourceList
+		resourcesList []*unversioned.APIResourceList
 		response      func(w http.ResponseWriter, req *http.Request)
 		expectErr     func(err error) bool
 	}{
 		{
-			resourcesList: &stable,
+			resourcesList: []*unversioned.APIResourceList{&stable},
 			expectErr:     IsGroupDiscoveryFailedError,
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
@@ -426,7 +428,7 @@ func TestServerPreferredResources(t *testing.T) {
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-		got, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResources()
 		if test.expectErr != nil {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -434,6 +436,11 @@ func TestServerPreferredResources(t *testing.T) {
 
 			continue
 		}
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		got, err := ToGroupVersionResources(resources)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -533,8 +540,12 @@ func TestServerPreferredResourcesRetries(t *testing.T) {
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-		got, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResources()
 		if !tc.expectedError(err) {
+			t.Errorf("case %d: unexpected error: %v", i, err)
+		}
+		got, err := ToGroupVersionResources(resources)
+		if err != nil {
 			t.Errorf("case %d: unexpected error: %v", i, err)
 		}
 		if len(got) != tc.expectResources {
@@ -695,21 +706,34 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		server := httptest.NewServer(http.HandlerFunc(test.response))
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-		got, err := client.ServerPreferredNamespacedResources()
+		resources, err := client.ServerPreferredNamespacedResources()
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Errorf("[%d] unexpected error: %v", i, err)
+			continue
+		}
+		got, err := ToGroupVersionResources(resources)
+		if err != nil {
+			t.Errorf("[%d] unexpected error: %v", i, err)
 			continue
 		}
 		// we need deterministic order and since during processing in ServerPreferredNamespacedResources
 		// a map comes into play the result needs sorting
 		if !reflect.DeepEqual(got, test.expected) {
-			t.Errorf("expected:\n%v\ngot:\n%v\n", test.expected, got)
+			t.Errorf("[%d] expected:\n%v\ngot:\n%v\n", i, test.expected, got)
 		}
 		server.Close()
 	}
+}
+
+func groupVersions(resources []*unversioned.APIResourceList) []string {
+	result := []string{}
+	for _, resourceList := range resources {
+		result = append(result, resourceList.GroupVersion)
+	}
+	return result
 }
