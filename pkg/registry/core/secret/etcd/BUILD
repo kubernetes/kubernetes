@@ -16,12 +16,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/secret:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
-        "//pkg/storage:go_default_library",
     ],
 )
 

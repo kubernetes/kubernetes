@@ -29,7 +29,6 @@ go_library(
         "//pkg/client/retry:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/labels:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
         "//pkg/registry/core/pod/rest:go_default_library",
         "//pkg/registry/generic:go_default_library",

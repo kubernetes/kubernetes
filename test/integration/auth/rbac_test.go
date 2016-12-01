@@ -50,6 +50,7 @@ import (
 	roleetcd "k8s.io/kubernetes/pkg/registry/rbac/role/etcd"
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -75,19 +76,24 @@ func clientsetForUser(user string, config *restclient.Config) clientset.Interfac
 	return clientset.NewForConfigOrDie(&configCopy)
 }
 
-func newRBACAuthorizer(t *testing.T, config *master.Config) authorizer.Authorizer {
-	newRESTOptions := func(resource string) generic.RESTOptions {
-		storageConfig, err := config.StorageFactory.NewConfig(rbacapi.Resource(resource))
-		if err != nil {
-			t.Fatalf("failed to get storage: %v", err)
-		}
-		return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource}
-	}
+type testRESTOptionsGetter struct {
+	config *master.Config
+}
 
-	roleRegistry := role.AuthorizerAdapter{Registry: role.NewRegistry(roleetcd.NewREST(newRESTOptions("roles")))}
-	roleBindingRegistry := rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(newRESTOptions("rolebindings")))}
-	clusterRoleRegistry := clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(newRESTOptions("clusterroles")))}
-	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(newRESTOptions("clusterrolebindings")))}
+func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	storageConfig, err := getter.config.StorageFactory.NewConfig(resource)
+	if err != nil {
+		return generic.RESTOptions{}, fmt.Errorf("failed to get storage: %v", err)
+	}
+	return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource.Resource}, nil
+}
+
+func newRBACAuthorizer(config *master.Config) authorizer.Authorizer {
+	optsGetter := &testRESTOptionsGetter{config}
+	roleRegistry := role.AuthorizerAdapter{Registry: role.NewRegistry(roleetcd.NewREST(optsGetter))}
+	roleBindingRegistry := rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(optsGetter))}
+	clusterRoleRegistry := clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(optsGetter))}
+	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(optsGetter))}
 	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry)
 }
 
@@ -332,7 +338,7 @@ func TestRBAC(t *testing.T) {
 	for i, tc := range tests {
 		// Create an API Server.
 		masterConfig := framework.NewIntegrationTestMasterConfig()
-		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, masterConfig)
+		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(masterConfig)
 		masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
 		_, s := framework.RunAMaster(masterConfig)
 		defer s.Close()
@@ -430,7 +436,7 @@ func TestBootstrapping(t *testing.T) {
 	superUser := "admin/system:masters"
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, masterConfig)
+	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(masterConfig)
 	masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()

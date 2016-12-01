@@ -24,13 +24,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/registry/generic"
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
 )
 
-func installFederationAPIs(g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {
-	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(restOptionsFactory.NewFor(federation.Resource("clusters")))
+func installFederationAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
+	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(optsGetter)
 	federationResources := map[string]rest.Storage{
 		"clusters":        clusterStorage,
 		"clusters/status": clusterStatusStorage,
