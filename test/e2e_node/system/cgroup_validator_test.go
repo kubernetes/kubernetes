@@ -23,7 +23,9 @@ import (
 )
 
 func TestValidateCgroupSubsystem(t *testing.T) {
-	v := &CgroupsValidator{}
+	v := &CgroupsValidator{
+		Reporter: DefaultReporter,
+	}
 	cgroupSpec := []string{"system1", "system2"}
 	for desc, test := range map[string]struct {
 		cgroupSpec []string

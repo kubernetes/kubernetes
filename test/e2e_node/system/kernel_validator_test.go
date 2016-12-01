@@ -24,7 +24,9 @@ import (
 )
 
 func TestValidateKernelVersion(t *testing.T) {
-	v := &KernelValidator{}
+	v := &KernelValidator{
+		Reporter: DefaultReporter,
+	}
 	// Currently, testRegex is align with DefaultSysSpec.KernelVersion, but in the future
 	// they may be different.
 	// This is fine, because the test mainly tests the kernel version validation logic,
@@ -69,7 +71,9 @@ func TestValidateKernelVersion(t *testing.T) {
 }
 
 func TestValidateCachedKernelConfig(t *testing.T) {
-	v := &KernelValidator{}
+	v := &KernelValidator{
+		Reporter: DefaultReporter,
+	}
 	testKernelSpec := KernelSpec{
 		Required: []KernelConfig{{Name: "REQUIRED_1"}, {Name: "REQUIRED_2", Aliases: []string{"ALIASE_REQUIRED_2"}}},
 		Optional: []KernelConfig{{Name: "OPTIONAL_1"}, {Name: "OPTIONAL_2"}},
@@ -184,7 +188,9 @@ CONFIG_3=n`
 		"CONFIG_2": asModule,
 		"CONFIG_3": leftOut,
 	}
-	v := &KernelValidator{}
+	v := &KernelValidator{
+		Reporter: DefaultReporter,
+	}
 	got, err := v.parseKernelConfig(bytes.NewReader([]byte(config)))
 	assert.Nil(t, err, "Expect error not to occur when parse kernel configuration %q", config)
 	assert.Equal(t, expected, got)

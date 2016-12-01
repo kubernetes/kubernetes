@@ -25,7 +25,9 @@ import (
 
 var _ Validator = &CgroupsValidator{}
 
-type CgroupsValidator struct{}
+type CgroupsValidator struct {
+	Reporter Reporter
+}
 
 func (c *CgroupsValidator) Name() string {
 	return "cgroups"
@@ -55,9 +57,9 @@ func (c *CgroupsValidator) validateCgroupSubsystems(cgroupSpec, subsystems []str
 		}
 		item := cgroupsConfigPrefix + strings.ToUpper(cgroup)
 		if found {
-			report(item, "enabled", good)
+			c.Reporter.Report(item, "enabled", good)
 		} else {
-			report(item, "missing", bad)
+			c.Reporter.Report(item, "missing", bad)
 			missing = append(missing, cgroup)
 		}
 	}
