@@ -64,7 +64,7 @@
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
 			"Comment": "v7.0.6-4-g2492d97",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
