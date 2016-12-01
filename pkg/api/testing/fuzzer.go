@@ -153,10 +153,10 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			} else {
 				rollingUpdate := extensions.RollingUpdateDeployment{}
 				if c.RandBool() {
-					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.RandUint64()))
-					rollingUpdate.MaxSurge = intstr.FromInt(int(c.RandUint64()))
+					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.Rand.Int31()))
+					rollingUpdate.MaxSurge = intstr.FromInt(int(c.Rand.Int31()))
 				} else {
-					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.RandUint64()))
+					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
 				}
 				j.RollingUpdate = &rollingUpdate
 			}
