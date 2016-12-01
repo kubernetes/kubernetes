@@ -21,13 +21,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry"
 	certificateetcd "k8s.io/kubernetes/pkg/registry/certificates/certificates/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 type RESTStorageProvider struct{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(certificates.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(certificatesapiv1alpha1.SchemeGroupVersion) {
@@ -38,12 +38,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	version := certificatesapiv1alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("certificatesigningrequests")) {
-		csrStorage, csrStatusStorage, csrApprovalStorage := certificateetcd.NewREST(restOptionsGetter(certificates.Resource("certificatesigningrequests")))
+		csrStorage, csrStatusStorage, csrApprovalStorage := certificateetcd.NewREST(restOptionsGetter)
 		storage["certificatesigningrequests"] = csrStorage
 		storage["certificatesigningrequests/status"] = csrStatusStorage
 		storage["certificatesigningrequests/approval"] = csrApprovalStorage

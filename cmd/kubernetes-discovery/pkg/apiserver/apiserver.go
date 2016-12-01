@@ -20,25 +20,18 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/version"
 
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1"
-	apiservicestorage "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/registry/apiservice"
+	apiservicestorage "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/registry/apiservice/etcd"
 )
-
-// TODO move to genericapiserver or something like that
-// RESTOptionsGetter is used to construct storage for a particular resource
-type RESTOptionsGetter interface {
-	NewFor(resource schema.GroupResource) generic.RESTOptions
-}
 
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
 	// RESTOptionsGetter is used to construct storage for a particular resource
-	RESTOptionsGetter RESTOptionsGetter
+	RESTOptionsGetter generic.RESTOptionsGetter
 }
 
 // APIDiscoveryServer contains state for a Kubernetes cluster master/api server.
@@ -80,7 +73,7 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 
 	v1alpha1storage := map[string]rest.Storage{}
-	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.RESTOptionsGetter.NewFor(apiregistration.Resource("apiservices")))
+	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.RESTOptionsGetter)
 
 	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 

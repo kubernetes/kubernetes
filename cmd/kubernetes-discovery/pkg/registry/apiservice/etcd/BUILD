@@ -12,14 +12,13 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["storage_apps.go"],
+    srcs = ["etcd.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/rest:go_default_library",
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/apps/v1beta1:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
-        "//pkg/registry/apps/petset/etcd:go_default_library",
+        "//cmd/kubernetes-discovery/pkg/apis/apiregistration:go_default_library",
+        "//cmd/kubernetes-discovery/pkg/registry/apiservice:go_default_library",
         "//pkg/registry/generic:go_default_library",
+        "//pkg/registry/generic/registry:go_default_library",
+        "//pkg/runtime:go_default_library",
     ],
 )
