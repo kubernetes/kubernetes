@@ -63,17 +63,17 @@ func (f *FakeAPIInterface) ListThirdPartyResources() []string {
 }
 
 func TestSyncAPIs(t *testing.T) {
-	resourcesNamed := func(names ...string) []expapi.ThirdPartyResource {
-		result := []expapi.ThirdPartyResource{}
-		for _, name := range names {
-			result = append(result, expapi.ThirdPartyResource{
-				ObjectMeta: api.ObjectMeta{Name: name},
-				Versions: []expapi.APIVersion{
-					{Name: "v1"},
-				},
+	resourceNamed := func(name string, versions ...string) expapi.ThirdPartyResource {
+		apiVersions := []expapi.APIVersion{}
+		for _, version := range versions {
+			apiVersions = append(apiVersions, expapi.APIVersion{
+				Name: version,
 			})
 		}
-		return result
+		return expapi.ThirdPartyResource{
+			ObjectMeta: api.ObjectMeta{Name: name},
+			Versions:   apiVersions,
+		}
 	}
 
 	tests := []struct {
@@ -85,14 +85,19 @@ func TestSyncAPIs(t *testing.T) {
 	}{
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+					resourceNamed("bar.example.com"),
+				},
 			},
 			expectedInstalled: []string{"foo.example.com"},
 			name:              "simple add",
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+				},
 			},
 			apis: []string{
 				"/apis/example.com",
@@ -102,7 +107,9 @@ func TestSyncAPIs(t *testing.T) {
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+				},
 			},
 			apis: []string{
 				"/apis/example.com",
@@ -118,7 +125,10 @@ func TestSyncAPIs(t *testing.T) {
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com", "foo.company.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+					resourceNamed("foo.company.com", "v1"),
+				},
 			},
 			apis: []string{
 				"/apis/company.com",
@@ -129,7 +139,9 @@ func TestSyncAPIs(t *testing.T) {
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+				},
 			},
 			apis: []string{
 				"/apis/company.com",
