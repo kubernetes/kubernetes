@@ -183,7 +183,7 @@ func Run(s *options.ServerRunOptions) error {
 	routes.Logs{}.Install(m.HandlerContainer)
 
 	// TODO: Refactor this code to share it with kube-apiserver rather than duplicating it here.
-	restOptionsFactory := restOptionsFactory{
+	restOptionsFactory := &restOptionsFactory{
 		storageFactory:          storageFactory,
 		enableGarbageCollection: s.GenericServerRunOptions.EnableGarbageCollection,
 		deleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
@@ -210,10 +210,10 @@ type restOptionsFactory struct {
 	enableGarbageCollection bool
 }
 
-func (f restOptionsFactory) NewFor(resource schema.GroupResource) generic.RESTOptions {
+func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	config, err := f.storageFactory.NewConfig(resource)
 	if err != nil {
-		glog.Fatalf("Unable to find storage config for %v, due to %v", resource, err.Error())
+		return generic.RESTOptions{}, fmt.Errorf("Unable to find storage config for %v, due to %v", resource, err.Error())
 	}
 	return generic.RESTOptions{
 		StorageConfig:           config,
@@ -221,5 +221,5 @@ func (f restOptionsFactory) NewFor(resource schema.GroupResource) generic.RESTOp
 		DeleteCollectionWorkers: f.deleteCollectionWorkers,
 		EnableGarbageCollection: f.enableGarbageCollection,
 		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
-	}
+	}, nil
 }

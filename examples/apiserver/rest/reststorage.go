@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 type REST struct {
@@ -36,37 +37,28 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work with testtype.
 func NewREST(config *storagebackend.Config, storageDecorator generic.StorageDecorator) *REST {
-	prefix := "/testtype"
-	newListFunc := func() runtime.Object { return &testgroup.TestTypeList{} }
-	// Usually you should reuse your RESTCreateStrategy.
-	strategy := &NotNamespaceScoped{}
-	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		testObj, ok := obj.(*testgroup.TestType)
-		if !ok {
-			return nil, nil, fmt.Errorf("not a TestType")
-		}
-		return labels.Set(testObj.Labels), nil, nil
-	}
-	storageInterface, _ := storageDecorator(
-		config, 100, &testgroup.TestType{}, prefix, strategy, newListFunc, getAttrs, storage.NoTriggerPublisher)
+	opts := generic.RESTOptions{StorageConfig: config, Decorator: storageDecorator, ResourcePrefix: "/testtype", DeleteCollectionWorkers: 1}
 	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object { return &testgroup.TestType{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
+		NewListFunc: func() runtime.Object { return &testgroup.TestTypeList{} },
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix.
+		// This func can be omitted when the name of the object is enough to locate it
 		KeyRootFunc: func(ctx api.Context) string {
-			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
+			return opts.ResourcePrefix
 		},
 		// Produces a path that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix.
+		// This func can be omitted when the name of the object is enough to locate it
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
+			return genericregistry.NoNamespaceKeyFunc(ctx, opts.ResourcePrefix, name)
 		},
 		// Retrieve the name field of the resource.
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*testgroup.TestType).Name, nil
 		},
+		QualifiedResource: api.Resource("testtype"),
 		// Used to match objects based on labels/fields for list.
 		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 			return storage.SelectionPredicate{
@@ -81,14 +73,28 @@ func NewREST(config *storagebackend.Config, storageDecorator generic.StorageDeco
 				},
 			}
 		},
-		Storage: storageInterface,
+		CreateStrategy: &fakeStrategy{api.Scheme, api.SimpleNameGenerator},
+	}
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		testObj, ok := obj.(*testgroup.TestType)
+		if !ok {
+			return nil, nil, fmt.Errorf("not a TestType")
+		}
+		return labels.Set(testObj.Labels), nil, nil
+	}
+	options := &generic.StoreOptions{RESTOptions: opts, AttrFunc: getAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 	return &REST{store}
 }
 
-type NotNamespaceScoped struct {
+type fakeStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
 }
 
-func (*NotNamespaceScoped) NamespaceScoped() bool {
-	return false
-}
+func (*fakeStrategy) NamespaceScoped() bool                                        { return false }
+func (*fakeStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object)         {}
+func (*fakeStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList { return nil }
+func (*fakeStrategy) Canonicalize(obj runtime.Object)                              {}

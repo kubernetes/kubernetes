@@ -110,7 +110,7 @@ func SetWatchCacheSizes(cacheSizes []string) {
 	}
 }
 
-func GetWatchCacheSizeByResource(resource Resource) int {
+func GetWatchCacheSizeByResource(resource Resource) int { // TODO this should use schema.GroupResource for lookups
 	if value, found := watchCacheSizes[resource]; found {
 		return value
 	}
