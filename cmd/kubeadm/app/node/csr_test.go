@@ -22,7 +22,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
+	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
