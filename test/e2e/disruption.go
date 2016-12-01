@@ -36,6 +36,7 @@ import (
 // awhile to guarantee that we've been patient waiting for something ordinary
 // to happen: a pod to get scheduled and move into Ready
 const schedulingTimeout = 10 * time.Minute
+const bigClusterSize = 7
 
 var _ = framework.KubeDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
@@ -71,12 +72,13 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 	})
 
 	evictionCases := []struct {
-		description    string
-		minAvailable   intstr.IntOrString
-		podCount       int
-		replicaSetSize int32
-		shouldDeny     bool
-		exclusive      bool
+		description        string
+		minAvailable       intstr.IntOrString
+		podCount           int
+		replicaSetSize     int32
+		shouldDeny         bool
+		exclusive          bool
+		skipForBigClusters bool
 	}{
 		{
 			description:  "no PDB",
@@ -105,6 +107,8 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			replicaSetSize: 10,
 			exclusive:      true,
 			shouldDeny:     true,
+			// This tests assumes that there is less than replicaSetSize nodes in the cluster.
+			skipForBigClusters: true,
 		},
 	}
 	for i := range evictionCases {
@@ -114,6 +118,9 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			expectation = "should not allow an eviction"
 		}
 		It(fmt.Sprintf("evictions: %s => %s", c.description, expectation), func() {
+			if c.skipForBigClusters {
+				framework.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
+			}
 			createPodsOrDie(cs, ns, c.podCount)
 			if c.replicaSetSize > 0 {
 				createReplicaSetOrDie(cs, ns, c.replicaSetSize, c.exclusive)
