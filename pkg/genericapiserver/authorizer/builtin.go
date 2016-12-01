@@ -25,9 +25,16 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
+)
+
+const (
+	ModeAlwaysAllow string = "AlwaysAllow"
+	ModeAlwaysDeny  string = "AlwaysDeny"
+	ModeABAC        string = "ABAC"
+	ModeWebhook     string = "Webhook"
+	ModeRBAC        string = "RBAC"
 )
 
 // alwaysAllowAuthorizer is an implementation of authorizer.Attributes
@@ -95,6 +102,8 @@ func NewPrivilegedGroups(groups ...string) *privilegedGroupAuthorizer {
 }
 
 type AuthorizationConfig struct {
+	AuthorizationModes []string
+
 	// Options for ModeABAC
 
 	// Path to an ABAC policy file.
@@ -118,28 +127,27 @@ type AuthorizationConfig struct {
 }
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
-// based on the authorizationMode or an error.  authorizationMode should be a comma separated values
-// of options.AuthorizationModeChoices.
-func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config AuthorizationConfig) (authorizer.Authorizer, error) {
+// based on the authorizationMode or an error.
+func NewAuthorizerFromAuthorizationConfig(config AuthorizationConfig) (authorizer.Authorizer, error) {
 
-	if len(authorizationModes) == 0 {
+	if len(config.AuthorizationModes) == 0 {
 		return nil, errors.New("At least one authorization mode should be passed")
 	}
 
 	var authorizers []authorizer.Authorizer
 	authorizerMap := make(map[string]bool)
 
-	for _, authorizationMode := range authorizationModes {
+	for _, authorizationMode := range config.AuthorizationModes {
 		if authorizerMap[authorizationMode] {
 			return nil, fmt.Errorf("Authorization mode %s specified more than once", authorizationMode)
 		}
 		// Keep cases in sync with constant list above.
 		switch authorizationMode {
-		case options.ModeAlwaysAllow:
+		case ModeAlwaysAllow:
 			authorizers = append(authorizers, NewAlwaysAllowAuthorizer())
-		case options.ModeAlwaysDeny:
+		case ModeAlwaysDeny:
 			authorizers = append(authorizers, NewAlwaysDenyAuthorizer())
-		case options.ModeABAC:
+		case ModeABAC:
 			if config.PolicyFile == "" {
 				return nil, errors.New("ABAC's authorization policy file not passed")
 			}
@@ -148,7 +156,7 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 				return nil, err
 			}
 			authorizers = append(authorizers, abacAuthorizer)
-		case options.ModeWebhook:
+		case ModeWebhook:
 			if config.WebhookConfigFile == "" {
 				return nil, errors.New("Webhook's configuration file not passed")
 			}
@@ -159,7 +167,7 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 				return nil, err
 			}
 			authorizers = append(authorizers, webhookAuthorizer)
-		case options.ModeRBAC:
+		case ModeRBAC:
 			rbacAuthorizer := rbac.New(
 				config.InformerFactory.Roles().Lister(),
 				config.InformerFactory.RoleBindings().Lister(),
@@ -174,13 +182,13 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 		authorizerMap[authorizationMode] = true
 	}
 
-	if !authorizerMap[options.ModeABAC] && config.PolicyFile != "" {
+	if !authorizerMap[ModeABAC] && config.PolicyFile != "" {
 		return nil, errors.New("Cannot specify --authorization-policy-file without mode ABAC")
 	}
-	if !authorizerMap[options.ModeWebhook] && config.WebhookConfigFile != "" {
+	if !authorizerMap[ModeWebhook] && config.WebhookConfigFile != "" {
 		return nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
 	}
-	if !authorizerMap[options.ModeRBAC] && config.RBACSuperUser != "" {
+	if !authorizerMap[ModeRBAC] && config.RBACSuperUser != "" {
 		return nil, errors.New("Cannot specify --authorization-rbac-super-user without mode RBAC")
 	}
 
