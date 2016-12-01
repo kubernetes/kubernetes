@@ -34,6 +34,8 @@ import (
 )
 
 var (
+	interrupt = time.NewTimer(time.Duration(0)) // interrupt testing at this time.
+	terminate = time.NewTimer(time.Duration(0)) // terminate testing at this time.
 	// TODO(fejta): change all these _ flags to -
 	build            = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
@@ -48,6 +50,7 @@ var (
 	skewTests            = flag.Bool("skew", false, "If true, run tests in another version at ../kubernetes/hack/e2e.go")
 	testArgs             = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 	test                 = flag.Bool("test", false, "Run Ginkgo tests.")
+	timeout              = flag.Float64("timeout", 0, "Terminate testing after timeout minutes")
 	up                   = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
 	upgradeArgs          = flag.String("upgrade_args", "", "If set, run upgrade tests before other tests")
 	verbose              = flag.Bool("v", false, "If true, print all command output.")
@@ -151,6 +154,15 @@ func writeXML(start time.Time) {
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
+
+	terminate.Stop()
+	if *timeout == 0 {
+		interrupt.Stop()
+	} else if *timeout > 0 {
+		interrupt.Reset(time.Duration(*timeout) * time.Minute)
+	} else {
+		log.Fatalf("Non-negative --timeout required: %f", *timeout)
+	}
 
 	if err := validWorkingDirectory(); err != nil {
 		log.Fatalf("Called from invalid working directory: %v", err)
@@ -770,8 +782,28 @@ func finishRunning(stepName string, cmd *exec.Cmd) error {
 		log.Printf("Step '%s' finished in %s", stepName, time.Since(start))
 	}(time.Now())
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error running %v: %v", stepName, err)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("error starting %v: %v", stepName, err)
 	}
-	return nil
+
+	finished := make(chan error)
+
+	go func() {
+		finished <- cmd.Wait()
+	}()
+
+	for {
+		select {
+		case <-terminate.C:
+			terminate.Reset(time.Duration(0))
+			cmd.Process.Kill()
+			return fmt.Errorf("Terminate testing after 15m after %.1fm timeout during %s", *timeout, stepName)
+		case <-interrupt.C:
+			log.Printf("Interrupt testing after %.1fm timeout", *timeout)
+			terminate.Reset(time.Duration(15) * time.Minute)
+			cmd.Process.Signal(os.Interrupt)
+		case err := <-finished:
+			return err
+		}
+	}
 }
