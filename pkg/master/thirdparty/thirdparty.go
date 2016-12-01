@@ -96,7 +96,7 @@ type thirdPartyGroup struct {
 // thirdPartyEntry combines objects storage and API group into one struct
 // for easy lookup.
 type thirdPartyEntry struct {
-	// Map from plural resource name to entry
+	// Map from plural resource name to RESTStorage
 	storage map[string]*thirdpartyresourcedataetcd.REST
 }
 
@@ -170,7 +170,8 @@ func (m *ThirdPartyResourceServer) removeThirdPartyStorage(path, resource string
 	}
 	if len(tpg.versionedEntry) == 0 {
 		delete(m.thirdPartyResources, group)
-		m.genericAPIServer.RemoveAPIGroupForDiscovery(group)
+		ix = strings.LastIndex(group, "/")
+		m.genericAPIServer.RemoveAPIGroupForDiscovery(group[ix + 1:])
 	} else {
 		m.thirdPartyResources[group] = tpg
 	}
@@ -332,14 +333,14 @@ func (m *ThirdPartyResourceServer) setupGroupForDiscovery(group string, versions
 			Version:      version,
 		})
 	}
-	preferedVersionForDiscovery := unversioned.GroupVersionForDiscovery{
+	preferredVersionForDiscovery := unversioned.GroupVersionForDiscovery{
 		GroupVersion: group + "/" + preferredVersion,
 		Version:      preferredVersion,
 	}
 	apiGroup := unversioned.APIGroup{
 		Name:             group,
 		Versions:         apiVersionsForDiscovery,
-		PreferredVersion: preferedVersionForDiscovery,
+		PreferredVersion: preferredVersionForDiscovery,
 	}
 	tpg.group = apiGroup
 	m.genericAPIServer.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, "/apis/" + apiGroup.Name, apiGroup))

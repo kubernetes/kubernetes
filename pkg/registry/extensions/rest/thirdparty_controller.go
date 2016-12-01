@@ -22,11 +22,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -88,13 +88,13 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 				return err
 			}
 			for _, version := range item.Versions {
-				plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+				plural, _ := meta.KindToResource(schema.GroupVersionKind{
 					Group:   group,
 					Version: version.Name,
 					Kind:    kind,
 				})
 				// place it in the set of resources that we expect, so that we don't delete it in the delete pass
-				fullAPIPath := makeFullAPIPath(group, version.Name) + "/" + plural.Resource
+				fullAPIPath := makeAPIPath(group, version.Name) + "/" + plural.Resource
 				existing.Insert(fullAPIPath)
 			}
 			// ensure a RESTful resource for this schema exists on the master
@@ -134,7 +134,7 @@ func MakeThirdPartyPath(group string) string {
 	return thirdpartyprefix + "/" + group
 }
 
-func makeFullAPIPath(group, version string) string {
+func makeAPIPath(group, version string) string {
 	if len(group) == 0 {
 		return thirdpartyprefix
 	}
