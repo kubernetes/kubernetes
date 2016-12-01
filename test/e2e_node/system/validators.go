@@ -29,21 +29,31 @@ type Validator interface {
 	Validate(SysSpec) error
 }
 
-// validators are all the validators.
-var validators = []Validator{
-	&OSValidator{},
-	&KernelValidator{},
-	&CgroupsValidator{},
-	&DockerValidator{},
+// Reporter is the interface for the reporters for the validators.
+type Reporter interface {
+	// Report reports the results of the system verification
+	Report(string, string, ValidationResultType) error
 }
 
 // Validate uses all validators to validate the system.
-func Validate() error {
+func Validate(spec SysSpec, report Reporter) error {
 	var errs []error
-	spec := DefaultSysSpec
+	// validators are all the validators.
+	var validators = []Validator{
+		&OSValidator{Reporter: report},
+		&KernelValidator{Reporter: report},
+		&CgroupsValidator{Reporter: report},
+		&DockerValidator{Reporter: report},
+	}
+
 	for _, v := range validators {
 		glog.Infof("Validating %s...", v.Name())
 		errs = append(errs, v.Validate(spec))
 	}
 	return errors.NewAggregate(errs)
+}
+
+// ValidateDefault uses all default validators to validate the system and writes to stdout.
+func ValidateDefault() error {
+	return Validate(DefaultSysSpec, DefaultReporter)
 }

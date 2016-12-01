@@ -19,6 +19,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/node:go_default_library",
+        "//test/e2e_node/system:go_default_library",
     ],
 )
 
