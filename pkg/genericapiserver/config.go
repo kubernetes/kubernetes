@@ -252,10 +252,10 @@ func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingO
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
 			// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
 			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
-			if cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress, alternateIPs, alternateDNS); err != nil {
+			if caCert, _, cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress, alternateIPs, alternateDNS); err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			} else {
-				if err := certutil.WriteCert(serverCertFile, cert); err != nil {
+				if err := certutil.WriteCert(serverCertFile, cert, caCert); err != nil {
 					return nil, err
 				}
 

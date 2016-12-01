@@ -461,7 +461,7 @@ func parseIPList(ips []string) []net.IP {
 }
 
 func createTestTLSCerts(spec TestCertSpec) (tlsCert tls.Certificate, err error) {
-	certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
+	_, _, certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
 	if err != nil {
 		return tlsCert, err
 	}
@@ -471,7 +471,7 @@ func createTestTLSCerts(spec TestCertSpec) (tlsCert tls.Certificate, err error) 
 }
 
 func createTestCertFiles(dir string, spec TestCertSpec) (certFilePath, keyFilePath string, err error) {
-	certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
+	caCertPem, _, certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
 	if err != nil {
 		return "", "", err
 	}
@@ -486,7 +486,7 @@ func createTestCertFiles(dir string, spec TestCertSpec) (certFilePath, keyFilePa
 		return "", "", err
 	}
 
-	_, err = certFile.Write(certPem)
+	_, err = certFile.Write(append(certPem, caCertPem...))
 	if err != nil {
 		return "", "", err
 	}
