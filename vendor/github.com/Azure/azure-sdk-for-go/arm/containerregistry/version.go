@@ -1,4 +1,4 @@
-package compute
+package containerregistry
 
 // Copyright (c) Microsoft and contributors.  All rights reserved.
 //
@@ -34,7 +34,7 @@ const (
 
 // UserAgent returns the UserAgent string to use when sending http.Requests.
 func UserAgent() string {
-	return fmt.Sprintf(userAgentFormat, Version(), "compute", "2016-03-30")
+	return fmt.Sprintf(userAgentFormat, Version(), "containerregistry", "2016-06-27-preview")
 }
 
 // Version returns the semantic version (see http://semver.org) of the client.

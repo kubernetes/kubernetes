@@ -26,7 +26,7 @@ import (
 
 // RoutesClient is the the Microsoft Azure Network management API provides a
 // RESTful set of web services that interact with Microsoft Azure Networks
-// service to manage your network resrources. The API has entities that
+// service to manage your network resources. The API has entities that
 // capture the relationship between an end user and the Microsoft Azure
 // Networks service.
 type RoutesClient struct {
@@ -43,14 +43,15 @@ func NewRoutesClientWithBaseURI(baseURI string, subscriptionID string) RoutesCli
 	return RoutesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// CreateOrUpdate the Put route operation creates/updates a route in the
-// specified route table This method may poll for completion. Polling can be
-// canceled by passing the cancel channel argument. The channel will be used
-// to cancel polling and any outstanding HTTP requests.
+// CreateOrUpdate creates or updates a route in the specified route table.
+// This method may poll for completion. Polling can be canceled by passing
+// the cancel channel argument. The channel will be used to cancel polling
+// and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. routeTableName is the
 // name of the route table. routeName is the name of the route.
-// routeParameters is parameters supplied to the create/update routeoperation
+// routeParameters is parameters supplied to the create or update route
+// operation.
 func (client RoutesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, routeName string, routeParameters Route, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, routeTableName, routeName, routeParameters, cancel)
 	if err != nil {
@@ -114,10 +115,10 @@ func (client RoutesClient) CreateOrUpdateResponder(resp *http.Response) (result 
 	return
 }
 
-// Delete the delete route operation deletes the specified route from a route
-// table. This method may poll for completion. Polling can be canceled by
-// passing the cancel channel argument. The channel will be used to cancel
-// polling and any outstanding HTTP requests.
+// Delete deletes the specified route from a route table. This method may poll
+// for completion. Polling can be canceled by passing the cancel channel
+// argument. The channel will be used to cancel polling and any outstanding
+// HTTP requests.
 //
 // resourceGroupName is the name of the resource group. routeTableName is the
 // name of the route table. routeName is the name of the route.
@@ -182,8 +183,7 @@ func (client RoutesClient) DeleteResponder(resp *http.Response) (result autorest
 	return
 }
 
-// Get the Get route operation retreives information about the specified route
-// from the route table.
+// Get gets the specified route from a route table.
 //
 // resourceGroupName is the name of the resource group. routeTableName is the
 // name of the route table. routeName is the name of the route.
@@ -247,8 +247,7 @@ func (client RoutesClient) GetResponder(resp *http.Response) (result Route, err 
 	return
 }
 
-// List the List network security rule operation retrieves all the routes in a
-// route table.
+// List gets all routes in a route table.
 //
 // resourceGroupName is the name of the resource group. routeTableName is the
 // name of the route table.
@@ -315,7 +314,7 @@ func (client RoutesClient) ListResponder(resp *http.Response) (result RouteListR
 func (client RoutesClient) ListNextResults(lastResults RouteListResult) (result RouteListResult, err error) {
 	req, err := lastResults.RouteListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.RoutesClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.RoutesClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -324,12 +323,12 @@ func (client RoutesClient) ListNextResults(lastResults RouteListResult) (result 
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.RoutesClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.RoutesClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.RoutesClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.RoutesClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return
