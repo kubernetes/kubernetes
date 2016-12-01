@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,25 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The build rule builds a Docker image that logs all Docker contains logs to
-# Google Compute Platform using the Cloud Logging API.
+# For systems without journald
+mkdir -p /var/log/journal
 
-# Procedure for change:
-# 1. Bump the tag number.
-# 2. Push to the private repo and test using newer version
-# 3. Issue PR.
-# 4. Assuming permissions to do so, when PR is approved
-#    make the gcr.io version of the image: make build push
-# 5. Issue PR with config files changes
+if [ -e /host/lib/libsystemd* ]
+then
+  rm /lib/x86_64-linux-gnu/libsystemd*
+  cp /host/lib/libsystemd* /lib/x86_64-linux-gnu/
+fi
 
-.PHONY:	build push
+LD_PRELOAD=/opt/td-agent/embedded/lib/libjemalloc.so
+RUBY_GC_HEAP_OLDOBJECT_LIMIT_FACTOR=0.9
 
-PREFIX=gcr.io/google_containers
-TAG = 1.29
-
-build:
-	docker build -t $(PREFIX)/fluentd-gcp:$(TAG) .
-
-
-push:
-	gcloud docker -- push $(PREFIX)/fluentd-gcp:$(TAG)
+/usr/sbin/td-agent "$@"
