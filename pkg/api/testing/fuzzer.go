@@ -45,7 +45,7 @@ import (
 
 // FuzzerFor can randomly populate api objects that are destined for version.
 func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz.Fuzzer {
-	f := fuzz.New().NilChance(.5).NumElements(1, 1)
+	f := fuzz.New().NilChance(.5).NumElements(0, 1)
 	if src != nil {
 		f.RandSource(src)
 	}
