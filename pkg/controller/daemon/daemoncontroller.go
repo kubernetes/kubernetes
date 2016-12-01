@@ -453,7 +453,9 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 		switch {
 		case shouldRun && !isRunning:
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
-			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
+			if dsc.nodeCanRunDaemonPodNow(&node, ds) {
+				nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
+			}
 		case shouldRun && len(daemonPods) > 1:
 			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 			// Sort the daemon pods by creation time, so the the oldest is preserved.
@@ -650,6 +652,17 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		return false
 	}
 
+	if len(ds.Spec.Template.Spec.NodeSelector) > 0 {
+		selector := labels.SelectorFromSet(ds.Spec.Template.Spec.NodeSelector)
+		if !selector.Matches(labels.Set(node.Labels)) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (dsc *DaemonSetsController) nodeCanRunDaemonPodNow(node *v1.Node, ds *extensions.DaemonSet) bool {
 	// TODO: Move it to the predicates
 	for _, c := range node.Status.Conditions {
 		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
