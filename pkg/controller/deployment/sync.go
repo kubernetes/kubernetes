@@ -500,7 +500,7 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 			}
 
 			// TODO: Use transactions when we have them.
-			if _, err := dc.scaleReplicaSet(rs, nameToSize[rs.Name], deployment, scalingOperation); err != nil {
+			if _, _, err := dc.scaleReplicaSet(rs, nameToSize[rs.Name], deployment, scalingOperation); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err
 			}
@@ -520,28 +520,33 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.Rep
 	} else {
 		scalingOperation = "down"
 	}
-	newRS, err := dc.scaleReplicaSet(rs, newScale, deployment, scalingOperation)
-	return true, newRS, err
+	scaled, newRS, err := dc.scaleReplicaSet(rs, newScale, deployment, scalingOperation)
+	return scaled, newRS, err
 }
 
-func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newScale int32, deployment *extensions.Deployment, scalingOperation string) (*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newScale int32, deployment *extensions.Deployment, scalingOperation string) (bool, *extensions.ReplicaSet, error) {
 	objCopy, err := api.Scheme.Copy(rs)
 	if err != nil {
-		return nil, err
+		return false, nil, err
 	}
 	rsCopy := objCopy.(*extensions.ReplicaSet)
 
 	sizeNeedsUpdate := *(rsCopy.Spec.Replicas) != newScale
+	// TODO: Do not mutate the replica set here, instead simply compare the annotation and if they mismatch
+	// call SetReplicasAnnotations inside the following if clause. Then we can also move the deep-copy from
+	// above inside the if too.
 	annotationsNeedUpdate := deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 
+	scaled := false
 	if sizeNeedsUpdate || annotationsNeedUpdate {
 		*(rsCopy.Spec.Replicas) = newScale
 		rs, err = dc.client.Extensions().ReplicaSets(rsCopy.Namespace).Update(rsCopy)
 		if err == nil && sizeNeedsUpdate {
+			scaled = true
 			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
 		}
 	}
-	return rs, err
+	return scaled, rs, err
 }
 
 // cleanupDeployment is responsible for cleaning up a deployment ie. retains all but the latest N old replica sets
