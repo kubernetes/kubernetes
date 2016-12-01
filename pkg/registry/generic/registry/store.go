@@ -32,6 +32,8 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage"
@@ -954,4 +956,93 @@ func (e *Store) Export(ctx api.Context, name string, opts metav1.ExportOptions) 
 		e.CreateStrategy.PrepareForCreate(ctx, obj)
 	}
 	return obj, nil
+}
+
+// completeKeyFunctions sets the default behavior for storage key generation
+func (e *Store) completeKeyFunctions(prefix string) {
+	if e.CreateStrategy.NamespaceScoped() {
+		if e.KeyRootFunc == nil {
+			e.KeyRootFunc = func(ctx api.Context) string {
+				return NamespaceKeyRootFunc(ctx, prefix)
+			}
+		}
+		if e.KeyFunc == nil {
+			e.KeyFunc = func(ctx api.Context, name string) (string, error) {
+				return NamespaceKeyFunc(ctx, prefix, name)
+			}
+		}
+	} else {
+		if e.KeyRootFunc == nil {
+			e.KeyRootFunc = func(ctx api.Context) string {
+				return prefix
+			}
+		}
+		if e.KeyFunc == nil {
+			e.KeyFunc = func(ctx api.Context, name string) (string, error) {
+				return NoNamespaceKeyFunc(ctx, prefix, name)
+			}
+		}
+	}
+}
+
+// CompleteWithOptions updates the store with the provided options and defaults common fields
+func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
+	if e.QualifiedResource.Empty() {
+		return fmt.Errorf("store %#v must have a non-empty qualified resource", e)
+	}
+	if e.NewFunc == nil {
+		return fmt.Errorf("store for %s must have NewFunc set", e.QualifiedResource.String())
+	}
+	if e.NewListFunc == nil {
+		return fmt.Errorf("store for %s must have NewListFunc set", e.QualifiedResource.String())
+	}
+	if e.CreateStrategy == nil {
+		return fmt.Errorf("store for %s must have CreateStrategy set", e.QualifiedResource.String())
+	}
+
+	opts, err := options.RESTOptions.GetRESTOptions(e.QualifiedResource)
+	if err != nil {
+		return err
+	}
+
+	// Resource prefix must come from the underlying factory
+	prefix := opts.ResourcePrefix
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+
+	e.completeKeyFunctions(prefix)
+
+	keyFunc := func(obj runtime.Object) (string, error) {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return "", err
+		}
+
+		if e.CreateStrategy.NamespaceScoped() {
+			return e.KeyFunc(api.WithNamespace(api.NewContext(), accessor.GetNamespace()), accessor.GetName())
+		}
+
+		return e.KeyFunc(api.NewContext(), accessor.GetName())
+	}
+
+	trigger := options.TriggerFunc
+	if trigger == nil {
+		trigger = storage.NoTriggerPublisher
+	}
+
+	e.DeleteCollectionWorkers = opts.DeleteCollectionWorkers
+	e.EnableGarbageCollection = opts.EnableGarbageCollection
+	e.Storage, e.DestroyFunc = opts.Decorator(
+		opts.StorageConfig,
+		cachesize.GetWatchCacheSizeByResource(cachesize.Resource(e.QualifiedResource.Resource)),
+		e.NewFunc(),
+		prefix,
+		keyFunc,
+		e.NewListFunc,
+		options.AttrFunc,
+		trigger,
+	)
+
+	return nil
 }

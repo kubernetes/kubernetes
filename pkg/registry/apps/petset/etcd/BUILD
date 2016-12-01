@@ -19,11 +19,9 @@ go_library(
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/registry/apps/petset:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
-        "//pkg/storage:go_default_library",
     ],
 )
 

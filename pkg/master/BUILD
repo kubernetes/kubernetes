@@ -56,7 +56,6 @@ go_library(
         "//pkg/healthz:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/thirdparty:go_default_library",
-        "//pkg/registry:go_default_library",
         "//pkg/registry/apps/rest:go_default_library",
         "//pkg/registry/authentication/rest:go_default_library",
         "//pkg/registry/authorization/rest:go_default_library",

@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/deployment"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -43,8 +42,8 @@ type DeploymentStorage struct {
 	Rollback   *RollbackREST
 }
 
-func NewStorage(opts generic.RESTOptions) DeploymentStorage {
-	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(opts)
+func NewStorage(optsGetter generic.RESTOptionsGetter) DeploymentStorage {
+	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(optsGetter)
 	deploymentRegistry := deployment.NewRegistry(deploymentRest)
 
 	return DeploymentStorage{
@@ -60,55 +59,25 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &extensions.DeploymentList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Deployments),
-		&extensions.Deployment{},
-		prefix,
-		deployment.Strategy,
-		newListFunc,
-		deployment.GetAttrs,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
 	store := &genericregistry.Store{
-		NewFunc: func() runtime.Object { return &extensions.Deployment{} },
-		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
-		// Produces a path that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix.
-		KeyRootFunc: func(ctx api.Context) string {
-			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		// Produces a path that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix.
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-		// Retrieve the name field of a deployment.
+		NewFunc:     func() runtime.Object { return &extensions.Deployment{} },
+		NewListFunc: func() runtime.Object { return &extensions.DeploymentList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensions.Deployment).Name, nil
 		},
-		// Used to match objects based on labels/fields for list.
-		PredicateFunc:           deployment.MatchDeployment,
-		QualifiedResource:       extensions.Resource("deployments"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     deployment.MatchDeployment,
+		QualifiedResource: extensions.Resource("deployments"),
 
-		// Used to validate deployment creation.
 		CreateStrategy: deployment.Strategy,
-
-		// Used to validate deployment updates.
 		UpdateStrategy: deployment.Strategy,
 		DeleteStrategy: deployment.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: deployment.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
+	}
+
 	statusStore := *store
 	statusStore.UpdateStrategy = deployment.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}
