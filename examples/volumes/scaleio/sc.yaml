@@ -1,0 +1,10 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: sc-0001
+provisioner: kubernetes.io/scaleio
+parameters:
+  gateway: http://127.0.0.1:34567
+  system: scaleio
+  protectionDomain: default
+  secretRef: sio-secret
