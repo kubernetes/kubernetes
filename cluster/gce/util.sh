@@ -1003,9 +1003,9 @@ function create-loadbalancer() {
   attach-external-ip "${EXISTING_MASTER_NAME}" "${EXISTING_MASTER_ZONE}"
 
   # Step 2: Create target pool.
-  gcloud compute target-pools create "${MASTER_NAME}" --region "${REGION}"
+  gcloud compute target-pools create "${MASTER_NAME}" --project "${PROJECT}" --region "${REGION}"
   # TODO: We should also add master instances with suffixes
-  gcloud compute target-pools add-instances "${MASTER_NAME}" --instances "${EXISTING_MASTER_NAME}" --zone "${EXISTING_MASTER_ZONE}"
+  gcloud compute target-pools add-instances "${MASTER_NAME}" --instances "${EXISTING_MASTER_NAME}" --project "${PROJECT}" --zone "${EXISTING_MASTER_ZONE}"
 
   # Step 3: Create forwarding rule.
   # TODO: This step can take up to 20 min. We need to speed this up...
