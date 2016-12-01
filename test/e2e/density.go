@@ -64,7 +64,8 @@ type DensityTestConfig struct {
 	PollInterval      time.Duration
 	PodCount          int
 	// What kind of resource we want to create
-	kind schema.GroupKind
+	kind          schema.GroupKind
+	SecretConfigs []*testutils.SecretConfig
 }
 
 func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceConstraint {
@@ -192,6 +193,10 @@ func logPodStartupStatus(c clientset.Interface, expectedPods int, observedLabels
 func runDensityTest(dtc DensityTestConfig) time.Duration {
 	defer GinkgoRecover()
 
+	// Create all secrets
+	for i := range dtc.SecretConfigs {
+		dtc.SecretConfigs[i].Run()
+	}
 	// Start all replication controllers.
 	startTime := time.Now()
 	wg := sync.WaitGroup{}
@@ -256,6 +261,11 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 			err := framework.DeleteResourceAndPods(dtc.ClientSet, dtc.InternalClientset, kind, dtc.Configs[i].GetNamespace(), name)
 			framework.ExpectNoError(err)
 		}
+	}
+
+	// Delete all secrets
+	for i := range dtc.SecretConfigs {
+		dtc.SecretConfigs[i].Stop()
 	}
 }
 
@@ -357,7 +367,8 @@ var _ = framework.KubeDescribe("Density", func() {
 		// Controls how often the apiserver is polled for pods
 		interval time.Duration
 		// What kind of resource we should be creating. Default: ReplicationController
-		kind schema.GroupKind
+		kind          schema.GroupKind
+		secretsPerPod int
 	}
 
 	densityTests := []Density{
@@ -380,7 +391,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			feature = "HighDensityPerformance"
 		}
 
-		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v", feature, testArg.podsPerNode, testArg.kind)
+		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets", feature, testArg.podsPerNode, testArg.kind, testArg.secretsPerPod)
 		itArg := testArg
 		It(name, func() {
 			nodePreparer := framework.NewE2ETestNodePreparer(
@@ -405,6 +416,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			framework.ExpectNoError(err)
 
 			configs := make([]testutils.RunObjectConfig, numberOfCollections)
+			secretConfigs := make([]*testutils.SecretConfig, 0, numberOfCollections*itArg.secretsPerPod)
 			// Since all RCs are created at the same time, timeout for each config
 			// has to assume that it will be run at the very end.
 			podThroughput := 20
@@ -412,8 +424,20 @@ var _ = framework.KubeDescribe("Density", func() {
 			// createClients is defined in load.go
 			clients, internalClients, err := createClients(numberOfCollections)
 			for i := 0; i < numberOfCollections; i++ {
-				name := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				nsName := namespaces[i].Name
+				secretNames := []string{}
+				for j := 0; j < itArg.secretsPerPod; j++ {
+					secretName := fmt.Sprintf("density-secret-%v-%v", i, j)
+					secretConfigs = append(secretConfigs, &testutils.SecretConfig{
+						Content:   map[string]string{"foo": "bar"},
+						Client:    clients[i],
+						Name:      secretName,
+						Namespace: nsName,
+						LogFunc:   framework.Logf,
+					})
+					secretNames = append(secretNames, secretName)
+				}
+				name := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				baseConfig := &testutils.RCConfig{
 					Client:               clients[i],
 					InternalClient:       internalClients[i],
@@ -429,6 +453,8 @@ var _ = framework.KubeDescribe("Density", func() {
 					MemRequest:           nodeMemCapacity / 100,
 					MaxContainerFailures: &MaxContainerFailures,
 					Silent:               true,
+					LogFunc:              framework.Logf,
+					SecretNames:          secretNames,
 				}
 				switch itArg.kind {
 				case api.Kind("ReplicationController"):
@@ -449,6 +475,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				PodCount:          totalPods,
 				PollInterval:      DensityPollInterval,
 				kind:              itArg.kind,
+				SecretConfigs:     secretConfigs,
 			}
 			e2eStartupTime = runDensityTest(dConfig)
 			if itArg.runLatencyTest {
@@ -694,6 +721,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				Replicas:             podsPerCollection,
 				MaxContainerFailures: &MaxContainerFailures,
 				Silent:               true,
+				LogFunc:              framework.Logf,
 			}
 		}
 		dConfig := DensityTestConfig{
