@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	clientcmdutil "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/util"
 )
 
 var (
@@ -127,7 +126,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	clientConfig.Host = configClusterInfo.Server
 
 	if len(config.overrides.Timeout) > 0 {
-		timeout, err := clientcmdutil.ParseTimeout(config.overrides.Timeout)
+		timeout, err := ParseTimeout(config.overrides.Timeout)
 		if err != nil {
 			return nil, err
 		}

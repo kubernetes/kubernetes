@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package clientcmd
 
 import (
 	"fmt"
@@ -31,5 +31,5 @@ func ParseTimeout(duration string) (time.Duration, error) {
 	if requestTimeout, err := time.ParseDuration(duration); err == nil {
 		return requestTimeout, nil
 	}
-	return 0, fmt.Errorf("Invalid timeout value. Timeout must be a single integer, or an integer followed by a corresponding time unit (e.g. 1s | 2m | 3h)")
+	return 0, fmt.Errorf("Invalid timeout value. Timeout must be a single integer in seconds, or an integer followed by a corresponding time unit (e.g. 1s | 2m | 3h)")
 }
