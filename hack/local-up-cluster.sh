@@ -192,6 +192,9 @@ CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
 
+# Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
+mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
+CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
@@ -345,7 +348,7 @@ function create_client_certkey {
         shift 1
     done
     echo "{\"CN\":\"${CN}\",\"names\":[${NAMES}],\"hosts\":[\"\"],\"key\":{\"algo\":\"rsa\",\"size\":2048}}" | docker run -i  --entrypoint /bin/bash -v "${CERT_DIR}:/certs" -w /certs cfssl/cfssl:latest -ec "cfssl gencert -ca=${CA}.crt -ca-key=${CA}.key -config=client-ca-config.json - | cfssljson -bare client-${ID}"
-    sudo /bin/bash -e <<EOF
+    ${CONTROLPLANE_SUDO} /bin/bash -e <<EOF
     mv "${CERT_DIR}/client-${ID}-key.pem" "${CERT_DIR}/client-${ID}.key"
     mv "${CERT_DIR}/client-${ID}.pem" "${CERT_DIR}/client-${ID}.crt"
     rm -f "${CERT_DIR}/client-${ID}.csr"
@@ -353,7 +356,7 @@ EOF
 }
 
 function write_client_kubeconfig {
-    cat <<EOF | sudo tee "${CERT_DIR}"/$1.kubeconfig > /dev/null
+    cat <<EOF | ${CONTROLPLANE_SUDO} tee "${CERT_DIR}"/$1.kubeconfig > /dev/null
 apiVersion: v1
 kind: Config
 clusters:
@@ -414,11 +417,8 @@ function start_apiserver {
         advertise_address="--advertise_address=${API_HOST_IP}"
     fi
 
-    # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
-    sudo mkdir -p "${CERT_DIR}"
-
     # Create client ca
-    sudo /bin/bash -e <<EOF
+    ${CONTROLPLANE_SUDO} /bin/bash -e <<EOF
     rm -f "${CERT_DIR}/client-ca.crt" "${CERT_DIR}/client-ca.key"
     openssl req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/client-ca.key" -out "${CERT_DIR}/client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "${CERT_DIR}/client-ca-config.json"
@@ -433,7 +433,7 @@ EOF
     create_client_certkey client-ca admin system:admin system:cluster-admins
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
@@ -472,7 +472,7 @@ function start_controller_manager {
     fi
 
     CTLRMGR_LOG=/tmp/kube-controller-manager.log
-    sudo -E "${GO_OUT}/hyperkube" controller-manager \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" controller-manager \
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
@@ -611,7 +611,7 @@ function start_kubelet {
 
 function start_kubeproxy {
     PROXY_LOG=/tmp/kube-proxy.log
-    sudo -E "${GO_OUT}/hyperkube" proxy \
+    sudo "${GO_OUT}/hyperkube" proxy \
       --v=${LOG_LEVEL} \
       --hostname-override="${HOSTNAME_OVERRIDE}" \
       --feature-gates="${FEATURE_GATES}" \
@@ -620,7 +620,7 @@ function start_kubeproxy {
     PROXY_PID=$!
 
     SCHEDULER_LOG=/tmp/kube-scheduler.log
-    sudo -E "${GO_OUT}/hyperkube" scheduler \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
       --kubeconfig "$CERT_DIR"/scheduler.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
