@@ -443,7 +443,6 @@ EOF
       --admission-control="${ADMISSION_CONTROL}" \
       --bind-address="${API_BIND_ADDR}" \
       --secure-port="${API_SECURE_PORT}" \
-      --tls-ca-file="${ROOT_CA_FILE}" \
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
@@ -457,6 +456,10 @@ EOF
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
     kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+
+    # extract root-ca from certificate chain created by the apiserver
+    openssl crl2pkcs7 -nocrl -certfile "${CERT_DIR}/apiserver.crt" | openssl pkcs7 -print_certs | \
+        sudo /bin/bash -c "awk '/subject.*CN=127.0.0.1@ca-/,/END CERTIFICATE/' > \"${ROOT_CA_FILE}\""
 
     # Create kubeconfigs for all components, using client certs
     write_client_kubeconfig kubelet
