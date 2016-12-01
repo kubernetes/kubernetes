@@ -587,43 +587,32 @@ func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*v1.Po
 	return getPodList(namespace, options)
 }
 
-// equalIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
+// EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
 // We ignore pod-template-hash because the hash result would be different upon podTemplateSpec API changes
 // (e.g. the addition of a new field will cause the hash code to change)
 // Note that we assume input podTemplateSpecs contain non-empty labels
-func equalIgnoreHash(template1, template2 v1.PodTemplateSpec) (bool, error) {
+func EqualIgnoreHash(template1, template2 v1.PodTemplateSpec) bool {
 	// First, compare template.Labels (ignoring hash)
 	labels1, labels2 := template1.Labels, template2.Labels
-	// The podTemplateSpec must have a non-empty label so that label selectors can find them.
-	// This is checked by validation (of resources contain a podTemplateSpec).
-	if len(labels1) == 0 || len(labels2) == 0 {
-		return false, fmt.Errorf("Unexpected empty labels found in given template")
-	}
 	if len(labels1) > len(labels2) {
 		labels1, labels2 = labels2, labels1
 	}
 	// We make sure len(labels2) >= len(labels1)
 	for k, v := range labels2 {
 		if labels1[k] != v && k != extensions.DefaultDeploymentUniqueLabelKey {
-			return false, nil
+			return false
 		}
 	}
-
 	// Then, compare the templates without comparing their labels
 	template1.Labels, template2.Labels = nil, nil
-	result := api.Semantic.DeepEqual(template1, template2)
-	return result, nil
+	return api.Semantic.DeepEqual(template1, template2)
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
 func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
 	newRSTemplate := GetNewReplicaSetTemplate(deployment)
 	for i := range rsList {
-		equal, err := equalIgnoreHash(rsList[i].Spec.Template, newRSTemplate)
-		if err != nil {
-			return nil, err
-		}
-		if equal {
+		if EqualIgnoreHash(rsList[i].Spec.Template, newRSTemplate) {
 			// This is the new ReplicaSet.
 			return rsList[i], nil
 		}
@@ -648,11 +637,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
 			}
 			// Filter out replica set that has the same pod template spec as the deployment - that is the new replica set.
-			equal, err := equalIgnoreHash(rs.Spec.Template, newRSTemplate)
-			if err != nil {
-				return nil, nil, err
-			}
-			if equal {
+			if EqualIgnoreHash(rs.Spec.Template, newRSTemplate) {
 				continue
 			}
 			allOldRSs[rs.ObjectMeta.Name] = rs
@@ -722,17 +707,13 @@ func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister *ca
 }
 
 // GetNewReplicaSetTemplate returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
+// Callers of this helper need to set the DefaultDeploymentUniqueLabelKey k/v pair.
 func GetNewReplicaSetTemplate(deployment *extensions.Deployment) v1.PodTemplateSpec {
-	// newRS will have the same template as in deployment spec, plus a unique label in some cases.
-	newRSTemplate := v1.PodTemplateSpec{
+	// newRS will have the same template as in deployment spec.
+	return v1.PodTemplateSpec{
 		ObjectMeta: deployment.Spec.Template.ObjectMeta,
 		Spec:       deployment.Spec.Template.Spec,
 	}
-	newRSTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
-		deployment.Spec.Template.ObjectMeta.Labels,
-		extensions.DefaultDeploymentUniqueLabelKey,
-		GetPodTemplateSpecHash(newRSTemplate))
-	return newRSTemplate
 }
 
 // TODO: remove the duplicate
@@ -746,7 +727,7 @@ func GetNewReplicaSetTemplateInternal(deployment *internalextensions.Deployment)
 	newRSTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
 		deployment.Spec.Template.ObjectMeta.Labels,
 		internalextensions.DefaultDeploymentUniqueLabelKey,
-		GetInternalPodTemplateSpecHash(newRSTemplate))
+		fmt.Sprintf("%d", GetInternalPodTemplateSpecHash(newRSTemplate)))
 	return newRSTemplate
 }
 
