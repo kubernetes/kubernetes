@@ -19,6 +19,7 @@ package informers
 import (
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -47,10 +48,10 @@ func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
 	informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return f.client.Rbac().ClusterRoles().List(options)
+				return f.internalclient.Rbac().ClusterRoles().List(convertListOptionsOrDie(options))
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return f.client.Rbac().ClusterRoles().Watch(options)
+				return f.internalclient.Rbac().ClusterRoles().Watch(convertListOptionsOrDie(options))
 			},
 		},
 		&rbac.ClusterRole{},
@@ -87,10 +88,10 @@ func (f *clusterRoleBindingInformer) Informer() cache.SharedIndexInformer {
 	informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return f.client.Rbac().ClusterRoleBindings().List(options)
+				return f.internalclient.Rbac().ClusterRoleBindings().List(convertListOptionsOrDie(options))
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return f.client.Rbac().ClusterRoleBindings().Watch(options)
+				return f.internalclient.Rbac().ClusterRoleBindings().Watch(convertListOptionsOrDie(options))
 			},
 		},
 		&rbac.ClusterRoleBinding{},
@@ -127,10 +128,10 @@ func (f *roleInformer) Informer() cache.SharedIndexInformer {
 	informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return f.client.Rbac().Roles(v1.NamespaceAll).List(options)
+				return f.internalclient.Rbac().Roles(v1.NamespaceAll).List(convertListOptionsOrDie(options))
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return f.client.Rbac().Roles(v1.NamespaceAll).Watch(options)
+				return f.internalclient.Rbac().Roles(v1.NamespaceAll).Watch(convertListOptionsOrDie(options))
 			},
 		},
 		&rbac.Role{},
@@ -167,10 +168,10 @@ func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
 	informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return f.client.Rbac().RoleBindings(v1.NamespaceAll).List(options)
+				return f.internalclient.Rbac().RoleBindings(v1.NamespaceAll).List(convertListOptionsOrDie(options))
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return f.client.Rbac().RoleBindings(v1.NamespaceAll).Watch(options)
+				return f.internalclient.Rbac().RoleBindings(v1.NamespaceAll).Watch(convertListOptionsOrDie(options))
 			},
 		},
 		&rbac.RoleBinding{},
@@ -184,4 +185,12 @@ func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
 
 func (f *roleBindingInformer) Lister() cache.RoleBindingLister {
 	return cache.NewRoleBindingLister(f.Informer().GetIndexer())
+}
+
+func convertListOptionsOrDie(in v1.ListOptions) api.ListOptions {
+	out := api.ListOptions{}
+	if err := api.Scheme.Convert(&in, &out, nil); err != nil {
+		panic(err)
+	}
+	return out
 }
