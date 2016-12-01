@@ -394,40 +394,6 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	})
 
 	////////////////////////////////////////////////////////////////////////
-	// NFSv3
-	////////////////////////////////////////////////////////////////////////
-
-	framework.KubeDescribe("NFSv3", func() {
-		It("should be mountable for NFSv3", func() {
-			config := VolumeTestConfig{
-				namespace:   namespace.Name,
-				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs:0.8",
-				serverPorts: []int{2049, 20048},
-			}
-
-			defer func() {
-				if clean {
-					volumeTestCleanup(f, config)
-				}
-			}()
-			pod := startVolumeServer(f, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("NFS server IP address: %v", serverIP)
-
-			volume := v1.VolumeSource{
-				NFS: &v1.NFSVolumeSource{
-					Server:   serverIP,
-					Path:     "/exports",
-					ReadOnly: true,
-				},
-			}
-			// Must match content of test/images/volumes-tester/nfs/index.html
-			testVolumeClient(f, config, volume, nil, "Hello from NFS!")
-		})
-	})
-
-	////////////////////////////////////////////////////////////////////////
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
