@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 			},
 		},
 	}
-	evictionTestTimeout := 30 * time.Minute
+	evictionTestTimeout := 10 * time.Minute
 	testCondition := "Disk Pressure due to Inodes"
 
 	runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasInodePressure)
@@ -206,6 +206,12 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 		})
 
 		AfterEach(func() {
+			By("deleting pods")
+			for _, spec := range podTestSpecs {
+				By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
+				f.PodClient().DeleteSync(spec.pod.Name, &v1.DeleteOptions{}, podDisappearTimeout)
+			}
+
 			By("making sure conditions eventually return to normal")
 			Eventually(func() bool {
 				hasPressure, err := hasPressureCondition(f, testCondition)
@@ -222,7 +228,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 
 			By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
-			f.PodClient().Create(&v1.Pod{
+			f.PodClient().CreateSync(&v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Name: podName,
 				},
@@ -230,7 +236,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/busybox:1.24",
+							Image: framework.GetPauseImageNameForHostArch(),
 							Name:  podName,
 						},
 					},
