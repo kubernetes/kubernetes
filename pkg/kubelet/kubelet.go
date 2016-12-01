@@ -1851,8 +1851,8 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		}
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
-			// If the sources aren't ready, skip housekeeping, as we may
-			// accidentally delete pods from unready sources.
+			// If the sources aren't ready or volume manager has not yet synced the states,
+			// skip housekeeping, as we may accidentally delete pods from unready sources.
 			glog.V(4).Infof("SyncLoop (housekeeping, skipped): sources aren't ready yet.")
 		} else {
 			glog.V(4).Infof("SyncLoop (housekeeping)")
