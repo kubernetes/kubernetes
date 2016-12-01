@@ -24,37 +24,18 @@ FROM gcr.io/google_containers/ubuntu-slim:0.4
 
 MAINTAINER Mik Vyatskov "vmik@google.com"
 
-# Disable prompts from apt
-ENV DEBIAN_FRONTEND noninteractive
+# Copy binaries from the build output
+COPY _output/jemalloc/lib /usr/lib/x86_64-linux-gnu
+COPY _output/systemd/lib/libsystemd.* /usr/lib/x86_64-linux-gnu/
+COPY _output/systemd/lib/libsystemd-journal.* /usr/lib/x86_64-linux-gnu/
 
-# Install build tools
-RUN apt-get -qq update && \
-    apt-get install -y -qq curl ca-certificates gcc make bash sudo && \
-    apt-get install -y -qq --reinstall lsb-base lsb-release && \
-    # Install logging agent and required gems
-    /usr/bin/curl -sSL https://toolbelt.treasuredata.com/sh/install-ubuntu-xenial-td-agent2.sh | sh && \
-    sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /etc/init.d/td-agent && \
-    td-agent-gem install --no-document fluent-plugin-record-reformer -v 0.8.2 && \
-    td-agent-gem install --no-document fluent-plugin-systemd -v 0.0.5 && \
-    td-agent-gem install --no-document fluent-plugin-google-cloud -v 0.5.2 && \
-    # Remove build tools
-    apt-get remove -y -qq gcc make && \
-    apt-get autoremove -y -qq && \
-    apt-get clean -qq && \
-    # Remove unnecessary files
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-        /opt/td-agent/embedded/share/doc \
-        /opt/td-agent/embedded/share/gtk-doc \
-        /opt/td-agent/embedded/lib/postgresql \
-        /opt/td-agent/embedded/bin/postgres \
-        /opt/td-agent/embedded/share/postgresql \
-        /etc/td-agent/td-agent.conf
+COPY _output/ruby /opt/ruby
+
+COPY _output/lib /usr/lib/x86_64-linux-gnu
 
 # Copy the Fluentd configuration files for logging Docker container logs.
-# Either configuration file can be used by specifying `-c <file>` as a command
-# line argument.
-COPY google-fluentd.conf /etc/td-agent/td-agent.conf
-COPY google-fluentd-journal.conf /etc/td-agent/td-agent-journal.conf
+COPY fluent.conf /etc/fluent/fluent.conf
+COPY agent.sh /agent.sh
 
 # Start Fluentd to pick up our config that watches Docker container logs.
-CMD /usr/sbin/td-agent $FLUENTD_ARGS
+CMD /agent.sh $FLUENTD_ARGS
