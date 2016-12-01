@@ -5,3 +5,7 @@
 ## v2 (Fri Oct 28 2016 Vishnu Kannan <vishh@google.com>)
   - Adding netbase package.
   - Digest: sha256:c7dfe059fbbf976fc4284a87eb18adf0f8e0c4cf30a30f5a852842c772a64c2d
+
+## v3 (Fri Nov 11 2016 Jing Xu <jinxu@google.com>)
+  - Add startmounter.sh script to start rpcbind before mounting for NFSv3
+  - Digest: sha256:35bc48a1ca97c3971611dc4662d08d131869daa692acb281c7e9e052924e38b1
