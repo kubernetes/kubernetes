@@ -94,19 +94,17 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 		return utilerrors.NewAggregate(errs)
 	}
 
-	config := genericapiserver.NewConfig().
+	config, err := genericapiserver.NewConfig().
 		ApplyOptions(serverOptions.GenericServerRunOptions).
-		ApplySecureServingOptions(serverOptions.SecureServing).
 		ApplyInsecureServingOptions(serverOptions.InsecureServing).
 		ApplyAuthenticationOptions(serverOptions.Authentication).
-		Complete()
-	if err := config.MaybeGenerateServingCerts(); err != nil {
-		// this wasn't treated as fatal for this process before
-		fmt.Printf("Error creating cert: %v", err)
+		ApplySecureServingOptions(serverOptions.SecureServing, serverOptions.GenericServerRunOptions.AdvertiseAddress.String())
+	if err != nil {
+		return fmt.Errorf("failed to configure https: %s", err)
 	}
 
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
-	s, err := config.New()
+	s, err := config.Complete().New()
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}
