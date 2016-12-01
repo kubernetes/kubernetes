@@ -14,12 +14,14 @@
 	{"name" : "ServiceSpreadingPriority", "weight" : 1},
 	{"name" : "EqualPriority", "weight" : 1}
 	],
-"extender": {
-        "url": "http://127.0.0.1:12346/scheduler",
+"extenders":[ 
+	{
+        "urlPrefix": "http://127.0.0.1:12346/scheduler",
         "apiVersion": "v1beta1",
         "filterVerb": "filter",
         "prioritizeVerb": "prioritize",
         "weight": 5,
         "enableHttps": false
-    }
+	}
+    ]
 }
