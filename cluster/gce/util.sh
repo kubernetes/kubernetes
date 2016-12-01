@@ -1205,7 +1205,7 @@ function kube-down() {
     --format "value(zone)" | wc -l)
 
   # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
-  if [[ "${REMAINING_MASTER_COUNT}" == "1" ]]; then
+  if [[ "${REMAINING_MASTER_COUNT}" -eq 1 ]]; then
     if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
       detect-master
       local EXISTING_MASTER_ZONE=$(gcloud compute instances list "${MASTER_NAME}" \
@@ -1225,7 +1225,7 @@ function kube-down() {
   fi
 
   # If there are no more remaining master replicas, we should delete all remaining network resources.
-  if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
+  if [[ "${REMAINING_MASTER_COUNT}" -eq 0 ]]; then
     # Delete firewall rule for the master.
     if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
       gcloud compute firewall-rules delete  \
@@ -1298,7 +1298,7 @@ function kube-down() {
   fi
 
   # If there are no more remaining master replicas, we should update kubeconfig.
-  if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
+  if [[ "${REMAINING_MASTER_COUNT}" -eq 0 ]]; then
     export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
     clear-kubeconfig
   fi
