@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -235,6 +236,12 @@ func (az *Cloud) DeleteVolume(name, uri string) error {
 	err = az.deleteVhdBlob(accountName, key, blob)
 	if err != nil {
 		glog.Warningf("failed to delete blob %s err: %v", uri, err)
+		detail := err.Error()
+		if strings.Contains(detail, "LeaseIdMissing") {
+			// disk is still being used
+			// see https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.blob.protocol.bloberrorcodestrings.leaseidmissing.aspx
+			return volume.NewDeletedVolumeInUseError(fmt.Sprintf("disk %q is still in use while being deleted", name))
+		}
 		return fmt.Errorf("failed to delete vhd %v, account %s, blob %s, err: %v", uri, accountName, blob, err)
 	}
 	glog.V(4).Infof("blob %s deleted", uri)
