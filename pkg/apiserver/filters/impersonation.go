@@ -123,6 +123,15 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 		oldUser, _ := api.UserFrom(ctx)
 		httplog.LogOf(req, w).Addf("%v is acting as %v", oldUser, newUser)
 
+		// clear all the impersonation headers from the request
+		req.Header.Del(authenticationapi.ImpersonateUserHeader)
+		req.Header.Del(authenticationapi.ImpersonateGroupHeader)
+		for headerName := range req.Header {
+			if strings.HasPrefix(headerName, authenticationapi.ImpersonateUserExtraHeaderPrefix) {
+				req.Header.Del(headerName)
+			}
+		}
+
 		handler.ServeHTTP(w, req)
 	})
 }
