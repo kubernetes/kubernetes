@@ -18,7 +18,9 @@ limitations under the License.
 
 package mount
 
-type Mounter struct{}
+type Mounter struct {
+	mounterPath string
+}
 
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	return nil

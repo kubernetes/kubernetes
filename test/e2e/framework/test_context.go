@@ -87,6 +87,8 @@ type NodeTestContextType struct {
 	EvictionHard string
 	// ManifestPath is the static pod manifest path.
 	ManifestPath string
+	// MounterPath is the path to the program to run to perform a mount
+	MounterPath string
 }
 
 type CloudConfig struct {
@@ -177,4 +179,5 @@ func RegisterNodeFlags() {
 	//flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
 	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
+	flag.StringVar(&TestContext.MounterPath, "experimental-mounter-path", "", "Path of mounter binary. Leave empty to use the default mount.")
 }
