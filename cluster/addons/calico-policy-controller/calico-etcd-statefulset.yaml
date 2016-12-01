@@ -11,8 +11,6 @@ spec:
   replicas: 1
   template:
     metadata:
-      annotations:
-        pod.alpha.kubernetes.io/initialized: "true"
       labels:
         kubernetes.io/cluster-service: "true"
         k8s-app: calico-etcd

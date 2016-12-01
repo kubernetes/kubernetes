@@ -10,7 +10,6 @@ spec:
       labels:
         app: mysql
       annotations:
-        pod.alpha.kubernetes.io/initialized: "true"
         pod.alpha.kubernetes.io/init-containers: '[
             {
                 "name": "install",
