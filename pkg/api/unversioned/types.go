@@ -25,7 +25,12 @@ limitations under the License.
 // separate packages.
 package unversioned
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/ugorji/go/codec"
+)
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
@@ -393,6 +398,39 @@ type APIResource struct {
 	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
 	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
 	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
+	// verbs is a list of supported kube verbs (this includes get, list, watch, create,
+	// update, patch, delete, deletecollection, and proxy)
+	Verbs Verbs `json:"verbs" protobuf:"bytes,4,name=verbs"`
+}
+
+// ExtraValue masks the value so protobuf can generate
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type Verbs []string
+
+func (vs Verbs) String() string {
+	return fmt.Sprintf("%v", []string(vs))
+}
+
+// CodecEncodeSelf is part of the codec.Selfer interface.
+func (c *Verbs) CodecEncodeSelf(encoder *codec.Encoder) {
+	encoder.Encode(c)
+}
+
+// CodecDecodeSelf is part of the codec.Selfer interface. It is overwritten here to make sure
+// that an empty verbs list is not decoded as nil. On the other hand, an undefined verbs list
+// will lead to nil because this decoding for Verbs is not invoked.
+//
+// TODO(sttts): this is due to a ugorji regression: https://github.com/ugorji/go/issues/119. Remove the
+// workaround when the regression is fixed.
+func (c *Verbs) CodecDecodeSelf(decoder *codec.Decoder) {
+	m := []string{}
+	decoder.Decode(&m)
+	if len(m) == 0 {
+		*c = []string{}
+	} else {
+		*c = m
+	}
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the

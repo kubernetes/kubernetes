@@ -18,7 +18,6 @@ package namespace
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -77,6 +77,92 @@ func (o *operationNotSupportedCache) setNotSupported(key operationKey) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 	o.m[key] = true
+}
+
+// ownerGraph is a data structure to learn the ownership relationship of GroupVersionResources
+type ownerGraph struct {
+	lock sync.RWMutex
+	owns map[schema.GroupVersionResource]map[schema.GroupVersionResource]struct{}
+}
+
+// topologicalOrder returns a topological order where non-ownees come first. If there is a cycle
+// in the owner graph, an error is returns plus a best effort non-topological order.
+func (o *ownerGraph) topologicalOrder(gvrs []schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	// Tarjan's Depth-First-Search for topological orders
+	L := []schema.GroupVersionResource{}
+	colors := map[schema.GroupVersionResource]int{} // 0 initially
+	var foundCycle []schema.GroupVersionResource
+	var visit func(u schema.GroupVersionResource) (onCycle bool)
+	visit = func(u schema.GroupVersionResource) (onCycle bool) {
+		colors[u] = 1
+		for v := range o.owns[u] {
+			switch colors[v] {
+			case 1:
+				if foundCycle == nil {
+					foundCycle = schema.GroupVersionResource{v}
+					onCycle = true
+				}
+			case 0:
+				onCycle = visit(v)
+				if onCycle {
+					foundCycle = append(foundCycle, v)
+					if foundCycle[0] == v {
+						onCycle = false
+					}
+					break
+				}
+			}
+		}
+
+		colors[u] = 2
+		L = append(L, u)
+		return onCycle
+	}
+
+	for u := range gvrs {
+		if colors[u] == 0 {
+			visit(u)
+		}
+	}
+
+	L = reverse(L)
+
+	if foundCycle != nil {
+		return L, fmt.Errorf("ownership cycle found: %v", foundCycle)
+	}
+
+	return L, nil
+}
+
+func reverse(gvrs []schema.GroupVersionResource) []int {
+	reversed := make([]int, len(gvrs))
+	for i, j := 0, len(gvrs)-1; i < j; i, j = i+1, j-1 {
+		reversed[i], reversed[j] = gvrs[j], gvrs[i]
+	}
+	return reversed
+}
+
+func (o *ownerGraph) setOwnedBy(ownee, owner schema.GroupVersionResource) {
+	o.lock.RLock()
+	if ownees, foundNode := o.owns[owner]; foundNode {
+		if _, foundEdge := ownees[ownee]; foundEdge {
+			o.lock.RUnlock()
+			return
+		}
+	}
+	o.lock.RUnlock()
+
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	if ownees, found := o.owns[owner]; found {
+		ownees[ownee] = struct{}{}
+	} else {
+		o.owns[owner] = map[schema.GroupVersionResource]struct{}{ownee: struct{}{}}
+	}
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
@@ -208,6 +294,8 @@ func deleteCollection(
 func listCollection(
 	dynamicClient *dynamic.Client,
 	opCache *operationNotSupportedCache,
+	gvrMap map[types.UID]schema.GroupVersionResource,
+	ownerMap map[types.UID][]types.UID,
 	gvr schema.GroupVersionResource,
 	namespace string,
 ) (*runtime.UnstructuredList, bool, error) {
@@ -226,6 +314,15 @@ func listCollection(
 		if !ok {
 			return nil, false, fmt.Errorf("resource: %s, expected *runtime.UnstructuredList, got %#v", apiResource.Name, obj)
 		}
+
+		for _, item := range unstructuredList.Items {
+			uid := item.GetUID()
+			gvrMap[uid] = gvr
+			for _, owner := range item.GetOwnerReferences() {
+				ownerMap[uid] = append(ownerMap[uid], owner.UID)
+			}
+		}
+
 		return unstructuredList, true, nil
 	}
 
@@ -248,12 +345,14 @@ func listCollection(
 func deleteEachItem(
 	dynamicClient *dynamic.Client,
 	opCache *operationNotSupportedCache,
+	gvrMap map[types.UID]schema.GroupVersionResource,
+	ownerMap map[types.UID][]types.UID,
 	gvr schema.GroupVersionResource,
 	namespace string,
 ) error {
 	glog.V(5).Infof("namespace controller - deleteEachItem - namespace: %s, gvr: %v", namespace, gvr)
 
-	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvr, namespace)
+	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvrMap, ownerMap, gvr, namespace)
 	if err != nil {
 		return err
 	}
@@ -276,6 +375,8 @@ func deleteAllContentForGroupVersionResource(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
+	gvrMap map[types.UID]schema.GroupVersionResource,
+	ownerMap map[types.UID][]types.UID,
 	gvr schema.GroupVersionResource,
 	namespace string,
 	namespaceDeletedAt unversioned.Time,
@@ -298,14 +399,14 @@ func deleteAllContentForGroupVersionResource(
 	}
 
 	// first try to delete the entire collection
-	deleteCollectionSupported, err := deleteCollection(dynamicClient, opCache, gvr, namespace)
+	deleteCollectionSupported, err := deleteCollection(dynamicClient, opCache, gvrMap, ownerMap, gvr, namespace)
 	if err != nil {
 		return estimate, err
 	}
 
 	// delete collection was not supported, so we list and delete each item...
 	if !deleteCollectionSupported {
-		err = deleteEachItem(dynamicClient, opCache, gvr, namespace)
+		err = deleteEachItem(dynamicClient, opCache, gvrMap, ownerMap, gvr, namespace)
 		if err != nil {
 			return estimate, err
 		}
@@ -314,7 +415,7 @@ func deleteAllContentForGroupVersionResource(
 	// verify there are no more remaining items
 	// it is not an error condition for there to be remaining items if local estimate is non-zero
 	glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - checking for no more items in namespace: %s, gvr: %v", namespace, gvr)
-	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvr, namespace)
+	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvrMap, ownerMap, gvr, namespace)
 	if err != nil {
 		glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - error verifying no items in namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
 		return estimate, err
@@ -344,6 +445,7 @@ func deleteAllContent(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
+	ownerGraph *ownerGraph,
 	groupVersionResources []schema.GroupVersionResource,
 	namespace string,
 	namespaceDeletedAt unversioned.Time,
@@ -351,10 +453,18 @@ func deleteAllContent(
 	estimate := int64(0)
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, gvrs: %v", namespace, groupVersionResources)
 	// iterate over each group version, and attempt to delete all of its resources
-	// we sort resources to delete in a priority order that deletes pods LAST
-	sort.Sort(sortableGroupVersionResources(groupVersionResources))
+	// we sort resources to delete in a priority order that deletes pods LAST.
+	groupVersionResources, err := ownerGraph.topologicalOrder(groupVersionResources)
+	if err != nil {
+		// this is not fatal, we still can go forward, but might delete dependent objects first, which might be slow
+		glog.V(6).Infof("Found no good topological order, namespace deletion might be slow: %v", err)
+	}
+
+	gvrMap := map[types.UID]schema.GroupVersionResource{}
+	ownerMap := map[types.UID][]types.UID{}
+
 	for _, gvr := range groupVersionResources {
-		gvrEstimate, err := deleteAllContentForGroupVersionResource(kubeClient, clientPool, opCache, gvr, namespace, namespaceDeletedAt)
+		gvrEstimate, err := deleteAllContentForGroupVersionResource(kubeClient, clientPool, opCache, gvrMap, ownerMap, gvr, namespace, namespaceDeletedAt)
 		if err != nil {
 			return estimate, err
 		}
@@ -362,6 +472,21 @@ func deleteAllContent(
 			estimate = gvrEstimate
 		}
 	}
+
+	// train the owner graph
+	for ownee, owners := range ownerMap {
+		owneeGvr, owneeFound := gvrMap[ownee]
+		if !owneeFound {
+			continue
+		}
+		for _, owner := range owners {
+			ownerGvr, ownerFound := gvrMap[owner]
+			if ownerFound {
+				ownerGraph.setOwnedBy(owneeGvr, ownerGvr)
+			}
+		}
+	}
+
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v", namespace, estimate)
 	return estimate, nil
 }
@@ -371,7 +496,8 @@ func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error),
+	ownerGraph *ownerGraph,
+	discoverResourcesFn func() ([]*unversioned.APIResourceList, error),
 	namespace *v1.Namespace,
 	finalizerToken v1.FinalizerName,
 ) error {
@@ -422,11 +548,16 @@ func syncNamespace(
 	}
 
 	// there may still be content for us to remove
-	groupVersionResources, err := groupVersionResourcesFn()
+	resources, err := discoverResourcesFn()
 	if err != nil {
 		return err
 	}
-	estimate, err := deleteAllContent(kubeClient, clientPool, opCache, groupVersionResources, namespace.Name, *namespace.DeletionTimestamp)
+	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
+	groupVersionResources, err := unversioned.ExtractGroupVersionResourcesWithVerbs(resources, "delete")
+	if err != nil {
+		return err
+	}
+	estimate, err := deleteAllContent(kubeClient, clientPool, opCache, ownerGraph, groupVersionResources, namespace.Name, *namespace.DeletionTimestamp)
 	if err != nil {
 		return err
 	}

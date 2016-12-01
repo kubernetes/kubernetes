@@ -360,9 +360,13 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	}
 	versions := &unversioned.APIVersions{Versions: versionStrings}
 
-	resourceMap, err := discoveryClient.ServerResources()
+	serverResources, err := discoveryClient.ServerResources()
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
+	}
+	resourceMap := map[string]*unversioned.APIResourceList{}
+	for _, groupVersionResources := range serverResources {
+		resourceMap[groupVersionResources.GroupVersion] = groupVersionResources
 	}
 
 	// TODO: should use a dynamic RESTMapper built from the discovery results.
@@ -372,29 +376,32 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	namespaceKubeClient := client("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
-	var gvrFn func() ([]schema.GroupVersionResource, error)
+	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
 	if err != nil {
 		glog.Fatalf("Failed to get group version resources: %v", err)
 	}
+	tprFound := false
+searchThirdPartyResource:
 	for _, rsrcList := range rsrcs {
 		for ix := range rsrcList.APIResources {
 			rsrc := &rsrcList.APIResources[ix]
 			if rsrc.Kind == "ThirdPartyResource" {
-				gvrFn = namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
+				tprFound = true
+				break searchThirdPartyResource
 			}
 		}
 	}
-	if gvrFn == nil {
-		gvr, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
+	if !tprFound {
+		resourceLists, err := discoverResourcesFn()
 		if err != nil {
 			glog.Fatalf("Failed to get resources: %v", err)
 		}
-		gvrFn = func() ([]schema.GroupVersionResource, error) {
-			return gvr, nil
+		discoverResourcesFn = func() ([]*unversioned.APIResourceList, error) {
+			return resourceLists, nil
 		}
 	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, gvrFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
+	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, discoverResourcesFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
 	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
@@ -567,17 +574,21 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 	if s.EnableGarbageCollector {
 		gcClientset := client("generic-garbage-collector")
-		groupVersionResources, err := gcClientset.Discovery().ServerPreferredResources()
+		preferredResources, err := gcClientset.Discovery().ServerPreferredResources()
 		if err != nil {
 			glog.Fatalf("Failed to get supported resources from server: %v", err)
 		}
-
+		deletableGroupVersionResources, err := unversioned.ExtractGroupVersionResourcesWithVerbs(preferredResources, "delete")
+		if err != nil {
+			// the resource without errors are returned. So don't make that fatal
+			glog.Errorf("Failed to parse resources from server: %v", err)
+		}
 		config := restclient.AddUserAgent(kubeconfig, "generic-garbage-collector")
 		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 		metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 		config.ContentConfig = dynamic.ContentConfig()
 		clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, groupVersionResources)
+		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources)
 		if err != nil {
 			glog.Errorf("Failed to start the generic garbage collector: %v", err)
 		} else {
