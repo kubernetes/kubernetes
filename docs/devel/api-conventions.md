@@ -568,7 +568,7 @@ Strategic Merge Patch also supports special operations as listed below.
 
 #### List of Scalars
 
-We have two merge strategy for list of scalars: replace and merge. Default strategy is replace,
+We have two merge strategies for list of scalars: replace and merge. Default strategy is replace,
 which will preserve the order; while merge strategy works like an unordered set. We call a list
 using merge strategy a merging list.
 
