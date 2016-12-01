@@ -20,6 +20,7 @@ go_library(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/types:go_default_library",
+        "//pkg/util/strategicpatch:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )
