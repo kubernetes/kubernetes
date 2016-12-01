@@ -32,20 +32,25 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
+	"github.com/pborman/uuid"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
@@ -54,9 +59,9 @@ import (
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
+	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 )
 
 const (
@@ -226,10 +231,75 @@ func NewConfig() *Config {
 	defaultOptions := options.NewServerRunOptions()
 	// unset fields that can be overridden to avoid setting values so that we won't end up with lingering values.
 	// TODO we probably want to run the defaults the other way.  A default here drives it in the CLI flags
-	defaultOptions.SecurePort = 0
-	defaultOptions.InsecurePort = 0
 	defaultOptions.AuditLogPath = ""
 	return config.ApplyOptions(defaultOptions)
+}
+
+func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions) *Config {
+	if secureServing == nil || secureServing.ServingOptions.BindPort <= 0 {
+		return c
+	}
+
+	secureServingInfo := &SecureServingInfo{
+		ServingInfo: ServingInfo{
+			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
+		},
+		ServerCert: GeneratableKeyCert{
+			CertKey: CertKey{
+				CertFile: secureServing.ServerCert.CertKey.CertFile,
+				KeyFile:  secureServing.ServerCert.CertKey.KeyFile,
+			},
+		},
+		SNICerts: []NamedCertKey{},
+		ClientCA: secureServing.ClientCA,
+	}
+	if secureServing.ServerCert.CertKey.CertFile == "" && secureServing.ServerCert.CertKey.KeyFile == "" {
+		secureServingInfo.ServerCert.Generate = true
+		secureServingInfo.ServerCert.CertFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".crt")
+		secureServingInfo.ServerCert.KeyFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".key")
+	}
+
+	secureServingInfo.SNICerts = nil
+	for _, nkc := range secureServing.SNICertKeys {
+		secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
+			CertKey: CertKey{
+				KeyFile:  nkc.KeyFile,
+				CertFile: nkc.CertFile,
+			},
+			Names: nkc.Names,
+		})
+	}
+
+	c.SecureServingInfo = secureServingInfo
+	c.ReadWritePort = secureServing.ServingOptions.BindPort
+
+	return c
+}
+
+func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOptions) *Config {
+	if insecureServing == nil || insecureServing.BindPort <= 0 {
+		return c
+	}
+
+	c.InsecureServingInfo = &ServingInfo{
+		BindAddress: net.JoinHostPort(insecureServing.BindAddress.String(), strconv.Itoa(insecureServing.BindPort)),
+	}
+
+	return c
+}
+
+func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOptions) *Config {
+	if o == nil || o.PasswordFile == nil {
+		return c
+	}
+
+	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
+	return c
+}
+
+func (c *Config) ApplyRBACSuperUser(rbacSuperUser string) *Config {
+	c.AuthorizerRBACSuperUser = rbacSuperUser
+	return c
 }
 
 // ApplyOptions applies the run options to the method receiver and returns self
@@ -243,49 +313,6 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		}
 	}
 
-	if options.SecurePort > 0 {
-		secureServingInfo := &SecureServingInfo{
-			ServingInfo: ServingInfo{
-				BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
-			},
-			ServerCert: GeneratableKeyCert{
-				CertKey: CertKey{
-					CertFile: options.TLSCertFile,
-					KeyFile:  options.TLSPrivateKeyFile,
-				},
-			},
-			SNICerts: []NamedCertKey{},
-			ClientCA: options.ClientCAFile,
-		}
-		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
-			secureServingInfo.ServerCert.Generate = true
-			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
-			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
-		}
-
-		secureServingInfo.SNICerts = nil
-		for _, nkc := range options.SNICertKeys {
-			secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
-				CertKey: CertKey{
-					KeyFile:  nkc.KeyFile,
-					CertFile: nkc.CertFile,
-				},
-				Names: nkc.Names,
-			})
-		}
-
-		c.SecureServingInfo = secureServingInfo
-		c.ReadWritePort = options.SecurePort
-	}
-
-	if options.InsecurePort > 0 {
-		insecureServingInfo := &ServingInfo{
-			BindAddress: net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort)),
-		}
-		c.InsecureServingInfo = insecureServingInfo
-	}
-
-	c.AuthorizerRBACSuperUser = options.AuthorizationRBACSuperUser
 	c.CorsAllowedOriginList = options.CorsAllowedOriginList
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
@@ -295,7 +322,6 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.MaxRequestsInFlight = options.MaxRequestsInFlight
 	c.MinRequestTimeout = options.MinRequestTimeout
 	c.PublicAddress = options.AdvertiseAddress
-	c.SupportsBasicAuth = len(options.BasicAuthFile) > 0
 
 	return c
 }
@@ -338,6 +364,25 @@ func (c *Config) Complete() completedConfig {
 	}
 	if c.DiscoveryAddresses == nil {
 		c.DiscoveryAddresses = DefaultDiscoveryAddresses{DefaultAddress: c.ExternalAddress}
+	}
+
+	// If the loopbackclientconfig is specified AND it has a token for use against the API server
+	// wrap the authenticator and authorizer in loopback authentication logic
+	if c.Authenticator != nil && c.Authorizer != nil && c.LoopbackClientConfig != nil && len(c.LoopbackClientConfig.BearerToken) > 0 {
+		privilegedLoopbackToken := c.LoopbackClientConfig.BearerToken
+		var uid = uuid.NewRandom().String()
+		tokens := make(map[string]*user.DefaultInfo)
+		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
+			Name:   user.APIServerUser,
+			UID:    uid,
+			Groups: []string{user.SystemPrivilegedGroup},
+		}
+
+		tokenAuthenticator := apiserverauthenticator.NewAuthenticatorFromTokens(tokens)
+		c.Authenticator = authenticatorunion.New(tokenAuthenticator, c.Authenticator)
+
+		tokenAuthorizer := apiserverauthorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
 
 	return completedConfig{c}
@@ -408,7 +453,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 }
 
 // MaybeGenerateServingCerts generates serving certificates if requested and needed.
-func (c completedConfig) MaybeGenerateServingCerts(alternateIPs ...net.IP) error {
+func (c *Config) MaybeGenerateServingCerts(alternateIPs ...net.IP) error {
 	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
 	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile) {
@@ -485,17 +530,6 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	genericvalidation.ValidateRunOptions(options)
 
-	// If advertise-address is not specified, use bind-address. If bind-address
-	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
-	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
-	if options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified() {
-		hostIP, err := utilnet.ChooseBindAddress(options.BindAddress)
-		if err != nil {
-			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
-				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
-		}
-		options.AdvertiseAddress = hostIP
-	}
 	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
 
 	// Set default value for ExternalAddress if not specified.

@@ -12,10 +12,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "etcd_validation.go",
-        "universal_validation.go",
-    ],
+    srcs = ["universal_validation.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/genericapiserver/options:go_default_library",

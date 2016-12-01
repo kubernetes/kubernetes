@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	// Install the testgroup API
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"
@@ -54,20 +55,51 @@ func newStorageFactory() genericapiserver.StorageFactory {
 	return storageFactory
 }
 
-func NewServerRunOptions() *genericoptions.ServerRunOptions {
-	serverOptions := genericoptions.NewServerRunOptions().WithEtcdOptions()
-	serverOptions.InsecurePort = InsecurePort
-	return serverOptions
+type ServerRunOptions struct {
+	GenericServerRunOptions *genericoptions.ServerRunOptions
+	Etcd                    *genericoptions.EtcdOptions
+	SecureServing           *genericoptions.SecureServingOptions
+	InsecureServing         *genericoptions.ServingOptions
+	Authentication          *genericoptions.BuiltInAuthenticationOptions
 }
 
-func Run(serverOptions *genericoptions.ServerRunOptions, stopCh <-chan struct{}) error {
+func NewServerRunOptions() *ServerRunOptions {
+	s := ServerRunOptions{
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		Etcd:            genericoptions.NewEtcdOptions(),
+		SecureServing:   genericoptions.NewSecureServingOptions(),
+		InsecureServing: genericoptions.NewInsecureServingOptions(),
+		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
+	}
+	s.InsecureServing.BindPort = InsecurePort
+	s.SecureServing.ServingOptions.BindPort = SecurePort
+
+	return &s
+}
+
+func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	// Set ServiceClusterIPRange
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
-	serverOptions.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
-	genericvalidation.ValidateRunOptions(serverOptions)
-	genericvalidation.VerifyEtcdServersList(serverOptions)
-	config := genericapiserver.NewConfig().ApplyOptions(serverOptions).Complete()
+	serverOptions.GenericServerRunOptions.ServiceClusterIPRange = *serviceClusterIPRange
+	serverOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
+
+	genericvalidation.ValidateRunOptions(serverOptions.GenericServerRunOptions)
+	if errs := serverOptions.Etcd.Validate(); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	if errs := serverOptions.SecureServing.Validate(); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	if errs := serverOptions.InsecureServing.Validate("insecure-port"); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	config := genericapiserver.NewConfig().
+		ApplyOptions(serverOptions.GenericServerRunOptions).
+		ApplySecureServingOptions(serverOptions.SecureServing).
+		ApplyInsecureServingOptions(serverOptions.InsecureServing).
+		ApplyAuthenticationOptions(serverOptions.Authentication).
+		Complete()
 	if err := config.MaybeGenerateServingCerts(); err != nil {
 		// this wasn't treated as fatal for this process before
 		fmt.Printf("Error creating cert: %v", err)
