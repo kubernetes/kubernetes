@@ -262,6 +262,7 @@ pkg/util/metrics
 pkg/util/netsh
 pkg/util/ratelimit
 pkg/util/replicaset
+pkg/util/restoptions
 pkg/util/validation/field
 pkg/util/workqueue
 pkg/version/prometheus

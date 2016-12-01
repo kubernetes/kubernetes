@@ -21,13 +21,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry"
 	statefulsetetcd "k8s.io/kubernetes/pkg/registry/apps/petset/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 type RESTStorageProvider struct{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apps.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1beta1.SchemeGroupVersion) {
@@ -38,12 +38,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	version := appsapiv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
-		statefulsetStorage, statefulsetStatusStorage := statefulsetetcd.NewREST(restOptionsGetter(apps.Resource("statefulsets")))
+		statefulsetStorage, statefulsetStatusStorage := statefulsetetcd.NewREST(restOptionsGetter)
 		storage["statefulsets"] = statefulsetStorage
 		storage["statefulsets/status"] = statefulsetStatusStorage
 	}
