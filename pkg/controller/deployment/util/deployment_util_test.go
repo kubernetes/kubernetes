@@ -446,11 +446,7 @@ func TestEqualIgnoreHash(t *testing.T) {
 				reverseString = " (reverse order)"
 			}
 			// Run
-			equal, err := equalIgnoreHash(*t1, *t2)
-			// Check
-			if err != nil {
-				t.Errorf("In test case %q%s, expected no error, returned %v", test.test, reverseString, err)
-			}
+			equal := EqualIgnoreHash(*t1, *t2)
 			if equal != test.expected {
 				t.Errorf("In test case %q%s, expected %v", test.test, reverseString, test.expected)
 			}
