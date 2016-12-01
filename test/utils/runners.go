@@ -111,6 +111,9 @@ type RCConfig struct {
 	// kubelets are running those variables should be nil.
 	NodeDumpFunc      func(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{}))
 	ContainerDumpFunc func(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{}))
+
+	// Names of the secrets to mount
+	SecretNames []string
 }
 
 func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
@@ -245,6 +248,12 @@ func (config *DeploymentConfig) create() error {
 		},
 	}
 
+	if len(config.SecretNames) > 0 {
+		volumes, mounts := getVolumesForSecrets(config.SecretNames)
+		deployment.Spec.Template.Spec.Volumes = volumes
+		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = mounts
+	}
+
 	config.applyTo(&deployment.Spec.Template)
 
 	_, err := config.Client.Extensions().Deployments(config.Namespace).Create(deployment)
@@ -303,6 +312,12 @@ func (config *ReplicaSetConfig) create() error {
 				},
 			},
 		},
+	}
+
+	if len(config.SecretNames) > 0 {
+		volumes, mounts := getVolumesForSecrets(config.SecretNames)
+		rs.Spec.Template.Spec.Volumes = volumes
+		rs.Spec.Template.Spec.Containers[0].VolumeMounts = mounts
 	}
 
 	config.applyTo(&rs.Spec.Template)
@@ -396,6 +411,12 @@ func (config *RCConfig) create() error {
 				},
 			},
 		},
+	}
+
+	if len(config.SecretNames) > 0 {
+		volumes, mounts := getVolumesForSecrets(config.SecretNames)
+		rc.Spec.Template.Spec.Volumes = volumes
+		rc.Spec.Template.Spec.Containers[0].VolumeMounts = mounts
 	}
 
 	config.applyTo(rc.Spec.Template)
@@ -925,4 +946,60 @@ func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCrea
 		}
 		return createPod(client, namespace, podCount, basePod)
 	}
+}
+
+type SecretConfig struct {
+	Content   map[string]string
+	Client    clientset.Interface
+	Name      string
+	Namespace string
+	// If set this function will be used to print log lines instead of glog.
+	LogFunc func(fmt string, args ...interface{})
+}
+
+func (config *SecretConfig) Run() error {
+	secret := &v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name: config.Name,
+		},
+		StringData: map[string]string{},
+	}
+	for k, v := range config.Content {
+		secret.StringData[k] = v
+	}
+
+	_, err := config.Client.Core().Secrets(config.Namespace).Create(secret)
+	if err != nil {
+		return fmt.Errorf("Error creating secret: %v", err)
+	}
+	config.LogFunc("Created secret %v/%v", config.Namespace, config.Name)
+	return nil
+}
+
+func (config *SecretConfig) Stop() error {
+	if err := config.Client.Core().Secrets(config.Namespace).Delete(config.Name, &v1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("Error deleting secret: %v", err)
+	}
+	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
+	return nil
+}
+
+func getVolumesForSecrets(names []string) ([]v1.Volume, []v1.VolumeMount) {
+	volumes := make([]v1.Volume, 0, len(names))
+	mounts := make([]v1.VolumeMount, 0, len(names))
+	for _, name := range names {
+		volumes = append(volumes, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: name,
+				},
+			},
+		})
+		mounts = append(mounts, v1.VolumeMount{
+			Name:      name,
+			MountPath: fmt.Sprintf("/%v", name),
+		})
+	}
+	return volumes, mounts
 }
