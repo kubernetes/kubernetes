@@ -27,7 +27,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	unversioned_core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -62,7 +62,7 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
-		broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: p.KubeClient.Core().Events("")})
+		broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: p.KubeClient.Core().Events("")})
 		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: "persistentvolume-controller"})
 	}
 

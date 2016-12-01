@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
@@ -57,7 +57,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	id, _, err := m.createPodSandbox(pod, 1)
 	assert.NoError(t, err)
 	fakeRuntime.AssertCalls([]string{"RunPodSandbox"})
-	sandboxes, err := fakeRuntime.ListPodSandbox(&runtimeApi.PodSandboxFilter{Id: &id})
+	sandboxes, err := fakeRuntime.ListPodSandbox(&runtimeapi.PodSandboxFilter{Id: &id})
 	assert.NoError(t, err)
 	assert.Equal(t, len(sandboxes), 1)
 	// TODO Check pod sandbox configuration

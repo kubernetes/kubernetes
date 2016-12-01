@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -57,7 +57,7 @@ func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 
 // Newest first.
-type podSandboxByCreated []*runtimeApi.PodSandbox
+type podSandboxByCreated []*runtimeapi.PodSandbox
 
 func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
@@ -69,37 +69,37 @@ func (c containerStatusByCreated) Len() int           { return len(c) }
 func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
 
-// toKubeContainerState converts runtimeApi.ContainerState to kubecontainer.ContainerState.
-func toKubeContainerState(state runtimeApi.ContainerState) kubecontainer.ContainerState {
+// toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.ContainerState.
+func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.ContainerState {
 	switch state {
-	case runtimeApi.ContainerState_CONTAINER_CREATED:
+	case runtimeapi.ContainerState_CONTAINER_CREATED:
 		return kubecontainer.ContainerStateCreated
-	case runtimeApi.ContainerState_CONTAINER_RUNNING:
+	case runtimeapi.ContainerState_CONTAINER_RUNNING:
 		return kubecontainer.ContainerStateRunning
-	case runtimeApi.ContainerState_CONTAINER_EXITED:
+	case runtimeapi.ContainerState_CONTAINER_EXITED:
 		return kubecontainer.ContainerStateExited
-	case runtimeApi.ContainerState_CONTAINER_UNKNOWN:
+	case runtimeapi.ContainerState_CONTAINER_UNKNOWN:
 		return kubecontainer.ContainerStateUnknown
 	}
 
 	return kubecontainer.ContainerStateUnknown
 }
 
-// toRuntimeProtocol converts v1.Protocol to runtimeApi.Protocol.
-func toRuntimeProtocol(protocol v1.Protocol) runtimeApi.Protocol {
+// toRuntimeProtocol converts v1.Protocol to runtimeapi.Protocol.
+func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 	switch protocol {
 	case v1.ProtocolTCP:
-		return runtimeApi.Protocol_TCP
+		return runtimeapi.Protocol_TCP
 	case v1.ProtocolUDP:
-		return runtimeApi.Protocol_UDP
+		return runtimeapi.Protocol_UDP
 	}
 
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
-	return runtimeApi.Protocol_TCP
+	return runtimeapi.Protocol_TCP
 }
 
-// toKubeContainer converts runtimeApi.Container to kubecontainer.Container.
-func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeApi.Container) (*kubecontainer.Container, error) {
+// toKubeContainer converts runtimeapi.Container to kubecontainer.Container.
+func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*kubecontainer.Container, error) {
 	if c == nil || c.Id == nil || c.Image == nil || c.State == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
@@ -115,11 +115,11 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeApi.Container) (*k
 	}, nil
 }
 
-// sandboxToKubeContainer converts runtimeApi.PodSandbox to kubecontainer.Container.
+// sandboxToKubeContainer converts runtimeapi.PodSandbox to kubecontainer.Container.
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
 // TODO: Remove this once it becomes obsolete.
-func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeApi.PodSandbox) (*kubecontainer.Container, error) {
+func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSandbox) (*kubecontainer.Container, error) {
 	if s == nil || s.Id == nil || s.State == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
@@ -149,7 +149,7 @@ func getContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 // getImageUser gets uid or user name that will run the command(s) from image. The function
 // guarantees that only one of them is set.
 func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, *string, error) {
-	imageStatus, err := m.imageService.ImageStatus(&runtimeApi.ImageSpec{Image: &image})
+	imageStatus, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: &image})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -237,8 +237,8 @@ func buildPodLogsDirectory(podUID types.UID) string {
 	return filepath.Join(podLogsRootDirectory, string(podUID))
 }
 
-// toKubeRuntimeStatus converts the runtimeApi.RuntimeStatus to kubecontainer.RuntimeStatus.
-func toKubeRuntimeStatus(status *runtimeApi.RuntimeStatus) *kubecontainer.RuntimeStatus {
+// toKubeRuntimeStatus converts the runtimeapi.RuntimeStatus to kubecontainer.RuntimeStatus.
+func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.RuntimeStatus {
 	conditions := []kubecontainer.RuntimeCondition{}
 	for _, c := range status.GetConditions() {
 		conditions = append(conditions, kubecontainer.RuntimeCondition{

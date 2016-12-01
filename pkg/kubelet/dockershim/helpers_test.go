@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
@@ -43,13 +43,13 @@ func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
 // TODO: Migrate the corresponding test to dockershim.
 func TestGetContainerSecurityOpts(t *testing.T) {
 	containerName := "bar"
-	makeConfig := func(annotations map[string]string) *runtimeApi.PodSandboxConfig {
+	makeConfig := func(annotations map[string]string) *runtimeapi.PodSandboxConfig {
 		return makeSandboxConfigWithLabelsAndAnnotations("pod", "ns", "1234", 1, nil, annotations)
 	}
 
 	tests := []struct {
 		msg          string
-		config       *runtimeApi.PodSandboxConfig
+		config       *runtimeapi.PodSandboxConfig
 		expectedOpts []string
 	}{{
 		msg:          "No security annotations",
@@ -106,13 +106,13 @@ func TestGetContainerSecurityOpts(t *testing.T) {
 
 // TestGetSandboxSecurityOpts tests the logic of generating sandbox security options from sandbox annotations.
 func TestGetSandboxSecurityOpts(t *testing.T) {
-	makeConfig := func(annotations map[string]string) *runtimeApi.PodSandboxConfig {
+	makeConfig := func(annotations map[string]string) *runtimeapi.PodSandboxConfig {
 		return makeSandboxConfigWithLabelsAndAnnotations("pod", "ns", "1234", 1, nil, annotations)
 	}
 
 	tests := []struct {
 		msg          string
-		config       *runtimeApi.PodSandboxConfig
+		config       *runtimeapi.PodSandboxConfig
 		expectedOpts []string
 	}{{
 		msg:          "No security annotations",

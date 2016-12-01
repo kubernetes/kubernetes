@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kdns "k8s.io/kubernetes/pkg/dns"
-	dnsConfig "k8s.io/kubernetes/pkg/dns/config"
+	dnsconfig "k8s.io/kubernetes/pkg/dns/config"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
@@ -58,15 +58,15 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 	ks.dnsBindAddress = config.DNSBindAddress
 	ks.dnsPort = config.DNSPort
 
-	var configSync dnsConfig.Sync
+	var configSync dnsconfig.Sync
 	if config.ConfigMap == "" {
 		glog.V(0).Infof("ConfigMap not configured, using values from command line flags")
-		configSync = dnsConfig.NewNopSync(
-			&dnsConfig.Config{Federations: config.Federations})
+		configSync = dnsconfig.NewNopSync(
+			&dnsconfig.Config{Federations: config.Federations})
 	} else {
 		glog.V(0).Infof("Using configuration read from ConfigMap: %v:%v",
 			config.ConfigMapNs, config.ConfigMap)
-		configSync = dnsConfig.NewSync(
+		configSync = dnsconfig.NewSync(
 			kubeClient, config.ConfigMapNs, config.ConfigMap)
 	}
 

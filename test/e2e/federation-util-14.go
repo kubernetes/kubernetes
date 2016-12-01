@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -34,18 +34,18 @@ func createClusterObjectOrFail_14(f *framework.Framework, context *framework.E2E
 	}
 
 	framework.Logf("Creating cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
-	cluster := federation_api.Cluster{
-		ObjectMeta: api_v1.ObjectMeta{
+	cluster := federationapi.Cluster{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name: context.Name,
 		},
-		Spec: federation_api.ClusterSpec{
-			ServerAddressByClientCIDRs: []federation_api.ServerAddressByClientCIDR{
+		Spec: federationapi.ClusterSpec{
+			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
 				{
 					ClientCIDR:    "0.0.0.0/0",
 					ServerAddress: context.Cluster.Cluster.Server,
 				},
 			},
-			SecretRef: &api_v1.LocalObjectReference{
+			SecretRef: &apiv1.LocalObjectReference{
 				// Note: Name must correlate with federation build script secret name,
 				//       which currently matches the cluster name.
 				//       See federation/cluster/common.sh:132
@@ -58,7 +58,7 @@ func createClusterObjectOrFail_14(f *framework.Framework, context *framework.E2E
 	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 }
 
-func buildClustersOrFail_14(f *framework.Framework) []*federation_api.Cluster {
+func buildClustersOrFail_14(f *framework.Framework) []*federationapi.Cluster {
 	contexts := f.GetUnderlyingFederatedContexts()
 
 	for _, context := range contexts {
@@ -74,7 +74,7 @@ func buildClustersOrFail_14(f *framework.Framework) []*federation_api.Cluster {
 			}
 			ready := false
 			for _, condition := range cluster.Status.Conditions {
-				if condition.Type == federation_api.ClusterReady && condition.Status == api_v1.ConditionTrue {
+				if condition.Type == federationapi.ClusterReady && condition.Status == apiv1.ConditionTrue {
 					ready = true
 				}
 			}
@@ -87,11 +87,11 @@ func buildClustersOrFail_14(f *framework.Framework) []*federation_api.Cluster {
 		framework.Failf("Not all clusters are ready: %v", err)
 	}
 
-	clusterList, err := f.FederationClientset_1_5.Federation().Clusters().List(api_v1.ListOptions{})
+	clusterList, err := f.FederationClientset_1_5.Federation().Clusters().List(apiv1.ListOptions{})
 	if err != nil {
 		framework.Failf("Error in get clusters: %v", err)
 	}
-	result := make([]*federation_api.Cluster, 0, len(contexts))
+	result := make([]*federationapi.Cluster, 0, len(contexts))
 	for i := range clusterList.Items {
 		result = append(result, &clusterList.Items[i])
 	}
