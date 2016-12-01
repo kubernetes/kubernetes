@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 func TestSandboxNameRoundTrip(t *testing.T) {
@@ -53,8 +53,8 @@ func TestNonParsableSandboxNames(t *testing.T) {
 func TestContainerNameRoundTrip(t *testing.T) {
 	sConfig := makeSandboxConfig("foo", "bar", "iamuid", 3)
 	name, attempt := "pause", uint32(5)
-	config := &runtimeApi.ContainerConfig{
-		Metadata: &runtimeApi.ContainerMetadata{
+	config := &runtimeapi.ContainerConfig{
+		Metadata: &runtimeapi.ContainerMetadata{
 			Name:    &name,
 			Attempt: &attempt,
 		},

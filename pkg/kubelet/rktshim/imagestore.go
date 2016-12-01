@@ -19,7 +19,7 @@ package rktshim
 import (
 	"errors"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 // TODO(tmrts): Move these errors to the container API for code re-use.
@@ -41,21 +41,21 @@ func NewImageStore(ImageStoreConfig) (*ImageStore, error) {
 }
 
 // List lists the images residing in the image store.
-func (*ImageStore) List() ([]runtimeApi.Image, error) {
+func (*ImageStore) List() ([]runtimeapi.Image, error) {
 	panic("not implemented")
 }
 
 // Pull pulls an image into the image store and uses the given authentication method.
-func (*ImageStore) Pull(runtimeApi.ImageSpec, runtimeApi.AuthConfig, *runtimeApi.PodSandboxConfig) error {
+func (*ImageStore) Pull(runtimeapi.ImageSpec, runtimeapi.AuthConfig, *runtimeapi.PodSandboxConfig) error {
 	panic("not implemented")
 }
 
 // Remove removes the image from the image store.
-func (*ImageStore) Remove(runtimeApi.ImageSpec) error {
+func (*ImageStore) Remove(runtimeapi.ImageSpec) error {
 	panic("not implemented")
 }
 
 // Status returns the status of the image.
-func (*ImageStore) Status(runtimeApi.ImageSpec) (runtimeApi.Image, error) {
+func (*ImageStore) Status(runtimeapi.ImageSpec) (runtimeapi.Image, error) {
 	panic("not implemented")
 }

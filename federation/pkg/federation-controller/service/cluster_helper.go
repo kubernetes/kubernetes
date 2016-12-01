@@ -24,7 +24,7 @@ import (
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
@@ -91,7 +91,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 		}
 		cachedClusterClient.endpointStore.Store, cachedClusterClient.endpointController = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+				ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
 					return clientset.Core().Endpoints(v1.NamespaceAll).List(options)
 				},
 				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
@@ -115,7 +115,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 
 		cachedClusterClient.serviceStore.Indexer, cachedClusterClient.serviceController = cache.NewIndexerInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (pkg_runtime.Object, error) {
+				ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
 					return clientset.Core().Services(v1.NamespaceAll).List(options)
 				},
 				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {

@@ -17,8 +17,8 @@ limitations under the License.
 package rktshim
 
 import (
-	kubeletApi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubeletapi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 // PodSandboxManager provides basic operations to create/delete and examine
@@ -29,12 +29,12 @@ type PodSandboxManager struct{}
 type PodSandboxManagerConfig struct{}
 
 // NewPodSandboxManager creates a PodSandboxManager.
-func NewPodSandboxManager(PodSandboxManagerConfig) (kubeletApi.PodSandboxManager, error) {
+func NewPodSandboxManager(PodSandboxManagerConfig) (kubeletapi.PodSandboxManager, error) {
 	return &PodSandboxManager{}, nil
 }
 
 // RunPodSandbox creates and starts a pod sandbox given a pod sandbox configuration.
-func (*PodSandboxManager) RunPodSandbox(*runtimeApi.PodSandboxConfig) (string, error) {
+func (*PodSandboxManager) RunPodSandbox(*runtimeapi.PodSandboxConfig) (string, error) {
 	panic("not implemented")
 }
 
@@ -49,16 +49,16 @@ func (*PodSandboxManager) RemovePodSandbox(string) error {
 }
 
 // PodSandboxStatus queries the status of the pod sandbox.
-func (*PodSandboxManager) PodSandboxStatus(string) (*runtimeApi.PodSandboxStatus, error) {
+func (*PodSandboxManager) PodSandboxStatus(string) (*runtimeapi.PodSandboxStatus, error) {
 	panic("not implemented")
 }
 
 // ListPodSandbox lists existing sandboxes, filtered by the PodSandboxFilter.
-func (*PodSandboxManager) ListPodSandbox(*runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error) {
+func (*PodSandboxManager) ListPodSandbox(*runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
 	panic("not implemented")
 }
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-func (*PodSandboxManager) PortForward(*runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
+func (*PodSandboxManager) PortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	panic("not implemented")
 }

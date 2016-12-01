@@ -24,19 +24,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // A helper to create a basic config.
-func makeSandboxConfig(name, namespace, uid string, attempt uint32) *runtimeApi.PodSandboxConfig {
+func makeSandboxConfig(name, namespace, uid string, attempt uint32) *runtimeapi.PodSandboxConfig {
 	return makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid, attempt, map[string]string{}, map[string]string{})
 }
 
-func makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid string, attempt uint32, labels, annotations map[string]string) *runtimeApi.PodSandboxConfig {
-	return &runtimeApi.PodSandboxConfig{
-		Metadata: &runtimeApi.PodSandboxMetadata{
+func makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid string, attempt uint32, labels, annotations map[string]string) *runtimeapi.PodSandboxConfig {
+	return &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
 			Name:      &name,
 			Namespace: &namespace,
 			Uid:       &uid,
@@ -52,7 +52,7 @@ func makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid string, atte
 func TestListSandboxes(t *testing.T) {
 	ds, _, _ := newTestDockerService()
 	name, namespace := "foo", "bar"
-	configs := []*runtimeApi.PodSandboxConfig{}
+	configs := []*runtimeapi.PodSandboxConfig{}
 	for i := 0; i < 3; i++ {
 		c := makeSandboxConfigWithLabelsAndAnnotations(fmt.Sprintf("%s%d", name, i),
 			fmt.Sprintf("%s%d", namespace, i), fmt.Sprintf("%d", i), 0,
@@ -62,15 +62,15 @@ func TestListSandboxes(t *testing.T) {
 		configs = append(configs, c)
 	}
 
-	expected := []*runtimeApi.PodSandbox{}
-	state := runtimeApi.PodSandboxState_SANDBOX_READY
+	expected := []*runtimeapi.PodSandbox{}
+	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	var createdAt int64 = 0
 	for i := range configs {
 		id, err := ds.RunPodSandbox(configs[i])
 		assert.NoError(t, err)
 		// Prepend to the expected list because ListPodSandbox returns
 		// the most recent sandbox first.
-		expected = append([]*runtimeApi.PodSandbox{{
+		expected = append([]*runtimeapi.PodSandbox{{
 			Metadata:    configs[i].Metadata,
 			Id:          &id,
 			State:       &state,
@@ -98,15 +98,15 @@ func TestSandboxStatus(t *testing.T) {
 	fakeIP := "2.3.4.5"
 	fakeNS := fmt.Sprintf("/proc/%d/ns/net", os.Getpid())
 
-	state := runtimeApi.PodSandboxState_SANDBOX_READY
+	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
 	hostNetwork := false
-	expected := &runtimeApi.PodSandboxStatus{
+	expected := &runtimeapi.PodSandboxStatus{
 		State:       &state,
 		CreatedAt:   &ct,
 		Metadata:    config.Metadata,
-		Network:     &runtimeApi.PodSandboxNetworkStatus{Ip: &fakeIP},
-		Linux:       &runtimeApi.LinuxPodSandboxStatus{Namespaces: &runtimeApi.Namespace{Network: &fakeNS, Options: &runtimeApi.NamespaceOption{HostNetwork: &hostNetwork}}},
+		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: &fakeIP},
+		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Network: &fakeNS, Options: &runtimeapi.NamespaceOption{HostNetwork: &hostNetwork}}},
 		Labels:      labels,
 		Annotations: annotations,
 	}
@@ -128,7 +128,7 @@ func TestSandboxStatus(t *testing.T) {
 	assert.Equal(t, expected, status)
 
 	// Stop the sandbox.
-	*expected.State = runtimeApi.PodSandboxState_SANDBOX_NOTREADY
+	*expected.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 	err = ds.StopPodSandbox(id)
 	assert.NoError(t, err)
 	status, err = ds.PodSandboxStatus(id)
@@ -186,9 +186,9 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 		map[string]string{"annotation": ns},
 	)
 	hostNetwork := true
-	c.Linux = &runtimeApi.LinuxPodSandboxConfig{
-		SecurityContext: &runtimeApi.LinuxSandboxSecurityContext{
-			NamespaceOptions: &runtimeApi.NamespaceOption{
+	c.Linux = &runtimeapi.LinuxPodSandboxConfig{
+		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
+			NamespaceOptions: &runtimeapi.NamespaceOption{
 				HostNetwork: &hostNetwork,
 			},
 		},

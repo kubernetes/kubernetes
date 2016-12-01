@@ -32,11 +32,11 @@ import (
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers"
-	v2_monitors "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors"
-	v2_pools "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools"
+	v2monitors "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors"
+	v2pools "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/rules"
-	neutron_ports "github.com/rackspace/gophercloud/openstack/networking/v2/ports"
+	neutronports "github.com/rackspace/gophercloud/openstack/networking/v2/ports"
 	"github.com/rackspace/gophercloud/pagination"
 
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -80,12 +80,12 @@ func networkExtensions(client *gophercloud.ServiceClient) (map[string]bool, erro
 	return seen, err
 }
 
-func getPortByIP(client *gophercloud.ServiceClient, ipAddress string) (neutron_ports.Port, error) {
-	var targetPort neutron_ports.Port
+func getPortByIP(client *gophercloud.ServiceClient, ipAddress string) (neutronports.Port, error) {
+	var targetPort neutronports.Port
 	var portFound = false
 
-	err := neutron_ports.List(client, neutron_ports.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-		portList, err := neutron_ports.ExtractPorts(page)
+	err := neutronports.List(client, neutronports.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		portList, err := neutronports.ExtractPorts(page)
 		if err != nil {
 			return false, err
 		}
@@ -293,10 +293,10 @@ func getListenerForPort(existingListeners []listeners.Listener, port v1.ServiceP
 }
 
 // Get pool for a listener. A listener always has exactly one pool.
-func getPoolByListenerID(client *gophercloud.ServiceClient, loadbalancerID string, listenerID string) (*v2_pools.Pool, error) {
-	listenerPools := make([]v2_pools.Pool, 0, 1)
-	err := v2_pools.List(client, v2_pools.ListOpts{LoadbalancerID: loadbalancerID}).EachPage(func(page pagination.Page) (bool, error) {
-		poolsList, err := v2_pools.ExtractPools(page)
+func getPoolByListenerID(client *gophercloud.ServiceClient, loadbalancerID string, listenerID string) (*v2pools.Pool, error) {
+	listenerPools := make([]v2pools.Pool, 0, 1)
+	err := v2pools.List(client, v2pools.ListOpts{LoadbalancerID: loadbalancerID}).EachPage(func(page pagination.Page) (bool, error) {
+		poolsList, err := v2pools.ExtractPools(page)
 		if err != nil {
 			return false, err
 		}
@@ -328,10 +328,10 @@ func getPoolByListenerID(client *gophercloud.ServiceClient, loadbalancerID strin
 	return &listenerPools[0], nil
 }
 
-func getMembersByPoolID(client *gophercloud.ServiceClient, id string) ([]v2_pools.Member, error) {
-	var members []v2_pools.Member
-	err := v2_pools.ListAssociateMembers(client, id, v2_pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-		membersList, err := v2_pools.ExtractMembers(page)
+func getMembersByPoolID(client *gophercloud.ServiceClient, id string) ([]v2pools.Member, error) {
+	var members []v2pools.Member
+	err := v2pools.ListAssociateMembers(client, id, v2pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		membersList, err := v2pools.ExtractMembers(page)
 		if err != nil {
 			return false, err
 		}
@@ -347,10 +347,10 @@ func getMembersByPoolID(client *gophercloud.ServiceClient, id string) ([]v2_pool
 }
 
 // Each pool has exactly one or zero monitors. ListOpts does not seem to filter anything.
-func getMonitorByPoolID(client *gophercloud.ServiceClient, id string) (*v2_monitors.Monitor, error) {
-	var monitorList []v2_monitors.Monitor
-	err := v2_monitors.List(client, v2_monitors.ListOpts{PoolID: id}).EachPage(func(page pagination.Page) (bool, error) {
-		monitorsList, err := v2_monitors.ExtractMonitors(page)
+func getMonitorByPoolID(client *gophercloud.ServiceClient, id string) (*v2monitors.Monitor, error) {
+	var monitorList []v2monitors.Monitor
+	err := v2monitors.List(client, v2monitors.ListOpts{PoolID: id}).EachPage(func(page pagination.Page) (bool, error) {
+		monitorsList, err := v2monitors.ExtractMonitors(page)
 		if err != nil {
 			return false, err
 		}
@@ -385,7 +385,7 @@ func getMonitorByPoolID(client *gophercloud.ServiceClient, id string) (*v2_monit
 }
 
 // Check if a member exists for node
-func memberExists(members []v2_pools.Member, addr string, port int) bool {
+func memberExists(members []v2pools.Member, addr string, port int) bool {
 	for _, member := range members {
 		if member.Address == addr && member.ProtocolPort == port {
 			return true
@@ -407,7 +407,7 @@ func popListener(existingListeners []listeners.Listener, id string) []listeners.
 	return existingListeners
 }
 
-func popMember(members []v2_pools.Member, addr string, port int) []v2_pools.Member {
+func popMember(members []v2pools.Member, addr string, port int) []v2pools.Member {
 	for i, member := range members {
 		if member.Address == addr && member.ProtocolPort == port {
 			members[i] = members[len(members)-1]
@@ -596,12 +596,12 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	}
 
 	affinity := v1.ServiceAffinityNone
-	var persistence *v2_pools.SessionPersistence
+	var persistence *v2pools.SessionPersistence
 	switch affinity {
 	case v1.ServiceAffinityNone:
 		persistence = nil
 	case v1.ServiceAffinityClientIP:
-		persistence = &v2_pools.SessionPersistence{Type: "SOURCE_IP"}
+		persistence = &v2pools.SessionPersistence{Type: "SOURCE_IP"}
 	default:
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
@@ -624,9 +624,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 
 	waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 
-	lbmethod := v2_pools.LBMethod(lbaas.opts.LBMethod)
+	lbmethod := v2pools.LBMethod(lbaas.opts.LBMethod)
 	if lbmethod == "" {
-		lbmethod = v2_pools.LBMethodRoundRobin
+		lbmethod = v2pools.LBMethodRoundRobin
 	}
 
 	oldListeners, err := getListenersByLoadBalancerID(lbaas.network, loadbalancer.ID)
@@ -662,9 +662,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		}
 		if pool == nil {
 			glog.V(4).Infof("Creating pool for listener %s", listener.ID)
-			pool, err = v2_pools.Create(lbaas.network, v2_pools.CreateOpts{
+			pool, err = v2pools.Create(lbaas.network, v2pools.CreateOpts{
 				Name:        fmt.Sprintf("pool_%s_%d", name, portIndex),
-				Protocol:    v2_pools.Protocol(port.Protocol),
+				Protocol:    v2pools.Protocol(port.Protocol),
 				LBMethod:    lbmethod,
 				ListenerID:  listener.ID,
 				Persistence: persistence,
@@ -695,7 +695,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 
 			if !memberExists(members, addr, int(port.NodePort)) {
 				glog.V(4).Infof("Creating member for pool %s", pool.ID)
-				_, err := v2_pools.CreateAssociateMember(lbaas.network, pool.ID, v2_pools.MemberCreateOpts{
+				_, err := v2pools.CreateAssociateMember(lbaas.network, pool.ID, v2pools.MemberCreateOpts{
 					ProtocolPort: int(port.NodePort),
 					Address:      addr,
 					SubnetID:     lbaas.opts.SubnetId,
@@ -716,7 +716,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		// Delete obsolete members for this pool
 		for _, member := range members {
 			glog.V(4).Infof("Deleting obsolete member %s for pool %s address %s", member.ID, pool.ID, member.Address)
-			err := v2_pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
+			err := v2pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
 			if err != nil && !isNotFound(err) {
 				return nil, fmt.Errorf("Error deleting obsolete member %s for pool %s address %s: %v", member.ID, pool.ID, member.Address, err)
 			}
@@ -726,7 +726,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		monitorID := pool.MonitorID
 		if monitorID == "" && lbaas.opts.CreateMonitor {
 			glog.V(4).Infof("Creating monitor for pool %s", pool.ID)
-			monitor, err := v2_monitors.Create(lbaas.network, v2_monitors.CreateOpts{
+			monitor, err := v2monitors.Create(lbaas.network, v2monitors.CreateOpts{
 				PoolID:     pool.ID,
 				Type:       string(port.Protocol),
 				Delay:      int(lbaas.opts.MonitorDelay.Duration.Seconds()),
@@ -756,7 +756,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			monitorID := pool.MonitorID
 			if monitorID != "" {
 				glog.V(4).Infof("Deleting obsolete monitor %s for pool %s", monitorID, pool.ID)
-				err = v2_monitors.Delete(lbaas.network, monitorID).ExtractErr()
+				err = v2monitors.Delete(lbaas.network, monitorID).ExtractErr()
 				if err != nil && !isNotFound(err) {
 					return nil, fmt.Errorf("Error deleting obsolete monitor %s for pool %s: %v", monitorID, pool.ID, err)
 				}
@@ -770,7 +770,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			if members != nil {
 				for _, member := range members {
 					glog.V(4).Infof("Deleting obsolete member %s for pool %s address %s", member.ID, pool.ID, member.Address)
-					err := v2_pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
+					err := v2pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
 					if err != nil && !isNotFound(err) {
 						return nil, fmt.Errorf("Error deleting obsolete member %s for pool %s address %s: %v", member.ID, pool.ID, member.Address, err)
 					}
@@ -779,7 +779,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			}
 			glog.V(4).Infof("Deleting obsolete pool %s for listener %s", pool.ID, listener.ID)
 			// delete pool
-			err = v2_pools.Delete(lbaas.network, pool.ID).ExtractErr()
+			err = v2pools.Delete(lbaas.network, pool.ID).ExtractErr()
 			if err != nil && !isNotFound(err) {
 				return nil, fmt.Errorf("Error deleting obsolete pool %s for listener %s: %v", pool.ID, listener.ID, err)
 			}
@@ -923,9 +923,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			return nil, err
 		}
 
-		update_opts := neutron_ports.UpdateOpts{SecurityGroups: []string{lbSecGroup.ID}}
+		update_opts := neutronports.UpdateOpts{SecurityGroups: []string{lbSecGroup.ID}}
 
-		res := neutron_ports.Update(lbaas.network, port.ID, update_opts)
+		res := neutronports.Update(lbaas.network, port.ID, update_opts)
 
 		if res.Err != nil {
 			glog.Errorf("Error occured updating port: %s", port.ID)
@@ -986,9 +986,9 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 	}
 
 	// Get all pools for this loadbalancer, by listener ID.
-	lbPools := make(map[string]v2_pools.Pool)
-	err = v2_pools.List(lbaas.network, v2_pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
-		poolsList, err := v2_pools.ExtractPools(page)
+	lbPools := make(map[string]v2pools.Pool)
+	err = v2pools.List(lbaas.network, v2pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
+		poolsList, err := v2pools.ExtractPools(page)
 		if err != nil {
 			return false, err
 		}
@@ -1038,9 +1038,9 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 		}
 
 		// Find existing pool members (by address) for this port
-		members := make(map[string]v2_pools.Member)
-		err := v2_pools.ListAssociateMembers(lbaas.network, pool.ID, v2_pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-			membersList, err := v2_pools.ExtractMembers(page)
+		members := make(map[string]v2pools.Member)
+		err := v2pools.ListAssociateMembers(lbaas.network, pool.ID, v2pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+			membersList, err := v2pools.ExtractMembers(page)
 			if err != nil {
 				return false, err
 			}
@@ -1059,7 +1059,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 				// Already exists, do not create member
 				continue
 			}
-			_, err := v2_pools.CreateAssociateMember(lbaas.network, pool.ID, v2_pools.MemberCreateOpts{
+			_, err := v2pools.CreateAssociateMember(lbaas.network, pool.ID, v2pools.MemberCreateOpts{
 				Address:      addr,
 				ProtocolPort: int(port.NodePort),
 				SubnetID:     lbaas.opts.SubnetId,
@@ -1076,7 +1076,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 				// Still present, do not delete member
 				continue
 			}
-			err = v2_pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
+			err = v2pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
 			if err != nil && !isNotFound(err) {
 				return err
 			}
@@ -1137,8 +1137,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	// get all pools (and health monitors) associated with this loadbalancer
 	var poolIDs []string
 	var monitorIDs []string
-	err = v2_pools.List(lbaas.network, v2_pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
-		poolsList, err := v2_pools.ExtractPools(page)
+	err = v2pools.List(lbaas.network, v2pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
+		poolsList, err := v2pools.ExtractPools(page)
 		if err != nil {
 			return false, err
 		}
@@ -1157,8 +1157,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	// get all members associated with each poolIDs
 	var memberIDs []string
 	for _, poolID := range poolIDs {
-		err := v2_pools.ListAssociateMembers(lbaas.network, poolID, v2_pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-			membersList, err := v2_pools.ExtractMembers(page)
+		err := v2pools.ListAssociateMembers(lbaas.network, poolID, v2pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+			membersList, err := v2pools.ExtractMembers(page)
 			if err != nil {
 				return false, err
 			}
@@ -1176,7 +1176,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 
 	// delete all monitors
 	for _, monitorID := range monitorIDs {
-		err := v2_monitors.Delete(lbaas.network, monitorID).ExtractErr()
+		err := v2monitors.Delete(lbaas.network, monitorID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}
@@ -1187,7 +1187,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	for _, poolID := range poolIDs {
 		// delete all members for this pool
 		for _, memberID := range memberIDs {
-			err := v2_pools.DeleteMember(lbaas.network, poolID, memberID).ExtractErr()
+			err := v2pools.DeleteMember(lbaas.network, poolID, memberID).ExtractErr()
 			if err != nil && !isNotFound(err) {
 				return err
 			}
@@ -1195,7 +1195,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		}
 
 		// delete pool
-		err := v2_pools.Delete(lbaas.network, poolID).ExtractErr()
+		err := v2pools.Delete(lbaas.network, poolID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}

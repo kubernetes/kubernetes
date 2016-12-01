@@ -23,7 +23,7 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 // This file contains helper functions to convert docker API types to runtime
@@ -36,13 +36,13 @@ const (
 	statusExitedPrefix  = "Exited"
 )
 
-func imageToRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error) {
+func imageToRuntimeAPIImage(image *dockertypes.Image) (*runtimeapi.Image, error) {
 	if image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime API image")
 	}
 
 	size := uint64(image.VirtualSize)
-	return &runtimeApi.Image{
+	return &runtimeapi.Image{
 		Id:          &image.ID,
 		RepoTags:    image.RepoTags,
 		RepoDigests: image.RepoDigests,
@@ -50,13 +50,13 @@ func imageToRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error)
 	}, nil
 }
 
-func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeApi.Image, error) {
+func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeapi.Image, error) {
 	if image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime API image")
 	}
 
 	size := uint64(image.VirtualSize)
-	runtimeImage := &runtimeApi.Image{
+	runtimeImage := &runtimeapi.Image{
 		Id:          &image.ID,
 		RepoTags:    image.RepoTags,
 		RepoDigests: image.RepoDigests,
@@ -77,7 +77,7 @@ func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
 	return imageID
 }
 
-func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, error) {
+func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeapi.Container, error) {
 	state := toRuntimeAPIContainerState(c.Status)
 	if len(c.Names) == 0 {
 		return nil, fmt.Errorf("unexpected empty container name: %+v", c)
@@ -90,11 +90,11 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 	sandboxID := c.Labels[sandboxIDLabelKey]
 	// The timestamp in dockertypes.Container is in seconds.
 	createdAt := c.Created * int64(time.Second)
-	return &runtimeApi.Container{
+	return &runtimeapi.Container{
 		Id:           &c.ID,
 		PodSandboxId: &sandboxID,
 		Metadata:     metadata,
-		Image:        &runtimeApi.ImageSpec{Image: &c.Image},
+		Image:        &runtimeapi.ImageSpec{Image: &c.Image},
 		ImageRef:     &c.ImageID,
 		State:        &state,
 		CreatedAt:    &createdAt,
@@ -103,48 +103,48 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 	}, nil
 }
 
-func toDockerContainerStatus(state runtimeApi.ContainerState) string {
+func toDockerContainerStatus(state runtimeapi.ContainerState) string {
 	switch state {
-	case runtimeApi.ContainerState_CONTAINER_CREATED:
+	case runtimeapi.ContainerState_CONTAINER_CREATED:
 		return "created"
-	case runtimeApi.ContainerState_CONTAINER_RUNNING:
+	case runtimeapi.ContainerState_CONTAINER_RUNNING:
 		return "running"
-	case runtimeApi.ContainerState_CONTAINER_EXITED:
+	case runtimeapi.ContainerState_CONTAINER_EXITED:
 		return "exited"
-	case runtimeApi.ContainerState_CONTAINER_UNKNOWN:
+	case runtimeapi.ContainerState_CONTAINER_UNKNOWN:
 		fallthrough
 	default:
 		return "unknown"
 	}
 }
 
-func toRuntimeAPIContainerState(state string) runtimeApi.ContainerState {
+func toRuntimeAPIContainerState(state string) runtimeapi.ContainerState {
 	// Parse the state string in dockertypes.Container. This could break when
 	// we upgrade docker.
 	switch {
 	case strings.HasPrefix(state, statusRunningPrefix):
-		return runtimeApi.ContainerState_CONTAINER_RUNNING
+		return runtimeapi.ContainerState_CONTAINER_RUNNING
 	case strings.HasPrefix(state, statusExitedPrefix):
-		return runtimeApi.ContainerState_CONTAINER_EXITED
+		return runtimeapi.ContainerState_CONTAINER_EXITED
 	case strings.HasPrefix(state, statusCreatedPrefix):
-		return runtimeApi.ContainerState_CONTAINER_CREATED
+		return runtimeapi.ContainerState_CONTAINER_CREATED
 	default:
-		return runtimeApi.ContainerState_CONTAINER_UNKNOWN
+		return runtimeapi.ContainerState_CONTAINER_UNKNOWN
 	}
 }
 
-func toRuntimeAPISandboxState(state string) runtimeApi.PodSandboxState {
+func toRuntimeAPISandboxState(state string) runtimeapi.PodSandboxState {
 	// Parse the state string in dockertypes.Container. This could break when
 	// we upgrade docker.
 	switch {
 	case strings.HasPrefix(state, statusRunningPrefix):
-		return runtimeApi.PodSandboxState_SANDBOX_READY
+		return runtimeapi.PodSandboxState_SANDBOX_READY
 	default:
-		return runtimeApi.PodSandboxState_SANDBOX_NOTREADY
+		return runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 	}
 }
 
-func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeApi.PodSandbox, error) {
+func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSandbox, error) {
 	state := toRuntimeAPISandboxState(c.Status)
 	if len(c.Names) == 0 {
 		return nil, fmt.Errorf("unexpected empty sandbox name: %+v", c)
@@ -156,7 +156,7 @@ func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeApi.PodSandbox, erro
 	labels, annotations := extractLabels(c.Labels)
 	// The timestamp in dockertypes.Container is in seconds.
 	createdAt := c.Created * int64(time.Second)
-	return &runtimeApi.PodSandbox{
+	return &runtimeapi.PodSandbox{
 		Id:          &c.ID,
 		Metadata:    metadata,
 		State:       &state,

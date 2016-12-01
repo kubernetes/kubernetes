@@ -26,7 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -299,7 +299,7 @@ type PodStatus struct {
 	ContainerStatuses []*ContainerStatus
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
-	SandboxStatuses []*runtimeApi.PodSandboxStatus
+	SandboxStatuses []*runtimeapi.PodSandboxStatus
 }
 
 // ContainerStatus represents the status of a container.

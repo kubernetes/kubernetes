@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math"
 	"net"
-	goRuntime "runtime"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"time"
@@ -177,8 +177,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
 				unversioned.LabelHostname: kl.hostname,
-				unversioned.LabelOS:       goRuntime.GOOS,
-				unversioned.LabelArch:     goRuntime.GOARCH,
+				unversioned.LabelOS:       goruntime.GOOS,
+				unversioned.LabelArch:     goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
@@ -572,8 +572,8 @@ func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
 
 // Set the GOOS and GOARCH for this node
 func (kl *Kubelet) setNodeStatusGoRuntime(node *v1.Node) {
-	node.Status.NodeInfo.OperatingSystem = goRuntime.GOOS
-	node.Status.NodeInfo.Architecture = goRuntime.GOARCH
+	node.Status.NodeInfo.OperatingSystem = goruntime.GOOS
+	node.Status.NodeInfo.Architecture = goruntime.GOARCH
 }
 
 // Set status for the node.

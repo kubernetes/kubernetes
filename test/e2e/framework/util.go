@@ -32,7 +32,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	goRuntime "runtime"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -226,7 +226,7 @@ func GetPauseImageName(c clientset.Interface) string {
 // GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
 // TODO: move this function to the test/utils
 func GetPauseImageNameForHostArch() string {
-	return currentPodInfraContainerImageName + "-" + goRuntime.GOARCH + ":" + currentPodInfraContainerImageVersion
+	return currentPodInfraContainerImageName + "-" + goruntime.GOARCH + ":" + currentPodInfraContainerImageVersion
 }
 
 // SubResource proxy should have been functional in v1.0.0, but SubResource

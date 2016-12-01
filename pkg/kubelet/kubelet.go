@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
-	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -256,7 +256,7 @@ func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps
 	return cfg, nil
 }
 
-func getRuntimeAndImageServices(config *componentconfig.KubeletConfiguration) (internalApi.RuntimeService, internalApi.ImageManagerService, error) {
+func getRuntimeAndImageServices(config *componentconfig.KubeletConfiguration) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	rs, err := remote.NewRemoteRuntimeService(config.RemoteRuntimeEndpoint, config.RuntimeRequestTimeout.Duration)
 	if err != nil {
 		return nil, nil, err
@@ -529,8 +529,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		// becomes the default.
 		klet.networkPlugin = nil
 
-		var runtimeService internalApi.RuntimeService
-		var imageService internalApi.ImageManagerService
+		var runtimeService internalapi.RuntimeService
+		var imageService internalapi.ImageManagerService
 		var err error
 
 		switch kubeCfg.ContainerRuntime {
@@ -548,8 +548,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			}
 
 			klet.criHandler = ds
-			rs := ds.(internalApi.RuntimeService)
-			is := ds.(internalApi.ImageManagerService)
+			rs := ds.(internalapi.RuntimeService)
+			is := ds.(internalapi.ImageManagerService)
 			// This is an internal knob to switch between grpc and non-grpc
 			// integration.
 			// TODO: Remove this knob once we switch to using GRPC completely.

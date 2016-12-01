@@ -19,8 +19,8 @@ package rktshim
 import (
 	"time"
 
-	kubeletApi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubeletapi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 // Runtime provides an API for lifecycle, inspection and introspection
@@ -31,12 +31,12 @@ type Runtime struct{}
 type RuntimeConfig struct{}
 
 // NewRuntime creates a container.Runtime instance using the Runtime.
-func NewRuntime(RuntimeConfig) (kubeletApi.ContainerManager, error) {
+func NewRuntime(RuntimeConfig) (kubeletapi.ContainerManager, error) {
 	return &Runtime{}, nil
 }
 
 // CreateContainer creates an app inside the provided pod sandbox and returns the RawContainerID.
-func (*Runtime) CreateContainer(string, *runtimeApi.ContainerConfig, *runtimeApi.PodSandboxConfig) (string, error) {
+func (*Runtime) CreateContainer(string, *runtimeapi.ContainerConfig, *runtimeapi.PodSandboxConfig) (string, error) {
 	panic("not implemented")
 }
 
@@ -56,12 +56,12 @@ func (*Runtime) RemoveContainer(string) error {
 }
 
 // ListContainers lists out the apps residing inside the pod sandbox using the ContainerFilter.
-func (*Runtime) ListContainers(*runtimeApi.ContainerFilter) ([]*runtimeApi.Container, error) {
+func (*Runtime) ListContainers(*runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	panic("not implemented")
 }
 
 // ContainerStatus returns the RawContainerStatus of an app inside the pod sandbox.
-func (*Runtime) ContainerStatus(string) (*runtimeApi.ContainerStatus, error) {
+func (*Runtime) ContainerStatus(string) (*runtimeapi.ContainerStatus, error) {
 	panic("not implemented")
 }
 
@@ -72,11 +72,11 @@ func (*Runtime) ExecSync(containerID string, cmd []string, timeout time.Duration
 }
 
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
-func (*Runtime) Exec(*runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
+func (*Runtime) Exec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	panic("not implemented")
 }
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-func (*Runtime) Attach(req *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
+func (*Runtime) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	panic("not implemented")
 }

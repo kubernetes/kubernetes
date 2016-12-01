@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/apis/federation"
-	fed_fake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
+	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -665,7 +665,7 @@ func TestDescribeCluster(t *testing.T) {
 			},
 		},
 	}
-	fake := fed_fake.NewSimpleClientset(&cluster)
+	fake := fedfake.NewSimpleClientset(&cluster)
 	d := ClusterDescriber{Interface: fake}
 	out, err := d.Describe("any", "foo", DescriberSettings{ShowEvents: true})
 	if err != nil {
