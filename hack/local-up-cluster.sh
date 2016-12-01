@@ -397,6 +397,12 @@ function start_apiserver {
     if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
       anytoken_arg="--insecure-allow-any-token "
     fi
+    auth_proxy_arg=""
+    if [[ -n "${ENABLE_AUTH_PROXY:-}" ]]; then
+      auth_proxy_arg="--requestheader-username-headers=X-Remote-User \
+      --requestheader-client-ca-file=${CERT_DIR}/auth-proxy-client-ca.crt \
+      --requestheader-allowed-names=system:auth-proxy "
+    fi
     authorizer_arg=""
     if [[ -n "${ENABLE_RBAC:-}" ]]; then
       authorizer_arg="--authorization-mode=RBAC "
@@ -432,12 +438,22 @@ EOF
     create_client_certkey client-ca scheduler system:scheduler system:masters
     create_client_certkey client-ca admin system:admin system:cluster-admins
 
+    # Create auth proxy client ca
+    sudo /bin/bash -e <<EOF
+    rm -f "${CERT_DIR}/auth-proxy-client-ca.crt" "${CERT_DIR}/auth-proxy-client-ca.key"
+    openssl req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/auth-proxy-client-ca.key" -out "${CERT_DIR}/auth-proxy-client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "${CERT_DIR}/auth-proxy-client-ca-config.json"
+EOF
+    create_client_certkey auth-proxy-client-ca auth-proxy system:auth-proxy
+
+    sudo bash -c "cat '${CERT_DIR}/client-ca.crt' '${CERT_DIR}/auth-proxy-client-ca.crt' > '${CERT_DIR}/client-ca-bundle.crt'"
+
     APISERVER_LOG=/tmp/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${auth_proxy_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
-      --client-ca-file="${CERT_DIR}/client-ca.crt" \
+      --client-ca-file="${CERT_DIR}/client-ca-bundle.crt" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
