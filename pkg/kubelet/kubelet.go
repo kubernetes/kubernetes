@@ -2034,11 +2034,6 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 	return val.(time.Time)
 }
 
-// PLEGHealthCheck returns whether the PLEG is healty.
-func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
-	return kl.pleg.Healthy()
-}
-
 // updateRuntimeUp calls the container runtime status callback, initializing
 // the runtime dependent modules when the container runtime first comes up,
 // and returns an error if the status check fails.  If the status check is OK,
