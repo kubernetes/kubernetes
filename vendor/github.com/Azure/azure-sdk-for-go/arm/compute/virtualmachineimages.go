@@ -43,6 +43,9 @@ func NewVirtualMachineImagesClientWithBaseURI(baseURI string, subscriptionID str
 
 // Get gets a virtual machine image.
 //
+// location is the name of a supported Azure region. publisherName is a valid
+// image publisher. offer is a valid image publisher offer. skus is a valid
+// image SKU. version is a valid image SKU version.
 func (client VirtualMachineImagesClient) Get(location string, publisherName string, offer string, skus string, version string) (result VirtualMachineImage, err error) {
 	req, err := client.GetPreparer(location, publisherName, offer, skus, version)
 	if err != nil {
@@ -105,9 +108,12 @@ func (client VirtualMachineImagesClient) GetResponder(resp *http.Response) (resu
 	return
 }
 
-// List gets a list of virtual machine images.
+// List gets a list of all virtual machine image versions for the specified
+// location, publisher, offer, and SKU.
 //
-// filter is the filter to apply on the operation.
+// location is the name of a supported Azure region. publisherName is a valid
+// image publisher. offer is a valid image publisher offer. skus is a valid
+// image SKU. filter is the filter to apply on the operation.
 func (client VirtualMachineImagesClient) List(location string, publisherName string, offer string, skus string, filter string, top *int32, orderby string) (result ListVirtualMachineImageResource, err error) {
 	req, err := client.ListPreparer(location, publisherName, offer, skus, filter, top, orderby)
 	if err != nil {
@@ -178,8 +184,11 @@ func (client VirtualMachineImagesClient) ListResponder(resp *http.Response) (res
 	return
 }
 
-// ListOffers gets a list of virtual machine image offers.
+// ListOffers gets a list of virtual machine image offers for the specified
+// location and publisher.
 //
+// location is the name of a supported Azure region. publisherName is a valid
+// image publisher.
 func (client VirtualMachineImagesClient) ListOffers(location string, publisherName string) (result ListVirtualMachineImageResource, err error) {
 	req, err := client.ListOffersPreparer(location, publisherName)
 	if err != nil {
@@ -239,8 +248,10 @@ func (client VirtualMachineImagesClient) ListOffersResponder(resp *http.Response
 	return
 }
 
-// ListPublishers gets a list of virtual machine image publishers.
+// ListPublishers gets a list of virtual machine image publishers for the
+// specified Azure location.
 //
+// location is the name of a supported Azure region.
 func (client VirtualMachineImagesClient) ListPublishers(location string) (result ListVirtualMachineImageResource, err error) {
 	req, err := client.ListPublishersPreparer(location)
 	if err != nil {
@@ -299,8 +310,11 @@ func (client VirtualMachineImagesClient) ListPublishersResponder(resp *http.Resp
 	return
 }
 
-// ListSkus gets a list of virtual machine image skus.
+// ListSkus gets a list of virtual machine image SKUs for the specified
+// location, publisher, and offer.
 //
+// location is the name of a supported Azure region. publisherName is a valid
+// image publisher. offer is a valid image publisher offer.
 func (client VirtualMachineImagesClient) ListSkus(location string, publisherName string, offer string) (result ListVirtualMachineImageResource, err error) {
 	req, err := client.ListSkusPreparer(location, publisherName, offer)
 	if err != nil {
