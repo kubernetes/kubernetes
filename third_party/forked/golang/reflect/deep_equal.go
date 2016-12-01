@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package reflect is a fork of go's standard library reflection package, which
-// allows for deep equal with equality functions defined.
+// allows for deep equal with overrides
 package reflect
 
 import (
@@ -11,57 +11,6 @@ import (
 	"reflect"
 	"strings"
 )
-
-// Equalities is a map from type to a function comparing two values of
-// that type.
-type Equalities map[reflect.Type]reflect.Value
-
-// For convenience, panics on errrors
-func EqualitiesOrDie(funcs ...interface{}) Equalities {
-	e := Equalities{}
-	if err := e.AddFuncs(funcs...); err != nil {
-		panic(err)
-	}
-	return e
-}
-
-// AddFuncs is a shortcut for multiple calls to AddFunc.
-func (e Equalities) AddFuncs(funcs ...interface{}) error {
-	for _, f := range funcs {
-		if err := e.AddFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// AddFunc uses func as an equality function: it must take
-// two parameters of the same type, and return a boolean.
-func (e Equalities) AddFunc(eqFunc interface{}) error {
-	fv := reflect.ValueOf(eqFunc)
-	ft := fv.Type()
-	if ft.Kind() != reflect.Func {
-		return fmt.Errorf("expected func, got: %v", ft)
-	}
-	if ft.NumIn() != 2 {
-		return fmt.Errorf("expected three 'in' params, got: %v", ft)
-	}
-	if ft.NumOut() != 1 {
-		return fmt.Errorf("expected one 'out' param, got: %v", ft)
-	}
-	if ft.In(0) != ft.In(1) {
-		return fmt.Errorf("expected arg 1 and 2 to have same type, but got %v", ft)
-	}
-	var forReturnType bool
-	boolType := reflect.TypeOf(forReturnType)
-	if ft.Out(0) != boolType {
-		return fmt.Errorf("expected bool return, got: %v", ft)
-	}
-	e[ft.In(0)] = fv
-	return nil
-}
-
-// Below here is forked from go's reflect/deepequal.go
 
 // During deepValueEqual, must keep track of checks that are
 // in progress.  The comparison algorithm assumes that all
@@ -100,7 +49,7 @@ func makeUsefulPanic(v reflect.Value) {
 // Tests for deep equality using reflected types. The map argument tracks
 // comparisons that have already been seen, which allows short circuiting on
 // recursive types.
-func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool, depth int) bool {
+func deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool, depth int) bool {
 	defer makeUsefulPanic(v1)
 
 	if !v1.IsValid() || !v2.IsValid() {
@@ -109,8 +58,15 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 	if v1.Type() != v2.Type() {
 		return false
 	}
-	if fv, ok := e[v1.Type()]; ok {
-		return fv.Call([]reflect.Value{v1, v2})[0].Bool()
+	if m, ok := v1.Type().MethodByName("SemanticDeepEqual"); ok {
+		if v2.Kind() == reflect.Ptr && m.Type.In(1).Kind() != reflect.Ptr {
+			if v2.IsNil() {
+				return v1.IsNil()
+			}
+			return m.Func.Call([]reflect.Value{v1, v2.Elem()})[0].Bool()
+		} else {
+			return m.Func.Call([]reflect.Value{v1, v2})[0].Bool()
+		}
 	}
 
 	hard := func(k reflect.Kind) bool {
@@ -150,7 +106,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		// We don't need to check length here because length is part of
 		// an array's type, which has already been filtered for.
 		for i := 0; i < v1.Len(); i++ {
-			if !e.deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
+			if !deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
 				return false
 			}
 		}
@@ -169,7 +125,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			return true
 		}
 		for i := 0; i < v1.Len(); i++ {
-			if !e.deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
+			if !deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
 				return false
 			}
 		}
@@ -178,12 +134,12 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		if v1.IsNil() || v2.IsNil() {
 			return v1.IsNil() == v2.IsNil()
 		}
-		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
+		return deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
 	case reflect.Ptr:
-		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
+		return deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
 	case reflect.Struct:
 		for i, n := 0, v1.NumField(); i < n; i++ {
-			if !e.deepValueEqual(v1.Field(i), v2.Field(i), visited, depth+1) {
+			if !deepValueEqual(v1.Field(i), v2.Field(i), visited, depth+1) {
 				return false
 			}
 		}
@@ -202,7 +158,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			return true
 		}
 		for _, k := range v1.MapKeys() {
-			if !e.deepValueEqual(v1.MapIndex(k), v2.MapIndex(k), visited, depth+1) {
+			if !deepValueEqual(v1.MapIndex(k), v2.MapIndex(k), visited, depth+1) {
 				return false
 			}
 		}
@@ -231,7 +187,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 //
 // Unexported field members cannot be compared and will cause an imformative panic; you must add an Equality
 // function for these types.
-func (e Equalities) DeepEqual(a1, a2 interface{}) bool {
+func DeepEqual(a1, a2 interface{}) bool {
 	if a1 == nil || a2 == nil {
 		return a1 == a2
 	}
@@ -240,10 +196,10 @@ func (e Equalities) DeepEqual(a1, a2 interface{}) bool {
 	if v1.Type() != v2.Type() {
 		return false
 	}
-	return e.deepValueEqual(v1, v2, make(map[visit]bool), 0)
+	return deepValueEqual(v1, v2, make(map[visit]bool), 0)
 }
 
-func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool, depth int) bool {
+func deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool, depth int) bool {
 	defer makeUsefulPanic(v1)
 
 	if !v1.IsValid() || !v2.IsValid() {
@@ -252,8 +208,15 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 	if v1.Type() != v2.Type() {
 		return false
 	}
-	if fv, ok := e[v1.Type()]; ok {
-		return fv.Call([]reflect.Value{v1, v2})[0].Bool()
+	if m, ok := v1.Type().MethodByName("SemanticDeepEqual"); ok {
+		if v2.Kind() == reflect.Ptr && m.Type.In(1).Kind() != reflect.Ptr {
+			if v2.IsNil() {
+				return v1.IsNil()
+			}
+			return m.Func.Call([]reflect.Value{v1, v2.Elem()})[0].Bool()
+		} else {
+			return m.Func.Call([]reflect.Value{v1, v2})[0].Bool()
+		}
 	}
 
 	hard := func(k reflect.Kind) bool {
@@ -293,7 +256,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		// We don't need to check length here because length is part of
 		// an array's type, which has already been filtered for.
 		for i := 0; i < v1.Len(); i++ {
-			if !e.deepValueDerive(v1.Index(i), v2.Index(i), visited, depth+1) {
+			if !deepValueDerive(v1.Index(i), v2.Index(i), visited, depth+1) {
 				return false
 			}
 		}
@@ -309,7 +272,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 			return true
 		}
 		for i := 0; i < v1.Len(); i++ {
-			if !e.deepValueDerive(v1.Index(i), v2.Index(i), visited, depth+1) {
+			if !deepValueDerive(v1.Index(i), v2.Index(i), visited, depth+1) {
 				return false
 			}
 		}
@@ -326,15 +289,15 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		if v1.IsNil() {
 			return true
 		}
-		return e.deepValueDerive(v1.Elem(), v2.Elem(), visited, depth+1)
+		return deepValueDerive(v1.Elem(), v2.Elem(), visited, depth+1)
 	case reflect.Ptr:
 		if v1.IsNil() {
 			return true
 		}
-		return e.deepValueDerive(v1.Elem(), v2.Elem(), visited, depth+1)
+		return deepValueDerive(v1.Elem(), v2.Elem(), visited, depth+1)
 	case reflect.Struct:
 		for i, n := 0, v1.NumField(); i < n; i++ {
-			if !e.deepValueDerive(v1.Field(i), v2.Field(i), visited, depth+1) {
+			if !deepValueDerive(v1.Field(i), v2.Field(i), visited, depth+1) {
 				return false
 			}
 		}
@@ -350,7 +313,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 			return true
 		}
 		for _, k := range v1.MapKeys() {
-			if !e.deepValueDerive(v1.MapIndex(k), v2.MapIndex(k), visited, depth+1) {
+			if !deepValueDerive(v1.MapIndex(k), v2.MapIndex(k), visited, depth+1) {
 				return false
 			}
 		}
@@ -375,7 +338,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 // the semantic comparison.
 //
 // The unset fields include a nil pointer and an empty string.
-func (e Equalities) DeepDerivative(a1, a2 interface{}) bool {
+func DeepDerivative(a1, a2 interface{}) bool {
 	if a1 == nil {
 		return true
 	}
@@ -384,5 +347,5 @@ func (e Equalities) DeepDerivative(a1, a2 interface{}) bool {
 	if v1.Type() != v2.Type() {
 		return false
 	}
-	return e.deepValueDerive(v1, v2, make(map[visit]bool), 0)
+	return deepValueDerive(v1, v2, make(map[visit]bool), 0)
 }

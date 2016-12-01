@@ -44,6 +44,11 @@ func (t Time) DeepCopy() Time {
 	return t
 }
 
+// SemanticDeepEqual implements api.Semantic.DeepEqual for Times
+func (a Time) SemanticDeepEqual(b Time) bool {
+	return a.UTC() == b.UTC()
+}
+
 // String returns the representation of the time.
 func (t Time) String() string {
 	return t.Time.String()

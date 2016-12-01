@@ -398,6 +398,15 @@ func (q Quantity) DeepCopy() Quantity {
 	return q
 }
 
+// SemanticDeepEqual defines equality for purposes of api.Semantic.DeepEqual()
+func (a Quantity) SemanticDeepEqual(b Quantity) bool {
+	// Ignore formatting, only care that numeric value stayed the same.
+	// TODO: if we decide it's important, it should be safe to start comparing the format.
+	//
+	// Uninitialized quantities are equivalent to 0 quantities.
+	return a.Cmp(b) == 0
+}
+
 // OpenAPIDefinition returns openAPI definition for this type.
 func (_ Quantity) OpenAPIDefinition() common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{

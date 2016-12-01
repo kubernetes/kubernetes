@@ -26,10 +26,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
+	forkedreflect "k8s.io/kubernetes/third_party/forked/golang/reflect"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/gofuzz"
@@ -64,6 +64,12 @@ type MyWeirdCustomEmbeddedVersionKindField struct {
 	ObjectKind string `json:"myKindKey,omitempty"`
 	Z          string `json:"Z,omitempty"`
 	Y          uint64 `json:"Y,omitempty"`
+}
+
+func (a MyWeirdCustomEmbeddedVersionKindField) SemanticDeepEqual(b MyWeirdCustomEmbeddedVersionKindField) bool {
+	a.APIVersion, a.ObjectKind = "", ""
+	b.APIVersion, b.ObjectKind = "", ""
+	return a == b
 }
 
 type TestType1 struct {
@@ -199,14 +205,6 @@ func objDiff(a, b interface{}) string {
 	//)
 }
 
-var semantic = conversion.EqualitiesOrDie(
-	func(a, b MyWeirdCustomEmbeddedVersionKindField) bool {
-		a.APIVersion, a.ObjectKind = "", ""
-		b.APIVersion, b.ObjectKind = "", ""
-		return a == b
-	},
-)
-
 func runTest(t *testing.T, source interface{}) {
 	name := reflect.TypeOf(source).Elem().Name()
 	TestObjectFuzzer.Fuzz(source)
@@ -222,7 +220,7 @@ func runTest(t *testing.T, source interface{}) {
 		t.Errorf("%v: %v (%v)", name, err, string(data))
 		return
 	}
-	if !semantic.DeepEqual(source, obj2) {
+	if !forkedreflect.DeepEqual(source, obj2) {
 		t.Errorf("1: %v: diff: %v", name, diff.ObjectGoPrintSideBySide(source, obj2))
 		return
 	}
@@ -231,7 +229,7 @@ func runTest(t *testing.T, source interface{}) {
 		t.Errorf("2: %v: %v", name, err)
 		return
 	}
-	if !semantic.DeepEqual(source, obj3) {
+	if !forkedreflect.DeepEqual(source, obj3) {
 		t.Errorf("3: %v: diff: %v", name, objDiff(source, obj3))
 		return
 	}
@@ -331,7 +329,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !semantic.DeepEqual(expect, obj) {
+	if !forkedreflect.DeepEqual(expect, obj) {
 		t.Errorf("unexpected object: %#v", obj)
 	}
 
@@ -339,7 +337,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	if err := runtime.DecodeInto(codec, data, into); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !semantic.DeepEqual(expect, into) {
+	if !forkedreflect.DeepEqual(expect, into) {
 		t.Errorf("unexpected object: %#v", obj)
 	}
 }
@@ -355,7 +353,7 @@ func TestEncode_Ptr(t *testing.T) {
 	if _, ok := obj2.(*TestType1); !ok {
 		t.Fatalf("Got wrong type")
 	}
-	if !semantic.DeepEqual(obj2, tt) {
+	if !forkedreflect.DeepEqual(obj2, tt) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", tt, obj2)
 	}
 }
@@ -440,7 +438,7 @@ func TestDirectCodec(t *testing.T) {
 			ObjectKind: "ExternalTestType1",
 		},
 	}
-	if !semantic.DeepEqual(e, a) {
+	if !forkedreflect.DeepEqual(e, a) {
 		t.Fatalf("expect %v, got %v", e, a)
 	}
 }

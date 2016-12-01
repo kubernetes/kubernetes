@@ -86,7 +86,7 @@ func TestProtobufRoundTrip(t *testing.T) {
 	if err := out.Unmarshal(data); err != nil {
 		t.Fatal(err)
 	}
-	if !api.Semantic.Equalities.DeepEqual(out, obj) {
+	if !api.Semantic.DeepEqual(out, obj) {
 		t.Logf("marshal\n%s", hex.Dump(data))
 		t.Fatalf("Unmarshal is unequal\n%s", diff.ObjectGoPrintDiff(out, obj))
 	}

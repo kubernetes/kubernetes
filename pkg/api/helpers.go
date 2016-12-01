@@ -24,15 +24,14 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
+	forkedreflect "k8s.io/kubernetes/third_party/forked/golang/reflect"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -53,24 +52,16 @@ func (c *ConversionError) Error() string {
 
 // Semantic can do semantic deep equality checks for api objects.
 // Example: api.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
-var Semantic = conversion.EqualitiesOrDie(
-	func(a, b resource.Quantity) bool {
-		// Ignore formatting, only care that numeric value stayed the same.
-		// TODO: if we decide it's important, it should be safe to start comparing the format.
-		//
-		// Uninitialized quantities are equivalent to 0 quantities.
-		return a.Cmp(b) == 0
-	},
-	func(a, b unversioned.Time) bool {
-		return a.UTC() == b.UTC()
-	},
-	func(a, b labels.Selector) bool {
-		return a.String() == b.String()
-	},
-	func(a, b fields.Selector) bool {
-		return a.String() == b.String()
-	},
-)
+type semantic struct{}
+var Semantic = semantic{}
+
+func (s semantic) DeepEqual(a, b interface{}) bool {
+	return forkedreflect.DeepEqual(a, b)
+}
+
+func (s semantic) DeepDerivative(a, b interface{}) bool {
+	return forkedreflect.DeepDerivative(a, b)
+}
 
 var standardResourceQuotaScopes = sets.NewString(
 	string(ResourceQuotaScopeTerminating),
