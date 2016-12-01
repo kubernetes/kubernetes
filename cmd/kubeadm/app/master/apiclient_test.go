@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/api"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestCreateClientAndWaitForAPI(t *testing.T) {
@@ -90,7 +90,7 @@ func TestNewDaemonSet(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		p := api.PodSpec{}
+		p := apiv1.PodSpec{}
 		actual := NewDaemonSet(rt.dn, p)
 		if actual.Spec.Selector.MatchLabels["k8s-app"] != rt.expected {
 			t.Errorf(
@@ -132,7 +132,7 @@ func TestNewService(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		p := api.ServiceSpec{}
+		p := apiv1.ServiceSpec{}
 		actual := NewService(rt.dn, p)
 		if actual.ObjectMeta.Labels["k8s-app"] != rt.expected {
 			t.Errorf(
@@ -174,7 +174,7 @@ func TestNewDeployment(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		p := api.PodSpec{}
+		p := apiv1.PodSpec{}
 		actual := NewDeployment(rt.dn, 1, p)
 		if actual.Spec.Selector.MatchLabels["k8s-app"] != rt.expected {
 			t.Errorf(
