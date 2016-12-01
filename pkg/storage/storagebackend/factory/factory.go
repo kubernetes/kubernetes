@@ -37,6 +37,8 @@ func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 		// - Honor "https" scheme to support secure connection in gRPC.
 		// - Support non-quorum read.
 		return newETCD3Storage(c)
+	case storagebackend.StorageTypeInmem:
+		return newInmemStorage(c)
 	default:
 		return nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
