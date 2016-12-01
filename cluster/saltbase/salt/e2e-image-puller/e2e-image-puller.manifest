@@ -55,7 +55,7 @@ spec:
       path: /usr/bin/docker
     name: docker
   # This pod is really fire-and-forget.
-  restartPolicy: Never
+  restartPolicy: OnFailure
   # This pod needs hostNetworking for true VM perf measurement as well as avoiding cbr0 issues
   hostNetwork: true
 
