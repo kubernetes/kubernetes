@@ -219,8 +219,6 @@ kube::golang::set_platform_envs() {
   [[ -n ${1-} ]] || {
     kube::log::error_exit "!!! Internal error. No platform set in kube::golang::set_platform_envs"
   }
-  # make sure we have a clean slate first
-  kube::golang::unset_platform_envs
 
   export GOOS=${platform%/*}
   export GOARCH=${platform##*/}
