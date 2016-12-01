@@ -211,7 +211,8 @@ func (e *Store) ListPredicate(ctx api.Context, p storage.SelectionPredicate, opt
 	}
 
 	if options == nil {
-		options = &api.ListOptions{ResourceVersion: "0"}
+		// By default we should serve the request from etcd.
+		options = &api.ListOptions{ResourceVersion: ""}
 	}
 	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
 	return list, storeerr.InterpretListError(err, e.QualifiedResource)
