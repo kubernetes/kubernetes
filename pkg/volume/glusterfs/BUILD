@@ -15,6 +15,7 @@ go_library(
     srcs = [
         "doc.go",
         "glusterfs.go",
+        "glusterfs_minmax.go",
         "glusterfs_util.go",
     ],
     tags = ["automanaged"],
