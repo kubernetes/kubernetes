@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -40,6 +41,15 @@ const (
 	// entries from the map automatically after the PDB DeletionTimeout regardless.
 	MaxDisruptedPodSize = 2000
 )
+
+// EvictionsRetry is the retry for a conflict where multiple clients
+// are making changes to the same resource.
+var EvictionsRetry = wait.Backoff{
+	Steps:    20,
+	Duration: 20 * time.Millisecond,
+	Factor:   1.0,
+	Jitter:   0.1,
+}
 
 func newEvictionStorage(store *registry.Store, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) *EvictionREST {
 	return &EvictionREST{store: store, podDisruptionBudgetClient: podDisruptionBudgetClient}
@@ -68,7 +78,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	}
 	pod := obj.(*api.Pod)
 	var rtStatus *unversioned.Status
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err = retry.RetryOnConflict(EvictionsRetry, func() error {
 		pdbs, err := r.getPodDisruptionBudgets(ctx, pod)
 		if err != nil {
 			return err

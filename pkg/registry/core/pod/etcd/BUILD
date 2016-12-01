@@ -36,6 +36,7 @@ go_library(
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
+        "//pkg/util/wait:go_default_library",
     ],
 )
 
