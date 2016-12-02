@@ -10,12 +10,13 @@ load(
     "cgo_library",
 )
 
-go_binary(
-    name = "kubernetes-discovery",
-    srcs = ["main.go"],
+go_library(
+    name = "go_default_library",
+    srcs = ["start.go"],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubernetes-discovery/pkg/cmd/server:go_default_library",
-        "//pkg/util/logs:go_default_library",
+        "//cmd/kubernetes-discovery/pkg/legacy:go_default_library",
+        "//pkg/kubectl/cmd/util:go_default_library",
+        "//vendor:github.com/spf13/cobra",
     ],
 )
