@@ -101,7 +101,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 					// SELinux. This is not optimal and would be nice to adjust in future
 					// so it can create and write /var/lib/etcd, but for now this avoids
 					// recommending setenforce 0 system-wide.
-					Type: "unconfined_t",
+					Type: "spc_t",
 				},
 			},
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))

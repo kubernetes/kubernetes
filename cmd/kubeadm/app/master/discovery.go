@@ -90,7 +90,7 @@ func newKubeDiscoveryPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 					// SELinux. This is not optimal and would be nice to adjust in future
 					// so it can read /tmp/secret, but for now this avoids recommending
 					// setenforce 0 system-wide.
-					Type: "unconfined_t",
+					Type: "spc_t",
 				},
 			},
 		}},
