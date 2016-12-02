@@ -68,7 +68,7 @@ function setup() {
 }
 
 function log-dump-ssh() {
-  if [[ -n "${use_custom_instance_list}" ]]; then
+  if [[ -z "${use_custom_instance_list}" ]]; then
     ssh-to-node "$@"
     return
   fi
