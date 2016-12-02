@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -78,6 +79,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	}
 	pod := obj.(*api.Pod)
 	var rtStatus *unversioned.Status
+	var pdbName string
 	err = retry.RetryOnConflict(EvictionsRetry, func() error {
 		pdbs, err := r.getPodDisruptionBudgets(ctx, pod)
 		if err != nil {
@@ -93,6 +95,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 			return nil
 		} else if len(pdbs) == 1 {
 			pdb := pdbs[0]
+			pdbName = pdb.Name
 			// Try to verify-and-decrement
 
 			// If it was false already, or if it becomes false during the course of our retries,
@@ -118,6 +121,9 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 		}
 		return nil
 	})
+	if err == wait.ErrWaitTimeout {
+		err = errors.NewTimeoutError(fmt.Sprintf("couldn't update PodDisruptionBudget %q due to conflicts", pdbName), 10)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -138,15 +144,16 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
+// checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
 func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
-	if pdb.Status.ObservedGeneration != pdb.Generation {
+	if pdb.Status.ObservedGeneration < pdb.Generation {
 		return false, nil
 	}
 	if pdb.Status.PodDisruptionsAllowed < 0 {
-		return false, fmt.Errorf("pdb disruptions allowed is negative")
+		return false, errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, fmt.Errorf("pdb disruptions allowed is negative"))
 	}
 	if len(pdb.Status.DisruptedPods) > MaxDisruptedPodSize {
-		return false, fmt.Errorf("DisrputedPods map too big - too many evictions not confirmed by PDB controller")
+		return false, errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, fmt.Errorf("DisrputedPods map too big - too many evictions not confirmed by PDB controller"))
 	}
 	if pdb.Status.PodDisruptionsAllowed == 0 {
 		return false, nil
@@ -167,18 +174,18 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	return true, nil
 }
 
-// Returns any PDBs that match the pod.
-// err is set if there's an error.
-func (r *EvictionREST) getPodDisruptionBudgets(ctx api.Context, pod *api.Pod) (pdbs []policy.PodDisruptionBudget, err error) {
+// getPodDisruptionBudgets returns any PDBs that match the pod or err if there's an error.
+func (r *EvictionREST) getPodDisruptionBudgets(ctx api.Context, pod *api.Pod) ([]policy.PodDisruptionBudget, error) {
 	if len(pod.Labels) == 0 {
-		return
+		return nil, nil
 	}
 
 	pdbList, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).List(api.ListOptions{})
 	if err != nil {
-		return
+		return nil, err
 	}
 
+	var pdbs []policy.PodDisruptionBudget
 	for _, pdb := range pdbList.Items {
 		if pdb.Namespace != pod.Namespace {
 			continue
