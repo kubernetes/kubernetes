@@ -134,15 +134,16 @@ func TestGetAttach(t *testing.T) {
 		request := &runtimeapi.AttachRequest{
 			ContainerId: &containerID,
 			Stdin:       &test.stdin,
+			Tty:         &test.tty,
 		}
 		// Non-TLS
-		resp, err := server.GetAttach(request, test.tty)
+		resp, err := server.GetAttach(request)
 		assert.NoError(t, err, "testcase=%+v", test)
 		expectedURL := "http://" + testAddr + "/attach/" + testContainerID + test.expectedQuery
 		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
 
 		// TLS
-		resp, err = tlsServer.GetAttach(request, test.tty)
+		resp, err = tlsServer.GetAttach(request)
 		assert.NoError(t, err, "testcase=%+v", test)
 		expectedURL = "https://" + testAddr + "/attach/" + testContainerID + test.expectedQuery
 		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
@@ -299,7 +300,7 @@ func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, st
 	return nil
 }
 
-func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, resize <-chan term.Size) error {
+func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	assert.Equal(f.t, testContainerID, containerID)
 	doServerStreams(f.t, "attach", stdin, stdout, stderr)
 	return nil

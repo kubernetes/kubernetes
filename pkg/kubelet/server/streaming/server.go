@@ -42,7 +42,7 @@ type Server interface {
 	// Get the serving URL for the requests.
 	// Requests must not be nil. Responses may be nil iff an error is returned.
 	GetExec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
-	GetAttach(req *runtimeapi.AttachRequest, tty bool) (*runtimeapi.AttachResponse, error)
+	GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error)
 	GetPortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
 
 	// Start the server.
@@ -58,7 +58,7 @@ type Server interface {
 // The interface to execute the commands and provide the streams.
 type Runtime interface {
 	Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error
-	Attach(containerID string, in io.Reader, out, err io.WriteCloser, resize <-chan term.Size) error
+	Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error
 	PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error
 }
 
@@ -154,12 +154,12 @@ func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse,
 	}, nil
 }
 
-func (s *server) GetAttach(req *runtimeapi.AttachRequest, tty bool) (*runtimeapi.AttachResponse, error) {
+func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	url := s.buildURL("attach", req.GetContainerId(), streamOpts{
 		stdin:  req.GetStdin(),
 		stdout: true,
-		stderr: !tty, // For TTY connections, both stderr is combined with stdout.
-		tty:    tty,
+		stderr: !req.GetTty(), // For TTY connections, both stderr is combined with stdout.
+		tty:    req.GetTty(),
 	})
 	return &runtimeapi.AttachResponse{
 		Url: &url,
@@ -314,7 +314,7 @@ func (a *criAdapter) ExecInContainer(podName string, podUID types.UID, container
 }
 
 func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error {
-	return a.Attach(container, in, out, err, resize)
+	return a.Attach(container, in, out, err, tty, resize)
 }
 
 func (a *criAdapter) PortForward(podName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
