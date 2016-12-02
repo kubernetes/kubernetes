@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package discoverysummarizer contains code for the discovery summarizer
+// Package discoverysummarizer contains code for the legacy discovery summarizer
 // (program to summarize discovery information from all federated api servers)
 // as per https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/federated-api-servers.md
 package legacy // import "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/legacy"

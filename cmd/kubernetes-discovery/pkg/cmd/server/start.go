@@ -17,15 +17,32 @@ limitations under the License.
 package server
 
 import (
+	"fmt"
 	"io"
 
+	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/legacy"
-	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+const defaultEtcdPathPrefix = "/registry/kubernetes.io/kubernetes-discovery"
+
 type DiscoveryServerOptions struct {
+	Etcd          *genericoptions.EtcdOptions
+	SecureServing *genericoptions.SecureServingOptions
+
 	StdOut io.Writer
 	StdErr io.Writer
 }
@@ -33,19 +50,29 @@ type DiscoveryServerOptions struct {
 // NewCommandStartMaster provides a CLI handler for 'start master' command
 func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o := &DiscoveryServerOptions{
+		Etcd:          genericoptions.NewEtcdOptions(),
+		SecureServing: genericoptions.NewSecureServingOptions(),
+
 		StdOut: out,
 		StdErr: err,
 	}
+	o.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
+	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(registered.EnabledVersionsForGroup(api.GroupName)...)
+	o.SecureServing.ServingOptions.BindPort = 9090
 
 	cmd := &cobra.Command{
 		Short: "Launch a discovery summarizer and proxy server",
 		Long:  "Launch a discovery summarizer and proxy server",
 		Run: func(c *cobra.Command, args []string) {
-			kcmdutil.CheckErr(o.Complete())
-			kcmdutil.CheckErr(o.Validate(args))
-			kcmdutil.CheckErr(o.RunDiscoveryServer())
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate(args))
+			cmdutil.CheckErr(o.RunDiscoveryServer())
 		},
 	}
+
+	flags := cmd.Flags()
+	o.Etcd.AddFlags(flags)
+	o.SecureServing.AddFlags(flags)
 
 	return cmd
 }
@@ -59,10 +86,37 @@ func (o *DiscoveryServerOptions) Complete() error {
 }
 
 func (o DiscoveryServerOptions) RunDiscoveryServer() error {
-	if true {
-		// for now this is the only option.  later, only use this if no etcd is configured
+	// if we don't have an etcd to back the server, we must be a legacy server
+	if len(o.Etcd.StorageConfig.ServerList) == 0 {
 		return o.RunLegacyDiscoveryServer()
 	}
+
+	// TODO have a "real" external address
+	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost"); err != nil {
+		return fmt.Errorf("error creating self-signed certificates: %v", err)
+	}
+
+	genericAPIServerConfig := genericapiserver.NewConfig()
+	if _, err := genericAPIServerConfig.ApplySecureServingOptions(o.SecureServing); err != nil {
+		return err
+	}
+
+	var err error
+	privilegedLoopbackToken := uuid.NewRandom().String()
+	if genericAPIServerConfig.LoopbackClientConfig, err = genericAPIServerConfig.SecureServingInfo.NewSelfClientConfig(privilegedLoopbackToken); err != nil {
+		return err
+	}
+
+	config := apiserver.Config{
+		GenericConfig:     genericAPIServerConfig,
+		RESTOptionsGetter: restOptionsFactory{storageConfig: &o.Etcd.StorageConfig},
+	}
+
+	server, err := config.Complete().New()
+	if err != nil {
+		return err
+	}
+	server.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 
 	return nil
 }
@@ -76,4 +130,18 @@ func (o DiscoveryServerOptions) RunLegacyDiscoveryServer() error {
 		return err
 	}
 	return s.Run(port)
+}
+
+type restOptionsFactory struct {
+	storageConfig *storagebackend.Config
+}
+
+func (f restOptionsFactory) NewFor(resource schema.GroupResource) generic.RESTOptions {
+	return generic.RESTOptions{
+		StorageConfig:           f.storageConfig,
+		Decorator:               registry.StorageWithCacher,
+		DeleteCollectionWorkers: 1,
+		EnableGarbageCollection: false,
+		ResourcePrefix:          f.storageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
+	}
 }
