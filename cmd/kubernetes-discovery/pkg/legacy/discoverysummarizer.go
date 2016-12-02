@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discoverysummarizer
+package legacy
 
 import (
 	"encoding/json"
@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	config "k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer/apis/config/v1alpha1"
+	config "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/legacy/apis/config/v1alpha1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
