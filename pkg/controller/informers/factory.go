@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -90,8 +92,11 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	glog.V(1).Infoln("Starting informer factory")
+
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
+			glog.V(2).Infof("Starting informer for %v", informerType)
 			go informer.Run(stopCh)
 			f.startedInformers[informerType] = true
 		}
