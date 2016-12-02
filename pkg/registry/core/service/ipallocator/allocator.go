@@ -90,6 +90,19 @@ func NewCIDRRange(cidr *net.IPNet) *Range {
 	})
 }
 
+// NewFromSnapshot allocates a Range and initializes it from a snapshot.
+func NewFromSnapshot(snap *api.RangeAllocation) (*Range, error) {
+	_, ipnet, err := net.ParseCIDR(snap.Range)
+	if err != nil {
+		return nil, err
+	}
+	r := NewCIDRRange(ipnet)
+	if err := r.Restore(ipnet, snap.Data); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
 func maximum(a, b int) int {
 	if a > b {
 		return a
@@ -100,6 +113,16 @@ func maximum(a, b int) int {
 // Free returns the count of IP addresses left in the range.
 func (r *Range) Free() int {
 	return r.alloc.Free()
+}
+
+// Used returns the count of IP addresses used in the range.
+func (r *Range) Used() int {
+	return r.max - r.alloc.Free()
+}
+
+// CIDR returns the CIDR covered by the range.
+func (r *Range) CIDR() net.IPNet {
+	return *r.net
 }
 
 // Allocate attempts to reserve the provided IP. ErrNotInRange or

@@ -50,10 +50,10 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 
 func TestRepair(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	ipregistry := &mockRangeRegistry{
-		item: &api.RangeAllocation{},
+		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
 	}
+	_, cidr, _ := net.ParseCIDR(ipregistry.item.Range)
 	r := NewRepair(0, fakeClient.Core(), cidr, ipregistry)
 
 	if err := r.RunOnce(); err != nil {
@@ -64,7 +64,7 @@ func TestRepair(t *testing.T) {
 	}
 
 	ipregistry = &mockRangeRegistry{
-		item:      &api.RangeAllocation{},
+		item:      &api.RangeAllocation{Range: "192.168.1.0/24"},
 		updateErr: fmt.Errorf("test error"),
 	}
 	r = NewRepair(0, fakeClient.Core(), cidr, ipregistry)
@@ -73,7 +73,7 @@ func TestRepair(t *testing.T) {
 	}
 }
 
-func TestRepairEmpty(t *testing.T) {
+func TestRepairLeak(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	previous := ipallocator.NewCIDRRange(cidr)
 	previous.Allocate(net.ParseIP("192.168.1.10"))
@@ -94,16 +94,31 @@ func TestRepairEmpty(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
+
 	r := NewRepair(0, fakeClient.Core(), cidr, ipregistry)
+	// Run through the "leak detection holdoff" loops.
+	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
+		if err := r.RunOnce(); err != nil {
+			t.Fatal(err)
+		}
+		after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !after.Has(net.ParseIP("192.168.1.10")) {
+			t.Errorf("expected ipallocator to still have leaked IP")
+		}
+	}
+	// Run one more time to actually remove the leak.
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}
-	after := ipallocator.NewCIDRRange(cidr)
-	if err := after.Restore(cidr, ipregistry.updated.Data); err != nil {
+	after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if after.Has(net.ParseIP("192.168.1.10")) {
-		t.Errorf("unexpected ipallocator state: %#v", after)
+		t.Errorf("expected ipallocator to not have leaked IP")
 	}
 }
 
@@ -157,14 +172,14 @@ func TestRepairWithExisting(t *testing.T) {
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}
-	after := ipallocator.NewCIDRRange(cidr)
-	if err := after.Restore(cidr, ipregistry.updated.Data); err != nil {
+	after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if !after.Has(net.ParseIP("192.168.1.1")) || !after.Has(net.ParseIP("192.168.1.100")) {
 		t.Errorf("unexpected ipallocator state: %#v", after)
 	}
-	if after.Free() != 252 {
-		t.Errorf("unexpected ipallocator state: %#v", after)
+	if free := after.Free(); free != 252 {
+		t.Errorf("unexpected ipallocator state: %d free", free)
 	}
 }
