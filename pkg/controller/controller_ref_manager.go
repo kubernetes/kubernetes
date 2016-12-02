@@ -65,7 +65,7 @@ func (m *PodControllerRefManager) Classify(pods []*v1.Pod) (
 				pod.Namespace, pod.Name, pod.Status.Phase, pod.DeletionTimestamp)
 			continue
 		}
-		controllerRef := getControllerOf(pod.ObjectMeta)
+		controllerRef := GetControllerOf(pod.ObjectMeta)
 		if controllerRef != nil {
 			if controllerRef.UID == m.controllerObject.UID {
 				// already controlled
@@ -90,9 +90,9 @@ func (m *PodControllerRefManager) Classify(pods []*v1.Pod) (
 	return matchesAndControlled, matchesNeedsController, controlledDoesNotMatch
 }
 
-// getControllerOf returns the controllerRef if controllee has a controller,
+// GetControllerOf returns the controllerRef if controllee has a controller,
 // otherwise returns nil.
-func getControllerOf(controllee v1.ObjectMeta) *metav1.OwnerReference {
+func GetControllerOf(controllee v1.ObjectMeta) *v1.OwnerReference {
 	for _, owner := range controllee.OwnerReferences {
 		// controlled by other controller
 		if owner.Controller != nil && *owner.Controller == true {
@@ -182,7 +182,7 @@ func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*extensions.Repl
 	controlledDoesNotMatch []*extensions.ReplicaSet) {
 	for i := range replicaSets {
 		replicaSet := replicaSets[i]
-		controllerRef := getControllerOf(replicaSet.ObjectMeta)
+		controllerRef := GetControllerOf(replicaSet.ObjectMeta)
 		if controllerRef != nil {
 			if controllerRef.UID != m.controllerObject.UID {
 				// ignoring the ReplicaSet controlled by other Deployment

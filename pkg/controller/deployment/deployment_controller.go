@@ -340,7 +340,6 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deployment) error {
 	rsList, err := dc.rsLister.ReplicaSets(deployment.Namespace).List(labels.Everything())
 	if err != nil {
-		glog.Errorf("Error getting ReplicaSets for deployment %q: %v", deployment.Name, err)
 		return err
 	}
 
@@ -416,7 +415,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
 	if err = dc.handleOverlap(d); err != nil {
-		dc.eventRecorder.Eventf(d, api.EventTypeWarning, "SelectorOverlap", err.Error())
+		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectorOverlap", err.Error())
 		return nil
 	}
 
