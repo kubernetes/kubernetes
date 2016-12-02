@@ -651,6 +651,92 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	}
 }
 
+func TestRESTMapperRESTMappings(t *testing.T) {
+	testGroup := "tgroup"
+	testGroupVersion := schema.GroupVersion{Group: testGroup, Version: "v1"}
+
+	testCases := []struct {
+		Kind                string
+		APIGroupVersions    []schema.GroupVersion
+		DefaultVersions     []schema.GroupVersion
+		AddGroupVersionKind []schema.GroupVersionKind
+
+		ExpectedRESTMappings []*RESTMapping
+		Err                  bool
+	}{
+		{Kind: "Unknown", Err: true},
+		{Kind: "InternalObject", Err: true},
+
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "Unknown", Err: true},
+
+		// ask for specific version - not available - thus error
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []schema.GroupVersion{{Group: testGroup, Version: "v2"}}, Err: true},
+
+		// ask for specific version - available - check ExpectedRESTMappings
+		{
+			DefaultVersions:      []schema.GroupVersion{testGroupVersion},
+			Kind:                 "InternalObject",
+			APIGroupVersions:     []schema.GroupVersion{{Group: testGroup, Version: "v2"}},
+			AddGroupVersionKind:  []schema.GroupVersionKind{schema.GroupVersion{Group: testGroup, Version: "v2"}.WithKind("InternalObject")},
+			ExpectedRESTMappings: []*RESTMapping{{Resource: "internalobjects", GroupVersionKind: schema.GroupVersionKind{Group: testGroup, Version: "v2", Kind: "InternalObject"}}},
+		},
+
+		// ask for specific versions - only one available - check ExpectedRESTMappings
+		{
+			DefaultVersions:      []schema.GroupVersion{testGroupVersion},
+			Kind:                 "InternalObject",
+			APIGroupVersions:     []schema.GroupVersion{{Group: testGroup, Version: "v3"}, {Group: testGroup, Version: "v2"}},
+			AddGroupVersionKind:  []schema.GroupVersionKind{schema.GroupVersion{Group: testGroup, Version: "v2"}.WithKind("InternalObject")},
+			ExpectedRESTMappings: []*RESTMapping{{Resource: "internalobjects", GroupVersionKind: schema.GroupVersionKind{Group: testGroup, Version: "v2", Kind: "InternalObject"}}},
+		},
+
+		// do not ask for specific version - search through default versions - check ExpectedRESTMappings
+		{
+			DefaultVersions:      []schema.GroupVersion{testGroupVersion, {Group: testGroup, Version: "v2"}},
+			Kind:                 "InternalObject",
+			AddGroupVersionKind:  []schema.GroupVersionKind{schema.GroupVersion{Group: testGroup, Version: "v1"}.WithKind("InternalObject"), schema.GroupVersion{Group: testGroup, Version: "v2"}.WithKind("InternalObject")},
+			ExpectedRESTMappings: []*RESTMapping{{Resource: "internalobjects", GroupVersionKind: schema.GroupVersionKind{Group: testGroup, Version: "v1", Kind: "InternalObject"}}, {Resource: "internalobjects", GroupVersionKind: schema.GroupVersionKind{Group: testGroup, Version: "v2", Kind: "InternalObject"}}},
+		},
+	}
+
+	for i, testCase := range testCases {
+		mapper := NewDefaultRESTMapper(testCase.DefaultVersions, fakeInterfaces)
+		for _, gvk := range testCase.AddGroupVersionKind {
+			mapper.Add(gvk, RESTScopeNamespace)
+		}
+
+		preferredVersions := []string{}
+		for _, gv := range testCase.APIGroupVersions {
+			preferredVersions = append(preferredVersions, gv.Version)
+		}
+		gk := schema.GroupKind{Group: testGroup, Kind: testCase.Kind}
+
+		mappings, err := mapper.RESTMappings(gk, preferredVersions...)
+		hasErr := err != nil
+		if hasErr != testCase.Err {
+			t.Errorf("%d: unexpected error behavior %t: %v", i, testCase.Err, err)
+		}
+		if hasErr {
+			continue
+		}
+		if len(mappings) != len(testCase.ExpectedRESTMappings) {
+			t.Errorf("%d: unexpected number = %d of rest mappings was returned, expected = %d", i, len(mappings), len(testCase.ExpectedRESTMappings))
+		}
+		for j, mapping := range mappings {
+			exp := testCase.ExpectedRESTMappings[j]
+			if mapping.Resource != exp.Resource {
+				t.Errorf("%d - %d: unexpected resource: %#v", i, j, mapping)
+			}
+			if mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
+				t.Errorf("%d - %d: missing codec and accessor: %#v", i, j, mapping)
+			}
+			if mapping.GroupVersionKind != exp.GroupVersionKind {
+				t.Errorf("%d - %d: unexpected GroupVersionKind: %#v", i, j, mapping)
+			}
+		}
+	}
+}
+
 func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
 	expectedGroupVersion1 := schema.GroupVersion{Group: "tgroup", Version: "test1"}
 	expectedGroupVersion2 := schema.GroupVersion{Group: "tgroup", Version: "test2"}

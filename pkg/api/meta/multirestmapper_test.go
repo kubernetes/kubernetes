@@ -346,7 +346,7 @@ func (m fixedRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (m
 	return nil, m.err
 }
 
-func (m fixedRESTMapper) RESTMappings(gk schema.GroupKind) (mappings []*RESTMapping, err error) {
+func (m fixedRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) (mappings []*RESTMapping, err error) {
 	return m.mappings, m.err
 }
 

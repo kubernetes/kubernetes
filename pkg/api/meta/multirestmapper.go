@@ -185,12 +185,12 @@ func (m MultiRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*
 
 // RESTMappings returns all possible RESTMappings for the provided group kind, or an error
 // if the type is not recognized.
-func (m MultiRESTMapper) RESTMappings(gk schema.GroupKind) ([]*RESTMapping, error) {
+func (m MultiRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error) {
 	var allMappings []*RESTMapping
 	var errors []error
 
 	for _, t := range m {
-		currMappings, err := t.RESTMappings(gk)
+		currMappings, err := t.RESTMappings(gk, versions...)
 		// ignore "no match" errors, but any other error percolates back up
 		if IsNoMatchError(err) {
 			continue
