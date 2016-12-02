@@ -35,8 +35,8 @@ func TestTimeMarshalYAML(t *testing.T) {
 		result string
 	}{
 		{Time{}, "t: null\n"},
-		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: 1998-05-05T05:05:05Z\n"},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: 1998-05-05T05:05:05Z\n"},
+		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: 1998-05-05T05:05:05.000Z\n"},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: 1998-05-05T05:05:05.000Z\n"},
 	}
 
 	for _, c := range cases {
@@ -57,7 +57,7 @@ func TestTimeUnmarshalYAML(t *testing.T) {
 		result Time
 	}{
 		{"t: null\n", Time{}},
-		{"t: 1998-05-05T05:05:05Z\n", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{"t: 1998-05-05T05:05:05.000Z\n", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 
 	for _, c := range cases {
@@ -77,8 +77,8 @@ func TestTimeMarshalJSON(t *testing.T) {
 		result string
 	}{
 		{Time{}, "{\"t\":null}"},
-		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "{\"t\":\"1998-05-05T05:05:05Z\"}"},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "{\"t\":\"1998-05-05T05:05:05Z\"}"},
+		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "{\"t\":\"1998-05-05T05:05:05.000Z\"}"},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "{\"t\":\"1998-05-05T05:05:05.000Z\"}"},
 	}
 
 	for _, c := range cases {
@@ -99,7 +99,7 @@ func TestTimeUnmarshalJSON(t *testing.T) {
 		result Time
 	}{
 		{"{\"t\":null}", Time{}},
-		{"{\"t\":\"1998-05-05T05:05:05Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{"{\"t\":\"1998-05-05T05:05:05.000Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 
 	for _, c := range cases {
