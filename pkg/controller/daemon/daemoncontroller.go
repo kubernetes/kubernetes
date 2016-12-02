@@ -652,14 +652,19 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		return false
 	}
 
-	if len(ds.Spec.Template.Spec.NodeSelector) > 0 {
-		selector := labels.SelectorFromSet(ds.Spec.Template.Spec.NodeSelector)
-		if !selector.Matches(labels.Set(node.Labels)) {
-			return false
-		}
-	}
+	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
+	newPod.Namespace = ds.Namespace
+	newPod.Spec.NodeName = node.Name
 
-	return true
+	pods := []*v1.Pod{}
+
+	nodeInfo := schedulercache.NewNodeInfo(pods...)
+	nodeInfo.SetNode(node)
+
+	predicates.PodSelectorMatches(newPod, nil, nodeInfo)
+
+	fit, _, _ := predicates.PodSelectorMatches(newPod, nil, nodeInfo)
+	return fit
 }
 
 func (dsc *DaemonSetsController) nodeCanRunDaemonPodNow(node *v1.Node, ds *extensions.DaemonSet) bool {
