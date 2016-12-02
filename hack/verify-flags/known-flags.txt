@@ -336,6 +336,10 @@ kubelet-read-only-port
 kubelet-root-dir
 kubelet-sync-frequency
 kubelet-timeout
+kubernetes-anywhere-cluster
+kubernetes-anywhere-path
+kubernetes-anywhere-phase2-provider
+kubernetes-anywhere-up-timeout
 kubernetes-service-node-port
 label-columns
 large-cluster-size-threshold
