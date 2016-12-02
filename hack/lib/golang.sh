@@ -219,6 +219,8 @@ kube::golang::set_platform_envs() {
   [[ -n ${1-} ]] || {
     kube::log::error_exit "!!! Internal error. No platform set in kube::golang::set_platform_envs"
   }
+  # make sure we have a clean slate first
+  kube::golang::unset_platform_envs
 
   export GOOS=${platform%/*}
   export GOARCH=${platform##*/}
@@ -456,6 +458,8 @@ kube::golang::build_binaries_for_platform() {
   local -a nonstatics=()
   local -a tests=()
 
+  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
+
   for binary in "${binaries[@]}"; do
 
     if [[ "${binary}" =~ ".test"$ ]]; then
@@ -685,8 +689,10 @@ kube::golang::build_binaries() {
     else
       for platform in "${platforms[@]}"; do
         kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
-        kube::golang::set_platform_envs "${platform}"
-        kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
+        (
+          kube::golang::set_platform_envs "${platform}"
+          kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
+        )
       done
     fi
   )

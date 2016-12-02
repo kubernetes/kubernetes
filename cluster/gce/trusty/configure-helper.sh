@@ -599,6 +599,9 @@ start_kube_apiserver() {
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
+  if [ -n "${ETCD_QUORUM_READ:-}" ]; then
+    params="${params} --etcd-quorum-read=${ETCD_QUORUM_READ}"
+  fi
 
   local admission_controller_config_mount=""
   local admission_controller_config_volume=""
