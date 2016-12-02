@@ -41,7 +41,9 @@ mount and network utilities. Missing any of these can lead to unexpected
 differences between Kubernetes hosts. For example, the Google Container VM
 image (GCI) is missing various mount commands even though the Kernel supports
 those filesystem types. Similarly, CoreOS Linux intentionally doesn't ship with
-many mount utilities or socat in the base image.
+many mount utilities or socat in the base image. Other distros have a related
+problem of ensuring these dependencies are present and versioned appropriately
+for the Kubelet.
 
 In order to solve this problem, it's proposed that running the Kubelet in a
 prepackaged chroot should be a supported, recommended, way of running a fully
@@ -57,16 +59,23 @@ running the Kubelet intentionally is using a chroot and is neither a container n
 The kubelet chroot will essentially operate as follows:
 
 ```
-container-download-and-extract gcr.io/google_containers/hyperkube:v1.4.0 /path/to/kubelet
+container-download-and-extract gcr.io/google_containers/hyperkube:v1.4.0 /path/to/chroot
 mount --make-shared /var/lib/kubelet
-mount --rbind /var/lib/kubelet /path/to/kubelet/var/lib/kubelet
-mount --rbind /sys /path/to/kubelet/sys
+mount --rbind /var/lib/kubelet /path/to/chroot/var/lib/kubelet
+# And many more mounts, omitted
 ...
 chroot /path/to/kubelet /usr/bin/hyperkube kubelet
 ```
 
 Note: Kubelet might need access to more directories on the host and we intend to identity mount all those directories into the chroot. A partial list can be found in the CoreOS kubelet-wrapper script.
 This logic will also naturally be abstracted so it's no more difficult for the user to run the Kubelet.
+
+Currently, the Kubelet does not need access to arbitrary paths on the host (as
+hostPath volumes are managed entirely by the docker daemon process, including
+SELinux context applying), so Kubelet makes no operations at those paths). This
+will likely change in the future, at which point a shared bindmount of `/` will
+be made available at a known path in the Kubelet chroot. This change will
+necessarily be more intrusive.
 
 ## Current Use
 
@@ -86,9 +95,26 @@ The Hyperkube image is distributed as part of an official release to the `gcr.io
 
 This will need to be remediated in order to complete this proposal.
 
+### Testing & Rollout
+
+In order to ensure the paths remain complete, e2e tests *must* be run against a
+Kubelet operating in this manner as part of the submit queue.
+
+To ensure that this feature does not unduly impact others, it will be added to
+GCI, but gated behind a feature-flag for a sort confidence-building period
+(e.g.  `KUBE_RUN_HYPERKUBE_IMAGE=false`). A temporary non-blocking e2e job will
+be added with that option. If the results look clean after a week, the
+deployment option can be removed and the GCI image can completely switch over.
+
+Once that testing is in place, it can be rolled out across other distros as
+desired.
+
+
 #### Everything else
 
-In the initial implementation, rkt or docker can be used to extract the rootfs of the hyperkube image. rkt fly or a systemd unit (using `RootDirectory`) can be used to perform the needed setup, chroot, and execution of the kubelet within that rootfs.
+In the initial implementation, rkt or docker can be used to extract the rootfs of the hyperkube image. rkt fly or a systemd unit (using [`RootDirectory`](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#RootDirectory=)) can be used to perform the needed setup, chroot, and execution of the kubelet within that rootfs.
+
+
 
 ## FAQ
 
@@ -156,6 +182,8 @@ Currently, there's a `--containerized` flag. This flag doesn't actually remove t
 #### Why not a mount namespace?
 
 #### Timeframe
+
+1.6?
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
