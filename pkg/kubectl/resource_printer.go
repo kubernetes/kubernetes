@@ -485,7 +485,7 @@ var (
 	ingressColumns               = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 	statefulSetColumns           = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 	endpointColumns              = []string{"NAME", "ENDPOINTS", "AGE"}
-	nodeColumns                  = []string{"NAME", "STATUS", "AGE"}
+	nodeColumns                  = []string{"NAME", "STATUS", "AGE", "VERSION"}
 	daemonSetColumns             = []string{"NAME", "DESIRED", "CURRENT", "READY", "NODE-SELECTOR", "AGE"}
 	eventColumns                 = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 	limitRangeColumns            = []string{"NAME", "AGE"}
@@ -1532,7 +1532,7 @@ func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
 		status = append(status, role)
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp), node.Status.NodeInfo.KubeletVersion); err != nil {
 		return err
 	}
 
