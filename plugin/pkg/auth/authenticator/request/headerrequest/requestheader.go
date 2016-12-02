@@ -82,6 +82,11 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 		return nil, false, nil
 	}
 
+	// clear headers used for authentication
+	for _, headerName := range a.nameHeaders {
+		req.Header.Del(headerName)
+	}
+
 	return &user.DefaultInfo{Name: name}, true, nil
 }
 
