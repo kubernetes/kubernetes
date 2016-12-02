@@ -463,7 +463,6 @@ func TargetContainers() []string {
 		rootContainerName,
 		stats.SystemContainerRuntime,
 		stats.SystemContainerKubelet,
-		stats.SystemContainerMisc,
 	}
 }
 
