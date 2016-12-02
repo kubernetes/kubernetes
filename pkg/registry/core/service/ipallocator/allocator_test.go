@@ -34,6 +34,9 @@ func TestAllocate(t *testing.T) {
 	if f := r.Free(); f != 254 {
 		t.Errorf("unexpected free %d", f)
 	}
+	if f := r.Used(); f != 0 {
+		t.Errorf("unexpected used %d", f)
+	}
 	found := sets.NewString()
 	count := 0
 	for r.Free() > 0 {
@@ -59,6 +62,9 @@ func TestAllocate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if f := r.Free(); f != 1 {
+		t.Errorf("unexpected free %d", f)
+	}
+	if f := r.Used(); f != 253 {
 		t.Errorf("unexpected free %d", f)
 	}
 	ip, err := r.AllocateNext()
@@ -87,10 +93,16 @@ func TestAllocate(t *testing.T) {
 	if f := r.Free(); f != 1 {
 		t.Errorf("unexpected free %d", f)
 	}
+	if f := r.Used(); f != 253 {
+		t.Errorf("unexpected free %d", f)
+	}
 	if err := r.Allocate(released); err != nil {
 		t.Fatal(err)
 	}
 	if f := r.Free(); f != 0 {
+		t.Errorf("unexpected free %d", f)
+	}
+	if f := r.Used(); f != 254 {
 		t.Errorf("unexpected free %d", f)
 	}
 }
@@ -254,5 +266,44 @@ func TestSnapshot(t *testing.T) {
 	}
 	if other.Free() != r.Free() {
 		t.Errorf("counts do not match: %d", other.Free())
+	}
+}
+
+func TestNewFromSnapshot(t *testing.T) {
+	_, cidr, err := net.ParseCIDR("192.168.0.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewCIDRRange(cidr)
+	allocated := []net.IP{}
+	for i := 0; i < 128; i++ {
+		ip, err := r.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+		allocated = append(allocated, ip)
+	}
+
+	snapshot := api.RangeAllocation{}
+	if err = r.Snapshot(&snapshot); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err = NewFromSnapshot(&snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if x := r.Free(); x != 126 {
+		t.Fatalf("expected 126 free IPs, got %d", x)
+	}
+	if x := r.Used(); x != 128 {
+		t.Fatalf("expected 128 used IPs, got %d", x)
+	}
+
+	for _, ip := range allocated {
+		if !r.Has(ip) {
+			t.Fatalf("expected IP to be allocated, but it was not")
+		}
 	}
 }
