@@ -469,7 +469,7 @@ func (o resourceByPreferredGroupVersion) Less(i, j int) bool {
 // order is not provided, the search order provided to DefaultRESTMapper will be used to resolve which
 // version should be used to access the named group/kind.
 func (m *DefaultRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error) {
-	mappings, err := m.commonRESTMappings(gk, versions...)
+	mappings, err := m.RESTMappings(gk, versions...)
 	if err != nil {
 		return nil, err
 	}
@@ -479,22 +479,12 @@ func (m *DefaultRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string)
 	return mappings[0], nil
 }
 
-// RESTMappings returns the RESTMappings for the provided group kind in a rough internal preferred order. If no
-// kind is found it will return a NoResourceMatchError.
-func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind) ([]*RESTMapping, error) {
-	mappings, err := m.commonRESTMappings(gk, "")
-	if err != nil || len(mappings) == 0 {
-		return nil, err
-	}
-	return mappings, nil
-}
-
-// commonRESTMappings returns RESTMappings for the provided group kind. If a version search order
+// RESTMappings returns the RESTMappings for the provided group kind. If a version search order
 // is not provided, the search order provided to DefaultRESTMapper will be used.
-func (m *DefaultRESTMapper) commonRESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error) {
-	var mappings []*RESTMapping
-	var potentialGVK []schema.GroupVersionKind
-	var hadVersion bool
+func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error) {
+	mappings := make([]*RESTMapping, 0)
+	potentialGVK := make([]schema.GroupVersionKind, 0)
+	hadVersion := false
 
 	// Pick an appropriate version
 	for _, version := range versions {
@@ -516,6 +506,10 @@ func (m *DefaultRESTMapper) commonRESTMappings(gk schema.GroupKind, versions ...
 			}
 			potentialGVK = append(potentialGVK, gk.WithVersion(gv.Version))
 		}
+	}
+
+	if len(potentialGVK) == 0 {
+		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
 	}
 
 	for _, gvk := range potentialGVK {
