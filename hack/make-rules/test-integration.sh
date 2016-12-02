@@ -58,6 +58,8 @@ runTests() {
   kube::etcd::start
   kube::log::status "Running integration test cases"
 
+  # since everything gets compiled here, generate just in case.
+  go generate ./...
   # TODO: Re-enable race detection when we switch to a thread-safe etcd client
   # KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
