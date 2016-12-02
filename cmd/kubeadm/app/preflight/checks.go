@@ -18,7 +18,7 @@ package preflight
 
 import (
 	"bufio"
-	"errors"
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -182,7 +182,7 @@ func (fac FileAvailableCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
-// InPathChecks checks if the given executable is present in the path.
+// InPathCheck checks if the given executable is present in the path.
 type InPathCheck struct {
 	executable string
 	mandatory  bool
@@ -359,16 +359,14 @@ func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 		for _, w := range warnings {
 			io.WriteString(ww, fmt.Sprintf("[preflight] WARNING: %s\n", w))
 		}
-		for _, e := range errs {
-			found = append(found, e)
-		}
+		found = append(found, errs...)
 	}
 	if len(found) > 0 {
-		errs := ""
+		var errs bytes.Buffer
 		for _, i := range found {
-			errs += "\t" + i.Error() + "\n"
+			errs.WriteString("\t" + i.Error() + "\n")
 		}
-		return &PreFlightError{Msg: errors.New(errs).Error()}
+		return &PreFlightError{Msg: errs.String()}
 	}
 	return nil
 }
