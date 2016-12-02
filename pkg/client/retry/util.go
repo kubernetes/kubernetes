@@ -36,10 +36,11 @@ var DefaultRetry = wait.Backoff{
 // may be attempting to make an unrelated modification to a resource under
 // active management by one or more controllers.
 var DefaultBackoff = wait.Backoff{
-	Steps:    4,
-	Duration: 10 * time.Millisecond,
-	Factor:   5.0,
-	Jitter:   0.1,
+	Steps:       4,
+	Duration:    10 * time.Millisecond,
+	Factor:      5.0,
+	Jitter:      0.1,
+	MaxDuration: 1 * time.Second,
 }
 
 // RetryConflict executes the provided function repeatedly, retrying if the server returns a conflicting

@@ -122,8 +122,7 @@ func Jitter(duration time.Duration, maxFactor float64) time.Duration {
 	if maxFactor <= 0.0 {
 		maxFactor = 1.0
 	}
-	wait := duration + time.Duration(rand.Float64()*maxFactor*float64(duration))
-	return wait
+	return duration + time.Duration(rand.Float64()*maxFactor*float64(duration))
 }
 
 // ErrWaitTimeout is returned when the condition exited without success.
@@ -133,12 +132,16 @@ var ErrWaitTimeout = errors.New("timed out waiting for the condition")
 // if the loop should be aborted.
 type ConditionFunc func() (done bool, err error)
 
+// sleepFn is abstracted for testing
+var sleepFn = time.Sleep
+
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
-	Duration time.Duration // the base duration
-	Factor   float64       // Duration is multipled by factor each iteration
-	Jitter   float64       // The amount of jitter applied each iteration
-	Steps    int           // Exit with error after this many steps
+	Duration    time.Duration // the base duration
+	Factor      float64       // Duration is multipled by factor each iteration
+	Jitter      float64       // The amount of jitter applied each iteration
+	Steps       int           // Exit with error after this many steps
+	MaxDuration time.Duration // Once this is reached, stop growing but still jitter. 0 means no limit.
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
@@ -153,15 +156,29 @@ type Backoff struct {
 // errors terminate immediately.
 func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 	duration := backoff.Duration
-	for i := 0; i < backoff.Steps; i++ {
-		if i != 0 {
-			adjusted := duration
-			if backoff.Jitter > 0.0 {
-				adjusted = Jitter(duration, backoff.Jitter)
+
+	// always run once
+	if ok, err := condition(); err != nil || ok {
+		return err
+	}
+
+	for i := 0; i < (backoff.Steps - 1); i++ {
+		adjusted := duration
+		// respect the max duration if set
+		if adjusted > 0 {
+			if adjusted > backoff.MaxDuration {
+				adjusted = backoff.MaxDuration
+			} else {
+				duration = time.Duration(float64(duration) * backoff.Factor)
 			}
-			time.Sleep(adjusted)
-			duration = time.Duration(float64(duration) * backoff.Factor)
 		}
+		// always add some jitter if requested
+		if backoff.Jitter > 0.0 {
+			adjusted = Jitter(adjusted, backoff.Jitter)
+		}
+
+		sleepFn(adjusted)
+
 		if ok, err := condition(); err != nil || ok {
 			return err
 		}
