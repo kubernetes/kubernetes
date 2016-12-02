@@ -444,6 +444,7 @@ Services should be able to create a functioning NodePort service,bprashanth,0
 Services should be able to up and down services,bprashanth,0
 Services should check NodePort out-of-range,bprashanth,0
 Services should create endpoints for unready pods,maisem,0
+Serivces should only allow access from service loadbalancer source ranges,freehan,0
 Services should preserve source pod IP for traffic thru service cluster IP,Random-Liu,1
 Services should prevent NodePort collisions,bprashanth,0
 Services should provide secure master service,bprashanth,0
