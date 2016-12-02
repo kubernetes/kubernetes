@@ -18,12 +18,12 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
+        "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/extensions/ingress:go_default_library",
-        "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
+        "//pkg/util/restoptions:go_default_library",
     ],
 )
 
@@ -36,6 +36,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",

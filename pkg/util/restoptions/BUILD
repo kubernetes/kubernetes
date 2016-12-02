@@ -12,15 +12,16 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["etcd.go"],
+    srcs = ["helpers.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/rbac:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/api/meta:go_default_library",
         "//pkg/genericapiserver:go_default_library",
+        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
-        "//pkg/registry/rbac/clusterrolebinding:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
-        "//pkg/util/restoptions:go_default_library",
+        "//vendor:github.com/golang/glog",
     ],
 )
