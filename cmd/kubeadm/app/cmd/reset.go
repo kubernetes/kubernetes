@@ -138,7 +138,7 @@ func (r *Reset) Run(out io.Writer) error {
 
 	resetConfigDir("/etc/kubernetes/")
 
-	dirsToClean := []string{"/var/lib/kubelet", "/var/lib/etcd"}
+	dirsToClean := []string{"/var/lib/kubelet", "/var/lib/etcd", "/etc/cni/net.d"}
 	fmt.Printf("Deleting contents of stateful directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		cleanDir(dir)
