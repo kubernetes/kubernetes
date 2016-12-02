@@ -22,18 +22,22 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type DrainOptions struct {
@@ -42,11 +46,13 @@ type DrainOptions struct {
 	Force              bool
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
+	Timeout            time.Duration
 	DeleteLocalData    bool
 	mapper             meta.RESTMapper
 	nodeInfo           *resource.Info
 	out                io.Writer
 	typer              runtime.ObjectTyper
+	ifPrint            bool
 }
 
 // Takes a pod and returns a bool indicating whether or not to operate on the
@@ -166,6 +172,7 @@ func NewCmdDrain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", false, "Ignore DaemonSet-managed pods.")
 	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
+	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	return cmd
 }
 
@@ -187,6 +194,8 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	o.ifPrint = true
 
 	r := o.factory.NewBuilder(cmdutil.GetIncludeThirdPartyAPIs(cmd)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -387,7 +396,42 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 		cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, "deleted")
 	}
 
-	return nil
+	getPodFn := func(namespace, name string) (*api.Pod, error) {
+		return o.client.Pods(namespace).Get(name)
+	}
+	pendingPods, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
+	if err != nil {
+		fmt.Fprintf(o.out, "There are pending pods when an error occured:\n")
+		for _, pendindPod := range pendingPods {
+			cmdutil.PrintSuccess(o.mapper, true, o.out, "pod", pendindPod.Name, "")
+		}
+	}
+	return err
+}
+
+func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Duration, getPodFn func(namespace, name string) (*api.Pod, error)) ([]api.Pod, error) {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		pendingPods := []api.Pod{}
+		for i, pod := range pods {
+			p, err := getPodFn(pod.Namespace, pod.Name)
+			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
+				if o.ifPrint {
+					cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, "deleted")
+				}
+				continue
+			} else if err != nil {
+				return false, err
+			} else {
+				pendingPods = append(pendingPods, pods[i])
+			}
+		}
+		pods = pendingPods
+		if len(pendingPods) > 0 {
+			return false, nil
+		}
+		return true, nil
+	})
+	return pods, err
 }
 
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for

@@ -18,6 +18,8 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -31,6 +33,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -39,6 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 var node *api.Node
@@ -473,6 +478,8 @@ func TestDrain(t *testing.T) {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &job)}, nil
 				case m.isFor("GET", "/namespaces/default/replicasets/rs"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
+				case m.isFor("GET", "/namespaces/default/pods/bar"):
+					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, nil)}, nil
 				case m.isFor("GET", "/pods"):
 					values, err := url.ParseQuery(req.URL.RawQuery)
 					if err != nil {
@@ -543,6 +550,122 @@ func TestDrain(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestDeletePods(t *testing.T) {
+	ifHasBeenCalled := map[string]bool{}
+	tests := []struct {
+		description       string
+		interval          time.Duration
+		timeout           time.Duration
+		expectPendingPods bool
+		expectError       bool
+		expectedError     *error
+		getPodFn          func(namespace, name string) (*api.Pod, error)
+	}{
+		{
+			description:       "Wait for deleting to complete",
+			interval:          100 * time.Millisecond,
+			timeout:           10 * time.Second,
+			expectPendingPods: false,
+			expectError:       false,
+			expectedError:     nil,
+			getPodFn: func(namespace, name string) (*api.Pod, error) {
+				oldPodMap, _ := createPods(false)
+				newPodMap, _ := createPods(true)
+				if oldPod, found := oldPodMap[name]; found {
+					if _, ok := ifHasBeenCalled[name]; !ok {
+						ifHasBeenCalled[name] = true
+						return &oldPod, nil
+					} else {
+						if oldPod.ObjectMeta.Generation < 4 {
+							newPod := newPodMap[name]
+							return &newPod, nil
+						} else {
+							return nil, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
+						}
+					}
+				}
+				return nil, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
+			},
+		},
+		{
+			description:       "Deleting could timeout",
+			interval:          200 * time.Millisecond,
+			timeout:           3 * time.Second,
+			expectPendingPods: true,
+			expectError:       true,
+			expectedError:     &wait.ErrWaitTimeout,
+			getPodFn: func(namespace, name string) (*api.Pod, error) {
+				oldPodMap, _ := createPods(false)
+				if oldPod, found := oldPodMap[name]; found {
+					return &oldPod, nil
+				}
+				return nil, errors.New(fmt.Sprintf("%q: not found", name))
+			},
+		},
+		{
+			description:       "Client error could be passed out",
+			interval:          200 * time.Millisecond,
+			timeout:           5 * time.Second,
+			expectPendingPods: true,
+			expectError:       true,
+			expectedError:     nil,
+			getPodFn: func(namespace, name string) (*api.Pod, error) {
+				return nil, errors.New("This is a random error for testing")
+			},
+		},
+	}
+
+	o := DrainOptions{}
+	o.ifPrint = false
+	for _, test := range tests {
+		_, pods := createPods(false)
+		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, test.getPodFn)
+
+		if test.expectError {
+			if err == nil {
+				t.Fatalf("%s: unexpected non-error", test.description)
+			} else if test.expectedError != nil {
+				if *test.expectedError != err {
+					t.Fatalf("%s: the error does not match expected error", test.description)
+				}
+			}
+		}
+		if !test.expectError && err != nil {
+			t.Fatalf("%s: unexpected error", test.description)
+		}
+		if test.expectPendingPods && len(pendingPods) == 0 {
+			t.Fatalf("%s: unexpected empty pods", test.description)
+		}
+		if !test.expectPendingPods && len(pendingPods) > 0 {
+			t.Fatalf("%s: unexpected pending pods", test.description)
+		}
+	}
+}
+
+func createPods(ifCreateNewPods bool) (map[string]api.Pod, []api.Pod) {
+	podMap := make(map[string]api.Pod)
+	podSlice := []api.Pod{}
+	for i := 0; i < 8; i++ {
+		var uid types.UID
+		if ifCreateNewPods {
+			uid = types.UID(i)
+		} else {
+			uid = types.UID(string(i) + string(i))
+		}
+		pod := api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:       "pod" + string(i),
+				Namespace:  "default",
+				UID:        uid,
+				Generation: int64(i),
+			},
+		}
+		podMap[pod.Name] = pod
+		podSlice = append(podSlice, pod)
+	}
+	return podMap, podSlice
 }
 
 type MyReq struct {
