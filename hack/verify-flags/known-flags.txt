@@ -208,6 +208,7 @@ external-etcd-endpoints
 external-etcd-keyfile
 external-hostname
 external-ip
+external-name
 extra-peer-dirs
 experimental-fail-swap-on
 failover-timeout

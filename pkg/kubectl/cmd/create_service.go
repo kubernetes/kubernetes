@@ -40,6 +40,7 @@ func NewCmdCreateService(f cmdutil.Factory, cmdOut, errOut io.Writer) *cobra.Com
 	cmd.AddCommand(NewCmdCreateServiceClusterIP(f, cmdOut))
 	cmd.AddCommand(NewCmdCreateServiceNodePort(f, cmdOut))
 	cmd.AddCommand(NewCmdCreateServiceLoadBalancer(f, cmdOut))
+	cmd.AddCommand(NewCmdCreateServiceExternalName(f, cmdOut))
 
 	return cmd
 }
@@ -215,6 +216,67 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 		Name:                name,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
+		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
+	})
+}
+
+var (
+	serviceExternalNameLong = templates.LongDesc(`
+	Create an ExternalName service with the specified name.
+
+	ExternalName service references to an external DNS address instead of
+	only pods, which will allow application authors to reference services
+	that exist off platform, on other clusters, or locally.`)
+
+	serviceExternalNameExample = templates.Examples(`
+	# Create a new ExternalName service named my-ns 
+	kubectl create service externalname my-ns --external-name bar.com`)
+)
+
+// NewCmdCreateServiceExternalName is a macro command for creating a ExternalName service
+func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "externalname NAME --external-name external.name [--dry-run]",
+		Short:   "Create an ExternalName service.",
+		Long:    serviceExternalNameLong,
+		Example: serviceExternalNameExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			err := CreateExternalNameService(f, cmdOut, cmd, args)
+			cmdutil.CheckErr(err)
+		},
+	}
+	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceExternalNameGeneratorV1Name)
+	addPortFlags(cmd)
+	cmd.Flags().String("external-name", "", "external name of service")
+	cmd.MarkFlagRequired("external-name")
+	return cmd
+}
+
+// CreateExternalNameService is the implementation of the service externalname command
+func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+	name, err := NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
+	}
+	var generator kubectl.StructuredGenerator
+	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
+	case cmdutil.ServiceExternalNameGeneratorV1Name:
+		generator = &kubectl.ServiceCommonGeneratorV1{
+			Name:         name,
+			Type:         api.ServiceTypeExternalName,
+			ExternalName: cmdutil.GetFlagString(cmd, "external-name"),
+			ClusterIP:    "",
+		}
+	default:
+		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+	}
+	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
+		Name:                name,
+		StructuredGenerator: generator,
+		DryRun:              cmdutil.GetDryRunFlag(cmd),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
 }
