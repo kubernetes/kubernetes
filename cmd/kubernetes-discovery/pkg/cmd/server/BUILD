@@ -12,13 +12,11 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "discoverysummarizer.go",
-        "doc.go",
-    ],
+    srcs = ["start.go"],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubernetes-discovery/discoverysummarizer/apis/config/v1alpha1:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
+        "//cmd/kubernetes-discovery/pkg/legacy:go_default_library",
+        "//pkg/kubectl/cmd/util:go_default_library",
+        "//vendor:github.com/spf13/cobra",
     ],
 )
