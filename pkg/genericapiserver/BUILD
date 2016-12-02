@@ -55,8 +55,6 @@ go_library(
         "//pkg/genericapiserver/routes:go_default_library",
         "//pkg/genericapiserver/validation:go_default_library",
         "//pkg/healthz:go_default_library",
-        "//pkg/registry/core/service/ipallocator:go_default_library",
-        "//pkg/registry/generic:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/recognizer:go_default_library",
