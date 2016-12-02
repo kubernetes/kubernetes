@@ -18,9 +18,11 @@ package glusterfs
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	dstrings "strings"
 
 	"github.com/golang/glog"
@@ -63,6 +65,8 @@ const (
 	durabilityType              = "replicate"
 	secretKeyName               = "key" // key name used in secret
 	gciGlusterMountBinariesPath = "/sbin/mount.glusterfs"
+	defaultGidMin               = 2000
+	defaultGidMax               = math.MaxUint32
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -381,12 +385,24 @@ type provisioningConfig struct {
 	secretName      string
 	secretValue     string
 	clusterId       string
+	gidMin          uint32
+	gidMax          uint32
 }
 
 type glusterfsVolumeProvisioner struct {
 	*glusterfsMounter
 	provisioningConfig
 	options volume.VolumeOptions
+}
+
+func convertGid(inputGid string) (uint32, error) {
+	inputGid32, err := strconv.ParseUint(inputGid, 10, 32);
+	if err != nil {
+		glog.Errorf("glusterfs: failed to parse gid %v ", inputGid)
+		return 0, fmt.Errorf("glusterfs: failed to parse gid %v ", inputGid)
+	}
+	outputGid := uint32(inputGid32)
+	return outputGid, nil
 }
 
 func (plugin *glusterfsPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -681,6 +697,18 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			cfg.clusterId = v
 		case "restauthenabled":
 			authEnabled = dstrings.ToLower(v) == "true"
+		case "gidmin":
+			parseGidMin, err := convertGid(v)
+			if err != nil {
+				return nil, fmt.Errorf("glusterfs: invalid value %q for volume plugin %s", k, glusterfsPluginName)
+			}
+			cfg.gidMin = parseGidMin
+		case "gidmax":
+			parseGidMax, err := convertGid(v)
+			if err != nil {
+				return nil, fmt.Errorf("glusterfs: invalid value %q for volume plugin %s", k, glusterfsPluginName)
+			}
+			cfg.gidMax = parseGidMax
 		default:
 			return nil, fmt.Errorf("glusterfs: invalid option %q for volume plugin %s", k, glusterfsPluginName)
 		}
@@ -711,5 +739,18 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	} else {
 		cfg.secretValue = cfg.userKey
 	}
+
+	if cfg.gidMin == 0 {
+		cfg.gidMin = defaultGidMin
+	}
+
+	if cfg.gidMax == 0 {
+		cfg.gidMax = defaultGidMax
+	}
+
+	if cfg.gidMin > cfg.gidMax {
+		return nil, fmt.Errorf("StorageClass for provisioner %q must have gidMax value >= gidMin", glusterfsPluginName)
+	}
+
 	return &cfg, nil
 }
