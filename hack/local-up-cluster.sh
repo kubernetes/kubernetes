@@ -202,6 +202,21 @@ EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
 CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
+# If on an selinux system, need to set the correct context so cfssl container can access it
+which getenforce &>/dev/null
+if [ $? -eq 0 ]; then
+    if [ "$(getenforce)" == "Enforcing" ]; then
+        # Try newer container_file_t type first
+        ${CONTROLPLANE_SUDO} chcon -R -t container_file_t "${CERT_DIR}" &>/dev/null
+        if [ $? -ne 0 ]; then
+            # Use older svirt_sandbox_file_t type
+            ${CONTROLPLANE_SUDO} chcon -R -t svirt_sandbox_file_t "${CERT_DIR}" &>/dev/null
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Unable to set selinux context on ${CERT_DIR}. Certificate generation may fail."
+            fi
+        fi
+    fi
+fi
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
