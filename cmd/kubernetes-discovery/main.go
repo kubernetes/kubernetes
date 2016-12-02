@@ -21,6 +21,7 @@ import (
 	"runtime"
 
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/cmd/server"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/logs"
 )
 
@@ -34,6 +35,6 @@ func main() {
 
 	cmd := server.NewCommandStartDiscoveryServer(os.Stdout, os.Stderr)
 	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
+		cmdutil.CheckErr(err)
 	}
 }
