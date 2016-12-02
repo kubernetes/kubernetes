@@ -222,7 +222,7 @@ func PodMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bo
 }
 
 func isBestEffort(pod *api.Pod) bool {
-	return qos.InternalGetPodQOS(pod) == qos.BestEffort
+	return qos.InternalGetPodQOS(pod) == api.PodQOSBestEffort
 }
 
 func isTerminating(pod *api.Pod) bool {

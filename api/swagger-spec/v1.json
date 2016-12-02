@@ -19118,6 +19118,9 @@
        "$ref": "v1.ContainerStatus"
       },
       "description": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses"
+     },
+     "qosClass": {
+      "type": "string"
      }
     }
    },

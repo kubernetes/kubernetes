@@ -67,7 +67,7 @@ func newPod(name string, containers []v1.Container) *v1.Pod {
 func TestGetPodQOS(t *testing.T) {
 	testCases := []struct {
 		pod      *v1.Pod
-		expected QOSClass
+		expected v1.PodQOSClass
 	}{
 		{
 			pod: newPod("guaranteed", []v1.Container{

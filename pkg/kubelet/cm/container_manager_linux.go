@@ -276,7 +276,7 @@ func InitQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (
 	cm := NewCgroupManager(subsystems, cgroupDriver)
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
-	qosClasses := [2]qos.QOSClass{qos.Burstable, qos.BestEffort}
+	qosClasses := [2]v1.PodQOSClass{qos.Burstable, qos.BestEffort}
 
 	// Create containers for both qos classes
 	for _, qosClass := range qosClasses {

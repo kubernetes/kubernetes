@@ -16,14 +16,16 @@ limitations under the License.
 
 package qos
 
+import "k8s.io/kubernetes/pkg/api/v1"
+
 // QOSClass defines the supported qos classes of Pods/Containers.
 type QOSClass string
 
 const (
 	// Guaranteed is the Guaranteed qos class.
-	Guaranteed QOSClass = "Guaranteed"
+	Guaranteed v1.PodQOSClass = v1.PodQOSGuaranteed
 	// Burstable is the Burstable qos class.
-	Burstable QOSClass = "Burstable"
+	Burstable v1.PodQOSClass = v1.PodQOSBurstable
 	// BestEffort is the BestEffort qos class.
-	BestEffort QOSClass = "BestEffort"
+	BestEffort v1.PodQOSClass = v1.PodQOSBestEffort
 )

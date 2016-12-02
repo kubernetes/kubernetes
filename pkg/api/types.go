@@ -1894,6 +1894,18 @@ type PodSecurityContext struct {
 	FSGroup *int64 `json:"fsGroup,omitempty"`
 }
 
+// PodQOSClass defines the supported qos classes of Pods/Containers.
+type PodQOSClass string
+
+const (
+	// PodQOSGuaranteed is the Guaranteed qos class.
+	PodQOSGuaranteed PodQOSClass = "Guaranteed"
+	// PodQOSBurstable is the Burstable qos class.
+	PodQOSBurstable PodQOSClass = "Burstable"
+	// PodQOSBestEffort is the BestEffort qos class.
+	PodQOSBestEffort PodQOSClass = "BestEffort"
+)
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -1930,6 +1942,8 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
+	// +optional
+	QOSClass PodQOSClass `json:"qosClass,omitempty"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

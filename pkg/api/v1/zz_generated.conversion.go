@@ -3163,6 +3163,7 @@ func autoConvert_v1_PodStatus_To_api_PodStatus(in *PodStatus, out *api.PodStatus
 	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
 	out.InitContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
+	out.QOSClass = api.PodQOSClass(in.QOSClass)
 	return nil
 }
 
@@ -3180,6 +3181,7 @@ func autoConvert_api_PodStatus_To_v1_PodStatus(in *api.PodStatus, out *PodStatus
 	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
 	out.InitContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
+	out.QOSClass = PodQOSClass(in.QOSClass)
 	return nil
 }
 

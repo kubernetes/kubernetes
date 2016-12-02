@@ -2784,6 +2784,7 @@ func DeepCopy_api_PodStatus(in interface{}, out interface{}, c *conversion.Clone
 		} else {
 			out.ContainerStatuses = nil
 		}
+		out.QOSClass = in.QOSClass
 		return nil
 	}
 }
