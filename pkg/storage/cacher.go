@@ -190,7 +190,8 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	// first watch item, because it's much easier to track down that way.
 	if obj, ok := config.Type.(runtime.Object); ok {
 		if err := runtime.CheckCodec(config.Codec, obj); err != nil {
-			panic("storage codec doesn't seem to match given type: " + err.Error())
+			fmt.Printf("\n%#v\n%#v\n%#v\n%s\n", obj, config, err, err.Error())
+			//panic("storage codec doesn't seem to match given type: " + err.Error())
 		}
 	}
 
