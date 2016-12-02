@@ -36,6 +36,28 @@ const awsStandardDNSSuffix = "amazonaws.com"
 const awsChinaDNSSuffix = "amazonaws.com.cn"
 const registryURLTemplate = "*.dkr.ecr.%s.%s"
 
+// AWSRegions is the complete list of regions known to the AWS cloudprovider
+// and credentialprovider.
+var AWSRegions = [...]string{
+	"us-east-1",
+	"us-east-2",
+	"us-west-1",
+	"us-west-2",
+	"eu-west-1",
+	"eu-central-1",
+	"ap-south-1",
+	"ap-southeast-1",
+	"ap-southeast-2",
+	"ap-northeast-1",
+	"ap-northeast-2",
+	"cn-north-1",
+	"us-gov-west-1",
+	"sa-east-1",
+}
+
+const authTokenRetries = 20
+const authTokenDelayDuration = 1 * time.Second
+
 // awsHandlerLogger is a handler that logs all AWS SDK requests
 // Copied from pkg/cloudprovider/providers/aws/log_handler.go
 func awsHandlerLogger(req *request.Request) {
@@ -48,6 +70,26 @@ func awsHandlerLogger(req *request.Request) {
 	}
 
 	glog.V(3).Infof("AWS request: %s:%s in %s", service, name, *region)
+}
+
+// Implements the RequestRetryer interface
+type authTokenRetryer struct{}
+
+// MaxRetries returns the number of maximum returns the service will use to make
+// an individual API request.
+func (a authTokenRetryer) MaxRetries() int {
+	return authTokenRetries
+}
+
+// RetryRules returns the delay duration before retrying this request again
+func (a authTokenRetryer) RetryRules(r *request.Request) time.Duration {
+	// Since AWS has a default limit of 1 ECR token per account per second and doing an exponential back off will block the kubelet longer
+	return authTokenDelayDuration
+}
+
+// ShouldRetry returns if the request should be retried.
+func (a authTokenRetryer) ShouldRetry(r *request.Request) bool {
+	return r.IsErrorRetryable()
 }
 
 // An interface for testing purposes.
@@ -168,6 +210,7 @@ func (p *ecrProvider) Enabled() bool {
 	getter := &ecrTokenGetter{svc: ecr.New(session.New(&aws.Config{
 		Credentials: nil,
 		Region:      &p.region,
+		Retryer:     authTokenRetryer{},
 	}))}
 	getter.svc.Handlers.Sign.PushFrontNamed(request.NamedHandler{
 		Name: "k8s/logger",
