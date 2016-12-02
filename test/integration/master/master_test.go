@@ -139,7 +139,7 @@ var hpaV1 string = `
 `
 
 func autoscalingPath(resource, namespace, name string) string {
-	return testapi.Autoscaling.ResourcePath(resource, namespace, name)
+	return testapi.Autoscaling.VersionedResourcePathWithPrefix("v1", "", resource, namespace, name)
 }
 
 func batchPath(resource, namespace, name string) string {
@@ -162,9 +162,9 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 		expectedStatusCodes map[int]bool
 		expectedVersion     string
 	}{
-		{"POST", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), hpaV1, integration.Code201, ""},
-		{"GET", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), "", integration.Code200, testapi.Autoscaling.GroupVersion().String()},
-		{"GET", extensionsPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
+		{"POST", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), hpaV1, integration.Code201, ""},
+		{"GET", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", integration.Code200, "autoscaling/v1"},
+		{"GET", extensionsPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
 	}
 
 	for _, r := range requests {

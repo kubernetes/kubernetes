@@ -35,6 +35,7 @@ import (
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	autoscalingapiv2alpha1 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	certificatesapiv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -412,6 +413,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
+		autoscalingapiv2alpha1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
 	)
 
 	return ret
