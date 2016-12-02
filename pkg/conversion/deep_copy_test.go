@@ -21,11 +21,12 @@ import (
 	"reflect"
 	"testing"
 
+	forkedreflect "k8s.io/kubernetes/third_party/forked/golang/reflect"
+
 	"github.com/google/gofuzz"
 )
 
 func TestDeepCopy(t *testing.T) {
-	semantic := EqualitiesOrDie()
 	f := fuzz.New().NilChance(.5).NumElements(0, 100)
 	table := []interface{}{
 		map[string]string{},
@@ -45,7 +46,7 @@ func TestDeepCopy(t *testing.T) {
 			t.Errorf("Error: couldn't copy %#v", obj)
 			continue
 		}
-		if e, a := obj, obj2; !semantic.DeepEqual(e, a) {
+		if e, a := obj, obj2; !forkedreflect.DeepEqual(e, a) {
 			t.Errorf("expected %#v\ngot %#v", e, a)
 		}
 
@@ -56,7 +57,7 @@ func TestDeepCopy(t *testing.T) {
 			t.Errorf("Error: couldn't copy %#v", obj)
 			continue
 		}
-		if e, a := obj3, obj4; !semantic.DeepEqual(e, a) {
+		if e, a := obj3, obj4; !forkedreflect.DeepEqual(e, a) {
 			t.Errorf("expected %#v\ngot %#v", e, a)
 		}
 		f.Fuzz(obj3)

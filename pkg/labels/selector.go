@@ -320,6 +320,11 @@ func (lsel internalSelector) String() string {
 	return strings.Join(reqs, ",")
 }
 
+// SemanticDeepEqual implements api.Semantic.DeepEqual() for internalSelector
+func (a internalSelector) SemanticDeepEqual(b internalSelector) bool {
+	return a.String() == b.String()
+}
+
 // constants definition for lexer token
 type Token int
 

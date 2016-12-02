@@ -93,6 +93,10 @@ func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, t.value)
 }
 
+func (a hasTerm) SemanticDeepEqual(b hasTerm) bool {
+	return a.String() == b.String()
+}
+
 type notHasTerm struct {
 	field, value string
 }
@@ -127,6 +131,10 @@ func (t *notHasTerm) Requirements() Requirements {
 
 func (t *notHasTerm) String() string {
 	return fmt.Sprintf("%v!=%v", t.field, t.value)
+}
+
+func (a notHasTerm) SemanticDeepEqual(b notHasTerm) bool {
+	return a.String() == b.String()
 }
 
 type andTerm []Selector
@@ -194,6 +202,10 @@ func (t andTerm) String() string {
 		terms = append(terms, q.String())
 	}
 	return strings.Join(terms, ",")
+}
+
+func (a andTerm) SemanticDeepEqual(b andTerm) bool {
+	return a.String() == b.String()
 }
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
