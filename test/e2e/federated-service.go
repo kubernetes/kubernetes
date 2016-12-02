@@ -173,8 +173,18 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
 				obj, err := conversion.NewCloner().DeepCopy(service)
-				// Cloning shouldn't fail. On the off-chance it does, we should
-				// shallow copy service to serviceShard before failing.
+				// Cloning shouldn't fail. On the off-chance it does, we
+				// should shallow copy service to serviceShard before
+				// failing. If we don't do this we will never really
+				// get a chance to clean up the underlying services
+				// when the cloner fails for reasons not in our
+				// control. For example, cloner bug. That will cause
+				// the resources to leak, which in turn causes the
+				// test project to run out of quota and the entire
+				// suite starts failing. So we must try as hard as
+				// possible to cleanup the underlying services. So
+				// if DeepCopy fails, we are going to try with shallow
+				// copy as a last resort.
 				if err != nil {
 					serviceCopy := *service
 					serviceShard = &serviceCopy
@@ -182,6 +192,8 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				}
 				var ok bool
 				serviceShard, ok = obj.(*v1.Service)
+				// Same argument as above about using shallow copy
+				// as a last resort.
 				if !ok {
 					serviceCopy := *service
 					serviceShard = &serviceCopy
