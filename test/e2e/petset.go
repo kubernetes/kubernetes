@@ -64,7 +64,6 @@ const (
 	readTimeout = 60 * time.Second
 )
 
-// Time: 25m, slow by design.
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = framework.KubeDescribe("StatefulSet [Slow]", func() {
