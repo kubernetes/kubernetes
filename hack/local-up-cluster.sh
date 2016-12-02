@@ -56,6 +56,13 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 
+# RBAC Mode options
+ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
+ENABLE_AUTH_PROXY=${ENABLE_AUTH_PROXY:-false}
+ENABLE_RBAC=${ENABLE_RBAC:-false}
+KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
+AUTH_ARGS=${AUTH_ARGS:-""}
+
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
@@ -366,6 +373,7 @@ clusters:
     name: local-up-cluster
 users:
   - user:
+      token: ${KUBECONFIG_TOKEN:-}
       client-certificate: ${CERT_DIR}/client-$1.crt
       client-key: ${CERT_DIR}/client-$1.key
     name: local-up-cluster
@@ -394,17 +402,18 @@ function start_apiserver {
     # which should be able to be used as the CA to verify itself
 
     anytoken_arg=""
-    if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
+    if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
       anytoken_arg="--insecure-allow-any-token "
+      KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-"system:admin/system:masters"}
     fi
     auth_proxy_arg=""
-    if [[ -n "${ENABLE_AUTH_PROXY:-}" ]]; then
+    if [[ "${ENABLE_AUTH_PROXY}" = true ]]; then
       auth_proxy_arg="--requestheader-username-headers=X-Remote-User \
       --requestheader-client-ca-file=${CERT_DIR}/auth-proxy-client-ca.crt \
       --requestheader-allowed-names=system:auth-proxy "
     fi
     authorizer_arg=""
-    if [[ -n "${ENABLE_RBAC:-}" ]]; then
+    if [[ "${ENABLE_RBAC}" = true ]]; then
       authorizer_arg="--authorization-mode=RBAC "
     fi
     priv_arg=""
@@ -479,6 +488,20 @@ EOF
     write_client_kubeconfig kube-proxy
     write_client_kubeconfig controller
     write_client_kubeconfig scheduler
+
+    if [[ -z "${AUTH_ARGS}"  ]]; then
+        if [[ "${ALLOW_ANY_TOKEN}" = true  ]]; then
+            # use token authentication
+            if [[ -n "${KUBECONFIG_TOKEN}"  ]]; then
+                AUTH_ARGS="--token=${KUBECONFIG_TOKEN}"
+            else
+                AUTH_ARGS="--token=system:admin/system:masters"
+            fi
+        else
+            # default to use basic authentication
+            AUTH_ARGS="--username=admin --password=admin"
+        fi
+    fi
 }
 
 function start_controller_manager {
@@ -710,7 +733,7 @@ To start using your cluster, open up another terminal/tab and run:
   export KUBERNETES_PROVIDER=local
 
   cluster/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-  cluster/kubectl.sh config set-credentials myself --client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt
+  cluster/kubectl.sh config set-credentials myself ${AUTH_ARGS}
   cluster/kubectl.sh config set-context local --cluster=local --user=myself
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
