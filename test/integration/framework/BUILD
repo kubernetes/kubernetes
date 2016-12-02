@@ -13,7 +13,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "etcd_utils.go",
         "master_utils.go",
         "perf_utils.go",
         "serializer.go",
@@ -63,10 +62,8 @@ go_library(
         "//plugin/pkg/auth/authenticator/request/union:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
-        "//vendor:github.com/coreos/etcd/client",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
-        "//vendor:golang.org/x/net/context",
     ],
 )
