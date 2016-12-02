@@ -1028,8 +1028,7 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 // ValidatePersistentVolumeUpdate tests to see if the update is legal for an end user to make.
 // newPv is updated with fields that cannot be changed.
 func ValidatePersistentVolumeUpdate(newPv, oldPv *api.PersistentVolume) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = ValidatePersistentVolume(newPv)
+	allErrs := ValidatePersistentVolume(newPv)
 	newPv.Status = oldPv.Status
 	return allErrs
 }

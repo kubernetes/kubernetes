@@ -782,7 +782,7 @@ func (s *ServiceController) clusterSyncLoop() {
 	if newSet.Equal(s.knownClusterSet) {
 		// The set of cluster names in the services in the federation hasn't changed, but we can retry
 		// updating any services that we failed to update last time around.
-		servicesToUpdate = s.updateDNSRecords(servicesToUpdate, newClusters)
+		s.updateDNSRecords(servicesToUpdate, newClusters)
 		return
 	}
 	glog.Infof("Detected change in list of cluster names. New  set: %v, Old set: %v", newSet, s.knownClusterSet)

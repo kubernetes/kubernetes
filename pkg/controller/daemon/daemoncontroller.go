@@ -294,7 +294,7 @@ func isDaemonSetMatch(pod *v1.Pod, ds *extensions.DaemonSet) bool {
 	}
 	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
-		err = fmt.Errorf("invalid selector: %v", err)
+		glog.Warningf("invalid selector: %v", err)
 		return false
 	}
 

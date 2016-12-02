@@ -143,7 +143,7 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 				return nil
 			}
 			// hold a lock: rbd lock add
-			cmd, err = b.plugin.execCommand("rbd",
+			_, err = b.plugin.execCommand("rbd",
 				append([]string{"lock", "add", b.Image, lock_id, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		} else {
 			// defencing, find locker name
@@ -155,7 +155,7 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 				}
 			}
 			// remove a lock: rbd lock remove
-			cmd, err = b.plugin.execCommand("rbd",
+			_, err = b.plugin.execCommand("rbd",
 				append([]string{"lock", "remove", b.Image, lock_id, locker, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		}
 

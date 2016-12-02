@@ -263,7 +263,7 @@ func isReplicaSetMatch(pod *v1.Pod, rs *extensions.ReplicaSet) bool {
 	}
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
-		err = fmt.Errorf("invalid selector: %v", err)
+		glog.Warningf("invalid selector: %v", err)
 		return false
 	}
 
