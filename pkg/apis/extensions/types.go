@@ -312,6 +312,10 @@ type DeploymentStatus struct {
 	// +optional
 	UpdatedReplicas int32
 
+	// Total number of ready pods targeted by this deployment.
+	// +optional
+	ReadyReplicas int32
+
 	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
 	// +optional
 	AvailableReplicas int32
