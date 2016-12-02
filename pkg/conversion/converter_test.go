@@ -17,7 +17,6 @@ limitations under the License.
 package conversion
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -522,7 +521,7 @@ func TestConverter_fuzz(t *testing.T) {
 				continue
 			}
 			if e, a := item.from, item.check; !reflect.DeepEqual(e, a) {
-				t.Errorf("(%v, %v): unexpected diff: %v", i, j, objDiff(e, a))
+				t.Errorf("(%v, %v): unexpected diff: %v", i, j, diff.ObjectDiff(e, a))
 			}
 		}
 	}
@@ -570,7 +569,7 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	third := Foo{}
 	err = c.Convert(&second, &third, AllowDifferentFieldTypeNames, nil)
 	if e, a := first, third; !reflect.DeepEqual(e, a) {
-		t.Errorf("Unexpected diff: %v", objDiff(e, a))
+		t.Errorf("Unexpected diff: %v", diff.ObjectDiff(e, a))
 	}
 }
 
@@ -821,27 +820,7 @@ func TestConverter_FieldRename(t *testing.T) {
 			continue
 		}
 		if e, a := item.expect, item.to; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: unexpected diff: %v", name, objDiff(e, a))
+			t.Errorf("%v: unexpected diff: %v", name, diff.ObjectDiff(e, a))
 		}
 	}
-}
-
-func objDiff(a, b interface{}) string {
-	ab, err := json.Marshal(a)
-	if err != nil {
-		panic("a")
-	}
-	bb, err := json.Marshal(b)
-	if err != nil {
-		panic("b")
-	}
-	return diff.StringDiff(string(ab), string(bb))
-
-	// An alternate diff attempt, in case json isn't showing you
-	// the difference. (reflect.DeepEqual makes a distinction between
-	// nil and empty slices, for example.)
-	//return diff.StringDiff(
-	//	fmt.Sprintf("%#v", a),
-	//	fmt.Sprintf("%#v", b),
-	//)
 }
