@@ -25,12 +25,19 @@ import (
 	"net"
 
 	"k8s.io/kubernetes/pkg/client/restclient"
+
+	"github.com/golang/glog"
 )
 
 // NewSelfClientConfig returns a clientconfig which can be used to talk to this apiserver.
 func NewSelfClientConfig(secureServingInfo *SecureServingInfo, insecureServingInfo *ServingInfo, token string) (*restclient.Config, error) {
 	if cfg, err := secureServingInfo.NewSelfClientConfig(token); err != nil || cfg != nil {
-		return cfg, err
+		if insecureServingInfo == nil {
+			// be fatal if insecure port is not available
+			return cfg, err
+		} else {
+			glog.Warningf("Failed to create secure local client, falling back to insecure local connection: %v", err)
+		}
 	}
 	if cfg, err := insecureServingInfo.NewSelfClientConfig(token); err != nil || cfg != nil {
 		return cfg, err
