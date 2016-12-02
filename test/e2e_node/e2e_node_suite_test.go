@@ -51,6 +51,7 @@ var e2es *services.E2EServices
 
 // TODO(random-liu): Change the following modes to sub-command.
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
+var runKubeletMode = flag.Bool("run-kubelet-mode", false, "If true, only start kubelet, and not run test.")
 var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
 
 func init() {
@@ -79,6 +80,11 @@ func TestE2eNode(t *testing.T) {
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
 		services.RunE2EServices()
+		return
+	}
+	if *runKubeletMode {
+		// If run-kubelet-mode is specified, only start kubelet.
+		services.RunKubelet()
 		return
 	}
 	if *systemValidateMode {
