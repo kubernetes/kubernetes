@@ -1105,6 +1105,9 @@ func (proxier *Proxier) syncProxyRules() {
 					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
 					continue
 				}
+				if lp.protocol == "udp" {
+					proxier.clearUdpConntrackForPort(lp.port)
+				}
 				replacementPortsMap[lp] = socket
 			} // We're holding the port, so it's OK to install iptables rules.
 
@@ -1321,6 +1324,24 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 	proxier.portsMap = replacementPortsMap
+}
+
+// Clear UDP conntrack for port or all conntrack entries when port equal zero.
+// When a packet arrives, it will not go through NAT table again, because it is not "the first" packet.
+// The solution is clearing the conntrack. Known issus:
+// https://github.com/docker/docker/issues/8795
+// https://github.com/kubernetes/kubernetes/issues/31983
+func (proxier *Proxier) clearUdpConntrackForPort(port int) {
+	var err error = nil
+	glog.V(2).Infof("Deleting conntrack entries for udp connections")
+	if port > 0 {
+		err = proxier.execConntrackTool("-D", "-p", "udp", "--dport", strconv.Itoa(port))
+		if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
+			glog.Errorf("conntrack return with error: %v", err)
+		}
+	} else {
+		glog.Errorf("Wrong port number. The port number must be greater than zero")
+	}
 }
 
 // Join all words with spaces, terminate with newline and write to buf.
