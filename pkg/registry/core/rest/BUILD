@@ -24,6 +24,7 @@ go_library(
         "//pkg/genericapiserver:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
+        "//pkg/registry:go_default_library",
         "//pkg/registry/core/componentstatus:go_default_library",
         "//pkg/registry/core/configmap/etcd:go_default_library",
         "//pkg/registry/core/controller/etcd:go_default_library",
