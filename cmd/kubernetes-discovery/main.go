@@ -17,21 +17,23 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer"
+	"os"
+	"runtime"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/cmd/server"
+	"k8s.io/kubernetes/pkg/util/logs"
 )
 
 func main() {
-	// TODO: move them to flags.
-	configFilePath := "config.json"
-	port := "9090"
-	s, err := discoverysummarizer.NewDiscoverySummarizer(configFilePath)
-	if err != nil {
-		glog.Fatalf("%v\n", err)
+	logs.InitLogs()
+	defer logs.FlushLogs()
+
+	if len(os.Getenv("GOMAXPROCS")) == 0 {
+		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
-	err = s.Run(port)
-	if err != nil {
-		glog.Fatalf("%v\n", err)
+
+	cmd := server.NewCommandStartDiscoveryServer(os.Stdout, os.Stderr)
+	if err := cmd.Execute(); err != nil {
+		os.Exit(1)
 	}
 }
