@@ -177,8 +177,10 @@ type RESTMapper interface {
 
 	// RESTMapping identifies a preferred resource mapping for the provided group kind.
 	RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error)
-	// RESTMappings returns all resource mappings for the provided group kind.
-	RESTMappings(gk schema.GroupKind) ([]*RESTMapping, error)
+	// RESTMappings returns all resource mappings for the provided group kind if no
+	// version search is provided. Otherwise identifies a preferred resource mapping for
+	// the provided version(s).
+	RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error)
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
