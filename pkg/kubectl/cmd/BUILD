@@ -26,6 +26,7 @@ go_library(
         "convert.go",
         "cp.go",
         "create.go",
+        "create_clusterrolebinding.go",
         "create_configmap.go",
         "create_deployment.go",
         "create_namespace.go",
