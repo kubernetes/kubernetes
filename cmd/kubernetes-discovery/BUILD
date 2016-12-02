@@ -16,6 +16,7 @@ go_binary(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubernetes-discovery/pkg/cmd/server:go_default_library",
+        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util/logs:go_default_library",
     ],
 )
