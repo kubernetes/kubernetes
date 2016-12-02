@@ -2015,7 +2015,7 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 	return val.(time.Time)
 }
 
-// PLEGHealthCheck returns whether the PLEG is healty.
+// PLEGHealthCheck returns whether the PLEG is healthy.
 func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
 	return kl.pleg.Healthy()
 }
