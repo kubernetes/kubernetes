@@ -525,6 +525,7 @@ rkt-stage1-image
 root-ca-file
 root-dir
 route-reconciliation-period
+run-kubelet-mode
 run-proxy
 run-services-mode
 runtime-cgroups

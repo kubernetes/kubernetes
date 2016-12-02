@@ -63,6 +63,22 @@ func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate.")
 }
 
+// RunKubelet starts kubelet and waits for termination signal. Once receives the
+// termination signal, it will stop the kubelet gracefully.
+func RunKubelet() {
+	var err error
+	// Enable monitorParent to make sure kubelet will receive termination signal
+	// when test process exits.
+	e := NewE2EServices(true /* monitorParent */)
+	defer e.Stop()
+	e.kubelet, err = e.startKubelet()
+	if err != nil {
+		glog.Fatalf("Failed to start kubelet: %v", err)
+	}
+	// Wait until receiving a termination signal.
+	waitForTerminationSignal()
+}
+
 const (
 	// Ports of different e2e services.
 	kubeletPort         = "10250"
