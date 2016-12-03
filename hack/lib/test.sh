@@ -34,7 +34,7 @@ kube::test::get_object_assert() {
   local expected=$3
   local args=${4:-}
 
-  res=$(eval kubectl ${args} get "${kube_flags[@]}" $object -o go-template=\"$request\")
+  res=$(eval kubectl get "${kube_flags[@]}" ${args} $object -o go-template=\"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
