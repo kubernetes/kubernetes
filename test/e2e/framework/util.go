@@ -319,6 +319,12 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 	}
 }
 
+func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
+	if !NodeOSDistroIs(supportedNodeOsDistros...) {
+		Skipf("Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
+	}
+}
+
 func SkipIfContainerRuntimeIs(runtimes ...string) {
 	for _, runtime := range runtimes {
 		if runtime == TestContext.ContainerRuntime {
@@ -330,6 +336,15 @@ func SkipIfContainerRuntimeIs(runtimes ...string) {
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(TestContext.Provider) {
+			return true
+		}
+	}
+	return false
+}
+
+func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
+	for _, distro := range supportedNodeOsDistros {
+		if strings.ToLower(distro) == strings.ToLower(TestContext.NodeOSDistro) {
 			return true
 		}
 	}
