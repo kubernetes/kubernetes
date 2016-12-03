@@ -16,7 +16,9 @@ limitations under the License.
 
 package v1alpha1
 
-import ( metav1 "k8s.io/kubernetes/pkg/apis/meta/v1" )
+import (
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+)
 
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`

@@ -432,7 +432,7 @@ type PersistentVolumeList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items                []PersistentVolume `json:"items"`
+	Items           []PersistentVolume `json:"items"`
 }
 
 // +genclient=true
@@ -456,7 +456,7 @@ type PersistentVolumeClaimList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items                []PersistentVolumeClaim `json:"items"`
+	Items           []PersistentVolumeClaim `json:"items"`
 }
 
 // PersistentVolumeClaimSpec describes the common attributes of storage devices

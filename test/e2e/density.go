@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"

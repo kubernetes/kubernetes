@@ -22,9 +22,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )

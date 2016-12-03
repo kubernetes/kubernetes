@@ -25,10 +25,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch/versioned"
@@ -36,7 +36,7 @@ import (
 
 type Foo struct {
 	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty" description:"standard object metadata"`
+	api.ObjectMeta  `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
@@ -270,10 +270,10 @@ func TestThirdPartyResourceDataListEncoding(t *testing.T) {
 	}
 
 	targetOutput := struct {
-		Kind       string               `json:"kind,omitempty"`
-		Items      []json.RawMessage    `json:"items"`
-		Metadata   metav1.ListMeta `json:"metadata,omitempty"`
-		APIVersion string               `json:"apiVersion,omitempty"`
+		Kind       string            `json:"kind,omitempty"`
+		Items      []json.RawMessage `json:"items"`
+		Metadata   metav1.ListMeta   `json:"metadata,omitempty"`
+		APIVersion string            `json:"apiVersion,omitempty"`
 	}{}
 	err = json.Unmarshal(buf.Bytes(), &targetOutput)
 

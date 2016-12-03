@@ -30,11 +30,11 @@ const (
 // with a random string (e.g. UUID) with only slight modification of this code.
 // TODO(mikedanese): this should potentially be versioned
 type LeaderElectionRecord struct {
-	HolderIdentity       string           `json:"holderIdentity"`
-	LeaseDurationSeconds int              `json:"leaseDurationSeconds"`
+	HolderIdentity       string      `json:"holderIdentity"`
+	LeaseDurationSeconds int         `json:"leaseDurationSeconds"`
 	AcquireTime          metav1.Time `json:"acquireTime"`
 	RenewTime            metav1.Time `json:"renewTime"`
-	LeaderTransitions    int              `json:"leaderTransitions"`
+	LeaderTransitions    int         `json:"leaderTransitions"`
 }
 
 // ResourceLockConfig common data that exists across different

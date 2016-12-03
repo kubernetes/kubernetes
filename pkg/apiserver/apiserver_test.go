@@ -38,8 +38,8 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apiserver/filters"
 	"k8s.io/kubernetes/pkg/apiserver/request"
 	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
@@ -122,13 +122,13 @@ func newMapper() *meta.DefaultRESTMapper {
 
 func addGrouplessTypes() {
 	type ListOptions struct {
-		Object               runtime.Object
+		Object          runtime.Object
 		metav1.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labelSelector,omitempty"`
-		FieldSelector        string `json:"fieldSelector,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
+		LabelSelector   string `json:"labelSelector,omitempty"`
+		FieldSelector   string `json:"fieldSelector,omitempty"`
+		Watch           bool   `json:"watch,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty"`
+		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
@@ -140,13 +140,13 @@ func addGrouplessTypes() {
 
 func addTestTypes() {
 	type ListOptions struct {
-		Object               runtime.Object
+		Object          runtime.Object
 		metav1.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labelSelector,omitempty"`
-		FieldSelector        string `json:"fieldSelector,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
+		LabelSelector   string `json:"labelSelector,omitempty"`
+		FieldSelector   string `json:"fieldSelector,omitempty"`
+		Watch           bool   `json:"watch,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty"`
+		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
@@ -168,13 +168,13 @@ func addTestTypes() {
 
 func addNewTestTypes() {
 	type ListOptions struct {
-		Object               runtime.Object
+		Object          runtime.Object
 		metav1.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labelSelector,omitempty"`
-		FieldSelector        string `json:"fieldSelector,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
+		LabelSelector   string `json:"labelSelector,omitempty"`
+		FieldSelector   string `json:"fieldSelector,omitempty"`
+		Watch           bool   `json:"watch,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty"`
+		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(newGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
@@ -3250,9 +3250,9 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 // same group as its parent resource.
 type SimpleXGSubresource struct {
 	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
-	SubresourceInfo      string            `json:"subresourceInfo,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
+	api.ObjectMeta  `json:"metadata"`
+	SubresourceInfo string            `json:"subresourceInfo,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
 }
 
 func (obj *SimpleXGSubresource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

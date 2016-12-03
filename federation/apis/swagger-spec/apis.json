@@ -13,7 +13,7 @@
     "description": "get available API versions",
     "operations": [
      {
-      "type": "unversioned.APIGroupList",
+      "type": "v1.APIGroupList",
       "method": "GET",
       "summary": "get available API versions",
       "nickname": "getAPIVersions",
@@ -33,8 +33,8 @@
    }
   ],
   "models": {
-   "unversioned.APIGroupList": {
-    "id": "unversioned.APIGroupList",
+   "v1.APIGroupList": {
+    "id": "v1.APIGroupList",
     "description": "APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
     "required": [
      "groups"
@@ -51,14 +51,14 @@
      "groups": {
       "type": "array",
       "items": {
-       "$ref": "unversioned.APIGroup"
+       "$ref": "v1.APIGroup"
       },
       "description": "groups is a list of APIGroup."
      }
     }
    },
-   "unversioned.APIGroup": {
-    "id": "unversioned.APIGroup",
+   "v1.APIGroup": {
+    "id": "v1.APIGroup",
     "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
     "required": [
      "name",
@@ -81,25 +81,25 @@
      "versions": {
       "type": "array",
       "items": {
-       "$ref": "unversioned.GroupVersionForDiscovery"
+       "$ref": "v1.GroupVersionForDiscovery"
       },
       "description": "versions are the versions supported in this group."
      },
      "preferredVersion": {
-      "$ref": "unversioned.GroupVersionForDiscovery",
+      "$ref": "v1.GroupVersionForDiscovery",
       "description": "preferredVersion is the version preferred by the API server, which probably is the storage version."
      },
      "serverAddressByClientCIDRs": {
       "type": "array",
       "items": {
-       "$ref": "unversioned.ServerAddressByClientCIDR"
+       "$ref": "v1.ServerAddressByClientCIDR"
       },
       "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP."
      }
     }
    },
-   "unversioned.GroupVersionForDiscovery": {
-    "id": "unversioned.GroupVersionForDiscovery",
+   "v1.GroupVersionForDiscovery": {
+    "id": "v1.GroupVersionForDiscovery",
     "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
     "required": [
      "groupVersion",
@@ -116,8 +116,8 @@
      }
     }
    },
-   "unversioned.ServerAddressByClientCIDR": {
-    "id": "unversioned.ServerAddressByClientCIDR",
+   "v1.ServerAddressByClientCIDR": {
+    "id": "v1.ServerAddressByClientCIDR",
     "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
     "required": [
      "clientCIDR",

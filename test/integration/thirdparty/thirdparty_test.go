@@ -28,9 +28,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -65,7 +65,7 @@ var versionsToTest = []string{"v1"}
 
 type Foo struct {
 	metav1.TypeMeta `json:",inline"`
-	v1.ObjectMeta        `json:"metadata,omitempty" description:"standard object metadata"`
+	v1.ObjectMeta   `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`

@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/conversion"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"

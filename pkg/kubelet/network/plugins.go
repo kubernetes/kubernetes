@@ -24,9 +24,9 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 
 	"github.com/golang/glog"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"

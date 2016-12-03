@@ -24,9 +24,9 @@ import (
 
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 

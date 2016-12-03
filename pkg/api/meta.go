@@ -75,19 +75,19 @@ func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }
 
 // Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
 // fast, direct access to metadata fields for API objects.
-func (meta *ObjectMeta) GetNamespace() string                   { return meta.Namespace }
-func (meta *ObjectMeta) SetNamespace(namespace string)          { meta.Namespace = namespace }
-func (meta *ObjectMeta) GetName() string                        { return meta.Name }
-func (meta *ObjectMeta) SetName(name string)                    { meta.Name = name }
-func (meta *ObjectMeta) GetGenerateName() string                { return meta.GenerateName }
-func (meta *ObjectMeta) SetGenerateName(generateName string)    { meta.GenerateName = generateName }
-func (meta *ObjectMeta) GetUID() types.UID                      { return meta.UID }
-func (meta *ObjectMeta) SetUID(uid types.UID)                   { meta.UID = uid }
-func (meta *ObjectMeta) GetResourceVersion() string             { return meta.ResourceVersion }
-func (meta *ObjectMeta) SetResourceVersion(version string)      { meta.ResourceVersion = version }
-func (meta *ObjectMeta) GetSelfLink() string                    { return meta.SelfLink }
-func (meta *ObjectMeta) SetSelfLink(selfLink string)            { meta.SelfLink = selfLink }
-func (meta *ObjectMeta) GetCreationTimestamp() metav1.Time { return meta.CreationTimestamp }
+func (meta *ObjectMeta) GetNamespace() string                { return meta.Namespace }
+func (meta *ObjectMeta) SetNamespace(namespace string)       { meta.Namespace = namespace }
+func (meta *ObjectMeta) GetName() string                     { return meta.Name }
+func (meta *ObjectMeta) SetName(name string)                 { meta.Name = name }
+func (meta *ObjectMeta) GetGenerateName() string             { return meta.GenerateName }
+func (meta *ObjectMeta) SetGenerateName(generateName string) { meta.GenerateName = generateName }
+func (meta *ObjectMeta) GetUID() types.UID                   { return meta.UID }
+func (meta *ObjectMeta) SetUID(uid types.UID)                { meta.UID = uid }
+func (meta *ObjectMeta) GetResourceVersion() string          { return meta.ResourceVersion }
+func (meta *ObjectMeta) SetResourceVersion(version string)   { meta.ResourceVersion = version }
+func (meta *ObjectMeta) GetSelfLink() string                 { return meta.SelfLink }
+func (meta *ObjectMeta) SetSelfLink(selfLink string)         { meta.SelfLink = selfLink }
+func (meta *ObjectMeta) GetCreationTimestamp() metav1.Time   { return meta.CreationTimestamp }
 func (meta *ObjectMeta) SetCreationTimestamp(creationTimestamp metav1.Time) {
 	meta.CreationTimestamp = creationTimestamp
 }

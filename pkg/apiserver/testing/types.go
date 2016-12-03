@@ -24,7 +24,7 @@ import (
 
 type Simple struct {
 	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
+	api.ObjectMeta  `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional
@@ -35,7 +35,7 @@ func (obj *Simple) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleRoot struct {
 	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
+	api.ObjectMeta  `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional
@@ -46,9 +46,9 @@ func (obj *SimpleRoot) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta 
 
 type SimpleGetOptions struct {
 	metav1.TypeMeta `json:",inline"`
-	Param1               string `json:"param1"`
-	Param2               string `json:"param2"`
-	Path                 string `json:"atAPath"`
+	Param1          string `json:"param1"`
+	Param2          string `json:"param2"`
+	Path            string `json:"atAPath"`
 }
 
 func (SimpleGetOptions) SwaggerDoc() map[string]string {

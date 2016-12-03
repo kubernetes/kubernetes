@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
