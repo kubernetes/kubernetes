@@ -1348,7 +1348,7 @@
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
-			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
+			"Rev": "44d81051d367757e1c7c6a5a86423ece9afcf63c"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
