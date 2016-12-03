@@ -485,8 +485,6 @@ func (c *Config) MaybeGenerateServingCerts(alternateIPs ...net.IP) error {
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {
-	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
-
 	generic := func(handler http.Handler) http.Handler {
 		handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 		handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
@@ -497,10 +495,10 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 		return handler
 	}
 	audit := func(handler http.Handler) http.Handler {
-		return apiserverfilters.WithAudit(handler, attributeGetter, c.AuditWriter)
+		return apiserverfilters.WithAudit(handler, c.RequestContextMapper, c.AuditWriter)
 	}
 	protect := func(handler http.Handler) http.Handler {
-		handler = apiserverfilters.WithAuthorization(handler, attributeGetter, c.Authorizer)
+		handler = apiserverfilters.WithAuthorization(handler, c.RequestContextMapper, c.Authorizer)
 		handler = apiserverfilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 		handler = audit(handler) // before impersonation to read original user
 		handler = authhandlers.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))

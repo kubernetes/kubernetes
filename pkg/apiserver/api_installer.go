@@ -752,7 +752,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		default:
 			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
-		// Note: update GetAttribs() when adding a custom handler.
+		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
 	return &apiResource, nil
 }
