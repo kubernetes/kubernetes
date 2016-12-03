@@ -36,3 +36,11 @@ go_test(
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
     ],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = ["controller_policy_test.go"],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = ["//pkg/util/sets:go_default_library"],
+)
