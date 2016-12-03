@@ -70,7 +70,7 @@ func TestIgnoreClusterName(t *testing.T) {
 	assert.Empty(t, nsNew.ClusterName)
 
 	nsEtcd := v1.Namespace{}
-	err = etcdStorage.Get(ctx, ns.Name, &nsEtcd, false)
+	err = etcdStorage.Get(ctx, ns.Name, "", &nsEtcd, false)
 	assert.Nil(t, err)
 	assert.Equal(t, ns.Name, nsEtcd.Name)
 	assert.Empty(t, nsEtcd.ClusterName)
@@ -81,7 +81,7 @@ func TestIgnoreClusterName(t *testing.T) {
 	assert.Empty(t, nsNew.ClusterName)
 
 	nsEtcd = v1.Namespace{}
-	err = etcdStorage.Get(ctx, ns.Name, &nsEtcd, false)
+	err = etcdStorage.Get(ctx, ns.Name, "", &nsEtcd, false)
 	assert.Nil(t, err)
 	assert.Equal(t, ns.Name, nsEtcd.Name)
 	assert.Empty(t, nsEtcd.ClusterName)

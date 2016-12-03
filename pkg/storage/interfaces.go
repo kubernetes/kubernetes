@@ -124,7 +124,9 @@ type Interface interface {
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
 	// Treats empty responses and nil response nodes exactly like a not found error.
-	Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// be have at least 'resourceVersion'.
+	Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).

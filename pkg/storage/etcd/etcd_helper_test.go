@@ -240,7 +240,7 @@ func TestGet(t *testing.T) {
 		t.Errorf("Unexpected error %#v", err)
 	}
 	expect = got
-	if err := helper.Get(context.TODO(), key, &got, false); err != nil {
+	if err := helper.Get(context.TODO(), key, "", &got, false); err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
 	if !reflect.DeepEqual(got, expect) {
@@ -256,7 +256,7 @@ func TestGetNotFoundErr(t *testing.T) {
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
 
 	var got api.Pod
-	err := helper.Get(context.TODO(), boguskey, &got, false)
+	err := helper.Get(context.TODO(), boguskey, "", &got, false)
 	if !storage.IsNotFound(err) {
 		t.Errorf("Unexpected reponse on key=%v, err=%v", key, err)
 	}
@@ -276,7 +276,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	err = helper.Get(context.TODO(), "/some/key", returnedObj, false)
+	err = helper.Get(context.TODO(), "/some/key", "", returnedObj, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -332,7 +332,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 	}
 
 	objCheck := &storagetesting.TestResource{}
-	err = helper.Get(context.TODO(), key, objCheck, false)
+	err = helper.Get(context.TODO(), key, "", objCheck, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -442,7 +442,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 	wgDone.Wait()
 
 	stored := &storagetesting.TestResource{}
-	err := helper.Get(context.TODO(), key, stored, false)
+	err := helper.Get(context.TODO(), key, "", stored, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", stored)
 	}
@@ -562,7 +562,7 @@ func TestDeleteWithRetry(t *testing.T) {
 	if fake.getCount != expectedRetries {
 		t.Errorf("Expect %d retries, got %d", expectedRetries, fake.getCount)
 	}
-	err = helper.Get(context.TODO(), "/some/key", obj, false)
+	err = helper.Get(context.TODO(), "/some/key", "", obj, false)
 	if !storage.IsNotFound(err) {
 		t.Errorf("Expect an NotFound error, got %v", err)
 	}
