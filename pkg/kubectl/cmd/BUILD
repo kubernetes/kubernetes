@@ -120,6 +120,7 @@ go_library(
         "//vendor:github.com/jonboulle/clockwork",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
+        "//vendor:github.com/spf13/pflag",
     ],
 )
 
