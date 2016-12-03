@@ -62,7 +62,7 @@ spec:
         - --domain=${DNS_DOMAIN}.
         - --dns-port=10053
         - --config-map=kube-dns
-        - --v=0
+        - --v=2
         env:
           - name: PROMETHEUS_PORT
             value: "10055"
