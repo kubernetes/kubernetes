@@ -53,6 +53,7 @@ go_library(
         "federation-replicaset.go",
         "federation-util.go",
         "federation-util-14.go",
+        "firewall.go",
         "garbage_collector.go",
         "generated_clientset.go",
         "gke_local_ssd.go",
