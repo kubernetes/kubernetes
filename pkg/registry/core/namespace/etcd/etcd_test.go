@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
@@ -141,7 +140,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	key := etcdtest.AddPrefix("namespaces/foo")
+	key := "namespaces/foo"
 	ctx := api.NewContext()
 	now := unversioned.Now()
 	namespace := &api.Namespace{
@@ -166,7 +165,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	key := etcdtest.AddPrefix("namespaces/foo")
+	key := "namespaces/foo"
 	ctx := api.NewContext()
 	now := unversioned.Now()
 	namespace := &api.Namespace{

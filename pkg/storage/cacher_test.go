@@ -84,7 +84,7 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
 		}
 		return newObj.(*api.Pod), nil, nil
 	}
-	key := etcdtest.AddPrefix("pods/" + obj.Namespace + "/" + obj.Name)
+	key := "pods/" + obj.Namespace + "/" + obj.Name
 	if err := s.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, old == nil, nil, updateFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestList(t *testing.T) {
 	updatePod(t, etcdStorage, podFooNS2, nil)
 
 	deleted := api.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/bar"), &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -361,7 +361,7 @@ func TestFiltering(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podFooPrime, fooUnfiltered)
 
 	deleted := api.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/foo"), &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
