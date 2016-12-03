@@ -81,9 +81,7 @@ spec:
         - --domain=$DNS_DOMAIN.
         - --dns-port=10053
         - --config-map=kube-dns
-        # This should be set to v=2 only after the new image (cut from 1.5) has
-        # been released, otherwise we will flood the logs.
-        - --v=0
+        - --v=2
         env:
         - name: PROMETHEUS_PORT
           value: "10055"
