@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -199,7 +198,7 @@ func TestScaleGet(t *testing.T) {
 	defer storage.Deployment.Store.DestroyFunc()
 	var deployment extensions.Deployment
 	ctx := api.WithNamespace(api.NewContext(), namespace)
-	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
+	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
@@ -236,7 +235,7 @@ func TestScaleUpdate(t *testing.T) {
 	defer storage.Deployment.Store.DestroyFunc()
 	var deployment extensions.Deployment
 	ctx := api.WithNamespace(api.NewContext(), namespace)
-	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
+	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
@@ -273,7 +272,7 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
 	ctx := api.WithNamespace(api.NewContext(), namespace)
-	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
+	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -337,8 +336,6 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 	for k, test := range testCases {
 		storage, server := newStorage(t)
 		rollbackStorage := storage.Rollback
-		key, _ := storage.Deployment.KeyFunc(ctx, name)
-		key = etcdtest.AddPrefix(key)
 
 		if _, err := storage.Deployment.Create(ctx, validNewDeployment()); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
@@ -368,8 +365,6 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 	rollbackStorage := storage.Rollback
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 
-	key, _ := storage.Deployment.KeyFunc(ctx, name)
-	key = etcdtest.AddPrefix(key)
 	_, err := rollbackStorage.Create(ctx, &extensions.DeploymentRollback{
 		Name:               name,
 		UpdatedAnnotations: map[string]string{},
