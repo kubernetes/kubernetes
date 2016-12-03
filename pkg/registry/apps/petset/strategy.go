@@ -102,19 +102,22 @@ func StatefulSetToSelectableFields(statefulSet *apps.StatefulSet) fields.Set {
 	return generic.ObjectMetaFieldsSet(&statefulSet.ObjectMeta, true)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	statefulSet, ok := obj.(*apps.StatefulSet)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not an StatefulSet.")
+	}
+	return labels.Set(statefulSet.ObjectMeta.Labels), StatefulSetToSelectableFields(statefulSet), nil
+}
+
 // MatchStatefulSet is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
 func MatchStatefulSet(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			statefulSet, ok := obj.(*apps.StatefulSet)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not an StatefulSet.")
-			}
-			return labels.Set(statefulSet.ObjectMeta.Labels), StatefulSetToSelectableFields(statefulSet), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 
