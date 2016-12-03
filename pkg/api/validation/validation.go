@@ -34,6 +34,7 @@ import (
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
 	"k8s.io/kubernetes/pkg/api/v1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -347,6 +348,15 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	if !api.Semantic.DeepEqual(oldVal, newVal) {
 		allErrs = append(allErrs, field.Invalid(fldPath, newVal, fieldImmutableErrorMsg))
+	}
+	return allErrs
+}
+
+func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if oldVal != newVal {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("annotations", annotation), newVal, fieldImmutableErrorMsg))
 	}
 	return allErrs
 }
@@ -1262,11 +1272,15 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 		oldPvc.Spec.VolumeName = newPvc.Spec.VolumeName
 		defer func() { oldPvc.Spec.VolumeName = "" }()
 	}
-	// changes to Spec are not allowed, but updates to label/annotations are OK.
+	// changes to Spec are not allowed, but updates to label/and some annotations are OK.
 	// no-op updates pass validation.
 	if !api.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation"))
 	}
+
+	// storageclass annotation should be immutable after creation
+	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], oldPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], storageutil.StorageClassAnnotation, field.NewPath("metadata"))...)
+
 	newPvc.Status = oldPvc.Status
 	return allErrs
 }
