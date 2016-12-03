@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -157,7 +157,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
 	}
 
-	selector, err := unversioned.LabelSelectorAsSelector(&unversioned.LabelSelector{MatchLabels: scale.Status.Selector})
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: scale.Status.Selector})
 	if err != nil {
 		errMsg := fmt.Sprintf("couldn't convert selector string to a corresponding selector object: %v", err)
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
@@ -220,7 +220,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 			return 0, "", "", time.Time{}, fmt.Errorf("selector is required")
 		}
 
-		selector, err := unversioned.LabelSelectorAsSelector(&unversioned.LabelSelector{MatchLabels: scale.Status.Selector})
+		selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: scale.Status.Selector})
 		if err != nil {
 			errMsg := fmt.Sprintf("couldn't convert selector string to a corresponding selector object: %v", err)
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
@@ -426,7 +426,7 @@ func (a *HorizontalController) updateStatus(hpa *autoscaling.HorizontalPodAutosc
 	}
 
 	if rescale {
-		now := unversioned.NewTime(time.Now())
+		now := metav1.NewTime(time.Now())
 		hpa.Status.LastScaleTime = &now
 	}
 

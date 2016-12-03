@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
@@ -502,7 +502,7 @@ func TestStoreCustomExport(t *testing.T) {
 		t.Errorf("Unexpected error updating podA")
 	}
 
-	obj, err := registry.Export(testContext, podA.Name, unversioned.ExportOptions{})
+	obj, err := registry.Export(testContext, podA.Name, metav1.ExportOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -546,7 +546,7 @@ func TestStoreBasicExport(t *testing.T) {
 		t.Errorf("Unexpected error updating podA")
 	}
 
-	obj, err := registry.Export(testContext, podA.Name, unversioned.ExportOptions{})
+	obj, err := registry.Export(testContext, podA.Name, metav1.ExportOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -623,7 +623,7 @@ func TestStoreDelete(t *testing.T) {
 // in prior operation, but the pod remains with deletion timestamp
 // and grace period set to 0.
 func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
-	deletionTimestamp := unversioned.NewTime(time.Now())
+	deletionTimestamp := metav1.NewTime(time.Now())
 	deletionGracePeriodSeconds := int64(0)
 	initialGeneration := int64(1)
 	pod := &api.Pod{

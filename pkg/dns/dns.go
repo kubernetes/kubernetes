@@ -27,7 +27,7 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"github.com/miekg/dns"
 	skymsg "github.com/skynetservices/skydns/msg"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
@@ -861,8 +861,8 @@ func (kd *KubeDNS) getClusterZoneAndRegion() (string, string, error) {
 		// Select a node (arbitrarily the first node) that has
 		// `LabelZoneFailureDomain` and `LabelZoneRegion` set.
 		for _, nodeItem := range nodeList.Items {
-			_, zfound := nodeItem.Labels[unversioned.LabelZoneFailureDomain]
-			_, rfound := nodeItem.Labels[unversioned.LabelZoneRegion]
+			_, zfound := nodeItem.Labels[metav1.LabelZoneFailureDomain]
+			_, rfound := nodeItem.Labels[metav1.LabelZoneRegion]
 			if !zfound || !rfound {
 				continue
 			}
@@ -880,11 +880,11 @@ func (kd *KubeDNS) getClusterZoneAndRegion() (string, string, error) {
 		return "", "", fmt.Errorf("Could not find any nodes")
 	}
 
-	zone, ok := node.Labels[unversioned.LabelZoneFailureDomain]
+	zone, ok := node.Labels[metav1.LabelZoneFailureDomain]
 	if !ok || zone == "" {
 		return "", "", fmt.Errorf("unknown cluster zone")
 	}
-	region, ok := node.Labels[unversioned.LabelZoneRegion]
+	region, ok := node.Labels[metav1.LabelZoneRegion]
 	if !ok || region == "" {
 		return "", "", fmt.Errorf("unknown cluster region")
 	}

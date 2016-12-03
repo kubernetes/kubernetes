@@ -35,7 +35,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -222,7 +222,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 				}
 			}
 			// remove all pods...
-			selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+			selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 			options := v1.ListOptions{LabelSelector: selector.String()}
 			podList, err := pc.ListPods(job.Namespace, options)
 			if err != nil {
@@ -284,7 +284,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	} else {
 		sj.Status.Active = append(sj.Status.Active, *ref)
 	}
-	sj.Status.LastScheduleTime = &unversioned.Time{Time: scheduledTime}
+	sj.Status.LastScheduleTime = &metav1.Time{Time: scheduledTime}
 	if _, err := sjc.UpdateStatus(&sj); err != nil {
 		glog.Infof("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
 	}

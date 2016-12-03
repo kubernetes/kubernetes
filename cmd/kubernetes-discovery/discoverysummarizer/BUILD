@@ -19,6 +19,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubernetes-discovery/discoverysummarizer/apis/config/v1alpha1:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
     ],
 )

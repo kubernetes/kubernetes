@@ -25,7 +25,7 @@ import (
 	"github.com/google/gofuzz"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -117,7 +117,7 @@ func TestDefaulting(t *testing.T) {
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
 	f.Funcs(
 		func(s *runtime.RawExtension, c fuzz.Continue) {},
-		func(s *unversioned.LabelSelector, c fuzz.Continue) {
+		func(s *metav1.LabelSelector, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			s.MatchExpressions = nil // need to fuzz this specially
 		},

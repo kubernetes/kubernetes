@@ -26,7 +26,7 @@ import (
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
 	pkg4_resource "k8s.io/kubernetes/pkg/api/resource"
-	pkg1_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	pkg1_unversioned "k8s.io/kubernetes/pkg/apis/meta/v1"
 	pkg2_v1 "k8s.io/kubernetes/pkg/api/v1"
 	pkg3_types "k8s.io/kubernetes/pkg/types"
 	pkg5_intstr "k8s.io/kubernetes/pkg/util/intstr"

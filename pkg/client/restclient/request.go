@@ -33,7 +33,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	pathvalidation "k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/client/metrics"
@@ -405,7 +405,7 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 		r.err = err
 		return r
 	}
-	return r.setParam(unversioned.FieldSelectorQueryParam(r.content.GroupVersion.String()), s2.String())
+	return r.setParam(metav1.FieldSelectorQueryParam(r.content.GroupVersion.String()), s2.String())
 }
 
 // LabelsSelectorParam adds the given selector as a query parameter
@@ -419,7 +419,7 @@ func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(unversioned.LabelSelectorQueryParam(r.content.GroupVersion.String()), s.String())
+	return r.setParam(metav1.LabelSelectorQueryParam(r.content.GroupVersion.String()), s.String())
 }
 
 // UintParam creates a query parameter with the given value.
@@ -454,14 +454,14 @@ func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCod
 		for _, value := range v {
 			// TODO: Move it to setParam method, once we get rid of
 			// FieldSelectorParam & LabelSelectorParam methods.
-			if k == unversioned.LabelSelectorQueryParam(r.content.GroupVersion.String()) && value == "" {
+			if k == metav1.LabelSelectorQueryParam(r.content.GroupVersion.String()) && value == "" {
 				// Don't set an empty selector for backward compatibility.
 				// Since there is no way to get the difference between empty
 				// and unspecified string, we don't set it to avoid having
 				// labelSelector= param in every request.
 				continue
 			}
-			if k == unversioned.FieldSelectorQueryParam(r.content.GroupVersion.String()) {
+			if k == metav1.FieldSelectorQueryParam(r.content.GroupVersion.String()) {
 				if len(value) == 0 {
 					// Don't set an empty selector for backward compatibility.
 					// Since there is no way to get the difference between empty
@@ -1083,9 +1083,9 @@ func (r Result) Get() (runtime.Object, error) {
 		return nil, err
 	}
 	switch t := out.(type) {
-	case *unversioned.Status:
+	case *metav1.Status:
 		// any status besides StatusSuccess is considered an error.
-		if t.Status != unversioned.StatusSuccess {
+		if t.Status != metav1.StatusSuccess {
 			return nil, errors.FromObject(t)
 		}
 	}
@@ -1118,9 +1118,9 @@ func (r Result) Into(obj runtime.Object) error {
 	// if a different object is returned, see if it is Status and avoid double decoding
 	// the object.
 	switch t := out.(type) {
-	case *unversioned.Status:
+	case *metav1.Status:
 		// any status besides StatusSuccess is considered an error.
-		if t.Status != unversioned.StatusSuccess {
+		if t.Status != metav1.StatusSuccess {
 			return errors.FromObject(t)
 		}
 	}
@@ -1153,9 +1153,9 @@ func (r Result) Error() error {
 		return r.err
 	}
 	switch t := out.(type) {
-	case *unversioned.Status:
+	case *metav1.Status:
 		// because we default the kind, we *must* check for StatusFailure
-		if t.Status == unversioned.StatusFailure {
+		if t.Status == metav1.StatusFailure {
 			return errors.FromObject(t)
 		}
 	}

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -116,7 +116,7 @@ func NewDaemonSet(daemonName string, podSpec v1.PodSpec) *extensions.DaemonSet {
 	return &extensions.DaemonSet{
 		ObjectMeta: v1.ObjectMeta{Name: daemonName},
 		Spec: extensions.DaemonSetSpec{
-			Selector: &unversionedapi.LabelSelector{MatchLabels: l},
+			Selector: &metav1.LabelSelector{MatchLabels: l},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{Labels: l},
 				Spec:       podSpec,
@@ -142,7 +142,7 @@ func NewDeployment(deploymentName string, replicas int32, podSpec v1.PodSpec) *e
 		ObjectMeta: v1.ObjectMeta{Name: deploymentName},
 		Spec: extensions.DeploymentSpec{
 			Replicas: &replicas,
-			Selector: &unversionedapi.LabelSelector{MatchLabels: l},
+			Selector: &metav1.LabelSelector{MatchLabels: l},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{Labels: l},
 				Spec:       podSpec,
@@ -171,7 +171,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 		return err
 	}
 
-	n.ObjectMeta.Labels[unversionedapi.NodeLabelKubeadmAlphaRole] = unversionedapi.NodeLabelRoleMaster
+	n.ObjectMeta.Labels[metav1.NodeLabelKubeadmAlphaRole] = metav1.NodeLabelRoleMaster
 
 	if !schedulable {
 		taintsAnnotation, _ := json.Marshal([]v1.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
@@ -225,9 +225,9 @@ func SetNodeAffinity(meta *v1.ObjectMeta, expr ...v1.NodeSelectorRequirement) {
 // MasterNodeAffinity returns v1.NodeSelectorRequirement to be used with SetNodeAffinity to set affinity to master node
 func MasterNodeAffinity() v1.NodeSelectorRequirement {
 	return v1.NodeSelectorRequirement{
-		Key:      unversionedapi.NodeLabelKubeadmAlphaRole,
+		Key:      metav1.NodeLabelKubeadmAlphaRole,
 		Operator: v1.NodeSelectorOpIn,
-		Values:   []string{unversionedapi.NodeLabelRoleMaster},
+		Values:   []string{metav1.NodeLabelRoleMaster},
 	}
 }
 

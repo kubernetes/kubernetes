@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -145,7 +145,7 @@ func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.O
 	}
 
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
-	out = &unversioned.Status{Status: unversioned.StatusSuccess}
+	out = &metav1.Status{Status: metav1.StatusSuccess}
 	return
 }
 

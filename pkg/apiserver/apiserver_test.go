@@ -38,7 +38,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apiserver/filters"
 	"k8s.io/kubernetes/pkg/apiserver/request"
@@ -123,7 +123,7 @@ func newMapper() *meta.DefaultRESTMapper {
 func addGrouplessTypes() {
 	type ListOptions struct {
 		Object               runtime.Object
-		unversioned.TypeMeta `json:",inline"`
+		metav1.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`
 		Watch                bool   `json:"watch,omitempty"`
@@ -131,17 +131,17 @@ func addGrouplessTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &unversioned.ExportOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{}, &unversioned.ExportOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{}, &metav1.ExportOptions{},
 		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 }
 
 func addTestTypes() {
 	type ListOptions struct {
 		Object               runtime.Object
-		unversioned.TypeMeta `json:",inline"`
+		metav1.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`
 		Watch                bool   `json:"watch,omitempty"`
@@ -149,27 +149,27 @@ func addTestTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &unversioned.ExportOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &v1.Pod{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{}, &unversioned.ExportOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{}, &metav1.ExportOptions{},
 		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion, &api.Pod{})
 	// Register SimpleXGSubresource in both testGroupVersion and testGroup2Version, and also their
 	// their corresponding internal versions, to verify that the desired group version object is
 	// served in the tests.
-	api.Scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{}, &unversioned.ExportOptions{})
-	api.Scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{}, &unversioned.ExportOptions{})
+	api.Scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
+	api.Scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
 	versioned.AddToGroupVersion(api.Scheme, testGroupVersion)
 }
 
 func addNewTestTypes() {
 	type ListOptions struct {
 		Object               runtime.Object
-		unversioned.TypeMeta `json:",inline"`
+		metav1.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`
 		Watch                bool   `json:"watch,omitempty"`
@@ -177,7 +177,7 @@ func addNewTestTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(newGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &unversioned.ExportOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
 		&v1.Pod{},
 	)
@@ -382,7 +382,7 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	obj, err := storage.Get(ctx, name)
 	if err != nil {
 		return nil, err
@@ -467,7 +467,7 @@ func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string, options *ap
 	if err := storage.errors["delete"]; err != nil {
 		return nil, err
 	}
-	var obj runtime.Object = &unversioned.Status{Status: unversioned.StatusSuccess}
+	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
 	var err error
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(&apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: id}})
@@ -1242,7 +1242,7 @@ func TestExport(t *testing.T) {
 		item: apiservertesting.Simple{
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion:   "1234",
-				CreationTimestamp: unversioned.NewTime(time.Unix(10, 10)),
+				CreationTimestamp: metav1.NewTime(time.Unix(10, 10)),
 			},
 			Other: "foo",
 		},
@@ -1796,7 +1796,7 @@ func TestConnectResponderError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if obj.(*unversioned.Status).Code != http.StatusForbidden {
+	if obj.(*metav1.Status).Code != http.StatusForbidden {
 		t.Errorf("Unexpected response: %#v", obj)
 	}
 }
@@ -3035,7 +3035,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	}
 }
 
-func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *unversioned.Status {
+func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
 	client := http.Client{}
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	if err != nil {
@@ -3047,7 +3047,7 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *u
 		t.Fatalf("unexpected error on %s %s: %v", method, url, err)
 		return nil
 	}
-	var status unversioned.Status
+	var status metav1.Status
 	if body, err := extractBody(response, &status); err != nil {
 		t.Fatalf("unexpected error on %s %s: %v\nbody:\n%s", method, url, err, body)
 		return nil
@@ -3069,7 +3069,7 @@ func TestDelayReturnsError(t *testing.T) {
 	defer server.Close()
 
 	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
-	if status.Status != unversioned.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != unversioned.StatusReasonAlreadyExists {
+	if status.Status != metav1.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != metav1.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
 }
@@ -3091,7 +3091,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	// still be an error object.  This seems ok, the alternative is to validate the object before
 	// encoding, but this really should never happen, so it's wasted compute for every API request.
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusOK)
-	if status.Reason != unversioned.StatusReasonUnknown {
+	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
 	if !strings.Contains(status.Message, "no kind is registered for the type apiserver.UnregisteredAPIObject") {
@@ -3145,7 +3145,7 @@ func TestCreateTimeout(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
-	if itemOut.Status != unversioned.StatusFailure || itemOut.Reason != unversioned.StatusReasonTimeout {
+	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
 }
@@ -3249,7 +3249,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 // SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
 // same group as its parent resource.
 type SimpleXGSubresource struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata"`
 	SubresourceInfo      string            `json:"subresourceInfo,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty"`

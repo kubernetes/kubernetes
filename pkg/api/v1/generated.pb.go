@@ -190,7 +190,7 @@ import fmt "fmt"
 import math "math"
 
 import k8s_io_kubernetes_pkg_api_resource "k8s.io/kubernetes/pkg/api/resource"
-import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/apis/meta/v1"
 import k8s_io_kubernetes_pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 
 import k8s_io_kubernetes_pkg_types "k8s.io/kubernetes/pkg/types"

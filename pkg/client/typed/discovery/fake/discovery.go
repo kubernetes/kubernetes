@@ -18,7 +18,7 @@ package fake
 
 import (
 	"github.com/emicklei/go-restful/swagger"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -30,7 +30,7 @@ type FakeDiscovery struct {
 	*core.Fake
 }
 
-func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	action := core.ActionImpl{
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "resource"},
@@ -39,7 +39,7 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*un
 	return c.Resources[groupVersion], nil
 }
 
-func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (c *FakeDiscovery) ServerResources() (map[string]*metav1.APIResourceList, error) {
 	action := core.ActionImpl{
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "resource"},
@@ -56,7 +56,7 @@ func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]schema.GroupVers
 	return nil, nil
 }
 
-func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
+func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 	return nil, nil
 }
 

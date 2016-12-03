@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -47,7 +47,7 @@ type dynamicLister struct {
 	path string
 }
 
-func (d dynamicLister) ListAPIResources() []unversioned.APIResource {
+func (d dynamicLister) ListAPIResources() []metav1.APIResource {
 	return d.m.getExistingThirdPartyResources(d.path)
 }
 
@@ -89,7 +89,7 @@ func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPISe
 type thirdPartyEntry struct {
 	// Map from plural resource name to entry
 	storage map[string]*thirdpartyresourcedataetcd.REST
-	group   unversioned.APIGroup
+	group   metav1.APIGroup
 }
 
 // HasThirdPartyResource returns true if a particular third party resource currently installed.
@@ -194,14 +194,14 @@ func (m *ThirdPartyResourceServer) ListThirdPartyResources() []string {
 	return result
 }
 
-func (m *ThirdPartyResourceServer) getExistingThirdPartyResources(path string) []unversioned.APIResource {
-	result := []unversioned.APIResource{}
+func (m *ThirdPartyResourceServer) getExistingThirdPartyResources(path string) []metav1.APIResource {
+	result := []metav1.APIResource{}
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
 	entry := m.thirdPartyResources[path]
 	if entry != nil {
 		for key, obj := range entry.storage {
-			result = append(result, unversioned.APIResource{
+			result = append(result, metav1.APIResource{
 				Name:       key,
 				Namespaced: true,
 				Kind:       obj.Kind(),
@@ -218,7 +218,7 @@ func (m *ThirdPartyResourceServer) hasThirdPartyGroupStorage(path string) bool {
 	return found
 }
 
-func (m *ThirdPartyResourceServer) addThirdPartyResourceStorage(path, resource string, storage *thirdpartyresourcedataetcd.REST, apiGroup unversioned.APIGroup) {
+func (m *ThirdPartyResourceServer) addThirdPartyResourceStorage(path, resource string, storage *thirdpartyresourcedataetcd.REST, apiGroup metav1.APIGroup) {
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
 	entry, found := m.thirdPartyResources[path]
@@ -257,13 +257,13 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	})
 	path := extensionsrest.MakeThirdPartyPath(group)
 
-	groupVersion := unversioned.GroupVersionForDiscovery{
+	groupVersion := metav1.GroupVersionForDiscovery{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
 	}
-	apiGroup := unversioned.APIGroup{
+	apiGroup := metav1.APIGroup{
 		Name:             group,
-		Versions:         []unversioned.GroupVersionForDiscovery{groupVersion},
+		Versions:         []metav1.GroupVersionForDiscovery{groupVersion},
 		PreferredVersion: groupVersion,
 	}
 

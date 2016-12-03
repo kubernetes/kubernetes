@@ -24,10 +24,10 @@ go_library(
     deps = [
         "//pkg/api/errors:go_default_library",
         "//pkg/api/resource:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1:go_default_library",

@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/third_party/forked/golang/netutil"
 )
@@ -251,8 +251,8 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 			responseError = "unable to read error from server response"
 		} else {
 			// TODO: I don't belong here, I should be abstracted from this class
-			if obj, _, err := api.Codecs.UniversalDecoder().Decode(responseErrorBytes, nil, &unversioned.Status{}); err == nil {
-				if status, ok := obj.(*unversioned.Status); ok {
+			if obj, _, err := api.Codecs.UniversalDecoder().Decode(responseErrorBytes, nil, &metav1.Status{}); err == nil {
+				if status, ok := obj.(*metav1.Status); ok {
 					return nil, &apierrors.StatusError{ErrStatus: *status}
 				}
 			}

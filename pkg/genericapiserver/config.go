@@ -37,7 +37,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
@@ -435,7 +435,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		InsecureServingInfo: c.InsecureServingInfo,
 		ExternalAddress:     c.ExternalAddress,
 
-		apiGroupsForDiscovery: map[string]unversioned.APIGroup{},
+		apiGroupsForDiscovery: map[string]metav1.APIGroup{},
 
 		enableOpenAPISupport: c.EnableOpenAPISupport,
 		openAPIConfig:        c.OpenAPIConfig,

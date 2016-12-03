@@ -23,7 +23,7 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
 
@@ -46,7 +46,7 @@ type NodeTimeSeries struct {
 }
 
 // logDensityTimeSeries logs the time series data of operation and resource usage
-func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]unversioned.Time, testInfo map[string]string) {
+func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1.Time, testInfo map[string]string) {
 	timeSeries := &NodeTimeSeries{
 		Labels:  testInfo,
 		Version: currentDataVersion,
@@ -69,7 +69,7 @@ func (a int64arr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a int64arr) Less(i, j int) bool { return a[i] < a[j] }
 
 // getCumulatedPodTimeSeries gets the cumulative pod number time series.
-func getCumulatedPodTimeSeries(timePerPod map[string]unversioned.Time) []int64 {
+func getCumulatedPodTimeSeries(timePerPod map[string]metav1.Time) []int64 {
 	timeSeries := make(int64arr, 0)
 	for _, ts := range timePerPod {
 		timeSeries = append(timeSeries, ts.Time.UnixNano())

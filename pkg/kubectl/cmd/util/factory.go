@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -617,7 +617,7 @@ func (f *factory) LogsForObject(object, options runtime.Object) (*restclient.Req
 		if !ok {
 			return nil, errors.New("provided options object is not a PodLogOptions")
 		}
-		selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -806,7 +806,7 @@ func (f *factory) AttachablePodForObject(object runtime.Object) (*api.Pod, error
 		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 		return pod, err
 	case *extensions.Deployment:
-		selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -814,7 +814,7 @@ func (f *factory) AttachablePodForObject(object runtime.Object) (*api.Pod, error
 		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 		return pod, err
 	case *batch.Job:
-		selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}

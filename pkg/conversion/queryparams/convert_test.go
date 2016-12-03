@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
@@ -70,8 +70,8 @@ type childStructs struct {
 	Follow       bool              `json:"follow,omitempty"`
 	Previous     bool              `json:"previous,omitempty"`
 	SinceSeconds *int64            `json:"sinceSeconds,omitempty"`
-	SinceTime    *unversioned.Time `json:"sinceTime,omitempty"`
-	EmptyTime    *unversioned.Time `json:"emptyTime"`
+	SinceTime    *metav1.Time `json:"sinceTime,omitempty"`
+	EmptyTime    *metav1.Time `json:"emptyTime"`
 }
 
 func (obj *childStructs) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
@@ -98,7 +98,7 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 
 func TestConvert(t *testing.T) {
 	sinceSeconds := int64(123)
-	sinceTime := unversioned.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC)
+	sinceTime := metav1.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC)
 
 	tests := []struct {
 		input    interface{}

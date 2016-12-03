@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -271,7 +271,7 @@ bar
 					FieldSpec: "{.apiVersion}",
 				},
 			},
-			obj: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}, TypeMeta: unversioned.TypeMeta{APIVersion: "baz"}},
+			obj: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
 			expectedOutput: `NAME      API_VERSION
 foo       baz
 `,

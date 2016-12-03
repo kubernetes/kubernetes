@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	_ "k8s.io/kubernetes/pkg/api/install" // To register api.Pod used in tests below
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	k8sruntime "k8s.io/kubernetes/pkg/runtime"
@@ -442,9 +442,9 @@ func TestUpdateExpiredEvent(t *testing.T) {
 	sink := &testEventSink{
 		OnPatch: func(*v1.Event, []byte) (*v1.Event, error) {
 			return nil, &errors.StatusError{
-				ErrStatus: unversioned.Status{
+				ErrStatus: metav1.Status{
 					Code:   http.StatusNotFound,
-					Reason: unversioned.StatusReasonNotFound,
+					Reason: metav1.StatusReasonNotFound,
 				}}
 		},
 		OnCreate: func(event *v1.Event) (*v1.Event, error) {

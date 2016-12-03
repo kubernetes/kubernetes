@@ -18,20 +18,20 @@ package testgroup
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // +genclient=true
 
 type TestType struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata,omitempty"`
 	Status               TestTypeStatus `json:"status,omitempty"`
 }
 
 type TestTypeList struct {
-	unversioned.TypeMeta `json:",inline"`
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []TestType `json:"items"`
 }

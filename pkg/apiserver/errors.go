@@ -21,29 +21,29 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
-// statusError is an object that can be converted into an unversioned.Status
+// statusError is an object that can be converted into an metav1.Status
 type statusError interface {
-	Status() unversioned.Status
+	Status() metav1.Status
 }
 
-// errToAPIStatus converts an error to an unversioned.Status object.
-func errToAPIStatus(err error) *unversioned.Status {
+// errToAPIStatus converts an error to an metav1.Status object.
+func errToAPIStatus(err error) *metav1.Status {
 	switch t := err.(type) {
 	case statusError:
 		status := t.Status()
 		if len(status.Status) == 0 {
-			status.Status = unversioned.StatusFailure
+			status.Status = metav1.StatusFailure
 		}
 		if status.Code == 0 {
 			switch status.Status {
-			case unversioned.StatusSuccess:
+			case metav1.StatusSuccess:
 				status.Code = http.StatusOK
-			case unversioned.StatusFailure:
+			case metav1.StatusFailure:
 				status.Code = http.StatusInternalServerError
 			}
 		}
@@ -60,11 +60,11 @@ func errToAPIStatus(err error) *unversioned.Status {
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
-		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an unversioned.Status: %v", err))
-		return &unversioned.Status{
-			Status:  unversioned.StatusFailure,
+		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %v", err))
+		return &metav1.Status{
+			Status:  metav1.StatusFailure,
 			Code:    int32(status),
-			Reason:  unversioned.StatusReasonUnknown,
+			Reason:  metav1.StatusReasonUnknown,
 			Message: err.Error(),
 		}
 	}
@@ -112,11 +112,11 @@ func (e errNotAcceptable) Error() string {
 	return fmt.Sprintf("only the following media types are accepted: %v", strings.Join(e.accepted, ", "))
 }
 
-func (e errNotAcceptable) Status() unversioned.Status {
-	return unversioned.Status{
-		Status:  unversioned.StatusFailure,
+func (e errNotAcceptable) Status() metav1.Status {
+	return metav1.Status{
+		Status:  metav1.StatusFailure,
 		Code:    http.StatusNotAcceptable,
-		Reason:  unversioned.StatusReason("NotAcceptable"),
+		Reason:  metav1.StatusReason("NotAcceptable"),
 		Message: e.Error(),
 	}
 }
@@ -131,11 +131,11 @@ func (e errUnsupportedMediaType) Error() string {
 	return fmt.Sprintf("the body of the request was in an unknown format - accepted media types include: %v", strings.Join(e.accepted, ", "))
 }
 
-func (e errUnsupportedMediaType) Status() unversioned.Status {
-	return unversioned.Status{
-		Status:  unversioned.StatusFailure,
+func (e errUnsupportedMediaType) Status() metav1.Status {
+	return metav1.Status{
+		Status:  metav1.StatusFailure,
 		Code:    http.StatusUnsupportedMediaType,
-		Reason:  unversioned.StatusReason("UnsupportedMediaType"),
+		Reason:  metav1.StatusReason("UnsupportedMediaType"),
 		Message: e.Error(),
 	}
 }

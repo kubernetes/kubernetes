@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -61,7 +61,7 @@ func getKey(rc *v1.ReplicationController, t *testing.T) string {
 
 func newReplicationController(replicas int) *v1.ReplicationController {
 	rc := &v1.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -100,7 +100,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 }
 
 // create a pod with the given phase for the given rc (same selectors and namespace).
-func newPod(name string, rc *v1.ReplicationController, status v1.PodPhase, lastTransitionTime *unversioned.Time) *v1.Pod {
+func newPod(name string, rc *v1.ReplicationController, status v1.PodPhase, lastTransitionTime *metav1.Time) *v1.Pod {
 	var conditions []v1.PodCondition
 	if status == v1.PodRunning {
 		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
@@ -947,7 +947,7 @@ func TestOverlappingRCs(t *testing.T) {
 		var controllers []*v1.ReplicationController
 		for j := 1; j < 10; j++ {
 			controllerSpec := newReplicationController(1)
-			controllerSpec.CreationTimestamp = unversioned.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
+			controllerSpec.CreationTimestamp = metav1.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
 			controllerSpec.Name = string(uuid.NewUUID())
 			controllers = append(controllers, controllerSpec)
 		}
@@ -979,7 +979,7 @@ func TestDeletionTimestamp(t *testing.T) {
 		t.Errorf("Couldn't get key for object %#v: %v", controllerSpec, err)
 	}
 	pod := newPodList(nil, 1, v1.PodPending, controllerSpec, "pod").Items[0]
-	pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	pod.ResourceVersion = "1"
 	manager.expectations.ExpectDeletions(rcKey, []string{controller.PodKey(&pod)})
 
@@ -1025,7 +1025,7 @@ func TestDeletionTimestamp(t *testing.T) {
 		},
 	}
 	manager.expectations.ExpectDeletions(rcKey, []string{controller.PodKey(secondPod)})
-	oldPod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+	oldPod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	oldPod.ResourceVersion = "2"
 	manager.updatePod(&oldPod, &pod)
 
@@ -1321,7 +1321,7 @@ func TestUpdateSelectorControllerRef(t *testing.T) {
 func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	manager, fakePodControl := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
-	now := unversioned.Now()
+	now := metav1.Now()
 	rc.DeletionTimestamp = &now
 	manager.rcStore.Indexer.Add(rc)
 	pod1 := newPod("pod1", rc, v1.PodRunning, nil)
@@ -1396,12 +1396,12 @@ func TestAvailableReplicas(t *testing.T) {
 	manager.rcStore.Indexer.Add(rc)
 
 	// First pod becomes ready 20s ago
-	moment := unversioned.Time{Time: time.Now().Add(-2e10)}
+	moment := metav1.Time{Time: time.Now().Add(-2e10)}
 	pod := newPod("pod", rc, v1.PodRunning, &moment)
 	manager.podStore.Indexer.Add(pod)
 
 	// Second pod becomes ready now
-	otherMoment := unversioned.Now()
+	otherMoment := metav1.Now()
 	otherPod := newPod("otherPod", rc, v1.PodRunning, &otherMoment)
 	manager.podStore.Indexer.Add(otherPod)
 

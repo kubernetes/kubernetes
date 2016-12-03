@@ -32,7 +32,7 @@ import (
 	"text/template"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
@@ -456,7 +456,7 @@ func TestWebhook(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expTypeMeta := unversioned.TypeMeta{
+	expTypeMeta := metav1.TypeMeta{
 		APIVersion: "authorization.k8s.io/v1beta1",
 		Kind:       "SubjectAccessReview",
 	}
