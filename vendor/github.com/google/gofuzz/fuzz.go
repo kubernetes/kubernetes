@@ -129,7 +129,7 @@ func (f *Fuzzer) genElementCount() int {
 	if f.minElements == f.maxElements {
 		return f.minElements
 	}
-	return f.minElements + f.r.Intn(f.maxElements-f.minElements)
+	return f.minElements + f.r.Intn(f.maxElements-f.minElements+1)
 }
 
 func (f *Fuzzer) genShouldFill() bool {
@@ -229,12 +229,19 @@ func (f *Fuzzer) doFuzz(v reflect.Value, flags uint64) {
 			return
 		}
 		v.Set(reflect.Zero(v.Type()))
+	case reflect.Array:
+		if f.genShouldFill() {
+			n := v.Len()
+			for i := 0; i < n; i++ {
+				f.doFuzz(v.Index(i), 0)
+			}
+			return
+		}
+		v.Set(reflect.Zero(v.Type()))
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
 			f.doFuzz(v.Field(i), 0)
 		}
-	case reflect.Array:
-		fallthrough
 	case reflect.Chan:
 		fallthrough
 	case reflect.Func:
