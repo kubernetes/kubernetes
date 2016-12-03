@@ -92,7 +92,7 @@ type PodDisruptionBudgetList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items                []PodDisruptionBudget `json:"items"`
+	Items           []PodDisruptionBudget `json:"items"`
 }
 
 // +genclient=true

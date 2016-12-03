@@ -20,9 +20,9 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"

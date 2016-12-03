@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
@@ -148,7 +148,7 @@ func TestGenericTypeMeta(t *testing.T) {
 		Name              string               `json:"name,omitempty"`
 		GenerateName      string               `json:"generateName,omitempty"`
 		UID               string               `json:"uid,omitempty"`
-		CreationTimestamp metav1.Time     `json:"creationTimestamp,omitempty"`
+		CreationTimestamp metav1.Time          `json:"creationTimestamp,omitempty"`
 		SelfLink          string               `json:"selfLink,omitempty"`
 		ResourceVersion   string               `json:"resourceVersion,omitempty"`
 		APIVersion        string               `json:"apiVersion,omitempty"`
@@ -198,7 +198,7 @@ type InternalTypeMeta struct {
 	Name              string               `json:"name,omitempty"`
 	GenerateName      string               `json:"generateName,omitempty"`
 	UID               string               `json:"uid,omitempty"`
-	CreationTimestamp metav1.Time     `json:"creationTimestamp,omitempty"`
+	CreationTimestamp metav1.Time          `json:"creationTimestamp,omitempty"`
 	SelfLink          string               `json:"selfLink,omitempty"`
 	ResourceVersion   string               `json:"resourceVersion,omitempty"`
 	APIVersion        string               `json:"apiVersion,omitempty"`

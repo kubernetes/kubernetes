@@ -24,8 +24,8 @@ import (
 
 type TestResource struct {
 	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
-	Value                int `json:"value"`
+	api.ObjectMeta  `json:"metadata"`
+	Value           int `json:"value"`
 }
 
 func (obj *TestResource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

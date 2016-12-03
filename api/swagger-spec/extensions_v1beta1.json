@@ -141,7 +141,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete collection of DaemonSet",
       "nickname": "deletecollectionNamespacedDaemonSet",
@@ -207,7 +207,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -445,7 +445,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -488,7 +488,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete a DaemonSet",
       "nickname": "deleteNamespacedDaemonSet",
@@ -546,7 +546,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -934,7 +934,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1111,7 +1111,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Deployment",
       "nickname": "deletecollectionNamespacedDeployment",
@@ -1177,7 +1177,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -1415,7 +1415,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1458,7 +1458,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete a Deployment",
       "nickname": "deleteNamespacedDeployment",
@@ -1516,7 +1516,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -1965,7 +1965,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2130,7 +2130,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2307,7 +2307,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete collection of HorizontalPodAutoscaler",
       "nickname": "deletecollectionNamespacedHorizontalPodAutoscaler",
@@ -2373,7 +2373,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -2611,7 +2611,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2654,7 +2654,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete a HorizontalPodAutoscaler",
       "nickname": "deleteNamespacedHorizontalPodAutoscaler",
@@ -2712,7 +2712,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -3100,7 +3100,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3277,7 +3277,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Ingress",
       "nickname": "deletecollectionNamespacedIngress",
@@ -3343,7 +3343,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -3581,7 +3581,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3624,7 +3624,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete an Ingress",
       "nickname": "deleteNamespacedIngress",
@@ -3682,7 +3682,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -4070,7 +4070,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4247,7 +4247,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Job",
       "nickname": "deletecollectionNamespacedJob",
@@ -4313,7 +4313,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -4551,7 +4551,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4594,7 +4594,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete a Job",
       "nickname": "deleteNamespacedJob",
@@ -4652,7 +4652,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -5040,7 +5040,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5217,7 +5217,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete collection of NetworkPolicy",
       "nickname": "deletecollectionNamespacedNetworkPolicy",
@@ -5283,7 +5283,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -5521,7 +5521,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5564,7 +5564,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete a NetworkPolicy",
       "nickname": "deleteNamespacedNetworkPolicy",
@@ -5622,7 +5622,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -6022,7 +6022,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ReplicaSet",
       "nickname": "deletecollectionNamespacedReplicaSet",
@@ -6088,7 +6088,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -6326,7 +6326,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6369,7 +6369,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete a ReplicaSet",
       "nickname": "deleteNamespacedReplicaSet",
@@ -6427,7 +6427,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -6815,7 +6815,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6980,7 +6980,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7145,7 +7145,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7306,7 +7306,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ThirdPartyResource",
       "nickname": "deletecollectionThirdPartyResource",
@@ -7364,7 +7364,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -7578,7 +7578,7 @@
         "allowMultiple": false
        },
        {
-        "type": "unversioned.Patch",
+        "type": "v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7613,7 +7613,7 @@
       ]
      },
      {
-      "type": "unversioned.Status",
+      "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete a ThirdPartyResource",
       "nickname": "deleteThirdPartyResource",
@@ -7663,7 +7663,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "unversioned.Status"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -7769,7 +7769,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "unversioned.APIResourceList",
+      "type": "v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -7805,7 +7805,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
@@ -7817,8 +7817,8 @@
      }
     }
    },
-   "unversioned.ListMeta": {
-    "id": "unversioned.ListMeta",
+   "v1.ListMeta": {
+    "id": "v1.ListMeta",
     "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
     "properties": {
      "selfLink": {
@@ -7892,12 +7892,10 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "format": "date-time",
       "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionTimestamp": {
       "type": "string",
-      "format": "date-time",
       "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionGracePeriodSeconds": {
@@ -7973,7 +7971,7 @@
     ],
     "properties": {
      "selector": {
-      "$ref": "unversioned.LabelSelector",
+      "$ref": "v1.LabelSelector",
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "template": {
@@ -7982,8 +7980,8 @@
      }
     }
    },
-   "unversioned.LabelSelector": {
-    "id": "unversioned.LabelSelector",
+   "v1.LabelSelector": {
+    "id": "v1.LabelSelector",
     "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
      "matchLabels": {
@@ -7993,14 +7991,14 @@
      "matchExpressions": {
       "type": "array",
       "items": {
-       "$ref": "unversioned.LabelSelectorRequirement"
+       "$ref": "v1.LabelSelectorRequirement"
       },
       "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
      }
     }
    },
-   "unversioned.LabelSelectorRequirement": {
-    "id": "unversioned.LabelSelectorRequirement",
+   "v1.LabelSelectorRequirement": {
+    "id": "v1.LabelSelectorRequirement",
     "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
     "required": [
      "key",
@@ -9413,8 +9411,8 @@
      }
     }
    },
-   "unversioned.Status": {
-    "id": "unversioned.Status",
+   "v1.Status": {
+    "id": "v1.Status",
     "description": "Status is a return value for calls that don't return other objects.",
     "properties": {
      "kind": {
@@ -9426,7 +9424,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "status": {
@@ -9442,7 +9440,7 @@
       "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
      },
      "details": {
-      "$ref": "unversioned.StatusDetails",
+      "$ref": "v1.StatusDetails",
       "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
      },
      "code": {
@@ -9452,8 +9450,8 @@
      }
     }
    },
-   "unversioned.StatusDetails": {
-    "id": "unversioned.StatusDetails",
+   "v1.StatusDetails": {
+    "id": "v1.StatusDetails",
     "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
     "properties": {
      "name": {
@@ -9471,7 +9469,7 @@
      "causes": {
       "type": "array",
       "items": {
-       "$ref": "unversioned.StatusCause"
+       "$ref": "v1.StatusCause"
       },
       "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
      },
@@ -9482,8 +9480,8 @@
      }
     }
    },
-   "unversioned.StatusCause": {
-    "id": "unversioned.StatusCause",
+   "v1.StatusCause": {
+    "id": "v1.StatusCause",
     "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
     "properties": {
      "reason": {
@@ -9515,8 +9513,8 @@
      }
     }
    },
-   "unversioned.Patch": {
-    "id": "unversioned.Patch",
+   "v1.Patch": {
+    "id": "v1.Patch",
     "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
     "properties": {}
    },
@@ -9577,7 +9575,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard list metadata."
      },
      "items": {
@@ -9628,7 +9626,7 @@
       "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1."
      },
      "selector": {
-      "$ref": "unversioned.LabelSelector",
+      "$ref": "v1.LabelSelector",
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment."
      },
      "template": {
@@ -9758,12 +9756,10 @@
      },
      "lastUpdateTime": {
       "type": "string",
-      "format": "date-time",
       "description": "The last time this condition was updated."
      },
      "lastTransitionTime": {
       "type": "string",
-      "format": "date-time",
       "description": "Last time the condition transitioned from one status to another."
      },
      "reason": {
@@ -9881,7 +9877,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard list metadata."
      },
      "items": {
@@ -9997,7 +9993,6 @@
      },
      "lastScaleTime": {
       "type": "string",
-      "format": "date-time",
       "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
      },
      "currentReplicas": {
@@ -10033,7 +10028,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
@@ -10229,7 +10224,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
@@ -10290,7 +10285,7 @@
       "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer"
      },
      "selector": {
-      "$ref": "unversioned.LabelSelector",
+      "$ref": "v1.LabelSelector",
       "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "autoSelector": {
@@ -10316,12 +10311,10 @@
      },
      "startTime": {
       "type": "string",
-      "format": "date-time",
       "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
      },
      "completionTime": {
       "type": "string",
-      "format": "date-time",
       "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
      },
      "active": {
@@ -10359,12 +10352,10 @@
      },
      "lastProbeTime": {
       "type": "string",
-      "format": "date-time",
       "description": "Last time the condition was checked."
      },
      "lastTransitionTime": {
       "type": "string",
-      "format": "date-time",
       "description": "Last time the condition transit from one status to another."
      },
      "reason": {
@@ -10393,7 +10384,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
@@ -10433,7 +10424,7 @@
     ],
     "properties": {
      "podSelector": {
-      "$ref": "unversioned.LabelSelector",
+      "$ref": "v1.LabelSelector",
       "description": "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace."
      },
      "ingress": {
@@ -10486,11 +10477,11 @@
     "id": "v1beta1.NetworkPolicyPeer",
     "properties": {
      "podSelector": {
-      "$ref": "unversioned.LabelSelector",
+      "$ref": "v1.LabelSelector",
       "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace."
      },
      "namespaceSelector": {
-      "$ref": "unversioned.LabelSelector",
+      "$ref": "v1.LabelSelector",
       "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces."
      }
     }
@@ -10511,7 +10502,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "items": {
@@ -10564,7 +10555,7 @@
       "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
      },
      "selector": {
-      "$ref": "unversioned.LabelSelector",
+      "$ref": "v1.LabelSelector",
       "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "template": {
@@ -10632,7 +10623,6 @@
      },
      "lastTransitionTime": {
       "type": "string",
-      "format": "date-time",
       "description": "The last time the condition transitioned from one status to another."
      },
      "reason": {
@@ -10661,7 +10651,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta",
+      "$ref": "v1.ListMeta",
       "description": "Standard list metadata."
      },
      "items": {
@@ -10712,8 +10702,8 @@
      }
     }
    },
-   "unversioned.APIResourceList": {
-    "id": "unversioned.APIResourceList",
+   "v1.APIResourceList": {
+    "id": "v1.APIResourceList",
     "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
     "required": [
      "groupVersion",
@@ -10735,14 +10725,14 @@
      "resources": {
       "type": "array",
       "items": {
-       "$ref": "unversioned.APIResource"
+       "$ref": "v1.APIResource"
       },
       "description": "resources contains the name of the resources and if they are namespaced."
      }
     }
    },
-   "unversioned.APIResource": {
-    "id": "unversioned.APIResource",
+   "v1.APIResource": {
+    "id": "v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
