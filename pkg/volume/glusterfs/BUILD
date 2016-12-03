@@ -15,6 +15,7 @@ go_library(
     srcs = [
         "doc.go",
         "glusterfs.go",
+        "glusterfs_minmax.go",
         "glusterfs_util.go",
     ],
     tags = ["automanaged"],
@@ -37,7 +38,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["glusterfs_test.go"],
+    srcs = [
+        "glusterfs_minmax_test.go",
+        "glusterfs_test.go",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
