@@ -317,7 +317,6 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/cluster-autoscaler/cluster-autoscaler.manifest" "${dst_dir}/"
   cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
   cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
-  cp "${salt_dir}/fluentd-gcp-gci/fluentd-gcp-gci.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
   cp "${salt_dir}/etcd/etcd.manifest" "${dst_dir}"
