@@ -194,23 +194,33 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	// Configure iptables firewall rules
 	// TODO: consider calling bootstrap script to configure host based on OS
-	cmd = getSSHCommand("&&",
-		`iptables -L INPUT | grep "Chain INPUT (policy DROP)"`,
-		"(iptables -C INPUT -w -p TCP -j ACCEPT || iptables -A INPUT -w -p TCP -j ACCEPT)",
-		"(iptables -C INPUT -w -p UDP -j ACCEPT || iptables -A INPUT -w -p UDP -j ACCEPT)",
-		"(iptables -C INPUT -w -p ICMP -j ACCEPT || iptables -A INPUT -w -p ICMP -j ACCEPT)")
-	output, err := SSH(host, "sh", "-c", cmd)
+	output, err := SSH(host, "iptables", "-L", "INPUT")
 	if err != nil {
-		glog.Errorf("Failed to configured firewall: %v output: %v", err, output)
+		return "", false, fmt.Errorf("failed to get iptables INPUT: %v output: %q", err, output)
 	}
-	cmd = getSSHCommand("&&",
-		`iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null`,
-		"(iptables -C FORWARD -w -p TCP -j ACCEPT || iptables -A FORWARD -w -p TCP -j ACCEPT)",
-		"(iptables -C FORWARD -w -p UDP -j ACCEPT || iptables -A FORWARD -w -p UDP -j ACCEPT)",
-		"(iptables -C FORWARD -w -p ICMP -j ACCEPT || iptables -A FORWARD -w -p ICMP -j ACCEPT)")
-	output, err = SSH(host, "sh", "-c", cmd)
+	if strings.Contains(output, "Chain INPUT (policy DROP)") {
+		cmd = getSSHCommand("&&",
+			"(iptables -C INPUT -w -p TCP -j ACCEPT || iptables -A INPUT -w -p TCP -j ACCEPT)",
+			"(iptables -C INPUT -w -p UDP -j ACCEPT || iptables -A INPUT -w -p UDP -j ACCEPT)",
+			"(iptables -C INPUT -w -p ICMP -j ACCEPT || iptables -A INPUT -w -p ICMP -j ACCEPT)")
+		output, err := SSH(host, "sh", "-c", cmd)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to configured firewall: %v output: %v", err, output)
+		}
+	}
+	output, err = SSH(host, "iptables", "-L", "FORWARD")
 	if err != nil {
-		glog.Errorf("Failed to configured firewall: %v output: %v", err, output)
+		return "", false, fmt.Errorf("failed to get iptables FORWARD: %v output: %q", err, output)
+	}
+	if strings.Contains(output, "Chain FORWARD (policy DROP)") {
+		cmd = getSSHCommand("&&",
+			"(iptables -C FORWARD -w -p TCP -j ACCEPT || iptables -A FORWARD -w -p TCP -j ACCEPT)",
+			"(iptables -C FORWARD -w -p UDP -j ACCEPT || iptables -A FORWARD -w -p UDP -j ACCEPT)",
+			"(iptables -C FORWARD -w -p ICMP -j ACCEPT || iptables -A FORWARD -w -p ICMP -j ACCEPT)")
+		output, err = SSH(host, "sh", "-c", cmd)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to configured firewall: %v output: %v", err, output)
+		}
 	}
 
 	// Copy the archive to the staging directory
