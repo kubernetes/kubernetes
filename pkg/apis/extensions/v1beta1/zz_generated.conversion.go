@@ -308,10 +308,12 @@ func autoConvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(in *DaemonSet
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.DaemonSet, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_DaemonSet_To_extensions_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]extensions.DaemonSet, len(*in))
+			for i := range *in {
+				if err := Convert_v1beta1_DaemonSet_To_extensions_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -328,10 +330,12 @@ func autoConvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extension
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]DaemonSet, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_DaemonSet_To_v1beta1_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]DaemonSet, len(*in))
+			for i := range *in {
+				if err := Convert_extensions_DaemonSet_To_v1beta1_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -460,10 +464,12 @@ func autoConvert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *Deploym
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.Deployment, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_Deployment_To_extensions_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]extensions.Deployment, len(*in))
+			for i := range *in {
+				if err := Convert_v1beta1_Deployment_To_extensions_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -480,10 +486,12 @@ func autoConvert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *extensi
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]Deployment, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_Deployment_To_v1beta1_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Deployment, len(*in))
+			for i := range *in {
+				if err := Convert_extensions_Deployment_To_v1beta1_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -718,10 +726,12 @@ func autoConvert_v1beta1_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPo
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]autoscaling.HorizontalPodAutoscaler, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]autoscaling.HorizontalPodAutoscaler, len(*in))
+			for i := range *in {
+				if err := Convert_v1beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -738,10 +748,12 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPo
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]HorizontalPodAutoscaler, len(*in))
-		for i := range *in {
-			if err := Convert_autoscaling_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]HorizontalPodAutoscaler, len(*in))
+			for i := range *in {
+				if err := Convert_autoscaling_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1088,10 +1100,12 @@ func autoConvert_v1beta1_JobList_To_batch_JobList(in *JobList, out *batch.JobLis
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]batch.Job, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_Job_To_batch_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]batch.Job, len(*in))
+			for i := range *in {
+				if err := Convert_v1beta1_Job_To_batch_Job(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1108,10 +1122,12 @@ func autoConvert_batch_JobList_To_v1beta1_JobList(in *batch.JobList, out *JobLis
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]Job, len(*in))
-		for i := range *in {
-			if err := Convert_batch_Job_To_v1beta1_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Job, len(*in))
+			for i := range *in {
+				if err := Convert_batch_Job_To_v1beta1_Job(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1340,10 +1356,12 @@ func autoConvert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyLi
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.PodSecurityPolicy, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]extensions.PodSecurityPolicy, len(*in))
+			for i := range *in {
+				if err := Convert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1360,10 +1378,12 @@ func autoConvert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyLi
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]PodSecurityPolicy, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]PodSecurityPolicy, len(*in))
+			for i := range *in {
+				if err := Convert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1385,10 +1405,12 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySp
 	out.HostNetwork = in.HostNetwork
 	if in.HostPorts != nil {
 		in, out := &in.HostPorts, &out.HostPorts
-		*out = make([]extensions.HostPortRange, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_HostPortRange_To_extensions_HostPortRange(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]extensions.HostPortRange, len(*in))
+			for i := range *in {
+				if err := Convert_v1beta1_HostPortRange_To_extensions_HostPortRange(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1425,10 +1447,12 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 	out.HostNetwork = in.HostNetwork
 	if in.HostPorts != nil {
 		in, out := &in.HostPorts, &out.HostPorts
-		*out = make([]HostPortRange, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_HostPortRange_To_v1beta1_HostPortRange(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]HostPortRange, len(*in))
+			for i := range *in {
+				if err := Convert_extensions_HostPortRange_To_v1beta1_HostPortRange(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1522,10 +1546,12 @@ func autoConvert_v1beta1_ReplicaSetList_To_extensions_ReplicaSetList(in *Replica
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.ReplicaSet, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]extensions.ReplicaSet, len(*in))
+			for i := range *in {
+				if err := Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1542,10 +1568,12 @@ func autoConvert_extensions_ReplicaSetList_To_v1beta1_ReplicaSetList(in *extensi
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]ReplicaSet, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_ReplicaSet_To_v1beta1_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]ReplicaSet, len(*in))
+			for i := range *in {
+				if err := Convert_extensions_ReplicaSet_To_v1beta1_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {

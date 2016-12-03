@@ -640,6 +640,7 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 }
 
 func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.SnippetWriter) {
+	sw.Do("if *in != nil {\n", nil)
 	sw.Do("*out = make($.|raw$, len(*in))\n", outType)
 	if inType.Elem == outType.Elem && inType.Elem.Kind == types.Builtin {
 		sw.Do("copy(*out, *in)\n", nil)
@@ -670,6 +671,7 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 		}
 		sw.Do("}\n", nil)
 	}
+	sw.Do("}\n", nil)
 }
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {

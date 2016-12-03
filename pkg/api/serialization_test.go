@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
 	proto "github.com/golang/protobuf/proto"
 	flag "github.com/spf13/pflag"
 	"github.com/ugorji/go/codec"
@@ -60,7 +61,9 @@ var codecsToTest = []func(version schema.GroupVersion, item runtime.Object) (run
 }
 
 func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runtime.Object, seed int64) runtime.Object {
+	glog.Errorf("TIM: starting with %#v", item)
 	apitesting.FuzzerFor(t, forVersion, rand.NewSource(seed)).Fuzz(item)
+	glog.Errorf("TIM: fuzzed to %#v)", item)
 
 	j, err := meta.TypeAccessor(item)
 	if err != nil {
@@ -91,38 +94,47 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	}
 	item = copied.(runtime.Object)
 
+	glog.Errorf("TIM: starting with %#v", item)
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := runtime.Encode(codec, item)
+	glog.Errorf("TIM: encoded to %#v", string(data))
 	if err != nil {
 		if runtime.IsNotRegisteredError(err) {
 			t.Logf("%v: not registered: %v (%s)", name, err, printer.Sprintf("%#v", item))
 		} else {
+			glog.Errorf("TIM: %v: %v (%s)", name, err, printer.Sprintf("%#v", item))
 			t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", item))
 		}
 		return
 	}
 
 	if !api.Semantic.DeepEqual(original, item) {
+		glog.Errorf("TIM: 0: %v: encode altered the object, diff: %v", name, diff.ObjectReflectDiff(original, item))
 		t.Errorf("0: %v: encode altered the object, diff: %v", name, diff.ObjectReflectDiff(original, item))
 		return
 	}
 
 	obj2, err := runtime.Decode(codec, data)
+	glog.Errorf("TIM: decoded to %#v", obj2)
 	if err != nil {
+		glog.Errorf("TIM: 0: %v: %v\nCodec: %#v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", item))
 		t.Errorf("0: %v: %v\nCodec: %#v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", item))
 		panic("failed")
 	}
 	if !api.Semantic.DeepEqual(original, obj2) {
+		glog.Errorf("TIM:\n1: %v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(item, obj2), codec, printer.Sprintf("%#v", item), dataAsString(data), printer.Sprintf("%#v", obj2))
 		t.Errorf("\n1: %v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(item, obj2), codec, printer.Sprintf("%#v", item), dataAsString(data), printer.Sprintf("%#v", obj2))
 		return
 	}
 
 	obj3 := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
 	if err := runtime.DecodeInto(codec, data, obj3); err != nil {
+		glog.Errorf("TIM: 2: %v: %v", name, err)
 		t.Errorf("2: %v: %v", name, err)
 		return
 	}
 	if !api.Semantic.DeepEqual(item, obj3) {
+		glog.Errorf("TIM: 3: %v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(item, obj3), codec)
 		t.Errorf("3: %v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(item, obj3), codec)
 		return
 	}
@@ -132,7 +144,9 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 func roundTripSame(t *testing.T, group testapi.TestGroup, item runtime.Object, except ...string) {
 	set := sets.NewString(except...)
 	seed := rand.Int63()
+	glog.Errorf("TIM: before roundTripSame::fuzzInternalObject 1")
 	fuzzInternalObject(t, group.InternalGroupVersion(), item, seed)
+	glog.Errorf("TIM: after roundTripSame::fuzzInternalObject 1")
 
 	version := *group.GroupVersion()
 	codecs := []runtime.Codec{}
@@ -149,9 +163,13 @@ func roundTripSame(t *testing.T, group testapi.TestGroup, item runtime.Object, e
 	}
 
 	if !set.Has(version.String()) {
+		glog.Errorf("TIM: before roundTripSame::fuzzInternalObject 2")
 		fuzzInternalObject(t, version, item, seed)
+		glog.Errorf("TIM: after roundTripSame::fuzzInternalObject 2")
 		for _, codec := range codecs {
+			glog.Errorf("TIM: before roundTripSame::roundTrip: codec %v", codec)
 			roundTrip(t, codec, item)
+			glog.Errorf("TIM: after roundTripSame::roundTrip")
 		}
 	}
 }
@@ -294,8 +312,10 @@ func TestRoundTripTypes(t *testing.T) {
 			}
 			// Try a few times, since runTest uses random values.
 			for i := 0; i < *fuzzIters; i++ {
+				glog.Errorf("TIM: roundtrip testing %v", kind)
 				doRoundTripTest(group, kind, t)
 				if t.Failed() {
+					glog.Errorf("TIM: roundtrip failed for %v", kind)
 					break
 				}
 			}
@@ -312,10 +332,14 @@ func doRoundTripTest(group testapi.TestGroup, kind string, t *testing.T) {
 		t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
 	}
 	if api.Scheme.Recognizes(group.GroupVersion().WithKind(kind)) {
+		glog.Errorf("TIM: before roundTripSame")
 		roundTripSame(t, group, item, nonRoundTrippableTypesByVersion[kind]...)
+		glog.Errorf("TIM: after roundTripSame")
 	}
 	if !nonInternalRoundTrippableTypes.Has(kind) && api.Scheme.Recognizes(group.GroupVersion().WithKind(kind)) {
+		glog.Errorf("TIM: before roundTrip")
 		roundTrip(t, group.Codec(), fuzzInternalObject(t, group.InternalGroupVersion(), item, rand.Int63()))
+		glog.Errorf("TIM: after roundTrip")
 	}
 }
 

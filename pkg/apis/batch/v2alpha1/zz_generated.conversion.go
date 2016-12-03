@@ -103,10 +103,12 @@ func autoConvert_v2alpha1_CronJobList_To_batch_CronJobList(in *CronJobList, out 
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]batch.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_v2alpha1_CronJob_To_batch_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]batch.CronJob, len(*in))
+			for i := range *in {
+				if err := Convert_v2alpha1_CronJob_To_batch_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -123,10 +125,12 @@ func autoConvert_batch_CronJobList_To_v2alpha1_CronJobList(in *batch.CronJobList
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_batch_CronJob_To_v2alpha1_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]CronJob, len(*in))
+			for i := range *in {
+				if err := Convert_batch_CronJob_To_v2alpha1_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -257,10 +261,12 @@ func autoConvert_v2alpha1_JobList_To_batch_JobList(in *JobList, out *batch.JobLi
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]batch.Job, len(*in))
-		for i := range *in {
-			if err := Convert_v2alpha1_Job_To_batch_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]batch.Job, len(*in))
+			for i := range *in {
+				if err := Convert_v2alpha1_Job_To_batch_Job(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -277,10 +283,12 @@ func autoConvert_batch_JobList_To_v2alpha1_JobList(in *batch.JobList, out *JobLi
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]Job, len(*in))
-		for i := range *in {
-			if err := Convert_batch_Job_To_v2alpha1_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Job, len(*in))
+			for i := range *in {
+				if err := Convert_batch_Job_To_v2alpha1_Job(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {

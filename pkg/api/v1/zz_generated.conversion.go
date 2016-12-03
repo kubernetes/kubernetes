@@ -1734,10 +1734,12 @@ func autoConvert_v1_List_To_api_List(in *List, out *api.List, s conversion.Scope
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]runtime.Object, len(*in))
-		for i := range *in {
-			if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]runtime.Object, len(*in))
+			for i := range *in {
+				if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -1754,10 +1756,12 @@ func autoConvert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]runtime.RawExtension, len(*in))
-		for i := range *in {
-			if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]runtime.RawExtension, len(*in))
+			for i := range *in {
+				if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -2598,10 +2602,12 @@ func autoConvert_v1_PersistentVolumeList_To_api_PersistentVolumeList(in *Persist
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]api.PersistentVolume, len(*in))
-		for i := range *in {
-			if err := Convert_v1_PersistentVolume_To_api_PersistentVolume(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]api.PersistentVolume, len(*in))
+			for i := range *in {
+				if err := Convert_v1_PersistentVolume_To_api_PersistentVolume(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -2618,10 +2624,12 @@ func autoConvert_api_PersistentVolumeList_To_v1_PersistentVolumeList(in *api.Per
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]PersistentVolume, len(*in))
-		for i := range *in {
-			if err := Convert_api_PersistentVolume_To_v1_PersistentVolume(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]PersistentVolume, len(*in))
+			for i := range *in {
+				if err := Convert_api_PersistentVolume_To_v1_PersistentVolume(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -2930,10 +2938,12 @@ func autoConvert_v1_PodList_To_api_PodList(in *PodList, out *api.PodList, s conv
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]api.Pod, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Pod_To_api_Pod(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]api.Pod, len(*in))
+			for i := range *in {
+				if err := Convert_v1_Pod_To_api_Pod(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -2950,10 +2960,12 @@ func autoConvert_api_PodList_To_v1_PodList(in *api.PodList, out *PodList, s conv
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]Pod, len(*in))
-		for i := range *in {
-			if err := Convert_api_Pod_To_v1_Pod(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Pod, len(*in))
+			for i := range *in {
+				if err := Convert_api_Pod_To_v1_Pod(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -3058,10 +3070,12 @@ func Convert_api_PodSignature_To_v1_PodSignature(in *api.PodSignature, out *PodS
 func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversion.Scope) error {
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes
-		*out = make([]api.Volume, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Volume_To_api_Volume(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]api.Volume, len(*in))
+			for i := range *in {
+				if err := Convert_v1_Volume_To_api_Volume(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -3098,10 +3112,12 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversion.Scope) error {
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes
-		*out = make([]Volume, len(*in))
-		for i := range *in {
-			if err := Convert_api_Volume_To_v1_Volume(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Volume, len(*in))
+			for i := range *in {
+				if err := Convert_api_Volume_To_v1_Volume(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -3217,10 +3233,12 @@ func autoConvert_v1_PodTemplateList_To_api_PodTemplateList(in *PodTemplateList, 
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]api.PodTemplate, len(*in))
-		for i := range *in {
-			if err := Convert_v1_PodTemplate_To_api_PodTemplate(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]api.PodTemplate, len(*in))
+			for i := range *in {
+				if err := Convert_v1_PodTemplate_To_api_PodTemplate(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -3237,10 +3255,12 @@ func autoConvert_api_PodTemplateList_To_v1_PodTemplateList(in *api.PodTemplateLi
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]PodTemplate, len(*in))
-		for i := range *in {
-			if err := Convert_api_PodTemplate_To_v1_PodTemplate(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]PodTemplate, len(*in))
+			for i := range *in {
+				if err := Convert_api_PodTemplate_To_v1_PodTemplate(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -3523,10 +3543,12 @@ func autoConvert_v1_ReplicationControllerList_To_api_ReplicationControllerList(i
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]api.ReplicationController, len(*in))
-		for i := range *in {
-			if err := Convert_v1_ReplicationController_To_api_ReplicationController(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]api.ReplicationController, len(*in))
+			for i := range *in {
+				if err := Convert_v1_ReplicationController_To_api_ReplicationController(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -3543,10 +3565,12 @@ func autoConvert_api_ReplicationControllerList_To_v1_ReplicationControllerList(i
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]ReplicationController, len(*in))
-		for i := range *in {
-			if err := Convert_api_ReplicationController_To_v1_ReplicationController(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]ReplicationController, len(*in))
+			for i := range *in {
+				if err := Convert_api_ReplicationController_To_v1_ReplicationController(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -3834,10 +3858,12 @@ func autoConvert_v1_SecretList_To_api_SecretList(in *SecretList, out *api.Secret
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]api.Secret, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Secret_To_api_Secret(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]api.Secret, len(*in))
+			for i := range *in {
+				if err := Convert_v1_Secret_To_api_Secret(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -3854,10 +3880,12 @@ func autoConvert_api_SecretList_To_v1_SecretList(in *api.SecretList, out *Secret
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]Secret, len(*in))
-		for i := range *in {
-			if err := Convert_api_Secret_To_v1_Secret(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Secret, len(*in))
+			for i := range *in {
+				if err := Convert_api_Secret_To_v1_Secret(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -4026,10 +4054,12 @@ func autoConvert_v1_ServiceList_To_api_ServiceList(in *ServiceList, out *api.Ser
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]api.Service, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Service_To_api_Service(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]api.Service, len(*in))
+			for i := range *in {
+				if err := Convert_v1_Service_To_api_Service(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -4046,10 +4076,12 @@ func autoConvert_api_ServiceList_To_v1_ServiceList(in *api.ServiceList, out *Ser
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]Service, len(*in))
-		for i := range *in {
-			if err := Convert_api_Service_To_v1_Service(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Service, len(*in))
+			for i := range *in {
+				if err := Convert_api_Service_To_v1_Service(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {

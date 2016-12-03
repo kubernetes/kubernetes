@@ -103,6 +103,9 @@ func (c *threadSafeMap) List() []interface{} {
 	for _, item := range c.items {
 		list = append(list, item)
 	}
+	if len(list) == 0 {
+		return nil
+	}
 	return list
 }
 
@@ -114,6 +117,9 @@ func (c *threadSafeMap) ListKeys() []string {
 	list := make([]string, 0, len(c.items))
 	for key := range c.items {
 		list = append(list, key)
+	}
+	if len(list) == 0 {
+		return nil
 	}
 	return list
 }

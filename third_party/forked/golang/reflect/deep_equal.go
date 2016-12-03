@@ -156,11 +156,8 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		}
 		return true
 	case reflect.Slice:
-		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
-			return false
-		}
-		if v1.IsNil() || v1.Len() == 0 {
-			return true
+		if v1.IsNil() || v2.IsNil() {
+			return v1.IsNil() && v2.IsNil()
 		}
 		if v1.Len() != v2.Len() {
 			return false
@@ -176,10 +173,13 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		return true
 	case reflect.Interface:
 		if v1.IsNil() || v2.IsNil() {
-			return v1.IsNil() == v2.IsNil()
+			return v1.IsNil() && v2.IsNil()
 		}
 		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
 	case reflect.Ptr:
+		if v1.IsNil() || v2.IsNil() {
+			return v1.IsNil() && v2.IsNil()
+		}
 		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
 	case reflect.Struct:
 		for i, n := 0, v1.NumField(); i < n; i++ {
@@ -194,6 +194,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		}
 		if v1.IsNil() || v1.Len() == 0 {
 			return true
+
 		}
 		if v1.Len() != v2.Len() {
 			return false
@@ -208,8 +209,8 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		}
 		return true
 	case reflect.Func:
-		if v1.IsNil() && v2.IsNil() {
-			return true
+		if v1.IsNil() || v2.IsNil() {
+			return v1.IsNil() && v2.IsNil()
 		}
 		// Can't do better than this:
 		return false
