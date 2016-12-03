@@ -290,7 +290,7 @@ func (s *ServiceController) init() error {
 	}
 	zones, ok := s.dns.Zones()
 	if !ok {
-		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records.")
+		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records")
 	}
 	s.dnsZones = zones
 	matchingZones, err := getDnsZones(s.zoneName, s.zoneID, s.dnsZones)
