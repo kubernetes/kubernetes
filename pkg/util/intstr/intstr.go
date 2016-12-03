@@ -70,6 +70,16 @@ func FromString(val string) IntOrString {
 	return IntOrString{Type: String, StrVal: val}
 }
 
+// Parse the given string and try to convert it to an integer before
+// setting it as a string value.
+func Parse(val string) IntOrString {
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return FromString(val)
+	}
+	return FromInt(i)
+}
+
 // UnmarshalJSON implements the json.Unmarshaller interface.
 func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 	if value[0] == '"' {
