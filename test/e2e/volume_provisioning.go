@@ -26,7 +26,8 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/test/e2e/framework"
-
+	gcli "github.com/heketi/heketi/client/api/go-client"
+	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -116,8 +117,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 	framework.KubeDescribe("DynamicProvisioner", func() {
 		It("should create and delete persistent volumes [Slow]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
-
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "glusterfs")
 			By("creating a StorageClass")
 			class := newStorageClass()
 			_, err := c.Storage().StorageClasses().Create(class)
@@ -138,7 +138,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 	framework.KubeDescribe("DynamicProvisioner Alpha", func() {
 		It("should create and delete alpha persistent volumes [Slow]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "glusterfs")
 
 			By("creating a claim with an alpha dynamic provisioning annotation")
 			claim := newClaim(ns, true)
@@ -242,6 +242,8 @@ func newStorageClass() *storage.StorageClass {
 		pluginName = "kubernetes.io/aws-ebs"
 	case framework.ProviderIs("openstack"):
 		pluginName = "kubernetes.io/cinder"
+	case framework.ProviderIs("glusterfs"):
+		pluginName = "kubernetes.io/glusterfs"
 	}
 
 	return &storage.StorageClass{
@@ -253,4 +255,140 @@ func newStorageClass() *storage.StorageClass {
 		},
 		Provisioner: pluginName,
 	}
+}
+
+func startGlusterDpServerPod() {
+
+	f := framework.NewDefaultFramework("volume-provisioning")
+
+
+	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
+	// note that namespace deletion is handled by delete-namespace flag
+	clean := true
+	// filled in BeforeEach
+	var c *client.Client
+	var namespace *api.Namespace
+
+	BeforeEach(func() {
+		c = f.Client
+		namespace = f.Namespace
+	})
+
+	config := VolumeTestConfig{
+				namespace:   namespace.Name,
+				prefix:      "gluster",
+				serverImage: "gcr.io/google_containers/volume-manager-gluster:0.1",
+				serverPorts: []int{8081,},
+			}
+	pod := startVolumeServer(c, config)
+	serverIP := pod.Status.PodIP
+	framework.Logf("Gluster volume manager server IP address: %v", serverIP)
+
+	//Contact the volume manager server, then create/delete volumes
+
+	cli := gcli.NewClient("http://"+serverIP+":8081", "","")
+	if cli == nil {
+			framework.Errorf("glusterfs: failed to create gluster rest client")
+			return
+	}
+	sz:= 10
+	replicacount := 3
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Durability: gapi.VolumeDurabilityInfo{Type: durabilitytype, Replicate: gapi.ReplicaDurability{Replica: replicacount}}}
+	volume, err := cli.VolumeCreate(volumeReq)
+	if err != nil {
+		framework.Errorf("glusterfs: error creating volume %s ", err)
+		return
+	}
+	framework.Infof("glusterfs: volume with size :%d and name:%s created", volume.Size, volume.Name)
+	err = cli.VolumeDelete(volume.Id)
+	if err != nil {
+		framework.V(4).Infof("glusterfs: error when deleting the volume :%s", err)
+		return err
+	}
+	framework.Infof("glusterfs: volume %s deleted successfully", volume.Id)
+}
+
+
+
+// Starts a container specified by config.serverImage and exports all
+// config.serverPorts from it. The returned pod should be used to get the server
+// IP address and create appropriate VolumeSource.
+func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod {
+	podClient := client.Pods(config.namespace)
+
+	portCount := len(config.serverPorts)
+	serverPodPorts := make([]api.ContainerPort, portCount)
+
+	for i := 0; i < portCount; i++ {
+		portName := fmt.Sprintf("%s-%d", config.prefix, i)
+
+		serverPodPorts[i] = api.ContainerPort{
+			Name:          portName,
+			ContainerPort: int32(config.serverPorts[i]),
+			Protocol:      api.ProtocolTCP,
+		}
+	}
+
+	volumeCount := len(config.volumes)
+	volumes := make([]api.Volume, volumeCount)
+	mounts := make([]api.VolumeMount, volumeCount)
+
+	i := 0
+	for src, dst := range config.volumes {
+		mountName := fmt.Sprintf("path%d", i)
+		volumes[i].Name = mountName
+		volumes[i].VolumeSource.HostPath = &api.HostPathVolumeSource{
+			Path: src,
+		}
+
+		mounts[i].Name = mountName
+		mounts[i].ReadOnly = false
+		mounts[i].MountPath = dst
+
+		i++
+	}
+
+	By(fmt.Sprint("creating ", config.prefix, " server pod"))
+	privileged := new(bool)
+	*privileged = true
+	serverPod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: config.prefix + "-server",
+			Labels: map[string]string{
+				"role": config.prefix + "-server",
+			},
+		},
+
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  config.prefix + "-server",
+					Image: config.serverImage,
+					SecurityContext: &api.SecurityContext{
+						Privileged: privileged,
+					},
+					Args:         config.serverArgs,
+					Ports:        serverPodPorts,
+					VolumeMounts: mounts,
+				},
+			},
+			Volumes: volumes,
+		},
+	}
+	serverPod, err := podClient.Create(serverPod)
+	framework.ExpectNoError(err, "Failed to create %s pod: %v", serverPod.Name, err)
+
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, serverPod))
+
+	By("locating the server pod")
+	pod, err := podClient.Get(serverPod.Name)
+	framework.ExpectNoError(err, "Cannot locate the server pod %v: %v", serverPod.Name, err)
+
+	By("sleeping a bit to give the server time to start")
+	time.Sleep(20 * time.Second)
+	return pod
 }
