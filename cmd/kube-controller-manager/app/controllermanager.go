@@ -523,12 +523,13 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	if availableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1alpha1", Resource: "certificatesigningrequests"}] {
 		glog.Infof("Starting certificate request controller")
 		resyncPeriod := ResyncPeriod(s)()
+		c := clientBuilder.ClientOrDie("certificate-controller")
 		certController, err := certcontroller.NewCertificateController(
-			clientBuilder.ClientOrDie("certificate-controller"),
+			c,
 			resyncPeriod,
 			s.ClusterSigningCertFile,
 			s.ClusterSigningKeyFile,
-			s.ApproveAllKubeletCSRsForGroup,
+			certcontroller.NewGroupApprover(c.Certificates().CertificateSigningRequests(), s.ApproveAllKubeletCSRsForGroup),
 		)
 		if err != nil {
 			glog.Errorf("Failed to start certificate controller: %v", err)
