@@ -72,7 +72,7 @@ func TestDefaultRuleResolver(t *testing.T) {
 		Resources: []string{"*"},
 	}
 
-	staticRoles1 := staticRoles{
+	staticRoles1 := StaticRoles{
 		roles: []*rbac.Role{
 			{
 				ObjectMeta: api.ObjectMeta{Namespace: "namespace1", Name: "readthings"},
@@ -111,7 +111,7 @@ func TestDefaultRuleResolver(t *testing.T) {
 	}
 
 	tests := []struct {
-		staticRoles
+		StaticRoles
 
 		// For a given context, what are the rules that apply?
 		user           user.Info
@@ -119,32 +119,32 @@ func TestDefaultRuleResolver(t *testing.T) {
 		effectiveRules []rbac.PolicyRule
 	}{
 		{
-			staticRoles:    staticRoles1,
+			StaticRoles:    staticRoles1,
 			user:           &user.DefaultInfo{Name: "foobar"},
 			namespace:      "namespace1",
 			effectiveRules: []rbac.PolicyRule{ruleReadPods, ruleReadServices},
 		},
 		{
-			staticRoles:    staticRoles1,
+			StaticRoles:    staticRoles1,
 			user:           &user.DefaultInfo{Name: "foobar"},
 			namespace:      "namespace2",
 			effectiveRules: []rbac.PolicyRule{},
 		},
 		{
-			staticRoles: staticRoles1,
+			StaticRoles: staticRoles1,
 			// Same as above but without a namespace. Only cluster rules should apply.
 			user:           &user.DefaultInfo{Name: "foobar", Groups: []string{"admin"}},
 			effectiveRules: []rbac.PolicyRule{ruleAdmin},
 		},
 		{
-			staticRoles:    staticRoles1,
+			StaticRoles:    staticRoles1,
 			user:           &user.DefaultInfo{},
 			effectiveRules: []rbac.PolicyRule{},
 		},
 	}
 
 	for i, tc := range tests {
-		ruleResolver := newMockRuleResolver(&tc.staticRoles)
+		ruleResolver := newMockRuleResolver(&tc.StaticRoles)
 		rules, err := ruleResolver.RulesFor(tc.user, tc.namespace)
 		if err != nil {
 			t.Errorf("case %d: GetEffectivePolicyRules(context)=%v", i, err)
