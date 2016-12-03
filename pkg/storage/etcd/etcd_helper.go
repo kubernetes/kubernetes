@@ -232,7 +232,7 @@ func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion 
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error {
+func (h *etcdHelper) Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error {
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}

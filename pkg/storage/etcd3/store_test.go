@@ -133,7 +133,7 @@ func TestGet(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &api.Pod{}
-		err := store.Get(ctx, tt.key, out, tt.ignoreNotFound)
+		err := store.Get(ctx, tt.key, "", out, tt.ignoreNotFound)
 		if tt.expectNotFoundErr {
 			if err == nil || !storage.IsNotFound(err) {
 				t.Errorf("#%d: expecting not found error, but get: %s", i, err)

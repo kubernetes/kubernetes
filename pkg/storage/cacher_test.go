@@ -90,10 +90,41 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
 	}
 	obj.ResourceVersion = ""
 	result := &api.Pod{}
-	if err := s.Get(context.TODO(), key, result, false); err != nil {
+	if err := s.Get(context.TODO(), key, "", result, false); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	return result
+}
+
+func TestGet(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	podFoo := makeTestPod("foo")
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+
+	// We pass the ResourceVersion from the above Create() operation.
+	result := &api.Pod{}
+	if err := cacher.Get(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, result, true); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if e, a := *fooCreated, *result; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected: %#v, got: %#v", e, a)
+	}
+
+	if err := cacher.Get(context.TODO(), "pods/ns/bar", fooCreated.ResourceVersion, result, true); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	emptyPod := api.Pod{}
+	if e, a := emptyPod, *result; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected: %#v, got: %#v", e, a)
+	}
+
+	if err := cacher.Get(context.TODO(), "pods/ns/bar", fooCreated.ResourceVersion, result, false); !storage.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
 }
 
 func TestList(t *testing.T) {

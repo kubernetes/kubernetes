@@ -78,7 +78,7 @@ func TestStore(t *testing.T) {
 	other := allocator.NewAllocationMap(100, "rangeSpecValue")
 
 	allocation := &api.RangeAllocation{}
-	if err := storage.storage.Get(context.TODO(), key(), allocation, false); err != nil {
+	if err := storage.storage.Get(context.TODO(), key(), "", allocation, false); err != nil {
 		t.Fatal(err)
 	}
 	if allocation.Range != "rangeSpecValue" {
