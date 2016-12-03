@@ -113,7 +113,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-1", "uid11-1", "1Gi", "", v1.ClaimPending, storageutil.StorageClassAnnotation),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-1", "uid11-1", "1Gi", "", v1.ClaimPending, storageutil.StorageClassAnnotation, annStorageProvisioner),
-			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			[]string{"Normal ProvisioningSucceeded"}, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision failure - plugin not found
@@ -185,7 +185,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-8", "uid11-8", "1Gi", "", v1.ClaimPending, storageutil.StorageClassAnnotation),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-8", "uid11-8", "1Gi", "", v1.ClaimPending, storageutil.StorageClassAnnotation, annStorageProvisioner),
-			noevents,
+			[]string{"Normal ProvisioningSucceeded"},
 			[]reactorError{
 				// Inject error to the first
 				// kubeclient.PersistentVolumes.Create() call. All other calls
@@ -306,7 +306,7 @@ func TestProvisionSync(t *testing.T) {
 			claimWithClass("silver", newClaimArray("claim11-13", "uid11-13", "1Gi", "", v1.ClaimPending)),
 			// Binding will be completed in the next syncClaim
 			claimWithClass("silver", newClaimArray("claim11-13", "uid11-13", "1Gi", "", v1.ClaimPending, annStorageProvisioner)),
-			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision2Success}, testSyncClaim),
+			[]string{"Normal ProvisioningSucceeded"}, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision2Success}, testSyncClaim),
 		},
 		{
 			// Provision error - non existing class
