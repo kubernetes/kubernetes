@@ -401,7 +401,7 @@ var _ = framework.KubeDescribe("Stateful Set recreate", func() {
 	petPodName := "web-0"
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "vagrant")
+		framework.SkipUnlessProviderIs("gce", "gke", "vagrant")
 		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
 		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
