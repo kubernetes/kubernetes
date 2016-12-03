@@ -28,11 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -44,6 +46,13 @@ const (
 	// String used to mark pod deletion
 	nonExist = "NonExist"
 )
+
+type RunObjectConfig interface {
+	Run() error
+	GetName() string
+	GetNamespace() string
+	GetKind() schema.GroupKind
+}
 
 type RCConfig struct {
 	Client         clientset.Interface
@@ -193,6 +202,22 @@ func RunDeployment(config DeploymentConfig) error {
 	return config.start()
 }
 
+func (config *DeploymentConfig) Run() error {
+	return RunDeployment(*config)
+}
+
+func (config *DeploymentConfig) GetName() string {
+	return config.RCConfig.GetName()
+}
+
+func (config *DeploymentConfig) GetNamespace() string {
+	return config.RCConfig.GetNamespace()
+}
+
+func (config *DeploymentConfig) GetKind() schema.GroupKind {
+	return extensionsinternal.Kind("Deployment")
+}
+
 func (config *DeploymentConfig) create() error {
 	deployment := &extensions.Deployment{
 		ObjectMeta: v1.ObjectMeta{
@@ -245,6 +270,22 @@ func RunReplicaSet(config ReplicaSetConfig) error {
 	return config.start()
 }
 
+func (config *ReplicaSetConfig) Run() error {
+	return RunReplicaSet(*config)
+}
+
+func (config *ReplicaSetConfig) GetName() string {
+	return config.RCConfig.GetName()
+}
+
+func (config *ReplicaSetConfig) GetNamespace() string {
+	return config.RCConfig.GetNamespace()
+}
+
+func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
+	return extensionsinternal.Kind("ReplicaSet")
+}
+
 func (config *ReplicaSetConfig) create() error {
 	rs := &extensions.ReplicaSet{
 		ObjectMeta: v1.ObjectMeta{
@@ -295,6 +336,22 @@ func RunRC(config RCConfig) error {
 		return err
 	}
 	return config.start()
+}
+
+func (config *RCConfig) Run() error {
+	return RunRC(*config)
+}
+
+func (config *RCConfig) GetName() string {
+	return config.Name
+}
+
+func (config *RCConfig) GetNamespace() string {
+	return config.Namespace
+}
+
+func (config *RCConfig) GetKind() schema.GroupKind {
+	return api.Kind("ReplicationController")
 }
 
 func (config *RCConfig) create() error {
