@@ -30,6 +30,7 @@ go_library(
         "create_configmap.go",
         "create_deployment.go",
         "create_namespace.go",
+        "create_pdb.go",
         "create_quota.go",
         "create_secret.go",
         "create_service.go",
