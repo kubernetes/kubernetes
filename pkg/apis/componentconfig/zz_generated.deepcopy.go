@@ -188,7 +188,6 @@ func DeepCopy_componentconfig_KubeSchedulerConfiguration(in interface{}, out int
 		out.AlgorithmProvider = in.AlgorithmProvider
 		out.PolicyConfigFile = in.PolicyConfigFile
 		out.EnableProfiling = in.EnableProfiling
-		out.EnableContentionProfiling = in.EnableContentionProfiling
 		out.ContentType = in.ContentType
 		out.KubeAPIQPS = in.KubeAPIQPS
 		out.KubeAPIBurst = in.KubeAPIBurst
