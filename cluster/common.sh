@@ -995,7 +995,7 @@ required = [ "alpha", "beta", "core" ]
 data = json.loads(sys.argv[1])
 rel = data.get("Google Cloud SDK")
 if rel != "HEAD" and version.LooseVersion(rel) < minVersion:
-  print "gcloud version out of date ( < %s )" % minVersion
+  print("gcloud version out of date ( < %s )" % minVersion)
   exit(1)
 missing = []
 for c in required:
