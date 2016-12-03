@@ -28,7 +28,7 @@ import (
 )
 
 // streamProtocolV2 implements version 2 of the streaming protocol for attach
-// and exec. The original streaming protocol was unversioned. As a result, this
+// and exec. The original streaming protocol was metav1. As a result, this
 // version is referred to as version 2, even though it is the first actual
 // numbered version.
 type streamProtocolV2 struct {

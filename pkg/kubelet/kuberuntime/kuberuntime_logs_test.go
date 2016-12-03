@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -32,7 +32,7 @@ func TestLogOptions(t *testing.T) {
 	var (
 		line         = int64(8)
 		bytes        = int64(64)
-		timestamp    = unversioned.Now()
+		timestamp    = metav1.Now()
 		sinceseconds = int64(10)
 	)
 	for c, test := range []struct {

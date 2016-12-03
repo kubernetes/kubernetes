@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -259,7 +259,7 @@ func (t *thirdPartyResourceDataDecoder) populate(data []byte) (runtime.Object, *
 }
 
 func (t *thirdPartyResourceDataDecoder) populateFromObject(mapObj map[string]interface{}, data []byte) (runtime.Object, *schema.GroupVersionKind, error) {
-	typeMeta := unversioned.TypeMeta{}
+	typeMeta := metav1.TypeMeta{}
 	if err := json.Unmarshal(data, &typeMeta); err != nil {
 		return nil, nil, err
 	}
@@ -318,7 +318,7 @@ func IsThirdPartyObject(rawData []byte, gvk *schema.GroupVersionKind) (isThirdPa
 		if err != nil {
 			return false, nil, err
 		}
-		metadata := unversioned.TypeMeta{}
+		metadata := metav1.TypeMeta{}
 		if err = json.Unmarshal(data, &metadata); err != nil {
 			return false, nil, err
 		}
@@ -507,7 +507,7 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 			Kind  string            `json:"kind,omitempty"`
 			Items []json.RawMessage `json:"items"`
 			// +optional
-			Metadata unversioned.ListMeta `json:"metadata,omitempty"`
+			Metadata metav1.ListMeta `json:"metadata,omitempty"`
 			// +optional
 			APIVersion string `json:"apiVersion,omitempty"`
 		}{
@@ -538,7 +538,7 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 		}
 
 		return nil
-	case *unversioned.Status, *unversioned.APIResourceList:
+	case *metav1.Status, *metav1.APIResourceList:
 		return t.delegate.Encode(obj, stream)
 	default:
 		return fmt.Errorf("unexpected object to encode: %#v", obj)

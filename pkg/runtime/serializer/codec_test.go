@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -172,7 +172,7 @@ func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
 	s.AddKnownTypeWithName(externalGV.WithKind("TestType3"), &ExternalTestType1{})
 	s.AddKnownTypeWithName(externalGV2.WithKind("TestType1"), &ExternalTestType1{})
 
-	s.AddUnversionedTypes(externalGV, &unversioned.Status{})
+	s.AddUnversionedTypes(externalGV, &metav1.Status{})
 
 	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
 	codec := cf.LegacyCodec(schema.GroupVersion{Version: "v1"})
@@ -390,7 +390,7 @@ func GetDirectCodecTestScheme() *runtime.Scheme {
 	s.AddKnownTypes(internalGV, &TestType1{})
 	s.AddKnownTypes(externalGV, &ExternalTestType1{})
 
-	s.AddUnversionedTypes(externalGV, &unversioned.Status{})
+	s.AddUnversionedTypes(externalGV, &metav1.Status{})
 	return s
 }
 

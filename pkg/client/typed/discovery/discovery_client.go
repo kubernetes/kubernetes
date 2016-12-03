@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -59,15 +59,15 @@ type CachedDiscoveryInterface interface {
 type ServerGroupsInterface interface {
 	// ServerGroups returns the supported groups, with information like supported versions and the
 	// preferred version.
-	ServerGroups() (*unversioned.APIGroupList, error)
+	ServerGroups() (*metav1.APIGroupList, error)
 }
 
 // ServerResourcesInterface has methods for obtaining supported resources on the API server
 type ServerResourcesInterface interface {
 	// ServerResourcesForGroupVersion returns the supported resources for a group and version.
-	ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error)
+	ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error)
 	// ServerResources returns the supported resources for all groups and versions.
-	ServerResources() (map[string]*unversioned.APIResourceList, error)
+	ServerResources() (map[string]*metav1.APIResourceList, error)
 	// ServerPreferredResources returns the supported resources with the version preferred by the
 	// server.
 	ServerPreferredResources() ([]schema.GroupVersionResource, error)
@@ -96,12 +96,12 @@ type DiscoveryClient struct {
 	LegacyPrefix string
 }
 
-// Convert unversioned.APIVersions to unversioned.APIGroup. APIVersions is used by legacy v1, so
+// Convert metav1.APIVersions to metav1.APIGroup. APIVersions is used by legacy v1, so
 // group would be "".
-func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unversioned.APIGroup) {
-	groupVersions := []unversioned.GroupVersionForDiscovery{}
+func apiVersionsToAPIGroup(apiVersions *metav1.APIVersions) (apiGroup metav1.APIGroup) {
+	groupVersions := []metav1.GroupVersionForDiscovery{}
 	for _, version := range apiVersions.Versions {
-		groupVersion := unversioned.GroupVersionForDiscovery{
+		groupVersion := metav1.GroupVersionForDiscovery{
 			GroupVersion: version,
 			Version:      version,
 		}
@@ -115,11 +115,11 @@ func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unver
 
 // ServerGroups returns the supported groups, with information like supported versions and the
 // preferred version.
-func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList, err error) {
+func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
-	v := &unversioned.APIVersions{}
+	v := &metav1.APIVersions{}
 	err = d.restClient.Get().AbsPath(d.LegacyPrefix).Do().Into(v)
-	apiGroup := unversioned.APIGroup{}
+	apiGroup := metav1.APIGroup{}
 	if err == nil {
 		apiGroup = apiVersionsToAPIGroup(v)
 	}
@@ -128,14 +128,14 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 	}
 
 	// Get the groupVersions exposed at /apis
-	apiGroupList = &unversioned.APIGroupList{}
+	apiGroupList = &metav1.APIGroupList{}
 	err = d.restClient.Get().AbsPath("/apis").Do().Into(apiGroupList)
 	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
 		return nil, err
 	}
 	// to be compatible with a v1.0 server, if it's a 403 or 404, ignore and return whatever we got from /api
 	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
-		apiGroupList = &unversioned.APIGroupList{}
+		apiGroupList = &metav1.APIGroupList{}
 	}
 
 	// append the group retrieved from /api to the list
@@ -144,7 +144,7 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 }
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
-func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (resources *unversioned.APIResourceList, err error) {
+func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (resources *metav1.APIResourceList, err error) {
 	url := url.URL{}
 	if len(groupVersion) == 0 {
 		return nil, fmt.Errorf("groupVersion shouldn't be empty")
@@ -154,7 +154,7 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	} else {
 		url.Path = "/apis/" + groupVersion
 	}
-	resources = &unversioned.APIResourceList{}
+	resources = &metav1.APIResourceList{}
 	err = d.restClient.Get().AbsPath(url.String()).Do().Into(resources)
 	if err != nil {
 		// ignore 403 or 404 error to be compatible with an v1.0 server.
@@ -167,13 +167,13 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 }
 
 // ServerResources returns the supported resources for all groups and versions.
-func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (d *DiscoveryClient) ServerResources() (map[string]*metav1.APIResourceList, error) {
 	apiGroups, err := d.ServerGroups()
 	if err != nil {
 		return nil, err
 	}
-	groupVersions := unversioned.ExtractGroupVersions(apiGroups)
-	result := map[string]*unversioned.APIResourceList{}
+	groupVersions := metav1.ExtractGroupVersions(apiGroups)
+	result := map[string]*metav1.APIResourceList{}
 	for _, groupVersion := range groupVersions {
 		resources, err := d.ServerResourcesForGroupVersion(groupVersion)
 		if err != nil {
@@ -305,7 +305,7 @@ func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.A
 	if err != nil {
 		return nil, err
 	}
-	groupVersions := unversioned.ExtractGroupVersions(groupList)
+	groupVersions := metav1.ExtractGroupVersions(groupList)
 	// This check also takes care the case that kubectl is newer than the running endpoint
 	if stringDoesntExistIn(version.String(), groupVersions) {
 		return nil, fmt.Errorf("API version: %v is not supported by the server. Use one of: %v", version, groupVersions)

@@ -16,10 +16,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/unversioned/validation:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/apis/meta/v1/validation:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/util/validation/field:go_default_library",
         "//vendor:github.com/robfig/cron",
@@ -33,8 +33,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/types:go_default_library",
     ],
 )

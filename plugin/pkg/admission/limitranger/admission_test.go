@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -573,7 +573,7 @@ func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("list", "limitranges", func(action core.Action) (bool, runtime.Object, error) {
 		limitRangeList := &api.LimitRangeList{
-			ListMeta: unversioned.ListMeta{
+			ListMeta: metav1.ListMeta{
 				ResourceVersion: fmt.Sprintf("%d", len(limitRanges)),
 			},
 		}

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
@@ -108,7 +108,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func(i int32) *int32 { return &i }(replicas),
-			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 				"name": name,
 			}},
 			Template: v1.PodTemplateSpec{

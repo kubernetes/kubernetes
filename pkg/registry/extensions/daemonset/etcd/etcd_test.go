@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -44,7 +44,7 @@ func newValidDaemonSet() *extensions.DaemonSet {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -80,7 +80,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&extensions.DaemonSet{
 			Spec: extensions.DaemonSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{}},
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{}},
 				Template: validDaemonSet.Spec.Template,
 			},
 		},

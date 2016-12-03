@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -287,7 +287,7 @@ func bounded(lower, upper interface{}) types.GomegaMatcher {
 }
 
 func recent(d time.Duration) types.GomegaMatcher {
-	return WithTransform(func(t unversioned.Time) time.Time {
+	return WithTransform(func(t metav1.Time) time.Time {
 		return t.Time
 	}, And(
 		BeTemporally(">=", time.Now().Add(-d)),

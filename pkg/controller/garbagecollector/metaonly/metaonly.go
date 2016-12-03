@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
@@ -55,7 +55,7 @@ func NewMetadataCodecFactory() serializer.CodecFactory {
 		metaOnlyObject := gvkToMetadataOnlyObject(kind)
 		scheme.AddKnownTypeWithName(kind, metaOnlyObject)
 	}
-	scheme.AddUnversionedTypes(api.Unversioned, &unversioned.Status{})
+	scheme.AddUnversionedTypes(api.Unversioned, &metav1.Status{})
 	return serializer.NewCodecFactory(scheme)
 }
 

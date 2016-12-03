@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -61,16 +61,16 @@ func TestExtractInvalidPods(t *testing.T) {
 	}{
 		{
 			desc: "No version",
-			pod:  &v1.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: ""}},
+			pod:  &v1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: ""}},
 		},
 		{
 			desc: "Invalid version",
-			pod:  &v1.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: "v1betta2"}},
+			pod:  &v1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "v1betta2"}},
 		},
 		{
 			desc: "Invalid volume name",
 			pod: &v1.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{{Name: "_INVALID_"}},
 				},
@@ -79,7 +79,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &v1.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -88,7 +88,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &v1.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: ""}},
 				},
@@ -97,7 +97,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &v1.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "_INVALID_"}},
 				},
@@ -135,7 +135,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		{
 			desc: "Single pod",
 			pods: &v1.Pod{
-				TypeMeta: unversioned.TypeMeta{
+				TypeMeta: metav1.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},
@@ -185,7 +185,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		{
 			desc: "Multiple pods",
 			pods: &v1.PodList{
-				TypeMeta: unversioned.TypeMeta{
+				TypeMeta: metav1.TypeMeta{
 					Kind:       "PodList",
 					APIVersion: "",
 				},
@@ -319,7 +319,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 func TestURLWithHeader(t *testing.T) {
 	pod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 			Kind:       "Pod",
 		},

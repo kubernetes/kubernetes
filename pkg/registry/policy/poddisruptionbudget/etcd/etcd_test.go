@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -57,7 +57,7 @@ func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
 			Labels:    map[string]string{"a": "b"},
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
-			Selector:     &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			MinAvailable: intstr.FromInt(7),
 		},
 		Status: policy.PodDisruptionBudgetStatus{},

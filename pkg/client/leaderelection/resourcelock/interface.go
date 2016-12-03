@@ -17,7 +17,7 @@ limitations under the License.
 package resourcelock
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 )
 
@@ -32,8 +32,8 @@ const (
 type LeaderElectionRecord struct {
 	HolderIdentity       string           `json:"holderIdentity"`
 	LeaseDurationSeconds int              `json:"leaseDurationSeconds"`
-	AcquireTime          unversioned.Time `json:"acquireTime"`
-	RenewTime            unversioned.Time `json:"renewTime"`
+	AcquireTime          metav1.Time `json:"acquireTime"`
+	RenewTime            metav1.Time `json:"renewTime"`
 	LeaderTransitions    int              `json:"leaderTransitions"`
 }
 

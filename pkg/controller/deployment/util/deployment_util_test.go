@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
@@ -91,7 +91,7 @@ func newPod(now time.Time, ready bool, beforeSec int) v1.Pod {
 			Conditions: []v1.PodCondition{
 				{
 					Type:               v1.PodReady,
-					LastTransitionTime: unversioned.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second)),
+					LastTransitionTime: metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second)),
 					Status:             conditionStatus,
 				},
 			},
@@ -135,7 +135,7 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func(i int32) *int32 { return &i }(1),
-			Selector: &unversioned.LabelSelector{MatchLabels: labels},
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: labels,
@@ -166,7 +166,7 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(0); return &i }(),
 			Template: template,
-			Selector: &unversioned.LabelSelector{MatchLabels: template.Labels},
+			Selector: &metav1.LabelSelector{MatchLabels: template.Labels},
 		},
 	}
 }
@@ -181,7 +181,7 @@ func generateDeployment(image string) extensions.Deployment {
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: func(i int32) *int32 { return &i }(1),
-			Selector: &unversioned.LabelSelector{MatchLabels: podLabels},
+			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: podLabels,
@@ -1060,7 +1060,7 @@ func TestDeploymentTimedOut(t *testing.T) {
 					{
 						Type:           condType,
 						Status:         status,
-						LastUpdateTime: unversioned.Time{Time: from},
+						LastUpdateTime: metav1.Time{Time: from},
 					},
 				},
 			},

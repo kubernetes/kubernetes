@@ -30,7 +30,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -361,8 +361,8 @@ func testCheckStop(t *testing.T, i int, w watch.Interface) {
 			switch e.Object.(type) {
 			case *api.Pod:
 				obj = e.Object.(*api.Pod).Name
-			case *unversioned.Status:
-				obj = e.Object.(*unversioned.Status).Message
+			case *metav1.Status:
+				obj = e.Object.(*metav1.Status).Message
 			}
 			t.Errorf("#%d: ResultChan should have been closed. Event: %s. Object: %s", i, e.Type, obj)
 		}

@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -720,10 +720,10 @@ func newErrWatcher(err error) *errWatcher {
 	case *errors.StatusError:
 		errEvent.Object = &err.ErrStatus
 	default:
-		errEvent.Object = &unversioned.Status{
-			Status:  unversioned.StatusFailure,
+		errEvent.Object = &metav1.Status{
+			Status:  metav1.StatusFailure,
 			Message: err.Error(),
-			Reason:  unversioned.StatusReasonInternalError,
+			Reason:  metav1.StatusReasonInternalError,
 			Code:    http.StatusInternalServerError,
 		}
 	}

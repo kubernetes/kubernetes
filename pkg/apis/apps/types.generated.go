@@ -27,7 +27,7 @@ import (
 	codec1978 "github.com/ugorji/go/codec"
 	pkg2_api "k8s.io/kubernetes/pkg/api"
 	pkg4_resource "k8s.io/kubernetes/pkg/api/resource"
-	pkg1_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	pkg1_unversioned "k8s.io/kubernetes/pkg/apis/meta/v1"
 	pkg3_types "k8s.io/kubernetes/pkg/types"
 	pkg5_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"

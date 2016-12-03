@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
@@ -415,7 +415,7 @@ func (t *Tester) testCreateRejectsMismatchedNamespace(valid runtime.Object) {
 
 func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(valid)
-	now := unversioned.Now()
+	now := metav1.Now()
 	objectMeta.UID = "bad-uid"
 	objectMeta.CreationTimestamp = now
 
@@ -761,9 +761,9 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !t.returnDeletedObject {
-		if status, ok := obj.(*unversioned.Status); !ok {
+		if status, ok := obj.(*metav1.Status); !ok {
 			t.Errorf("expected status of delete, got %v", status)
-		} else if status.Status != unversioned.StatusSuccess {
+		} else if status.Status != metav1.StatusSuccess {
 			t.Errorf("expected success, got: %v", status.Status)
 		}
 	}
@@ -807,9 +807,9 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	}
 
 	if !t.returnDeletedObject {
-		if status, ok := obj.(*unversioned.Status); !ok {
+		if status, ok := obj.(*metav1.Status); !ok {
 			t.Errorf("expected status of delete, got %v", status)
-		} else if status.Status != unversioned.StatusSuccess {
+		} else if status.Status != metav1.StatusSuccess {
 			t.Errorf("expected success, got: %v", status.Status)
 		}
 	}

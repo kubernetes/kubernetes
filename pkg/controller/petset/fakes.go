@@ -23,7 +23,7 @@ import (
 	inf "gopkg.in/inf.v0"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -71,7 +71,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 	}
 
 	return &apps.StatefulSet{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1beta1",
 		},
@@ -81,7 +81,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			UID:       types.UID("test"),
 		},
 		Spec: apps.StatefulSetSpec{
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
@@ -273,7 +273,7 @@ func (f *fakePetClient) setDeletionTimestamp(index int) error {
 	if len(f.pets) <= index {
 		return fmt.Errorf("Index out of range, len %v index %v", len(f.pets), index)
 	}
-	f.pets[index].pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+	f.pets[index].pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	return nil
 }
 

@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -88,7 +88,7 @@ func TestDaemonSetController(t *testing.T) {
 			SelfLink:  "/api/v1/namespaces/ns/daemonsets/test-daemonset",
 		},
 		Spec: extensionsv1.DaemonSetSpec{
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: make(map[string]string),
 			},
 		},

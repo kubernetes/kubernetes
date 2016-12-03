@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -117,7 +117,7 @@ func newDeployment(deploymentName string, replicas int32, podLabels map[string]s
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: func(i int32) *int32 { return &i }(replicas),
-			Selector: &unversioned.LabelSelector{MatchLabels: podLabels},
+			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
 			Strategy: extensions.DeploymentStrategy{
 				Type: strategyType,
 			},
@@ -195,7 +195,7 @@ func stopDeploymentMaybeOverlap(c clientset.Interface, internalClient internalcl
 	Expect(err).To(HaveOccurred())
 	Expect(errors.IsNotFound(err)).To(BeTrue())
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
-	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
 	options := v1.ListOptions{LabelSelector: selector.String()}
 	rss, err := c.Extensions().ReplicaSets(ns).List(options)
@@ -629,7 +629,7 @@ func testPausedDeployment(f *framework.Framework) {
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
-	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		Expect(err).NotTo(HaveOccurred())
 	}
@@ -975,7 +975,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	err = framework.CheckRSHashLabel(newRS)
 	Expect(err).NotTo(HaveOccurred())
 	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
-	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
 	options := v1.ListOptions{LabelSelector: selector.String()}
 	pods, err := c.Core().Pods(ns).List(options)
@@ -1424,7 +1424,7 @@ func testIterativeDeployments(f *framework.Framework) {
 		default:
 			// arbitrarily delete deployment pods
 			framework.Logf("%02d: arbitrarily deleting one or more deployment pods for deployment %q", i, deployment.Name)
-			selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+			selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 			Expect(err).NotTo(HaveOccurred())
 			opts := v1.ListOptions{LabelSelector: selector.String()}
 			podList, err := c.Core().Pods(ns).List(opts)

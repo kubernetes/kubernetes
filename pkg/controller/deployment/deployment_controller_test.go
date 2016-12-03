@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -37,10 +37,10 @@ import (
 
 var (
 	alwaysReady = func() bool { return true }
-	noTimestamp = unversioned.Time{}
+	noTimestamp = metav1.Time{}
 )
 
-func rs(name string, replicas int, selector map[string]string, timestamp unversioned.Time) *extensions.ReplicaSet {
+func rs(name string, replicas int, selector map[string]string, timestamp metav1.Time) *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
 		ObjectMeta: v1.ObjectMeta{
 			Name:              name,
@@ -49,7 +49,7 @@ func rs(name string, replicas int, selector map[string]string, timestamp unversi
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
-			Selector: &unversioned.LabelSelector{MatchLabels: selector},
+			Selector: &metav1.LabelSelector{MatchLabels: selector},
 			Template: v1.PodTemplateSpec{},
 		},
 	}
@@ -65,7 +65,7 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 
 func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *extensions.Deployment {
 	d := extensions.Deployment{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:       uuid.NewUUID(),
 			Name:      name,
@@ -80,7 +80,7 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 				},
 			},
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
-			Selector: &unversioned.LabelSelector{MatchLabels: selector},
+			Selector: &metav1.LabelSelector{MatchLabels: selector},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: selector,
@@ -228,7 +228,7 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	f := newFixture(t)
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	now := unversioned.Now()
+	now := metav1.Now()
 	d.DeletionTimestamp = &now
 	f.dLister = append(f.dLister, d)
 
@@ -250,7 +250,7 @@ func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing
 	informers.Start(stopCh)
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	empty := unversioned.LabelSelector{}
+	empty := metav1.LabelSelector{}
 	d.Spec.Selector = &empty
 	controller.dLister.Indexer.Add(d)
 	// We expect the deployment controller to not take action here since it's configuration

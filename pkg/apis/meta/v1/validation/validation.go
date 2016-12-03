@@ -17,12 +17,12 @@ limitations under the License.
 package validation
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-func ValidateLabelSelector(ps *unversioned.LabelSelector, fldPath *field.Path) field.ErrorList {
+func ValidateLabelSelector(ps *metav1.LabelSelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ps == nil {
 		return allErrs
@@ -34,14 +34,14 @@ func ValidateLabelSelector(ps *unversioned.LabelSelector, fldPath *field.Path) f
 	return allErrs
 }
 
-func ValidateLabelSelectorRequirement(sr unversioned.LabelSelectorRequirement, fldPath *field.Path) field.ErrorList {
+func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch sr.Operator {
-	case unversioned.LabelSelectorOpIn, unversioned.LabelSelectorOpNotIn:
+	case metav1.LabelSelectorOpIn, metav1.LabelSelectorOpNotIn:
 		if len(sr.Values) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
 		}
-	case unversioned.LabelSelectorOpExists, unversioned.LabelSelectorOpDoesNotExist:
+	case metav1.LabelSelectorOpExists, metav1.LabelSelectorOpDoesNotExist:
 		if len(sr.Values) > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
 		}

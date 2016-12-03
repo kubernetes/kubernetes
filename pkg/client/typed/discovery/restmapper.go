@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 
 	"github.com/golang/glog"
@@ -31,10 +31,10 @@ import (
 // APIGroupResources is an API group with a mapping of versions to
 // resources.
 type APIGroupResources struct {
-	Group unversioned.APIGroup
+	Group metav1.APIGroup
 	// A mapping of version string to a slice of APIResources for
 	// that version.
-	VersionedResources map[string][]unversioned.APIResource
+	VersionedResources map[string][]metav1.APIResource
 }
 
 // NewRESTMapper returns a PriorityRESTMapper based on the discovered
@@ -121,7 +121,7 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 	for _, group := range apiGroups.Groups {
 		groupResources := &APIGroupResources{
 			Group:              group,
-			VersionedResources: make(map[string][]unversioned.APIResource),
+			VersionedResources: make(map[string][]metav1.APIResource),
 		}
 		for _, version := range group.Versions {
 			resources, err := cl.ServerResourcesForGroupVersion(version.GroupVersion)

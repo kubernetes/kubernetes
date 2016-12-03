@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	corepod "k8s.io/kubernetes/pkg/registry/core/pod"
@@ -187,7 +187,7 @@ func TestList(t *testing.T) {
 	for _, item := range result.Items {
 		// unset fields that are set by the infrastructure
 		item.ResourceVersion = ""
-		item.CreationTimestamp = unversioned.Time{}
+		item.CreationTimestamp = metav1.Time{}
 
 		if item.Namespace != "ns" {
 			t.Errorf("Unexpected namespace: %s", item.Namespace)

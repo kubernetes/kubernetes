@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -60,7 +60,7 @@ func validNewReplicaSet() *extensions.ReplicaSet {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -101,7 +101,7 @@ func TestCreate(t *testing.T) {
 		&extensions.ReplicaSet{
 			Spec: extensions.ReplicaSetSpec{
 				Replicas: 2,
-				Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{}},
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{}},
 				Template: validReplicaSet.Spec.Template,
 			},
 		},
@@ -130,7 +130,7 @@ func TestUpdate(t *testing.T) {
 		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.ReplicaSet)
-			object.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{}}
+			object.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
 	)
