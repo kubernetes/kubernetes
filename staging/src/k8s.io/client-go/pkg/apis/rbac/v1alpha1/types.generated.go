@@ -25,8 +25,8 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
-	pkg2_unversioned "k8s.io/client-go/pkg/api/unversioned"
 	pkg3_v1 "k8s.io/client-go/pkg/api/v1"
+	pkg2_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	pkg1_runtime "k8s.io/client-go/pkg/runtime"
 	pkg4_types "k8s.io/client-go/pkg/types"
 	"reflect"
@@ -64,8 +64,8 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg2_unversioned.TypeMeta
-		var v1 pkg3_v1.ObjectMeta
+		var v0 pkg3_v1.ObjectMeta
+		var v1 pkg2_v1.TypeMeta
 		var v2 pkg1_runtime.RawExtension
 		var v3 pkg4_types.UID
 		var v4 time.Time
@@ -2033,7 +2033,7 @@ func (x *RoleBindingList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv180 := &x.ListMeta
 				yym181 := z.DecBinary()
@@ -2114,7 +2114,7 @@ func (x *RoleBindingList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv187 := &x.ListMeta
 		yym188 := z.DecBinary()
@@ -2377,7 +2377,7 @@ func (x *RoleList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv212 := &x.ListMeta
 				yym213 := z.DecBinary()
@@ -2458,7 +2458,7 @@ func (x *RoleList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv219 := &x.ListMeta
 		yym220 := z.DecBinary()
@@ -3396,7 +3396,7 @@ func (x *ClusterRoleBindingList) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv305 := &x.ListMeta
 				yym306 := z.DecBinary()
@@ -3477,7 +3477,7 @@ func (x *ClusterRoleBindingList) codecDecodeSelfFromArray(l int, d *codec1978.De
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv312 := &x.ListMeta
 		yym313 := z.DecBinary()
@@ -3740,7 +3740,7 @@ func (x *ClusterRoleList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv337 := &x.ListMeta
 				yym338 := z.DecBinary()
@@ -3821,7 +3821,7 @@ func (x *ClusterRoleList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv344 := &x.ListMeta
 		yym345 := z.DecBinary()

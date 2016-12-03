@@ -22,7 +22,7 @@ syntax = 'proto2';
 package k8s.io.kubernetes.pkg.api.v1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
@@ -252,7 +252,7 @@ message ComponentStatusList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ComponentStatus objects.
   repeated ComponentStatus items = 2;
@@ -284,7 +284,7 @@ message ConfigMapKeySelector {
 message ConfigMapList {
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of ConfigMaps.
   repeated ConfigMap items = 2;
@@ -508,7 +508,7 @@ message ContainerState {
 message ContainerStateRunning {
   // Time at which the container was last (re-)started
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time startedAt = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time startedAt = 1;
 }
 
 // ContainerStateTerminated is a terminated state of a container.
@@ -530,11 +530,11 @@ message ContainerStateTerminated {
 
   // Time at which previous execution of the container started
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time startedAt = 5;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time startedAt = 5;
 
   // Time at which the container last terminated
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time finishedAt = 6;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time finishedAt = 6;
 
   // Container's ID in the format 'docker://<container_id>'
   // +optional
@@ -765,7 +765,7 @@ message EndpointsList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of endpoints.
   repeated Endpoints items = 2;
@@ -840,11 +840,11 @@ message Event {
 
   // The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time firstTimestamp = 6;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time firstTimestamp = 6;
 
   // The time at which the most recent occurrence of this event was recorded.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTimestamp = 7;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTimestamp = 7;
 
   // The number of times this event has occurred.
   // +optional
@@ -860,7 +860,7 @@ message EventList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of events
   repeated Event items = 2;
@@ -886,15 +886,6 @@ message ExecAction {
   // Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
   // +optional
   repeated string command = 1;
-}
-
-// ExportOptions is the query options to the standard REST get call.
-message ExportOptions {
-  // Should this value be exported.  Export strips fields that a user can not specify.
-  optional bool export = 1;
-
-  // Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
-  optional bool exact = 2;
 }
 
 // Represents a Fibre Channel volume.
@@ -1214,7 +1205,7 @@ message LimitRangeList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of LimitRange objects.
   // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md
@@ -1232,7 +1223,7 @@ message List {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of objects
   repeated k8s.io.kubernetes.pkg.runtime.RawExtension items = 2;
@@ -1340,7 +1331,7 @@ message NamespaceList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Namespace objects in the list.
   // More info: http://kubernetes.io/docs/user-guide/namespaces
@@ -1426,11 +1417,11 @@ message NodeCondition {
 
   // Last time we got an update on a given condition.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastHeartbeatTime = 3;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastHeartbeatTime = 3;
 
   // Last time the condition transit from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // (brief) reason for the condition's last transition.
   // +optional
@@ -1453,7 +1444,7 @@ message NodeList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of nodes
   repeated Node items = 2;
@@ -1522,7 +1513,7 @@ message NodeSpec {
   optional string providerID = 3;
 
   // Unschedulable controls node schedulability of new pods. By default, node is schedulable.
-  // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"
+  // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
   // +optional
   optional bool unschedulable = 4;
 }
@@ -1709,7 +1700,7 @@ message ObjectMeta {
   // Null for lists.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time creationTimestamp = 8;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time creationTimestamp = 8;
 
   // DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
   // field is set by the server when a graceful deletion is requested by the user, and is not
@@ -1729,7 +1720,7 @@ message ObjectMeta {
   // Read-only.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time deletionTimestamp = 9;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time deletionTimestamp = 9;
 
   // Number of seconds allowed for this object to gracefully terminate before
   // it will be removed from the system. Only set when deletionTimestamp is also set.
@@ -1887,7 +1878,7 @@ message PersistentVolumeClaimList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // A list of persistent volume claims.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
@@ -1904,7 +1895,7 @@ message PersistentVolumeClaimSpec {
 
   // A label query over volumes to consider for binding.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.LabelSelector selector = 4;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector selector = 4;
 
   // Resources represents the minimum resources the volume should have.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources
@@ -1952,7 +1943,7 @@ message PersistentVolumeList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of persistent volumes.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes
@@ -2170,7 +2161,7 @@ message PodAffinity {
 message PodAffinityTerm {
   // A label query over a set of resources, in this case pods.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.LabelSelector labelSelector = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
   // nil list means "this pod's namespace," empty list means "all namespaces"
@@ -2271,11 +2262,11 @@ message PodCondition {
 
   // Last time we probed the condition.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
   // Last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // Unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
@@ -2325,7 +2316,7 @@ message PodList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pods.
   // More info: http://kubernetes.io/docs/user-guide/pods
@@ -2358,7 +2349,7 @@ message PodLogOptions {
   // If this value is in the future, no logs will be returned.
   // Only one of sinceSeconds or sinceTime may be specified.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time sinceTime = 5;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time sinceTime = 5;
 
   // If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line
   // of log output. Defaults to false.
@@ -2582,7 +2573,7 @@ message PodStatus {
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time startTime = 7;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time startTime = 7;
 
   // The list has one entry per container in the manifest. Each entry is currently the output
   // of `docker inspect`.
@@ -2625,7 +2616,7 @@ message PodTemplateList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pod templates
   repeated PodTemplate items = 2;
@@ -2658,7 +2649,7 @@ message PreferAvoidPodsEntry {
 
   // Time at which this entry was added to the list.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time evictionTime = 2;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time evictionTime = 2;
 
   // (brief) reason why this entry was added to the list.
   // +optional
@@ -2836,7 +2827,7 @@ message ReplicationControllerCondition {
 
   // The last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 3;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
@@ -2852,7 +2843,7 @@ message ReplicationControllerList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of replication controllers.
   // More info: http://kubernetes.io/docs/user-guide/replication-controller
@@ -2954,7 +2945,7 @@ message ResourceQuotaList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ResourceQuota objects.
   // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
@@ -3063,7 +3054,7 @@ message SecretList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of secret objects.
   // More info: http://kubernetes.io/docs/user-guide/secrets
@@ -3201,7 +3192,7 @@ message ServiceAccountList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ServiceAccounts.
   // More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md#service-accounts
@@ -3213,7 +3204,7 @@ message ServiceList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of services
   repeated Service items = 2;

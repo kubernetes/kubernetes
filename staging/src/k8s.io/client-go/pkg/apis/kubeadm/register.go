@@ -18,6 +18,7 @@ package kubeadm
 
 import (
 	"k8s.io/client-go/pkg/api"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 )
@@ -50,7 +51,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterInfo{},
 		&api.ListOptions{},
 		&api.DeleteOptions{},
-		&api.ExportOptions{},
+		&metav1.ExportOptions{},
 	)
 	return nil
 }

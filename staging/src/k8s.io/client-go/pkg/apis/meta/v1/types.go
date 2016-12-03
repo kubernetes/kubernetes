@@ -23,7 +23,7 @@ limitations under the License.
 //   (e.g. LabelSelector).
 // In the future, we will probably move these categories of objects into
 // separate packages.
-package unversioned
+package v1
 
 import "strings"
 
@@ -69,9 +69,9 @@ type ListMeta struct {
 // ExportOptions is the query options to the standard REST get call.
 type ExportOptions struct {
 	TypeMeta `json:",inline"`
-	// Should this value be exported.  Export strips fields that a user can not specify.`
+	// Should this value be exported.  Export strips fields that a user can not specify.
 	Export bool `json:"export" protobuf:"varint,1,opt,name=export"`
-	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
+	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
 }
 

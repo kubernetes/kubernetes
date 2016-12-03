@@ -26,7 +26,7 @@ import (
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
 	pkg1_api "k8s.io/client-go/pkg/api"
-	pkg2_unversioned "k8s.io/client-go/pkg/api/unversioned"
+	pkg2_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	pkg3_types "k8s.io/client-go/pkg/types"
 	"reflect"
 	"runtime"
@@ -64,7 +64,7 @@ func init() {
 	}
 	if false { // reference the types, but skip this branch at build/run time
 		var v0 pkg1_api.LocalObjectReference
-		var v1 pkg2_unversioned.Time
+		var v1 pkg2_v1.Time
 		var v2 pkg3_types.UID
 		var v3 time.Time
 		_, _, _, _ = v0, v1, v2, v3
@@ -801,7 +801,7 @@ func (x *ClusterCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "lastProbeTime":
 			if r.TryDecodeAsNil() {
-				x.LastProbeTime = pkg2_unversioned.Time{}
+				x.LastProbeTime = pkg2_v1.Time{}
 			} else {
 				yyv62 := &x.LastProbeTime
 				yym63 := z.DecBinary()
@@ -818,7 +818,7 @@ func (x *ClusterCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "lastTransitionTime":
 			if r.TryDecodeAsNil() {
-				x.LastTransitionTime = pkg2_unversioned.Time{}
+				x.LastTransitionTime = pkg2_v1.Time{}
 			} else {
 				yyv64 := &x.LastTransitionTime
 				yym65 := z.DecBinary()
@@ -903,7 +903,7 @@ func (x *ClusterCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastProbeTime = pkg2_unversioned.Time{}
+		x.LastProbeTime = pkg2_v1.Time{}
 	} else {
 		yyv71 := &x.LastProbeTime
 		yym72 := z.DecBinary()
@@ -930,7 +930,7 @@ func (x *ClusterCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastTransitionTime = pkg2_unversioned.Time{}
+		x.LastTransitionTime = pkg2_v1.Time{}
 	} else {
 		yyv73 := &x.LastTransitionTime
 		yym74 := z.DecBinary()
@@ -1855,7 +1855,7 @@ func (x *ClusterList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv154 := &x.ListMeta
 				yym155 := z.DecBinary()
@@ -1936,7 +1936,7 @@ func (x *ClusterList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv161 := &x.ListMeta
 		yym162 := z.DecBinary()

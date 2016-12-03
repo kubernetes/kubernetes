@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/apimachinery/registered"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
@@ -35,14 +35,14 @@ import (
 func TestRESTMapper(t *testing.T) {
 	resources := []*APIGroupResources{
 		{
-			Group: unversioned.APIGroup{
-				Versions: []unversioned.GroupVersionForDiscovery{
+			Group: metav1.APIGroup{
+				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
 					{Version: "v2"},
 				},
-				PreferredVersion: unversioned.GroupVersionForDiscovery{Version: "v1"},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
 			},
-			VersionedResources: map[string][]unversioned.APIResource{
+			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "pods", Namespaced: true, Kind: "Pod"},
 				},
@@ -52,14 +52,14 @@ func TestRESTMapper(t *testing.T) {
 			},
 		},
 		{
-			Group: unversioned.APIGroup{
+			Group: metav1.APIGroup{
 				Name: "extensions",
-				Versions: []unversioned.GroupVersionForDiscovery{
+				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1beta"},
 				},
-				PreferredVersion: unversioned.GroupVersionForDiscovery{Version: "v1beta"},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta"},
 			},
-			VersionedResources: map[string][]unversioned.APIResource{
+			VersionedResources: map[string][]metav1.APIResource{
 				"v1beta": {
 					{Name: "jobs", Namespaced: true, Kind: "Job"},
 				},
@@ -250,19 +250,19 @@ func (c *fakeCachedDiscoveryInterface) RESTClient() rest.Interface {
 	return &fake.RESTClient{}
 }
 
-func (c *fakeCachedDiscoveryInterface) ServerGroups() (*unversioned.APIGroupList, error) {
+func (c *fakeCachedDiscoveryInterface) ServerGroups() (*metav1.APIGroupList, error) {
 	if c.enabledA {
-		return &unversioned.APIGroupList{
-			Groups: []unversioned.APIGroup{
+		return &metav1.APIGroupList{
+			Groups: []metav1.APIGroup{
 				{
 					Name: "a",
-					Versions: []unversioned.GroupVersionForDiscovery{
+					Versions: []metav1.GroupVersionForDiscovery{
 						{
 							GroupVersion: "a/v1",
 							Version:      "v1",
 						},
 					},
-					PreferredVersion: unversioned.GroupVersionForDiscovery{
+					PreferredVersion: metav1.GroupVersionForDiscovery{
 						GroupVersion: "a/v1",
 						Version:      "v1",
 					},
@@ -270,14 +270,14 @@ func (c *fakeCachedDiscoveryInterface) ServerGroups() (*unversioned.APIGroupList
 			},
 		}, nil
 	}
-	return &unversioned.APIGroupList{}, nil
+	return &metav1.APIGroupList{}, nil
 }
 
-func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	if c.enabledA && groupVersion == "a/v1" {
-		return &unversioned.APIResourceList{
+		return &metav1.APIResourceList{
 			GroupVersion: "a/v1",
-			APIResources: []unversioned.APIResource{
+			APIResources: []metav1.APIResource{
 				{
 					Name:       "foo",
 					Kind:       "Foo",
@@ -290,14 +290,14 @@ func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersi
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
-func (c *fakeCachedDiscoveryInterface) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (c *fakeCachedDiscoveryInterface) ServerResources() (map[string]*metav1.APIResourceList, error) {
 	if c.enabledA {
 		av1, _ := c.ServerResourcesForGroupVersion("a/v1")
-		return map[string]*unversioned.APIResourceList{
+		return map[string]*metav1.APIResourceList{
 			"a/v1": av1,
 		}, nil
 	}
-	return map[string]*unversioned.APIResourceList{}, nil
+	return map[string]*metav1.APIResourceList{}, nil
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]schema.GroupVersionResource, error) {

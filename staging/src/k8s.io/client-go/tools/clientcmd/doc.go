@@ -31,7 +31,7 @@ Sample usage from merged .kubeconfig files (local directory, home directory)
 	if err != nil {
 		// Do something
 	}
-	client, err := unversioned.New(config)
+	client, err := metav1.New(config)
 	// ...
 */
 package clientcmd // import "k8s.io/client-go/tools/clientcmd"

@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/pkg/watch"
@@ -54,7 +54,7 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-			return &v1.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	go r.ListAndWatch(wait.NeverStop)
@@ -80,7 +80,7 @@ func TestRunUntil(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-			return &v1.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	r.RunUntil(stopCh)
@@ -228,7 +228,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-			return &v1.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	s := NewFIFO(MetaNamespaceKeyFunc)
@@ -271,7 +271,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 		return &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: id, ResourceVersion: rv}}
 	}
 	mkList := func(rv string, pods ...*v1.Pod) *v1.PodList {
-		list := &v1.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: rv}}
+		list := &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: rv}}
 		for _, pod := range pods {
 			list.Items = append(list.Items, *pod)
 		}
@@ -374,7 +374,7 @@ func TestReflectorResync(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-			return &v1.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "0"}}, nil
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "0"}}, nil
 		},
 	}
 	resyncPeriod := 1 * time.Millisecond

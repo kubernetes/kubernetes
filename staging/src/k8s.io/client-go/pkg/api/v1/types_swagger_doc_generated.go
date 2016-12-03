@@ -493,16 +493,6 @@ func (ExecAction) SwaggerDoc() map[string]string {
 	return map_ExecAction
 }
 
-var map_ExportOptions = map[string]string{
-	"":       "ExportOptions is the query options to the standard REST get call.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify.",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
-}
-
-func (ExportOptions) SwaggerDoc() map[string]string {
-	return map_ExportOptions
-}
-
 var map_FCVolumeSource = map[string]string{
 	"":           "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
 	"targetWWNs": "Required: FC target worldwide names (WWNs)",
@@ -901,7 +891,7 @@ var map_NodeSpec = map[string]string{
 	"podCIDR":       "PodCIDR represents the pod IP range assigned to the node.",
 	"externalID":    "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
-	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"",
+	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {

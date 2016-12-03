@@ -17,8 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/intstr"
 )
@@ -41,7 +41,7 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 	// TODO: support templates defined elsewhere when we support them in the API
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &unversioned.LabelSelector{
+			obj.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: labels,
 			}
 		}
@@ -57,7 +57,7 @@ func SetDefaults_Deployment(obj *Deployment) {
 
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &unversioned.LabelSelector{MatchLabels: labels}
+			obj.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
 		}
 		if len(obj.Labels) == 0 {
 			obj.Labels = labels
@@ -103,7 +103,7 @@ func SetDefaults_Job(obj *Job) {
 
 		// and default behavior for an unspecified manual selector is to use the pod template labels
 		if manualSelector && obj.Spec.Selector == nil {
-			obj.Spec.Selector = &unversioned.LabelSelector{
+			obj.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: labels,
 			}
 		}
@@ -141,7 +141,7 @@ func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 	// TODO: support templates defined elsewhere when we support them in the API
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &unversioned.LabelSelector{
+			obj.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: labels,
 			}
 		}
