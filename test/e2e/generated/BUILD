@@ -13,8 +13,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "gobindata_util.go",
         "main.go",
         ":bindata",
+    ],
+    deps = [
+        "//vendor:github.com/golang/glog",
     ],
 )
 

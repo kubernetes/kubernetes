@@ -161,7 +161,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 // WaitForSuccess waits for pod to success.
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
-	Expect(waitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+	Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:

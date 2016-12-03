@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/generated"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -379,7 +380,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		It("liveness pods should be automatically restarted", func() {
 			mkpath := func(file string) string {
 				path := filepath.Join("test/fixtures/doc-yaml/user-guide/liveness", file)
-				ExpectNoError(framework.CreateFileForGoBinData(path, path))
+				ExpectNoError(createFileForGoBinData(path, path))
 				return path
 			}
 			execYaml := mkpath("exec-liveness.yaml")
@@ -431,7 +432,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		It("should create a pod that reads a secret", func() {
 			mkpath := func(file string) string {
 				path := filepath.Join("test/fixtures/doc-yaml/user-guide/secrets", file)
-				ExpectNoError(framework.CreateFileForGoBinData(path, path))
+				ExpectNoError(createFileForGoBinData(path, path))
 				return path
 			}
 			secretYaml := mkpath("secret.yaml")
@@ -456,7 +457,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		It("should create a pod that prints his name and namespace", func() {
 			mkpath := func(file string) string {
 				path := filepath.Join("test/fixtures/doc-yaml/user-guide/downward-api", file)
-				ExpectNoError(framework.CreateFileForGoBinData(path, path))
+				ExpectNoError(createFileForGoBinData(path, path))
 				return path
 			}
 			podYaml := mkpath("dapi-pod.yaml")
@@ -585,4 +586,21 @@ func prepareResourceWithReplacedString(inputFile, old, new string) string {
 	Expect(err).NotTo(HaveOccurred())
 	podYaml := strings.Replace(string(data), old, new, 1)
 	return podYaml
+}
+
+func createFileForGoBinData(gobindataPath, outputFilename string) error {
+	data := generated.ReadOrDie(gobindataPath)
+	if len(data) == 0 {
+		return fmt.Errorf("Failed to read gobindata from %v", gobindataPath)
+	}
+	fullPath := filepath.Join(framework.TestContext.OutputDir, outputFilename)
+	err := os.MkdirAll(filepath.Dir(fullPath), 0777)
+	if err != nil {
+		return fmt.Errorf("Error while creating directory %v: %v", filepath.Dir(fullPath), err)
+	}
+	err = ioutil.WriteFile(fullPath, data, 0644)
+	if err != nil {
+		return fmt.Errorf("Error while trying to write to file %v: %v", fullPath, err)
+	}
+	return nil
 }

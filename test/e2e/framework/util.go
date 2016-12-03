@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -78,7 +77,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
-	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -617,52 +615,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 	return nil
 }
 
-func podFromManifest(filename string) (*v1.Pod, error) {
-	var pod v1.Pod
-	Logf("Parsing pod from %v", filename)
-	data := ReadOrDie(filename)
-	json, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return nil, err
-	}
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &pod); err != nil {
-		return nil, err
-	}
-	return &pod, nil
-}
-
-// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
-// to flip to Ready, log its output and delete it.
-func RunKubernetesServiceTestContainer(c clientset.Interface, ns string) {
-	path := "test/images/clusterapi-tester/pod.yaml"
-	p, err := podFromManifest(path)
-	if err != nil {
-		Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
-		return
-	}
-	p.Namespace = ns
-	if _, err := c.Core().Pods(ns).Create(p); err != nil {
-		Logf("Failed to create %v: %v", p.Name, err)
-		return
-	}
-	defer func() {
-		if err := c.Core().Pods(ns).Delete(p.Name, nil); err != nil {
-			Logf("Failed to delete pod %v: %v", p.Name, err)
-		}
-	}()
-	timeout := 5 * time.Minute
-	if err := waitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
-		Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
-		return
-	}
-	logs, err := GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
-	if err != nil {
-		Logf("Failed to retrieve logs from %v: %v", p.Name, err)
-	} else {
-		Logf("Output of clusterapi-tester:\n%v", logs)
-	}
-}
-
 func kubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string, logFunc func(ftm string, args ...interface{})) {
 	for _, container := range pod.Spec.Containers {
 		if strings.Contains(container.Name, containerNameSubstr) {
@@ -791,7 +743,7 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	return err
 }
 
-func waitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
+func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
 	Logf("Waiting up to %[1]v for pod %[2]s status to be %[3]s", timeout, podName, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
 		pod, err := c.Core().Pods(ns).Get(podName)
@@ -1354,7 +1306,7 @@ func WaitForPodNotPending(c clientset.Interface, ns, podName, resourceVersion st
 // waitForPodTerminatedInNamespace returns an error if it took too long for the pod
 // to terminate or if the pod terminated with an unexpected reason.
 func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, namespace string) error {
-	return waitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+	return WaitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", PodStartTimeout, func(pod *v1.Pod) (bool, error) {
 		if pod.Status.Phase == v1.PodFailed {
 			if pod.Status.Reason == reason {
 				return true, nil
@@ -1369,7 +1321,7 @@ func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, namespace string, timeout time.Duration) error {
-	return waitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *v1.Pod) (bool, error) {
+	return WaitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
 			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
@@ -3703,7 +3655,7 @@ func CheckPodsCondition(c clientset.Interface, ns string, podNames []string, tim
 	for ix := range podNames {
 		// Launch off pod readiness checkers.
 		go func(name string) {
-			err := waitForPodCondition(c, ns, name, desc, timeout, condition)
+			err := WaitForPodCondition(c, ns, name, desc, timeout, condition)
 			result <- err == nil
 		}(podNames[ix])
 	}
@@ -4784,23 +4736,6 @@ func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *v1.NodeL
 		}
 	}
 	return masters, nodes
-}
-
-func CreateFileForGoBinData(gobindataPath, outputFilename string) error {
-	data := ReadOrDie(gobindataPath)
-	if len(data) == 0 {
-		return fmt.Errorf("Failed to read gobindata from %v", gobindataPath)
-	}
-	fullPath := filepath.Join(TestContext.OutputDir, outputFilename)
-	err := os.MkdirAll(filepath.Dir(fullPath), 0777)
-	if err != nil {
-		return fmt.Errorf("Error while creating directory %v: %v", filepath.Dir(fullPath), err)
-	}
-	err = ioutil.WriteFile(fullPath, data, 0644)
-	if err != nil {
-		return fmt.Errorf("Error while trying to write to file %v: %v", fullPath, err)
-	}
-	return nil
 }
 
 func ListNamespaceEvents(c clientset.Interface, ns string) error {

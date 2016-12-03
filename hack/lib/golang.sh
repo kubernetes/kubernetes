@@ -168,7 +168,7 @@ readonly KUBE_STATIC_LIBRARIES=(
 
 # Add any files with those //generate annotations in the array below.
 readonly KUBE_BINDATAS=(
-  test/e2e/framework/gobindata_util.go
+  test/e2e/generated/gobindata_util.go
 )
 
 kube::golang::is_statically_linked_library() {
