@@ -34,6 +34,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,6 +76,12 @@ const (
 	// clusterDelimiter is the delimiter used by the ingress controller
 	// to split uid from other naming/metadata.
 	clusterDelimiter = "--"
+
+	// Name of the default http backend service
+	defaultBackendName = "default-http-backend"
+
+	// IP src range from which the GCE L7 performs health checks.
+	GCEL7SrcRange = "130.211.0.0/22"
 
 	// Cloud resources created by the ingress controller older than this
 	// are automatically purged to prevent running out of quota.
@@ -604,6 +611,18 @@ func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp stri
 	return false
 }
 
+func (cont *GCEIngressController) getFirewallRuleName() string {
+	return fmt.Sprintf("%vfw-l7%v%v", k8sPrefix, clusterDelimiter, cont.UID)
+}
+
+func (cont *GCEIngressController) getFirewallRule() *compute.Firewall {
+	gceCloud := cont.cloud.Provider.(*gcecloud.GCECloud)
+	fwName := cont.getFirewallRuleName()
+	fw, err := gceCloud.GetFirewall(fwName)
+	Expect(err).NotTo(HaveOccurred())
+	return fw
+}
+
 func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
 	fwList := []compute.Firewall{}
 	regex := fmt.Sprintf("%vfw-l7%v.*", k8sPrefix, clusterDelimiter)
@@ -895,6 +914,50 @@ func (j *testJig) curlServiceNodePort(ns, name string, port int) {
 	u, err := framework.GetNodePortURL(j.client, ns, name, port)
 	framework.ExpectNoError(err)
 	framework.ExpectNoError(pollURL(u, "", 30*time.Second, j.pollInterval, &http.Client{Timeout: reqTimeout}, false))
+}
+
+// getIngressNodePorts returns all related backend services' nodePorts.
+// Current GCE ingress controller allows traffic to the default HTTP backend
+// by default, so retrieve its nodePort as well.
+func (j *testJig) getIngressNodePorts() []string {
+	nodePorts := []string{}
+	defaultSvc, err := j.client.Core().Services(api.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	nodePorts = append(nodePorts, strconv.Itoa(int(defaultSvc.Spec.Ports[0].NodePort)))
+
+	backendSvcs := []string{}
+	if j.ing.Spec.Backend != nil {
+		backendSvcs = append(backendSvcs, j.ing.Spec.Backend.ServiceName)
+	}
+	for _, rule := range j.ing.Spec.Rules {
+		for _, ingPath := range rule.HTTP.Paths {
+			backendSvcs = append(backendSvcs, ingPath.Backend.ServiceName)
+		}
+	}
+	for _, svcName := range backendSvcs {
+		svc, err := j.client.Core().Services(j.ing.Namespace).Get(svcName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		nodePorts = append(nodePorts, strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
+	}
+	return nodePorts
+}
+
+// constructFirewallForIngress returns the expected GCE firewall rule for the ingress resource
+func (j *testJig) constructFirewallForIngress(gceController *GCEIngressController) *compute.Firewall {
+	nodeTags := framework.GetNodeTags(j.client, gceController.cloud)
+	nodePorts := j.getIngressNodePorts()
+
+	fw := compute.Firewall{}
+	fw.Name = gceController.getFirewallRuleName()
+	fw.SourceRanges = []string{GCEL7SrcRange}
+	fw.TargetTags = nodeTags.Items
+	fw.Allowed = []*compute.FirewallAllowed{
+		{
+			IPProtocol: "tcp",
+			Ports:      nodePorts,
+		},
+	}
+	return &fw
 }
 
 // ingFromManifest reads a .json/yaml file and returns the rc in it.
