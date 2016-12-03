@@ -1134,6 +1134,10 @@ func (dm *DockerManager) checkVersionCompatibility() error {
 }
 
 func (dm *DockerManager) fmtDockerOpts(opts []dockerOpt) ([]string, error) {
+	if opts == nil {
+		return nil, nil
+	}
+
 	version, err := dm.APIVersion()
 	if err != nil {
 		return nil, err
