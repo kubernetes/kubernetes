@@ -150,7 +150,7 @@ func GetHollowKubeletConfig(
 	c.MaxContainerCount = 100
 	c.MaxOpenFiles = 1024
 	c.MaxPerPodContainerCount = 2
-	c.NvidiaGPUs = 0
+	c.EnableExperimentalNvidiaGPU = false
 	c.RegisterNode = true
 	c.RegisterSchedulable = true
 	c.RegistryBurst = 10

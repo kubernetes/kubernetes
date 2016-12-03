@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
@@ -84,16 +86,25 @@ func (kl *Kubelet) getActivePods() []*v1.Pod {
 }
 
 // makeDevices determines the devices for the given container.
-// Experimental. For now, we hardcode /dev/nvidia0 no matter what the user asks for
-// (we only support one device per node).
-// TODO: add support for more than 1 GPU after #28216.
-func makeDevices(container *v1.Container) []kubecontainer.DeviceInfo {
+// Experimental.
+func (kl *Kubelet) makeDevices(container *v1.Container) []kubecontainer.DeviceInfo {
+	if !kl.enableExperimentalNvidiaGPU {
+		return nil
+	}
+
 	nvidiaGPULimit := container.Resources.Limits.NvidiaGPU()
+
 	if nvidiaGPULimit.Value() != 0 {
-		return []kubecontainer.DeviceInfo{
-			{PathOnHost: "/dev/nvidia0", PathInContainer: "/dev/nvidia0", Permissions: "mrw"},
-			{PathOnHost: "/dev/nvidiactl", PathInContainer: "/dev/nvidiactl", Permissions: "mrw"},
-			{PathOnHost: "/dev/nvidia-uvm", PathInContainer: "/dev/nvidia-uvm", Permissions: "mrw"},
+		if nvidiaGPUPaths, err := kl.nvidiaGPUManager.AllocateGPUs(int(nvidiaGPULimit.Value())); err == nil {
+			devices := []kubecontainer.DeviceInfo{{PathOnHost: nvidia.NvidiaCtlDevice, PathInContainer: nvidia.NvidiaCtlDevice, Permissions: "mrw"},
+				{PathOnHost: nvidia.NvidiaUVMDevice, PathInContainer: nvidia.NvidiaUVMDevice, Permissions: "mrw"}}
+
+			for i, path := range nvidiaGPUPaths {
+				devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: "/dev/nvidia" + strconv.Itoa(i), Permissions: "mrw"})
+			}
+
+			return devices
+
 		}
 	}
 
@@ -285,7 +296,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	opts.Devices = makeDevices(container)
+	opts.Devices = kl.makeDevices(container)
 
 	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
