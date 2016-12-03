@@ -22,14 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/networkpolicy"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for network policies against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against network policies.
@@ -48,7 +48,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		storage.NoTriggerPublisher,
 	)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object { return &extensionsapi.NetworkPolicy{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
@@ -56,12 +56,12 @@ func NewREST(opts generic.RESTOptions) *REST {
 		// Produces a NetworkPolicy that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
+			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		// Produces a NetworkPolicy that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
+			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		// Retrieve the name field of a network policy
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {

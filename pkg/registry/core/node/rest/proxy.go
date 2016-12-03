@@ -27,14 +27,14 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/node"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ProxyREST implements the proxy subresource for a Node
 type ProxyREST struct {
-	Store          *registry.Store
+	Store          *genericregistry.Store
 	Connection     client.ConnectionInfoGetter
 	ProxyTransport http.RoundTripper
 }

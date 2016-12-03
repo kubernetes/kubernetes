@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/registry"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/core/controller/etcd"
@@ -88,7 +89,7 @@ type LegacyRESTStorage struct {
 	ServiceNodePortAllocator  rangeallocation.RangeRegistry
 }
 
-func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter genericapiserver.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
+func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter registry.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta:                    *registered.GroupOrDie(api.GroupName),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},

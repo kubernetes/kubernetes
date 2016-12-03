@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -53,7 +53,7 @@ type PodStorage struct {
 
 // REST implements a RESTStorage for pods against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 	proxyTransport http.RoundTripper
 }
 
@@ -73,14 +73,14 @@ func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTr
 		pod.NodeNameTriggerFunc,
 	)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
+			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
+			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Pod).Name, nil
@@ -125,7 +125,7 @@ func (r *REST) ResourceLocation(ctx api.Context, name string) (*url.URL, http.Ro
 
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 // New creates a new binding resource
@@ -199,7 +199,7 @@ func (r *BindingREST) assignPod(ctx api.Context, podID string, machine string, a
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
 type StatusREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 // New creates a new pod resource
