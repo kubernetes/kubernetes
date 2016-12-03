@@ -19,14 +19,14 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.api.unversioned;
+package k8s.io.kubernetes.pkg.apis.meta.v1;
 
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "unversioned";
+option go_package = "v1";
 
 // APIGroup contains the name, the supported versions, and the preferred version
 // of a group.
