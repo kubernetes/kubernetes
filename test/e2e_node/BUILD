@@ -103,6 +103,7 @@ go_test(
         "//test/e2e_node/services:go_default_library",
         "//test/e2e_node/system:go_default_library",
         "//test/utils:go_default_library",
+        "//vendor:github.com/coreos/go-systemd/util",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/kardianos/osext",
