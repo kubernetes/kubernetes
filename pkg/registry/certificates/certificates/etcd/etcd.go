@@ -25,14 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for CertificateSigningRequest against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a registry which will store CertificateSigningRequest in the given helper
@@ -51,14 +51,14 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *ApprovalREST) {
 		storage.NoTriggerPublisher,
 	)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &certificates.CertificateSigningRequest{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, id)
+			return genericregistry.NoNamespaceKeyFunc(ctx, prefix, id)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*certificates.CertificateSigningRequest).Name, nil
@@ -92,7 +92,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *ApprovalREST) {
 
 // StatusREST implements the REST endpoint for changing the status of a CSR.
 type StatusREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {
@@ -106,7 +106,7 @@ func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedOb
 
 // ApprovalREST implements the REST endpoint for changing the approval state of a CSR.
 type ApprovalREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 func (r *ApprovalREST) New() runtime.Object {

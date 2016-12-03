@@ -21,14 +21,14 @@ import (
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/storage/storageclass"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against persistent volumes.
@@ -47,14 +47,14 @@ func NewREST(opts generic.RESTOptions) *REST {
 		storage.NoTriggerPublisher,
 	)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &storageapi.StorageClass{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, name)
+			return genericregistry.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*storageapi.StorageClass).Name, nil

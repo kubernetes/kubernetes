@@ -20,12 +20,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/core/event"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against events.
@@ -36,14 +36,14 @@ func NewREST(opts generic.RESTOptions, ttl uint64) *REST {
 	// for events will lead to too high memory consumption.
 	storageInterface, dFunc := generic.NewRawStorage(opts.StorageConfig)
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &api.Event{} },
 		NewListFunc: func() runtime.Object { return &api.EventList{} },
 		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
+			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, id)
+			return genericregistry.NamespaceKeyFunc(ctx, prefix, id)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Event).Name, nil
