@@ -393,7 +393,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member) error {
 	}
 	switch t.Kind {
 	case types.Builtin:
-		return fmt.Errorf("please add type %v to getOpenAPITypeFormat function.", t)
+		return fmt.Errorf("please add type %v to getOpenAPITypeFormat function", t)
 	case types.Map:
 		if err := g.generateMapProperty(t); err != nil {
 			return err
@@ -405,7 +405,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member) error {
 	case types.Struct, types.Interface:
 		g.generateReferenceProperty(t)
 	default:
-		return fmt.Errorf("cannot generate spec for type %v.", t)
+		return fmt.Errorf("cannot generate spec for type %v", t)
 	}
 	g.Do("},\n},\n", nil)
 	return g.Error()

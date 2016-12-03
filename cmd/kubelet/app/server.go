@@ -178,7 +178,7 @@ func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletD
 		if kubeDeps != nil && kubeDeps.Cloud != nil {
 			instances, ok := kubeDeps.Cloud.Instances()
 			if !ok {
-				err = fmt.Errorf("failed to get instances from cloud provider, can't determine nodename.")
+				err = fmt.Errorf("failed to get instances from cloud provider, can't determine nodename")
 				return nil, err
 			}
 			nodename, err = instances.CurrentNodeName(hostname)
@@ -720,7 +720,7 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	// NewMainKubelet should have set up a pod source config if one didn't exist
 	// when the builder was run. This is just a precaution.
 	if kubeDeps.PodConfig == nil {
-		return fmt.Errorf("failed to create kubelet, pod source config was nil!")
+		return fmt.Errorf("failed to create kubelet, pod source config was nil")
 	}
 	podCfg := kubeDeps.PodConfig
 

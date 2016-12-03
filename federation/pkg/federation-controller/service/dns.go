@@ -141,9 +141,9 @@ func getDnsZone(dnsZoneName string, dnsZoneID string, dnsZonesInterface dnsprovi
 	}
 
 	if len(dnsZones) == 0 {
-		return nil, fmt.Errorf("DNS zone %s not found.", name)
+		return nil, fmt.Errorf("DNS zone %s not found", name)
 	} else {
-		return nil, fmt.Errorf("DNS zone %s is ambiguous (please specify zoneID).", name)
+		return nil, fmt.Errorf("DNS zone %s is ambiguous (please specify zoneID)", name)
 	}
 }
 
