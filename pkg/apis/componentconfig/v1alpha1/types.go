@@ -109,8 +109,6 @@ type KubeSchedulerConfiguration struct {
 	PolicyConfigFile string `json:"policyConfigFile"`
 	// enableProfiling enables profiling via web interface.
 	EnableProfiling *bool `json:"enableProfiling"`
-	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
-	EnableContentionProfiling bool `json:"enableContentionProfiling"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
@@ -190,12 +188,13 @@ type KubeletConfiguration struct {
 	HTTPCheckFrequency unversioned.Duration `json:"httpCheckFrequency"`
 	// manifestURL is the URL for accessing the container manifest
 	ManifestURL string `json:"manifestURL"`
-	// manifestURLHeader is the HTTP header to use when accessing the manifest
+	// DEPRECATED: manifestURLHeader is the HTTP header to use when accessing the manifest
 	// URL, with the key separated from the value with a ':', as in 'key:value'
 	ManifestURLHeader string `json:"manifestURLHeader"`
 	// manifestURLHeaders is a comma-separated list of HTTP headers to use
 	// when accessing the manifest URL, with the key separated from the value
-	// with a ':', as in 'key:value', will be combined with ManifestURLHeader
+	// with a ':', as in 'key:value'. These will be applied in addition to
+	// the header provided via manifest-url-header.
 	ManifestURLHeaders []string `json:"manifestURLHeaders"`
 	// enableServer enables the Kubelet's server
 	EnableServer *bool `json:"enableServer"`
