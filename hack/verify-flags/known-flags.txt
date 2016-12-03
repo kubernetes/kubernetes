@@ -360,6 +360,7 @@ make-iptables-util-chains
 make-symlinks
 manifest-url
 manifest-url-header
+manifest-url-headers
 masquerade-all
 master-os-distro
 master-service-namespace
