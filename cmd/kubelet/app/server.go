@@ -18,7 +18,6 @@ limitations under the License.
 package app
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -63,7 +62,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/cert"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -525,12 +523,12 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 			return nil, err
 		}
 		if !canReadCertAndKey {
-			cert, key, err := certutil.GenerateSelfSignedCertKey(nodeutil.GetHostname(kc.HostnameOverride), nil, nil)
+			caCert, _, cert, key, err := certutil.GenerateSelfSignedCertKey(nodeutil.GetHostname(kc.HostnameOverride), nil, nil)
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
 
-			if err := certutil.WriteCert(kc.TLSCertFile, cert); err != nil {
+			if err := certutil.WriteCert(kc.TLSCertFile, cert, caCert); err != nil {
 				return nil, err
 			}
 
