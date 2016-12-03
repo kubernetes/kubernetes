@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 )
 

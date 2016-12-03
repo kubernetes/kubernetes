@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 

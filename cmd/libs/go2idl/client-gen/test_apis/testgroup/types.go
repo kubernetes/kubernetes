@@ -25,8 +25,8 @@ import (
 
 type TestType struct {
 	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
-	Status               TestTypeStatus `json:"status,omitempty"`
+	api.ObjectMeta  `json:"metadata,omitempty"`
+	Status          TestTypeStatus `json:"status,omitempty"`
 }
 
 type TestTypeList struct {

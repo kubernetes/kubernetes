@@ -26,7 +26,7 @@ import (
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
 	pkg3_resource "k8s.io/kubernetes/pkg/api/resource"
-	pkg2_unversioned "k8s.io/kubernetes/pkg/apis/meta/v1"
+	pkg2_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	pkg6_fields "k8s.io/kubernetes/pkg/fields"
 	pkg5_labels "k8s.io/kubernetes/pkg/labels"
 	pkg7_runtime "k8s.io/kubernetes/pkg/runtime"
@@ -68,7 +68,7 @@ func init() {
 	}
 	if false { // reference the types, but skip this branch at build/run time
 		var v0 pkg3_resource.Quantity
-		var v1 pkg2_unversioned.Time
+		var v1 pkg2_v1.Time
 		var v2 pkg6_fields.Selector
 		var v3 pkg5_labels.Selector
 		var v4 pkg7_runtime.Object
@@ -678,7 +678,7 @@ func (x *ObjectMeta) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "creationTimestamp":
 			if r.TryDecodeAsNil() {
-				x.CreationTimestamp = pkg2_unversioned.Time{}
+				x.CreationTimestamp = pkg2_v1.Time{}
 			} else {
 				yyv62 := &x.CreationTimestamp
 				yym63 := z.DecBinary()
@@ -700,7 +700,7 @@ func (x *ObjectMeta) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.DeletionTimestamp == nil {
-					x.DeletionTimestamp = new(pkg2_unversioned.Time)
+					x.DeletionTimestamp = new(pkg2_v1.Time)
 				}
 				yym65 := z.DecBinary()
 				_ = yym65
@@ -922,7 +922,7 @@ func (x *ObjectMeta) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CreationTimestamp = pkg2_unversioned.Time{}
+		x.CreationTimestamp = pkg2_v1.Time{}
 	} else {
 		yyv85 := &x.CreationTimestamp
 		yym86 := z.DecBinary()
@@ -954,7 +954,7 @@ func (x *ObjectMeta) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.DeletionTimestamp == nil {
-			x.DeletionTimestamp = new(pkg2_unversioned.Time)
+			x.DeletionTimestamp = new(pkg2_v1.Time)
 		}
 		yym88 := z.DecBinary()
 		_ = yym88
@@ -8170,7 +8170,7 @@ func (x *PersistentVolumeList) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv474 := &x.ListMeta
 				yym475 := z.DecBinary()
@@ -8251,7 +8251,7 @@ func (x *PersistentVolumeList) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv481 := &x.ListMeta
 		yym482 := z.DecBinary()
@@ -8857,7 +8857,7 @@ func (x *PersistentVolumeClaimList) codecDecodeSelfFromMap(l int, d *codec1978.D
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv537 := &x.ListMeta
 				yym538 := z.DecBinary()
@@ -8938,7 +8938,7 @@ func (x *PersistentVolumeClaimList) codecDecodeSelfFromArray(l int, d *codec1978
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv544 := &x.ListMeta
 		yym545 := z.DecBinary()
@@ -9211,7 +9211,7 @@ func (x *PersistentVolumeClaimSpec) codecDecodeSelfFromMap(l int, d *codec1978.D
 				}
 			} else {
 				if x.Selector == nil {
-					x.Selector = new(pkg2_unversioned.LabelSelector)
+					x.Selector = new(pkg2_v1.LabelSelector)
 				}
 				yym568 := z.DecBinary()
 				_ = yym568
@@ -9287,7 +9287,7 @@ func (x *PersistentVolumeClaimSpec) codecDecodeSelfFromArray(l int, d *codec1978
 		}
 	} else {
 		if x.Selector == nil {
-			x.Selector = new(pkg2_unversioned.LabelSelector)
+			x.Selector = new(pkg2_v1.LabelSelector)
 		}
 		yym575 := z.DecBinary()
 		_ = yym575
@@ -23240,7 +23240,7 @@ func (x *ContainerStateRunning) codecDecodeSelfFromMap(l int, d *codec1978.Decod
 		switch yys1684 {
 		case "startedAt":
 			if r.TryDecodeAsNil() {
-				x.StartedAt = pkg2_unversioned.Time{}
+				x.StartedAt = pkg2_v1.Time{}
 			} else {
 				yyv1685 := &x.StartedAt
 				yym1686 := z.DecBinary()
@@ -23281,7 +23281,7 @@ func (x *ContainerStateRunning) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.StartedAt = pkg2_unversioned.Time{}
+		x.StartedAt = pkg2_v1.Time{}
 	} else {
 		yyv1688 := &x.StartedAt
 		yym1689 := z.DecBinary()
@@ -23628,7 +23628,7 @@ func (x *ContainerStateTerminated) codecDecodeSelfFromMap(l int, d *codec1978.De
 			}
 		case "startedAt":
 			if r.TryDecodeAsNil() {
-				x.StartedAt = pkg2_unversioned.Time{}
+				x.StartedAt = pkg2_v1.Time{}
 			} else {
 				yyv1724 := &x.StartedAt
 				yym1725 := z.DecBinary()
@@ -23645,7 +23645,7 @@ func (x *ContainerStateTerminated) codecDecodeSelfFromMap(l int, d *codec1978.De
 			}
 		case "finishedAt":
 			if r.TryDecodeAsNil() {
-				x.FinishedAt = pkg2_unversioned.Time{}
+				x.FinishedAt = pkg2_v1.Time{}
 			} else {
 				yyv1726 := &x.FinishedAt
 				yym1727 := z.DecBinary()
@@ -23756,7 +23756,7 @@ func (x *ContainerStateTerminated) codecDecodeSelfFromArray(l int, d *codec1978.
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.StartedAt = pkg2_unversioned.Time{}
+		x.StartedAt = pkg2_v1.Time{}
 	} else {
 		yyv1734 := &x.StartedAt
 		yym1735 := z.DecBinary()
@@ -23783,7 +23783,7 @@ func (x *ContainerStateTerminated) codecDecodeSelfFromArray(l int, d *codec1978.
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.FinishedAt = pkg2_unversioned.Time{}
+		x.FinishedAt = pkg2_v1.Time{}
 	} else {
 		yyv1736 := &x.FinishedAt
 		yym1737 := z.DecBinary()
@@ -24880,7 +24880,7 @@ func (x *PodCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "lastProbeTime":
 			if r.TryDecodeAsNil() {
-				x.LastProbeTime = pkg2_unversioned.Time{}
+				x.LastProbeTime = pkg2_v1.Time{}
 			} else {
 				yyv1829 := &x.LastProbeTime
 				yym1830 := z.DecBinary()
@@ -24897,7 +24897,7 @@ func (x *PodCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "lastTransitionTime":
 			if r.TryDecodeAsNil() {
-				x.LastTransitionTime = pkg2_unversioned.Time{}
+				x.LastTransitionTime = pkg2_v1.Time{}
 			} else {
 				yyv1831 := &x.LastTransitionTime
 				yym1832 := z.DecBinary()
@@ -24982,7 +24982,7 @@ func (x *PodCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastProbeTime = pkg2_unversioned.Time{}
+		x.LastProbeTime = pkg2_v1.Time{}
 	} else {
 		yyv1838 := &x.LastProbeTime
 		yym1839 := z.DecBinary()
@@ -25009,7 +25009,7 @@ func (x *PodCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastTransitionTime = pkg2_unversioned.Time{}
+		x.LastTransitionTime = pkg2_v1.Time{}
 	} else {
 		yyv1840 := &x.LastTransitionTime
 		yym1841 := z.DecBinary()
@@ -25312,7 +25312,7 @@ func (x *PodList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv1867 := &x.ListMeta
 				yym1868 := z.DecBinary()
@@ -25393,7 +25393,7 @@ func (x *PodList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv1874 := &x.ListMeta
 		yym1875 := z.DecBinary()
@@ -27306,7 +27306,7 @@ func (x *PodAffinityTerm) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.LabelSelector == nil {
-					x.LabelSelector = new(pkg2_unversioned.LabelSelector)
+					x.LabelSelector = new(pkg2_v1.LabelSelector)
 				}
 				yym2015 := z.DecBinary()
 				_ = yym2015
@@ -27365,7 +27365,7 @@ func (x *PodAffinityTerm) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		}
 	} else {
 		if x.LabelSelector == nil {
-			x.LabelSelector = new(pkg2_unversioned.LabelSelector)
+			x.LabelSelector = new(pkg2_v1.LabelSelector)
 		}
 		yym2021 := z.DecBinary()
 		_ = yym2021
@@ -30507,7 +30507,7 @@ func (x *PodStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.StartTime == nil {
-					x.StartTime = new(pkg2_unversioned.Time)
+					x.StartTime = new(pkg2_v1.Time)
 				}
 				yym2292 := z.DecBinary()
 				_ = yym2292
@@ -30666,7 +30666,7 @@ func (x *PodStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.StartTime == nil {
-			x.StartTime = new(pkg2_unversioned.Time)
+			x.StartTime = new(pkg2_v1.Time)
 		}
 		yym2304 := z.DecBinary()
 		_ = yym2304
@@ -32082,7 +32082,7 @@ func (x *PodTemplateList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv2427 := &x.ListMeta
 				yym2428 := z.DecBinary()
@@ -32163,7 +32163,7 @@ func (x *PodTemplateList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv2434 := &x.ListMeta
 		yym2435 := z.DecBinary()
@@ -33200,7 +33200,7 @@ func (x *ReplicationControllerCondition) codecDecodeSelfFromMap(l int, d *codec1
 			}
 		case "lastTransitionTime":
 			if r.TryDecodeAsNil() {
-				x.LastTransitionTime = pkg2_unversioned.Time{}
+				x.LastTransitionTime = pkg2_v1.Time{}
 			} else {
 				yyv2524 := &x.LastTransitionTime
 				yym2525 := z.DecBinary()
@@ -33285,7 +33285,7 @@ func (x *ReplicationControllerCondition) codecDecodeSelfFromArray(l int, d *code
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastTransitionTime = pkg2_unversioned.Time{}
+		x.LastTransitionTime = pkg2_v1.Time{}
 	} else {
 		yyv2531 := &x.LastTransitionTime
 		yym2532 := z.DecBinary()
@@ -33905,7 +33905,7 @@ func (x *ReplicationControllerList) codecDecodeSelfFromMap(l int, d *codec1978.D
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv2587 := &x.ListMeta
 				yym2588 := z.DecBinary()
@@ -33986,7 +33986,7 @@ func (x *ReplicationControllerList) codecDecodeSelfFromArray(l int, d *codec1978
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv2594 := &x.ListMeta
 		yym2595 := z.DecBinary()
@@ -34249,7 +34249,7 @@ func (x *ServiceList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv2619 := &x.ListMeta
 				yym2620 := z.DecBinary()
@@ -34330,7 +34330,7 @@ func (x *ServiceList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv2626 := &x.ListMeta
 		yym2627 := z.DecBinary()
@@ -36879,7 +36879,7 @@ func (x *ServiceAccountList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder)
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv2849 := &x.ListMeta
 				yym2850 := z.DecBinary()
@@ -36960,7 +36960,7 @@ func (x *ServiceAccountList) codecDecodeSelfFromArray(l int, d *codec1978.Decode
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv2856 := &x.ListMeta
 		yym2857 := z.DecBinary()
@@ -38418,7 +38418,7 @@ func (x *EndpointsList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv2983 := &x.ListMeta
 				yym2984 := z.DecBinary()
@@ -38499,7 +38499,7 @@ func (x *EndpointsList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv2990 := &x.ListMeta
 		yym2991 := z.DecBinary()
@@ -41005,7 +41005,7 @@ func (x *PreferAvoidPodsEntry) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "evictionTime":
 			if r.TryDecodeAsNil() {
-				x.EvictionTime = pkg2_unversioned.Time{}
+				x.EvictionTime = pkg2_v1.Time{}
 			} else {
 				yyv3207 := &x.EvictionTime
 				yym3208 := z.DecBinary()
@@ -41075,7 +41075,7 @@ func (x *PreferAvoidPodsEntry) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.EvictionTime = pkg2_unversioned.Time{}
+		x.EvictionTime = pkg2_v1.Time{}
 	} else {
 		yyv3213 := &x.EvictionTime
 		yym3214 := z.DecBinary()
@@ -41848,7 +41848,7 @@ func (x *NodeCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "lastHeartbeatTime":
 			if r.TryDecodeAsNil() {
-				x.LastHeartbeatTime = pkg2_unversioned.Time{}
+				x.LastHeartbeatTime = pkg2_v1.Time{}
 			} else {
 				yyv3273 := &x.LastHeartbeatTime
 				yym3274 := z.DecBinary()
@@ -41865,7 +41865,7 @@ func (x *NodeCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "lastTransitionTime":
 			if r.TryDecodeAsNil() {
-				x.LastTransitionTime = pkg2_unversioned.Time{}
+				x.LastTransitionTime = pkg2_v1.Time{}
 			} else {
 				yyv3275 := &x.LastTransitionTime
 				yym3276 := z.DecBinary()
@@ -41950,7 +41950,7 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastHeartbeatTime = pkg2_unversioned.Time{}
+		x.LastHeartbeatTime = pkg2_v1.Time{}
 	} else {
 		yyv3282 := &x.LastHeartbeatTime
 		yym3283 := z.DecBinary()
@@ -41977,7 +41977,7 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastTransitionTime = pkg2_unversioned.Time{}
+		x.LastTransitionTime = pkg2_v1.Time{}
 	} else {
 		yyv3284 := &x.LastTransitionTime
 		yym3285 := z.DecBinary()
@@ -43041,7 +43041,7 @@ func (x *NodeList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv3369 := &x.ListMeta
 				yym3370 := z.DecBinary()
@@ -43122,7 +43122,7 @@ func (x *NodeList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv3376 := &x.ListMeta
 		yym3377 := z.DecBinary()
@@ -44121,7 +44121,7 @@ func (x *NamespaceList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv3458 := &x.ListMeta
 				yym3459 := z.DecBinary()
@@ -44202,7 +44202,7 @@ func (x *NamespaceList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv3465 := &x.ListMeta
 		yym3466 := z.DecBinary()
@@ -46073,7 +46073,7 @@ func (x *PodLogOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.SinceTime == nil {
-					x.SinceTime = new(pkg2_unversioned.Time)
+					x.SinceTime = new(pkg2_v1.Time)
 				}
 				yym3645 := z.DecBinary()
 				_ = yym3645
@@ -46262,7 +46262,7 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.SinceTime == nil {
-			x.SinceTime = new(pkg2_unversioned.Time)
+			x.SinceTime = new(pkg2_v1.Time)
 		}
 		yym3660 := z.DecBinary()
 		_ = yym3660
@@ -49960,7 +49960,7 @@ func (x *Event) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "firstTimestamp":
 			if r.TryDecodeAsNil() {
-				x.FirstTimestamp = pkg2_unversioned.Time{}
+				x.FirstTimestamp = pkg2_v1.Time{}
 			} else {
 				yyv3991 := &x.FirstTimestamp
 				yym3992 := z.DecBinary()
@@ -49977,7 +49977,7 @@ func (x *Event) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "lastTimestamp":
 			if r.TryDecodeAsNil() {
-				x.LastTimestamp = pkg2_unversioned.Time{}
+				x.LastTimestamp = pkg2_v1.Time{}
 			} else {
 				yyv3993 := &x.LastTimestamp
 				yym3994 := z.DecBinary()
@@ -50145,7 +50145,7 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.FirstTimestamp = pkg2_unversioned.Time{}
+		x.FirstTimestamp = pkg2_v1.Time{}
 	} else {
 		yyv4005 := &x.FirstTimestamp
 		yym4006 := z.DecBinary()
@@ -50172,7 +50172,7 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastTimestamp = pkg2_unversioned.Time{}
+		x.LastTimestamp = pkg2_v1.Time{}
 	} else {
 		yyv4007 := &x.LastTimestamp
 		yym4008 := z.DecBinary()
@@ -50449,7 +50449,7 @@ func (x *EventList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv4032 := &x.ListMeta
 				yym4033 := z.DecBinary()
@@ -50530,7 +50530,7 @@ func (x *EventList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv4039 := &x.ListMeta
 		yym4040 := z.DecBinary()
@@ -50793,7 +50793,7 @@ func (x *List) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv4064 := &x.ListMeta
 				yym4065 := z.DecBinary()
@@ -50874,7 +50874,7 @@ func (x *List) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv4071 := &x.ListMeta
 		yym4072 := z.DecBinary()
@@ -52045,7 +52045,7 @@ func (x *LimitRangeList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv4161 := &x.ListMeta
 				yym4162 := z.DecBinary()
@@ -52126,7 +52126,7 @@ func (x *LimitRangeList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv4168 := &x.ListMeta
 		yym4169 := z.DecBinary()
@@ -53212,7 +53212,7 @@ func (x *ResourceQuotaList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) 
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv4254 := &x.ListMeta
 				yym4255 := z.DecBinary()
@@ -53293,7 +53293,7 @@ func (x *ResourceQuotaList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv4261 := &x.ListMeta
 		yym4262 := z.DecBinary()
@@ -53947,7 +53947,7 @@ func (x *SecretList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv4319 := &x.ListMeta
 				yym4320 := z.DecBinary()
@@ -54028,7 +54028,7 @@ func (x *SecretList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv4326 := &x.ListMeta
 		yym4327 := z.DecBinary()
@@ -54618,7 +54618,7 @@ func (x *ConfigMapList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv4379 := &x.ListMeta
 				yym4380 := z.DecBinary()
@@ -54699,7 +54699,7 @@ func (x *ConfigMapList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv4386 := &x.ListMeta
 		yym4387 := z.DecBinary()
@@ -55620,7 +55620,7 @@ func (x *ComponentStatusList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv4465 := &x.ListMeta
 				yym4466 := z.DecBinary()
@@ -55701,7 +55701,7 @@ func (x *ComponentStatusList) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv4472 := &x.ListMeta
 		yym4473 := z.DecBinary()

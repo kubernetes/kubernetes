@@ -93,14 +93,14 @@ type WithoutItemsList struct {
 type WrongItemsJSONTagList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items                []interface{} `json:"items,omitempty"`
+	Items           []interface{} `json:"items,omitempty"`
 }
 
 // If a type has Items, its name should end with "List"
 type ListWithWrongName struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items                []interface{} `json:"items"`
+	Items           []interface{} `json:"items"`
 }
 
 // TestValidateListType verifies the validateListType function reports error on

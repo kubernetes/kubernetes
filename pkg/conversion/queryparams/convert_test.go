@@ -66,10 +66,10 @@ func (obj *baz) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKin
 // childStructs tests some of the types we serialize to query params for log API calls
 // notably, the nested time struct
 type childStructs struct {
-	Container    string            `json:"container,omitempty"`
-	Follow       bool              `json:"follow,omitempty"`
-	Previous     bool              `json:"previous,omitempty"`
-	SinceSeconds *int64            `json:"sinceSeconds,omitempty"`
+	Container    string       `json:"container,omitempty"`
+	Follow       bool         `json:"follow,omitempty"`
+	Previous     bool         `json:"previous,omitempty"`
+	SinceSeconds *int64       `json:"sinceSeconds,omitempty"`
 	SinceTime    *metav1.Time `json:"sinceTime,omitempty"`
 	EmptyTime    *metav1.Time `json:"emptyTime"`
 }

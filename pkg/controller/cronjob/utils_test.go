@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/types"
 	//"k8s.io/kubernetes/pkg/controller"
 	// "k8s.io/kubernetes/pkg/util/rand"
