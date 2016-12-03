@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/client-go/pkg/util/diff"
 )
@@ -39,7 +39,7 @@ func makeObjectReference(kind, name, namespace string) v1.ObjectReference {
 }
 
 func makeEvent(reason, message string, involvedObject v1.ObjectReference) v1.Event {
-	eventTime := unversioned.Now()
+	eventTime := metav1.Now()
 	event := v1.Event{
 		Reason:         reason,
 		Message:        message,
@@ -227,7 +227,7 @@ func TestEventCorrelator(t *testing.T) {
 		correlator := NewEventCorrelator(&clock)
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]
-			now := unversioned.NewTime(clock.Now())
+			now := metav1.NewTime(clock.Now())
 			event.FirstTimestamp = now
 			event.LastTimestamp = now
 			result, err := correlator.EventCorrelate(&event)
@@ -238,7 +238,7 @@ func TestEventCorrelator(t *testing.T) {
 		}
 
 		// update the input to current clock value
-		now := unversioned.NewTime(clock.Now())
+		now := metav1.NewTime(clock.Now())
 		testInput.newEvent.FirstTimestamp = now
 		testInput.newEvent.LastTimestamp = now
 		result, err := correlator.EventCorrelate(&testInput.newEvent)

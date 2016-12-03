@@ -22,11 +22,11 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	apps "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	certificates "k8s.io/client-go/pkg/apis/certificates/v1alpha1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	storageinternal "k8s.io/client-go/pkg/apis/storage"
 	storage "k8s.io/client-go/pkg/apis/storage/v1beta1"
@@ -252,7 +252,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *v1.Pod) (daemonSets []ext
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = unversioned.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		selector, err = metav1.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -361,7 +361,7 @@ func (s *StoreToStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (psList []app
 		if ps.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
+		selector, err = metav1.LabelSelectorAsSelector(ps.Spec.Selector)
 		if err != nil {
 			err = fmt.Errorf("invalid selector: %v", err)
 			return
@@ -423,7 +423,7 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Po
 		if pdb.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = unversioned.LabelSelectorAsSelector(pdb.Spec.Selector)
+		selector, err = metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 		if err != nil {
 			glog.Warningf("invalid selector: %v", err)
 			// TODO(mml): add an event to the PDB

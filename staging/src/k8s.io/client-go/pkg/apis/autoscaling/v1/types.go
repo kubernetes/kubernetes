@@ -17,8 +17,8 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
@@ -57,7 +57,7 @@ type HorizontalPodAutoscalerStatus struct {
 	// last time the HorizontalPodAutoscaler scaled the number of pods;
 	// used by the autoscaler to control how often the number of pods is changed.
 	// +optional
-	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty" protobuf:"bytes,2,opt,name=lastScaleTime"`
+	LastScaleTime *metav1.Time `json:"lastScaleTime,omitempty" protobuf:"bytes,2,opt,name=lastScaleTime"`
 
 	// current number of replicas of pods managed by this autoscaler.
 	CurrentReplicas int32 `json:"currentReplicas" protobuf:"varint,3,opt,name=currentReplicas"`
@@ -75,7 +75,7 @@ type HorizontalPodAutoscalerStatus struct {
 
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -91,10 +91,10 @@ type HorizontalPodAutoscaler struct {
 
 // list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler `json:"items" protobuf:"bytes,2,rep,name=items"`
@@ -102,7 +102,7 @@ type HorizontalPodAutoscalerList struct {
 
 // Scale represents a scaling request for a resource.
 type Scale struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
 	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

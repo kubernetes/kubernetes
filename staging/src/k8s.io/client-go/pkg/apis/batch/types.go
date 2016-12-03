@@ -18,14 +18,14 @@ package batch
 
 import (
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 // +genclient=true
 
 // Job represents the configuration of a single job.
 type Job struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
@@ -44,11 +44,11 @@ type Job struct {
 
 // JobList is a collection of jobs.
 type JobList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of Job.
 	Items []Job `json:"items"`
@@ -56,7 +56,7 @@ type JobList struct {
 
 // JobTemplate describes a template for creating copies of a predefined pod.
 type JobTemplate struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
@@ -107,7 +107,7 @@ type JobSpec struct {
 	// Selector is a label query over pods that should match the pod count.
 	// Normally, the system sets this field for you.
 	// +optional
-	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// ManualSelector controls generation of pod labels and pod selectors.
 	// Leave `manualSelector` unset unless you are certain what you are doing.
@@ -137,13 +137,13 @@ type JobStatus struct {
 	// It is not guaranteed to be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// +optional
-	StartTime *unversioned.Time `json:"startTime,omitempty"`
+	StartTime *metav1.Time `json:"startTime,omitempty"`
 
 	// CompletionTime represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// +optional
-	CompletionTime *unversioned.Time `json:"completionTime,omitempty"`
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 
 	// Active is the number of actively running pods.
 	// +optional
@@ -176,10 +176,10 @@ type JobCondition struct {
 	Status api.ConditionStatus `json:"status"`
 	// Last time the condition was checked.
 	// +optional
-	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
 	// Last time the condition transit from one status to another.
 	// +optional
-	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 	// (brief) reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty"`
@@ -192,7 +192,7 @@ type JobCondition struct {
 
 // CronJob represents the configuration of a single cron job.
 type CronJob struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
@@ -211,11 +211,11 @@ type CronJob struct {
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of CronJob.
 	Items []CronJob `json:"items"`
@@ -272,5 +272,5 @@ type CronJobStatus struct {
 
 	// LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
 	// +optional
-	LastScheduleTime *unversioned.Time `json:"lastScheduleTime,omitempty"`
+	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
 }

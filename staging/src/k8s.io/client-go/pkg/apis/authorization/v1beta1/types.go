@@ -19,8 +19,8 @@ package v1beta1
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 // +genclient=true
@@ -29,7 +29,7 @@ import (
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.
 type SubjectAccessReview struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -49,7 +49,7 @@ type SubjectAccessReview struct {
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
 // to check whether they can perform an action
 type SelfSubjectAccessReview struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -68,7 +68,7 @@ type SelfSubjectAccessReview struct {
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions
 // checking.
 type LocalSubjectAccessReview struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
