@@ -87,6 +87,6 @@ kube::etcd::install() {
       ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
     fi
     kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
-    kube::log::info "export PATH=\${PATH}:$(pwd)/etcd"
+    kube::log::info "export PATH=$(pwd)/etcd:\${PATH}"
   )
 }
