@@ -19,11 +19,14 @@ package e2e
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -49,6 +52,9 @@ const (
 	// Name of the config-map and key the ingress controller stores its uid in.
 	uidConfigMap = "ingress-uid"
 	uidKey       = "uid"
+
+	// Name of the default http backend service
+	defaultBackendName = "default-http-backend"
 
 	// GCE only allows names < 64 characters, and the loadbalancer controller inserts
 	// a single character of padding.
@@ -119,6 +125,8 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 		})
 
 		It("shoud create ingress with given static-ip ", func() {
+			cloudConfig := framework.TestContext.CloudConfig
+
 			// ip released when the rest of lb resources are deleted in cleanupGCE
 			ip := gceController.staticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
@@ -134,6 +142,32 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 
 			By("should reject HTTP traffic")
 			ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, httpClient, true))
+
+			By("should have correct firewall rule for ingress")
+			fw, err := getFwForIngress(cloudConfig)
+			Expect(err).NotTo(HaveOccurred())
+			// Retrieve nodeTags from the node instance as the target tags for the ingress firewall rule
+			nodes := framework.GetReadySchedulableNodesOrDie(jig.client)
+			Expect(len(nodes.Items) > 0).Should(BeTrue())
+			nodeTags, err := getInstanceTags(cloudConfig, nodes.Items[0].Name)
+			Expect(err).NotTo(HaveOccurred())
+			// Getting ingress backend nodePorts. Current GCE ingress controller allows
+			// traffic to the default backend nodePort by default, so retrieve that as well.
+			nodePorts := []string{}
+			defaultSvc, err := jig.client.Core().Services(api.NamespaceSystem).Get(defaultBackendName)
+			Expect(err).NotTo(HaveOccurred())
+			nodePorts = append(nodePorts, strconv.Itoa(int(defaultSvc.Spec.Ports[0].NodePort)))
+			// Test service need to be consistent with the content in below file:
+			// test/e2e/testing-manifests/ingress/static-ip.svc.yaml
+			testSvc, err := jig.client.Core().Services(ns).Get("echoheaders-https")
+			Expect(err).NotTo(HaveOccurred())
+			nodePorts = append(nodePorts, strconv.Itoa(int(testSvc.Spec.Ports[0].NodePort)))
+			expFw, err := constructFwForIngress(fw.Name, nodePorts, nodeTags.Items)
+			Expect(err).NotTo(HaveOccurred())
+			// Passed the last argument as true to verify the backend ports are
+			// included but not exactly matched, given there may be other existing
+			// ingress resources and backends we are not aware of.
+			Expect(verifyFirewallRule(fw, expFw, cloudConfig.Network, true)).NotTo(HaveOccurred())
 
 			// TODO: uncomment the restart test once we have a way to synchronize
 			// and know that the controller has resumed watching. If we delete
