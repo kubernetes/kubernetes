@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 // This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
@@ -81,8 +81,8 @@ func (APIVersions) SwaggerDoc() map[string]string {
 
 var map_ExportOptions = map[string]string{
 	"":       "ExportOptions is the query options to the standard REST get call.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify.`",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+	"export": "Should this value be exported.  Export strips fields that a user can not specify.",
+	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
 }
 
 func (ExportOptions) SwaggerDoc() map[string]string {

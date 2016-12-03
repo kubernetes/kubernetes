@@ -26,7 +26,7 @@ import (
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
 	pkg3_api "k8s.io/client-go/pkg/api"
-	pkg2_unversioned "k8s.io/client-go/pkg/api/unversioned"
+	pkg2_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	pkg4_types "k8s.io/client-go/pkg/types"
 	pkg1_intstr "k8s.io/client-go/pkg/util/intstr"
 	"reflect"
@@ -65,7 +65,7 @@ func init() {
 	}
 	if false { // reference the types, but skip this branch at build/run time
 		var v0 pkg3_api.ObjectMeta
-		var v1 pkg2_unversioned.LabelSelector
+		var v1 pkg2_v1.LabelSelector
 		var v2 pkg4_types.UID
 		var v3 pkg1_intstr.IntOrString
 		var v4 time.Time
@@ -256,7 +256,7 @@ func (x *PodDisruptionBudgetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 				}
 			} else {
 				if x.Selector == nil {
-					x.Selector = new(pkg2_unversioned.LabelSelector)
+					x.Selector = new(pkg2_v1.LabelSelector)
 				}
 				yym17 := z.DecBinary()
 				_ = yym17
@@ -322,7 +322,7 @@ func (x *PodDisruptionBudgetSpec) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	} else {
 		if x.Selector == nil {
-			x.Selector = new(pkg2_unversioned.LabelSelector)
+			x.Selector = new(pkg2_v1.LabelSelector)
 		}
 		yym22 := z.DecBinary()
 		_ = yym22
@@ -413,7 +413,7 @@ func (x *PodDisruptionBudgetStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym29
 					if false {
 					} else {
-						h.encMapstringunversioned_Time((map[string]pkg2_unversioned.Time)(x.DisruptedPods), e)
+						h.encMapstringv1_Time((map[string]pkg2_v1.Time)(x.DisruptedPods), e)
 					}
 				}
 			} else {
@@ -427,7 +427,7 @@ func (x *PodDisruptionBudgetStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym30
 					if false {
 					} else {
-						h.encMapstringunversioned_Time((map[string]pkg2_unversioned.Time)(x.DisruptedPods), e)
+						h.encMapstringv1_Time((map[string]pkg2_v1.Time)(x.DisruptedPods), e)
 					}
 				}
 			}
@@ -583,7 +583,7 @@ func (x *PodDisruptionBudgetStatus) codecDecodeSelfFromMap(l int, d *codec1978.D
 				_ = yym48
 				if false {
 				} else {
-					h.decMapstringunversioned_Time((*map[string]pkg2_unversioned.Time)(yyv47), d)
+					h.decMapstringv1_Time((*map[string]pkg2_v1.Time)(yyv47), d)
 				}
 			}
 		case "disruptionsAllowed":
@@ -659,7 +659,7 @@ func (x *PodDisruptionBudgetStatus) codecDecodeSelfFromArray(l int, d *codec1978
 		_ = yym56
 		if false {
 		} else {
-			h.decMapstringunversioned_Time((*map[string]pkg2_unversioned.Time)(yyv55), d)
+			h.decMapstringv1_Time((*map[string]pkg2_v1.Time)(yyv55), d)
 		}
 	}
 	yyj53++
@@ -1299,7 +1299,7 @@ func (x *PodDisruptionBudgetList) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg2_unversioned.ListMeta{}
+				x.ListMeta = pkg2_v1.ListMeta{}
 			} else {
 				yyv113 := &x.ListMeta
 				yym114 := z.DecBinary()
@@ -1380,7 +1380,7 @@ func (x *PodDisruptionBudgetList) codecDecodeSelfFromArray(l int, d *codec1978.D
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
+		x.ListMeta = pkg2_v1.ListMeta{}
 	} else {
 		yyv120 := &x.ListMeta
 		yym121 := z.DecBinary()
@@ -1744,7 +1744,7 @@ func (x *Eviction) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) encMapstringunversioned_Time(v map[string]pkg2_unversioned.Time, e *codec1978.Encoder) {
+func (x codecSelfer1234) encMapstringv1_Time(v map[string]pkg2_v1.Time, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -1774,7 +1774,7 @@ func (x codecSelfer1234) encMapstringunversioned_Time(v map[string]pkg2_unversio
 	z.EncSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x codecSelfer1234) decMapstringunversioned_Time(v *map[string]pkg2_unversioned.Time, d *codec1978.Decoder) {
+func (x codecSelfer1234) decMapstringv1_Time(v *map[string]pkg2_v1.Time, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1784,11 +1784,11 @@ func (x codecSelfer1234) decMapstringunversioned_Time(v *map[string]pkg2_unversi
 	yybh152 := z.DecBasicHandle()
 	if yyv152 == nil {
 		yyrl152, _ := z.DecInferLen(yyl152, yybh152.MaxInitLen, 40)
-		yyv152 = make(map[string]pkg2_unversioned.Time, yyrl152)
+		yyv152 = make(map[string]pkg2_v1.Time, yyrl152)
 		*v = yyv152
 	}
 	var yymk152 string
-	var yymv152 pkg2_unversioned.Time
+	var yymv152 pkg2_v1.Time
 	var yymg152 bool
 	if yybh152.MapValueReset {
 		yymg152 = true
@@ -1805,11 +1805,11 @@ func (x codecSelfer1234) decMapstringunversioned_Time(v *map[string]pkg2_unversi
 			if yymg152 {
 				yymv152 = yyv152[yymk152]
 			} else {
-				yymv152 = pkg2_unversioned.Time{}
+				yymv152 = pkg2_v1.Time{}
 			}
 			z.DecSendContainerState(codecSelfer_containerMapValue1234)
 			if r.TryDecodeAsNil() {
-				yymv152 = pkg2_unversioned.Time{}
+				yymv152 = pkg2_v1.Time{}
 			} else {
 				yyv154 := &yymv152
 				yym155 := z.DecBinary()
@@ -1841,11 +1841,11 @@ func (x codecSelfer1234) decMapstringunversioned_Time(v *map[string]pkg2_unversi
 			if yymg152 {
 				yymv152 = yyv152[yymk152]
 			} else {
-				yymv152 = pkg2_unversioned.Time{}
+				yymv152 = pkg2_v1.Time{}
 			}
 			z.DecSendContainerState(codecSelfer_containerMapValue1234)
 			if r.TryDecodeAsNil() {
-				yymv152 = pkg2_unversioned.Time{}
+				yymv152 = pkg2_v1.Time{}
 			} else {
 				yyv157 := &yymv152
 				yym158 := z.DecBinary()

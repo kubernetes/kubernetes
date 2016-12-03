@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/client-go/pkg/api"
 	apierrors "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/third_party/forked/golang/netutil"
 	"k8s.io/client-go/pkg/util/httpstream"
 )
@@ -70,6 +70,11 @@ func NewRoundTripper(tlsConfig *tls.Config) httpstream.UpgradeRoundTripper {
 // the specified tlsConfig. This function is mostly meant for unit tests.
 func NewSpdyRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
 	return &SpdyRoundTripper{tlsConfig: tlsConfig}
+}
+
+// implements pkg/util/net.TLSClientConfigHolder for proper TLS checking during proxying with a spdy roundtripper
+func (s *SpdyRoundTripper) TLSClientConfig() *tls.Config {
+	return s.tlsConfig
 }
 
 // dial dials the host specified by req, using TLS if appropriate, optionally
@@ -246,8 +251,8 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 			responseError = "unable to read error from server response"
 		} else {
 			// TODO: I don't belong here, I should be abstracted from this class
-			if obj, _, err := api.Codecs.UniversalDecoder().Decode(responseErrorBytes, nil, &unversioned.Status{}); err == nil {
-				if status, ok := obj.(*unversioned.Status); ok {
+			if obj, _, err := api.Codecs.UniversalDecoder().Decode(responseErrorBytes, nil, &metav1.Status{}); err == nil {
+				if status, ok := obj.(*metav1.Status); ok {
 					return nil, &apierrors.StatusError{ErrStatus: *status}
 				}
 			}

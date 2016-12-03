@@ -27,8 +27,8 @@ import (
 	"strings"
 
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/conversion/queryparams"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
@@ -83,7 +83,7 @@ func (c *Client) GetRateLimiter() flowcontrol.RateLimiter {
 // Resource returns an API interface to the specified resource for this client's
 // group and version. If resource is not a namespaced resource, then namespace
 // is ignored. The ResourceClient inherits the parameter codec of c.
-func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
+func (c *Client) Resource(resource *metav1.APIResource, namespace string) *ResourceClient {
 	return &ResourceClient{
 		cl:             c.cl,
 		resource:       resource,
@@ -104,7 +104,7 @@ func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *Client {
 // dynamic client.
 type ResourceClient struct {
 	cl             *rest.RESTClient
-	resource       *unversioned.APIResource
+	resource       *metav1.APIResource
 	ns             string
 	parameterCodec runtime.ParameterCodec
 }
@@ -225,8 +225,8 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 		return nil, nil, err
 	}
 
-	if _, ok := obj.(*unversioned.Status); !ok && strings.ToLower(gvk.Kind) == "status" {
-		obj = &unversioned.Status{}
+	if _, ok := obj.(*metav1.Status); !ok && strings.ToLower(gvk.Kind) == "status" {
+		obj = &metav1.Status{}
 		err := json.Unmarshal(data, obj)
 		if err != nil {
 			return nil, nil, err

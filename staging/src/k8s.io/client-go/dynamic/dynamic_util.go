@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 )
@@ -35,7 +35,7 @@ func VersionInterfaces(schema.GroupVersion) (*meta.VersionInterfaces, error) {
 }
 
 // NewDiscoveryRESTMapper returns a RESTMapper based on discovery information.
-func NewDiscoveryRESTMapper(resources []*unversioned.APIResourceList, versionFunc meta.VersionInterfacesFunc) (*meta.DefaultRESTMapper, error) {
+func NewDiscoveryRESTMapper(resources []*metav1.APIResourceList, versionFunc meta.VersionInterfacesFunc) (*meta.DefaultRESTMapper, error) {
 	rm := meta.NewDefaultRESTMapper(nil, versionFunc)
 	for _, resourceList := range resources {
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
@@ -62,7 +62,7 @@ type ObjectTyper struct {
 }
 
 // NewObjectTyper constructs an ObjectTyper from discovery information.
-func NewObjectTyper(resources []*unversioned.APIResourceList) (runtime.ObjectTyper, error) {
+func NewObjectTyper(resources []*metav1.APIResourceList) (runtime.ObjectTyper, error) {
 	ot := &ObjectTyper{registered: make(map[schema.GroupVersionKind]bool)}
 	for _, resourceList := range resources {
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)

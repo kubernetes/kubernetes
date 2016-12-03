@@ -26,7 +26,7 @@ import (
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
 	pkg2_api "k8s.io/client-go/pkg/api"
-	pkg1_unversioned "k8s.io/client-go/pkg/api/unversioned"
+	pkg1_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	pkg3_types "k8s.io/client-go/pkg/types"
 	"reflect"
 	"runtime"
@@ -64,7 +64,7 @@ func init() {
 	}
 	if false { // reference the types, but skip this branch at build/run time
 		var v0 pkg2_api.ObjectMeta
-		var v1 pkg1_unversioned.TypeMeta
+		var v1 pkg1_v1.TypeMeta
 		var v2 pkg3_types.UID
 		var v3 time.Time
 		_, _, _, _ = v0, v1, v2, v3
@@ -1253,7 +1253,7 @@ func (x *CertificateSigningRequestCondition) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "lastUpdateTime":
 			if r.TryDecodeAsNil() {
-				x.LastUpdateTime = pkg1_unversioned.Time{}
+				x.LastUpdateTime = pkg1_v1.Time{}
 			} else {
 				yyv104 := &x.LastUpdateTime
 				yym105 := z.DecBinary()
@@ -1342,7 +1342,7 @@ func (x *CertificateSigningRequestCondition) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastUpdateTime = pkg1_unversioned.Time{}
+		x.LastUpdateTime = pkg1_v1.Time{}
 	} else {
 		yyv110 := &x.LastUpdateTime
 		yym111 := z.DecBinary()
@@ -1594,7 +1594,7 @@ func (x *CertificateSigningRequestList) codecDecodeSelfFromMap(l int, d *codec19
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg1_unversioned.ListMeta{}
+				x.ListMeta = pkg1_v1.ListMeta{}
 			} else {
 				yyv133 := &x.ListMeta
 				yym134 := z.DecBinary()
@@ -1675,7 +1675,7 @@ func (x *CertificateSigningRequestList) codecDecodeSelfFromArray(l int, d *codec
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg1_unversioned.ListMeta{}
+		x.ListMeta = pkg1_v1.ListMeta{}
 	} else {
 		yyv140 := &x.ListMeta
 		yym141 := z.DecBinary()

@@ -30,7 +30,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 	certutil "k8s.io/client-go/pkg/util/cert"
@@ -236,7 +236,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 
 	versionConfig := config.ContentConfig
 	if versionConfig.GroupVersion == nil {
-		v := unversioned.SchemeGroupVersion
+		v := metav1.SchemeGroupVersion
 		versionConfig.GroupVersion = &v
 	}
 

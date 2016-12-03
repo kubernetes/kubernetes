@@ -22,8 +22,8 @@ syntax = 'proto2';
 package k8s.io.kubernetes.pkg.apis.rbac.v1alpha1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
@@ -68,7 +68,7 @@ message ClusterRoleBindingBuilder {
 message ClusterRoleBindingList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoleBindings
   repeated ClusterRoleBinding items = 2;
@@ -78,7 +78,7 @@ message ClusterRoleBindingList {
 message ClusterRoleList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoles
   repeated ClusterRole items = 2;
@@ -154,7 +154,7 @@ message RoleBinding {
 message RoleBindingList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of RoleBindings
   repeated RoleBinding items = 2;
@@ -164,7 +164,7 @@ message RoleBindingList {
 message RoleList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of Roles
   repeated Role items = 2;

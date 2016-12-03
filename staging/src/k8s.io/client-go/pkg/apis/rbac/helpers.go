@@ -97,6 +97,32 @@ func NonResourceURLMatches(rule PolicyRule, requestedURL string) bool {
 	return false
 }
 
+// subjectsStrings returns users, groups, serviceaccounts, unknown for display purposes.
+func SubjectsStrings(subjects []Subject) ([]string, []string, []string, []string) {
+	users := []string{}
+	groups := []string{}
+	sas := []string{}
+	others := []string{}
+
+	for _, subject := range subjects {
+		switch subject.Kind {
+		case ServiceAccountKind:
+			sas = append(sas, fmt.Sprintf("%s/%s", subject.Namespace, subject.Name))
+
+		case UserKind:
+			users = append(users, subject.Name)
+
+		case GroupKind:
+			groups = append(groups, subject.Name)
+
+		default:
+			others = append(others, fmt.Sprintf("%s/%s/%s", subject.Kind, subject.Namespace, subject.Name))
+		}
+	}
+
+	return users, groups, sas, others
+}
+
 // +k8s:deepcopy-gen=false
 // PolicyRuleBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct rules in code.  It's more compact than trying to write them

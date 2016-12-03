@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/apimachinery/registered"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/watch"
@@ -230,11 +230,11 @@ func (t *tracker) Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Obj
 		return nil, err
 	}
 
-	if status, ok := obj.(*unversioned.Status); ok {
+	if status, ok := obj.(*metav1.Status); ok {
 		if status.Details != nil {
 			status.Details.Kind = gvk.Kind
 		}
-		if status.Status != unversioned.StatusSuccess {
+		if status.Status != metav1.StatusSuccess {
 			return nil, &errors.StatusError{ErrStatus: *status}
 		}
 	}
@@ -277,7 +277,7 @@ func (t *tracker) add(obj runtime.Object, replaceExisting bool) error {
 			return err
 		}
 
-		if status, ok := obj.(*unversioned.Status); ok && status.Details != nil {
+		if status, ok := obj.(*metav1.Status); ok && status.Details != nil {
 			gvk.Kind = status.Details.Kind
 		}
 

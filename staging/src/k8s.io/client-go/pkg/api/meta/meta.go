@@ -21,7 +21,7 @@ import (
 	"reflect"
 
 	"k8s.io/client-go/pkg/api/meta/metatypes"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/conversion"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
@@ -43,14 +43,14 @@ func ListAccessor(obj interface{}) (List, error) {
 	switch t := obj.(type) {
 	case List:
 		return t, nil
-	case unversioned.List:
+	case metav1.List:
 		return t, nil
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
 			return m, nil
 		}
 		return nil, errNotList
-	case unversioned.ListMetaAccessor:
+	case metav1.ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
 			return m, nil
 		}
@@ -85,7 +85,7 @@ func Accessor(obj interface{}) (Object, error) {
 			return m, nil
 		}
 		return nil, errNotObject
-	case List, unversioned.List, ListMetaAccessor, unversioned.ListMetaAccessor:
+	case List, metav1.List, ListMetaAccessor, metav1.ListMetaAccessor:
 		return nil, errNotObject
 	default:
 		return nil, errNotObject
@@ -372,8 +372,8 @@ type genericAccessor struct {
 	kind              *string
 	resourceVersion   *string
 	selfLink          *string
-	creationTimestamp *unversioned.Time
-	deletionTimestamp **unversioned.Time
+	creationTimestamp *metav1.Time
+	deletionTimestamp **metav1.Time
 	labels            *map[string]string
 	annotations       *map[string]string
 	ownerReferences   reflect.Value
@@ -468,19 +468,19 @@ func (a genericAccessor) SetSelfLink(selfLink string) {
 	*a.selfLink = selfLink
 }
 
-func (a genericAccessor) GetCreationTimestamp() unversioned.Time {
+func (a genericAccessor) GetCreationTimestamp() metav1.Time {
 	return *a.creationTimestamp
 }
 
-func (a genericAccessor) SetCreationTimestamp(timestamp unversioned.Time) {
+func (a genericAccessor) SetCreationTimestamp(timestamp metav1.Time) {
 	*a.creationTimestamp = timestamp
 }
 
-func (a genericAccessor) GetDeletionTimestamp() *unversioned.Time {
+func (a genericAccessor) GetDeletionTimestamp() *metav1.Time {
 	return *a.deletionTimestamp
 }
 
-func (a genericAccessor) SetDeletionTimestamp(timestamp *unversioned.Time) {
+func (a genericAccessor) SetDeletionTimestamp(timestamp *metav1.Time) {
 	*a.deletionTimestamp = timestamp
 }
 
