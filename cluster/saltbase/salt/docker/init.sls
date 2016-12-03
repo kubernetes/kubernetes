@@ -261,6 +261,20 @@ net.ipv4.ip_forward:
   sysctl.present:
     - value: 1
 
+{% if pillar.get('softlockup_panic', '').lower() == 'true' %}
+# TODO(dchen1107) Remove this once kernel.softlockup_panic is built into the CVM image.
+/etc/sysctl.conf:
+  file.append:
+    - text:
+      - "kernel.softlockup_panic = 1"
+      - "kernel.softlockup_all_cpu_backtrace = 1"
+
+'sysctl-reload':
+  cmd.run:
+    - name: 'sysctl --system'
+    - unless: 'sysctl -a | grep "kernel.softlockup_panic = 1"'
+{% endif %}
+ 
 {{ environment_file }}:
   file.managed:
     - source: salt://docker/docker-defaults
