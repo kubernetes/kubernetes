@@ -87,7 +87,7 @@ pkg/api/v1
 $(
   cd ${KUBE_ROOT}
   # because client-gen doesn't do policy/v1alpha1, we have to skip it too
-  find pkg/apis -name types.go | xargs dirname | sort | grep -v pkg.apis.policy.v1alpha1
+  find pkg/apis -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
 )
 )
 
