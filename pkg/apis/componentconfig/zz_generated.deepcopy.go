@@ -188,7 +188,6 @@ func DeepCopy_componentconfig_KubeSchedulerConfiguration(in interface{}, out int
 		out.AlgorithmProvider = in.AlgorithmProvider
 		out.PolicyConfigFile = in.PolicyConfigFile
 		out.EnableProfiling = in.EnableProfiling
-		out.EnableContentionProfiling = in.EnableContentionProfiling
 		out.ContentType = in.ContentType
 		out.KubeAPIQPS = in.KubeAPIQPS
 		out.KubeAPIBurst = in.KubeAPIBurst
@@ -241,6 +240,13 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.HTTPCheckFrequency = in.HTTPCheckFrequency
 		out.ManifestURL = in.ManifestURL
 		out.ManifestURLHeader = in.ManifestURLHeader
+		if in.ManifestURLHeaders != nil {
+			in, out := &in.ManifestURLHeaders, &out.ManifestURLHeaders
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.ManifestURLHeaders = nil
+		}
 		out.EnableServer = in.EnableServer
 		out.Address = in.Address
 		out.Port = in.Port
