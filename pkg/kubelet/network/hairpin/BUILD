@@ -15,8 +15,9 @@ go_library(
     srcs = ["hairpin.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/exec:go_default_library",
+        "//vendor:github.com/containernetworking/cni/pkg/ns",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/vishvananda/netlink",
     ],
 )
 
