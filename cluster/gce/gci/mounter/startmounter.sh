@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,19 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG=v4
-REGISTRY=gcr.io/google_containers
-IMAGE=gci-mounter
+# start rpcbind if it is not started yet
+s=`/etc/init.d/rpcbind status`
+if [[ $s == *"not running"* ]]; then
+   echo "Starting rpcbind: /sbin/rpcbind -w"
+   /sbin/rpcbind -w
+fi
+echo `/etc/init.d/rpcbind status`
 
-all: container
+# mount with passing paramaters
+/bin/mount "${@}"
 
-container:
-	docker build --pull -t ${REGISTRY}/${IMAGE}:${TAG} .
-
-push: 
-	gcloud docker -- push ${REGISTRY}/${IMAGE}:${TAG}
-
-upload:
-	./stage-upload.sh ${TAG} ${REGISTRY}/${IMAGE}:${TAG}
-
-.PHONY: all container push
+# kill rpcbind process after mount finishes
+if [[ $s == *"not running"* ]]; then
+      echo "Kill rpcbind pid $( pidof rpcbind )"
+      kill $( pidof rpcbind )
+fi

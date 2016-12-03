@@ -75,7 +75,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		return doMount(mounterPath, source, target, fstype, bindRemountOpts)
 	}
 	// These filesystem types are expected to be supported by the mount utility on the host across all Linux distros.
-	var defaultMounterFsTypes = sets.NewString("tmpfs", "ext4", "ext3", "ext2")
+	var defaultMounterFsTypes = sets.NewString("tmpfs", "ext4", "ext3", "ext2", "")
 	if !defaultMounterFsTypes.Has(fstype) {
 		mounterPath = mounter.mounterPath
 	}
