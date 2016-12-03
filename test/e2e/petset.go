@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	klabels "k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -403,7 +402,7 @@ var _ = framework.KubeDescribe("Stateful Set recreate", func() {
 	petPodName := "web-0"
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "vagrant")
+		framework.SkipUnlessProviderIs("gce", "gke", "vagrant")
 		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
 		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
