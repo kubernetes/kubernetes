@@ -71,8 +71,8 @@ type Config struct {
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
 
-	// Impersonate is the username that this RESTClient will impersonate
-	Impersonate string
+	// Impersonate is the configuration that RESTClient will use for impersonation.
+	Impersonate ImpersonationConfig
 
 	// Server requires plugin-specified authentication.
 	AuthProvider *clientcmdapi.AuthProviderConfig
@@ -117,6 +117,17 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+}
+
+// ImpersonationConfig has all the available impersonation options
+type ImpersonationConfig struct {
+	// UserName is the username to impersonate on each request.
+	UserName string
+	// Groups are the groups to impersonate on each request.
+	Groups []string
+	// Extra is a free-form field which can be used to link some authentication information
+	// to authorization information.  This field allows you to impersonate it.
+	Extra map[string][]string
 }
 
 // TLSClientConfig contains settings to enable transport layer security
