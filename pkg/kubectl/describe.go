@@ -95,6 +95,31 @@ func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
 
+// Each level has 2 spaces for PrefixWriter
+const (
+	LEVEL_0 = iota
+	LEVEL_1
+	LEVEL_2
+	LEVEL_3
+)
+
+type PrefixWriter struct {
+	out io.Writer
+}
+
+func (pw *PrefixWriter) Write(level int, format string, a ...interface{}) {
+	levelSpace := "  "
+	prefix := ""
+	for i := 0; i < level; i++ {
+		prefix += levelSpace
+	}
+	fmt.Fprintf(pw.out, prefix+format, a...)
+}
+
+func (pw *PrefixWriter) WriteLine(a ...interface{}) {
+	fmt.Fprintln(pw.out, a...)
+}
+
 func describerMap(c clientset.Interface) map[schema.GroupKind]Describer {
 	m := map[schema.GroupKind]Describer{
 		api.Kind("Pod"):                   &PodDescriber{c},
@@ -204,22 +229,23 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 
 func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.ResourceQuotaList, limitRangeList *api.LimitRangeList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", namespace.Name)
-		printLabelsMultiline(out, "Labels", namespace.Labels)
-		fmt.Fprintf(out, "Status:\t%s\n", string(namespace.Status.Phase))
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", namespace.Name)
+		printLabelsMultiline(w, "Labels", namespace.Labels)
+		w.Write(LEVEL_0, "Status:\t%s\n", string(namespace.Status.Phase))
 		if resourceQuotaList != nil {
-			fmt.Fprintf(out, "\n")
-			DescribeResourceQuotas(resourceQuotaList, out)
+			w.Write(LEVEL_0, "\n")
+			DescribeResourceQuotas(resourceQuotaList, w)
 		}
 		if limitRangeList != nil {
-			fmt.Fprintf(out, "\n")
-			DescribeLimitRanges(limitRangeList, out)
+			w.Write(LEVEL_0, "\n")
+			DescribeLimitRanges(limitRangeList, w)
 		}
 		return nil
 	})
 }
 
-func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w io.Writer) {
+func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w *PrefixWriter) {
 	for i := range spec.Limits {
 		item := spec.Limits[i]
 		maxResources := item.Max
@@ -279,52 +305,52 @@ func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w io.Writer)
 			}
 
 			msg := "%s%s\t%v\t%v\t%v\t%v\t%v\t%v\n"
-			fmt.Fprintf(w, msg, prefix, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
+			w.Write(LEVEL_0, msg, prefix, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
 		}
 	}
 }
 
 // DescribeLimitRanges merges a set of limit range items into a single tabular description
-func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
+func DescribeLimitRanges(limitRanges *api.LimitRangeList, w *PrefixWriter) {
 	if len(limitRanges.Items) == 0 {
-		fmt.Fprint(w, "No resource limits.\n")
+		w.Write(LEVEL_0, "No resource limits.\n")
 		return
 	}
-	fmt.Fprintf(w, "Resource Limits\n Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
-	fmt.Fprintf(w, " ----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
+	w.Write(LEVEL_0, "Resource Limits\n Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
+	w.Write(LEVEL_0, " ----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
 	for _, limitRange := range limitRanges.Items {
 		describeLimitRangeSpec(limitRange.Spec, " ", w)
 	}
 }
 
 // DescribeResourceQuotas merges a set of quota items into a single tabular description of all quotas
-func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
+func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w *PrefixWriter) {
 	if len(quotas.Items) == 0 {
-		fmt.Fprint(w, "No resource quota.\n")
+		w.Write(LEVEL_0, "No resource quota.\n")
 		return
 	}
 	sort.Sort(SortableResourceQuotas(quotas.Items))
 
-	fmt.Fprint(w, "Resource Quotas")
+	w.Write(LEVEL_0, "Resource Quotas")
 	for _, q := range quotas.Items {
-		fmt.Fprintf(w, "\n Name:\t%s\n", q.Name)
+		w.Write(LEVEL_0, "\n Name:\t%s\n", q.Name)
 		if len(q.Spec.Scopes) > 0 {
 			scopes := make([]string, 0, len(q.Spec.Scopes))
 			for _, scope := range q.Spec.Scopes {
 				scopes = append(scopes, string(scope))
 			}
 			sort.Strings(scopes)
-			fmt.Fprintf(w, " Scopes:\t%s\n", strings.Join(scopes, ", "))
+			w.Write(LEVEL_0, " Scopes:\t%s\n", strings.Join(scopes, ", "))
 			for _, scope := range scopes {
 				helpText := helpTextForResourceQuotaScope(api.ResourceQuotaScope(scope))
 				if len(helpText) > 0 {
-					fmt.Fprintf(w, "  * %s\n", helpText)
+					w.Write(LEVEL_0, "  * %s\n", helpText)
 				}
 			}
 		}
 
-		fmt.Fprintf(w, " Resource\tUsed\tHard\n")
-		fmt.Fprint(w, " --------\t---\t---\n")
+		w.Write(LEVEL_0, " Resource\tUsed\tHard\n")
+		w.Write(LEVEL_0, " --------\t---\t---\n")
 
 		resources := make([]api.ResourceName, 0, len(q.Status.Hard))
 		for resource := range q.Status.Hard {
@@ -335,7 +361,7 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
 		for _, resource := range resources {
 			hardQuantity := q.Status.Hard[resource]
 			usedQuantity := q.Status.Used[resource]
-			fmt.Fprintf(w, " %s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
+			w.Write(LEVEL_0, " %s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
 		}
 	}
 }
@@ -357,11 +383,12 @@ func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings
 
 func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", limitRange.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", limitRange.Namespace)
-		fmt.Fprintf(out, "Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
-		fmt.Fprintf(out, "----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
-		describeLimitRangeSpec(limitRange.Spec, "", out)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", limitRange.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", limitRange.Namespace)
+		w.Write(LEVEL_0, "Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
+		w.Write(LEVEL_0, "----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
+		describeLimitRangeSpec(limitRange.Spec, "", w)
 		return nil
 	})
 }
@@ -398,24 +425,25 @@ func helpTextForResourceQuotaScope(scope api.ResourceQuotaScope) string {
 }
 func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", resourceQuota.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", resourceQuota.Namespace)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", resourceQuota.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", resourceQuota.Namespace)
 		if len(resourceQuota.Spec.Scopes) > 0 {
 			scopes := make([]string, 0, len(resourceQuota.Spec.Scopes))
 			for _, scope := range resourceQuota.Spec.Scopes {
 				scopes = append(scopes, string(scope))
 			}
 			sort.Strings(scopes)
-			fmt.Fprintf(out, "Scopes:\t%s\n", strings.Join(scopes, ", "))
+			w.Write(LEVEL_0, "Scopes:\t%s\n", strings.Join(scopes, ", "))
 			for _, scope := range scopes {
 				helpText := helpTextForResourceQuotaScope(api.ResourceQuotaScope(scope))
 				if len(helpText) > 0 {
-					fmt.Fprintf(out, " * %s\n", helpText)
+					w.Write(LEVEL_0, " * %s\n", helpText)
 				}
 			}
 		}
-		fmt.Fprintf(out, "Resource\tUsed\tHard\n")
-		fmt.Fprintf(out, "--------\t----\t----\n")
+		w.Write(LEVEL_0, "Resource\tUsed\tHard\n")
+		w.Write(LEVEL_0, "--------\t----\t----\n")
 
 		resources := make([]api.ResourceName, 0, len(resourceQuota.Status.Hard))
 		for resource := range resourceQuota.Status.Hard {
@@ -428,7 +456,7 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 			resource := resources[i]
 			hardQuantity := resourceQuota.Status.Hard[resource]
 			usedQuantity := resourceQuota.Status.Used[resource]
-			fmt.Fprintf(out, msg, resource, usedQuantity.String(), hardQuantity.String())
+			w.Write(LEVEL_0, msg, resource, usedQuantity.String(), hardQuantity.String())
 		}
 		return nil
 	})
@@ -450,8 +478,9 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 			events, err2 := eventsInterface.List(options)
 			if describerSettings.ShowEvents && err2 == nil && len(events.Items) > 0 {
 				return tabbedString(func(out io.Writer) error {
-					fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
-					DescribeEvents(events, out)
+					w := &PrefixWriter{out}
+					w.Write(LEVEL_0, "Pod '%v': error '%v', but found events.\n", name, err)
+					DescribeEvents(events, w)
 					return nil
 				})
 			}
@@ -474,44 +503,46 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 
 func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", pod.Namespace)
-		fmt.Fprintf(out, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", pod.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", pod.Namespace)
+		w.Write(LEVEL_0, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
 		if pod.Status.StartTime != nil {
-			fmt.Fprintf(out, "Start Time:\t%s\n", pod.Status.StartTime.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Start Time:\t%s\n", pod.Status.StartTime.Time.Format(time.RFC1123Z))
 		}
-		printLabelsMultiline(out, "Labels", pod.Labels)
+		printLabelsMultiline(w, "Labels", pod.Labels)
 		if pod.DeletionTimestamp != nil {
-			fmt.Fprintf(out, "Status:\tTerminating (expires %s)\n", pod.DeletionTimestamp.Time.Format(time.RFC1123Z))
-			fmt.Fprintf(out, "Termination Grace Period:\t%ds\n", *pod.DeletionGracePeriodSeconds)
+			w.Write(LEVEL_0, "Status:\tTerminating (expires %s)\n", pod.DeletionTimestamp.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Termination Grace Period:\t%ds\n", *pod.DeletionGracePeriodSeconds)
 		} else {
-			fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Phase))
+			w.Write(LEVEL_0, "Status:\t%s\n", string(pod.Status.Phase))
 		}
 		if len(pod.Status.Reason) > 0 {
-			fmt.Fprintf(out, "Reason:\t%s\n", pod.Status.Reason)
+			w.Write(LEVEL_0, "Reason:\t%s\n", pod.Status.Reason)
 		}
 		if len(pod.Status.Message) > 0 {
-			fmt.Fprintf(out, "Message:\t%s\n", pod.Status.Message)
+			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
-		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
-		fmt.Fprintf(out, "Controllers:\t%s\n", printControllers(pod.Annotations))
+		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
+		w.Write(LEVEL_0, "Controllers:\t%s\n", printControllers(pod.Annotations))
+
 		if len(pod.Spec.InitContainers) > 0 {
-			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), out, "")
+			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
-		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), out, "")
+		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
 		if len(pod.Status.Conditions) > 0 {
-			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
-				fmt.Fprintf(out, "  %v \t%v \n",
+				w.Write(LEVEL_1, "%v \t%v \n",
 					c.Type,
 					c.Status)
 			}
 		}
-		describeVolumes(pod.Spec.Volumes, out, "")
-		fmt.Fprintf(out, "QoS Class:\t%s\n", qos.InternalGetPodQOS(pod))
-		printTolerationsInAnnotationMultiline(out, "Tolerations", pod.Annotations)
+		describeVolumes(pod.Spec.Volumes, w, "")
+		w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.InternalGetPodQOS(pod))
+		printTolerationsInAnnotationMultiline(w, "Tolerations", pod.Annotations)
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
@@ -529,74 +560,73 @@ func printControllers(annotation map[string]string) string {
 	return "<none>"
 }
 
-// TODO: Do a better job at indenting, maybe by using a prefix writer
-func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
+func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 	if volumes == nil || len(volumes) == 0 {
-		fmt.Fprintf(out, "%sNo volumes.\n", space)
+		w.Write(LEVEL_0, "%sNo volumes.\n", space)
 		return
 	}
-	fmt.Fprintf(out, "%sVolumes:\n", space)
+	w.Write(LEVEL_0, "%sVolumes:\n", space)
 	for _, volume := range volumes {
 		nameIndent := ""
 		if len(space) > 0 {
 			nameIndent = " "
 		}
-		fmt.Fprintf(out, "  %s%v:\n", nameIndent, volume.Name)
+		w.Write(LEVEL_1, "%s%v:\n", nameIndent, volume.Name)
 		switch {
 		case volume.VolumeSource.HostPath != nil:
-			printHostPathVolumeSource(volume.VolumeSource.HostPath, out)
+			printHostPathVolumeSource(volume.VolumeSource.HostPath, w)
 		case volume.VolumeSource.EmptyDir != nil:
-			printEmptyDirVolumeSource(volume.VolumeSource.EmptyDir, out)
+			printEmptyDirVolumeSource(volume.VolumeSource.EmptyDir, w)
 		case volume.VolumeSource.GCEPersistentDisk != nil:
-			printGCEPersistentDiskVolumeSource(volume.VolumeSource.GCEPersistentDisk, out)
+			printGCEPersistentDiskVolumeSource(volume.VolumeSource.GCEPersistentDisk, w)
 		case volume.VolumeSource.AWSElasticBlockStore != nil:
-			printAWSElasticBlockStoreVolumeSource(volume.VolumeSource.AWSElasticBlockStore, out)
+			printAWSElasticBlockStoreVolumeSource(volume.VolumeSource.AWSElasticBlockStore, w)
 		case volume.VolumeSource.GitRepo != nil:
-			printGitRepoVolumeSource(volume.VolumeSource.GitRepo, out)
+			printGitRepoVolumeSource(volume.VolumeSource.GitRepo, w)
 		case volume.VolumeSource.Secret != nil:
-			printSecretVolumeSource(volume.VolumeSource.Secret, out)
+			printSecretVolumeSource(volume.VolumeSource.Secret, w)
 		case volume.VolumeSource.ConfigMap != nil:
-			printConfigMapVolumeSource(volume.VolumeSource.ConfigMap, out)
+			printConfigMapVolumeSource(volume.VolumeSource.ConfigMap, w)
 		case volume.VolumeSource.NFS != nil:
-			printNFSVolumeSource(volume.VolumeSource.NFS, out)
+			printNFSVolumeSource(volume.VolumeSource.NFS, w)
 		case volume.VolumeSource.ISCSI != nil:
-			printISCSIVolumeSource(volume.VolumeSource.ISCSI, out)
+			printISCSIVolumeSource(volume.VolumeSource.ISCSI, w)
 		case volume.VolumeSource.Glusterfs != nil:
-			printGlusterfsVolumeSource(volume.VolumeSource.Glusterfs, out)
+			printGlusterfsVolumeSource(volume.VolumeSource.Glusterfs, w)
 		case volume.VolumeSource.PersistentVolumeClaim != nil:
-			printPersistentVolumeClaimVolumeSource(volume.VolumeSource.PersistentVolumeClaim, out)
+			printPersistentVolumeClaimVolumeSource(volume.VolumeSource.PersistentVolumeClaim, w)
 		case volume.VolumeSource.RBD != nil:
-			printRBDVolumeSource(volume.VolumeSource.RBD, out)
+			printRBDVolumeSource(volume.VolumeSource.RBD, w)
 		case volume.VolumeSource.Quobyte != nil:
-			printQuobyteVolumeSource(volume.VolumeSource.Quobyte, out)
+			printQuobyteVolumeSource(volume.VolumeSource.Quobyte, w)
 		case volume.VolumeSource.DownwardAPI != nil:
-			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
+			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, w)
 		case volume.VolumeSource.AzureDisk != nil:
-			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, out)
+			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, w)
 		case volume.VolumeSource.VsphereVolume != nil:
-			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, out)
+			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, w)
 		case volume.VolumeSource.Cinder != nil:
-			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
+			printCinderVolumeSource(volume.VolumeSource.Cinder, w)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
-			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, out)
+			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
 		default:
-			fmt.Fprintf(out, "  <unknown>\n")
+			w.Write(LEVEL_1, "<unknown>\n")
 		}
 	}
 }
 
-func printHostPathVolumeSource(hostPath *api.HostPathVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tHostPath (bare host directory volume)\n"+
+func printHostPathVolumeSource(hostPath *api.HostPathVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tHostPath (bare host directory volume)\n"+
 		"    Path:\t%v\n", hostPath.Path)
 }
 
-func printEmptyDirVolumeSource(emptyDir *api.EmptyDirVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
+func printEmptyDirVolumeSource(emptyDir *api.EmptyDirVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
 		"    Medium:\t%v\n", emptyDir.Medium)
 }
 
-func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tGCEPersistentDisk (a Persistent Disk resource in Google Compute Engine)\n"+
+func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tGCEPersistentDisk (a Persistent Disk resource in Google Compute Engine)\n"+
 		"    PDName:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    Partition:\t%v\n"+
@@ -604,8 +634,8 @@ func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, 
 		gce.PDName, gce.FSType, gce.Partition, gce.ReadOnly)
 }
 
-func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tAWSElasticBlockStore (a Persistent Disk resource in AWS)\n"+
+func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tAWSElasticBlockStore (a Persistent Disk resource in AWS)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    Partition:\t%v\n"+
@@ -613,41 +643,41 @@ func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSo
 		aws.VolumeID, aws.FSType, aws.Partition, aws.ReadOnly)
 }
 
-func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tGitRepo (a volume that is pulled from git when the pod is created)\n"+
+func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tGitRepo (a volume that is pulled from git when the pod is created)\n"+
 		"    Repository:\t%v\n"+
 		"    Revision:\t%v\n",
 		git.Repository, git.Revision)
 }
 
-func printSecretVolumeSource(secret *api.SecretVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tSecret (a volume populated by a Secret)\n"+
+func printSecretVolumeSource(secret *api.SecretVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tSecret (a volume populated by a Secret)\n"+
 		"    SecretName:\t%v\n", secret.SecretName)
 }
 
-func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
+func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
 		"    Name:\t%v\n", configMap.Name)
 }
 
-func printNFSVolumeSource(nfs *api.NFSVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tNFS (an NFS mount that lasts the lifetime of a pod)\n"+
+func printNFSVolumeSource(nfs *api.NFSVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tNFS (an NFS mount that lasts the lifetime of a pod)\n"+
 		"    Server:\t%v\n"+
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		nfs.Server, nfs.Path, nfs.ReadOnly)
 }
 
-func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tQuobyte (a Quobyte mount on the host that shares a pod's lifetime)\n"+
+func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tQuobyte (a Quobyte mount on the host that shares a pod's lifetime)\n"+
 		"    Registry:\t%v\n"+
 		"    Volume:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
 }
 
-func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
+func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
 		"    TargetPortal:\t%v\n"+
 		"    IQN:\t%v\n"+
 		"    Lun:\t%v\n"+
@@ -657,23 +687,23 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
 		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly)
 }
 
-func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
+func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		glusterfs.EndpointsName, glusterfs.Path, glusterfs.ReadOnly)
 }
 
-func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tPersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)\n"+
+func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tPersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)\n"+
 		"    ClaimName:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		claim.ClaimName, claim.ReadOnly)
 }
 
-func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
+func printRBDVolumeSource(rbd *api.RBDVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
 		"    CephMonitors:\t%v\n"+
 		"    RBDImage:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -685,20 +715,20 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
 		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
-func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
+func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
 	for _, mapping := range d.Items {
 		if mapping.FieldRef != nil {
-			fmt.Fprintf(out, "      %v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
+			w.Write(LEVEL_3, "%v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
 		}
 		if mapping.ResourceFieldRef != nil {
-			fmt.Fprintf(out, "      %v -> %v\n", mapping.ResourceFieldRef.Resource, mapping.Path)
+			w.Write(LEVEL_3, "%v -> %v\n", mapping.ResourceFieldRef.Resource, mapping.Path)
 		}
 	}
 }
 
-func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tAzureDisk (an Azure Data Disk mount on the host and bind mount to the pod)\n"+
+func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tAzureDisk (an Azure Data Disk mount on the host and bind mount to the pod)\n"+
 		"    DiskName:\t%v\n"+
 		"    DiskURI:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -707,22 +737,22 @@ func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
 		d.DiskName, d.DataDiskURI, *d.FSType, *d.CachingMode, *d.ReadOnly)
 }
 
-func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
+func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
 		"    VolumePath:\t%v\n"+
 		"    FSType:\t%v\n",
 		vsphere.VolumePath, vsphere.FSType)
 }
 
-func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tPhotonPersistentDisk (a Persistent Disk resource in photon platform)\n"+
+func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tPhotonPersistentDisk (a Persistent Disk resource in photon platform)\n"+
 		"    PdID:\t%v\n"+
 		"    FSType:\t%v\n",
 		photon.PdID, photon.FSType)
 }
 
-func printCinderVolumeSource(cinder *api.CinderVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
+func printCinderVolumeSource(cinder *api.CinderVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
@@ -749,50 +779,51 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 	}
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
-		printLabelsMultiline(out, "Labels", pv.Labels)
-		fmt.Fprintf(out, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pv.ObjectMeta))
-		fmt.Fprintf(out, "Status:\t%s\n", pv.Status.Phase)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
+		printLabelsMultiline(w, "Labels", pv.Labels)
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pv.ObjectMeta))
+		w.Write(LEVEL_0, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
-			fmt.Fprintf(out, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
+			w.Write(LEVEL_0, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
 		} else {
-			fmt.Fprintf(out, "Claim:\t%s\n", "")
+			w.Write(LEVEL_0, "Claim:\t%s\n", "")
 		}
-		fmt.Fprintf(out, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
-		fmt.Fprintf(out, "Access Modes:\t%s\n", api.GetAccessModesAsString(pv.Spec.AccessModes))
-		fmt.Fprintf(out, "Capacity:\t%s\n", storage.String())
-		fmt.Fprintf(out, "Message:\t%s\n", pv.Status.Message)
-		fmt.Fprintf(out, "Source:\n")
+		w.Write(LEVEL_0, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
+		w.Write(LEVEL_0, "Access Modes:\t%s\n", api.GetAccessModesAsString(pv.Spec.AccessModes))
+		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
+		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
+		w.Write(LEVEL_0, "Source:\n")
 
 		switch {
 		case pv.Spec.HostPath != nil:
-			printHostPathVolumeSource(pv.Spec.HostPath, out)
+			printHostPathVolumeSource(pv.Spec.HostPath, w)
 		case pv.Spec.GCEPersistentDisk != nil:
-			printGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk, out)
+			printGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk, w)
 		case pv.Spec.AWSElasticBlockStore != nil:
-			printAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore, out)
+			printAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore, w)
 		case pv.Spec.NFS != nil:
-			printNFSVolumeSource(pv.Spec.NFS, out)
+			printNFSVolumeSource(pv.Spec.NFS, w)
 		case pv.Spec.ISCSI != nil:
-			printISCSIVolumeSource(pv.Spec.ISCSI, out)
+			printISCSIVolumeSource(pv.Spec.ISCSI, w)
 		case pv.Spec.Glusterfs != nil:
-			printGlusterfsVolumeSource(pv.Spec.Glusterfs, out)
+			printGlusterfsVolumeSource(pv.Spec.Glusterfs, w)
 		case pv.Spec.RBD != nil:
-			printRBDVolumeSource(pv.Spec.RBD, out)
+			printRBDVolumeSource(pv.Spec.RBD, w)
 		case pv.Spec.Quobyte != nil:
-			printQuobyteVolumeSource(pv.Spec.Quobyte, out)
+			printQuobyteVolumeSource(pv.Spec.Quobyte, w)
 		case pv.Spec.VsphereVolume != nil:
-			printVsphereVolumeSource(pv.Spec.VsphereVolume, out)
+			printVsphereVolumeSource(pv.Spec.VsphereVolume, w)
 		case pv.Spec.Cinder != nil:
-			printCinderVolumeSource(pv.Spec.Cinder, out)
+			printCinderVolumeSource(pv.Spec.Cinder, w)
 		case pv.Spec.AzureDisk != nil:
-			printAzureDiskVolumeSource(pv.Spec.AzureDisk, out)
+			printAzureDiskVolumeSource(pv.Spec.AzureDisk, w)
 		case pv.Spec.PhotonPersistentDisk != nil:
-			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, out)
+			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
 		}
 
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 
 		return nil
@@ -823,156 +854,72 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	events, _ := d.Core().Events(namespace).Search(pvc)
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
-		fmt.Fprintf(out, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pvc.ObjectMeta))
-		fmt.Fprintf(out, "Status:\t%v\n", pvc.Status.Phase)
-		fmt.Fprintf(out, "Volume:\t%s\n", pvc.Spec.VolumeName)
-		printLabelsMultiline(out, "Labels", pvc.Labels)
-		fmt.Fprintf(out, "Capacity:\t%s\n", capacity)
-		fmt.Fprintf(out, "Access Modes:\t%s\n", accessModes)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pvc.ObjectMeta))
+		w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
+		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
+		printLabelsMultiline(w, "Labels", pvc.Labels)
+		w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
+		w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 
 		return nil
 	})
 }
 
-// TODO: Do a better job at indenting, maybe by using a prefix writer
-func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus, resolverFn EnvVarResolverFunc, out io.Writer, space string) {
+func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus,
+	resolverFn EnvVarResolverFunc, w *PrefixWriter, space string) {
 	statuses := map[string]api.ContainerStatus{}
 	for _, status := range containerStatuses {
 		statuses[status.Name] = status
 	}
-	if len(containers) == 0 {
-		fmt.Fprintf(out, "%s%s: <none>\n", space, label)
-	} else {
-		fmt.Fprintf(out, "%s%s:\n", space, label)
-	}
+
+	describeContainersLabel(containers, label, space, w)
+
 	for _, container := range containers {
 		status, ok := statuses[container.Name]
-		nameIndent := ""
-		if len(space) > 0 {
-			nameIndent = " "
-		}
-		fmt.Fprintf(out, "  %s%v:\n", nameIndent, container.Name)
+		describeContainerBasicInfo(container, status, ok, space, w)
+		describeContainerCommand(container, w)
+		describeContainerResource(container, w)
 		if ok {
-			fmt.Fprintf(out, "    Container ID:\t%s\n", status.ContainerID)
+			describeContainerState(status, w)
 		}
-		fmt.Fprintf(out, "    Image:\t%s\n", container.Image)
-		if ok {
-			fmt.Fprintf(out, "    Image ID:\t%s\n", status.ImageID)
-		}
-		portString := describeContainerPorts(container.Ports)
-		if strings.Contains(portString, ",") {
-			fmt.Fprintf(out, "    Ports:\t%s\n", portString)
-		} else {
-			fmt.Fprintf(out, "    Port:\t%s\n", portString)
-		}
+		describeContainerProbe(container, w)
+		describeContainerVolumes(container, w)
+		describeContainerEnvVars(container, resolverFn, w)
+	}
+}
 
-		if len(container.Command) > 0 {
-			fmt.Fprintf(out, "    Command:\n")
-			for _, c := range container.Command {
-				fmt.Fprintf(out, "      %s\n", c)
-			}
-		}
-		if len(container.Args) > 0 {
-			fmt.Fprintf(out, "    Args:\n")
-			for _, arg := range container.Args {
-				fmt.Fprintf(out, "      %s\n", arg)
-			}
-		}
+func describeContainersLabel(containers []api.Container, label, space string, w *PrefixWriter) {
+	none := ""
+	if len(containers) == 0 {
+		none = " <none>"
+	}
+	w.Write(LEVEL_0, "%s%s:%s\n", space, label, none)
+}
 
-		resources := container.Resources
-		if len(resources.Limits) > 0 {
-			fmt.Fprintf(out, "    Limits:\n")
-		}
-		for _, name := range SortedResourceNames(resources.Limits) {
-			quantity := resources.Limits[name]
-			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
-		}
-
-		if len(resources.Requests) > 0 {
-			fmt.Fprintf(out, "    Requests:\n")
-		}
-		for _, name := range SortedResourceNames(resources.Requests) {
-			quantity := resources.Requests[name]
-			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
-		}
-
-		if ok {
-			describeStatus("State", status.State, out)
-			if status.LastTerminationState.Terminated != nil {
-				describeStatus("Last State", status.LastTerminationState, out)
-			}
-			fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
-			fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
-		}
-
-		if container.LivenessProbe != nil {
-			probe := DescribeProbe(container.LivenessProbe)
-			fmt.Fprintf(out, "    Liveness:\t%s\n", probe)
-		}
-		if container.ReadinessProbe != nil {
-			probe := DescribeProbe(container.ReadinessProbe)
-			fmt.Fprintf(out, "    Readiness:\t%s\n", probe)
-		}
-
-		none := ""
-		if len(container.VolumeMounts) == 0 {
-			none = "\t<none>"
-		}
-
-		fmt.Fprintf(out, "    Volume Mounts:%s\n", none)
-		sort.Sort(SortableVolumeMounts(container.VolumeMounts))
-		for _, mount := range container.VolumeMounts {
-			flags := []string{}
-			switch {
-			case mount.ReadOnly:
-				flags = append(flags, "ro")
-			case !mount.ReadOnly:
-				flags = append(flags, "rw")
-			case len(mount.SubPath) > 0:
-				flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
-			}
-			fmt.Fprintf(out, "      %s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
-		}
-
-		none = ""
-		if len(container.Env) == 0 {
-			none = "\t<none>"
-		}
-		fmt.Fprintf(out, "    Environment Variables:%s\n", none)
-		for _, e := range container.Env {
-			if e.ValueFrom == nil {
-				fmt.Fprintf(out, "      %s:\t%s\n", e.Name, e.Value)
-				continue
-			}
-
-			switch {
-			case e.ValueFrom.FieldRef != nil:
-				var valueFrom string
-				if resolverFn != nil {
-					valueFrom = resolverFn(e)
-				}
-				fmt.Fprintf(out, "      %s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
-			case e.ValueFrom.ResourceFieldRef != nil:
-				valueFrom, err := fieldpath.InternalExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
-				if err != nil {
-					valueFrom = ""
-				}
-				resource := e.ValueFrom.ResourceFieldRef.Resource
-				if valueFrom == "0" && (resource == "limits.cpu" || resource == "limits.memory") {
-					valueFrom = "node allocatable"
-				}
-				fmt.Fprintf(out, "      %s:\t%s (%s)\n", e.Name, valueFrom, resource)
-			case e.ValueFrom.SecretKeyRef != nil:
-				fmt.Fprintf(out, "      %s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
-			case e.ValueFrom.ConfigMapKeyRef != nil:
-				fmt.Fprintf(out, "      %s:\t<set to the key '%s' of config map '%s'>\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name)
-			}
-		}
+func describeContainerBasicInfo(container api.Container, status api.ContainerStatus, ok bool, space string, w *PrefixWriter) {
+	nameIndent := ""
+	if len(space) > 0 {
+		nameIndent = " "
+	}
+	w.Write(LEVEL_1, "%s%v:\n", nameIndent, container.Name)
+	if ok {
+		w.Write(LEVEL_2, "Container ID:\t%s\n", status.ContainerID)
+	}
+	w.Write(LEVEL_2, "Image:\t%s\n", container.Image)
+	if ok {
+		w.Write(LEVEL_2, "Image ID:\t%s\n", status.ImageID)
+	}
+	portString := describeContainerPorts(container.Ports)
+	if strings.Contains(portString, ",") {
+		w.Write(LEVEL_2, "Ports:\t%s\n", portString)
+	} else {
+		w.Write(LEVEL_2, "Port:\t%s\n", portString)
 	}
 }
 
@@ -982,6 +929,118 @@ func describeContainerPorts(cPorts []api.ContainerPort) string {
 		ports = append(ports, fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol))
 	}
 	return strings.Join(ports, ", ")
+}
+
+func describeContainerCommand(container api.Container, w *PrefixWriter) {
+	if len(container.Command) > 0 {
+		w.Write(LEVEL_2, "Command:\n")
+		for _, c := range container.Command {
+			w.Write(LEVEL_3, "%s\n", c)
+		}
+	}
+	if len(container.Args) > 0 {
+		w.Write(LEVEL_2, "Args:\n")
+		for _, arg := range container.Args {
+			w.Write(LEVEL_3, "%s\n", arg)
+		}
+	}
+}
+
+func describeContainerResource(container api.Container, w *PrefixWriter) {
+	resources := container.Resources
+	if len(resources.Limits) > 0 {
+		w.Write(LEVEL_2, "Limits:\n")
+	}
+	for _, name := range SortedResourceNames(resources.Limits) {
+		quantity := resources.Limits[name]
+		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+	}
+
+	if len(resources.Requests) > 0 {
+		w.Write(LEVEL_2, "Requests:\n")
+	}
+	for _, name := range SortedResourceNames(resources.Requests) {
+		quantity := resources.Requests[name]
+		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+	}
+}
+
+func describeContainerState(status api.ContainerStatus, w *PrefixWriter) {
+	describeStatus("State", status.State, w)
+	if status.LastTerminationState.Terminated != nil {
+		describeStatus("Last State", status.LastTerminationState, w)
+	}
+	w.Write(LEVEL_2, "Ready:\t%v\n", printBool(status.Ready))
+	w.Write(LEVEL_2, "Restart Count:\t%d\n", status.RestartCount)
+}
+
+func describeContainerProbe(container api.Container, w *PrefixWriter) {
+	if container.LivenessProbe != nil {
+		probe := DescribeProbe(container.LivenessProbe)
+		w.Write(LEVEL_2, "Liveness:\t%s\n", probe)
+	}
+	if container.ReadinessProbe != nil {
+		probe := DescribeProbe(container.ReadinessProbe)
+		w.Write(LEVEL_2, "Readiness:\t%s\n", probe)
+	}
+}
+
+func describeContainerVolumes(container api.Container, w *PrefixWriter) {
+	none := ""
+	if len(container.VolumeMounts) == 0 {
+		none = "\t<none>"
+	}
+	w.Write(LEVEL_2, "Volume Mounts:%s\n", none)
+	sort.Sort(SortableVolumeMounts(container.VolumeMounts))
+	for _, mount := range container.VolumeMounts {
+		flags := []string{}
+		switch {
+		case mount.ReadOnly:
+			flags = append(flags, "ro")
+		case !mount.ReadOnly:
+			flags = append(flags, "rw")
+		case len(mount.SubPath) > 0:
+			flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
+		}
+		w.Write(LEVEL_3, "%s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
+	}
+}
+
+func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolverFunc, w *PrefixWriter) {
+	none := ""
+	if len(container.Env) == 0 {
+		none = "\t<none>"
+	}
+	w.Write(LEVEL_2, "Environment Variables:%s\n", none)
+	for _, e := range container.Env {
+		if e.ValueFrom == nil {
+			w.Write(LEVEL_3, "%s:\t%s\n", e.Name, e.Value)
+			continue
+		}
+
+		switch {
+		case e.ValueFrom.FieldRef != nil:
+			var valueFrom string
+			if resolverFn != nil {
+				valueFrom = resolverFn(e)
+			}
+			w.Write(LEVEL_3, "%s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
+		case e.ValueFrom.ResourceFieldRef != nil:
+			valueFrom, err := fieldpath.InternalExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+			if err != nil {
+				valueFrom = ""
+			}
+			resource := e.ValueFrom.ResourceFieldRef.Resource
+			if valueFrom == "0" && (resource == "limits.cpu" || resource == "limits.memory") {
+				valueFrom = "node allocatable"
+			}
+			w.Write(LEVEL_3, "%s:\t%s (%s)\n", e.Name, valueFrom, resource)
+		case e.ValueFrom.SecretKeyRef != nil:
+			w.Write(LEVEL_3, "%s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
+		case e.ValueFrom.ConfigMapKeyRef != nil:
+			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name)
+		}
+	}
 }
 
 // DescribeProbe is exported for consumers in other API groups that have probes
@@ -1025,32 +1084,32 @@ func EnvValueRetriever(pod *api.Pod) EnvVarResolverFunc {
 	}
 }
 
-func describeStatus(stateName string, state api.ContainerState, out io.Writer) {
+func describeStatus(stateName string, state api.ContainerState, w *PrefixWriter) {
 	switch {
 	case state.Running != nil:
-		fmt.Fprintf(out, "    %s:\tRunning\n", stateName)
-		fmt.Fprintf(out, "      Started:\t%v\n", state.Running.StartedAt.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_2, "%s:\tRunning\n", stateName)
+		w.Write(LEVEL_3, "Started:\t%v\n", state.Running.StartedAt.Time.Format(time.RFC1123Z))
 	case state.Waiting != nil:
-		fmt.Fprintf(out, "    %s:\tWaiting\n", stateName)
+		w.Write(LEVEL_2, "%s:\tWaiting\n", stateName)
 		if state.Waiting.Reason != "" {
-			fmt.Fprintf(out, "      Reason:\t%s\n", state.Waiting.Reason)
+			w.Write(LEVEL_3, "Reason:\t%s\n", state.Waiting.Reason)
 		}
 	case state.Terminated != nil:
-		fmt.Fprintf(out, "    %s:\tTerminated\n", stateName)
+		w.Write(LEVEL_2, "%s:\tTerminated\n", stateName)
 		if state.Terminated.Reason != "" {
-			fmt.Fprintf(out, "      Reason:\t%s\n", state.Terminated.Reason)
+			w.Write(LEVEL_3, "Reason:\t%s\n", state.Terminated.Reason)
 		}
 		if state.Terminated.Message != "" {
-			fmt.Fprintf(out, "      Message:\t%s\n", state.Terminated.Message)
+			w.Write(LEVEL_3, "Message:\t%s\n", state.Terminated.Message)
 		}
-		fmt.Fprintf(out, "      Exit Code:\t%d\n", state.Terminated.ExitCode)
+		w.Write(LEVEL_3, "Exit Code:\t%d\n", state.Terminated.ExitCode)
 		if state.Terminated.Signal > 0 {
-			fmt.Fprintf(out, "      Signal:\t%d\n", state.Terminated.Signal)
+			w.Write(LEVEL_3, "Signal:\t%d\n", state.Terminated.Signal)
 		}
-		fmt.Fprintf(out, "      Started:\t%s\n", state.Terminated.StartedAt.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "      Finished:\t%s\n", state.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_3, "Started:\t%s\n", state.Terminated.StartedAt.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_3, "Finished:\t%s\n", state.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
 	default:
-		fmt.Fprintf(out, "    %s:\tWaiting\n", stateName)
+		w.Write(LEVEL_2, "%s:\tWaiting\n", stateName)
 	}
 }
 
@@ -1100,44 +1159,47 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string, descri
 
 func describeReplicationController(controller *api.ReplicationController, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", controller.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", controller.Namespace)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", controller.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", controller.Namespace)
 		if controller.Spec.Template != nil {
-			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&controller.Spec.Template.Spec))
+			w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&controller.Spec.Template.Spec))
 		} else {
-			fmt.Fprintf(out, "Image(s):\t%s\n", "<unset>")
+			w.Write(LEVEL_0, "Image(s):\t%s\n", "<unset>")
 		}
-		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(controller.Spec.Selector))
-		printLabelsMultiline(out, "Labels", controller.Labels)
-		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
-		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		w.Write(LEVEL_0, "Selector:\t%s\n", labels.FormatLabels(controller.Spec.Selector))
+		printLabelsMultiline(w, "Labels", controller.Labels)
+		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
+		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+
 		if controller.Spec.Template != nil {
-			describeVolumes(controller.Spec.Template.Spec.Volumes, out, "")
+			describeVolumes(controller.Spec.Template.Spec.Volumes, w, "")
 		}
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
 }
 
 func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
+	w := &PrefixWriter{out}
 	if template == nil {
-		fmt.Fprintf(out, "  <unset>")
+		w.Write(LEVEL_1, "<unset>")
 		return
 	}
-	printLabelsMultiline(out, "  Labels", template.Labels)
+	printLabelsMultiline(w, "  Labels", template.Labels)
 	if len(template.Annotations) > 0 {
-		printLabelsMultiline(out, "  Annotations", template.Annotations)
+		printLabelsMultiline(w, "  Annotations", template.Annotations)
 	}
 	if len(template.Spec.ServiceAccountName) > 0 {
-		fmt.Fprintf(out, "  Service Account:\t%s\n", template.Spec.ServiceAccountName)
+		w.Write(LEVEL_1, "Service Account:\t%s\n", template.Spec.ServiceAccountName)
 	}
 	if len(template.Spec.InitContainers) > 0 {
-		describeContainers("Init Containers", template.Spec.InitContainers, nil, nil, out, "  ")
+		describeContainers("Init Containers", template.Spec.InitContainers, nil, nil, w, "  ")
 	}
-	describeContainers("Containers", template.Spec.Containers, nil, nil, out, "  ")
-	describeVolumes(template.Spec.Volumes, out, "  ")
+	describeContainers("Containers", template.Spec.Containers, nil, nil, w, "  ")
+	describeVolumes(template.Spec.Volumes, w, "  ")
 }
 
 // ReplicaSetDescriber generates information about a ReplicaSet and the pods it has created.
@@ -1171,21 +1233,22 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 
 func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", rs.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", rs.Namespace)
-		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
-		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
-		printLabelsMultiline(out, "Labels", rs.Labels)
-		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
-		fmt.Fprintf(out, "Pods Status:\t")
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", rs.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", rs.Namespace)
+		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
+		w.Write(LEVEL_0, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
+		printLabelsMultiline(w, "Labels", rs.Labels)
+		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
+		w.Write(LEVEL_0, "Pods Status:\t")
 		if getPodErr != nil {
-			fmt.Fprintf(out, "error in fetching pods: %s\n", getPodErr)
+			w.Write(LEVEL_0, "error in fetching pods: %s\n", getPodErr)
 		} else {
-			fmt.Fprintf(out, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+			w.Write(LEVEL_0, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		}
-		describeVolumes(rs.Spec.Template.Spec.Volumes, out, "")
+		describeVolumes(rs.Spec.Template.Spec.Volumes, w, "")
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
@@ -1212,28 +1275,29 @@ func (d *JobDescriber) Describe(namespace, name string, describerSettings Descri
 
 func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", job.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", job.Namespace)
-		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&job.Spec.Template.Spec))
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", job.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", job.Namespace)
+		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&job.Spec.Template.Spec))
 		selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
-		fmt.Fprintf(out, "Selector:\t%s\n", selector)
-		fmt.Fprintf(out, "Parallelism:\t%d\n", *job.Spec.Parallelism)
+		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		if job.Spec.Completions != nil {
-			fmt.Fprintf(out, "Completions:\t%d\n", *job.Spec.Completions)
+			w.Write(LEVEL_0, "Completions:\t%d\n", *job.Spec.Completions)
 		} else {
-			fmt.Fprintf(out, "Completions:\t<unset>\n")
+			w.Write(LEVEL_0, "Completions:\t<unset>\n")
 		}
 		if job.Status.StartTime != nil {
-			fmt.Fprintf(out, "Start Time:\t%s\n", job.Status.StartTime.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Start Time:\t%s\n", job.Status.StartTime.Time.Format(time.RFC1123Z))
 		}
 		if job.Spec.ActiveDeadlineSeconds != nil {
-			fmt.Fprintf(out, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
+			w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
 		}
-		printLabelsMultiline(out, "Labels", job.Labels)
-		fmt.Fprintf(out, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
-		describeVolumes(job.Spec.Template.Spec.Volumes, out, "")
+		printLabelsMultiline(w, "Labels", job.Labels)
+		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
+		describeVolumes(job.Spec.Template.Spec.Volumes, w, "")
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
@@ -1260,69 +1324,70 @@ func (d *CronJobDescriber) Describe(namespace, name string, describerSettings De
 
 func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", scheduledJob.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", scheduledJob.Namespace)
-		fmt.Fprintf(out, "Schedule:\t%s\n", scheduledJob.Spec.Schedule)
-		fmt.Fprintf(out, "Concurrency Policy:\t%s\n", scheduledJob.Spec.ConcurrencyPolicy)
-		fmt.Fprintf(out, "Suspend:\t%s\n", printBoolPtr(scheduledJob.Spec.Suspend))
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", scheduledJob.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", scheduledJob.Namespace)
+		w.Write(LEVEL_0, "Schedule:\t%s\n", scheduledJob.Spec.Schedule)
+		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", scheduledJob.Spec.ConcurrencyPolicy)
+		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(scheduledJob.Spec.Suspend))
 		if scheduledJob.Spec.StartingDeadlineSeconds != nil {
-			fmt.Fprintf(out, "Starting Deadline Seconds:\t%ds\n", *scheduledJob.Spec.StartingDeadlineSeconds)
+			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *scheduledJob.Spec.StartingDeadlineSeconds)
 		} else {
-			fmt.Fprintf(out, "Starting Deadline Seconds:\t<unset>\n")
+			w.Write(LEVEL_0, "Starting Deadline Seconds:\t<unset>\n")
 		}
-		describeJobTemplate(scheduledJob.Spec.JobTemplate, out)
-		printLabelsMultiline(out, "Labels", scheduledJob.Labels)
+		describeJobTemplate(scheduledJob.Spec.JobTemplate, w)
+		printLabelsMultiline(w, "Labels", scheduledJob.Labels)
 		if scheduledJob.Status.LastScheduleTime != nil {
-			fmt.Fprintf(out, "Last Schedule Time:\t%s\n", scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
 		} else {
-			fmt.Fprintf(out, "Last Schedule Time:\t<unset>\n")
+			w.Write(LEVEL_0, "Last Schedule Time:\t<unset>\n")
 		}
-		printActiveJobs(out, "Active Jobs", scheduledJob.Status.Active)
+		printActiveJobs(w, "Active Jobs", scheduledJob.Status.Active)
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
 }
 
-func describeJobTemplate(jobTemplate batch.JobTemplateSpec, out io.Writer) {
-	fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&jobTemplate.Spec.Template.Spec))
+func describeJobTemplate(jobTemplate batch.JobTemplateSpec, w *PrefixWriter) {
+	w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&jobTemplate.Spec.Template.Spec))
 	if jobTemplate.Spec.Selector != nil {
 		selector, _ := unversioned.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
-		fmt.Fprintf(out, "Selector:\t%s\n", selector)
+		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 	} else {
-		fmt.Fprintf(out, "Selector:\t<unset>\n")
+		w.Write(LEVEL_0, "Selector:\t<unset>\n")
 	}
 	if jobTemplate.Spec.Parallelism != nil {
-		fmt.Fprintf(out, "Parallelism:\t%d\n", *jobTemplate.Spec.Parallelism)
+		w.Write(LEVEL_0, "Parallelism:\t%d\n", *jobTemplate.Spec.Parallelism)
 	} else {
-		fmt.Fprintf(out, "Parallelism:\t<unset>\n")
+		w.Write(LEVEL_0, "Parallelism:\t<unset>\n")
 	}
 	if jobTemplate.Spec.Completions != nil {
-		fmt.Fprintf(out, "Completions:\t%d\n", *jobTemplate.Spec.Completions)
+		w.Write(LEVEL_0, "Completions:\t%d\n", *jobTemplate.Spec.Completions)
 	} else {
-		fmt.Fprintf(out, "Completions:\t<unset>\n")
+		w.Write(LEVEL_0, "Completions:\t<unset>\n")
 	}
 	if jobTemplate.Spec.ActiveDeadlineSeconds != nil {
-		fmt.Fprintf(out, "Active Deadline Seconds:\t%ds\n", *jobTemplate.Spec.ActiveDeadlineSeconds)
+		w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *jobTemplate.Spec.ActiveDeadlineSeconds)
 	}
-	describeVolumes(jobTemplate.Spec.Template.Spec.Volumes, out, "")
+	describeVolumes(jobTemplate.Spec.Template.Spec.Volumes, w, "")
 }
 
-func printActiveJobs(out io.Writer, title string, jobs []api.ObjectReference) {
-	fmt.Fprintf(out, "%s:\t", title)
+func printActiveJobs(w *PrefixWriter, title string, jobs []api.ObjectReference) {
+	w.Write(LEVEL_0, "%s:\t", title)
 	if len(jobs) == 0 {
-		fmt.Fprintln(out, "<none>")
+		w.WriteLine("<none>")
 		return
 	}
 
 	for i, job := range jobs {
 		if i != 0 {
-			fmt.Fprint(out, ", ")
+			w.Write(LEVEL_0, ", ")
 		}
-		fmt.Fprintf(out, "%s", job.Name)
+		w.Write(LEVEL_0, "%s", job.Name)
 	}
-	fmt.Fprintln(out, "")
+	w.WriteLine("")
 }
 
 // DaemonSetDescriber generates information about a daemon set and the pods it has created.
@@ -1358,22 +1423,23 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 
 func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", daemon.Name)
-		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
+		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
 		selector, err := unversioned.LabelSelectorAsSelector(daemon.Spec.Selector)
 		if err != nil {
 			// this shouldn't happen if LabelSelector passed validation
 			return err
 		}
-		fmt.Fprintf(out, "Selector:\t%s\n", selector)
-		fmt.Fprintf(out, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
-		printLabelsMultiline(out, "Labels", daemon.Labels)
-		fmt.Fprintf(out, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
-		fmt.Fprintf(out, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
-		fmt.Fprintf(out, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)
-		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		w.Write(LEVEL_0, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
+		printLabelsMultiline(w, "Labels", daemon.Labels)
+		w.Write(LEVEL_0, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
+		w.Write(LEVEL_0, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
+		w.Write(LEVEL_0, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)
+		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
@@ -1397,20 +1463,21 @@ func (d *SecretDescriber) Describe(namespace, name string, describerSettings Des
 
 func describeSecret(secret *api.Secret) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", secret.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", secret.Namespace)
-		printLabelsMultiline(out, "Labels", secret.Labels)
-		printLabelsMultiline(out, "Annotations", secret.Annotations)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", secret.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", secret.Namespace)
+		printLabelsMultiline(w, "Labels", secret.Labels)
+		printLabelsMultiline(w, "Annotations", secret.Annotations)
 
-		fmt.Fprintf(out, "\nType:\t%s\n", secret.Type)
+		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
 
-		fmt.Fprintf(out, "\nData\n====\n")
+		w.Write(LEVEL_0, "\nData\n====\n")
 		for k, v := range secret.Data {
 			switch {
 			case k == api.ServiceAccountTokenKey && secret.Type == api.SecretTypeServiceAccountToken:
-				fmt.Fprintf(out, "%s:\t%s\n", k, string(v))
+				w.Write(LEVEL_0, "%s:\t%s\n", k, string(v))
 			default:
-				fmt.Fprintf(out, "%s:\t%d bytes\n", k, len(v))
+				w.Write(LEVEL_0, "%s:\t%d bytes\n", k, len(v))
 			}
 		}
 
@@ -1453,9 +1520,10 @@ func (i *IngressDescriber) describeBackend(ns string, backend *extensions.Ingres
 
 func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSettings DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%v\n", ing.Name)
-		fmt.Fprintf(out, "Namespace:\t%v\n", ing.Namespace)
-		fmt.Fprintf(out, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
+		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
+		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
 		def := ing.Spec.Backend
 		ns := ing.Namespace
 		if def == nil {
@@ -1467,12 +1535,12 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 			}
 			ns = api.NamespaceSystem
 		}
-		fmt.Fprintf(out, "Default backend:\t%s (%s)\n", backendStringer(def), i.describeBackend(ns, def))
+		w.Write(LEVEL_0, "Default backend:\t%s (%s)\n", backendStringer(def), i.describeBackend(ns, def))
 		if len(ing.Spec.TLS) != 0 {
-			describeIngressTLS(out, ing.Spec.TLS)
+			describeIngressTLS(w, ing.Spec.TLS)
 		}
-		fmt.Fprint(out, "Rules:\n  Host\tPath\tBackends\n")
-		fmt.Fprint(out, "  ----\t----\t--------\n")
+		w.Write(LEVEL_0, "Rules:\n  Host\tPath\tBackends\n")
+		w.Write(LEVEL_1, "----\t----\t--------\n")
 		count := 0
 		for _, rules := range ing.Spec.Rules {
 			if rules.HTTP == nil {
@@ -1483,48 +1551,48 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 			if len(host) == 0 {
 				host = "*"
 			}
-			fmt.Fprintf(out, "  %s\t\n", host)
+			w.Write(LEVEL_1, "%s\t\n", host)
 			for _, path := range rules.HTTP.Paths {
-				fmt.Fprintf(out, "    \t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ns, &path.Backend))
+				w.Write(LEVEL_2, "\t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ns, &path.Backend))
 			}
 		}
 		if count == 0 {
-			fmt.Fprintf(out, "  %s\t%s \t%s (%s)\n", "*", "*", backendStringer(def), i.describeBackend(ns, def))
+			w.Write(LEVEL_1, "%s\t%s \t%s (%s)\n", "*", "*", backendStringer(def), i.describeBackend(ns, def))
 		}
-		describeIngressAnnotations(out, ing.Annotations)
+		describeIngressAnnotations(w, ing.Annotations)
 
 		if describerSettings.ShowEvents {
 			events, _ := i.Core().Events(ing.Namespace).Search(ing)
 			if events != nil {
-				DescribeEvents(events, out)
+				DescribeEvents(events, w)
 			}
 		}
 		return nil
 	})
 }
 
-func describeIngressTLS(out io.Writer, ingTLS []extensions.IngressTLS) {
-	fmt.Fprintf(out, "TLS:\n")
+func describeIngressTLS(w *PrefixWriter, ingTLS []extensions.IngressTLS) {
+	w.Write(LEVEL_0, "TLS:\n")
 	for _, t := range ingTLS {
 		if t.SecretName == "" {
-			fmt.Fprintf(out, "  SNI routes %v\n", strings.Join(t.Hosts, ","))
+			w.Write(LEVEL_1, "SNI routes %v\n", strings.Join(t.Hosts, ","))
 		} else {
-			fmt.Fprintf(out, "  %v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
+			w.Write(LEVEL_1, "%v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
 		}
 	}
 	return
 }
 
 // TODO: Move from annotations into Ingress status.
-func describeIngressAnnotations(out io.Writer, annotations map[string]string) {
-	fmt.Fprintf(out, "Annotations:\n")
+func describeIngressAnnotations(w *PrefixWriter, annotations map[string]string) {
+	w.Write(LEVEL_0, "Annotations:\n")
 	for k, v := range annotations {
 		if !strings.HasPrefix(k, "ingress") {
 			continue
 		}
 		parts := strings.Split(k, "/")
 		name := parts[len(parts)-1]
-		fmt.Fprintf(out, "  %v:\t%s\n", name, v)
+		w.Write(LEVEL_1, "%v:\t%s\n", name, v)
 	}
 	return
 }
@@ -1571,21 +1639,22 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		endpoints = &api.Endpoints{}
 	}
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", service.Namespace)
-		printLabelsMultiline(out, "Labels", service.Labels)
-		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
-		fmt.Fprintf(out, "Type:\t%s\n", service.Spec.Type)
-		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.ClusterIP)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", service.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", service.Namespace)
+		printLabelsMultiline(w, "Labels", service.Labels)
+		w.Write(LEVEL_0, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
+		w.Write(LEVEL_0, "Type:\t%s\n", service.Spec.Type)
+		w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.ClusterIP)
 		if len(service.Spec.ExternalIPs) > 0 {
-			fmt.Fprintf(out, "External IPs:\t%v\n", strings.Join(service.Spec.ExternalIPs, ","))
+			w.Write(LEVEL_0, "External IPs:\t%v\n", strings.Join(service.Spec.ExternalIPs, ","))
 		}
 		if service.Spec.ExternalName != "" {
-			fmt.Fprintf(out, "External Name:\t%s\n", service.Spec.ExternalName)
+			w.Write(LEVEL_0, "External Name:\t%s\n", service.Spec.ExternalName)
 		}
 		if len(service.Status.LoadBalancer.Ingress) > 0 {
 			list := buildIngressString(service.Status.LoadBalancer.Ingress)
-			fmt.Fprintf(out, "LoadBalancer Ingress:\t%s\n", list)
+			w.Write(LEVEL_0, "LoadBalancer Ingress:\t%s\n", list)
 		}
 		for i := range service.Spec.Ports {
 			sp := &service.Spec.Ports[i]
@@ -1594,15 +1663,15 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			if name == "" {
 				name = "<unset>"
 			}
-			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
+			w.Write(LEVEL_0, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
 			if sp.NodePort != 0 {
-				fmt.Fprintf(out, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
+				w.Write(LEVEL_0, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
 			}
-			fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, sets.NewString(sp.Name)))
+			w.Write(LEVEL_0, "Endpoints:\t%s\n", formatEndpoints(endpoints, sets.NewString(sp.Name)))
 		}
-		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
+		w.Write(LEVEL_0, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
@@ -1631,11 +1700,12 @@ func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings 
 
 func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", ep.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", ep.Namespace)
-		printLabelsMultiline(out, "Labels", ep.Labels)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", ep.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", ep.Namespace)
+		printLabelsMultiline(w, "Labels", ep.Labels)
 
-		fmt.Fprintf(out, "Subsets:\n")
+		w.Write(LEVEL_0, "Subsets:\n")
 		for i := range ep.Subsets {
 			subset := &ep.Subsets[i]
 
@@ -1647,7 +1717,7 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 			if len(addressesString) == 0 {
 				addressesString = "<none>"
 			}
-			fmt.Fprintf(out, "  Addresses:\t%s\n", addressesString)
+			w.Write(LEVEL_1, "Addresses:\t%s\n", addressesString)
 
 			notReadyAddresses := make([]string, 0, len(subset.NotReadyAddresses))
 			for _, addr := range subset.NotReadyAddresses {
@@ -1657,25 +1727,25 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 			if len(notReadyAddressesString) == 0 {
 				notReadyAddressesString = "<none>"
 			}
-			fmt.Fprintf(out, "  NotReadyAddresses:\t%s\n", notReadyAddressesString)
+			w.Write(LEVEL_1, "NotReadyAddresses:\t%s\n", notReadyAddressesString)
 
 			if len(subset.Ports) > 0 {
-				fmt.Fprintf(out, "  Ports:\n")
-				fmt.Fprintf(out, "    Name\tPort\tProtocol\n")
-				fmt.Fprintf(out, "    ----\t----\t--------\n")
+				w.Write(LEVEL_1, "Ports:\n")
+				w.Write(LEVEL_2, "Name\tPort\tProtocol\n")
+				w.Write(LEVEL_2, "----\t----\t--------\n")
 				for _, port := range subset.Ports {
 					name := port.Name
 					if len(name) == 0 {
 						name = "<unset>"
 					}
-					fmt.Fprintf(out, "    %s\t%d\t%s\n", name, port.Port, port.Protocol)
+					w.Write(LEVEL_2, "%s\t%d\t%s\n", name, port.Port, port.Protocol)
 				}
 			}
-			fmt.Fprintf(out, "\n")
+			w.Write(LEVEL_0, "\n")
 		}
 
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
@@ -1714,10 +1784,11 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", serviceAccount.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", serviceAccount.Namespace)
-		printLabelsMultiline(out, "Labels", serviceAccount.Labels)
-		fmt.Fprintln(out)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", serviceAccount.Namespace)
+		printLabelsMultiline(w, "Labels", serviceAccount.Labels)
+		w.WriteLine()
 
 		var (
 			emptyHeader = "                   "
@@ -1747,15 +1818,15 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 		}
 		for header, names := range types {
 			if len(names) == 0 {
-				fmt.Fprintf(out, "%s\t<none>\n", header)
+				w.Write(LEVEL_0, "%s\t<none>\n", header)
 			} else {
 				prefix := header
 				for _, name := range names {
-					fmt.Fprintf(out, "%s\t%s\n", prefix, name)
+					w.Write(LEVEL_0, "%s\t%s\n", prefix, name)
 					prefix = emptyHeader
 				}
 			}
-			fmt.Fprintln(out)
+			w.WriteLine()
 		}
 
 		return nil
@@ -1805,17 +1876,18 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 
 func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events *api.EventList, canViewPods bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
-		fmt.Fprintf(out, "Role:\t%s\n", findNodeRole(node))
-		printLabelsMultiline(out, "Labels", node.Labels)
-		printTaintsInAnnotationMultiline(out, "Taints", node.Annotations)
-		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "Phase:\t%v\n", node.Status.Phase)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
+		w.Write(LEVEL_0, "Role:\t%s\n", findNodeRole(node))
+		printLabelsMultiline(w, "Labels", node.Labels)
+		printTaintsInAnnotationMultiline(w, "Taints", node.Annotations)
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "Phase:\t%v\n", node.Status.Phase)
 		if len(node.Status.Conditions) > 0 {
-			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
-			fmt.Fprint(out, "  ----\t------\t-----------------\t------------------\t------\t-------\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
 			for _, c := range node.Status.Conditions {
-				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
+				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
 					c.Type,
 					c.Status,
 					c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
@@ -1837,47 +1909,47 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 			sort.Sort(SortableResourceNames(resources))
 			for _, resource := range resources {
 				value := resourceList[resource]
-				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
+				w.Write(LEVEL_0, " %s:\t%s\n", resource, value.String())
 			}
 		}
 
-		fmt.Fprintf(out, "Addresses:\t%s\n", strings.Join(addresses, ","))
+		w.Write(LEVEL_0, "Addresses:\t%s\n", strings.Join(addresses, ","))
 		if len(node.Status.Capacity) > 0 {
-			fmt.Fprintf(out, "Capacity:\n")
+			w.Write(LEVEL_0, "Capacity:\n")
 			printResourceList(node.Status.Capacity)
 		}
 		if len(node.Status.Allocatable) > 0 {
-			fmt.Fprintf(out, "Allocatable:\n")
+			w.Write(LEVEL_0, "Allocatable:\n")
 			printResourceList(node.Status.Allocatable)
 		}
 
-		fmt.Fprintf(out, "System Info:\n")
-		fmt.Fprintf(out, " Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
-		fmt.Fprintf(out, " System UUID:\t%s\n", node.Status.NodeInfo.SystemUUID)
-		fmt.Fprintf(out, " Boot ID:\t%s\n", node.Status.NodeInfo.BootID)
-		fmt.Fprintf(out, " Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
-		fmt.Fprintf(out, " OS Image:\t%s\n", node.Status.NodeInfo.OSImage)
-		fmt.Fprintf(out, " Operating System:\t%s\n", node.Status.NodeInfo.OperatingSystem)
-		fmt.Fprintf(out, " Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
-		fmt.Fprintf(out, " Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
-		fmt.Fprintf(out, " Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
-		fmt.Fprintf(out, " Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
+		w.Write(LEVEL_0, "System Info:\n")
+		w.Write(LEVEL_0, " Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
+		w.Write(LEVEL_0, " System UUID:\t%s\n", node.Status.NodeInfo.SystemUUID)
+		w.Write(LEVEL_0, " Boot ID:\t%s\n", node.Status.NodeInfo.BootID)
+		w.Write(LEVEL_0, " Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
+		w.Write(LEVEL_0, " OS Image:\t%s\n", node.Status.NodeInfo.OSImage)
+		w.Write(LEVEL_0, " Operating System:\t%s\n", node.Status.NodeInfo.OperatingSystem)
+		w.Write(LEVEL_0, " Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
+		w.Write(LEVEL_0, " Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
+		w.Write(LEVEL_0, " Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
+		w.Write(LEVEL_0, " Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
 		if len(node.Spec.PodCIDR) > 0 {
-			fmt.Fprintf(out, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
+			w.Write(LEVEL_0, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
 		}
 		if len(node.Spec.ExternalID) > 0 {
-			fmt.Fprintf(out, "ExternalID:\t%s\n", node.Spec.ExternalID)
+			w.Write(LEVEL_0, "ExternalID:\t%s\n", node.Spec.ExternalID)
 		}
 		if canViewPods && nodeNonTerminatedPodsList != nil {
-			if err := describeNodeResource(nodeNonTerminatedPodsList, node, out); err != nil {
+			if err := describeNodeResource(nodeNonTerminatedPodsList, node, w); err != nil {
 				return err
 			}
 		} else {
-			fmt.Fprintf(out, "Pods:\tnot authorized\n")
+			w.Write(LEVEL_0, "Pods:\tnot authorized\n")
 		}
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
@@ -1905,20 +1977,21 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 	}
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", ps.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", ps.Namespace)
-		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&ps.Spec.Template.Spec))
-		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(ps.Spec.Selector))
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(ps.Labels))
-		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", ps.Status.Replicas, ps.Spec.Replicas)
-		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(ps.Annotations))
-		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-		describeVolumes(ps.Spec.Template.Spec.Volumes, out, "")
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", ps.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", ps.Namespace)
+		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&ps.Spec.Template.Spec))
+		w.Write(LEVEL_0, "Selector:\t%s\n", unversioned.FormatLabelSelector(ps.Spec.Selector))
+		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(ps.Labels))
+		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", ps.Status.Replicas, ps.Spec.Replicas)
+		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(ps.Annotations))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		describeVolumes(ps.Spec.Template.Spec.Volumes, w, "")
 		if describerSettings.ShowEvents {
 			events, _ := p.client.Core().Events(namespace).Search(ps)
 			if events != nil {
-				DescribeEvents(events, out)
+				DescribeEvents(events, w)
 			}
 		}
 		return nil
@@ -1944,49 +2017,50 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		return "", err
 	}
 
-	printListHelper := func(out io.Writer, prefix, name string, values []string) {
+	printListHelper := func(w *PrefixWriter, prefix, name string, values []string) {
 		if len(values) == 0 {
 			return
 		}
-		fmt.Fprintf(out, prefix+name+":\t")
-		fmt.Fprintf(out, strings.Join(values, "\n"+prefix+"\t"))
-		fmt.Fprintf(out, "\n")
+		w.Write(LEVEL_0, prefix+name+":\t")
+		w.Write(LEVEL_0, strings.Join(values, "\n"+prefix+"\t"))
+		w.Write(LEVEL_0, "\n")
 	}
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", csr.Name)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(csr.Labels))
-		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(csr.Annotations))
-		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", csr.CreationTimestamp.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "Requesting User:\t%s\n", csr.Spec.Username)
-		fmt.Fprintf(out, "Status:\t%s\n", status)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", csr.Name)
+		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(csr.Labels))
+		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(csr.Annotations))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csr.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "Requesting User:\t%s\n", csr.Spec.Username)
+		w.Write(LEVEL_0, "Status:\t%s\n", status)
 
-		fmt.Fprintf(out, "Subject:\n")
-		fmt.Fprintf(out, "\tCommon Name:\t%s\n", cr.Subject.CommonName)
-		fmt.Fprintf(out, "\tSerial Number:\t%s\n", cr.Subject.SerialNumber)
-		printListHelper(out, "\t", "Organization", cr.Subject.Organization)
-		printListHelper(out, "\t", "Organizational Unit", cr.Subject.OrganizationalUnit)
-		printListHelper(out, "\t", "Country", cr.Subject.Country)
-		printListHelper(out, "\t", "Locality", cr.Subject.Locality)
-		printListHelper(out, "\t", "Province", cr.Subject.Province)
-		printListHelper(out, "\t", "StreetAddress", cr.Subject.StreetAddress)
-		printListHelper(out, "\t", "PostalCode", cr.Subject.PostalCode)
+		w.Write(LEVEL_0, "Subject:\n")
+		w.Write(LEVEL_0, "\tCommon Name:\t%s\n", cr.Subject.CommonName)
+		w.Write(LEVEL_0, "\tSerial Number:\t%s\n", cr.Subject.SerialNumber)
+		printListHelper(w, "\t", "Organization", cr.Subject.Organization)
+		printListHelper(w, "\t", "Organizational Unit", cr.Subject.OrganizationalUnit)
+		printListHelper(w, "\t", "Country", cr.Subject.Country)
+		printListHelper(w, "\t", "Locality", cr.Subject.Locality)
+		printListHelper(w, "\t", "Province", cr.Subject.Province)
+		printListHelper(w, "\t", "StreetAddress", cr.Subject.StreetAddress)
+		printListHelper(w, "\t", "PostalCode", cr.Subject.PostalCode)
 
 		if len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses) > 0 {
-			fmt.Fprintf(out, "Subject Alternative Names:\n")
-			printListHelper(out, "\t", "DNS Names", cr.DNSNames)
-			printListHelper(out, "\t", "Email Addresses", cr.EmailAddresses)
+			w.Write(LEVEL_0, "Subject Alternative Names:\n")
+			printListHelper(w, "\t", "DNS Names", cr.DNSNames)
+			printListHelper(w, "\t", "Email Addresses", cr.EmailAddresses)
 			var ipaddrs []string
 			for _, ipaddr := range cr.IPAddresses {
 				ipaddrs = append(ipaddrs, ipaddr.String())
 			}
-			printListHelper(out, "\t", "IP Addresses", ipaddrs)
+			printListHelper(w, "\t", "IP Addresses", ipaddrs)
 		}
 
 		if describerSettings.ShowEvents {
 			events, _ := p.client.Core().Events(namespace).Search(csr)
 			if events != nil {
-				DescribeEvents(events, out)
+				DescribeEvents(events, w)
 			}
 		}
 		return nil
@@ -2004,55 +2078,56 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		return "", err
 	}
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", hpa.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", hpa.Namespace)
-		printLabelsMultiline(out, "Labels", hpa.Labels)
-		printLabelsMultiline(out, "Annotations", hpa.Annotations)
-		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "Reference:\t%s/%s\n",
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", hpa.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", hpa.Namespace)
+		printLabelsMultiline(w, "Labels", hpa.Labels)
+		printLabelsMultiline(w, "Annotations", hpa.Annotations)
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "Reference:\t%s/%s\n",
 			hpa.Spec.ScaleTargetRef.Kind,
 			hpa.Spec.ScaleTargetRef.Name)
 		if hpa.Spec.TargetCPUUtilizationPercentage != nil {
-			fmt.Fprintf(out, "Target CPU utilization:\t%d%%\n", *hpa.Spec.TargetCPUUtilizationPercentage)
-			fmt.Fprintf(out, "Current CPU utilization:\t")
+			w.Write(LEVEL_0, "Target CPU utilization:\t%d%%\n", *hpa.Spec.TargetCPUUtilizationPercentage)
+			w.Write(LEVEL_0, "Current CPU utilization:\t")
 			if hpa.Status.CurrentCPUUtilizationPercentage != nil {
-				fmt.Fprintf(out, "%d%%\n", *hpa.Status.CurrentCPUUtilizationPercentage)
+				w.Write(LEVEL_0, "%d%%\n", *hpa.Status.CurrentCPUUtilizationPercentage)
 			} else {
-				fmt.Fprintf(out, "<unset>\n")
+				w.Write(LEVEL_0, "<unset>\n")
 			}
 		}
 		minReplicas := "<unset>"
 		if hpa.Spec.MinReplicas != nil {
 			minReplicas = fmt.Sprintf("%d", *hpa.Spec.MinReplicas)
 		}
-		fmt.Fprintf(out, "Min replicas:\t%s\n", minReplicas)
-		fmt.Fprintf(out, "Max replicas:\t%d\n", hpa.Spec.MaxReplicas)
+		w.Write(LEVEL_0, "Min replicas:\t%s\n", minReplicas)
+		w.Write(LEVEL_0, "Max replicas:\t%d\n", hpa.Spec.MaxReplicas)
 
 		// TODO: switch to scale subresource once the required code is submitted.
 		if strings.ToLower(hpa.Spec.ScaleTargetRef.Kind) == "replicationcontroller" {
-			fmt.Fprintf(out, "ReplicationController pods:\t")
+			w.Write(LEVEL_0, "ReplicationController pods:\t")
 			rc, err := d.client.Core().ReplicationControllers(hpa.Namespace).Get(hpa.Spec.ScaleTargetRef.Name)
 			if err == nil {
-				fmt.Fprintf(out, "%d current / %d desired\n", rc.Status.Replicas, rc.Spec.Replicas)
+				w.Write(LEVEL_0, "%d current / %d desired\n", rc.Status.Replicas, rc.Spec.Replicas)
 			} else {
-				fmt.Fprintf(out, "failed to check Replication Controller\n")
+				w.Write(LEVEL_0, "failed to check Replication Controller\n")
 			}
 		}
 
 		if describerSettings.ShowEvents {
 			events, _ := d.client.Core().Events(namespace).Search(hpa)
 			if events != nil {
-				DescribeEvents(events, out)
+				DescribeEvents(events, w)
 			}
 		}
 		return nil
 	})
 }
 
-func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node, out io.Writer) error {
-	fmt.Fprintf(out, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
-	fmt.Fprint(out, "  Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
-	fmt.Fprint(out, "  ---------\t----\t\t------------\t----------\t---------------\t-------------\n")
+func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node, w *PrefixWriter) error {
+	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
+	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\n")
 	allocatable := node.Status.Capacity
 	if len(node.Status.Allocatable) > 0 {
 		allocatable = node.Status.Allocatable
@@ -2068,13 +2143,13 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionMemoryReq := float64(memoryReq.Value()) / float64(allocatable.Memory().Value()) * 100
 		fractionMemoryLimit := float64(memoryLimit.Value()) / float64(allocatable.Memory().Value()) * 100
-		fmt.Fprintf(out, "  %s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n", pod.Namespace, pod.Name,
+		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n", pod.Namespace, pod.Name,
 			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
 
-	fmt.Fprint(out, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
-	fmt.Fprint(out, "  ------------\t----------\t---------------\t-------------\n")
+	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	w.Write(LEVEL_1, "------------\t----------\t---------------\t-------------\n")
 	reqs, limits, err := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	if err != nil {
 		return err
@@ -2084,7 +2159,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	fractionCpuLimits := float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 	fractionMemoryReqs := float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
 	fractionMemoryLimits := float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
-	fmt.Fprintf(out, "  %s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n",
+	w.Write(LEVEL_1, "%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n",
 		cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits),
 		memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
 	return nil
@@ -2131,16 +2206,16 @@ func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceN
 	return
 }
 
-func DescribeEvents(el *api.EventList, w io.Writer) {
+func DescribeEvents(el *api.EventList, w *PrefixWriter) {
 	if len(el.Items) == 0 {
-		fmt.Fprint(w, "No events.\n")
+		w.Write(LEVEL_0, "No events.\n")
 		return
 	}
 	sort.Sort(events.SortableEvents(el.Items))
-	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubObjectPath\tType\tReason\tMessage\n")
-	fmt.Fprint(w, "  ---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
+	w.Write(LEVEL_0, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubObjectPath\tType\tReason\tMessage\n")
+	w.Write(LEVEL_1, "---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
 	for _, e := range el.Items {
-		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
+		w.Write(LEVEL_1, "%s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
 			translateTimestamp(e.FirstTimestamp),
 			translateTimestamp(e.LastTimestamp),
 			e.Count,
@@ -2168,42 +2243,43 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 		return "", err
 	}
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", d.ObjectMeta.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", d.ObjectMeta.Namespace)
-		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
-		printLabelsMultiline(out, "Labels", d.Labels)
-		fmt.Fprintf(out, "Selector:\t%s\n", selector)
-		fmt.Fprintf(out, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
-		fmt.Fprintf(out, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
-		fmt.Fprintf(out, "MinReadySeconds:\t%d\n", d.Spec.MinReadySeconds)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", d.ObjectMeta.Namespace)
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
+		printLabelsMultiline(w, "Labels", d.Labels)
+		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		w.Write(LEVEL_0, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
+		w.Write(LEVEL_0, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
+		w.Write(LEVEL_0, "MinReadySeconds:\t%d\n", d.Spec.MinReadySeconds)
 		if d.Spec.Strategy.RollingUpdate != nil {
 			ru := d.Spec.Strategy.RollingUpdate
-			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
+			w.Write(LEVEL_0, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
 		}
 		if len(d.Status.Conditions) > 0 {
-			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tReason\n")
-			fmt.Fprint(out, "  ----\t------\t------\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
+			w.Write(LEVEL_1, "----\t------\t------\n")
 			for _, c := range d.Status.Conditions {
-				fmt.Fprintf(out, "  %v \t%v\t%v\n", c.Type, c.Status, c.Reason)
+				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
 		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.versionedClient)
 		if err == nil {
-			fmt.Fprintf(out, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
+			w.Write(LEVEL_0, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
 			var newRSs []*versionedextension.ReplicaSet
 			if newRS != nil {
 				newRSs = append(newRSs, newRS)
 			}
-			fmt.Fprintf(out, "NewReplicaSet:\t%s\n", printReplicaSetsByLabels(newRSs))
+			w.Write(LEVEL_0, "NewReplicaSet:\t%s\n", printReplicaSetsByLabels(newRSs))
 		}
 		overlapWith := d.Annotations[deploymentutil.OverlapAnnotation]
 		if len(overlapWith) > 0 {
-			fmt.Fprintf(out, "!!!WARNING!!! This deployment has overlapping label selector with deployment %q and won't behave as expected. Please fix it before continue.\n", overlapWith)
+			w.Write(LEVEL_0, "!!!WARNING!!! This deployment has overlapping label selector with deployment %q and won't behave as expected. Please fix it before continue.\n", overlapWith)
 		}
 		if describerSettings.ShowEvents {
 			events, err := dd.Core().Events(namespace).Search(d)
 			if err == nil && events != nil {
-				DescribeEvents(events, out)
+				DescribeEvents(events, w)
 			}
 		}
 		return nil
@@ -2305,14 +2381,15 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 
 func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", configMap.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", configMap.Namespace)
-		printLabelsMultiline(out, "Labels", configMap.Labels)
-		printLabelsMultiline(out, "Annotations", configMap.Annotations)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", configMap.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", configMap.Namespace)
+		printLabelsMultiline(w, "Labels", configMap.Labels)
+		printLabelsMultiline(w, "Annotations", configMap.Annotations)
 
-		fmt.Fprintf(out, "\nData\n====\n")
+		w.Write(LEVEL_0, "\nData\n====\n")
 		for k, v := range configMap.Data {
-			fmt.Fprintf(out, "%s:\t%d bytes\n", k, len(v))
+			w.Write(LEVEL_0, "%s:\t%d bytes\n", k, len(v))
 		}
 
 		return nil
@@ -2333,20 +2410,21 @@ func (d *ClusterDescriber) Describe(namespace, name string, describerSettings De
 
 func describeCluster(cluster *federation.Cluster) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", cluster.Name)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(cluster.Labels))
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", cluster.Name)
+		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(cluster.Labels))
 
-		fmt.Fprintf(out, "ServerAddressByClientCIDRs:\n  ClientCIDR\tServerAddress\n")
-		fmt.Fprintf(out, "  ----\t----\n")
+		w.Write(LEVEL_0, "ServerAddressByClientCIDRs:\n  ClientCIDR\tServerAddress\n")
+		w.Write(LEVEL_1, "----\t----\n")
 		for _, cidrAddr := range cluster.Spec.ServerAddressByClientCIDRs {
-			fmt.Fprintf(out, "  %v \t%v\n\n", cidrAddr.ClientCIDR, cidrAddr.ServerAddress)
+			w.Write(LEVEL_1, "%v \t%v\n\n", cidrAddr.ClientCIDR, cidrAddr.ServerAddress)
 		}
 
 		if len(cluster.Status.Conditions) > 0 {
-			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastUpdateTime\tLastTransitionTime\tReason\tMessage\n")
-			fmt.Fprint(out, "  ----\t------\t-----------------\t------------------\t------\t-------\n")
+			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastUpdateTime\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
 			for _, c := range cluster.Status.Conditions {
-				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
+				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
 					c.Type,
 					c.Status,
 					c.LastProbeTime.Time.Format(time.RFC1123Z),
@@ -2377,10 +2455,11 @@ func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSetti
 
 func describeNetworkPolicy(networkPolicy *extensions.NetworkPolicy) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", networkPolicy.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", networkPolicy.Namespace)
-		printLabelsMultiline(out, "Labels", networkPolicy.Labels)
-		printLabelsMultiline(out, "Annotations", networkPolicy.Annotations)
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", networkPolicy.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", networkPolicy.Namespace)
+		printLabelsMultiline(w, "Labels", networkPolicy.Labels)
+		printLabelsMultiline(w, "Annotations", networkPolicy.Annotations)
 
 		return nil
 	})
@@ -2396,18 +2475,19 @@ func (s *StorageClassDescriber) Describe(namespace, name string, describerSettin
 		return "", err
 	}
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", sc.Name)
-		fmt.Fprintf(out, "IsDefaultClass:\t%s\n", storageutil.IsDefaultAnnotationText(sc.ObjectMeta))
-		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
-		fmt.Fprintf(out, "Provisioner:\t%s\n", sc.Provisioner)
-		fmt.Fprintf(out, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", sc.Name)
+		w.Write(LEVEL_0, "IsDefaultClass:\t%s\n", storageutil.IsDefaultAnnotationText(sc.ObjectMeta))
+		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
+		w.Write(LEVEL_0, "Provisioner:\t%s\n", sc.Provisioner)
+		w.Write(LEVEL_0, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
 		if describerSettings.ShowEvents {
 			events, err := s.Core().Events(namespace).Search(sc)
 			if err != nil {
 				return err
 			}
 			if events != nil {
-				DescribeEvents(events, out)
+				DescribeEvents(events, w)
 			}
 		}
 		return nil
@@ -2424,25 +2504,26 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 		return "", err
 	}
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", pdb.Name)
-		fmt.Fprintf(out, "Min available:\t%s\n", pdb.Spec.MinAvailable.String())
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", pdb.Name)
+		w.Write(LEVEL_0, "Min available:\t%s\n", pdb.Spec.MinAvailable.String())
 		if pdb.Spec.Selector != nil {
-			fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(pdb.Spec.Selector))
+			w.Write(LEVEL_0, "Selector:\t%s\n", unversioned.FormatLabelSelector(pdb.Spec.Selector))
 		} else {
-			fmt.Fprintf(out, "Selector:\t<unset>\n")
+			w.Write(LEVEL_0, "Selector:\t<unset>\n")
 		}
-		fmt.Fprintf(out, "Status:\n")
-		fmt.Fprintf(out, "    Allowed disruptions:\t%d\n", pdb.Status.PodDisruptionsAllowed)
-		fmt.Fprintf(out, "    Current:\t%d\n", pdb.Status.CurrentHealthy)
-		fmt.Fprintf(out, "    Desired:\t%d\n", pdb.Status.DesiredHealthy)
-		fmt.Fprintf(out, "    Total:\t%d\n", pdb.Status.ExpectedPods)
+		w.Write(LEVEL_0, "Status:\n")
+		w.Write(LEVEL_2, "Allowed disruptions:\t%d\n", pdb.Status.PodDisruptionsAllowed)
+		w.Write(LEVEL_2, "Current:\t%d\n", pdb.Status.CurrentHealthy)
+		w.Write(LEVEL_2, "Desired:\t%d\n", pdb.Status.DesiredHealthy)
+		w.Write(LEVEL_2, "Total:\t%d\n", pdb.Status.ExpectedPods)
 		if describerSettings.ShowEvents {
 			events, err := p.Core().Events(namespace).Search(pdb)
 			if err != nil {
 				return err
 			}
 			if events != nil {
-				DescribeEvents(events, out)
+				DescribeEvents(events, w)
 			}
 		}
 		return nil
@@ -2591,17 +2672,17 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 }
 
 // printLabelsMultiline prints multiple labels with a proper alignment.
-func printLabelsMultiline(out io.Writer, title string, labels map[string]string) {
-	printLabelsMultilineWithIndent(out, "", title, "\t", labels)
+func printLabelsMultiline(w *PrefixWriter, title string, labels map[string]string) {
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels)
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printLabelsMultilineWithIndent(out io.Writer, initialIndent, title, innerIndent string, labels map[string]string) {
+func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string) {
 
-	fmt.Fprintf(out, "%s%s:%s", initialIndent, title, innerIndent)
+	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if labels == nil || len(labels) == 0 {
-		fmt.Fprintln(out, "<none>")
+		w.WriteLine("<none>")
 		return
 	}
 
@@ -2614,29 +2695,29 @@ func printLabelsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 
 	for i, key := range keys {
 		if i != 0 {
-			fmt.Fprint(out, initialIndent)
-			fmt.Fprint(out, innerIndent)
+			w.Write(LEVEL_0, "%s", initialIndent)
+			w.Write(LEVEL_0, "%s", innerIndent)
 		}
-		fmt.Fprintf(out, "%s=%s\n", key, labels[key])
+		w.Write(LEVEL_0, "%s=%s\n", key, labels[key])
 		i++
 	}
 }
 
 // printTaintsMultiline prints multiple taints with a proper alignment.
-func printTaintsInAnnotationMultiline(out io.Writer, title string, annotations map[string]string) {
+func printTaintsInAnnotationMultiline(w *PrefixWriter, title string, annotations map[string]string) {
 	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
 	if err != nil {
 		taints = []api.Taint{}
 	}
-	printTaintsMultilineWithIndent(out, "", title, "\t", taints)
+	printTaintsMultilineWithIndent(w, "", title, "\t", taints)
 }
 
 // printTaintsMultilineWithIndent prints multiple taints with a user-defined alignment.
-func printTaintsMultilineWithIndent(out io.Writer, initialIndent, title, innerIndent string, taints []api.Taint) {
-	fmt.Fprintf(out, "%s%s:%s", initialIndent, title, innerIndent)
+func printTaintsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, taints []api.Taint) {
+	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if taints == nil || len(taints) == 0 {
-		fmt.Fprintln(out, "<none>")
+		w.WriteLine("<none>")
 		return
 	}
 
@@ -2651,10 +2732,10 @@ func printTaintsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 		for _, taint := range taints {
 			if string(taint.Effect)+","+taint.Key == key {
 				if i != 0 {
-					fmt.Fprint(out, initialIndent)
-					fmt.Fprint(out, innerIndent)
+					w.Write(LEVEL_0, "%s", initialIndent)
+					w.Write(LEVEL_0, "%s", innerIndent)
 				}
-				fmt.Fprintf(out, "%s\n", taint.ToString())
+				w.Write(LEVEL_0, "%s\n", taint.ToString())
 				i++
 			}
 		}
@@ -2662,20 +2743,20 @@ func printTaintsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 }
 
 // printTolerationsMultiline prints multiple tolerations with a proper alignment.
-func printTolerationsInAnnotationMultiline(out io.Writer, title string, annotations map[string]string) {
+func printTolerationsInAnnotationMultiline(w *PrefixWriter, title string, annotations map[string]string) {
 	tolerations, err := api.GetTolerationsFromPodAnnotations(annotations)
 	if err != nil {
 		tolerations = []api.Toleration{}
 	}
-	printTolerationsMultilineWithIndent(out, "", title, "\t", tolerations)
+	printTolerationsMultilineWithIndent(w, "", title, "\t", tolerations)
 }
 
 // printTolerationsMultilineWithIndent prints multiple tolerations with a user-defined alignment.
-func printTolerationsMultilineWithIndent(out io.Writer, initialIndent, title, innerIndent string, tolerations []api.Toleration) {
-	fmt.Fprintf(out, "%s%s:%s", initialIndent, title, innerIndent)
+func printTolerationsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, tolerations []api.Toleration) {
+	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if tolerations == nil || len(tolerations) == 0 {
-		fmt.Fprintln(out, "<none>")
+		w.WriteLine("<none>")
 		return
 	}
 
@@ -2690,17 +2771,17 @@ func printTolerationsMultilineWithIndent(out io.Writer, initialIndent, title, in
 		for _, toleration := range tolerations {
 			if toleration.Key == key {
 				if i != 0 {
-					fmt.Fprint(out, initialIndent)
-					fmt.Fprint(out, innerIndent)
+					w.Write(LEVEL_0, "%s", initialIndent)
+					w.Write(LEVEL_0, "%s", innerIndent)
 				}
-				fmt.Fprintf(out, "%s=%s", toleration.Key, toleration.Value)
+				w.Write(LEVEL_0, "%s=%s", toleration.Key, toleration.Value)
 				if len(toleration.Operator) != 0 {
-					fmt.Fprintf(out, ":%s", toleration.Operator)
+					w.Write(LEVEL_0, ":%s", toleration.Operator)
 				}
 				if len(toleration.Effect) != 0 {
-					fmt.Fprintf(out, ":%s", toleration.Effect)
+					w.Write(LEVEL_0, ":%s", toleration.Effect)
 				}
-				fmt.Fprintf(out, "\n")
+				w.Write(LEVEL_0, "\n")
 				i++
 			}
 		}
