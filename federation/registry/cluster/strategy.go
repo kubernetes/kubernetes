@@ -52,7 +52,7 @@ func MatchCluster(label labels.Selector, field fields.Selector) apistorage.Selec
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 			cluster, ok := obj.(*federation.Cluster)
 			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a cluster.")
+				return nil, nil, fmt.Errorf("given object is not a cluster")
 			}
 			return labels.Set(cluster.ObjectMeta.Labels), ClusterToSelectableFields(cluster), nil
 		},

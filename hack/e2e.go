@@ -510,13 +510,13 @@ type kops struct {
 
 func NewKops() (*kops, error) {
 	if *kopsPath == "" {
-		return nil, fmt.Errorf("--kops must be set to a valid binary path for kops deployment.")
+		return nil, fmt.Errorf("--kops must be set to a valid binary path for kops deployment")
 	}
 	if *kopsCluster == "" {
-		return nil, fmt.Errorf("--kops-cluster must be set to a valid cluster name for kops deployment.")
+		return nil, fmt.Errorf("--kops-cluster must be set to a valid cluster name for kops deployment")
 	}
 	if *kopsState == "" {
-		return nil, fmt.Errorf("--kops-state must be set to a valid S3 path for kops deployment.")
+		return nil, fmt.Errorf("--kops-state must be set to a valid S3 path for kops deployment")
 	}
 	sshKey := *kopsSSHKey
 	if sshKey == "" {
