@@ -54,7 +54,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentSpec, InType: reflect.TypeOf(&DeploymentSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentStatus, InType: reflect.TypeOf(&DeploymentStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentStrategy, InType: reflect.TypeOf(&DeploymentStrategy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_FSGroupStrategyOptions, InType: reflect.TypeOf(&FSGroupStrategyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_HTTPIngressPath, InType: reflect.TypeOf(&HTTPIngressPath{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_HTTPIngressRuleValue, InType: reflect.TypeOf(&HTTPIngressRuleValue{})},
@@ -417,17 +416,6 @@ func DeepCopy_v1beta1_DeploymentStrategy(in interface{}, out interface{}, c *con
 		} else {
 			out.RollingUpdate = nil
 		}
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_ExportOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExportOptions)
-		out := out.(*ExportOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Export = in.Export
-		out.Exact = in.Exact
 		return nil
 	}
 }

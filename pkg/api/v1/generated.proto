@@ -888,15 +888,6 @@ message ExecAction {
   repeated string command = 1;
 }
 
-// ExportOptions is the query options to the standard REST get call.
-message ExportOptions {
-  // Should this value be exported.  Export strips fields that a user can not specify.
-  optional bool export = 1;
-
-  // Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
-  optional bool exact = 2;
-}
-
 // Represents a Fibre Channel volume.
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.

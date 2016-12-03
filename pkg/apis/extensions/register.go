@@ -18,6 +18,7 @@ package extensions
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -71,7 +72,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&api.DeleteOptions{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
-		&api.ExportOptions{},
+		&unversioned.ExportOptions{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
 		&NetworkPolicy{},

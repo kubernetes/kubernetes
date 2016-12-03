@@ -193,16 +193,6 @@ func (DeploymentStrategy) SwaggerDoc() map[string]string {
 	return map_DeploymentStrategy
 }
 
-var map_ExportOptions = map[string]string{
-	"":       "ExportOptions is the query options to the standard REST get call.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify.",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
-}
-
-func (ExportOptions) SwaggerDoc() map[string]string {
-	return map_ExportOptions
-}
-
 var map_FSGroupStrategyOptions = map[string]string{
 	"":       "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
 	"rule":   "Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",

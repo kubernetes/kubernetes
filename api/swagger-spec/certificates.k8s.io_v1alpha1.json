@@ -306,7 +306,7 @@
         "type": "boolean",
         "paramType": "query",
         "name": "exact",
-        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
         "required": false,
         "allowMultiple": false
        },
