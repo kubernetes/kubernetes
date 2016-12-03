@@ -78,7 +78,7 @@ spec:
         - --domain={{ pillar['dns_domain'] }}.
         - --dns-port=10053
         - --config-map=kube-dns
-        - --v=0
+        - --v=2
         - --kube_master_url=http://{{ private_address }}:8080
         {{ pillar['federations_domain_map'] }}
         env:

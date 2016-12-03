@@ -81,9 +81,7 @@ spec:
         - --domain={{ pillar['dns_domain'] }}.
         - --dns-port=10053
         - --config-map=kube-dns
-        # This should be set to v=2 only after the new image (cut from 1.5) has
-        # been released, otherwise we will flood the logs.
-        - --v=0
+        - --v=2
         {{ pillar['federations_domain_map'] }}
         env:
         - name: PROMETHEUS_PORT
