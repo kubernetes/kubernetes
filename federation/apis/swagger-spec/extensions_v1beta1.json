@@ -338,7 +338,7 @@
         "type": "boolean",
         "paramType": "query",
         "name": "exact",
-        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
         "required": false,
         "allowMultiple": false
        },
@@ -507,6 +507,22 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -1292,7 +1308,7 @@
         "type": "boolean",
         "paramType": "query",
         "name": "exact",
-        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
         "required": false,
         "allowMultiple": false
        },
@@ -1461,6 +1477,22 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -2472,7 +2504,7 @@
         "type": "boolean",
         "paramType": "query",
         "name": "exact",
-        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
         "required": false,
         "allowMultiple": false
        },
@@ -2641,6 +2673,22 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -3426,7 +3474,7 @@
         "type": "boolean",
         "paramType": "query",
         "name": "exact",
-        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
         "required": false,
         "allowMultiple": false
        },
@@ -3595,6 +3643,22 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -4675,6 +4739,10 @@
      "azureDisk": {
       "$ref": "v1.AzureDiskVolumeSource",
       "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
+     },
+     "photonPersistentDisk": {
+      "$ref": "v1.PhotonPersistentDiskVolumeSource",
+      "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
      }
     }
    },
@@ -5307,6 +5375,23 @@
    "v1.AzureDataDiskCachingMode": {
     "id": "v1.AzureDataDiskCachingMode",
     "properties": {}
+   },
+   "v1.PhotonPersistentDiskVolumeSource": {
+    "id": "v1.PhotonPersistentDiskVolumeSource",
+    "description": "Represents a Photon Controller persistent disk resource.",
+    "required": [
+     "pdID"
+    ],
+    "properties": {
+     "pdID": {
+      "type": "string",
+      "description": "ID that identifies Photon Controller persistent disk"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
    },
    "v1.Container": {
     "id": "v1.Container",

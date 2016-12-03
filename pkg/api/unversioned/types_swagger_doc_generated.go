@@ -81,8 +81,8 @@ func (APIVersions) SwaggerDoc() map[string]string {
 
 var map_ExportOptions = map[string]string{
 	"":       "ExportOptions is the query options to the standard REST get call.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify.`",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+	"export": "Should this value be exported.  Export strips fields that a user can not specify.",
+	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
 }
 
 func (ExportOptions) SwaggerDoc() map[string]string {
