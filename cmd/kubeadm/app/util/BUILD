@@ -16,6 +16,7 @@ go_library(
         "error.go",
         "kubeconfig.go",
         "tokens.go",
+        "version.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -34,6 +35,7 @@ go_test(
         "error_test.go",
         "kubeconfig_test.go",
         "tokens_test.go",
+        "version_test.go",
     ],
     library = "go_default_library",
     tags = ["automanaged"],
