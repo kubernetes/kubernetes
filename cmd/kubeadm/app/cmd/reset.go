@@ -136,9 +136,16 @@ func (r *Reset) Run(out io.Writer) error {
 		fmt.Printf("failed to unmount directories in /var/lib/kubelet, %s", string(umountOutputBytes))
 	}
 
+	dirsToClean := []string{"/var/lib/kubelet"}
+
+	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
+	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
+	if _, err := os.Stat("/etc/kubernetes/manifests/etcd.json"); os.IsNotExist(err) {
+		dirsToClean = append(dirsToClean, "/var/lib/etcd")
+	}
+
 	resetConfigDir("/etc/kubernetes/")
 
-	dirsToClean := []string{"/var/lib/kubelet", "/var/lib/etcd"}
 	fmt.Printf("Deleting contents of stateful directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		cleanDir(dir)
