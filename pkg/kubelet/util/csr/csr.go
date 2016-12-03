@@ -20,7 +20,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
@@ -51,7 +51,7 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 
 	req, err := client.Create(&certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
-		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
+		TypeMeta:   metav1.TypeMeta{Kind: "CertificateSigningRequest"},
 		ObjectMeta: v1.ObjectMeta{GenerateName: "csr-"},
 
 		// TODO: For now, this is a request for a certificate with allowed usage of "TLS Web Client Authentication".

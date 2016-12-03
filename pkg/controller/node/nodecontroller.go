@@ -25,7 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -82,8 +82,8 @@ const (
 )
 
 type nodeStatusData struct {
-	probeTimestamp           unversioned.Time
-	readyTransitionTimestamp unversioned.Time
+	probeTimestamp           metav1.Time
+	readyTransitionTimestamp metav1.Time
 	status                   v1.NodeStatus
 }
 
@@ -122,7 +122,7 @@ type NodeController struct {
 	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
 	// to aviod the problem with time skew across the cluster.
 	nodeStatusMap map[string]nodeStatusData
-	now           func() unversioned.Time
+	now           func() metav1.Time
 	// Lock to access evictor workers
 	evictorLock sync.Mutex
 	// workers that evicts pods from unresponsive nodes.
@@ -220,7 +220,7 @@ func NewNodeController(
 		nodeMonitorPeriod:           nodeMonitorPeriod,
 		nodeStartupGracePeriod:      nodeStartupGracePeriod,
 		lookupIP:                    net.LookupIP,
-		now:                         unversioned.Now,
+		now:                         metav1.Now,
 		clusterCIDR:                 clusterCIDR,
 		serviceCIDR:                 serviceCIDR,
 		allocateNodeCIDRs:           allocateNodeCIDRs,
@@ -698,7 +698,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 			readyTransitionTimestamp: nc.now(),
 		}
 	} else if savedCondition != nil && observedCondition != nil && savedCondition.LastHeartbeatTime != observedCondition.LastHeartbeatTime {
-		var transitionTime unversioned.Time
+		var transitionTime metav1.Time
 		// If ReadyCondition changed since the last time we checked, we update the transition timestamp to "now",
 		// otherwise we leave it as it is.
 		if savedCondition.LastTransitionTime != observedCondition.LastTransitionTime {

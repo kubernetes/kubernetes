@@ -27,7 +27,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/json"
@@ -287,19 +287,19 @@ func (u *Unstructured) SetSelfLink(selfLink string) {
 	u.setNestedField(selfLink, "metadata", "selfLink")
 }
 
-func (u *Unstructured) GetCreationTimestamp() unversioned.Time {
-	var timestamp unversioned.Time
+func (u *Unstructured) GetCreationTimestamp() metav1.Time {
+	var timestamp metav1.Time
 	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "creationTimestamp"))
 	return timestamp
 }
 
-func (u *Unstructured) SetCreationTimestamp(timestamp unversioned.Time) {
+func (u *Unstructured) SetCreationTimestamp(timestamp metav1.Time) {
 	ts, _ := timestamp.MarshalQueryParameter()
 	u.setNestedField(ts, "metadata", "creationTimestamp")
 }
 
-func (u *Unstructured) GetDeletionTimestamp() *unversioned.Time {
-	var timestamp unversioned.Time
+func (u *Unstructured) GetDeletionTimestamp() *metav1.Time {
+	var timestamp metav1.Time
 	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "deletionTimestamp"))
 	if timestamp.IsZero() {
 		return nil
@@ -307,7 +307,7 @@ func (u *Unstructured) GetDeletionTimestamp() *unversioned.Time {
 	return &timestamp
 }
 
-func (u *Unstructured) SetDeletionTimestamp(timestamp *unversioned.Time) {
+func (u *Unstructured) SetDeletionTimestamp(timestamp *metav1.Time) {
 	ts, _ := timestamp.MarshalQueryParameter()
 	u.setNestedField(ts, "metadata", "deletionTimestamp")
 }

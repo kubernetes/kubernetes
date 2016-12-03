@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	versionedwatch "k8s.io/kubernetes/pkg/watch/versioned"
@@ -76,7 +76,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PersistentVolumeClaim{},
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
-		&unversioned.ExportOptions{},
+		&metav1.ExportOptions{},
 		&ListOptions{},
 		&PodAttachOptions{},
 		&PodLogOptions{},
@@ -91,7 +91,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 
 	// Add common types
-	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
+	scheme.AddKnownTypes(SchemeGroupVersion, &metav1.Status{})
 
 	// Add the watch version that applies
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)

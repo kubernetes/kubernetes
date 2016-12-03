@@ -17,7 +17,7 @@ limitations under the License.
 package metaonly
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -25,7 +25,7 @@ import (
 // JSON data.
 // TODO: enable meta-only decoding for protobuf.
 type MetadataOnlyObject struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty"`
 }
@@ -34,9 +34,9 @@ type MetadataOnlyObject struct {
 // a list, and those of the enclosing objects.
 // TODO: enable meta-only decoding for protobuf.
 type MetadataOnlyObjectList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []MetadataOnlyObject `json:"items"`
 }

@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -47,7 +47,7 @@ func newJob(parallelism, completions int32) *batch.Job {
 			Namespace: v1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: v1.PodTemplateSpec{
@@ -243,7 +243,7 @@ func TestControllerSyncJob(t *testing.T) {
 		// job & pods setup
 		job := newJob(tc.parallelism, tc.completions)
 		if tc.deleting {
-			now := unversioned.Now()
+			now := metav1.Now()
 			job.DeletionTimestamp = &now
 		}
 		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
@@ -347,7 +347,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		// job & pods setup
 		job := newJob(tc.parallelism, tc.completions)
 		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
-		start := unversioned.Unix(unversioned.Now().Time.Unix()-tc.startTime, 0)
+		start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
 		job.Status.StartTime = &start
 		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
 		podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
@@ -419,7 +419,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	job := newJob(1, 1)
 	activeDeadlineSeconds := int64(10)
 	job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-	start := unversioned.Unix(unversioned.Now().Time.Unix()-15, 0)
+	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
 	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
@@ -536,7 +536,7 @@ func TestJobPodLookup(t *testing.T) {
 			job: &batch.Job{
 				ObjectMeta: v1.ObjectMeta{Name: "foo"},
 				Spec: batch.JobSpec{
-					Selector: &unversioned.LabelSelector{
+					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar"},
 					},
 				},
@@ -555,11 +555,11 @@ func TestJobPodLookup(t *testing.T) {
 			job: &batch.Job{
 				ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: batch.JobSpec{
-					Selector: &unversioned.LabelSelector{
-						MatchExpressions: []unversioned.LabelSelectorRequirement{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
 							{
 								Key:      "foo",
-								Operator: unversioned.LabelSelectorOpIn,
+								Operator: metav1.LabelSelectorOpIn,
 								Values:   []string{"bar"},
 							},
 						},

@@ -23,7 +23,7 @@ limitations under the License.
 //   (e.g. LabelSelector).
 // In the future, we will probably move these categories of objects into
 // separate packages.
-package unversioned
+package v1
 
 import "strings"
 

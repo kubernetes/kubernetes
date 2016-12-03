@@ -23,7 +23,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	storageerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/namespace"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -147,7 +147,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 				}
 				// Set the deletion timestamp if needed
 				if existingNamespace.DeletionTimestamp.IsZero() {
-					now := unversioned.Now()
+					now := metav1.Now()
 					existingNamespace.DeletionTimestamp = &now
 				}
 				// Set the namespace phase to terminating, if needed

@@ -23,7 +23,7 @@ import (
 	"net/http"
 
 	config "k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer/apis/config/v1alpha1"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 type DiscoverySummarizer interface {
@@ -101,13 +101,13 @@ func (ds *discoverySummarizerServer) indexHandler(w http.ResponseWriter, r *http
 // Handler for group versions summarizer.
 func (ds *discoverySummarizerServer) summarizeGroupVersionsHandler(path string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var apiGroupList *unversioned.APIGroupList
+		var apiGroupList *metav1.APIGroupList
 		// TODO: We can cache calls to all servers.
-		groups := make(chan *unversioned.APIGroupList)
+		groups := make(chan *metav1.APIGroupList)
 		errorChannel := make(chan error)
 		for _, serverAddress := range ds.groupVersionPaths[path] {
 			addr := serverAddress
-			go func(groups chan *unversioned.APIGroupList, error_channel chan error) {
+			go func(groups chan *metav1.APIGroupList, error_channel chan error) {
 				groupList, err := ds.getAPIGroupList(addr + path)
 				if err != nil {
 					errorChannel <- err
@@ -118,13 +118,13 @@ func (ds *discoverySummarizerServer) summarizeGroupVersionsHandler(path string) 
 			}(groups, errorChannel)
 		}
 
-		var groupList *unversioned.APIGroupList
+		var groupList *metav1.APIGroupList
 		var err error
 		for range ds.groupVersionPaths[path] {
 			select {
 			case groupList = <-groups:
 				if apiGroupList == nil {
-					apiGroupList = &unversioned.APIGroupList{}
+					apiGroupList = &metav1.APIGroupList{}
 					*apiGroupList = *groupList
 				} else {
 					apiGroupList.Groups = append(apiGroupList.Groups, groupList.Groups...)
@@ -158,7 +158,7 @@ func (ds *discoverySummarizerServer) summarizeLegacyVersionsHandler(path string)
 	}
 }
 
-func (ds *discoverySummarizerServer) getAPIGroupList(serverAddress string) (*unversioned.APIGroupList, error) {
+func (ds *discoverySummarizerServer) getAPIGroupList(serverAddress string) (*metav1.APIGroupList, error) {
 	response, err := http.Get(serverAddress)
 	if err != nil {
 		return nil, fmt.Errorf("Error in fetching %s: %v", serverAddress, err)
@@ -168,7 +168,7 @@ func (ds *discoverySummarizerServer) getAPIGroupList(serverAddress string) (*unv
 	if err != nil {
 		return nil, fmt.Errorf("Error reading response from %s: %v", serverAddress, err)
 	}
-	var apiGroupList unversioned.APIGroupList
+	var apiGroupList metav1.APIGroupList
 	err = json.Unmarshal(contents, &apiGroupList)
 	if err != nil {
 		return nil, fmt.Errorf("Error in unmarshalling response from server %s: %v", serverAddress, err)
@@ -176,7 +176,7 @@ func (ds *discoverySummarizerServer) getAPIGroupList(serverAddress string) (*unv
 	return &apiGroupList, nil
 }
 
-func (ds *discoverySummarizerServer) getAPIVersions(serverAddress string) (*unversioned.APIVersions, error) {
+func (ds *discoverySummarizerServer) getAPIVersions(serverAddress string) (*metav1.APIVersions, error) {
 	response, err := http.Get(serverAddress)
 	if err != nil {
 		return nil, fmt.Errorf("Error in fetching %s: %v", serverAddress, err)
@@ -186,7 +186,7 @@ func (ds *discoverySummarizerServer) getAPIVersions(serverAddress string) (*unve
 	if err != nil {
 		return nil, fmt.Errorf("Error reading response from %s: %v", serverAddress, err)
 	}
-	var apiVersions unversioned.APIVersions
+	var apiVersions metav1.APIVersions
 	err = json.Unmarshal(contents, &apiVersions)
 	if err != nil {
 		return nil, fmt.Errorf("Error in unmarshalling response from server %s: %v", serverAddress, err)

@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 
 	"github.com/emicklei/go-restful"
 )
@@ -47,7 +47,7 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 			Name:      "foo",
 			Namespace: "other",
 		},
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "Service",
 		},
 	}

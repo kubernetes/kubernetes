@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"path"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -313,7 +313,7 @@ func formatMedium(medium v1.StorageMedium) string {
 func testPodWithVolume(image, path string, source *v1.EmptyDirVolumeSource) *v1.Pod {
 	podName := "pod-" + string(uuid.NewUUID())
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},

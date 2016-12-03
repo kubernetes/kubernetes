@@ -22,7 +22,7 @@ package v1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	types "k8s.io/kubernetes/pkg/types"
@@ -2343,7 +2343,7 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 	out.ResourceVersion = in.ResourceVersion
 	out.Generation = in.Generation
 	out.CreationTimestamp = in.CreationTimestamp
-	out.DeletionTimestamp = (*unversioned.Time)(unsafe.Pointer(in.DeletionTimestamp))
+	out.DeletionTimestamp = (*meta_v1.Time)(unsafe.Pointer(in.DeletionTimestamp))
 	out.DeletionGracePeriodSeconds = (*int64)(unsafe.Pointer(in.DeletionGracePeriodSeconds))
 	out.Labels = *(*map[string]string)(unsafe.Pointer(&in.Labels))
 	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
@@ -2366,7 +2366,7 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 	out.ResourceVersion = in.ResourceVersion
 	out.Generation = in.Generation
 	out.CreationTimestamp = in.CreationTimestamp
-	out.DeletionTimestamp = (*unversioned.Time)(unsafe.Pointer(in.DeletionTimestamp))
+	out.DeletionTimestamp = (*meta_v1.Time)(unsafe.Pointer(in.DeletionTimestamp))
 	out.DeletionGracePeriodSeconds = (*int64)(unsafe.Pointer(in.DeletionGracePeriodSeconds))
 	out.Labels = *(*map[string]string)(unsafe.Pointer(&in.Labels))
 	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
@@ -2526,7 +2526,7 @@ func Convert_api_PersistentVolumeClaimList_To_v1_PersistentVolumeClaimList(in *a
 
 func autoConvert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in *PersistentVolumeClaimSpec, out *api.PersistentVolumeClaimSpec, s conversion.Scope) error {
 	out.AccessModes = *(*[]api.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := Convert_v1_ResourceRequirements_To_api_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
 	}
@@ -2540,7 +2540,7 @@ func Convert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in *P
 
 func autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in *api.PersistentVolumeClaimSpec, out *PersistentVolumeClaimSpec, s conversion.Scope) error {
 	out.AccessModes = *(*[]PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := Convert_api_ResourceRequirements_To_v1_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
 	}
@@ -2803,7 +2803,7 @@ func Convert_api_PodAffinity_To_v1_PodAffinity(in *api.PodAffinity, out *PodAffi
 }
 
 func autoConvert_v1_PodAffinityTerm_To_api_PodAffinityTerm(in *PodAffinityTerm, out *api.PodAffinityTerm, s conversion.Scope) error {
-	out.LabelSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.LabelSelector))
+	out.LabelSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.TopologyKey = in.TopologyKey
 	return nil
@@ -2814,7 +2814,7 @@ func Convert_v1_PodAffinityTerm_To_api_PodAffinityTerm(in *PodAffinityTerm, out 
 }
 
 func autoConvert_api_PodAffinityTerm_To_v1_PodAffinityTerm(in *api.PodAffinityTerm, out *PodAffinityTerm, s conversion.Scope) error {
-	out.LabelSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.LabelSelector))
+	out.LabelSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.TopologyKey = in.TopologyKey
 	return nil
@@ -2971,7 +2971,7 @@ func autoConvert_v1_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *a
 	out.Follow = in.Follow
 	out.Previous = in.Previous
 	out.SinceSeconds = (*int64)(unsafe.Pointer(in.SinceSeconds))
-	out.SinceTime = (*unversioned.Time)(unsafe.Pointer(in.SinceTime))
+	out.SinceTime = (*meta_v1.Time)(unsafe.Pointer(in.SinceTime))
 	out.Timestamps = in.Timestamps
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
@@ -2987,7 +2987,7 @@ func autoConvert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, ou
 	out.Follow = in.Follow
 	out.Previous = in.Previous
 	out.SinceSeconds = (*int64)(unsafe.Pointer(in.SinceSeconds))
-	out.SinceTime = (*unversioned.Time)(unsafe.Pointer(in.SinceTime))
+	out.SinceTime = (*meta_v1.Time)(unsafe.Pointer(in.SinceTime))
 	out.Timestamps = in.Timestamps
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
@@ -3138,7 +3138,7 @@ func autoConvert_v1_PodStatus_To_api_PodStatus(in *PodStatus, out *api.PodStatus
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
 	out.InitContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
 	return nil
@@ -3155,7 +3155,7 @@ func autoConvert_api_PodStatus_To_v1_PodStatus(in *api.PodStatus, out *PodStatus
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
 	out.InitContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
 	return nil

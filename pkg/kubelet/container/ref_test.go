@@ -19,7 +19,7 @@ package container
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
@@ -65,7 +65,7 @@ func TestFieldPath(t *testing.T) {
 func TestGenerateContainerRef(t *testing.T) {
 	var (
 		okPod = v1.Pod{
-			TypeMeta: unversioned.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Pod",
 				APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 			},

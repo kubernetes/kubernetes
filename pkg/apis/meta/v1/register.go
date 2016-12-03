@@ -14,11 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1
 
 import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
+
+// GroupName is the group name for this API.
+const GroupName = "meta.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: "", Version: ""}

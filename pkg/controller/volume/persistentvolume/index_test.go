@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 )
@@ -113,7 +113,7 @@ func TestMatchVolume(t *testing.T) {
 					Namespace: "myns",
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					Selector: &unversioned.LabelSelector{
+					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"should-not-exist": "true",
 						},
@@ -135,7 +135,7 @@ func TestMatchVolume(t *testing.T) {
 					Namespace: "myns",
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					Selector: &unversioned.LabelSelector{
+					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"should-exist": "true",
 						},
@@ -157,7 +157,7 @@ func TestMatchVolume(t *testing.T) {
 					Namespace: "myns",
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					Selector: &unversioned.LabelSelector{
+					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"should-exist": "true",
 						},
@@ -183,7 +183,7 @@ func TestMatchVolume(t *testing.T) {
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
 					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-					Selector: &unversioned.LabelSelector{
+					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"should-exist": "true",
 						},

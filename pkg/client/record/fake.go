@@ -19,7 +19,7 @@ package record
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -42,7 +42,7 @@ func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageF
 	}
 }
 
-func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with

@@ -27,7 +27,7 @@ import (
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	controllerutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -37,7 +37,7 @@ import (
 
 func newCluster(clusterName string, serverUrl string) *federationv1beta1.Cluster {
 	cluster := federationv1beta1.Cluster{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:  uuid.NewUUID(),
 			Name: clusterName,
@@ -56,8 +56,8 @@ func newCluster(clusterName string, serverUrl string) *federationv1beta1.Cluster
 
 func newClusterList(cluster *federationv1beta1.Cluster) *federationv1beta1.ClusterList {
 	clusterList := federationv1beta1.ClusterList{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
-		ListMeta: unversioned.ListMeta{
+		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
+		ListMeta: metav1.ListMeta{
 			SelfLink: "foobar",
 		},
 		Items: []federationv1beta1.Cluster{},
