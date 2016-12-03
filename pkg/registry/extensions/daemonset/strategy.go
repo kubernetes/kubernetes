@@ -110,20 +110,23 @@ func DaemonSetToSelectableFields(daemon *extensions.DaemonSet) fields.Set {
 	return generic.ObjectMetaFieldsSet(&daemon.ObjectMeta, true)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	ds, ok := obj.(*extensions.DaemonSet)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a ds.")
+	}
+	return labels.Set(ds.ObjectMeta.Labels), DaemonSetToSelectableFields(ds), nil
+}
+
 // MatchSetDaemon is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchDaemonSet(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			ds, ok := obj.(*extensions.DaemonSet)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a ds.")
-			}
-			return labels.Set(ds.ObjectMeta.Labels), DaemonSetToSelectableFields(ds), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

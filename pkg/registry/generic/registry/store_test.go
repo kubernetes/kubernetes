@@ -103,6 +103,11 @@ func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
 	return newTestGenericStoreRegistry(t, false)
 }
 
+func getPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod := obj.(*api.Pod)
+	return labels.Set{"name": pod.ObjectMeta.Name}, nil, nil
+}
+
 // matchPodName returns selection predicate that matches any pod with name in the set.
 // Makes testing simpler.
 func matchPodName(names ...string) storage.SelectionPredicate {
@@ -113,12 +118,9 @@ func matchPodName(names ...string) storage.SelectionPredicate {
 		panic("Labels requirement must validate successfully")
 	}
 	return storage.SelectionPredicate{
-		Label: labels.Everything().Add(*l),
-		Field: fields.Everything(),
-		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
-			pod := obj.(*api.Pod)
-			return labels.Set{"name": pod.ObjectMeta.Name}, nil, nil
-		},
+		Label:    labels.Everything().Add(*l),
+		Field:    fields.Everything(),
+		GetAttrs: getPodAttrs,
 	}
 }
 
@@ -1249,6 +1251,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.De
 			Type:           &api.Pod{},
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
+			GetAttrsFunc:   getPodAttrs,
 			NewListFunc:    func() runtime.Object { return &api.PodList{} },
 			Codec:          sc.Codec,
 		}

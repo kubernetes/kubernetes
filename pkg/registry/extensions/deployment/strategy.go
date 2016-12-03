@@ -128,19 +128,22 @@ func DeploymentToSelectableFields(deployment *extensions.Deployment) fields.Set 
 	return generic.ObjectMetaFieldsSet(&deployment.ObjectMeta, true)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	deployment, ok := obj.(*extensions.Deployment)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a deployment.")
+	}
+	return labels.Set(deployment.ObjectMeta.Labels), DeploymentToSelectableFields(deployment), nil
+}
+
 // MatchDeployment is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchDeployment(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
 	return apistorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			deployment, ok := obj.(*extensions.Deployment)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a deployment.")
-			}
-			return labels.Set(deployment.ObjectMeta.Labels), DeploymentToSelectableFields(deployment), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }

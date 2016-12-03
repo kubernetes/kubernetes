@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	corepod "k8s.io/kubernetes/pkg/registry/core/pod"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -60,6 +61,7 @@ func newTestCacher(s storage.Interface, cap int) *storage.Cacher {
 		Type:           &api.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
+		GetAttrsFunc:   corepod.GetAttrs,
 		NewListFunc:    func() runtime.Object { return &api.PodList{} },
 		Codec:          testapi.Default.Codec(),
 	}

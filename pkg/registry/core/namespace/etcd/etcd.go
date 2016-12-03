@@ -60,6 +60,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *FinalizeREST) {
 		prefix,
 		namespace.Strategy,
 		newListFunc,
+		namespace.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 
