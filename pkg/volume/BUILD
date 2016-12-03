@@ -50,6 +50,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "metrics_nil_test.go",
+        "metrics_statfs_test.go",
         "plugins_test.go",
         "util_test.go",
     ],
@@ -60,6 +61,7 @@ go_test(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/util/testing:go_default_library",
         "//pkg/watch:go_default_library",
     ],
 )
