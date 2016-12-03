@@ -498,7 +498,11 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("checking the result")
 			forEachReplicationController(c, ns, "app", "redis", validateReplicationControllerConfiguration)
 		})
-		It("should reuse nodePort when apply to an existing SVC", func() {
+		It("should reuse port when apply to an existing SVC", func() {
+			// This test doesn't do anything meaningful.  It was supposed to test that the nodeport
+			// did not get reset by apply, but never setup a nodeport typed service, so the
+			// nodeport was always 0.  Updated to get version tests to pass after a change in 1.5
+			// to make kubectl jsonpath fail if the field is not present for default values
 			serviceJson := readTestFileOrDie(redisServiceFilename)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
@@ -506,17 +510,17 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDieInput(string(serviceJson[:]), "create", "-f", "-", nsFlag)
 
 			By("getting the original nodePort")
-			originalNodePort := framework.RunKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].nodePort}")
+			originalPort := framework.RunKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
 
 			By("applying the same configuration")
 			framework.RunKubectlOrDieInput(string(serviceJson[:]), "apply", "-f", "-", nsFlag)
 
 			By("getting the nodePort after applying configuration")
-			currentNodePort := framework.RunKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].nodePort}")
+			currentPort := framework.RunKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
 
 			By("checking the result")
-			if originalNodePort != currentNodePort {
-				framework.Failf("nodePort should keep the same")
+			if originalPort != currentPort {
+				framework.Failf("port should keep the same")
 			}
 		})
 	})
