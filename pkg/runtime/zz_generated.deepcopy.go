@@ -22,7 +22,17 @@ package runtime
 
 import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
 )
+
+// GetGeneratedDeepCopyFuncs returns the generated funcs, since we aren't registering them.
+func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
+	return []conversion.GeneratedDeepCopyFunc{
+		{Fn: DeepCopy_runtime_RawExtension, InType: reflect.TypeOf(&RawExtension{})},
+		{Fn: DeepCopy_runtime_TypeMeta, InType: reflect.TypeOf(&TypeMeta{})},
+		{Fn: DeepCopy_runtime_Unknown, InType: reflect.TypeOf(&Unknown{})},
+	}
+}
 
 func DeepCopy_runtime_RawExtension(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{

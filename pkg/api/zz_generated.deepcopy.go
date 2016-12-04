@@ -23,8 +23,6 @@ package api
 import (
 	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	fields "k8s.io/kubernetes/pkg/fields"
-	labels "k8s.io/kubernetes/pkg/labels"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	types "k8s.io/kubernetes/pkg/types"
 	reflect "reflect"
@@ -1475,17 +1473,13 @@ func DeepCopy_api_ListOptions(in interface{}, out interface{}, c *conversion.Clo
 		out.TypeMeta = in.TypeMeta
 		if in.LabelSelector == nil {
 			out.LabelSelector = nil
-		} else if newVal, err := c.DeepCopy(&in.LabelSelector); err != nil {
-			return err
 		} else {
-			out.LabelSelector = *newVal.(*labels.Selector)
+			out.LabelSelector = in.LabelSelector.DeepCopy()
 		}
 		if in.FieldSelector == nil {
 			out.FieldSelector = nil
-		} else if newVal, err := c.DeepCopy(&in.FieldSelector); err != nil {
-			return err
 		} else {
-			out.FieldSelector = *newVal.(*fields.Selector)
+			out.FieldSelector = in.FieldSelector.DeepCopy()
 		}
 		out.Watch = in.Watch
 		out.ResourceVersion = in.ResourceVersion
