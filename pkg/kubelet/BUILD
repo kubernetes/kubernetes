@@ -49,7 +49,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/conversion:go_default_library",
         "//pkg/fieldpath:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/kubelet/api:go_default_library",
