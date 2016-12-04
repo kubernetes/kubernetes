@@ -116,9 +116,9 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
 		tmpLogPath := "/tmp/drop-inbound.log"
-		testReboot(f.ClientSet, fmt.Sprintf("nohup sh -c 'set -x && sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT"+
-			" && sudo iptables -I INPUT 2 -j DROP && sudo iptables -t filter -nL INPUT && date && sleep 120 && sudo iptables -t filter -nL INPUT"+
-			" && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >%v 2>&1 &", tmpLogPath), catLogHook(tmpLogPath))
+		testReboot(f.ClientSet, fmt.Sprintf("nohup sh -c 'set -x && sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT -w"+
+			" && sudo iptables -I INPUT 2 -j DROP -w && sudo iptables -t filter -nL INPUT && date && sleep 120 && sudo iptables -t filter -nL INPUT"+
+			" && sudo iptables -D INPUT -j DROP -w && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT -w' >%v 2>&1 &", tmpLogPath), catLogHook(tmpLogPath))
 	})
 
 	It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
@@ -126,9 +126,9 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
 		tmpLogPath := "/tmp/drop-outbound.log"
-		testReboot(f.ClientSet, fmt.Sprintf("nohup sh -c 'set -x && sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT"+
-			" && sudo iptables -I OUTPUT 2 -j DROP && sudo iptables -t filter -nL OUTPUT && date && sleep 120 && sudo iptables -t filter -nL OUTPUT"+
-			" && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >%v 2>&1 &", tmpLogPath), catLogHook(tmpLogPath))
+		testReboot(f.ClientSet, fmt.Sprintf("nohup sh -c 'set -x && sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT -w"+
+			" && sudo iptables -I OUTPUT 2 -j DROP -w && sudo iptables -t filter -nL OUTPUT && date && sleep 120 && sudo iptables -t filter -nL OUTPUT"+
+			" && sudo iptables -D OUTPUT -j DROP -w && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT -w' >%v 2>&1 &", tmpLogPath), catLogHook(tmpLogPath))
 	})
 })
 
