@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -215,7 +214,7 @@ func TestUnstructuredGetters(t *testing.T) {
 		t.Errorf("GetAnnotations() = %s, want %s", got, want)
 	}
 	refs := unstruct.GetOwnerReferences()
-	expectedOwnerReferences := []metatypes.OwnerReference{
+	expectedOwnerReferences := []metav1.OwnerReference{
 		{
 			Kind:       "Pod",
 			Name:       "poda",
@@ -301,7 +300,7 @@ func TestUnstructuredSetters(t *testing.T) {
 	unstruct.SetDeletionTimestamp(&date)
 	unstruct.SetLabels(map[string]string{"test_label": "test_value"})
 	unstruct.SetAnnotations(map[string]string{"test_annotation": "test_value"})
-	newOwnerReferences := []metatypes.OwnerReference{
+	newOwnerReferences := []metav1.OwnerReference{
 		{
 			Kind:       "Pod",
 			Name:       "poda",
