@@ -35,20 +35,26 @@ const (
 	NvidiaDeviceUVM string = "/dev/nvidia-uvm"
 )
 
-type NvidiaGPU struct {
+type NvidiaGPUManager struct {
 	gpuPaths []string
 	gpuMutex sync.Mutex
 }
 
+/*
+func NewNvidiaGPUManager() (ngm NvidiaGPUManager) {
+	ngm.Init()
+}
+*/
+
 // Get all the paths of NVIDIA GPU card from /dev/
-func (nvidiaGPU *NvidiaGPU) discovery() error {
+func (ngm *NvidiaGPUManager) discovery() error {
 	var err error
 	if gpuPaths == nil {
 		err = filepath.Walk("/dev", func(path string, f os.FileInfo, err error) error {
 			reg := regexp.MustCompile(`^nvidia[0-9]*$`)
 			gpupath := reg.FindAllString(f.Name(), -1)
 			if gpupath != nil && gpupath[0] != "" {
-				nvidiaGPU.gpuPaths = append(gpuPaths, "/dev/"+gpupath[0])
+				ngm.gpuPaths = append(gpuPaths, "/dev/"+gpupath[0])
 			}
 
 			return nil
@@ -78,27 +84,27 @@ func Init() error {
 	return err
 }
 
-func (nvidiaGPU *NvidiaGPU) Init() error {
-	nvidiaGPU.gpuMutex.Lock()
-	defer nvidiaGPU.gpuMutex.Unlock()
+func (ngm *NvidiaGPUManager) Init() error {
+	ngm.gpuMutex.Lock()
+	defer ngm.gpuMutex.Unlock()
 
 	return discovery()
 }
 
-func (nvidiaGPU *NvidiaGPU) Shutdown() {
-	nvidiaGPU.gpuMutex.Lock()
-	defer nvidiaGPU.gpuMutex.Unlock()
+func (nvidiaGPU *NvidiaGPUManager) Shutdown() {
+	ngm.gpuMutex.Lock()
+	defer ngm.gpuMutex.Unlock()
 
-	nvidiaGPU.gpugpuPaths = nil
+	ngm.gpugpuPaths = nil
 }
 
-func (nvidiaGPU *NvidiaGPU) Capacity() int {
-	nvidiaGPU.gpuMutex.Lock()
-	defer nvidiaGPU.gpuMutex.Unlock()
+func (ngm *NvidiaGPUManager) Capacity() int {
+	ngm.gpuMutex.Lock()
+	defer ngm.gpuMutex.Unlock()
 
-	return len(nvidiaGPU.gpuPaths)
+	return len(ngm.gpuPaths)
 }
-
+/*
 func (nvidiaGPU *NvidiaGPU) isAvailable(path string) bool {
 	for _, container range containers {
 		for _, device range container.Devices {
@@ -111,13 +117,13 @@ func (nvidiaGPU *NvidiaGPU) isAvailable(path string) bool {
 	return true
 }
 
-func (nvidiaGPU *NvidiaGPU) AllocateGPUs(int num) (paths []string) {
+func (ngm *NvidiaGPUManager) AllocateGPUs(int num) (paths []string) {
 	if num <= 0 {
 		return nil
 	}
 
-	for _, path range nvidiaGPU.gpuPaths {
-		if nvidiaGPU.isAvailable(path) {
+	for _, path range ngm.gpuPaths {
+		if ngm.isAvailable(path) {
 			paths = append(paths, path)
 			if len(paths) == num {
 			return
@@ -133,4 +139,4 @@ func (nvidiaGPU *NvidiaGPU) AvailableGPUs() (num int) {
 		}
 	}
 }
-
+*/
