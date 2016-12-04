@@ -27,7 +27,6 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/api/install"
 
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -170,7 +169,7 @@ func TestProcessItem(t *testing.T) {
 	gc := setupGC(t, clientConfig)
 	item := &node{
 		identity: objectReference{
-			OwnerReference: metatypes.OwnerReference{
+			OwnerReference: metav1.OwnerReference{
 				Kind:       pod.Kind,
 				APIVersion: pod.APIVersion,
 				Name:       pod.Name,
@@ -326,8 +325,8 @@ func TestDependentsRace(t *testing.T) {
 	go func() {
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
-			gc.propagator.addDependentToOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
-			gc.propagator.removeDependentFromOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
+			gc.propagator.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.propagator.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
 		}
 	}()
 	go func() {
@@ -366,7 +365,7 @@ func TestGCListWatcher(t *testing.T) {
 func podToGCNode(pod *v1.Pod) *node {
 	return &node{
 		identity: objectReference{
-			OwnerReference: metatypes.OwnerReference{
+			OwnerReference: metav1.OwnerReference{
 				Kind:       pod.Kind,
 				APIVersion: pod.APIVersion,
 				Name:       pod.Name,
