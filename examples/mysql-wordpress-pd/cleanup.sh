@@ -9,3 +9,5 @@ kubectl delete pv local-pv-2
 
 kubectl delete pvc mysql-pv-claim
 kubectl delete pvc wp-pv-claim
+
+kubectl delete secret mysql-pass
