@@ -22,14 +22,15 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
-
-	"github.com/golang/glog"
 )
 
 // Sorting printer sorts list types before delegating to another printer.
@@ -112,7 +113,7 @@ func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput stri
 	}
 
 	var values [][]reflect.Value
-	if unstructured, ok := objs[0].(*runtime.Unstructured); ok {
+	if unstructured, ok := objs[0].(*unstructured.Unstructured); ok {
 		values, err = parser.FindResults(unstructured.Object)
 	} else {
 		values, err = parser.FindResults(reflect.ValueOf(objs[0]).Elem().Interface())
@@ -266,7 +267,7 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	var jValues [][]reflect.Value
 	var err error
 
-	if unstructured, ok := iObj.(*runtime.Unstructured); ok {
+	if unstructured, ok := iObj.(*unstructured.Unstructured); ok {
 		iValues, err = parser.FindResults(unstructured.Object)
 	} else {
 		iValues, err = parser.FindResults(reflect.ValueOf(iObj).Elem().Interface())
@@ -275,7 +276,7 @@ func (r *RuntimeSort) Less(i, j int) bool {
 		glog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, r.field, err)
 	}
 
-	if unstructured, ok := jObj.(*runtime.Unstructured); ok {
+	if unstructured, ok := jObj.(*unstructured.Unstructured); ok {
 		jValues, err = parser.FindResults(unstructured.Object)
 	} else {
 		jValues, err = parser.FindResults(reflect.ValueOf(jObj).Elem().Interface())

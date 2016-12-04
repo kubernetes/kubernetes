@@ -21,17 +21,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/golang/glog"
 )
 
 // contentRemainingError is used to inform the caller that content is not fully removed from the namespace
@@ -210,7 +210,7 @@ func listCollection(
 	opCache *operationNotSupportedCache,
 	gvr schema.GroupVersionResource,
 	namespace string,
-) (*runtime.UnstructuredList, bool, error) {
+) (*unstructured.UnstructuredList, bool, error) {
 	glog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 
 	key := operationKey{op: operationList, gvr: gvr}
@@ -222,9 +222,9 @@ func listCollection(
 	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 	obj, err := dynamicClient.Resource(&apiResource, namespace).List(&v1.ListOptions{})
 	if err == nil {
-		unstructuredList, ok := obj.(*runtime.UnstructuredList)
+		unstructuredList, ok := obj.(*unstructured.UnstructuredList)
 		if !ok {
-			return nil, false, fmt.Errorf("resource: %s, expected *runtime.UnstructuredList, got %#v", apiResource.Name, obj)
+			return nil, false, fmt.Errorf("resource: %s, expected *unstructured.UnstructuredList, got %#v", apiResource.Name, obj)
 		}
 		return unstructuredList, true, nil
 	}

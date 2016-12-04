@@ -34,13 +34,6 @@ func TestDecodeList(t *testing.T) {
 				Raw:         []byte(`{"kind":"Pod","apiVersion":"` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `","metadata":{"name":"test"}}`),
 				ContentType: runtime.ContentTypeJSON,
 			},
-			&runtime.Unstructured{
-				Object: map[string]interface{}{
-					"kind":       "Foo",
-					"apiVersion": "Bar",
-					"test":       "value",
-				},
-			},
 		},
 	}
 	if errs := runtime.DecodeList(pl.Items, testapi.Default.Codec()); len(errs) != 0 {
