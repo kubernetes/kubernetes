@@ -22,6 +22,7 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
+	"os"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -183,13 +184,24 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 
 	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
-		err := preflight.RunInitMasterChecks(cfg)
-		if err != nil {
+		fmt.Println("[preflight] Running pre-flight checks...")
+
+		// First, check if we're root separately from the other preflight checks and fail fast
+		if err := preflight.RunChecks([]preflight.PreFlightCheck{preflight.IsRootCheck{}}, os.Stderr); err != nil {
+			return nil, &preflight.PreFlightError{Msg: err.Error()}
+		}
+
+		// Then continue with the others...
+		if err := preflight.RunInitMasterChecks(cfg); err != nil {
 			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	if err := preflight.TryStartKubelet(); err != nil {
+		return nil, &preflight.PreFlightError{Msg: err.Error()}
 	}
 
 	// validate version argument
