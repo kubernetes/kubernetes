@@ -17,12 +17,14 @@ limitations under the License.
 package nvidiagpu
 
 import (
+	"fmt"
 	"sync"
 	"os"
 	"path/filepath"
-	"regex"
+	"regexp"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	dockertypes "github.com/docker/engine-api/types"
 )
 
 
@@ -38,23 +40,19 @@ const (
 type NvidiaGPUManager struct {
 	gpuPaths []string
 	gpuMutex sync.Mutex
-}
 
-/*
-func NewNvidiaGPUManager() (ngm NvidiaGPUManager) {
-	ngm.Init()
+	dockerClient dockertools.DockerInterface
 }
-*/
 
 // Get all the paths of NVIDIA GPU card from /dev/
 func (ngm *NvidiaGPUManager) discovery() error {
 	var err error
-	if gpuPaths == nil {
+	if ngm.gpuPaths == nil {
 		err = filepath.Walk("/dev", func(path string, f os.FileInfo, err error) error {
 			reg := regexp.MustCompile(`^nvidia[0-9]*$`)
 			gpupath := reg.FindAllString(f.Name(), -1)
 			if gpupath != nil && gpupath[0] != "" {
-				ngm.gpuPaths = append(gpuPaths, "/dev/"+gpupath[0])
+				ngm.gpuPaths = append(ngm.gpuPaths, "/dev/"+gpupath[0])
 			}
 
 			return nil
@@ -71,7 +69,7 @@ func Valid(path string) bool {
 	return check != nil && check[0] != ""
 }
 
-func Init() error {
+func (ngm *NvidiaGPUManager) Init(dc dockertools.DockerInterface) error {
 	if _, err := os.Stat(NvidiaDeviceCtl); err != nil {
 		return err
 	}
@@ -79,23 +77,21 @@ func Init() error {
 		return err
 	}
 
-	err := discovery()
+	ngm.gpuMutex.Lock()
+	defer ngm.gpuMutex.Unlock()
+
+	err := ngm.discovery()
+
+	ngm.dockerClient = dc
 
 	return err
 }
 
-func (ngm *NvidiaGPUManager) Init() error {
+func (ngm *NvidiaGPUManager) Shutdown() {
 	ngm.gpuMutex.Lock()
 	defer ngm.gpuMutex.Unlock()
 
-	return discovery()
-}
-
-func (nvidiaGPU *NvidiaGPUManager) Shutdown() {
-	ngm.gpuMutex.Lock()
-	defer ngm.gpuMutex.Unlock()
-
-	ngm.gpugpuPaths = nil
+	ngm.gpuPaths = nil
 }
 
 func (ngm *NvidiaGPUManager) Capacity() int {
@@ -104,11 +100,29 @@ func (ngm *NvidiaGPUManager) Capacity() int {
 
 	return len(ngm.gpuPaths)
 }
-/*
-func (nvidiaGPU *NvidiaGPU) isAvailable(path string) bool {
-	for _, container range containers {
-		for _, device range container.Devices {
-			if device.PathOnHost == path {
+
+func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
+	containers, err := ngm.dockerClient.ListContainers(dockertypes.ContainerListOptions{All: true})
+
+	if err != nil {
+		return true
+	}
+
+	for i := range containers {
+		containerJSON, err := ngm.dockerClient.InspectContainer(containers[i].ID)
+
+		if err != nil {
+			continue
+		}
+
+		devices := containerJSON.HostConfig.Devices
+
+		if devices == nil {
+			continue
+		}
+
+		for _, device := range devices {
+			if Valid(device.PathOnHost) {
 				return false
 			}
 		}
@@ -117,26 +131,38 @@ func (nvidiaGPU *NvidiaGPU) isAvailable(path string) bool {
 	return true
 }
 
-func (ngm *NvidiaGPUManager) AllocateGPUs(int num) (paths []string) {
+func (ngm *NvidiaGPUManager) AllocateGPUs(num int) (paths []string, err error) {
 	if num <= 0 {
-		return nil
+		return
 	}
 
-	for _, path range ngm.gpuPaths {
+	ngm.gpuMutex.Lock()
+	defer ngm.gpuMutex.Unlock()
+
+	for _, path := range ngm.gpuPaths {
 		if ngm.isAvailable(path) {
 			paths = append(paths, path)
 			if len(paths) == num {
-			return
+				return
 			}
 		}
 	}
+
+	err = fmt.Errorf("Do not have sufficient GPUs!")
+
+	return
 }
 
-func (nvidiaGPU *NvidiaGPU) AvailableGPUs() (num int) {
-	for path range nvidiaGPU.gpuPaths {
-		if nvidiaGPU.isAvailable(path) {
+func (ngm *NvidiaGPUManager) AvailableGPUs() (num int) {
+	ngm.gpuMutex.Lock()
+	defer ngm.gpuMutex.Unlock()
+
+	for _, path := range ngm.gpuPaths {
+		if ngm.isAvailable(path) {
 			num++
 		}
 	}
+
+	return
 }
-*/
+

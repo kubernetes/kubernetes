@@ -93,6 +93,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/kubelet/nvidiagpu"
 )
 
 const (
@@ -1196,10 +1197,8 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
 
-	// Step 7: Init Nvidia Manager.
-	if err := kl.nvidiaGPUManager.Init(); err != nil {
-		kl.nvidiaGPUManager = nil
-	}
+	// Step 7: Init Nvidia Manager. Do not need to return err until we use NVML instead.
+	kl.nvidiaGPUManager.Init(kl.dockerClient)
 
 	// Step 8: Start resource analyzer
 	kl.resourceAnalyzer.Start()
