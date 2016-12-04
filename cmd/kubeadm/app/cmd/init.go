@@ -28,12 +28,11 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/flags"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	"k8s.io/kubernetes/pkg/runtime"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
@@ -103,9 +102,9 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
-	cmd.PersistentFlags().StringVar(
-		&cfg.CloudProvider, "cloud-provider", cfg.CloudProvider,
-		`Enable cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
+	cmd.PersistentFlags().Var(
+		flags.NewCloudProviderFlag(&cfg.CloudProvider), "cloud-provider",
+		`Enable cloud provider features (external load-balancers, storage, etc). Note that you have to configure all kubelets manually`,
 	)
 
 	cmd.PersistentFlags().StringVar(
@@ -205,14 +204,13 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	cfg.KubernetesVersion = ver
 	fmt.Println("Using Kubernetes version:", ver)
 
-	// TODO(phase1+) create a custom flag
+	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
-		if cloudprovider.IsCloudProvider(cfg.CloudProvider) {
-			fmt.Printf("cloud provider %q initialized for the control plane. Remember to set the same cloud provider flag on the kubelet.\n", cfg.CloudProvider)
-		} else {
-			return nil, fmt.Errorf("cloud provider %q is not supported, you can use any of %v, or leave it unset.\n", cfg.CloudProvider, cloudprovider.CloudProviders())
-		}
+		fmt.Println("WARNING: If you want cloudprovider integrations to work you have to set the --cloud-provider flag on ALL kubelets.")
+		fmt.Println("\tIf you haven't done it already, edit /etc/systemd/system/kubelet.service.d/10-kubeadm.conf and specify the cloudprovider flag there.")
+		fmt.Println("\tThis is indeed a limitation, but it's one of the reasons kubeadm is still in alpha.")
 	}
+
 	return &Init{cfg: cfg}, nil
 }
 
