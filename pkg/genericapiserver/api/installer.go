@@ -116,7 +116,7 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []metav1.AP
 
 // NewWebService creates a new restful webservice with the api installer's prefix and version.
 func (a *APIInstaller) NewWebService() *restful.WebService {
-	ws := new(restful.WebService)
+	ws := new(restful.WebService).TypeNameHandler(a.group.ModelNamerFunc)
 	ws.Path(a.prefix)
 	// a.prefix contains "prefix/group/version"
 	ws.Doc("API at " + a.prefix)
