@@ -38,7 +38,7 @@ type PreFlightError struct {
 }
 
 func (e *PreFlightError) Error() string {
-	return fmt.Sprintf("preflight check errors:\n%s", e.Msg)
+	return fmt.Sprintf("[preflight] Some fatal errors occurred:\n%s%s", e.Msg, "[preflight] If you know what you are doing, you can skip pre-flight checks with `--skip-preflight-checks`")
 }
 
 // PreFlightCheck validates the state of the system to ensure kubeadm will be
@@ -128,9 +128,7 @@ func (poc PortOpenCheck) Check() (warnings, errors []error) {
 }
 
 // IsRootCheck verifies user is root
-type IsRootCheck struct {
-	root bool
-}
+type IsRootCheck struct {}
 
 func (irc IsRootCheck) Check() (warnings, errors []error) {
 	errors = []error{}
@@ -141,8 +139,7 @@ func (irc IsRootCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
-// DirAvailableCheck checks if the given directory either does not exist, or
-// is empty.
+// DirAvailableCheck checks if the given directory either does not exist, or is empty.
 type DirAvailableCheck struct {
 	Path string
 }
@@ -261,7 +258,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	checks := []PreFlightCheck{
 		SystemVerificationCheck{},
-		IsRootCheck{root: true},
+		IsRootCheck{},
 		HostnameCheck{},
 		ServiceCheck{Service: "kubelet"},
 		ServiceCheck{Service: "docker"},
@@ -278,13 +275,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: "/etc/kubernetes/admin.conf"},
 		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
-		InPathCheck{executable: "ebtables", mandatory: true},
-		InPathCheck{executable: "ethtool", mandatory: true},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
 		InPathCheck{executable: "nsenter", mandatory: true},
-		InPathCheck{executable: "socat", mandatory: true},
+		InPathCheck{executable: "ebtables", mandatory: false},
+		InPathCheck{executable: "ethtool", mandatory: false},
+		InPathCheck{executable: "socat", mandatory: false},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
 	}
@@ -297,13 +294,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		)
 	}
 
-	return runChecks(checks, os.Stderr)
+	return RunChecks(checks, os.Stderr)
 }
 
 func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	checks := []PreFlightCheck{
 		SystemVerificationCheck{},
-		IsRootCheck{root: true},
+		IsRootCheck{},
 		HostnameCheck{},
 		ServiceCheck{Service: "docker"},
 		ServiceCheck{Service: "kubelet"},
@@ -313,36 +310,28 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
-		InPathCheck{executable: "ebtables", mandatory: true},
-		InPathCheck{executable: "ethtool", mandatory: true},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
 		InPathCheck{executable: "nsenter", mandatory: true},
-		InPathCheck{executable: "socat", mandatory: true},
+		InPathCheck{executable: "ebtables", mandatory: false},
+		InPathCheck{executable: "ethtool", mandatory: false},
+		InPathCheck{executable: "socat", mandatory: false},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
 	}
 
-	return runChecks(checks, os.Stderr)
+	return RunChecks(checks, os.Stderr)
 }
 
-func RunResetCheck() error {
-	checks := []PreFlightCheck{
-		IsRootCheck{root: true},
-	}
-
-	return runChecks(checks, os.Stderr)
-}
-
-// runChecks runs each check, displays it's warnings/errors, and once all
+// RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func runChecks(checks []PreFlightCheck, ww io.Writer) error {
+func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 	found := []error{}
 	for _, c := range checks {
 		warnings, errs := c.Check()
 		for _, w := range warnings {
-			io.WriteString(ww, fmt.Sprintf("WARNING: %s\n", w))
+			io.WriteString(ww, fmt.Sprintf("[preflight] Warning: %s\n", w))
 		}
 		for _, e := range errs {
 			found = append(found, e)

@@ -66,7 +66,7 @@ func NewReset(skipPreFlight, removeNode bool) (*Reset, error) {
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks...")
 
-		if err := preflight.RunResetCheck(); err != nil {
+		if err := preflight.RunChecks([]preflight.PreFlightCheck{preflight.IsRootCheck{}}, os.Stderr); err != nil {
 			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
