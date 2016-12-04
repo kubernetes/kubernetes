@@ -518,7 +518,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		node.Status.Allocatable[k] = value
 	}
 
-	node.Status.Allocatable[v1.ResourceNvidiaGPU] = *resource.NewQuantity(int64(nvidiaGPUCapacity - kl.nvidiaGPUManager.AvailableGPUs()), resource.DecimalSI)
+	node.Status.Allocatable[v1.ResourceNvidiaGPU] = *resource.NewQuantity(int64(kl.nvidiaGPUManager.AvailableGPUs()), resource.DecimalSI)
 }
 
 // Set versioninfo for the node.
