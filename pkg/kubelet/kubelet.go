@@ -443,7 +443,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
 		maxPods:           int(kubeCfg.MaxPods),
 		podsPerCore:       int(kubeCfg.PodsPerCore),
-		nvidiaGPUs:        int(kubeCfg.NvidiaGPUs),
 		syncLoopMonitor:   atomic.Value{},
 		resolverConfig:    kubeCfg.ResolverConfig,
 		cpuCFSQuota:       kubeCfg.CPUCFSQuota,
@@ -988,9 +987,6 @@ type Kubelet struct {
 	// Maximum Number of Pods which can be run by this Kubelet
 	maxPods int
 
-	// Number of NVIDIA GPUs on this node
-	nvidiaGPUs int
-
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor atomic.Value
 
@@ -1100,6 +1096,9 @@ type Kubelet struct {
 	// This should only be enabled when the container runtime is performing user remapping AND if the
 	// experimental behavior is desired.
 	experimentalHostUserNamespaceDefaulting bool
+
+	// NVIDIA GPU Manager
+	nvidiaGPUManager nvidiagpu.NvidiaGPUManager
 }
 
 // setupDataDirs creates:
@@ -1196,7 +1195,12 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
 
-	// Step 7: Start resource analyzer
+	// Step 7: Init Nvidia Manager.
+	if err := kl.nvidiaGPUManager.Init(); err != nil {
+		kl.nvidiaGPUManager = nil
+	}
+
+	// Step 8: Start resource analyzer
 	kl.resourceAnalyzer.Start()
 
 	return nil
