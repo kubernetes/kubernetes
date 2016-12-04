@@ -31,7 +31,6 @@ go_library(
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/wait:go_default_library",

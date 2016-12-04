@@ -188,7 +188,6 @@ go_test(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
-        "//pkg/conversion:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

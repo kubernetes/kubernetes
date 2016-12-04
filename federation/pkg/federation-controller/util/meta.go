@@ -19,8 +19,8 @@ package util
 import (
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -86,7 +86,7 @@ func ObjectMetaAndSpecEquivalent(a, b runtime.Object) bool {
 }
 
 func DeepCopyApiTypeOrPanic(item interface{}) interface{} {
-	result, err := conversion.NewCloner().DeepCopy(item)
+	result, err := api.Scheme.DeepCopy(item)
 	if err != nil {
 		panic(err)
 	}
