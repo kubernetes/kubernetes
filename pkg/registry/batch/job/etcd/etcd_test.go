@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -49,7 +49,7 @@ func validNewJob() *batch.Job {
 		Spec: batch.JobSpec{
 			Completions: &completions,
 			Parallelism: &parallelism,
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"a": "b"},
 			},
 			ManualSelector: newBool(true),
@@ -87,7 +87,7 @@ func TestCreate(t *testing.T) {
 		&batch.Job{
 			Spec: batch.JobSpec{
 				Completions: validJob.Spec.Completions,
-				Selector:    &unversioned.LabelSelector{},
+				Selector:    &metav1.LabelSelector{},
 				Template:    validJob.Spec.Template,
 			},
 		},
@@ -112,7 +112,7 @@ func TestUpdate(t *testing.T) {
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*batch.Job)
-			object.Spec.Selector = &unversioned.LabelSelector{}
+			object.Spec.Selector = &metav1.LabelSelector{}
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {

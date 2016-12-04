@@ -126,6 +126,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	if err := api.Convert_Pointer_bool_To_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
 		return err
 	}
+	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = int32(in.KubeAPIBurst)
@@ -150,6 +151,7 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	if err := api.Convert_bool_To_Pointer_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
 		return err
 	}
+	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = int(in.KubeAPIBurst)

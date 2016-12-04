@@ -31,8 +31,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -674,7 +674,7 @@ func withLabels(labels map[string]string, volumes []*v1.PersistentVolume) []*v1.
 // to be MatchLabels of the given label set and returns the array.  Meant
 // to be used to compose claims specified inline in a test.
 func withLabelSelector(labels map[string]string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
-	claims[0].Spec.Selector = &unversioned.LabelSelector{
+	claims[0].Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
 

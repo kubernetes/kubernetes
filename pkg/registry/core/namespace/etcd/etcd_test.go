@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -142,7 +142,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	key := "namespaces/foo"
 	ctx := api.NewContext()
-	now := unversioned.Now()
+	now := metav1.Now()
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "foo",
@@ -167,7 +167,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	key := "namespaces/foo"
 	ctx := api.NewContext()
-	now := unversioned.Now()
+	now := metav1.Now()
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "foo",

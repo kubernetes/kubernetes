@@ -20,11 +20,11 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -96,7 +96,7 @@ func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleS
 			out.Selector = in.Selector.MatchLabels
 		}
 
-		selector, err := unversioned.LabelSelectorAsSelector(in.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(in.Selector)
 		if err != nil {
 			return fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -113,14 +113,14 @@ func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out 
 	// new field can be expected to know about the old field (though that's not quite true, due
 	// to kubectl apply). However, these fields are readonly, so any non-nil value should work.
 	if in.TargetSelector != "" {
-		labelSelector, err := unversioned.ParseToLabelSelector(in.TargetSelector)
+		labelSelector, err := metav1.ParseToLabelSelector(in.TargetSelector)
 		if err != nil {
 			out.Selector = nil
 			return fmt.Errorf("failed to parse target selector: %v", err)
 		}
 		out.Selector = labelSelector
 	} else if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
+		out.Selector = new(metav1.LabelSelector)
 		selector := make(map[string]string)
 		for key, val := range in.Selector {
 			selector[key] = val

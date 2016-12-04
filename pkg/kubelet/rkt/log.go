@@ -26,8 +26,8 @@ import (
 	"golang.org/x/net/context"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
@@ -83,7 +83,7 @@ func (r *Runtime) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.Contai
 
 	var since int64
 	if logOptions.SinceSeconds != nil {
-		t := unversioned.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
+		t := metav1.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
 		since = t.Unix()
 	}
 	if logOptions.SinceTime != nil {

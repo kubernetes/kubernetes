@@ -48,8 +48,8 @@ import (
 	"time"
 
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -118,7 +118,7 @@ func startVolumeServer(f *framework.Framework, config VolumeTestConfig) *v1.Pod 
 	privileged := new(bool)
 	*privileged = true
 	serverPod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -194,7 +194,7 @@ func volumeTestCleanup(f *framework.Framework, config VolumeTestConfig) {
 func testVolumeClient(f *framework.Framework, config VolumeTestConfig, volume v1.VolumeSource, fsGroup *int64, expectedContent string) {
 	By(fmt.Sprint("starting ", config.prefix, " client"))
 	clientPod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -270,7 +270,7 @@ func injectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	podClient := client.Core().Pods(config.namespace)
 
 	injectPod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -417,7 +417,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 
 			// create Endpoints for the server
 			endpoints := v1.Endpoints{
-				TypeMeta: unversioned.TypeMeta{
+				TypeMeta: metav1.TypeMeta{
 					Kind:       "Endpoints",
 					APIVersion: "v1",
 				},

@@ -85,7 +85,7 @@ message RawExtension {
 //      runtime.TypeMeta    `json:",inline"`
 //      ... // other fields
 // }
-// func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { unversioned.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
+// func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
 // 
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.

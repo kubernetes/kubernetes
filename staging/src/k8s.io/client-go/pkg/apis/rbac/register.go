@@ -18,6 +18,7 @@ package rbac
 
 import (
 	"k8s.io/client-go/pkg/api"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/watch/versioned"
@@ -58,7 +59,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 		&api.ListOptions{},
 		&api.DeleteOptions{},
-		&api.ExportOptions{},
+		&metav1.ExportOptions{},
 	)
 	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

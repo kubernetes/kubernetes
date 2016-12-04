@@ -22,8 +22,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -115,12 +115,12 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 // Find the name of the zone in which a Node is running
 func getZoneNameForNode(node v1.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == unversioned.LabelZoneFailureDomain {
+		if key == metav1.LabelZoneFailureDomain {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
-		node.Name, unversioned.LabelZoneFailureDomain)
+		node.Name, metav1.LabelZoneFailureDomain)
 }
 
 // Find the names of all zones in which we have nodes in this cluster.

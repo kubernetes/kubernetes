@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -50,7 +50,7 @@ func TestAnalyze(t *testing.T) {
 					Type:               api_v1.PodScheduled,
 					Status:             api_v1.ConditionFalse,
 					Reason:             "Unschedulable",
-					LastTransitionTime: unversioned.Time{Time: now.Add(-10 * time.Minute)},
+					LastTransitionTime: metav1.Time{Time: now.Add(-10 * time.Minute)},
 				},
 			},
 		})
@@ -101,7 +101,7 @@ func newReplicaSet(selectorMap map[string]string) *v1beta1.ReplicaSet {
 		},
 		Spec: v1beta1.ReplicaSetSpec{
 			Replicas: &replicas,
-			Selector: &unversioned.LabelSelector{MatchLabels: selectorMap},
+			Selector: &metav1.LabelSelector{MatchLabels: selectorMap},
 		},
 	}
 	return rs

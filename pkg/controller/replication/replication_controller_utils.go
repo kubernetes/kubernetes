@@ -23,8 +23,8 @@ import (
 	"reflect"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -101,7 +101,7 @@ func calculateStatus(rc v1.ReplicationController, filteredPods []*v1.Pod, manage
 		}
 		if v1.IsPodReady(pod) {
 			readyReplicasCount++
-			if v1.IsPodAvailable(pod, rc.Spec.MinReadySeconds, unversioned.Now()) {
+			if v1.IsPodAvailable(pod, rc.Spec.MinReadySeconds, metav1.Now()) {
 				availableReplicasCount++
 			}
 		}
@@ -133,7 +133,7 @@ func NewReplicationControllerCondition(condType v1.ReplicationControllerConditio
 	return v1.ReplicationControllerCondition{
 		Type:               condType,
 		Status:             status,
-		LastTransitionTime: unversioned.Now(),
+		LastTransitionTime: metav1.Now(),
 		Reason:             reason,
 		Message:            msg,
 	}

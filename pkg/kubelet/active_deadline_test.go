@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
@@ -53,8 +53,8 @@ func TestActiveDeadlineHandler(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	now := metav1.Now()
+	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
 
 	// this pod has exceeded its active deadline
 	exceededActiveDeadlineSeconds := int64(30)

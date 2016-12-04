@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
@@ -287,7 +287,7 @@ func isDaemonSetMatch(pod *v1.Pod, ds *extensions.DaemonSet) bool {
 	if ds.Namespace != pod.Namespace {
 		return false
 	}
-	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		err = fmt.Errorf("invalid selector: %v", err)
 		return false
@@ -414,7 +414,7 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 // getNodesToDaemonSetPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
 func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) (map[string][]*v1.Pod, error) {
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
-	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -621,7 +621,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	}
 	ds := obj.(*extensions.DaemonSet)
 
-	everything := unversioned.LabelSelector{}
+	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
 		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, "SelectingAll", "This daemon set is selecting all pods. A non-empty selector is required.")
 		return nil

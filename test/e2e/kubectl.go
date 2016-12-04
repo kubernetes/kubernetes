@@ -44,8 +44,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/annotations"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -1507,12 +1507,12 @@ func checkOutput(output string, required [][]string) {
 	}
 }
 
-func getAPIVersions(apiEndpoint string) (*unversioned.APIVersions, error) {
+func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 	body, err := curl(apiEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("Failed http.Get of %s: %v", apiEndpoint, err)
 	}
-	var apiVersions unversioned.APIVersions
+	var apiVersions metav1.APIVersions
 	if err := json.Unmarshal([]byte(body), &apiVersions); err != nil {
 		return nil, fmt.Errorf("Failed to parse /api output %s: %v", body, err)
 	}

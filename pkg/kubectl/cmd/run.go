@@ -29,9 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -367,7 +367,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 }
 
 // TODO turn this into reusable method checking available resources
-func contains(resourcesList map[string]*unversioned.APIResourceList, resource schema.GroupVersionResource) bool {
+func contains(resourcesList map[string]*metav1.APIResourceList, resource schema.GroupVersionResource) bool {
 	if resourcesList == nil {
 		return false
 	}

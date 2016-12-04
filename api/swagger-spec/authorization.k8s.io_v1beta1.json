@@ -156,7 +156,7 @@
     "description": "API at /apis/authorization.k8s.io/v1beta1",
     "operations": [
      {
-      "type": "unversioned.APIResourceList",
+      "type": "v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -239,12 +239,10 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "format": "date-time",
       "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionTimestamp": {
       "type": "string",
-      "format": "date-time",
       "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionGracePeriodSeconds": {
@@ -480,8 +478,8 @@
      }
     }
    },
-   "unversioned.APIResourceList": {
-    "id": "unversioned.APIResourceList",
+   "v1.APIResourceList": {
+    "id": "v1.APIResourceList",
     "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
     "required": [
      "groupVersion",
@@ -503,14 +501,14 @@
      "resources": {
       "type": "array",
       "items": {
-       "$ref": "unversioned.APIResource"
+       "$ref": "v1.APIResource"
       },
       "description": "resources contains the name of the resources and if they are namespaced."
      }
     }
    },
-   "unversioned.APIResource": {
-    "id": "unversioned.APIResource",
+   "v1.APIResource": {
+    "id": "v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

@@ -19,9 +19,9 @@ package validation
 import (
 	"reflect"
 
-	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	extensionsvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	unversionedvalidation "k8s.io/kubernetes/pkg/apis/meta/v1/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )

@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 )
 
@@ -144,7 +144,7 @@ type signalObservation struct {
 	// The available resource
 	available *resource.Quantity
 	// Time at which the observation was taken
-	time unversioned.Time
+	time metav1.Time
 }
 
 // signalObservations maps a signal to an observed quantity

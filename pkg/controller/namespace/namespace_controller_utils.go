@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -172,7 +172,7 @@ func deleteCollection(
 		return false, nil
 	}
 
-	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 
 	// namespace controller does not want the garbage collector to insert the orphan finalizer since it calls
 	// resource deletions generically.  it will ensure all resources in the namespace are purged prior to releasing
@@ -219,7 +219,7 @@ func listCollection(
 		return nil, false, nil
 	}
 
-	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 	obj, err := dynamicClient.Resource(&apiResource, namespace).List(&v1.ListOptions{})
 	if err == nil {
 		unstructuredList, ok := obj.(*runtime.UnstructuredList)
@@ -260,7 +260,7 @@ func deleteEachItem(
 	if !listSupported {
 		return nil
 	}
-	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 	for _, item := range unstructuredList.Items {
 		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.GetName(), nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
@@ -278,7 +278,7 @@ func deleteAllContentForGroupVersionResource(
 	opCache *operationNotSupportedCache,
 	gvr schema.GroupVersionResource,
 	namespace string,
-	namespaceDeletedAt unversioned.Time,
+	namespaceDeletedAt metav1.Time,
 ) (int64, error) {
 	glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - namespace: %s, gvr: %v", namespace, gvr)
 
@@ -346,7 +346,7 @@ func deleteAllContent(
 	opCache *operationNotSupportedCache,
 	groupVersionResources []schema.GroupVersionResource,
 	namespace string,
-	namespaceDeletedAt unversioned.Time,
+	namespaceDeletedAt metav1.Time,
 ) (int64, error) {
 	estimate := int64(0)
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, gvrs: %v", namespace, groupVersionResources)
@@ -458,7 +458,7 @@ func syncNamespace(
 }
 
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
-func estimateGracefulTermination(kubeClient clientset.Interface, groupVersionResource schema.GroupVersionResource, ns string, namespaceDeletedAt unversioned.Time) (int64, error) {
+func estimateGracefulTermination(kubeClient clientset.Interface, groupVersionResource schema.GroupVersionResource, ns string, namespaceDeletedAt metav1.Time) (int64, error) {
 	groupResource := groupVersionResource.GroupResource()
 	glog.V(5).Infof("namespace controller - estimateGracefulTermination - group %s, resource: %s", groupResource.Group, groupResource.Resource)
 	estimate := int64(0)

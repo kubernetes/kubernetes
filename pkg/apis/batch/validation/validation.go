@@ -20,10 +20,10 @@ import (
 	"github.com/robfig/cron"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	unversionedvalidation "k8s.io/kubernetes/pkg/apis/meta/v1/validation"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -65,7 +65,7 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 	expectedLabels["controller-uid"] = string(obj.UID)
 	expectedLabels["job-name"] = string(obj.Name)
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
-	if selector, err := unversioned.LabelSelectorAsSelector(obj.Spec.Selector); err == nil {
+	if selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector); err == nil {
 		if !selector.Matches(labels.Set(expectedLabels)) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("selector"), obj.Spec.Selector, "`selector` not auto-generated"))
 		}
@@ -92,7 +92,7 @@ func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
-	if selector, err := unversioned.LabelSelectorAsSelector(spec.Selector); err == nil {
+	if selector, err := metav1.LabelSelectorAsSelector(spec.Selector); err == nil {
 		labels := labels.Set(spec.Template.Labels)
 		if !selector.Matches(labels) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))

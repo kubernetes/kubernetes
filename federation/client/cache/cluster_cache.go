@@ -22,7 +22,7 @@ import (
 	kubecache "k8s.io/kubernetes/pkg/client/cache"
 )
 
-// StoreToClusterLister makes a Store have the List method of the unversioned.ClusterInterface
+// StoreToClusterLister makes a Store have the List method of the metav1.ClusterInterface
 // The Store must contain (only) clusters.
 type StoreToClusterLister struct {
 	kubecache.Store

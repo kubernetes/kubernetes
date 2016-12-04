@@ -20,8 +20,8 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 )
@@ -34,7 +34,7 @@ var class2Parameters = map[string]string{
 }
 var storageClasses = []*storage.StorageClass{
 	{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 
@@ -46,7 +46,7 @@ var storageClasses = []*storage.StorageClass{
 		Parameters:  class1Parameters,
 	},
 	{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: v1.ObjectMeta{
@@ -56,7 +56,7 @@ var storageClasses = []*storage.StorageClass{
 		Parameters:  class2Parameters,
 	},
 	{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: v1.ObjectMeta{
@@ -66,7 +66,7 @@ var storageClasses = []*storage.StorageClass{
 		Parameters:  class1Parameters,
 	},
 	{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: v1.ObjectMeta{

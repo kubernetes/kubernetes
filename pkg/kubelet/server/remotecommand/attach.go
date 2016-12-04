@@ -23,7 +23,7 @@ import (
 	"time"
 
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -52,8 +52,8 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 		runtime.HandleError(err)
 		ctx.writeStatus(apierrors.NewInternalError(err))
 	} else {
-		ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
-			Status: unversioned.StatusSuccess,
+		ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+			Status: metav1.StatusSuccess,
 		}})
 	}
 }

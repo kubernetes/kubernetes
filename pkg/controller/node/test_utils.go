@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -218,17 +218,17 @@ type FakeRecorder struct {
 }
 
 func (f *FakeRecorder) Event(obj runtime.Object, eventtype, reason, message string) {
-	f.generateEvent(obj, unversioned.Now(), eventtype, reason, message)
+	f.generateEvent(obj, metav1.Now(), eventtype, reason, message)
 }
 
 func (f *FakeRecorder) Eventf(obj runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	f.Event(obj, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
 }
 
-func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp unversioned.Time, eventtype, reason, message string) {
+func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
 	ref, err := v1.GetReference(obj)
 	if err != nil {
 		return
@@ -243,7 +243,7 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp unversioned.T
 
 func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, message string) *v1.Event {
 	fmt.Println("make event")
-	t := unversioned.Time{Time: f.clock.Now()}
+	t := metav1.Time{Time: f.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
 		namespace = v1.NamespaceDefault

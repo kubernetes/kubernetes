@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/core/controller"
 	"k8s.io/kubernetes/pkg/registry/core/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -115,7 +115,7 @@ func scaleFromRC(rc *api.ReplicationController) *extensions.Scale {
 		},
 		Status: extensions.ScaleStatus{
 			Replicas: rc.Status.Replicas,
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: rc.Spec.Selector,
 			},
 		},

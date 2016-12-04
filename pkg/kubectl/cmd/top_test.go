@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -86,7 +87,7 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 		},
 	}
 	nodes := &api.NodeList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
 		Items: []api.Node{

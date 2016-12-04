@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/conversion"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -42,7 +42,7 @@ func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "node-name",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Annotations: map[string]string{
 				api.TaintsAnnotationKey: string(oldTaintsData),
 			},

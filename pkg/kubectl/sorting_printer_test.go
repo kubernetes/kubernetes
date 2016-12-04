@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	internal "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	api "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -151,17 +151,17 @@ func TestSortingPrinter(t *testing.T) {
 				Items: []api.Pod{
 					{
 						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(300, 0),
+							CreationTimestamp: metav1.Unix(300, 0),
 						},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(100, 0),
+							CreationTimestamp: metav1.Unix(100, 0),
 						},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(200, 0),
+							CreationTimestamp: metav1.Unix(200, 0),
 						},
 					},
 				},
@@ -170,17 +170,17 @@ func TestSortingPrinter(t *testing.T) {
 				Items: []api.Pod{
 					{
 						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(100, 0),
+							CreationTimestamp: metav1.Unix(100, 0),
 						},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(200, 0),
+							CreationTimestamp: metav1.Unix(200, 0),
 						},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(300, 0),
+							CreationTimestamp: metav1.Unix(300, 0),
 						},
 					},
 				},

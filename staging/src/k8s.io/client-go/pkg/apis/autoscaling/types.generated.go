@@ -26,7 +26,7 @@ import (
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
 	pkg2_api "k8s.io/client-go/pkg/api"
-	pkg1_unversioned "k8s.io/client-go/pkg/api/unversioned"
+	pkg1_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	pkg3_types "k8s.io/client-go/pkg/types"
 	"reflect"
 	"runtime"
@@ -64,7 +64,7 @@ func init() {
 	}
 	if false { // reference the types, but skip this branch at build/run time
 		var v0 pkg2_api.ObjectMeta
-		var v1 pkg1_unversioned.TypeMeta
+		var v1 pkg1_v1.TypeMeta
 		var v2 pkg3_types.UID
 		var v3 time.Time
 		_, _, _, _ = v0, v1, v2, v3
@@ -1665,7 +1665,7 @@ func (x *HorizontalPodAutoscalerStatus) codecDecodeSelfFromMap(l int, d *codec19
 				}
 			} else {
 				if x.LastScaleTime == nil {
-					x.LastScaleTime = new(pkg1_unversioned.Time)
+					x.LastScaleTime = new(pkg1_v1.Time)
 				}
 				yym141 := z.DecBinary()
 				_ = yym141
@@ -1764,7 +1764,7 @@ func (x *HorizontalPodAutoscalerStatus) codecDecodeSelfFromArray(l int, d *codec
 		}
 	} else {
 		if x.LastScaleTime == nil {
-			x.LastScaleTime = new(pkg1_unversioned.Time)
+			x.LastScaleTime = new(pkg1_v1.Time)
 		}
 		yym150 := z.DecBinary()
 		_ = yym150
@@ -2409,7 +2409,7 @@ func (x *HorizontalPodAutoscalerList) codecDecodeSelfFromMap(l int, d *codec1978
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ListMeta = pkg1_unversioned.ListMeta{}
+				x.ListMeta = pkg1_v1.ListMeta{}
 			} else {
 				yyv207 := &x.ListMeta
 				yym208 := z.DecBinary()
@@ -2490,7 +2490,7 @@ func (x *HorizontalPodAutoscalerList) codecDecodeSelfFromArray(l int, d *codec19
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg1_unversioned.ListMeta{}
+		x.ListMeta = pkg1_v1.ListMeta{}
 	} else {
 		yyv214 := &x.ListMeta
 		yym215 := z.DecBinary()

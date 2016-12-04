@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -45,7 +45,7 @@ import (
 
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
 	pods := &api.PodList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
 		Items: []api.Pod{
@@ -60,7 +60,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 	}
 	svc := &api.ServiceList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "16",
 		},
 		Items: []api.Service{
@@ -74,7 +74,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 	}
 	rc := &api.ReplicationControllerList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "17",
 		},
 		Items: []api.ReplicationController{
@@ -209,7 +209,7 @@ func TestGetObjects(t *testing.T) {
 
 func TestGetSortedObjects(t *testing.T) {
 	pods := &api.PodList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
 		Items: []api.Pod{
@@ -505,7 +505,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
+			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -684,14 +684,14 @@ func TestWatchSelector(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	podList := &api.PodList{
 		Items: pods,
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "10",
 		},
 	}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
+			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -843,7 +843,7 @@ func TestWatchOnlyList(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	podList := &api.PodList{
 		Items: pods,
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "10",
 		},
 	}

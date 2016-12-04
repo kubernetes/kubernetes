@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/conversion"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -261,7 +261,7 @@ func TestNewPodAddedDelete(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, addedPod))
 
 	// mark this pod as deleted
-	timestamp := unversioned.NewTime(time.Now())
+	timestamp := metav1.NewTime(time.Now())
 	deletedPod := CreateValidPod("foo", "new")
 	deletedPod.ObjectMeta.DeletionTimestamp = &timestamp
 	podUpdate = CreatePodUpdate(kubetypes.DELETE, TestSource, deletedPod)

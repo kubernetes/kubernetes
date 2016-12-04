@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -45,8 +45,8 @@ const (
 // A function that calculates how many pods from the list are in one of
 // the meaningful (from the replica set perspective) states. This function is
 // a temporary workaround against the current lack of ownerRef in pods.
-func AnalysePods(selectorv1 *unversioned.LabelSelector, allPods []util.FederatedObject, currentTime time.Time) (map[string]PodAnalysisResult, error) {
-	selector, err := unversioned.LabelSelectorAsSelector(selectorv1)
+func AnalysePods(selectorv1 *metav1.LabelSelector, allPods []util.FederatedObject, currentTime time.Time) (map[string]PodAnalysisResult, error) {
+	selector, err := metav1.LabelSelectorAsSelector(selectorv1)
 	if err != nil {
 		return nil, fmt.Errorf("invalid selector: %v", err)
 	}

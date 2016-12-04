@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -55,7 +55,7 @@ func validNewDeployment() *extensions.Deployment {
 			Namespace: namespace,
 		},
 		Spec: extensions.DeploymentSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Strategy: extensions.DeploymentStrategy{
 				Type: extensions.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &extensions.RollingUpdateDeployment{
@@ -102,7 +102,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&extensions.Deployment{
 			Spec: extensions.DeploymentSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{}},
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{}},
 				Template: validDeployment.Spec.Template,
 			},
 		},
@@ -136,7 +136,7 @@ func TestUpdate(t *testing.T) {
 		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.Deployment)
-			object.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{}}
+			object.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
 	)

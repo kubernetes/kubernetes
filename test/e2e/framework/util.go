@@ -44,13 +44,13 @@ import (
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/conditions"
@@ -381,7 +381,7 @@ func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr schema.GroupVersio
 	if err != nil {
 		Failf("Unexpected error getting dynamic client for %v: %v", gvr.GroupVersion(), err)
 	}
-	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 	_, err = dynamicClient.Resource(&apiResource, namespace).List(&v1.ListOptions{})
 	if err != nil {
 		// not all resources support list, so we ignore those
@@ -1104,7 +1104,7 @@ func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, n
 			continue
 		}
 		// get the api resource
-		apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+		apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 		// TODO: temporary hack for https://github.com/kubernetes/kubernetes/issues/31798
 		if ignoredResources.Has(apiResource.Name) {
 			Logf("namespace: %s, resource: %s, ignored listing per whitelist", namespace, apiResource.Name)
@@ -2376,7 +2376,7 @@ func isNodeSchedulable(node *v1.Node) bool {
 // Test whether a fake pod can be scheduled on "node", given its current taints.
 func isNodeUntainted(node *v1.Node) bool {
 	fakePod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
@@ -2917,7 +2917,7 @@ func DeleteReplicaSet(clientset clientset.Interface, internalClientset internalc
 // ReplicaSet selector (because the pods have completed termination).
 func waitForReplicaSetPodsGone(c clientset.Interface, rs *extensions.ReplicaSet) error {
 	return wait.PollImmediate(Poll, 2*time.Minute, func() (bool, error) {
-		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		ExpectNoError(err)
 		options := v1.ListOptions{LabelSelector: selector.String()}
 		if pods, err := c.Core().Pods(rs.Namespace).List(options); err == nil && len(pods.Items) == 0 {

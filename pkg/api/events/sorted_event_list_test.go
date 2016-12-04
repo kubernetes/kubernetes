@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestSortableEvents(t *testing.T) {
@@ -31,24 +31,24 @@ func TestSortableEvents(t *testing.T) {
 		{
 			Source:         api.EventSource{Component: "kubelet"},
 			Message:        "Item 1",
-			FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-			LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 			Count:          1,
 			Type:           api.EventTypeNormal,
 		},
 		{
 			Source:         api.EventSource{Component: "scheduler"},
 			Message:        "Item 2",
-			FirstTimestamp: unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
-			LastTimestamp:  unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+			FirstTimestamp: metav1.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+			LastTimestamp:  metav1.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
 			Count:          1,
 			Type:           api.EventTypeNormal,
 		},
 		{
 			Source:         api.EventSource{Component: "kubelet"},
 			Message:        "Item 3",
-			FirstTimestamp: unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
-			LastTimestamp:  unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+			FirstTimestamp: metav1.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+			LastTimestamp:  metav1.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
 			Count:          1,
 			Type:           api.EventTypeNormal,
 		},

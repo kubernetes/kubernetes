@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 )
@@ -50,7 +51,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterInfo{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
-		&v1.ExportOptions{},
+		&metav1.ExportOptions{},
 	)
 	return nil
 }

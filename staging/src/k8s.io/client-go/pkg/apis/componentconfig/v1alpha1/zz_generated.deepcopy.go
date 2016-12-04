@@ -21,10 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	reflect "reflect"
-
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
+	reflect "reflect"
 )
 
 func init() {
@@ -106,6 +105,7 @@ func DeepCopy_v1alpha1_KubeSchedulerConfiguration(in interface{}, out interface{
 		} else {
 			out.EnableProfiling = nil
 		}
+		out.EnableContentionProfiling = in.EnableContentionProfiling
 		out.ContentType = in.ContentType
 		out.KubeAPIQPS = in.KubeAPIQPS
 		out.KubeAPIBurst = in.KubeAPIBurst

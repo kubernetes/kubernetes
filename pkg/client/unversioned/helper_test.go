@@ -25,8 +25,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -80,12 +80,12 @@ func TestSetKubernetesDefaults(t *testing.T) {
 
 func TestHelperGetServerAPIVersions(t *testing.T) {
 	expect := []string{"v1", "v2", "v3"}
-	APIVersions := unversioned.APIVersions{Versions: expect}
+	APIVersions := metav1.APIVersions{Versions: expect}
 	expect = append(expect, "group1/v1", "group1/v2", "group2/v1", "group2/v2")
-	APIGroupList := unversioned.APIGroupList{
-		Groups: []unversioned.APIGroup{
+	APIGroupList := metav1.APIGroupList{
+		Groups: []metav1.APIGroup{
 			{
-				Versions: []unversioned.GroupVersionForDiscovery{
+				Versions: []metav1.GroupVersionForDiscovery{
 					{
 						GroupVersion: "group1/v1",
 					},
@@ -95,7 +95,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 				},
 			},
 			{
-				Versions: []unversioned.GroupVersionForDiscovery{
+				Versions: []metav1.GroupVersionForDiscovery{
 					{
 						GroupVersion: "group2/v1",
 					},

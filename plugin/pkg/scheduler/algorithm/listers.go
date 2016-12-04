@@ -19,9 +19,9 @@ package algorithm
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -169,7 +169,7 @@ func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.
 		if rs.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err = metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return
 		}

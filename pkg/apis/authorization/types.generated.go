@@ -26,7 +26,7 @@ import (
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
 	pkg2_api "k8s.io/kubernetes/pkg/api"
-	pkg1_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	pkg1_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	pkg3_types "k8s.io/kubernetes/pkg/types"
 	"reflect"
 	"runtime"
@@ -64,7 +64,7 @@ func init() {
 	}
 	if false { // reference the types, but skip this branch at build/run time
 		var v0 pkg2_api.ObjectMeta
-		var v1 pkg1_unversioned.TypeMeta
+		var v1 pkg1_v1.TypeMeta
 		var v2 pkg3_types.UID
 		var v3 time.Time
 		_, _, _, _ = v0, v1, v2, v3
@@ -784,7 +784,7 @@ func (x *SubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 			}
 		case "creationTimestamp":
 			if r.TryDecodeAsNil() {
-				x.CreationTimestamp = pkg1_unversioned.Time{}
+				x.CreationTimestamp = pkg1_v1.Time{}
 			} else {
 				yyv76 := &x.CreationTimestamp
 				yym77 := z.DecBinary()
@@ -801,7 +801,7 @@ func (x *SubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 			}
 		case "deletionTimestamp":
 			if x.ObjectMeta.DeletionTimestamp == nil {
-				x.ObjectMeta.DeletionTimestamp = new(pkg1_unversioned.Time)
+				x.ObjectMeta.DeletionTimestamp = new(pkg1_v1.Time)
 			}
 			if r.TryDecodeAsNil() {
 				if x.DeletionTimestamp != nil {
@@ -809,7 +809,7 @@ func (x *SubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 				}
 			} else {
 				if x.DeletionTimestamp == nil {
-					x.DeletionTimestamp = new(pkg1_unversioned.Time)
+					x.DeletionTimestamp = new(pkg1_v1.Time)
 				}
 				yym79 := z.DecBinary()
 				_ = yym79
@@ -1080,7 +1080,7 @@ func (x *SubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CreationTimestamp = pkg1_unversioned.Time{}
+		x.CreationTimestamp = pkg1_v1.Time{}
 	} else {
 		yyv103 := &x.CreationTimestamp
 		yym104 := z.DecBinary()
@@ -1096,7 +1096,7 @@ func (x *SubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 		}
 	}
 	if x.ObjectMeta.DeletionTimestamp == nil {
-		x.ObjectMeta.DeletionTimestamp = new(pkg1_unversioned.Time)
+		x.ObjectMeta.DeletionTimestamp = new(pkg1_v1.Time)
 	}
 	yyj93++
 	if yyhl93 {
@@ -1115,7 +1115,7 @@ func (x *SubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 		}
 	} else {
 		if x.DeletionTimestamp == nil {
-			x.DeletionTimestamp = new(pkg1_unversioned.Time)
+			x.DeletionTimestamp = new(pkg1_v1.Time)
 		}
 		yym106 := z.DecBinary()
 		_ = yym106
@@ -2025,7 +2025,7 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 			}
 		case "creationTimestamp":
 			if r.TryDecodeAsNil() {
-				x.CreationTimestamp = pkg1_unversioned.Time{}
+				x.CreationTimestamp = pkg1_v1.Time{}
 			} else {
 				yyv195 := &x.CreationTimestamp
 				yym196 := z.DecBinary()
@@ -2042,7 +2042,7 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 			}
 		case "deletionTimestamp":
 			if x.ObjectMeta.DeletionTimestamp == nil {
-				x.ObjectMeta.DeletionTimestamp = new(pkg1_unversioned.Time)
+				x.ObjectMeta.DeletionTimestamp = new(pkg1_v1.Time)
 			}
 			if r.TryDecodeAsNil() {
 				if x.DeletionTimestamp != nil {
@@ -2050,7 +2050,7 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 				}
 			} else {
 				if x.DeletionTimestamp == nil {
-					x.DeletionTimestamp = new(pkg1_unversioned.Time)
+					x.DeletionTimestamp = new(pkg1_v1.Time)
 				}
 				yym198 := z.DecBinary()
 				_ = yym198
@@ -2321,7 +2321,7 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.D
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CreationTimestamp = pkg1_unversioned.Time{}
+		x.CreationTimestamp = pkg1_v1.Time{}
 	} else {
 		yyv222 := &x.CreationTimestamp
 		yym223 := z.DecBinary()
@@ -2337,7 +2337,7 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	}
 	if x.ObjectMeta.DeletionTimestamp == nil {
-		x.ObjectMeta.DeletionTimestamp = new(pkg1_unversioned.Time)
+		x.ObjectMeta.DeletionTimestamp = new(pkg1_v1.Time)
 	}
 	yyj212++
 	if yyhl212 {
@@ -2356,7 +2356,7 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	} else {
 		if x.DeletionTimestamp == nil {
-			x.DeletionTimestamp = new(pkg1_unversioned.Time)
+			x.DeletionTimestamp = new(pkg1_v1.Time)
 		}
 		yym225 := z.DecBinary()
 		_ = yym225
@@ -3266,7 +3266,7 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.De
 			}
 		case "creationTimestamp":
 			if r.TryDecodeAsNil() {
-				x.CreationTimestamp = pkg1_unversioned.Time{}
+				x.CreationTimestamp = pkg1_v1.Time{}
 			} else {
 				yyv314 := &x.CreationTimestamp
 				yym315 := z.DecBinary()
@@ -3283,7 +3283,7 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.De
 			}
 		case "deletionTimestamp":
 			if x.ObjectMeta.DeletionTimestamp == nil {
-				x.ObjectMeta.DeletionTimestamp = new(pkg1_unversioned.Time)
+				x.ObjectMeta.DeletionTimestamp = new(pkg1_v1.Time)
 			}
 			if r.TryDecodeAsNil() {
 				if x.DeletionTimestamp != nil {
@@ -3291,7 +3291,7 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.De
 				}
 			} else {
 				if x.DeletionTimestamp == nil {
-					x.DeletionTimestamp = new(pkg1_unversioned.Time)
+					x.DeletionTimestamp = new(pkg1_v1.Time)
 				}
 				yym317 := z.DecBinary()
 				_ = yym317
@@ -3562,7 +3562,7 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CreationTimestamp = pkg1_unversioned.Time{}
+		x.CreationTimestamp = pkg1_v1.Time{}
 	} else {
 		yyv341 := &x.CreationTimestamp
 		yym342 := z.DecBinary()
@@ -3578,7 +3578,7 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.
 		}
 	}
 	if x.ObjectMeta.DeletionTimestamp == nil {
-		x.ObjectMeta.DeletionTimestamp = new(pkg1_unversioned.Time)
+		x.ObjectMeta.DeletionTimestamp = new(pkg1_v1.Time)
 	}
 	yyj331++
 	if yyhl331 {
@@ -3597,7 +3597,7 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.
 		}
 	} else {
 		if x.DeletionTimestamp == nil {
-			x.DeletionTimestamp = new(pkg1_unversioned.Time)
+			x.DeletionTimestamp = new(pkg1_v1.Time)
 		}
 		yym344 := z.DecBinary()
 		_ = yym344

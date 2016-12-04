@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -38,7 +38,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Errorf("unexpected version %v", version)
 	}
 
-	clusterList := federation.ClusterList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
+	clusterList := federation.ClusterList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}
 	version, err = accessor.ResourceVersion(&clusterList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

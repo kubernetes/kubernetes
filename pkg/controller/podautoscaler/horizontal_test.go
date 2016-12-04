@@ -33,6 +33,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -97,7 +98,7 @@ type testCase struct {
 	resource *fakeResource
 
 	// Last scale time
-	lastScaleTime *unversioned.Time
+	lastScaleTime *metav1.Time
 }
 
 // Needs to be called under a lock.
@@ -120,7 +121,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
-	selector := &unversioned.LabelSelector{
+	selector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
 	}
 
@@ -1046,7 +1047,7 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 }
 
 func TestScaleUpRCImmediately(t *testing.T) {
-	time := unversioned.Time{Time: time.Now()}
+	time := metav1.Time{Time: time.Now()}
 	tc := testCase{
 		minReplicas:         2,
 		maxReplicas:         6,
@@ -1062,7 +1063,7 @@ func TestScaleUpRCImmediately(t *testing.T) {
 }
 
 func TestScaleDownRCImmediately(t *testing.T) {
-	time := unversioned.Time{Time: time.Now()}
+	time := metav1.Time{Time: time.Now()}
 	tc := testCase{
 		minReplicas:         2,
 		maxReplicas:         5,

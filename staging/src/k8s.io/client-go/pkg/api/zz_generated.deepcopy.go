@@ -21,7 +21,7 @@ limitations under the License.
 package api
 
 import (
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
+	v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	conversion "k8s.io/client-go/pkg/conversion"
 	fields "k8s.io/client-go/pkg/fields"
 	labels "k8s.io/client-go/pkg/labels"
@@ -80,7 +80,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EventList, InType: reflect.TypeOf(&EventList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EventSource, InType: reflect.TypeOf(&EventSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ExecAction, InType: reflect.TypeOf(&ExecAction{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FCVolumeSource, InType: reflect.TypeOf(&FCVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FlexVolumeSource, InType: reflect.TypeOf(&FlexVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FlockerVolumeSource, InType: reflect.TypeOf(&FlockerVolumeSource{})},
@@ -1113,17 +1112,6 @@ func DeepCopy_api_ExecAction(in interface{}, out interface{}, c *conversion.Clon
 	}
 }
 
-func DeepCopy_api_ExportOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExportOptions)
-		out := out.(*ExportOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Export = in.Export
-		out.Exact = in.Exact
-		return nil
-	}
-}
-
 func DeepCopy_api_FCVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*FCVolumeSource)
@@ -1935,7 +1923,7 @@ func DeepCopy_api_ObjectMeta(in interface{}, out interface{}, c *conversion.Clon
 		out.CreationTimestamp = in.CreationTimestamp.DeepCopy()
 		if in.DeletionTimestamp != nil {
 			in, out := &in.DeletionTimestamp, &out.DeletionTimestamp
-			*out = new(unversioned.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.DeletionTimestamp = nil
@@ -2092,8 +2080,8 @@ func DeepCopy_api_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(v1.LabelSelector)
+			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -2414,8 +2402,8 @@ func DeepCopy_api_PodAffinityTerm(in interface{}, out interface{}, c *conversion
 		out := out.(*PodAffinityTerm)
 		if in.LabelSelector != nil {
 			in, out := &in.LabelSelector, &out.LabelSelector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(v1.LabelSelector)
+			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -2550,7 +2538,7 @@ func DeepCopy_api_PodLogOptions(in interface{}, out interface{}, c *conversion.C
 		}
 		if in.SinceTime != nil {
 			in, out := &in.SinceTime, &out.SinceTime
-			*out = new(unversioned.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.SinceTime = nil
@@ -2757,7 +2745,7 @@ func DeepCopy_api_PodStatus(in interface{}, out interface{}, c *conversion.Clone
 		out.PodIP = in.PodIP
 		if in.StartTime != nil {
 			in, out := &in.StartTime, &out.StartTime
-			*out = new(unversioned.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.StartTime = nil

@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 )
 
@@ -56,7 +56,7 @@ type ControllerManagerConfiguration struct {
 	// management, but more CPU (and network) load.
 	ConcurrentReplicaSetSyncs int `json:"concurrentReplicaSetSyncs"`
 	// clusterMonitorPeriod is the period for syncing ClusterStatus in cluster controller.
-	ClusterMonitorPeriod unversioned.Duration `json:"clusterMonitorPeriod"`
+	ClusterMonitorPeriod metav1.Duration `json:"clusterMonitorPeriod"`
 	// APIServerQPS is the QPS to use while talking with federation apiserver.
 	APIServerQPS float32 `json:"federatedAPIQPS"`
 	// APIServerBurst is the burst to use while talking with federation apiserver.
@@ -90,7 +90,7 @@ func NewCMServer() *CMServer {
 			Address:                   "0.0.0.0",
 			ConcurrentServiceSyncs:    10,
 			ConcurrentReplicaSetSyncs: 10,
-			ClusterMonitorPeriod:      unversioned.Duration{Duration: 40 * time.Second},
+			ClusterMonitorPeriod:      metav1.Duration{Duration: 40 * time.Second},
 			APIServerQPS:              20.0,
 			APIServerBurst:            30,
 			LeaderElection:            leaderelection.DefaultLeaderElectionConfiguration(),

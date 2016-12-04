@@ -20,8 +20,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -64,7 +64,7 @@ func (ow *realOOMWatcher) Start(ref *v1.ObjectReference) error {
 
 		for event := range eventChannel.GetChannel() {
 			glog.V(2).Infof("Got sys oom event from cadvisor: %v", event)
-			ow.recorder.PastEventf(ref, unversioned.Time{Time: event.Timestamp}, v1.EventTypeWarning, systemOOMEvent, "System OOM encountered")
+			ow.recorder.PastEventf(ref, metav1.Time{Time: event.Timestamp}, v1.EventTypeWarning, systemOOMEvent, "System OOM encountered")
 		}
 		glog.Errorf("Unexpectedly stopped receiving OOM notifications from cAdvisor")
 	}()

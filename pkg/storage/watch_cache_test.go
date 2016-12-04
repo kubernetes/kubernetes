@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -349,7 +349,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}, nil
+			return &api.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
 		},
 	}
 	r := cache.NewReflector(lw, &api.Pod{}, store, 0)

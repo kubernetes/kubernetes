@@ -18,14 +18,14 @@ package testing
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type TestResource struct {
-	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
-	Value                int `json:"value"`
+	metav1.TypeMeta `json:",inline"`
+	api.ObjectMeta  `json:"metadata"`
+	Value           int `json:"value"`
 }
 
 func (obj *TestResource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

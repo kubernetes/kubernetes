@@ -29,7 +29,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIVersions"
+        "$ref": "#/definitions/v1.APIVersions"
        }
       },
       "401": {
@@ -62,7 +62,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -670,7 +670,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -910,7 +910,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -1066,7 +1066,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -1099,7 +1099,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -1307,7 +1307,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -1463,7 +1463,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -1496,7 +1496,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -1704,7 +1704,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -1860,7 +1860,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -1893,7 +1893,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -2101,7 +2101,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -2257,7 +2257,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -2290,7 +2290,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -2498,7 +2498,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -2654,7 +2654,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -2687,7 +2687,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -2823,7 +2823,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -3031,7 +3031,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -3187,7 +3187,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -3220,7 +3220,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -3703,13 +3703,6 @@
       "type": "integer",
       "description": "A relative time in seconds before the current time from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
       "name": "sinceSeconds",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "An RFC3339 timestamp from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
-      "name": "sinceTime",
       "in": "query"
      },
      {
@@ -4282,7 +4275,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -4490,7 +4483,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -4646,7 +4639,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -4679,7 +4672,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -4887,7 +4880,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -5043,7 +5036,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -5076,7 +5069,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -5212,7 +5205,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -5348,7 +5341,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -5556,7 +5549,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -5712,7 +5705,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -5745,7 +5738,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -5881,7 +5874,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -6089,7 +6082,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -6245,7 +6238,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -6278,7 +6271,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -6486,7 +6479,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -6642,7 +6635,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -6675,7 +6668,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -6949,7 +6942,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -6982,7 +6975,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -7504,7 +7497,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -7676,7 +7669,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -7709,7 +7702,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -7893,7 +7886,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -8093,7 +8086,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -8241,7 +8234,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -8274,7 +8267,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -8772,7 +8765,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -9049,7 +9042,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -9197,7 +9190,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -9230,7 +9223,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -9358,7 +9351,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -14601,7 +14594,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroupList"
+        "$ref": "#/definitions/v1.APIGroupList"
        }
       },
       "401": {
@@ -14634,7 +14627,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -14667,7 +14660,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -14842,7 +14835,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -14998,7 +14991,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -15031,7 +15024,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -15167,7 +15160,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -15565,7 +15558,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -15598,7 +15591,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -15679,7 +15672,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -15712,7 +15705,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -15897,7 +15890,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -15930,7 +15923,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -16182,7 +16175,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -16338,7 +16331,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -16371,7 +16364,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -16507,7 +16500,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -16828,7 +16821,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -16861,7 +16854,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -17113,7 +17106,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -17269,7 +17262,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -17302,7 +17295,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -17438,7 +17431,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -17759,7 +17752,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -18088,7 +18081,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -18244,7 +18237,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -18277,7 +18270,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -18413,7 +18406,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -18621,7 +18614,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -18777,7 +18770,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -18810,7 +18803,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -18946,7 +18939,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -19154,7 +19147,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -19310,7 +19303,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -19343,7 +19336,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -19479,7 +19472,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -20387,7 +20380,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -20420,7 +20413,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -20595,7 +20588,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -20743,7 +20736,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -20776,7 +20769,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -21108,7 +21101,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -21141,7 +21134,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -21701,7 +21694,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -21857,7 +21850,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -21890,7 +21883,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -22026,7 +22019,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -22234,7 +22227,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -22390,7 +22383,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -22423,7 +22416,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -22623,7 +22616,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -22759,7 +22752,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -22967,7 +22960,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -23123,7 +23116,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -23156,7 +23149,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -23292,7 +23285,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -23500,7 +23493,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -23656,7 +23649,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -23689,7 +23682,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -23825,7 +23818,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -24033,7 +24026,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -24189,7 +24182,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -24222,7 +24215,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -24358,7 +24351,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -24566,7 +24559,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -24722,7 +24715,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -24755,7 +24748,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -24963,7 +24956,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -25119,7 +25112,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -25152,7 +25145,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -25288,7 +25281,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -25424,7 +25417,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -25560,7 +25553,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -25922,7 +25915,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -26070,7 +26063,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -26103,7 +26096,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -28108,7 +28101,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -28141,7 +28134,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -28316,7 +28309,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -28472,7 +28465,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -28505,7 +28498,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -28641,7 +28634,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -29039,7 +29032,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -29072,7 +29065,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -29247,7 +29240,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -29379,7 +29372,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -29412,7 +29405,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -29612,7 +29605,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -29744,7 +29737,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -29777,7 +29770,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -29977,7 +29970,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -30117,7 +30110,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -30150,7 +30143,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -30358,7 +30351,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -30498,7 +30491,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -30531,7 +30524,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -31585,7 +31578,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIGroup"
+        "$ref": "#/definitions/v1.APIGroup"
        }
       },
       "401": {
@@ -31618,7 +31611,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.APIResourceList"
+        "$ref": "#/definitions/v1.APIResourceList"
        }
       },
       "401": {
@@ -31793,7 +31786,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -31941,7 +31934,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/unversioned.Status"
+        "$ref": "#/definitions/v1.Status"
        }
       },
       "401": {
@@ -31974,7 +31967,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/unversioned.Patch"
+        "$ref": "#/definitions/v1.Patch"
        }
       }
      ],
@@ -32263,7 +32256,7 @@
      }
     }
    },
-   "unversioned.APIGroup": {
+   "v1.APIGroup": {
     "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
     "required": [
      "name",
@@ -32277,25 +32270,25 @@
      },
      "preferredVersion": {
       "description": "preferredVersion is the version preferred by the API server, which probably is the storage version.",
-      "$ref": "#/definitions/unversioned.GroupVersionForDiscovery"
+      "$ref": "#/definitions/v1.GroupVersionForDiscovery"
      },
      "serverAddressByClientCIDRs": {
       "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/unversioned.ServerAddressByClientCIDR"
+       "$ref": "#/definitions/v1.ServerAddressByClientCIDR"
       }
      },
      "versions": {
       "description": "versions are the versions supported in this group.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/unversioned.GroupVersionForDiscovery"
+       "$ref": "#/definitions/v1.GroupVersionForDiscovery"
       }
      }
     }
    },
-   "unversioned.APIGroupList": {
+   "v1.APIGroupList": {
     "description": "APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
     "required": [
      "groups"
@@ -32305,12 +32298,12 @@
       "description": "groups is a list of APIGroup.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/unversioned.APIGroup"
+       "$ref": "#/definitions/v1.APIGroup"
       }
      }
     }
    },
-   "unversioned.APIResource": {
+   "v1.APIResource": {
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
@@ -32332,7 +32325,7 @@
      }
     }
    },
-   "unversioned.APIResourceList": {
+   "v1.APIResourceList": {
     "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
     "required": [
      "groupVersion",
@@ -32347,12 +32340,12 @@
       "description": "resources contains the name of the resources and if they are namespaced.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/unversioned.APIResource"
+       "$ref": "#/definitions/v1.APIResource"
       }
      }
     }
    },
-   "unversioned.APIVersions": {
+   "v1.APIVersions": {
     "description": "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
     "required": [
      "versions",
@@ -32363,7 +32356,7 @@
       "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/unversioned.ServerAddressByClientCIDR"
+       "$ref": "#/definitions/v1.ServerAddressByClientCIDR"
       }
      },
      "versions": {
@@ -32374,179 +32367,6 @@
       }
      }
     }
-   },
-   "unversioned.GroupVersionForDiscovery": {
-    "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
-    "required": [
-     "groupVersion",
-     "version"
-    ],
-    "properties": {
-     "groupVersion": {
-      "description": "groupVersion specifies the API group and version in the form \"group/version\"",
-      "type": "string"
-     },
-     "version": {
-      "description": "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.",
-      "type": "string"
-     }
-    }
-   },
-   "unversioned.LabelSelector": {
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-    "properties": {
-     "matchExpressions": {
-      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/unversioned.LabelSelectorRequirement"
-      }
-     },
-     "matchLabels": {
-      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-      "type": "object",
-      "additionalProperties": {
-       "type": "string"
-      }
-     }
-    }
-   },
-   "unversioned.LabelSelectorRequirement": {
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-    "required": [
-     "key",
-     "operator"
-    ],
-    "properties": {
-     "key": {
-      "description": "key is the label key that the selector applies to.",
-      "type": "string"
-     },
-     "operator": {
-      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
-      "type": "string"
-     },
-     "values": {
-      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
-      "type": "array",
-      "items": {
-       "type": "string"
-      }
-     }
-    }
-   },
-   "unversioned.ListMeta": {
-    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
-    "properties": {
-     "resourceVersion": {
-      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency",
-      "type": "string"
-     },
-     "selfLink": {
-      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only.",
-      "type": "string"
-     }
-    }
-   },
-   "unversioned.Patch": {
-    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body."
-   },
-   "unversioned.ServerAddressByClientCIDR": {
-    "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
-    "required": [
-     "clientCIDR",
-     "serverAddress"
-    ],
-    "properties": {
-     "clientCIDR": {
-      "description": "The CIDR with which clients can match their IP to figure out the server address that they should use.",
-      "type": "string"
-     },
-     "serverAddress": {
-      "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port.",
-      "type": "string"
-     }
-    }
-   },
-   "unversioned.Status": {
-    "description": "Status is a return value for calls that don't return other objects.",
-    "properties": {
-     "code": {
-      "description": "Suggested HTTP return code for this status, 0 if not set.",
-      "type": "integer",
-      "format": "int32"
-     },
-     "details": {
-      "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.",
-      "$ref": "#/definitions/unversioned.StatusDetails"
-     },
-     "message": {
-      "description": "A human-readable description of the status of this operation.",
-      "type": "string"
-     },
-     "metadata": {
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
-     },
-     "reason": {
-      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it.",
-      "type": "string"
-     },
-     "status": {
-      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-      "type": "string"
-     }
-    }
-   },
-   "unversioned.StatusCause": {
-    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
-    "properties": {
-     "field": {
-      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\"",
-      "type": "string"
-     },
-     "message": {
-      "description": "A human-readable description of the cause of the error.  This field may be presented as-is to a reader.",
-      "type": "string"
-     },
-     "reason": {
-      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available.",
-      "type": "string"
-     }
-    }
-   },
-   "unversioned.StatusDetails": {
-    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
-    "properties": {
-     "causes": {
-      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/unversioned.StatusCause"
-      }
-     },
-     "group": {
-      "description": "The group attribute of the resource associated with the status StatusReason.",
-      "type": "string"
-     },
-     "kind": {
-      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "type": "string"
-     },
-     "name": {
-      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described).",
-      "type": "string"
-     },
-     "retryAfterSeconds": {
-      "description": "If specified, the time in seconds before the operation should be retried.",
-      "type": "integer",
-      "format": "int32"
-     }
-    }
-   },
-   "unversioned.Time": {
-    "type": "string",
-    "format": "date-time"
    },
    "v1.AttachedVolume": {
     "description": "AttachedVolume describes a volume attached to a node",
@@ -32656,7 +32476,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -32703,7 +32523,7 @@
      },
      "metadata": {
       "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -32874,7 +32694,7 @@
     "properties": {
      "startedAt": {
       "description": "Time at which the container was last (re-)started",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      }
     }
    },
@@ -32895,7 +32715,7 @@
      },
      "finishedAt": {
       "description": "Time at which the container last terminated",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "Message regarding the last termination of the container",
@@ -32912,7 +32732,7 @@
      },
      "startedAt": {
       "description": "Time at which previous execution of the container started",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      }
     }
    },
@@ -33131,7 +32951,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -33190,7 +33010,7 @@
      },
      "firstTimestamp": {
       "description": "The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "involvedObject": {
       "description": "The object that this event is about.",
@@ -33198,7 +33018,7 @@
      },
      "lastTimestamp": {
       "description": "The time at which the most recent occurrence of this event was recorded.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "A human-readable description of the status of this operation.",
@@ -33237,7 +33057,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -33263,6 +33083,23 @@
       "items": {
        "type": "string"
       }
+     }
+    }
+   },
+   "v1.GroupVersionForDiscovery": {
+    "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
+    "required": [
+     "groupVersion",
+     "version"
+    ],
+    "properties": {
+     "groupVersion": {
+      "description": "groupVersion specifies the API group and version in the form \"group/version\"",
+      "type": "string"
+     },
+     "version": {
+      "description": "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.",
+      "type": "string"
      }
     }
    },
@@ -33363,7 +33200,7 @@
      },
      "metadata": {
       "description": "Standard list metadata.",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -33419,7 +33256,7 @@
      },
      "lastScaleTime": {
       "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "observedGeneration": {
       "description": "most recent generation observed by this autoscaler.",
@@ -33454,11 +33291,11 @@
     "properties": {
      "lastProbeTime": {
       "description": "Last time the condition was checked.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "lastTransitionTime": {
       "description": "Last time the condition transit from one status to another.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "Human readable message indicating details about last transition.",
@@ -33493,7 +33330,7 @@
      },
      "metadata": {
       "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -33524,7 +33361,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
@@ -33542,7 +33379,7 @@
      },
      "completionTime": {
       "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "conditions": {
       "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
@@ -33558,12 +33395,55 @@
      },
      "startTime": {
       "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "succeeded": {
       "description": "Succeeded is the number of pods which reached Phase Succeeded.",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "v1.LabelSelector": {
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchExpressions": {
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.LabelSelectorRequirement"
+      }
+     },
+     "matchLabels": {
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "v1.LabelSelectorRequirement": {
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "description": "key is the label key that the selector applies to.",
+      "type": "string"
+     },
+     "operator": {
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+      "type": "string"
+     },
+     "values": {
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
      }
     }
    },
@@ -33652,7 +33532,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -33668,6 +33548,19 @@
       "items": {
        "$ref": "#/definitions/v1.LimitRangeItem"
       }
+     }
+    }
+   },
+   "v1.ListMeta": {
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "properties": {
+     "resourceVersion": {
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency",
+      "type": "string"
+     },
+     "selfLink": {
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only.",
+      "type": "string"
      }
     }
    },
@@ -33737,7 +33630,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -33805,11 +33698,11 @@
     "properties": {
      "lastHeartbeatTime": {
       "description": "Last time we got an update on a given condition.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "lastTransitionTime": {
       "description": "Last time the condition transit from one status to another.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "Human readable message indicating details about last transition.",
@@ -33853,7 +33746,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -34033,7 +33926,7 @@
      },
      "creationTimestamp": {
       "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "deletionGracePeriodSeconds": {
       "description": "Number of seconds allowed for this object to gracefully terminate before it will be removed from the system. Only set when deletionTimestamp is also set. May only be shortened. Read-only.",
@@ -34042,7 +33935,7 @@
      },
      "deletionTimestamp": {
       "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "finalizers": {
       "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
@@ -34160,6 +34053,9 @@
      }
     }
    },
+   "v1.Patch": {
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body."
+   },
    "v1.PersistentVolume": {
     "description": "PersistentVolume (PV) is a storage resource provisioned by an administrator. It is analogous to a node. More info: http://kubernetes.io/docs/user-guide/persistent-volumes",
     "properties": {
@@ -34209,7 +34105,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -34229,7 +34125,7 @@
      },
      "selector": {
       "description": "A label query over volumes to consider for binding.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "volumeName": {
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim.",
@@ -34275,7 +34171,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -34349,11 +34245,11 @@
     "properties": {
      "lastProbeTime": {
       "description": "Last time we probed the condition.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "lastTransitionTime": {
       "description": "Last time the condition transitioned from one status to another.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "Human-readable message indicating details about last transition.",
@@ -34388,7 +34284,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -34552,7 +34448,7 @@
      },
      "startTime": {
       "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      }
     }
    },
@@ -34584,7 +34480,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -34666,7 +34562,7 @@
     "properties": {
      "lastTransitionTime": {
       "description": "The last time the condition transitioned from one status to another.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "A human readable message indicating details about the transition.",
@@ -34701,7 +34597,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -34823,7 +34719,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35004,7 +34900,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35035,6 +34931,23 @@
      "seLinuxOptions": {
       "description": "The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
       "$ref": "#/definitions/v1.SELinuxOptions"
+     }
+    }
+   },
+   "v1.ServerAddressByClientCIDR": {
+    "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
+    "required": [
+     "clientCIDR",
+     "serverAddress"
+    ],
+    "properties": {
+     "clientCIDR": {
+      "description": "The CIDR with which clients can match their IP to figure out the server address that they should use.",
+      "type": "string"
+     },
+     "serverAddress": {
+      "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port.",
+      "type": "string"
      }
     }
    },
@@ -35093,7 +35006,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35112,7 +35025,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35218,6 +35131,82 @@
      }
     }
    },
+   "v1.Status": {
+    "description": "Status is a return value for calls that don't return other objects.",
+    "properties": {
+     "code": {
+      "description": "Suggested HTTP return code for this status, 0 if not set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "details": {
+      "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.",
+      "$ref": "#/definitions/v1.StatusDetails"
+     },
+     "message": {
+      "description": "A human-readable description of the status of this operation.",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "$ref": "#/definitions/v1.ListMeta"
+     },
+     "reason": {
+      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "type": "string"
+     }
+    }
+   },
+   "v1.StatusCause": {
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "properties": {
+     "field": {
+      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\"",
+      "type": "string"
+     },
+     "message": {
+      "description": "A human-readable description of the cause of the error.  This field may be presented as-is to a reader.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available.",
+      "type": "string"
+     }
+    }
+   },
+   "v1.StatusDetails": {
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "properties": {
+     "causes": {
+      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.StatusCause"
+      }
+     },
+     "group": {
+      "description": "The group attribute of the resource associated with the status StatusReason.",
+      "type": "string"
+     },
+     "kind": {
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "name": {
+      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described).",
+      "type": "string"
+     },
+     "retryAfterSeconds": {
+      "description": "If specified, the time in seconds before the operation should be retried.",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
    "v1.TCPSocketAction": {
     "description": "TCPSocketAction describes an action based on opening a socket",
     "required": [
@@ -35229,6 +35218,10 @@
       "$ref": "#/definitions/intstr.IntOrString"
      }
     }
+   },
+   "v1.Time": {
+    "type": "string",
+    "format": "date-time"
    },
    "v1.Volume": {
     "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
@@ -35290,7 +35283,7 @@
     "properties": {
      "lastUpdateTime": {
       "description": "timestamp for the last update to this condition",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "human readable message with details about the request state",
@@ -35318,7 +35311,7 @@
       }
      },
      "metadata": {
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35422,7 +35415,7 @@
      },
      "metadata": {
       "description": "Standard object's metadata.",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35441,7 +35434,7 @@
      },
      "metadata": {
       "description": "Standard object's metadata.",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35550,7 +35543,7 @@
      },
      "metadata": {
       "description": "Standard object's metadata.",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35569,7 +35562,7 @@
      },
      "metadata": {
       "description": "Standard object's metadata.",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35673,7 +35666,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35685,7 +35678,7 @@
     "properties": {
      "selector": {
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
@@ -35750,11 +35743,11 @@
     "properties": {
      "lastTransitionTime": {
       "description": "Last time the condition transitioned from one status to another.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "lastUpdateTime": {
       "description": "The last time this condition was updated.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "A human readable message indicating details about the transition.",
@@ -35789,7 +35782,7 @@
      },
      "metadata": {
       "description": "Standard list metadata.",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -35853,7 +35846,7 @@
      },
      "selector": {
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
@@ -35960,7 +35953,7 @@
      },
      "metadata": {
       "description": "Standard list metadata.",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -36015,7 +36008,7 @@
      },
      "lastScaleTime": {
       "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "observedGeneration": {
       "description": "most recent generation observed by this autoscaler.",
@@ -36073,7 +36066,7 @@
      },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -36160,11 +36153,11 @@
     "properties": {
      "lastProbeTime": {
       "description": "Last time the condition was checked.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "lastTransitionTime": {
       "description": "Last time the condition transit from one status to another.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "Human readable message indicating details about last transition.",
@@ -36199,7 +36192,7 @@
      },
      "metadata": {
       "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -36230,7 +36223,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
@@ -36248,7 +36241,7 @@
      },
      "completionTime": {
       "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "conditions": {
       "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
@@ -36264,7 +36257,7 @@
      },
      "startTime": {
       "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "succeeded": {
       "description": "Succeeded is the number of pods which reached Phase Succeeded.",
@@ -36338,7 +36331,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -36346,11 +36339,11 @@
     "properties": {
      "namespaceSelector": {
       "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "podSelector": {
       "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      }
     }
    },
@@ -36380,7 +36373,7 @@
      },
      "podSelector": {
       "description": "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      }
     }
    },
@@ -36426,7 +36419,7 @@
       }
      },
      "metadata": {
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -36439,7 +36432,7 @@
      },
      "selector": {
       "description": "Label query over pods whose evictions are managed by the disruption budget.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      }
     }
    },
@@ -36467,7 +36460,7 @@
       "description": "DisruptedPods contains information about pods whose eviction was processed by the API server eviction subresource handler but has not yet been observed by the PodDisruptionBudget controller. A pod will be in this map from the time when the API server processed the eviction request to the time when the pod is seen by PDB controller as having been marked for deletion (or after a timeout). The key in the map is the name of the pod and the value is the time when the API server processed the eviction request. If the deletion didn't occur and a pod is still there it will be removed from the list automatically by PodDisruptionBudget controller after some time. If everything goes smooth this map should be empty for the most of the time. Large number of entries in the map may indicate problems with pod deletions.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/unversioned.Time"
+       "$ref": "#/definitions/v1.Time"
       }
      },
      "disruptionsAllowed": {
@@ -36513,7 +36506,7 @@
     "properties": {
      "lastTransitionTime": {
       "description": "The last time the condition transitioned from one status to another.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "A human readable message indicating details about the transition.",
@@ -36548,7 +36541,7 @@
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -36567,7 +36560,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
@@ -36782,7 +36775,7 @@
       }
      },
      "metadata": {
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -36800,7 +36793,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "serviceName": {
       "description": "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
@@ -36875,7 +36868,7 @@
      },
      "metadata": {
       "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -37008,7 +37001,7 @@
      },
      "metadata": {
       "description": "Standard list metadata.",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -37119,7 +37112,7 @@
      },
      "metadata": {
       "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -37165,7 +37158,7 @@
      },
      "lastScheduleTime": {
       "description": "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      }
     }
    },
@@ -37195,11 +37188,11 @@
     "properties": {
      "lastProbeTime": {
       "description": "Last time the condition was checked.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "lastTransitionTime": {
       "description": "Last time the condition transit from one status to another.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "message": {
       "description": "Human readable message indicating details about last transition.",
@@ -37234,7 +37227,7 @@
      },
      "metadata": {
       "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/unversioned.ListMeta"
+      "$ref": "#/definitions/v1.ListMeta"
      }
     }
    },
@@ -37265,7 +37258,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
@@ -37283,7 +37276,7 @@
      },
      "completionTime": {
       "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "conditions": {
       "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
@@ -37299,7 +37292,7 @@
      },
      "startTime": {
       "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-      "$ref": "#/definitions/unversioned.Time"
+      "$ref": "#/definitions/v1.Time"
      },
      "succeeded": {
       "description": "Succeeded is the number of pods which reached Phase Succeeded.",

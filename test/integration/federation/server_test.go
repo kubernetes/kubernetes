@@ -31,9 +31,9 @@ import (
 	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
@@ -150,7 +150,7 @@ func testSupport(t *testing.T) {
 	}
 }
 
-func findGroup(groups []unversioned.APIGroup, groupName string) *unversioned.APIGroup {
+func findGroup(groups []metav1.APIGroup, groupName string) *metav1.APIGroup {
 	for _, group := range groups {
 		if group.Name == groupName {
 			return &group
@@ -160,9 +160,9 @@ func findGroup(groups []unversioned.APIGroup, groupName string) *unversioned.API
 }
 
 func testAPIGroupList(t *testing.T) {
-	groupVersionForDiscoveryMap := make(map[string]unversioned.GroupVersionForDiscovery)
+	groupVersionForDiscoveryMap := make(map[string]metav1.GroupVersionForDiscovery)
 	for _, groupVersion := range groupVersions {
-		groupVersionForDiscoveryMap[groupVersion.Group] = unversioned.GroupVersionForDiscovery{
+		groupVersionForDiscoveryMap[groupVersion.Group] = metav1.GroupVersionForDiscovery{
 			GroupVersion: groupVersion.String(),
 			Version:      groupVersion.Version,
 		}
@@ -173,7 +173,7 @@ func testAPIGroupList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiGroupList unversioned.APIGroupList
+	var apiGroupList metav1.APIGroupList
 	err = json.Unmarshal(contents, &apiGroupList)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -197,7 +197,7 @@ func testAPIGroup(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		var apiGroup unversioned.APIGroup
+		var apiGroup metav1.APIGroup
 		err = json.Unmarshal(contents, &apiGroup)
 		if err != nil {
 			t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -224,7 +224,7 @@ func testCoreAPIGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiVersions unversioned.APIVersions
+	var apiVersions metav1.APIVersions
 	err = json.Unmarshal(contents, &apiVersions)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -234,7 +234,7 @@ func testCoreAPIGroup(t *testing.T) {
 	assert.NotEmpty(t, apiVersions.ServerAddressByClientCIDRs)
 }
 
-func findResource(resources []unversioned.APIResource, resourceName string) *unversioned.APIResource {
+func findResource(resources []metav1.APIResource, resourceName string) *metav1.APIResource {
 	for _, resource := range resources {
 		if resource.Name == resourceName {
 			return &resource
@@ -255,7 +255,7 @@ func testFederationResourceList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiResourceList unversioned.APIResourceList
+	var apiResourceList metav1.APIResourceList
 	err = json.Unmarshal(contents, &apiResourceList)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -279,7 +279,7 @@ func testCoreResourceList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiResourceList unversioned.APIResourceList
+	var apiResourceList metav1.APIResourceList
 	err = json.Unmarshal(contents, &apiResourceList)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -330,7 +330,7 @@ func testExtensionsResourceList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiResourceList unversioned.APIResourceList
+	var apiResourceList metav1.APIResourceList
 	err = json.Unmarshal(contents, &apiResourceList)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)

@@ -21,18 +21,18 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/types"
 )
 
-func getValidManualSelector() *unversioned.LabelSelector {
-	return &unversioned.LabelSelector{
+func getValidManualSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
 }
 
-func getValidPodTemplateSpecForManual(selector *unversioned.LabelSelector) api.PodTemplateSpec {
+func getValidPodTemplateSpecForManual(selector *metav1.LabelSelector) api.PodTemplateSpec {
 	return api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
 			Labels: selector.MatchLabels,
@@ -45,13 +45,13 @@ func getValidPodTemplateSpecForManual(selector *unversioned.LabelSelector) api.P
 	}
 }
 
-func getValidGeneratedSelector() *unversioned.LabelSelector {
-	return &unversioned.LabelSelector{
+func getValidGeneratedSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{"controller-uid": "1a2b3c", "job-name": "myjob"},
 	}
 }
 
-func getValidPodTemplateSpecForGenerated(selector *unversioned.LabelSelector) api.PodTemplateSpec {
+func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.PodTemplateSpec {
 	return api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
 			Labels: selector.MatchLabels,

@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -1476,7 +1476,7 @@ func (ctrl *PersistentVolumeController) findAlphaProvisionablePlugin() (vol.Prov
 
 	// Return a dummy StorageClass instance with no parameters
 	storageClass := &storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: v1.ObjectMeta{

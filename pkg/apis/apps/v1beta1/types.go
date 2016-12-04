@@ -17,8 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // +genclient=true
@@ -30,7 +30,7 @@ import (
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
 type StatefulSet struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -58,7 +58,7 @@ type StatefulSetSpec struct {
 	// If empty, defaulted to labels on the pod template.
 	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	// +optional
-	Selector *unversioned.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Each pod stamped out by the StatefulSet
@@ -96,8 +96,8 @@ type StatefulSetStatus struct {
 
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Items                []StatefulSet `json:"items" protobuf:"bytes,2,rep,name=items"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items           []StatefulSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

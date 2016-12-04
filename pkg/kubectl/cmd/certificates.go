@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -107,7 +107,7 @@ func (options *CertificateOptions) RunCertificateApprove(f cmdutil.Factory, out 
 			Type:           certificates.CertificateApproved,
 			Reason:         "KubectlApprove",
 			Message:        "This CSR was approved by kubectl certificate approve.",
-			LastUpdateTime: unversioned.Now(),
+			LastUpdateTime: metav1.Now(),
 		})
 		return csr, "approved"
 	})
@@ -152,7 +152,7 @@ func (options *CertificateOptions) RunCertificateDeny(f cmdutil.Factory, out io.
 			Type:           certificates.CertificateDenied,
 			Reason:         "KubectlDeny",
 			Message:        "This CSR was approved by kubectl certificate deny.",
-			LastUpdateTime: unversioned.Now(),
+			LastUpdateTime: metav1.Now(),
 		})
 		return csr, "denied"
 	})

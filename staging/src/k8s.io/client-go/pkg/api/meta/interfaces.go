@@ -18,7 +18,7 @@ package meta
 
 import (
 	"k8s.io/client-go/pkg/api/meta/metatypes"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/types"
@@ -51,10 +51,10 @@ type Object interface {
 	SetResourceVersion(version string)
 	GetSelfLink() string
 	SetSelfLink(selfLink string)
-	GetCreationTimestamp() unversioned.Time
-	SetCreationTimestamp(timestamp unversioned.Time)
-	GetDeletionTimestamp() *unversioned.Time
-	SetDeletionTimestamp(timestamp *unversioned.Time)
+	GetCreationTimestamp() metav1.Time
+	SetCreationTimestamp(timestamp metav1.Time)
+	GetDeletionTimestamp() *metav1.Time
+	SetDeletionTimestamp(timestamp *metav1.Time)
 	GetLabels() map[string]string
 	SetLabels(labels map[string]string)
 	GetAnnotations() map[string]string
@@ -76,10 +76,10 @@ type ListMetaAccessor interface {
 // List lets you work with list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field will be a no-op and return a default value.
-type List unversioned.List
+type List metav1.List
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
-type Type unversioned.Type
+type Type metav1.Type
 
 // MetadataAccessor lets you work with object and list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does

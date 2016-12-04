@@ -22,10 +22,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -54,13 +54,13 @@ func getKey(ds *extensions.DaemonSet, t *testing.T) string {
 
 func newDaemonSet(name string) *extensions.DaemonSet {
 	return &extensions.DaemonSet{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Namespace: v1.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+			Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: simpleDaemonSetLabel,
@@ -83,7 +83,7 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 
 func newNode(name string, label map[string]string) *v1.Node {
 	return &v1.Node{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
@@ -108,7 +108,7 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: podName,
 			Labels:       label,
@@ -311,7 +311,7 @@ func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 	})
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec = podSpec
-	now := unversioned.Now()
+	now := metav1.Now()
 	ds.DeletionTimestamp = &now
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
@@ -426,7 +426,7 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 	// should detect this misconfiguration and choose not to sync the DaemonSet. We should
 	// not observe a deletion of the pod on node1.
 	ds := newDaemonSet("foo")
-	ls := unversioned.LabelSelector{}
+	ls := metav1.LabelSelector{}
 	ds.Spec.Selector = &ls
 	ds.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
 	manager.dsStore.Add(ds)
@@ -583,7 +583,7 @@ func TestNumberReadyStatus(t *testing.T) {
 		t.Errorf("Wrong daemon %s status: %v", daemon.Name, daemon.Status)
 	}
 
-	selector, _ := unversioned.LabelSelectorAsSelector(daemon.Spec.Selector)
+	selector, _ := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
 	daemonPods, _ := manager.podStore.Pods(daemon.Namespace).List(selector)
 	for _, pod := range daemonPods {
 		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}

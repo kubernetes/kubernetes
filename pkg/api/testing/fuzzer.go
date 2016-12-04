@@ -27,10 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/fields"
@@ -70,7 +70,7 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			j.APIVersion = ""
 			j.Kind = ""
 		},
-		func(j *unversioned.TypeMeta, c fuzz.Continue) {
+		func(j *metav1.TypeMeta, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
 			j.APIVersion = ""
@@ -86,7 +86,7 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			var sec, nsec int64
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
-			j.CreationTimestamp = unversioned.Unix(sec, nsec).Rfc3339Copy()
+			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
 		},
 		func(j *api.ObjectReference, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
@@ -98,7 +98,7 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.FieldPath = c.RandString()
 		},
-		func(j *unversioned.ListMeta, c fuzz.Continue) {
+		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.SelfLink = c.RandString()
 		},
@@ -488,14 +488,14 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			// TODO: Implement a fuzzer to generate valid keys, values and operators for
 			// selector requirements.
 			if s.Status.Selector != nil {
-				s.Status.Selector = &unversioned.LabelSelector{
+				s.Status.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"testlabelkey": "testlabelval",
 					},
-					MatchExpressions: []unversioned.LabelSelectorRequirement{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
 							Key:      "testkey",
-							Operator: unversioned.LabelSelectorOpIn,
+							Operator: metav1.LabelSelectorOpIn,
 							Values:   []string{"val1", "val2", "val3"},
 						},
 					},

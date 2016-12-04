@@ -29,9 +29,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -56,7 +56,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 
 func newReplicationController(replicas int) *v1.ReplicationController {
 	rc := &v1.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -328,7 +328,7 @@ func TestSortingActivePods(t *testing.T) {
 	pods[3].Spec.NodeName = "foo"
 	pods[3].Status.Phase = v1.PodRunning
 	// pods[4] is running and ready but without LastTransitionTime.
-	now := unversioned.Now()
+	now := metav1.Now()
 	pods[4].Spec.NodeName = "foo"
 	pods[4].Status.Phase = v1.PodRunning
 	pods[4].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
@@ -339,7 +339,7 @@ func TestSortingActivePods(t *testing.T) {
 	pods[5].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: now}}
 	pods[5].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
 	// pods[6] is running ready for a longer time than pods[5].
-	then := unversioned.Time{Time: now.AddDate(0, -1, 0)}
+	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
 	pods[6].Spec.NodeName = "foo"
 	pods[6].Status.Phase = v1.PodRunning
 	pods[6].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}

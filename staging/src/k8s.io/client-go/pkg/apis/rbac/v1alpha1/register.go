@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/watch/versioned"
@@ -27,6 +28,11 @@ const GroupName = "rbac.authorization.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
+
+// Resource takes an unqualified resource and returns a Group qualified GroupResource
+func Resource(resource string) schema.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
+}
 
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs)
@@ -48,7 +54,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
-		&v1.ExportOptions{},
+		&metav1.ExportOptions{},
 	)
 	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

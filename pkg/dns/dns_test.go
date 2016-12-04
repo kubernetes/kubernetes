@@ -32,9 +32,9 @@ import (
 	skyserver "github.com/skynetservices/skydns/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	endpointsapi "k8s.io/kubernetes/pkg/api/v1/endpoints"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	fake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/dns/config"
@@ -606,8 +606,8 @@ func newNodes() *v1.NodeList {
 						// Note: The zone name here is an arbitrary string and doesn't exactly follow the
 						// format used by the cloud providers to name their zones. But that shouldn't matter
 						// for these tests here.
-						unversioned.LabelZoneFailureDomain: "testcontinent-testreg-testzone",
-						unversioned.LabelZoneRegion:        "testcontinent-testreg",
+						metav1.LabelZoneFailureDomain: "testcontinent-testreg-testzone",
+						metav1.LabelZoneRegion:        "testcontinent-testreg",
 					},
 				},
 			},

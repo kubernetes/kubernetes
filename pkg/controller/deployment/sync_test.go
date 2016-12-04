@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	testclient "k8s.io/kubernetes/pkg/client/testing/core"
@@ -37,9 +37,9 @@ func maxSurge(val int) *intstr.IntOrString {
 }
 
 func TestScale(t *testing.T) {
-	newTimestamp := unversioned.Date(2016, 5, 20, 2, 0, 0, 0, time.UTC)
-	oldTimestamp := unversioned.Date(2016, 5, 20, 1, 0, 0, 0, time.UTC)
-	olderTimestamp := unversioned.Date(2016, 5, 20, 0, 0, 0, 0, time.UTC)
+	newTimestamp := metav1.Date(2016, 5, 20, 2, 0, 0, 0, time.UTC)
+	oldTimestamp := metav1.Date(2016, 5, 20, 1, 0, 0, 0, time.UTC)
+	olderTimestamp := metav1.Date(2016, 5, 20, 0, 0, 0, 0, time.UTC)
 
 	var updatedTemplate = func(replicas int) *extensions.Deployment {
 		d := newDeployment("foo", replicas, nil, nil, nil, map[string]string{"foo": "bar"})

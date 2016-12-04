@@ -21,9 +21,9 @@ import (
 	"os"
 	"path"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -134,7 +134,7 @@ func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
 	podName := "pod-host-path-test"
 
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},

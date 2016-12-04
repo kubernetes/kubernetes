@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -71,7 +71,7 @@ func (s *PodDisruptionBudgetV1Generator) StructuredGenerate() (runtime.Object, e
 		return nil, err
 	}
 
-	selector, err := unversioned.ParseToLabelSelector(s.Selector)
+	selector, err := metav1.ParseToLabelSelector(s.Selector)
 	if err != nil {
 		return nil, err
 	}

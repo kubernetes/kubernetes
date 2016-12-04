@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -109,19 +109,19 @@ func (c *fakeDiscoveryClient) RESTClient() restclient.Interface {
 	return &fake.RESTClient{}
 }
 
-func (c *fakeDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error) {
+func (c *fakeDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	c.groupCalls = c.groupCalls + 1
-	return &unversioned.APIGroupList{
-		Groups: []unversioned.APIGroup{
+	return &metav1.APIGroupList{
+		Groups: []metav1.APIGroup{
 			{
 				Name: "a",
-				Versions: []unversioned.GroupVersionForDiscovery{
+				Versions: []metav1.GroupVersionForDiscovery{
 					{
 						GroupVersion: "a/v1",
 						Version:      "v1",
 					},
 				},
-				PreferredVersion: unversioned.GroupVersionForDiscovery{
+				PreferredVersion: metav1.GroupVersionForDiscovery{
 					GroupVersion: "a/v1",
 					Version:      "v1",
 				},
@@ -130,18 +130,18 @@ func (c *fakeDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error) 
 	}, nil
 }
 
-func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
 	if groupVersion == "a/v1" {
-		return &unversioned.APIResourceList{}, nil
+		return &metav1.APIResourceList{}, nil
 	}
 
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
-func (c *fakeDiscoveryClient) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (c *fakeDiscoveryClient) ServerResources() (map[string]*metav1.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return map[string]*unversioned.APIResourceList{}, nil
+	return map[string]*metav1.APIResourceList{}, nil
 }
 
 func (c *fakeDiscoveryClient) ServerPreferredResources() ([]schema.GroupVersionResource, error) {

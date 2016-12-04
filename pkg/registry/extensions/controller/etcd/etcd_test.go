@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/storage"
@@ -80,7 +80,7 @@ var validScale = extensions.Scale{
 	},
 	Status: extensions.ScaleStatus{
 		Replicas: 0,
-		Selector: &unversioned.LabelSelector{
+		Selector: &metav1.LabelSelector{
 			MatchLabels: validPodTemplate.Template.Labels,
 		},
 	},

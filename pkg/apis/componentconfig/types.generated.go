@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
-	pkg1_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	pkg1_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	pkg2_config "k8s.io/kubernetes/pkg/util/config"
 	"reflect"
 	"runtime"
@@ -62,7 +62,7 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg1_unversioned.TypeMeta
+		var v0 pkg1_v1.TypeMeta
 		var v1 pkg2_config.ConfigurationMap
 		var v2 time.Duration
 		_, _, _ = v0, v1, v2
@@ -721,7 +721,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			}
 		case "iptablesSyncPeriodSeconds":
 			if r.TryDecodeAsNil() {
-				x.IPTablesSyncPeriod = pkg1_unversioned.Duration{}
+				x.IPTablesSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv96 := &x.IPTablesSyncPeriod
 				yym97 := z.DecBinary()
@@ -736,7 +736,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			}
 		case "iptablesMinSyncPeriodSeconds":
 			if r.TryDecodeAsNil() {
-				x.IPTablesMinSyncPeriod = pkg1_unversioned.Duration{}
+				x.IPTablesMinSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv98 := &x.IPTablesMinSyncPeriod
 				yym99 := z.DecBinary()
@@ -803,7 +803,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			}
 		case "udpTimeoutMilliseconds":
 			if r.TryDecodeAsNil() {
-				x.UDPIdleTimeout = pkg1_unversioned.Duration{}
+				x.UDPIdleTimeout = pkg1_v1.Duration{}
 			} else {
 				yyv108 := &x.UDPIdleTimeout
 				yym109 := z.DecBinary()
@@ -836,7 +836,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			}
 		case "conntrackTCPEstablishedTimeout":
 			if r.TryDecodeAsNil() {
-				x.ConntrackTCPEstablishedTimeout = pkg1_unversioned.Duration{}
+				x.ConntrackTCPEstablishedTimeout = pkg1_v1.Duration{}
 			} else {
 				yyv113 := &x.ConntrackTCPEstablishedTimeout
 				yym114 := z.DecBinary()
@@ -851,7 +851,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			}
 		case "conntrackTCPCloseWaitTimeout":
 			if r.TryDecodeAsNil() {
-				x.ConntrackTCPCloseWaitTimeout = pkg1_unversioned.Duration{}
+				x.ConntrackTCPCloseWaitTimeout = pkg1_v1.Duration{}
 			} else {
 				yyv115 := &x.ConntrackTCPCloseWaitTimeout
 				yym116 := z.DecBinary()
@@ -1028,7 +1028,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.IPTablesSyncPeriod = pkg1_unversioned.Duration{}
+		x.IPTablesSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv127 := &x.IPTablesSyncPeriod
 		yym128 := z.DecBinary()
@@ -1053,7 +1053,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.IPTablesMinSyncPeriod = pkg1_unversioned.Duration{}
+		x.IPTablesMinSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv129 := &x.IPTablesMinSyncPeriod
 		yym130 := z.DecBinary()
@@ -1200,7 +1200,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.UDPIdleTimeout = pkg1_unversioned.Duration{}
+		x.UDPIdleTimeout = pkg1_v1.Duration{}
 	} else {
 		yyv139 := &x.UDPIdleTimeout
 		yym140 := z.DecBinary()
@@ -1273,7 +1273,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ConntrackTCPEstablishedTimeout = pkg1_unversioned.Duration{}
+		x.ConntrackTCPEstablishedTimeout = pkg1_v1.Duration{}
 	} else {
 		yyv144 := &x.ConntrackTCPEstablishedTimeout
 		yym145 := z.DecBinary()
@@ -1298,7 +1298,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ConntrackTCPCloseWaitTimeout = pkg1_unversioned.Duration{}
+		x.ConntrackTCPCloseWaitTimeout = pkg1_v1.Duration{}
 	} else {
 		yyv146 := &x.ConntrackTCPCloseWaitTimeout
 		yym147 := z.DecBinary()
@@ -3958,7 +3958,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "syncFrequency":
 			if r.TryDecodeAsNil() {
-				x.SyncFrequency = pkg1_unversioned.Duration{}
+				x.SyncFrequency = pkg1_v1.Duration{}
 			} else {
 				yyv521 := &x.SyncFrequency
 				yym522 := z.DecBinary()
@@ -3973,7 +3973,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "fileCheckFrequency":
 			if r.TryDecodeAsNil() {
-				x.FileCheckFrequency = pkg1_unversioned.Duration{}
+				x.FileCheckFrequency = pkg1_v1.Duration{}
 			} else {
 				yyv523 := &x.FileCheckFrequency
 				yym524 := z.DecBinary()
@@ -3988,7 +3988,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "httpCheckFrequency":
 			if r.TryDecodeAsNil() {
-				x.HTTPCheckFrequency = pkg1_unversioned.Duration{}
+				x.HTTPCheckFrequency = pkg1_v1.Duration{}
 			} else {
 				yyv525 := &x.HTTPCheckFrequency
 				yym526 := z.DecBinary()
@@ -4173,7 +4173,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "minimumGCAge":
 			if r.TryDecodeAsNil() {
-				x.MinimumGCAge = pkg1_unversioned.Duration{}
+				x.MinimumGCAge = pkg1_v1.Duration{}
 			} else {
 				yyv555 := &x.MinimumGCAge
 				yym556 := z.DecBinary()
@@ -4248,7 +4248,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "streamingConnectionIdleTimeout":
 			if r.TryDecodeAsNil() {
-				x.StreamingConnectionIdleTimeout = pkg1_unversioned.Duration{}
+				x.StreamingConnectionIdleTimeout = pkg1_v1.Duration{}
 			} else {
 				yyv567 := &x.StreamingConnectionIdleTimeout
 				yym568 := z.DecBinary()
@@ -4263,7 +4263,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "nodeStatusUpdateFrequency":
 			if r.TryDecodeAsNil() {
-				x.NodeStatusUpdateFrequency = pkg1_unversioned.Duration{}
+				x.NodeStatusUpdateFrequency = pkg1_v1.Duration{}
 			} else {
 				yyv569 := &x.NodeStatusUpdateFrequency
 				yym570 := z.DecBinary()
@@ -4278,7 +4278,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "imageMinimumGCAge":
 			if r.TryDecodeAsNil() {
-				x.ImageMinimumGCAge = pkg1_unversioned.Duration{}
+				x.ImageMinimumGCAge = pkg1_v1.Duration{}
 			} else {
 				yyv571 := &x.ImageMinimumGCAge
 				yym572 := z.DecBinary()
@@ -4311,7 +4311,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "volumeStatsAggPeriod":
 			if r.TryDecodeAsNil() {
-				x.VolumeStatsAggPeriod = pkg1_unversioned.Duration{}
+				x.VolumeStatsAggPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv576 := &x.VolumeStatsAggPeriod
 				yym577 := z.DecBinary()
@@ -4428,7 +4428,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "runtimeRequestTimeout":
 			if r.TryDecodeAsNil() {
-				x.RuntimeRequestTimeout = pkg1_unversioned.Duration{}
+				x.RuntimeRequestTimeout = pkg1_v1.Duration{}
 			} else {
 				yyv595 := &x.RuntimeRequestTimeout
 				yym596 := z.DecBinary()
@@ -4575,7 +4575,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "outOfDiskTransitionFrequency":
 			if r.TryDecodeAsNil() {
-				x.OutOfDiskTransitionFrequency = pkg1_unversioned.Duration{}
+				x.OutOfDiskTransitionFrequency = pkg1_v1.Duration{}
 			} else {
 				yyv619 := &x.OutOfDiskTransitionFrequency
 				yym620 := z.DecBinary()
@@ -4638,7 +4638,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		case "evictionPressureTransitionPeriod":
 			if r.TryDecodeAsNil() {
-				x.EvictionPressureTransitionPeriod = pkg1_unversioned.Duration{}
+				x.EvictionPressureTransitionPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv629 := &x.EvictionPressureTransitionPeriod
 				yym630 := z.DecBinary()
@@ -4835,7 +4835,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.SyncFrequency = pkg1_unversioned.Duration{}
+		x.SyncFrequency = pkg1_v1.Duration{}
 	} else {
 		yyv653 := &x.SyncFrequency
 		yym654 := z.DecBinary()
@@ -4860,7 +4860,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.FileCheckFrequency = pkg1_unversioned.Duration{}
+		x.FileCheckFrequency = pkg1_v1.Duration{}
 	} else {
 		yyv655 := &x.FileCheckFrequency
 		yym656 := z.DecBinary()
@@ -4885,7 +4885,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.HTTPCheckFrequency = pkg1_unversioned.Duration{}
+		x.HTTPCheckFrequency = pkg1_v1.Duration{}
 	} else {
 		yyv657 := &x.HTTPCheckFrequency
 		yym658 := z.DecBinary()
@@ -5330,7 +5330,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.MinimumGCAge = pkg1_unversioned.Duration{}
+		x.MinimumGCAge = pkg1_v1.Duration{}
 	} else {
 		yyv687 := &x.MinimumGCAge
 		yym688 := z.DecBinary()
@@ -5515,7 +5515,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.StreamingConnectionIdleTimeout = pkg1_unversioned.Duration{}
+		x.StreamingConnectionIdleTimeout = pkg1_v1.Duration{}
 	} else {
 		yyv699 := &x.StreamingConnectionIdleTimeout
 		yym700 := z.DecBinary()
@@ -5540,7 +5540,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.NodeStatusUpdateFrequency = pkg1_unversioned.Duration{}
+		x.NodeStatusUpdateFrequency = pkg1_v1.Duration{}
 	} else {
 		yyv701 := &x.NodeStatusUpdateFrequency
 		yym702 := z.DecBinary()
@@ -5565,7 +5565,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ImageMinimumGCAge = pkg1_unversioned.Duration{}
+		x.ImageMinimumGCAge = pkg1_v1.Duration{}
 	} else {
 		yyv703 := &x.ImageMinimumGCAge
 		yym704 := z.DecBinary()
@@ -5638,7 +5638,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.VolumeStatsAggPeriod = pkg1_unversioned.Duration{}
+		x.VolumeStatsAggPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv708 := &x.VolumeStatsAggPeriod
 		yym709 := z.DecBinary()
@@ -5935,7 +5935,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.RuntimeRequestTimeout = pkg1_unversioned.Duration{}
+		x.RuntimeRequestTimeout = pkg1_v1.Duration{}
 	} else {
 		yyv727 := &x.RuntimeRequestTimeout
 		yym728 := z.DecBinary()
@@ -6312,7 +6312,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.OutOfDiskTransitionFrequency = pkg1_unversioned.Duration{}
+		x.OutOfDiskTransitionFrequency = pkg1_v1.Duration{}
 	} else {
 		yyv751 := &x.OutOfDiskTransitionFrequency
 		yym752 := z.DecBinary()
@@ -6455,7 +6455,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.EvictionPressureTransitionPeriod = pkg1_unversioned.Duration{}
+		x.EvictionPressureTransitionPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv761 := &x.EvictionPressureTransitionPeriod
 		yym762 := z.DecBinary()
@@ -7104,7 +7104,7 @@ func (x *KubeletWebhookAuthorization) codecDecodeSelfFromMap(l int, d *codec1978
 		switch yys811 {
 		case "cacheAuthorizedTTL":
 			if r.TryDecodeAsNil() {
-				x.CacheAuthorizedTTL = pkg1_unversioned.Duration{}
+				x.CacheAuthorizedTTL = pkg1_v1.Duration{}
 			} else {
 				yyv812 := &x.CacheAuthorizedTTL
 				yym813 := z.DecBinary()
@@ -7119,7 +7119,7 @@ func (x *KubeletWebhookAuthorization) codecDecodeSelfFromMap(l int, d *codec1978
 			}
 		case "cacheUnauthorizedTTL":
 			if r.TryDecodeAsNil() {
-				x.CacheUnauthorizedTTL = pkg1_unversioned.Duration{}
+				x.CacheUnauthorizedTTL = pkg1_v1.Duration{}
 			} else {
 				yyv814 := &x.CacheUnauthorizedTTL
 				yym815 := z.DecBinary()
@@ -7158,7 +7158,7 @@ func (x *KubeletWebhookAuthorization) codecDecodeSelfFromArray(l int, d *codec19
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CacheAuthorizedTTL = pkg1_unversioned.Duration{}
+		x.CacheAuthorizedTTL = pkg1_v1.Duration{}
 	} else {
 		yyv817 := &x.CacheAuthorizedTTL
 		yym818 := z.DecBinary()
@@ -7183,7 +7183,7 @@ func (x *KubeletWebhookAuthorization) codecDecodeSelfFromArray(l int, d *codec19
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CacheUnauthorizedTTL = pkg1_unversioned.Duration{}
+		x.CacheUnauthorizedTTL = pkg1_v1.Duration{}
 	} else {
 		yyv819 := &x.CacheUnauthorizedTTL
 		yym820 := z.DecBinary()
@@ -7745,7 +7745,7 @@ func (x *KubeletWebhookAuthentication) codecDecodeSelfFromMap(l int, d *codec197
 			}
 		case "cacheTTL":
 			if r.TryDecodeAsNil() {
-				x.CacheTTL = pkg1_unversioned.Duration{}
+				x.CacheTTL = pkg1_v1.Duration{}
 			} else {
 				yyv867 := &x.CacheTTL
 				yym868 := z.DecBinary()
@@ -7800,7 +7800,7 @@ func (x *KubeletWebhookAuthentication) codecDecodeSelfFromArray(l int, d *codec1
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CacheTTL = pkg1_unversioned.Duration{}
+		x.CacheTTL = pkg1_v1.Duration{}
 	} else {
 		yyv871 := &x.CacheTTL
 		yym872 := z.DecBinary()
@@ -8934,7 +8934,7 @@ func (x *LeaderElectionConfiguration) codecDecodeSelfFromMap(l int, d *codec1978
 			}
 		case "leaseDuration":
 			if r.TryDecodeAsNil() {
-				x.LeaseDuration = pkg1_unversioned.Duration{}
+				x.LeaseDuration = pkg1_v1.Duration{}
 			} else {
 				yyv989 := &x.LeaseDuration
 				yym990 := z.DecBinary()
@@ -8949,7 +8949,7 @@ func (x *LeaderElectionConfiguration) codecDecodeSelfFromMap(l int, d *codec1978
 			}
 		case "renewDeadline":
 			if r.TryDecodeAsNil() {
-				x.RenewDeadline = pkg1_unversioned.Duration{}
+				x.RenewDeadline = pkg1_v1.Duration{}
 			} else {
 				yyv991 := &x.RenewDeadline
 				yym992 := z.DecBinary()
@@ -8964,7 +8964,7 @@ func (x *LeaderElectionConfiguration) codecDecodeSelfFromMap(l int, d *codec1978
 			}
 		case "retryPeriod":
 			if r.TryDecodeAsNil() {
-				x.RetryPeriod = pkg1_unversioned.Duration{}
+				x.RetryPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv993 := &x.RetryPeriod
 				yym994 := z.DecBinary()
@@ -9019,7 +9019,7 @@ func (x *LeaderElectionConfiguration) codecDecodeSelfFromArray(l int, d *codec19
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LeaseDuration = pkg1_unversioned.Duration{}
+		x.LeaseDuration = pkg1_v1.Duration{}
 	} else {
 		yyv997 := &x.LeaseDuration
 		yym998 := z.DecBinary()
@@ -9044,7 +9044,7 @@ func (x *LeaderElectionConfiguration) codecDecodeSelfFromArray(l int, d *codec19
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.RenewDeadline = pkg1_unversioned.Duration{}
+		x.RenewDeadline = pkg1_v1.Duration{}
 	} else {
 		yyv999 := &x.RenewDeadline
 		yym1000 := z.DecBinary()
@@ -9069,7 +9069,7 @@ func (x *LeaderElectionConfiguration) codecDecodeSelfFromArray(l int, d *codec19
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.RetryPeriod = pkg1_unversioned.Duration{}
+		x.RetryPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1001 := &x.RetryPeriod
 		yym1002 := z.DecBinary()
@@ -10580,7 +10580,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "serviceSyncPeriod":
 			if r.TryDecodeAsNil() {
-				x.ServiceSyncPeriod = pkg1_unversioned.Duration{}
+				x.ServiceSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1239 := &x.ServiceSyncPeriod
 				yym1240 := z.DecBinary()
@@ -10595,7 +10595,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "nodeSyncPeriod":
 			if r.TryDecodeAsNil() {
-				x.NodeSyncPeriod = pkg1_unversioned.Duration{}
+				x.NodeSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1241 := &x.NodeSyncPeriod
 				yym1242 := z.DecBinary()
@@ -10610,7 +10610,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "routeReconciliationPeriod":
 			if r.TryDecodeAsNil() {
-				x.RouteReconciliationPeriod = pkg1_unversioned.Duration{}
+				x.RouteReconciliationPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1243 := &x.RouteReconciliationPeriod
 				yym1244 := z.DecBinary()
@@ -10625,7 +10625,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "resourceQuotaSyncPeriod":
 			if r.TryDecodeAsNil() {
-				x.ResourceQuotaSyncPeriod = pkg1_unversioned.Duration{}
+				x.ResourceQuotaSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1245 := &x.ResourceQuotaSyncPeriod
 				yym1246 := z.DecBinary()
@@ -10640,7 +10640,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "namespaceSyncPeriod":
 			if r.TryDecodeAsNil() {
-				x.NamespaceSyncPeriod = pkg1_unversioned.Duration{}
+				x.NamespaceSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1247 := &x.NamespaceSyncPeriod
 				yym1248 := z.DecBinary()
@@ -10655,7 +10655,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "pvClaimBinderSyncPeriod":
 			if r.TryDecodeAsNil() {
-				x.PVClaimBinderSyncPeriod = pkg1_unversioned.Duration{}
+				x.PVClaimBinderSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1249 := &x.PVClaimBinderSyncPeriod
 				yym1250 := z.DecBinary()
@@ -10670,7 +10670,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "minResyncPeriod":
 			if r.TryDecodeAsNil() {
-				x.MinResyncPeriod = pkg1_unversioned.Duration{}
+				x.MinResyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1251 := &x.MinResyncPeriod
 				yym1252 := z.DecBinary()
@@ -10691,7 +10691,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "horizontalPodAutoscalerSyncPeriod":
 			if r.TryDecodeAsNil() {
-				x.HorizontalPodAutoscalerSyncPeriod = pkg1_unversioned.Duration{}
+				x.HorizontalPodAutoscalerSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1254 := &x.HorizontalPodAutoscalerSyncPeriod
 				yym1255 := z.DecBinary()
@@ -10706,7 +10706,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "deploymentControllerSyncPeriod":
 			if r.TryDecodeAsNil() {
-				x.DeploymentControllerSyncPeriod = pkg1_unversioned.Duration{}
+				x.DeploymentControllerSyncPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1256 := &x.DeploymentControllerSyncPeriod
 				yym1257 := z.DecBinary()
@@ -10721,7 +10721,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "podEvictionTimeout":
 			if r.TryDecodeAsNil() {
-				x.PodEvictionTimeout = pkg1_unversioned.Duration{}
+				x.PodEvictionTimeout = pkg1_v1.Duration{}
 			} else {
 				yyv1258 := &x.PodEvictionTimeout
 				yym1259 := z.DecBinary()
@@ -10748,7 +10748,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "nodeMonitorGracePeriod":
 			if r.TryDecodeAsNil() {
-				x.NodeMonitorGracePeriod = pkg1_unversioned.Duration{}
+				x.NodeMonitorGracePeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1262 := &x.NodeMonitorGracePeriod
 				yym1263 := z.DecBinary()
@@ -10769,7 +10769,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "nodeStartupGracePeriod":
 			if r.TryDecodeAsNil() {
-				x.NodeStartupGracePeriod = pkg1_unversioned.Duration{}
+				x.NodeStartupGracePeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1265 := &x.NodeStartupGracePeriod
 				yym1266 := z.DecBinary()
@@ -10784,7 +10784,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "nodeMonitorPeriod":
 			if r.TryDecodeAsNil() {
-				x.NodeMonitorPeriod = pkg1_unversioned.Duration{}
+				x.NodeMonitorPeriod = pkg1_v1.Duration{}
 			} else {
 				yyv1267 := &x.NodeMonitorPeriod
 				yym1268 := z.DecBinary()
@@ -10903,7 +10903,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			}
 		case "controllerStartInterval":
 			if r.TryDecodeAsNil() {
-				x.ControllerStartInterval = pkg1_unversioned.Duration{}
+				x.ControllerStartInterval = pkg1_v1.Duration{}
 			} else {
 				yyv1286 := &x.ControllerStartInterval
 				yym1287 := z.DecBinary()
@@ -11298,7 +11298,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ServiceSyncPeriod = pkg1_unversioned.Duration{}
+		x.ServiceSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1315 := &x.ServiceSyncPeriod
 		yym1316 := z.DecBinary()
@@ -11323,7 +11323,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.NodeSyncPeriod = pkg1_unversioned.Duration{}
+		x.NodeSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1317 := &x.NodeSyncPeriod
 		yym1318 := z.DecBinary()
@@ -11348,7 +11348,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.RouteReconciliationPeriod = pkg1_unversioned.Duration{}
+		x.RouteReconciliationPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1319 := &x.RouteReconciliationPeriod
 		yym1320 := z.DecBinary()
@@ -11373,7 +11373,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ResourceQuotaSyncPeriod = pkg1_unversioned.Duration{}
+		x.ResourceQuotaSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1321 := &x.ResourceQuotaSyncPeriod
 		yym1322 := z.DecBinary()
@@ -11398,7 +11398,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.NamespaceSyncPeriod = pkg1_unversioned.Duration{}
+		x.NamespaceSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1323 := &x.NamespaceSyncPeriod
 		yym1324 := z.DecBinary()
@@ -11423,7 +11423,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.PVClaimBinderSyncPeriod = pkg1_unversioned.Duration{}
+		x.PVClaimBinderSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1325 := &x.PVClaimBinderSyncPeriod
 		yym1326 := z.DecBinary()
@@ -11448,7 +11448,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.MinResyncPeriod = pkg1_unversioned.Duration{}
+		x.MinResyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1327 := &x.MinResyncPeriod
 		yym1328 := z.DecBinary()
@@ -11489,7 +11489,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.HorizontalPodAutoscalerSyncPeriod = pkg1_unversioned.Duration{}
+		x.HorizontalPodAutoscalerSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1330 := &x.HorizontalPodAutoscalerSyncPeriod
 		yym1331 := z.DecBinary()
@@ -11514,7 +11514,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.DeploymentControllerSyncPeriod = pkg1_unversioned.Duration{}
+		x.DeploymentControllerSyncPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1332 := &x.DeploymentControllerSyncPeriod
 		yym1333 := z.DecBinary()
@@ -11539,7 +11539,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.PodEvictionTimeout = pkg1_unversioned.Duration{}
+		x.PodEvictionTimeout = pkg1_v1.Duration{}
 	} else {
 		yyv1334 := &x.PodEvictionTimeout
 		yym1335 := z.DecBinary()
@@ -11596,7 +11596,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.NodeMonitorGracePeriod = pkg1_unversioned.Duration{}
+		x.NodeMonitorGracePeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1338 := &x.NodeMonitorGracePeriod
 		yym1339 := z.DecBinary()
@@ -11637,7 +11637,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.NodeStartupGracePeriod = pkg1_unversioned.Duration{}
+		x.NodeStartupGracePeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1341 := &x.NodeStartupGracePeriod
 		yym1342 := z.DecBinary()
@@ -11662,7 +11662,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.NodeMonitorPeriod = pkg1_unversioned.Duration{}
+		x.NodeMonitorPeriod = pkg1_v1.Duration{}
 	} else {
 		yyv1343 := &x.NodeMonitorPeriod
 		yym1344 := z.DecBinary()
@@ -11961,7 +11961,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ControllerStartInterval = pkg1_unversioned.Duration{}
+		x.ControllerStartInterval = pkg1_v1.Duration{}
 	} else {
 		yyv1362 := &x.ControllerStartInterval
 		yym1363 := z.DecBinary()

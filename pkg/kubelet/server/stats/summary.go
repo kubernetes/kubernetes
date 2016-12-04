@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -266,7 +266,7 @@ func (sb *summaryBuilder) buildSummaryPods() []stats.PodStats {
 		if containerName == leaky.PodInfraContainerName {
 			// Special case for infrastructure container which is hidden from the user and has network stats
 			podStats.Network = sb.containerInfoV2ToNetworkStats("pod:"+ref.Namespace+"_"+ref.Name, &cinfo)
-			podStats.StartTime = unversioned.NewTime(cinfo.Spec.CreationTime)
+			podStats.StartTime = metav1.NewTime(cinfo.Spec.CreationTime)
 		} else {
 			podStats.Containers = append(podStats.Containers, sb.containerInfoV2ToStats(containerName, &cinfo))
 		}
@@ -310,7 +310,7 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 	name string,
 	info *cadvisorapiv2.ContainerInfo) stats.ContainerStats {
 	cStats := stats.ContainerStats{
-		StartTime: unversioned.NewTime(info.Spec.CreationTime),
+		StartTime: metav1.NewTime(info.Spec.CreationTime),
 		Name:      name,
 	}
 	cstat, found := sb.latestContainerStats(info)
@@ -319,7 +319,7 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 	}
 	if info.Spec.HasCpu {
 		cpuStats := stats.CPUStats{
-			Time: unversioned.NewTime(cstat.Timestamp),
+			Time: metav1.NewTime(cstat.Timestamp),
 		}
 		if cstat.CpuInst != nil {
 			cpuStats.UsageNanoCores = &cstat.CpuInst.Usage.Total
@@ -333,7 +333,7 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 		pageFaults := cstat.Memory.ContainerData.Pgfault
 		majorPageFaults := cstat.Memory.ContainerData.Pgmajfault
 		cStats.Memory = &stats.MemoryStats{
-			Time:            unversioned.NewTime(cstat.Timestamp),
+			Time:            metav1.NewTime(cstat.Timestamp),
 			UsageBytes:      &cstat.Memory.Usage,
 			WorkingSetBytes: &cstat.Memory.WorkingSet,
 			RSSBytes:        &cstat.Memory.RSS,
@@ -372,7 +372,7 @@ func (sb *summaryBuilder) containerInfoV2ToNetworkStats(name string, info *cadvi
 	for _, inter := range cstat.Network.Interfaces {
 		if inter.Name == network.DefaultInterfaceName {
 			return &stats.NetworkStats{
-				Time:     unversioned.NewTime(cstat.Timestamp),
+				Time:     metav1.NewTime(cstat.Timestamp),
 				RxBytes:  &inter.RxBytes,
 				RxErrors: &inter.RxErrors,
 				TxBytes:  &inter.TxBytes,
@@ -426,7 +426,7 @@ func (sb *summaryBuilder) containerInfoV2ToUserDefinedMetrics(info *cadvisorapiv
 	for _, specVal := range udmMap {
 		udm = append(udm, stats.UserDefinedMetric{
 			UserDefinedMetricDescriptor: specVal.ref,
-			Time:  unversioned.NewTime(specVal.time),
+			Time:  metav1.NewTime(specVal.time),
 			Value: specVal.value,
 		})
 	}
