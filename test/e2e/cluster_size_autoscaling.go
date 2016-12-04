@@ -216,7 +216,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			glog.Infof("Kubectl:%s\n", framework.RunKubectlOrDie("get", "nodes", "-o", "json"))
 			if output, err := exec.Command("gcloud", "compute", "instances", "list",
 				"--project="+framework.TestContext.CloudConfig.ProjectID,
-				"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err != nil {
+				"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
 				glog.Infof("Gcloud compute instances list: %s", output)
 			} else {
 				glog.Errorf("Failed to get instances list: %v", err)
@@ -226,7 +226,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 				if output, err := exec.Command("gcloud", "compute", "instances", "describe",
 					newNode,
 					"--project="+framework.TestContext.CloudConfig.ProjectID,
-					"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err != nil {
+					"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
 					glog.Infof("Gcloud compute instances describe: %s", output)
 				} else {
 					glog.Errorf("Failed to get instances describe: %v", err)
