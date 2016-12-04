@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
@@ -300,11 +301,11 @@ func TestSetListToRuntimeObjectArray(t *testing.T) {
 }
 
 func TestSetListToMatchingType(t *testing.T) {
-	pl := &runtime.UnstructuredList{}
+	pl := &unstructured.UnstructuredList{}
 	list := []runtime.Object{
-		&runtime.Unstructured{Object: map[string]interface{}{"foo": 1}},
-		&runtime.Unstructured{Object: map[string]interface{}{"foo": 2}},
-		&runtime.Unstructured{Object: map[string]interface{}{"foo": 3}},
+		&unstructured.Unstructured{Object: map[string]interface{}{"foo": 1}},
+		&unstructured.Unstructured{Object: map[string]interface{}{"foo": 2}},
+		&unstructured.Unstructured{Object: map[string]interface{}{"foo": 3}},
 	}
 	err := meta.SetList(pl, list)
 	if err != nil {
