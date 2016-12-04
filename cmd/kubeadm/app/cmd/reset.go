@@ -136,7 +136,7 @@ func (r *Reset) Run(out io.Writer) error {
 		fmt.Printf("failed to unmount directories in /var/lib/kubelet, %s", string(umountOutputBytes))
 	}
 
-	dirsToClean := []string{"/var/lib/kubelet"}
+	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d"}
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
