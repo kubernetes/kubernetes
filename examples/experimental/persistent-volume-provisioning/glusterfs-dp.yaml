@@ -9,3 +9,5 @@ parameters:
   restuser: "admin"
   secretNamespace: "default"
   secretName: "heketi-secret"
+  gidMin: "40000"
+  gidMax: "50000"
