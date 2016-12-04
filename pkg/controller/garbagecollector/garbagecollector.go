@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
@@ -621,7 +622,7 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
 }
 
-func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
+func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
@@ -632,7 +633,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructur
 	return client.Resource(resource, item.Namespace).Get(item.Name)
 }
 
-func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unstructured) (*runtime.Unstructured, error) {
+func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
@@ -643,7 +644,7 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unst
 	return client.Resource(resource, item.Namespace).Update(obj)
 }
 
-func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*runtime.Unstructured, error) {
+func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
@@ -654,8 +655,8 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*ru
 	return client.Resource(resource, item.Namespace).Patch(item.Name, api.StrategicMergePatchType, patch)
 }
 
-func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
-	ret := &runtime.Unstructured{}
+func objectReferenceToUnstructured(ref objectReference) *unstructured.Unstructured {
+	ret := &unstructured.Unstructured{}
 	ret.SetKind(ref.Kind)
 	ret.SetAPIVersion(ref.APIVersion)
 	ret.SetUID(ref.UID)

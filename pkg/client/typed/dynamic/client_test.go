@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -46,8 +47,8 @@ func getListJSON(version, kind string, items ...[]byte) []byte {
 	return []byte(json)
 }
 
-func getObject(version, kind, name string) *runtime.Unstructured {
-	return &runtime.Unstructured{
+func getObject(version, kind, name string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": version,
 			"kind":       kind,
@@ -77,7 +78,7 @@ func TestList(t *testing.T) {
 		namespace string
 		path      string
 		resp      []byte
-		want      *runtime.UnstructuredList
+		want      *unstructured.UnstructuredList
 	}{
 		{
 			name: "normal_list",
@@ -85,12 +86,12 @@ func TestList(t *testing.T) {
 			resp: getListJSON("vTest", "rTestList",
 				getJSON("vTest", "rTest", "item1"),
 				getJSON("vTest", "rTest", "item2")),
-			want: &runtime.UnstructuredList{
+			want: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
 					"apiVersion": "vTest",
 					"kind":       "rTestList",
 				},
-				Items: []*runtime.Unstructured{
+				Items: []*unstructured.Unstructured{
 					getObject("vTest", "rTest", "item1"),
 					getObject("vTest", "rTest", "item2"),
 				},
@@ -103,12 +104,12 @@ func TestList(t *testing.T) {
 			resp: getListJSON("vTest", "rTestList",
 				getJSON("vTest", "rTest", "item1"),
 				getJSON("vTest", "rTest", "item2")),
-			want: &runtime.UnstructuredList{
+			want: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
 					"apiVersion": "vTest",
 					"kind":       "rTestList",
 				},
-				Items: []*runtime.Unstructured{
+				Items: []*unstructured.Unstructured{
 					getObject("vTest", "rTest", "item1"),
 					getObject("vTest", "rTest", "item2"),
 				},
@@ -154,7 +155,7 @@ func TestGet(t *testing.T) {
 		name      string
 		path      string
 		resp      []byte
-		want      *runtime.Unstructured
+		want      *unstructured.Unstructured
 	}{
 		{
 			name: "normal_get",
@@ -236,7 +237,7 @@ func TestDelete(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
-			runtime.UnstructuredJSONScheme.Encode(statusOK, w)
+			unstructured.UnstructuredJSONScheme.Encode(statusOK, w)
 		})
 		if err != nil {
 			t.Errorf("unexpected error when creating client: %v", err)
@@ -285,7 +286,7 @@ func TestDeleteCollection(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
-			runtime.UnstructuredJSONScheme.Encode(statusOK, w)
+			unstructured.UnstructuredJSONScheme.Encode(statusOK, w)
 		})
 		if err != nil {
 			t.Errorf("unexpected error when creating client: %v", err)
@@ -305,7 +306,7 @@ func TestCreate(t *testing.T) {
 	tcs := []struct {
 		name      string
 		namespace string
-		obj       *runtime.Unstructured
+		obj       *unstructured.Unstructured
 		path      string
 	}{
 		{
@@ -364,7 +365,7 @@ func TestUpdate(t *testing.T) {
 	tcs := []struct {
 		name      string
 		namespace string
-		obj       *runtime.Unstructured
+		obj       *unstructured.Unstructured
 		path      string
 	}{
 		{
@@ -489,7 +490,7 @@ func TestPatch(t *testing.T) {
 		name      string
 		namespace string
 		patch     []byte
-		want      *runtime.Unstructured
+		want      *unstructured.Unstructured
 		path      string
 	}{
 		{

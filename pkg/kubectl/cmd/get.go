@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -193,7 +194,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
-		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
+		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 			FilenameParam(enforceNamespace, &options.FilenameOptions).
 			SelectorParam(selector).
@@ -278,7 +279,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return nil
 	}
 
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
@@ -326,7 +327,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			obj = infos[0].Object
 		} else {
 			// we have more than one item, so coerce all items into a list
-			list := &runtime.UnstructuredList{
+			list := &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
 					"kind":       "List",
 					"apiVersion": "v1",
@@ -334,7 +335,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				},
 			}
 			for _, info := range infos {
-				list.Items = append(list.Items, info.Object.(*runtime.Unstructured))
+				list.Items = append(list.Items, info.Object.(*unstructured.Unstructured))
 			}
 			obj = list
 		}
@@ -347,7 +348,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 
 			// take the filtered items and create a new list for display
-			list := &runtime.UnstructuredList{
+			list := &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
 					"kind":       "List",
 					"apiVersion": "v1",
@@ -360,7 +361,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 
 			for _, item := range items {
-				list.Items = append(list.Items, item.(*runtime.Unstructured))
+				list.Items = append(list.Items, item.(*unstructured.Unstructured))
 			}
 			if err := printer.PrintObj(list, out); err != nil {
 				errs = append(errs, err)

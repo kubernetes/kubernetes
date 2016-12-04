@@ -22,7 +22,7 @@ import (
 )
 
 // InterfacesForUnstructured returns VersionInterfaces suitable for
-// dealing with runtime.Unstructured objects.
+// dealing with unstructured.Unstructured objects.
 func InterfacesForUnstructured(schema.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{
 		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
