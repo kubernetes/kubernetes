@@ -63,12 +63,6 @@ type PasswordFileAuthenticationOptions struct {
 	BasicAuthFile string
 }
 
-type RequestHeaderAuthenticationOptions struct {
-	UsernameHeaders []string
-	ClientCAFile    string
-	AllowedNames    []string
-}
-
 type ServiceAccountAuthenticationOptions struct {
 	KeyFiles []string
 	Lookup   bool
@@ -206,17 +200,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	if s.RequestHeader != nil {
-		fs.StringSliceVar(&s.RequestHeader.UsernameHeaders, "requestheader-username-headers", s.RequestHeader.UsernameHeaders, ""+
-			"List of request headers to inspect for usernames. X-Remote-User is common.")
-
-		fs.StringVar(&s.RequestHeader.ClientCAFile, "requestheader-client-ca-file", s.RequestHeader.ClientCAFile, ""+
-			"Root certificate bundle to use to verify client certificates on incoming requests "+
-			"before trusting usernames in headers specified by --requestheader-username-headers")
-
-		fs.StringSliceVar(&s.RequestHeader.AllowedNames, "requestheader-allowed-names", s.RequestHeader.AllowedNames, ""+
-			"List of client certificate common names to allow to provide usernames in headers "+
-			"specified by --requestheader-username-headers. If empty, any client certificate validated "+
-			"by the authorities in --requestheader-client-ca-file is allowed.")
+		s.RequestHeader.AddFlags(fs)
 	}
 
 	if s.ServiceAccounts != nil {
@@ -275,7 +259,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig(clientCAFile strin
 	}
 
 	if s.RequestHeader != nil {
-		ret.RequestHeaderConfig = s.RequestHeader.AuthenticationRequestHeaderConfig()
+		ret.RequestHeaderConfig = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	}
 
 	if s.ServiceAccounts != nil {
@@ -295,17 +279,47 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig(clientCAFile strin
 	return ret
 }
 
-// AuthenticationRequestHeaderConfig returns an authenticator config object for these options
-// if necessary.  nil otherwise.
-func (s *RequestHeaderAuthenticationOptions) AuthenticationRequestHeaderConfig() *authenticator.RequestHeaderConfig {
+type RequestHeaderAuthenticationOptions struct {
+	UsernameHeaders     []string
+	GroupHeaders        []string
+	ExtraHeaderPrefixes []string
+	ClientCAFile        string
+	AllowedNames        []string
+}
+
+func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringSliceVar(&s.UsernameHeaders, "requestheader-username-headers", s.UsernameHeaders, ""+
+		"List of request headers to inspect for usernames. X-Remote-User is common.")
+
+	fs.StringSliceVar(&s.GroupHeaders, "requestheader-group-headers", s.GroupHeaders, ""+
+		"List of request headers to inspect for groups. X-Remote-Group is suggested.")
+
+	fs.StringSliceVar(&s.ExtraHeaderPrefixes, "requestheader-extra-headers-prefix", s.ExtraHeaderPrefixes, ""+
+		"List of request header prefixes to inspect. X-Remote-Extra- is suggested.")
+
+	fs.StringVar(&s.ClientCAFile, "requestheader-client-ca-file", s.ClientCAFile, ""+
+		"Root certificate bundle to use to verify client certificates on incoming requests "+
+		"before trusting usernames in headers specified by --requestheader-username-headers")
+
+	fs.StringSliceVar(&s.AllowedNames, "requestheader-allowed-names", s.AllowedNames, ""+
+		"List of client certificate common names to allow to provide usernames in headers "+
+		"specified by --requestheader-username-headers. If empty, any client certificate validated "+
+		"by the authorities in --requestheader-client-ca-file is allowed.")
+}
+
+// ToAuthenticationRequestHeaderConfig returns a RequestHeaderConfig config object for these options
+// if necessary, nil otherwise.
+func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() *authenticator.RequestHeaderConfig {
 	if len(s.UsernameHeaders) == 0 {
 		return nil
 	}
 
 	return &authenticator.RequestHeaderConfig{
-		UsernameHeaders:    s.UsernameHeaders,
-		ClientCA:           s.ClientCAFile,
-		AllowedClientNames: s.AllowedNames,
+		UsernameHeaders:     s.UsernameHeaders,
+		GroupHeaders:        s.GroupHeaders,
+		ExtraHeaderPrefixes: s.ExtraHeaderPrefixes,
+		ClientCA:            s.ClientCAFile,
+		AllowedClientNames:  s.AllowedNames,
 	}
 }
 

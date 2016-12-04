@@ -496,6 +496,8 @@ report-dir
 report-prefix
 requestheader-allowed-names
 requestheader-client-ca-file
+requestheader-extra-headers-prefix
+requestheader-group-headers
 requestheader-username-headers
 require-kubeconfig
 required-contexts
