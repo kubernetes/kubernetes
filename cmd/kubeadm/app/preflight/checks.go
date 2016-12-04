@@ -51,7 +51,8 @@ type PreFlightCheck interface {
 // detect a supported init system however, all checks are skipped and a warning is
 // returned.
 type ServiceCheck struct {
-	Service string
+	Service       string
+	CheckIfActive bool
 }
 
 func (sc ServiceCheck) Check() (warnings, errors []error) {
@@ -73,7 +74,7 @@ func (sc ServiceCheck) Check() (warnings, errors []error) {
 				sc.Service, sc.Service))
 	}
 
-	if !initSystem.ServiceIsActive(sc.Service) {
+	if sc.CheckIfActive && !initSystem.ServiceIsActive(sc.Service) {
 		errors = append(errors,
 			fmt.Errorf("%s service is not active, please run 'systemctl start %s.service'",
 				sc.Service, sc.Service))
@@ -128,7 +129,7 @@ func (poc PortOpenCheck) Check() (warnings, errors []error) {
 }
 
 // IsRootCheck verifies user is root
-type IsRootCheck struct {}
+type IsRootCheck struct{}
 
 func (irc IsRootCheck) Check() (warnings, errors []error) {
 	errors = []error{}
@@ -260,8 +261,8 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{},
-		ServiceCheck{Service: "kubelet"},
-		ServiceCheck{Service: "docker"},
+		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), int(cfg.Discovery.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
 		PortOpenCheck{port: 8080},
@@ -302,8 +303,8 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{},
-		ServiceCheck{Service: "docker"},
-		ServiceCheck{Service: "kubelet"},
+		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
 		HTTPProxyCheck{Proto: "https", Host: cfg.MasterAddresses[0], Port: int(cfg.APIPort)},
 		HTTPProxyCheck{Proto: "http", Host: cfg.MasterAddresses[0], Port: int(cfg.DiscoveryPort)},
@@ -343,6 +344,20 @@ func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 			errs += "\t" + i.Error() + "\n"
 		}
 		return errors.New(errs)
+	}
+	return nil
+}
+
+func TryStartKubelet() error {
+	// If we notice that the kubelet service is inactive, try to start it
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		fmt.Println("[preflight] No supported init system detected, won't check if kubelet is running")
+	} else if !initSystem.ServiceIsActive("kubelet") {
+		fmt.Printf("[preflight] Starting the kubelet service by running %q\n", "systemctl start kubelet")
+		if err := initSystem.ServiceStart("kubelet"); err != nil {
+			return fmt.Errorf("Couldn't start the kubelet service. Please start the kubelet service manually and try again.")
+		}
 	}
 	return nil
 }
