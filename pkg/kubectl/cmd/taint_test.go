@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	"k8s.io/kubernetes/pkg/conversion"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -52,7 +51,7 @@ func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*
 		},
 		Status: api.NodeStatus{},
 	}
-	clone, _ := conversion.NewCloner().DeepCopy(node)
+	clone, _ := api.Scheme.DeepCopy(node)
 
 	newTaintsData, _ := json.Marshal(newTaints)
 	// A copy of the same node, but tainted.

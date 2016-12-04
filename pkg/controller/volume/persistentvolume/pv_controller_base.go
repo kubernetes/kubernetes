@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -30,7 +31,6 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -178,7 +178,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		// Ignore template volumes from kubernetes 1.2
 		deleted := ctrl.upgradeVolumeFrom1_2(&volume)
 		if !deleted {
-			clone, err := conversion.NewCloner().DeepCopy(&volume)
+			clone, err := api.Scheme.DeepCopy(&volume)
 			if err != nil {
 				glog.Errorf("error cloning volume %q: %v", volume.Name, err)
 				continue
@@ -199,7 +199,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		return
 	}
 	for _, claim := range claimList.Items {
-		clone, err := conversion.NewCloner().DeepCopy(&claim)
+		clone, err := api.Scheme.DeepCopy(&claim)
 		if err != nil {
 			glog.Errorf("error cloning claim %q: %v", claimToClaimKey(&claim), err)
 			continue
@@ -504,7 +504,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := conversion.NewCloner().DeepCopy(claim)
+	clone, err := api.Scheme.DeepCopy(claim)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning pv: %v", err)
 	}

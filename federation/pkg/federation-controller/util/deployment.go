@@ -70,6 +70,6 @@ func DeepCopyDeploymentObjectMeta(meta api_v1.ObjectMeta) api_v1.ObjectMeta {
 func DeepCopyDeployment(a *extensions_v1.Deployment) *extensions_v1.Deployment {
 	return &extensions_v1.Deployment{
 		ObjectMeta: DeepCopyDeploymentObjectMeta(a.ObjectMeta),
-		Spec:       DeepCopyApiTypeOrPanic(a.Spec).(extensions_v1.DeploymentSpec),
+		Spec:       *(DeepCopyApiTypeOrPanic(&a.Spec).(*extensions_v1.DeploymentSpec)),
 	}
 }

@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -486,7 +485,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	if controllerRef != nil {
 		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
 	}
-	clone, err := conversion.NewCloner().DeepCopy(&template.Spec)
+	clone, err := api.Scheme.DeepCopy(&template.Spec)
 	if err != nil {
 		return nil, err
 	}
