@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -337,14 +336,14 @@ type MyAPIObject2 struct {
 	v1.ObjectMeta
 }
 
-func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metatypes.OwnerReference) {
+func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metav1.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&myAPIObject2)
 	references := myAPIObject2.ObjectMeta.OwnerReferences
 	// This is necessary for the test to pass because the getter will return a
 	// non-nil slice.
-	metaOwnerReferences = make([]metatypes.OwnerReference, 0)
+	metaOwnerReferences = make([]metav1.OwnerReference, 0)
 	for i := 0; i < len(references); i++ {
-		metaOwnerReferences = append(metaOwnerReferences, metatypes.OwnerReference{
+		metaOwnerReferences = append(metaOwnerReferences, metav1.OwnerReference{
 			Kind:       references[i].Kind,
 			Name:       references[i].Name,
 			UID:        references[i].UID,

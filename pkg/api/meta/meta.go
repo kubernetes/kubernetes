@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -314,7 +313,7 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 }
 
 // extractFromOwnerReference extracts v to o. v is the OwnerReferences field of an object.
-func extractFromOwnerReference(v reflect.Value, o *metatypes.OwnerReference) error {
+func extractFromOwnerReference(v reflect.Value, o *metav1.OwnerReference) error {
 	if err := runtime.Field(v, "APIVersion", &o.APIVersion); err != nil {
 		return err
 	}
@@ -339,7 +338,7 @@ func extractFromOwnerReference(v reflect.Value, o *metatypes.OwnerReference) err
 }
 
 // setOwnerReference sets v to o. v is the OwnerReferences field of an object.
-func setOwnerReference(v reflect.Value, o *metatypes.OwnerReference) error {
+func setOwnerReference(v reflect.Value, o *metav1.OwnerReference) error {
 	if err := runtime.SetField(o.APIVersion, v, "APIVersion"); err != nil {
 		return err
 	}
@@ -521,8 +520,8 @@ func (a genericAccessor) SetFinalizers(finalizers []string) {
 	*a.finalizers = finalizers
 }
 
-func (a genericAccessor) GetOwnerReferences() []metatypes.OwnerReference {
-	var ret []metatypes.OwnerReference
+func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
+	var ret []metav1.OwnerReference
 	s := a.ownerReferences
 	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
 		glog.Errorf("expect %v to be a pointer to slice", s)
@@ -530,7 +529,7 @@ func (a genericAccessor) GetOwnerReferences() []metatypes.OwnerReference {
 	}
 	s = s.Elem()
 	// Set the capacity to one element greater to avoid copy if the caller later append an element.
-	ret = make([]metatypes.OwnerReference, s.Len(), s.Len()+1)
+	ret = make([]metav1.OwnerReference, s.Len(), s.Len()+1)
 	for i := 0; i < s.Len(); i++ {
 		if err := extractFromOwnerReference(s.Index(i), &ret[i]); err != nil {
 			glog.Errorf("extractFromOwnerReference failed: %v", err)
@@ -540,7 +539,7 @@ func (a genericAccessor) GetOwnerReferences() []metatypes.OwnerReference {
 	return ret
 }
 
-func (a genericAccessor) SetOwnerReferences(references []metatypes.OwnerReference) {
+func (a genericAccessor) SetOwnerReferences(references []metav1.OwnerReference) {
 	s := a.ownerReferences
 	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
 		glog.Errorf("expect %v to be a pointer to slice", s)

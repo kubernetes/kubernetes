@@ -17,8 +17,8 @@ limitations under the License.
 package meta
 
 import (
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
@@ -61,13 +61,14 @@ type Object interface {
 	SetAnnotations(annotations map[string]string)
 	GetFinalizers() []string
 	SetFinalizers(finalizers []string)
-	GetOwnerReferences() []metatypes.OwnerReference
-	SetOwnerReferences([]metatypes.OwnerReference)
+	GetOwnerReferences() []metav1.OwnerReference
+	SetOwnerReferences([]metav1.OwnerReference)
 	GetClusterName() string
 	SetClusterName(clusterName string)
 }
 
-var _ Object = &runtime.Unstructured{}
+// TODO: move me to pkg/apis/meta/v1/unstructured once Object is moved to pkg/apis/meta/v1
+var _ Object = &unstructured.Unstructured{}
 
 type ListMetaAccessor interface {
 	GetListMeta() List
