@@ -323,7 +323,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 			Version: "unversioned",
 		},
 	}
-	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig(openapigen.OpenAPIDefinitions)
 
 	master, err := config.Complete().New()
 	if err != nil {

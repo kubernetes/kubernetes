@@ -163,6 +163,12 @@ func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
 	return s.minRequestTimeout
 }
 
+// OpenAPIConfig is exposed so that third party swagger definitions can be generated with the appropriate
+// model names.
+func (s *GenericAPIServer) OpenAPIConfig() *openapicommon.Config {
+	return s.openAPIConfig
+}
+
 type preparedGenericAPIServer struct {
 	*GenericAPIServer
 }
@@ -170,7 +176,9 @@ type preparedGenericAPIServer struct {
 // PrepareRun does post API installation setup steps.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.swaggerConfig != nil {
-		routes.Swagger{Config: s.swaggerConfig}.Install(s.HandlerContainer)
+		routes.Swagger{
+			Config: s.swaggerConfig,
+		}.Install(s.HandlerContainer)
 	}
 	if s.openAPIConfig != nil {
 		routes.OpenAPI{
@@ -338,6 +346,8 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Admit:             s.admissionControl,
 		Context:           s.RequestContextMapper(),
 		MinRequestTimeout: s.minRequestTimeout,
+
+		ModelNamerFunc: s.openAPIConfig.ObjectTypeNameFunction(),
 	}
 }
 

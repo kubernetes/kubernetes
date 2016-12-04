@@ -53,7 +53,8 @@ func testOpenAPITypeWritter(t *testing.T, code string) (error, *assert.Assertion
 	}
 	rawNamer := namer.NewRawNamer("o", nil)
 	namers := namer.NameSystems{
-		"raw": namer.NewRawNamer("", nil),
+		"raw":     namer.NewRawNamer("", nil),
+		"openapi": rawNamer,
 	}
 	builder, universe, _ := construct(t, testFiles, rawNamer)
 	context, err := generator.NewContext(builder, namers, "raw")
@@ -63,7 +64,7 @@ func testOpenAPITypeWritter(t *testing.T, code string) (error, *assert.Assertion
 	buffer := &bytes.Buffer{}
 	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
 	blahT := universe.Type(types.Name{Package: "base/foo", Name: "Blah"})
-	return newOpenAPITypeWriter(sw).generate(blahT), assert, buffer
+	return newOpenAPITypeWriter(sw, context).generate(blahT), assert, buffer
 }
 
 func TestSimple(t *testing.T) {
@@ -225,6 +226,11 @@ Format: "byte",
 },
 Required: []string{"String","Int64","Int32","Int16","Int8","Uint","Uint64","Uint32","Uint16","Uint8","Byte","Bool","Float64","Float32","ByteArray"},
 },
+VendorExtensible: spec.VendorExtensible{
+Extensions: spec.Extensions{
+"io.k8s.kubernetes.openapi.type.golang": "base/foo.Blah",
+},
+},
 },
 Dependencies: []string{
 },
@@ -328,6 +334,11 @@ Format: "",
 },
 },
 Required: []string{"StringPointer","StructPointer","SlicePointer","MapPointer"},
+},
+VendorExtensible: spec.VendorExtensible{
+Extensions: spec.Extensions{
+"io.k8s.kubernetes.openapi.type.golang": "base/foo.Blah",
+},
 },
 },
 Dependencies: []string{

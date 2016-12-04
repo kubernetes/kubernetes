@@ -81,6 +81,9 @@ type APIGroupVersion struct {
 	// ResourceLister is an interface that knows how to list resources
 	// for this API Group.
 	ResourceLister handlers.APIResourceLister
+
+	// ModelNamerFunc turns an object into it's Swagger/OpenAPI compatible name.
+	ModelNamerFunc func(interface{}) string
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.

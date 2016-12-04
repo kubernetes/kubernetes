@@ -57,6 +57,14 @@ func hasOpenAPITagValue(comments []string, value string) bool {
 	return false
 }
 
+func hasGroupNameTag(comments []string) (string, bool) {
+	tagValues := types.ExtractCommentTags("+", comments)["groupName"]
+	if len(tagValues) > 0 {
+		return tagValues[0], true
+	}
+	return "", false
+}
+
 // hasOptionalTag returns true if the member has +optional in its comments or
 // omitempty in its json tags.
 func hasOptionalTag(m *types.Member) bool {
@@ -65,6 +73,54 @@ func hasOptionalTag(m *types.Member) bool {
 	hasOptionalJsonTag := strings.Contains(
 		reflect.StructTag(m.Tags).Get("json"), "omitempty")
 	return hasOptionalCommentTag || hasOptionalJsonTag
+}
+
+// openAPIPackageName returns the correct OpenAPI prefix for a type in this package
+// if the package is a public API package.
+func openAPIPackageName(pkg *types.Package) string {
+	name, ok := hasGroupNameTag(pkg.Comments)
+	if ok {
+		parts := strings.Split(name, ".")
+		for i := 0; i < len(parts)/2; i++ {
+			end := len(parts) - 1 - i
+			parts[i], parts[end] = parts[end], parts[i]
+		}
+		// assume the package is the version
+		if len(name) > 0 {
+			parts = append(parts, pkg.Name)
+		} else {
+			parts = []string{pkg.Name}
+		}
+		return strings.Join(parts, ".")
+	}
+
+	// use the last segment of package path and name
+	parts := strings.Split(pkg.Path, "/")
+	if len(parts) > 2 {
+		parts = parts[len(parts)-2:]
+	}
+	return strings.Join(parts, ".")
+}
+
+// genericOpenAPIPackageName returns a type prefix for a generic Go package that
+// matches the Java package naming style.
+func genericOpenAPIPackageName(name string) string {
+	dirs := strings.Split(name, "/")
+	// convert any segments that have dots into reverse domain notation
+	for i, s := range dirs {
+		if strings.Contains(s, ".") {
+			segments := strings.Split(s, ".")
+			for j := 0; j < len(segments)/2; j++ {
+				end := len(segments) - j - 1
+				segments[j], segments[end] = segments[end], segments[j]
+			}
+			dirs[i] = strings.Join(segments, ".")
+		}
+	}
+	name = strings.Join(dirs, ".")
+	name = strings.Replace(name, "-", "_", -1)
+	name = strings.ToLower(name)
+	return name
 }
 
 // NameSystems returns the name system used by the generators in this package.
@@ -99,13 +155,34 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	if pkg == nil {
 		glog.Fatalf("Got nil output package: %v", err)
 	}
+
+	// identify all packages that request OpenAPI generation and assign them names
+	// based on their top two directory paths (apps/v1beta1) or their groupName +
+	// package name
+	apiNames := make(map[string]string)
+	for _, pkg := range context.Universe {
+		if hasOpenAPITagValue(pkg.Comments, tagValueTrue) {
+			name := openAPIPackageName(pkg)
+			apiNames[pkg.Path] = name
+		}
+	}
+
+	tracker := namer.NewDefaultImportTracker(types.Name{})
+	tracker.IsInvalidType = func(*types.Type) bool { return false }
+	tracker.LocalName = func(name types.Name) string {
+		if name, ok := apiNames[name.Package]; ok {
+			return name
+		}
+		return genericOpenAPIPackageName(name.Package)
+	}
+
 	return generator.Packages{
 		&generator.DefaultPackage{
 			PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
 			PackagePath: pkg.Path,
 			HeaderText:  header,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
-				return []generator.Generator{NewOpenAPIGen(arguments.OutputFileBaseName, pkg, context)}
+				return []generator.Generator{NewOpenAPIGen(arguments.OutputFileBaseName, pkg, context, tracker)}
 			},
 			FilterFunc: func(c *generator.Context, t *types.Type) bool {
 				// There is a conflict between this codegen and codecgen, we should avoid types generated for codecgen
@@ -134,26 +211,30 @@ const (
 type openAPIGen struct {
 	generator.DefaultGen
 	// TargetPackage is the package that will get OpenAPIDefinitions variable contains all open API definitions.
-	targetPackage *types.Package
-	imports       namer.ImportTracker
-	context       *generator.Context
+	targetPackage  *types.Package
+	imports        namer.ImportTracker
+	context        *generator.Context
+	openAPIImports namer.DefaultImportTracker
 }
 
-func NewOpenAPIGen(sanitizedName string, targetPackage *types.Package, context *generator.Context) generator.Generator {
+func NewOpenAPIGen(sanitizedName string, targetPackage *types.Package, context *generator.Context, openAPIImports namer.DefaultImportTracker) generator.Generator {
 	return &openAPIGen{
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
 		},
-		imports:       generator.NewImportTracker(),
-		targetPackage: targetPackage,
-		context:       context,
+		imports:        generator.NewImportTracker(),
+		targetPackage:  targetPackage,
+		context:        context,
+		openAPIImports: openAPIImports,
 	}
 }
 
 func (g *openAPIGen) Namers(c *generator.Context) namer.NameSystems {
-	// Have the raw namer for this file track what it imports.
 	return namer.NameSystems{
+		// Have the raw namer for this file track what it imports.
 		"raw": namer.NewRawNamer(g.targetPackage.Path, g.imports),
+		// Track the openapi names per file
+		"openapi": namer.NewRawNamer("", &g.openAPIImports),
 	}
 }
 
@@ -208,7 +289,7 @@ func (g *openAPIGen) Finalize(c *generator.Context, w io.Writer) error {
 func (g *openAPIGen) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	glog.V(5).Infof("generating for type %v", t)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	err := newOpenAPITypeWriter(sw).generate(t)
+	err := newOpenAPITypeWriter(sw, c).generate(t)
 	if err != nil {
 		return err
 	}
@@ -240,12 +321,14 @@ type openAPITypeWriter struct {
 	*generator.SnippetWriter
 	refTypes               map[string]*types.Type
 	GetDefinitionInterface *types.Type
+	context                *generator.Context
 }
 
-func newOpenAPITypeWriter(sw *generator.SnippetWriter) openAPITypeWriter {
+func newOpenAPITypeWriter(sw *generator.SnippetWriter, c *generator.Context) openAPITypeWriter {
 	return openAPITypeWriter{
 		SnippetWriter: sw,
 		refTypes:      map[string]*types.Type{},
+		context:       c,
 	}
 }
 
@@ -266,17 +349,12 @@ func hasOpenAPIDefinitionMethod(t *types.Type) bool {
 	return false
 }
 
-// typeShortName returns short package name (e.g. the name x appears in package x definition) dot type name.
-func typeShortName(t *types.Type) string {
-	return filepath.Base(t.Name.Package) + "." + t.Name.Name
-}
-
 func (g openAPITypeWriter) generate(t *types.Type) error {
 	// Only generate for struct type and ignore the rest
 	switch t.Kind {
 	case types.Struct:
 		args := argsFromType(t)
-		g.Do("\"$.$\": ", typeShortName(t))
+		g.Do("\"$.|openapi$\": ", t)
 		if hasOpenAPIDefinitionMethod(t) {
 			g.Do("$.type|raw${}.OpenAPIDefinition(),", args)
 			return nil
@@ -304,7 +382,11 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		if len(required) > 0 {
 			g.Do("Required: []string{\"$.$\"},\n", strings.Join(required, "\",\""))
 		}
+		g.Do("},\n", nil)
+		g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
+		g.Do("\"io.k8s.kubernetes.openapi.type.golang\": \"$.$\",\n", t.Name)
 		g.Do("},\n},\n", nil)
+		g.Do("},\n", nil)
 		g.Do("Dependencies: []string{\n", args)
 		// Map order is undefined, sort them or we may get a different file generated each time.
 		keys := []string{}
@@ -417,14 +499,9 @@ func (g openAPITypeWriter) generateSimpleProperty(typeString, format string) {
 }
 
 func (g openAPITypeWriter) generateReferenceProperty(t *types.Type) {
-	var name string
-	if t.Name.Package == "" {
-		name = t.Name.Name
-	} else {
-		name = filepath.Base(t.Name.Package) + "." + t.Name.Name
-	}
+	name := g.context.Namers["openapi"].Name(t)
 	g.refTypes[name] = t
-	g.Do("Ref: spec.MustCreateRef(\"#/definitions/$.$\"),\n", name)
+	g.Do("Ref: spec.MustCreateRef(\"#/definitions/$.|openapi$\"),\n", t)
 }
 
 func resolveAliasAndPtrType(t *types.Type) *types.Type {

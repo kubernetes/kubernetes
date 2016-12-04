@@ -17,6 +17,9 @@ limitations under the License.
 package common
 
 import (
+	"reflect"
+	"strings"
+
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 )
@@ -140,4 +143,71 @@ func GetOpenAPITypeFormat(typeName string) (string, string) {
 		return "", ""
 	}
 	return mapped[0], mapped[1]
+}
+
+// golangTypeNameOpenAPIVendorExtension is an OpenAPI vendor extension that identifies the Golang
+// type name of a given OpenAPI struct.
+const golangTypeNameOpenAPIVendorExtension = "io.k8s.kubernetes.openapi.type.golang"
+
+// TypeNameFunction returns a function that can map a given Go type to an OpenAPI name.
+func (c *Config) TypeNameFunction() func(t reflect.Type) string {
+	typesToDefinitions := make(typeMapper)
+	if c != nil && c.Definitions != nil {
+		for name, definition := range *c.Definitions {
+			if t, ok := definition.Schema.VendorExtensible.Extensions.GetString(golangTypeNameOpenAPIVendorExtension); ok {
+				typesToDefinitions[t] = name
+			}
+		}
+	}
+	return typesToDefinitions.Name
+}
+
+// ObjectTypeNameFunction returns the appropriate name for an object.
+func (c *Config) ObjectTypeNameFunction() func(obj interface{}) string {
+	fn := c.TypeNameFunction()
+	return func(obj interface{}) string { return fn(reflect.TypeOf(obj)) }
+}
+
+// typeMapper is a map of Go types names to OpenAPI definition names.
+type typeMapper map[string]string
+
+// Name returns the appropriate OpenAPI definition name for a given Go type.
+func (m typeMapper) Name(t reflect.Type) string {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	typeName := t.Name()
+	if len(t.PkgPath()) > 0 {
+		typeName = t.PkgPath() + "." + typeName
+	}
+
+	// previously registered types
+	if name, ok := m[typeName]; ok {
+		return name
+	}
+
+	// unknown types
+	name := t.PkgPath()
+	dirs := strings.Split(name, "/")
+	// convert any segments that have dots into reverse domain notation
+	for i, s := range dirs {
+		if strings.Contains(s, ".") {
+			segments := strings.Split(s, ".")
+			for j := 0; j < len(segments)/2; j++ {
+				end := len(segments) - j - 1
+				segments[j], segments[end] = segments[end], segments[j]
+			}
+			dirs[i] = strings.Join(segments, ".")
+		}
+	}
+	name = strings.Join(dirs, ".")
+	name = strings.Replace(name, "-", "_", -1)
+	name = strings.ToLower(name)
+	if len(name) > 0 {
+		name = name + "." + t.Name()
+	} else {
+		name = t.Name()
+	}
+	return name
 }

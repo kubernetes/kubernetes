@@ -329,5 +329,7 @@ func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralRes
 		MinRequestTimeout: m.genericAPIServer.MinRequestTimeout(),
 
 		ResourceLister: dynamicLister{m, extensionsrest.MakeThirdPartyPath(group)},
+
+		ModelNamerFunc: m.genericAPIServer.OpenAPIConfig().ObjectTypeNameFunction(),
 	}
 }

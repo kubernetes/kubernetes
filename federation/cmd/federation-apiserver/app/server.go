@@ -171,7 +171,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.AdmissionControl = admissionController
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.OpenAPIDefinitions)
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
-	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig(openapi.OpenAPIDefinitions)
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
