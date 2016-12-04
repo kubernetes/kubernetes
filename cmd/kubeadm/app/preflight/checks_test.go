@@ -43,7 +43,7 @@ func TestRunChecks(t *testing.T) {
 		output   string
 	}{
 		{[]PreFlightCheck{}, true, ""},
-		{[]PreFlightCheck{preflightCheckTest{"warning"}}, true, "WARNING: warning\n"}, // should just print warning
+		{[]PreFlightCheck{preflightCheckTest{"warning"}}, true, "[preflight] Warning: warning\n"}, // should just print warning
 		{[]PreFlightCheck{preflightCheckTest{"error"}}, false, ""},
 		{[]PreFlightCheck{preflightCheckTest{"test"}}, false, ""},
 	}
