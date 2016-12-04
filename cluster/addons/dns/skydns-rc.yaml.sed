@@ -31,6 +31,10 @@ spec:
   # 1. In order to make Addon Manager do not reconcile this replicas parameter.
   # 2. Default is 1.
   # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  strategy:
+    rollingUpdate:
+      maxSurge: 10%
+      maxUnavailable: 0
   selector:
     matchLabels:
       k8s-app: kube-dns
