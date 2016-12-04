@@ -27,10 +27,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
@@ -270,7 +270,7 @@ func isReplicaSetMatch(pod *v1.Pod, rs *extensions.ReplicaSet) bool {
 	if rs.Namespace != pod.Namespace {
 		return false
 	}
-	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		err = fmt.Errorf("invalid selector: %v", err)
 		return false
@@ -559,7 +559,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return nil
 	}
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
-	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error converting pod selector to selector: %v", err))
 		return nil

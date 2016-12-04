@@ -19,7 +19,7 @@ package v1
 import (
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/meta/metatypes"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/types"
 )
 
@@ -27,24 +27,24 @@ func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }
 
 // Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
 // fast, direct access to metadata fields for API objects.
-func (meta *ObjectMeta) GetNamespace() string                   { return meta.Namespace }
-func (meta *ObjectMeta) SetNamespace(namespace string)          { meta.Namespace = namespace }
-func (meta *ObjectMeta) GetName() string                        { return meta.Name }
-func (meta *ObjectMeta) SetName(name string)                    { meta.Name = name }
-func (meta *ObjectMeta) GetGenerateName() string                { return meta.GenerateName }
-func (meta *ObjectMeta) SetGenerateName(generateName string)    { meta.GenerateName = generateName }
-func (meta *ObjectMeta) GetUID() types.UID                      { return meta.UID }
-func (meta *ObjectMeta) SetUID(uid types.UID)                   { meta.UID = uid }
-func (meta *ObjectMeta) GetResourceVersion() string             { return meta.ResourceVersion }
-func (meta *ObjectMeta) SetResourceVersion(version string)      { meta.ResourceVersion = version }
-func (meta *ObjectMeta) GetSelfLink() string                    { return meta.SelfLink }
-func (meta *ObjectMeta) SetSelfLink(selfLink string)            { meta.SelfLink = selfLink }
-func (meta *ObjectMeta) GetCreationTimestamp() unversioned.Time { return meta.CreationTimestamp }
-func (meta *ObjectMeta) SetCreationTimestamp(creationTimestamp unversioned.Time) {
+func (meta *ObjectMeta) GetNamespace() string                { return meta.Namespace }
+func (meta *ObjectMeta) SetNamespace(namespace string)       { meta.Namespace = namespace }
+func (meta *ObjectMeta) GetName() string                     { return meta.Name }
+func (meta *ObjectMeta) SetName(name string)                 { meta.Name = name }
+func (meta *ObjectMeta) GetGenerateName() string             { return meta.GenerateName }
+func (meta *ObjectMeta) SetGenerateName(generateName string) { meta.GenerateName = generateName }
+func (meta *ObjectMeta) GetUID() types.UID                   { return meta.UID }
+func (meta *ObjectMeta) SetUID(uid types.UID)                { meta.UID = uid }
+func (meta *ObjectMeta) GetResourceVersion() string          { return meta.ResourceVersion }
+func (meta *ObjectMeta) SetResourceVersion(version string)   { meta.ResourceVersion = version }
+func (meta *ObjectMeta) GetSelfLink() string                 { return meta.SelfLink }
+func (meta *ObjectMeta) SetSelfLink(selfLink string)         { meta.SelfLink = selfLink }
+func (meta *ObjectMeta) GetCreationTimestamp() metav1.Time   { return meta.CreationTimestamp }
+func (meta *ObjectMeta) SetCreationTimestamp(creationTimestamp metav1.Time) {
 	meta.CreationTimestamp = creationTimestamp
 }
-func (meta *ObjectMeta) GetDeletionTimestamp() *unversioned.Time { return meta.DeletionTimestamp }
-func (meta *ObjectMeta) SetDeletionTimestamp(deletionTimestamp *unversioned.Time) {
+func (meta *ObjectMeta) GetDeletionTimestamp() *metav1.Time { return meta.DeletionTimestamp }
+func (meta *ObjectMeta) SetDeletionTimestamp(deletionTimestamp *metav1.Time) {
 	meta.DeletionTimestamp = deletionTimestamp
 }
 func (meta *ObjectMeta) GetLabels() map[string]string                 { return meta.Labels }

@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestValidateStatefulSet(t *testing.T) {
@@ -55,14 +55,14 @@ func TestValidateStatefulSet(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -77,14 +77,14 @@ func TestValidateStatefulSet(t *testing.T) {
 		"zero-length ID": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -97,21 +97,21 @@ func TestValidateStatefulSet(t *testing.T) {
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"negative_replicas": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				Replicas: -1,
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"invalid_label": {
@@ -123,7 +123,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -148,7 +148,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -158,7 +158,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
@@ -177,7 +177,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: apps.StatefulSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyNever,
@@ -263,7 +263,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -271,7 +271,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
 					Replicas: 3,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -289,7 +289,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -297,7 +297,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
 					Replicas: 2,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 				},
 			},
@@ -306,7 +306,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -314,7 +314,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
 					Replicas: 1,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 				},
 			},
@@ -323,7 +323,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -331,7 +331,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
 					Replicas: 2,
-					Selector: &unversioned.LabelSelector{MatchLabels: invalidLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -340,7 +340,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -348,7 +348,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
 					Replicas: 2,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: invalidPodTemplate.Template,
 				},
 			},
@@ -357,7 +357,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -365,7 +365,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
 					Replicas: -1,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},

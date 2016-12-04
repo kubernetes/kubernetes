@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
@@ -43,7 +43,7 @@ type TestParam struct {
 	expectingError        bool
 	actualCreated         bool
 	expCreated            bool
-	expStatus             *unversioned.Status
+	expStatus             *metav1.Status
 	testBody              bool
 	testBodyErrorIsNotNil bool
 }
@@ -84,12 +84,12 @@ func TestDoRequestSuccess(t *testing.T) {
 }
 
 func TestDoRequestFailed(t *testing.T) {
-	status := &unversioned.Status{
+	status := &metav1.Status{
 		Code:    http.StatusNotFound,
-		Status:  unversioned.StatusFailure,
-		Reason:  unversioned.StatusReasonNotFound,
+		Status:  metav1.StatusFailure,
+		Reason:  metav1.StatusReasonNotFound,
 		Message: " \"\" not found",
-		Details: &unversioned.StatusDetails{},
+		Details: &metav1.StatusDetails{},
 	}
 	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
 	fakeHandler := utiltesting.FakeHandler{
@@ -119,14 +119,14 @@ func TestDoRequestFailed(t *testing.T) {
 }
 
 func TestDoRawRequestFailed(t *testing.T) {
-	status := &unversioned.Status{
+	status := &metav1.Status{
 		Code:    http.StatusNotFound,
-		Status:  unversioned.StatusFailure,
-		Reason:  unversioned.StatusReasonNotFound,
+		Status:  metav1.StatusFailure,
+		Reason:  metav1.StatusReasonNotFound,
 		Message: "the server could not find the requested resource",
-		Details: &unversioned.StatusDetails{
-			Causes: []unversioned.StatusCause{
-				{Type: unversioned.CauseTypeUnexpectedServerResponse, Message: "unknown"},
+		Details: &metav1.StatusDetails{
+			Causes: []metav1.StatusCause{
+				{Type: metav1.CauseTypeUnexpectedServerResponse, Message: "unknown"},
 			},
 		},
 	}
@@ -314,8 +314,8 @@ func TestCreateBackoffManager(t *testing.T) {
 
 }
 
-func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting.FakeHandler, *unversioned.Status) {
-	status := &unversioned.Status{Status: fmt.Sprintf("%s", unversioned.StatusSuccess)}
+func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting.FakeHandler, *metav1.Status) {
+	status := &metav1.Status{Status: fmt.Sprintf("%s", metav1.StatusSuccess)}
 	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   statusCode,

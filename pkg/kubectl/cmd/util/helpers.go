@@ -31,9 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -178,7 +178,7 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 	}
 }
 
-func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
+func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 	errs := make([]error, 0, len(scs))
 	errorMsgs := sets.NewString()
 	for _, sc := range scs {
@@ -207,7 +207,7 @@ func StandardErrorMessage(err error) (string, bool) {
 	switch {
 	case isStatus:
 		switch s := status.Status(); {
-		case s.Reason == unversioned.StatusReasonUnauthorized:
+		case s.Reason == metav1.StatusReasonUnauthorized:
 			return fmt.Sprintf("error: You must be logged in to the server (%s)", s.Message), true
 		case len(s.Reason) > 0:
 			return fmt.Sprintf("Error from server (%s): %s", s.Reason, err.Error()), true

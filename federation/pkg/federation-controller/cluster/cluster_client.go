@@ -24,8 +24,8 @@ import (
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -66,7 +66,7 @@ func NewClusterClientSet(c *federation_v1beta1.Cluster) (*ClusterClient, error) 
 // GetClusterHealthStatus gets the kubernetes cluster health status by requesting "/healthz"
 func (self *ClusterClient) GetClusterHealthStatus() *federation_v1beta1.ClusterStatus {
 	clusterStatus := federation_v1beta1.ClusterStatus{}
-	currentTime := unversioned.Now()
+	currentTime := metav1.Now()
 	newClusterReadyCondition := federation_v1beta1.ClusterCondition{
 		Type:               federation_v1beta1.ClusterReady,
 		Status:             v1.ConditionTrue,
@@ -120,23 +120,23 @@ func (self *ClusterClient) GetClusterZones() (zones []string, region string, err
 // Find the name of the zone in which a Node is running
 func getZoneNameForNode(node api.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == unversioned.LabelZoneFailureDomain {
+		if key == metav1.LabelZoneFailureDomain {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
-		node.Name, unversioned.LabelZoneFailureDomain)
+		node.Name, metav1.LabelZoneFailureDomain)
 }
 
 // Find the name of the region in which a Node is running
 func getRegionNameForNode(node api.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == unversioned.LabelZoneRegion {
+		if key == metav1.LabelZoneRegion {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Region name for node %s not found. No label with key %s",
-		node.Name, unversioned.LabelZoneRegion)
+		node.Name, metav1.LabelZoneRegion)
 }
 
 // Find the names of all zones and the region in which we have nodes in this cluster.

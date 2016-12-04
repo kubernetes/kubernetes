@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,10 +29,6 @@ import (
 // Time is a wrapper around time.Time which supports correct
 // marshaling to YAML and JSON.  Wrappers are provided for many
 // of the factory methods that the time package offers.
-//
-// +protobuf.options.marshal=false
-// +protobuf.as=Timestamp
-// +protobuf.options.(gogoproto.goproto_stringer)=false
 type Time struct {
 	time.Time `protobuf:"-"`
 }

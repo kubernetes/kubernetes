@@ -23,9 +23,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -193,7 +193,7 @@ func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvai
 			Namespace: ns,
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
-			Selector:     &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			MinAvailable: minAvailable,
 		},
 	}
@@ -272,7 +272,7 @@ func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, excl
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: &size,
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: v1.PodTemplateSpec{

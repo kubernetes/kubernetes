@@ -21,8 +21,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
 	reflect "reflect"
@@ -111,8 +111,8 @@ func DeepCopy_v1beta1_PodDisruptionBudgetSpec(in interface{}, out interface{}, c
 		out.MinAvailable = in.MinAvailable
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -129,7 +129,7 @@ func DeepCopy_v1beta1_PodDisruptionBudgetStatus(in interface{}, out interface{},
 		out.ObservedGeneration = in.ObservedGeneration
 		if in.DisruptedPods != nil {
 			in, out := &in.DisruptedPods, &out.DisruptedPods
-			*out = make(map[string]unversioned.Time)
+			*out = make(map[string]meta_v1.Time)
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}

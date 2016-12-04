@@ -24,8 +24,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -201,7 +201,7 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 	for i := 0; i < updateNodeStatusMaxRetries; i++ {
 		// Patch could also fail, even though the chance is very slim. So we still do
 		// patch in the retry loop.
-		currentTime := unversioned.Now()
+		currentTime := metav1.Now()
 		if routeCreated {
 			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, v1.NodeCondition{
 				Type:               v1.NodeNetworkUnavailable,

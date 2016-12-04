@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -303,7 +303,7 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 				{
 					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
@@ -342,13 +342,13 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 				{
 					ObjectMeta: v1.ObjectMeta{Name: "foo"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
 					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -429,7 +429,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
@@ -468,13 +468,13 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: v1.ObjectMeta{Name: "foo"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
 					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},

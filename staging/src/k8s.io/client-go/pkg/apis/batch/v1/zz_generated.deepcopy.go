@@ -21,8 +21,8 @@ limitations under the License.
 package v1
 
 import (
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
 	reflect "reflect"
@@ -124,8 +124,8 @@ func DeepCopy_v1_JobSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(meta_v1.LabelSelector)
+			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -162,14 +162,14 @@ func DeepCopy_v1_JobStatus(in interface{}, out interface{}, c *conversion.Cloner
 		}
 		if in.StartTime != nil {
 			in, out := &in.StartTime, &out.StartTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.StartTime = nil
 		}
 		if in.CompletionTime != nil {
 			in, out := &in.CompletionTime, &out.CompletionTime
-			*out = new(unversioned.Time)
+			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.CompletionTime = nil

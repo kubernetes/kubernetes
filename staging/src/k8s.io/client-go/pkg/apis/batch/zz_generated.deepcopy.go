@@ -22,7 +22,7 @@ package batch
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
+	v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
 	reflect "reflect"
@@ -131,7 +131,7 @@ func DeepCopy_batch_CronJobStatus(in interface{}, out interface{}, c *conversion
 		}
 		if in.LastScheduleTime != nil {
 			in, out := &in.LastScheduleTime, &out.LastScheduleTime
-			*out = new(unversioned.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.LastScheduleTime = nil
@@ -220,8 +220,8 @@ func DeepCopy_batch_JobSpec(in interface{}, out interface{}, c *conversion.Clone
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(v1.LabelSelector)
+			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -258,14 +258,14 @@ func DeepCopy_batch_JobStatus(in interface{}, out interface{}, c *conversion.Clo
 		}
 		if in.StartTime != nil {
 			in, out := &in.StartTime, &out.StartTime
-			*out = new(unversioned.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.StartTime = nil
 		}
 		if in.CompletionTime != nil {
 			in, out := &in.CompletionTime, &out.CompletionTime
-			*out = new(unversioned.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		} else {
 			out.CompletionTime = nil

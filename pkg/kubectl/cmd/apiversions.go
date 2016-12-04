@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -56,7 +56,7 @@ func RunApiVersions(f cmdutil.Factory, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("Couldn't get available api versions from server: %v\n", err)
 	}
-	apiVersions := unversioned.ExtractGroupVersions(groupList)
+	apiVersions := metav1.ExtractGroupVersions(groupList)
 	sort.Strings(apiVersions)
 	for _, v := range apiVersions {
 		fmt.Fprintln(w, v)

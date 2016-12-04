@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -90,7 +90,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Obj
 		if newDeployment.Annotations == nil {
 			newDeployment.Annotations = make(map[string]string)
 		}
-		now := unversioned.Now()
+		now := metav1.Now()
 		newDeployment.Annotations[util.SelectorUpdateAnnotation] = now.Format(time.RFC3339)
 	}
 }

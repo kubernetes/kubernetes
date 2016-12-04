@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	fed "k8s.io/kubernetes/pkg/dns/federation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -254,7 +254,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 	const servicePort = 10101
 
 	t.utilPod = &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "Pod",
 		},
 		ObjectMeta: v1.ObjectMeta{
@@ -283,7 +283,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 	Expect(t.f.WaitForPodRunning(t.utilPod.Name)).NotTo(HaveOccurred())
 
 	t.utilService = &v1.Service{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "Service",
 		},
 		ObjectMeta: v1.ObjectMeta{

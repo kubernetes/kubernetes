@@ -34,12 +34,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -677,7 +677,7 @@ func shortHumanDuration(d time.Duration) string {
 
 // translateTimestamp returns the elapsed time since timestamp in
 // human-readable approximation.
-func translateTimestamp(timestamp unversioned.Time) string {
+func translateTimestamp(timestamp metav1.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
@@ -945,7 +945,7 @@ func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOption
 		if err := layoutContainers(containers, w); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(w, "\t%s", unversioned.FormatLabelSelector(rs.Spec.Selector)); err != nil {
+		if _, err := fmt.Fprintf(w, "\t%s", metav1.FormatLabelSelector(rs.Spec.Selector)); err != nil {
 			return err
 		}
 	}
@@ -1013,7 +1013,7 @@ func printJob(job *batch.Job, w io.Writer, options PrintOptions) error {
 		}
 	}
 
-	selector, err := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
 		return err
@@ -1303,7 +1303,7 @@ func printStatefulSet(ps *apps.StatefulSet, w io.Writer, options PrintOptions) e
 		if err := layoutContainers(containers, w); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(w, "\t%s", unversioned.FormatLabelSelector(ps.Spec.Selector)); err != nil {
+		if _, err := fmt.Fprintf(w, "\t%s", metav1.FormatLabelSelector(ps.Spec.Selector)); err != nil {
 			return err
 		}
 	}
@@ -1342,7 +1342,7 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options PrintOptions)
 	desiredScheduled := ds.Status.DesiredNumberScheduled
 	currentScheduled := ds.Status.CurrentNumberScheduled
 	numberReady := ds.Status.NumberReady
-	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
 		return err
@@ -1566,10 +1566,10 @@ func getNodeExternalIP(node *api.Node) string {
 // * a kubeadm.alpha.kubernetes.io/role label
 // If no role is found, ("", nil) is returned
 func findNodeRole(node *api.Node) string {
-	if role := node.Labels[unversioned.NodeLabelRole]; role != "" {
+	if role := node.Labels[metav1.NodeLabelRole]; role != "" {
 		return role
 	}
-	if role := node.Labels[unversioned.NodeLabelKubeadmAlphaRole]; role != "" {
+	if role := node.Labels[metav1.NodeLabelKubeadmAlphaRole]; role != "" {
 		return role
 	}
 	// No role found
@@ -2205,7 +2205,7 @@ func printNetworkPolicy(networkPolicy *extensions.NetworkPolicy, w io.Writer, op
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, unversioned.FormatLabelSelector(&networkPolicy.Spec.PodSelector), translateTimestamp(networkPolicy.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, metav1.FormatLabelSelector(&networkPolicy.Spec.PodSelector), translateTimestamp(networkPolicy.CreationTimestamp)); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, AppendLabels(networkPolicy.Labels, options.ColumnLabels)); err != nil {
@@ -2254,7 +2254,7 @@ func printStorageClassList(scList *storage.StorageClassList, w io.Writer, option
 	return nil
 }
 
-func printStatus(status *unversioned.Status, w io.Writer, options PrintOptions) error {
+func printStatus(status *metav1.Status, w io.Writer, options PrintOptions) error {
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", status.Status, status.Reason, status.Message); err != nil {
 		return err
 	}

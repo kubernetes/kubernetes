@@ -32,8 +32,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
@@ -145,8 +145,8 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 		},
 		Status: v1.PodStatus{},
 	}
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	now := metav1.Now()
+	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
 	pod.Status.StartTime = &startTime
 	syncer.SetPodStatus(pod, getRandomPodStatus())
 
@@ -198,7 +198,7 @@ func TestChangedStatus(t *testing.T) {
 func TestChangedStatusKeepsStartTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	testPod := getTestPod()
-	now := unversioned.Now()
+	now := metav1.Now()
 	firstStatus := getRandomPodStatus()
 	firstStatus.StartTime = &now
 	syncer.SetPodStatus(testPod, firstStatus)
@@ -375,7 +375,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	client.ClearActions()
 
 	// Pod is terminated, but still running.
-	pod.DeletionTimestamp = new(unversioned.Time)
+	pod.DeletionTimestamp = new(metav1.Time)
 	m.SetPodStatus(pod, getRandomPodStatus())
 	m.testSyncBatch()
 	verifyActions(t, client, []core.Action{getAction, updateAction})
@@ -496,7 +496,7 @@ func TestStaticPod(t *testing.T) {
 	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
 
 	status := getRandomPodStatus()
-	now := unversioned.Now()
+	now := metav1.Now()
 	status.StartTime = &now
 	m.SetPodStatus(staticPod, status)
 
@@ -740,13 +740,13 @@ func expectPodStatus(t *testing.T, m *manager, pod *v1.Pod) v1.PodStatus {
 func TestDeletePods(t *testing.T) {
 	pod := getTestPod()
 	// Set the deletion timestamp.
-	pod.DeletionTimestamp = new(unversioned.Time)
+	pod.DeletionTimestamp = new(metav1.Time)
 	client := fake.NewSimpleClientset(pod)
 	m := newTestManager(client)
 	m.podManager.AddPod(pod)
 
 	status := getRandomPodStatus()
-	now := unversioned.Now()
+	now := metav1.Now()
 	status.StartTime = &now
 	m.SetPodStatus(pod, status)
 
@@ -769,7 +769,7 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 		kubetypes.ConfigMirrorAnnotationKey: "mirror",
 	}
 	// Set the deletion timestamp.
-	mirrorPod.DeletionTimestamp = new(unversioned.Time)
+	mirrorPod.DeletionTimestamp = new(metav1.Time)
 	client := fake.NewSimpleClientset(mirrorPod)
 	m := newTestManager(client)
 	m.podManager.AddPod(staticPod)
@@ -780,7 +780,7 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
 
 	status := getRandomPodStatus()
-	now := unversioned.Now()
+	now := metav1.Now()
 	status.StartTime = &now
 	m.SetPodStatus(staticPod, status)
 

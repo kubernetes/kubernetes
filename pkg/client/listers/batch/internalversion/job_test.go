@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -69,7 +69,7 @@ func TestJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
+						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "baz"},
 						},
 					},
@@ -122,7 +122,7 @@ func TestJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
+						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -130,7 +130,7 @@ func TestJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
+						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -160,7 +160,7 @@ func TestJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "foo"},
 					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
+						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -168,7 +168,7 @@ func TestJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "bar"},
 					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
+						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},

@@ -18,12 +18,12 @@ package autoscaling
 
 import (
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 // Scale represents a scaling request for a resource.
 type Scale struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
 	// +optional
 	api.ObjectMeta `json:"metadata,omitempty"`
@@ -93,7 +93,7 @@ type HorizontalPodAutoscalerStatus struct {
 	// last time the HorizontalPodAutoscaler scaled the number of pods;
 	// used by the autoscaler to control how often the number of pods is changed.
 	// +optional
-	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty"`
+	LastScaleTime *metav1.Time `json:"lastScaleTime,omitempty"`
 
 	// current number of replicas of pods managed by this autoscaler.
 	CurrentReplicas int32 `json:"currentReplicas"`
@@ -111,7 +111,7 @@ type HorizontalPodAutoscalerStatus struct {
 
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	api.ObjectMeta `json:"metadata,omitempty"`
 
@@ -126,9 +126,9 @@ type HorizontalPodAutoscaler struct {
 
 // list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler `json:"items"`

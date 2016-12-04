@@ -17,8 +17,8 @@ limitations under the License.
 package e2e_node
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -31,7 +31,7 @@ var _ = framework.KubeDescribe("SimpleMount", func() {
 	// If the mount fails, the pod will not be able to run, and CreateSync will timeout.
 	It("should be able to mount an emptydir on a container", func() {
 		pod := &v1.Pod{
-			TypeMeta: unversioned.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Pod",
 				APIVersion: "v1",
 			},

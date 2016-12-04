@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -40,7 +40,7 @@ func TestEstablishMasterConnection(t *testing.T) {
 		var obj interface{}
 		switch req.URL.Path {
 		case "/api":
-			obj = &unversioned.APIVersions{
+			obj = &metav1.APIVersions{
 				Versions: []string{
 					"v1.4",
 				},
@@ -54,11 +54,11 @@ func TestEstablishMasterConnection(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		case "/apis":
-			obj = &unversioned.APIGroupList{
-				Groups: []unversioned.APIGroup{
+			obj = &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{
 					{
 						Name: "certificates.k8s.io",
-						Versions: []unversioned.GroupVersionForDiscovery{
+						Versions: []metav1.GroupVersionForDiscovery{
 							{GroupVersion: "extensions/v1beta1"},
 						},
 					},
@@ -165,7 +165,7 @@ func TestCheckAPIEndpoint(t *testing.T) {
 				var obj interface{}
 				switch req.URL.Path {
 				case "/api":
-					obj = &unversioned.APIVersions{
+					obj = &metav1.APIVersions{
 						Versions: []string{
 							"v1.4",
 						},
@@ -196,7 +196,7 @@ func TestCheckAPIEndpoint(t *testing.T) {
 				var obj interface{}
 				switch req.URL.Path {
 				case "/api":
-					obj = &unversioned.APIVersions{
+					obj = &metav1.APIVersions{
 						Versions: []string{
 							"v1.4",
 						},
@@ -210,11 +210,11 @@ func TestCheckAPIEndpoint(t *testing.T) {
 					w.WriteHeader(http.StatusOK)
 					w.Write(output)
 				case "/apis":
-					obj = &unversioned.APIGroupList{
-						Groups: []unversioned.APIGroup{
+					obj = &metav1.APIGroupList{
+						Groups: []metav1.APIGroup{
 							{
 								Name: "certificates.k8s.io",
-								Versions: []unversioned.GroupVersionForDiscovery{
+								Versions: []metav1.GroupVersionForDiscovery{
 									{GroupVersion: "extensions/v1beta1"},
 								},
 							},

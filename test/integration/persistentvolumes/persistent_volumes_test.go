@@ -28,9 +28,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -330,7 +330,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	}
 	t.Log("volumes created")
 
-	pvc.Spec.Selector = &unversioned.LabelSelector{
+	pvc.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			"foo": "true",
 		},
@@ -410,26 +410,26 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	}
 	t.Log("volumes created")
 
-	pvc.Spec.Selector = &unversioned.LabelSelector{
-		MatchExpressions: []unversioned.LabelSelectorRequirement{
+	pvc.Spec.Selector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
 				Key:      "foo",
-				Operator: unversioned.LabelSelectorOpIn,
+				Operator: metav1.LabelSelectorOpIn,
 				Values:   []string{"valA"},
 			},
 			{
 				Key:      "foo",
-				Operator: unversioned.LabelSelectorOpNotIn,
+				Operator: metav1.LabelSelectorOpNotIn,
 				Values:   []string{"valB"},
 			},
 			{
 				Key:      "bar",
-				Operator: unversioned.LabelSelectorOpExists,
+				Operator: metav1.LabelSelectorOpExists,
 				Values:   []string{},
 			},
 			{
 				Key:      "baz",
-				Operator: unversioned.LabelSelectorOpDoesNotExist,
+				Operator: metav1.LabelSelectorOpDoesNotExist,
 				Values:   []string{},
 			},
 		},
@@ -861,7 +861,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	defer testClient.Storage().StorageClasses().DeleteCollection(nil, v1.ListOptions{})
 
 	storageClass := storage.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: v1.ObjectMeta{

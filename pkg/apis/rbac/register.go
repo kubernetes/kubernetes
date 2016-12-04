@@ -18,7 +18,7 @@ package rbac
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch/versioned"
@@ -59,7 +59,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 		&api.ListOptions{},
 		&api.DeleteOptions{},
-		&unversioned.ExportOptions{},
+		&metav1.ExportOptions{},
 	)
 	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

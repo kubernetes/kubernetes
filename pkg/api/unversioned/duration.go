@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 // marshaling to YAML and JSON. In particular, it marshals into strings, which
 // can be used as map keys in json.
 type Duration struct {
-	time.Duration `protobuf:"varint,1,opt,name=duration,casttype=time.Duration"`
+	time.Duration `protobuf:"-"`
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.

@@ -19,7 +19,7 @@ package discovery
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
@@ -61,7 +61,7 @@ func NegotiateVersion(client DiscoveryInterface, requiredGV *schema.GroupVersion
 		// not a negotiation specific error.
 		return nil, err
 	}
-	versions := unversioned.ExtractGroupVersions(groups)
+	versions := metav1.ExtractGroupVersions(groups)
 	serverVersions := sets.String{}
 	for _, v := range versions {
 		serverVersions.Insert(v)

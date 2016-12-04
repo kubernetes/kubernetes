@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -435,11 +435,11 @@ var _ = framework.KubeDescribe("Density", func() {
 			if itArg.runLatencyTest {
 				By("Scheduling additional Pods to measure startup latencies")
 
-				createTimes := make(map[string]unversioned.Time, 0)
+				createTimes := make(map[string]metav1.Time, 0)
 				nodeNames := make(map[string]string, 0)
-				scheduleTimes := make(map[string]unversioned.Time, 0)
-				runTimes := make(map[string]unversioned.Time, 0)
-				watchTimes := make(map[string]unversioned.Time, 0)
+				scheduleTimes := make(map[string]metav1.Time, 0)
+				runTimes := make(map[string]metav1.Time, 0)
+				watchTimes := make(map[string]metav1.Time, 0)
 
 				var mutex sync.Mutex
 				checkPod := func(p *v1.Pod) {
@@ -449,10 +449,10 @@ var _ = framework.KubeDescribe("Density", func() {
 
 					if p.Status.Phase == v1.PodRunning {
 						if _, found := watchTimes[p.Name]; !found {
-							watchTimes[p.Name] = unversioned.Now()
+							watchTimes[p.Name] = metav1.Now()
 							createTimes[p.Name] = p.CreationTimestamp
 							nodeNames[p.Name] = p.Spec.NodeName
-							var startTime unversioned.Time
+							var startTime metav1.Time
 							for _, cs := range p.Status.ContainerStatuses {
 								if cs.State.Running != nil {
 									if startTime.Before(cs.State.Running.StartedAt) {
@@ -460,7 +460,7 @@ var _ = framework.KubeDescribe("Density", func() {
 									}
 								}
 							}
-							if startTime != unversioned.NewTime(time.Time{}) {
+							if startTime != metav1.NewTime(time.Time{}) {
 								runTimes[p.Name] = startTime
 							} else {
 								framework.Failf("Pod %v is reported to be running, but none of its containers is", p.Name)

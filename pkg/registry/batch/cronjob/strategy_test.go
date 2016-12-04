@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func newBool(a bool) *bool {
@@ -71,7 +71,7 @@ func TestCronJobStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
-	now := unversioned.Now()
+	now := metav1.Now()
 	updatedCronJob := &batch.CronJob{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.CronJobSpec{
@@ -125,7 +125,7 @@ func TestCronJobStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	now := unversioned.Now()
+	now := metav1.Now()
 	newCronJob := &batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "mycronjob",

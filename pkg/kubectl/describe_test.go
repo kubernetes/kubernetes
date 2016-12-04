@@ -29,10 +29,10 @@ import (
 	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -135,8 +135,8 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 					ObjectMeta:     api.ObjectMeta{Name: "one"},
 					Source:         api.EventSource{Component: "kubelet"},
 					Message:        "Item 1",
-					FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-					LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 					Count:          1,
 					Type:           api.EventTypeNormal,
 				},
@@ -144,8 +144,8 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 					ObjectMeta:     api.ObjectMeta{Name: "two"},
 					Source:         api.EventSource{Component: "scheduler"},
 					Message:        "Item 2",
-					FirstTimestamp: unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
-					LastTimestamp:  unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+					FirstTimestamp: metav1.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
 					Count:          1,
 					Type:           api.EventTypeNormal,
 				},
@@ -153,8 +153,8 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 					ObjectMeta:     api.ObjectMeta{Name: "three"},
 					Source:         api.EventSource{Component: "kubelet"},
 					Message:        "Item 3",
-					FirstTimestamp: unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
-					LastTimestamp:  unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+					FirstTimestamp: metav1.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
 					Count:          1,
 					Type:           api.EventTypeNormal,
 				},
@@ -212,7 +212,7 @@ func TestDescribeContainers(t *testing.T) {
 				Name: "test",
 				State: api.ContainerState{
 					Running: &api.ContainerStateRunning{
-						StartedAt: unversioned.NewTime(time.Now()),
+						StartedAt: metav1.NewTime(time.Now()),
 					},
 				},
 				Ready:        true,
@@ -242,8 +242,8 @@ func TestDescribeContainers(t *testing.T) {
 				Name: "test",
 				State: api.ContainerState{
 					Terminated: &api.ContainerStateTerminated{
-						StartedAt:  unversioned.NewTime(time.Now()),
-						FinishedAt: unversioned.NewTime(time.Now()),
+						StartedAt:  metav1.NewTime(time.Now()),
+						FinishedAt: metav1.NewTime(time.Now()),
 						Reason:     "potato",
 						ExitCode:   2,
 					},
@@ -260,13 +260,13 @@ func TestDescribeContainers(t *testing.T) {
 				Name: "test",
 				State: api.ContainerState{
 					Running: &api.ContainerStateRunning{
-						StartedAt: unversioned.NewTime(time.Now()),
+						StartedAt: metav1.NewTime(time.Now()),
 					},
 				},
 				LastTerminationState: api.ContainerState{
 					Terminated: &api.ContainerStateTerminated{
-						StartedAt:  unversioned.NewTime(time.Now().Add(time.Second * 3)),
-						FinishedAt: unversioned.NewTime(time.Now()),
+						StartedAt:  metav1.NewTime(time.Now().Add(time.Second * 3)),
+						FinishedAt: metav1.NewTime(time.Now()),
 						Reason:     "crashing",
 						ExitCode:   3,
 					},
@@ -629,7 +629,7 @@ func TestDescribeDeployment(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: v1beta1.DeploymentSpec{
-			Selector: &unversioned.LabelSelector{},
+			Selector: &metav1.LabelSelector{},
 			Template: v1.PodTemplateSpec{},
 		},
 	})
@@ -707,7 +707,7 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Namespace:         "ns1",
 			Name:              "pdb1",
-			CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+			CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			MinAvailable: intstr.FromInt(22),
@@ -736,8 +736,8 @@ func TestDescribeEvents(t *testing.T) {
 				},
 				Source:         api.EventSource{Component: "kubelet"},
 				Message:        "Item 1",
-				FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 				Type:           api.EventTypeNormal,
 			},
@@ -761,7 +761,7 @@ func TestDescribeEvents(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: v1beta1.DeploymentSpec{
-					Selector: &unversioned.LabelSelector{},
+					Selector: &metav1.LabelSelector{},
 				},
 			}),
 		},

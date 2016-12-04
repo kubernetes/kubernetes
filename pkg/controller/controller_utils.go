@@ -25,10 +25,10 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -685,14 +685,14 @@ func (s ActivePods) Less(i, j int) bool {
 
 // afterOrZero checks if time t1 is after time t2; if one of them
 // is zero, the zero time is seen as after non-zero time.
-func afterOrZero(t1, t2 unversioned.Time) bool {
+func afterOrZero(t1, t2 metav1.Time) bool {
 	if t1.Time.IsZero() || t2.Time.IsZero() {
 		return t1.Time.IsZero()
 	}
 	return t1.After(t2.Time)
 }
 
-func podReadyTime(pod *v1.Pod) unversioned.Time {
+func podReadyTime(pod *v1.Pod) metav1.Time {
 	if v1.IsPodReady(pod) {
 		for _, c := range pod.Status.Conditions {
 			// we only care about pod ready conditions
@@ -701,7 +701,7 @@ func podReadyTime(pod *v1.Pod) unversioned.Time {
 			}
 		}
 	}
-	return unversioned.Time{}
+	return metav1.Time{}
 }
 
 func maxContainerRestarts(pod *v1.Pod) int {

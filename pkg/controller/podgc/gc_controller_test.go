@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/labels"
@@ -109,7 +109,7 @@ func TestGCTerminated(t *testing.T) {
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
 			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: unversioned.Time{Time: creationTime}},
+				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
 				Status:     v1.PodStatus{Phase: pod.phase},
 				Spec:       v1.PodSpec{NodeName: "node"},
 			})
@@ -184,7 +184,7 @@ func TestGCOrphaned(t *testing.T) {
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
 			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: unversioned.Time{Time: creationTime}},
+				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
 				Status:     v1.PodStatus{Phase: pod.phase},
 				Spec:       v1.PodSpec{NodeName: "node"},
 			})
@@ -221,7 +221,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	type nameToPhase struct {
 		name              string
 		phase             v1.PodPhase
-		deletionTimeStamp *unversioned.Time
+		deletionTimeStamp *metav1.Time
 		nodeName          string
 	}
 
@@ -233,9 +233,9 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		{
 			name: "Unscheduled pod in any phase must be deleted",
 			pods: []nameToPhase{
-				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &unversioned.Time{}, nodeName: ""},
-				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &unversioned.Time{}, nodeName: ""},
-				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &unversioned.Time{}, nodeName: ""},
+				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
 			},
 			deletedPodNames: sets.NewString("a", "b", "c"),
 		},
@@ -244,7 +244,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed, deletionTimeStamp: nil, nodeName: ""},
 				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: nil, nodeName: "node"},
-				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &unversioned.Time{}, nodeName: "node"},
+				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: "node"},
 			},
 			deletedPodNames: sets.NewString(),
 		},
@@ -266,7 +266,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
 			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: unversioned.Time{Time: creationTime},
+				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
 					DeletionTimestamp: pod.deletionTimeStamp},
 				Status: v1.PodStatus{Phase: pod.phase},
 				Spec:   v1.PodSpec{NodeName: pod.nodeName},

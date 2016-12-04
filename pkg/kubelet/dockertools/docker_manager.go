@@ -44,8 +44,8 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -323,7 +323,7 @@ func (dm *DockerManager) GetContainerLogs(pod *v1.Pod, containerID kubecontainer
 func GetContainerLogs(client DockerInterface, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer, rawTerm bool) error {
 	var since int64
 	if logOptions.SinceSeconds != nil {
-		t := unversioned.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
+		t := metav1.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
 		since = t.Unix()
 	}
 	if logOptions.SinceTime != nil {
@@ -1564,7 +1564,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		}
 	}
 	glog.V(2).Infof("Killing container %q with %d second grace period", name, gracePeriod)
-	start := unversioned.Now()
+	start := metav1.Now()
 
 	if pod != nil && container != nil && container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		glog.V(4).Infof("Running preStop hook for container %q", name)
@@ -1585,7 +1585,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		case <-done:
 			glog.V(4).Infof("preStop hook for container %q completed", name)
 		}
-		gracePeriod -= int64(unversioned.Now().Sub(start.Time).Seconds())
+		gracePeriod -= int64(metav1.Now().Sub(start.Time).Seconds())
 	}
 
 	// if the caller did not specify a grace period override, we ensure that the grace period
@@ -1604,9 +1604,9 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 
 	err := dm.client.StopContainer(ID, int(gracePeriod))
 	if err == nil {
-		glog.V(2).Infof("Container %q exited after %s", name, unversioned.Now().Sub(start.Time))
+		glog.V(2).Infof("Container %q exited after %s", name, metav1.Now().Sub(start.Time))
 	} else {
-		glog.Warningf("Container %q termination failed after %s: %v", name, unversioned.Now().Sub(start.Time), err)
+		glog.Warningf("Container %q termination failed after %s: %v", name, metav1.Now().Sub(start.Time), err)
 	}
 	ref, ok := dm.containerRefManager.GetRef(containerID)
 	if !ok {

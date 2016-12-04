@@ -31,9 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
@@ -720,7 +720,7 @@ func statefulSetFromManifest(fileName, ns string) *apps.StatefulSet {
 	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &ps)).NotTo(HaveOccurred())
 	ps.Namespace = ns
 	if ps.Spec.Selector == nil {
-		ps.Spec.Selector = &unversioned.LabelSelector{
+		ps.Spec.Selector = &metav1.LabelSelector{
 			MatchLabels: ps.Spec.Template.Labels,
 		}
 	}
@@ -878,7 +878,7 @@ func (p *statefulSetTester) update(ns, name string, update func(ps *apps.Statefu
 }
 
 func (p *statefulSetTester) getPodList(ps *apps.StatefulSet) *v1.PodList {
-	selector, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
 	ExpectNoError(err)
 	podList, err := p.c.Core().Pods(ps.Namespace).List(v1.ListOptions{LabelSelector: selector.String()})
 	ExpectNoError(err)
@@ -1141,7 +1141,7 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 	}
 
 	return &apps.StatefulSet{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1beta1",
 		},
@@ -1150,7 +1150,7 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 			Namespace: ns,
 		},
 		Spec: apps.StatefulSetSpec{
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
 			Replicas: func(i int32) *int32 { return &i }(replicas),

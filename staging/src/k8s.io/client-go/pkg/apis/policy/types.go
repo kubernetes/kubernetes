@@ -18,7 +18,7 @@ package policy
 
 import (
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/util/intstr"
 )
 
@@ -34,7 +34,7 @@ type PodDisruptionBudgetSpec struct {
 	// Label query over pods whose evictions are managed by the disruption
 	// budget.
 	// +optional
-	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 // PodDisruptionBudgetStatus represents information about the status of a
@@ -56,7 +56,7 @@ type PodDisruptionBudgetStatus struct {
 	// the list automatically by PodDisruptionBudget controller after some time.
 	// If everything goes smooth this map should be empty for the most of the time.
 	// Large number of entries in the map may indicate problems with pod deletions.
-	DisruptedPods map[string]unversioned.Time `json:"disruptedPods" protobuf:"bytes,5,rep,name=disruptedPods"`
+	DisruptedPods map[string]metav1.Time `json:"disruptedPods" protobuf:"bytes,5,rep,name=disruptedPods"`
 
 	// Number of pod disruptions that are currently allowed.
 	PodDisruptionsAllowed int32 `json:"disruptionsAllowed"`
@@ -75,7 +75,7 @@ type PodDisruptionBudgetStatus struct {
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	api.ObjectMeta `json:"metadata,omitempty"`
 
@@ -89,10 +89,10 @@ type PodDisruptionBudget struct {
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty"`
-	Items                []PodDisruptionBudget `json:"items"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []PodDisruptionBudget `json:"items"`
 }
 
 // +genclient=true
@@ -102,7 +102,7 @@ type PodDisruptionBudgetList struct {
 // This is a subresource of Pod.  A request to cause such an eviction is
 // created by POSTing to .../pods/<pod name>/eviction.
 type Eviction struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 
 	// ObjectMeta describes the pod that is being evicted.
 	// +optional

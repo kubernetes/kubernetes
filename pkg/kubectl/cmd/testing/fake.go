@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
@@ -567,13 +567,13 @@ func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Nego
 func testDynamicResources() []*discovery.APIGroupResources {
 	return []*discovery.APIGroupResources{
 		{
-			Group: unversioned.APIGroup{
-				Versions: []unversioned.GroupVersionForDiscovery{
+			Group: metav1.APIGroup{
+				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
 				},
-				PreferredVersion: unversioned.GroupVersionForDiscovery{Version: "v1"},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
 			},
-			VersionedResources: map[string][]unversioned.APIResource{
+			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "pods", Namespaced: true, Kind: "Pod"},
 					{Name: "services", Namespaced: true, Kind: "Service"},

@@ -22,7 +22,7 @@ import (
 	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -85,11 +85,11 @@ func (d *decoratedWatcher) ResultChan() <-chan watch.Event {
 }
 
 func makeStatusErrorEvent(err error) watch.Event {
-	status := &unversioned.Status{
-		Status:  unversioned.StatusFailure,
+	status := &metav1.Status{
+		Status:  metav1.StatusFailure,
 		Message: err.Error(),
 		Code:    http.StatusInternalServerError,
-		Reason:  unversioned.StatusReasonInternalError,
+		Reason:  metav1.StatusReasonInternalError,
 	}
 	return watch.Event{
 		Type:   watch.Error,

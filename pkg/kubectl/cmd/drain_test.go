@@ -36,9 +36,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 	node = &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "node",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
 		Spec: api.NodeSpec{
 			ExternalID: "node",
@@ -225,7 +225,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "rc",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("replicationcontrollers", "rc"),
 		},
@@ -241,7 +241,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			Annotations:       rc_anno,
 		},
@@ -254,11 +254,11 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "ds",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/daemonsets/ds",
 		},
 		Spec: extensions.DaemonSetSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: labels},
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
 
@@ -269,7 +269,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			Annotations:       ds_anno,
 		},
@@ -282,11 +282,11 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "job",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/jobs/job",
 		},
 		Spec: batch.JobSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: labels},
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
 
@@ -294,7 +294,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			Annotations:       map[string]string{api.CreatedByAnnotation: refJson(t, &job)},
 		},
@@ -304,12 +304,12 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "rs",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("replicasets", "rs"),
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: labels},
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
 
@@ -320,7 +320,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			Annotations:       rs_anno,
 		},
@@ -333,7 +333,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 		},
 		Spec: api.PodSpec{
@@ -345,7 +345,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 		},
 		Spec: api.PodSpec{
@@ -490,16 +490,16 @@ func TestDrain(t *testing.T) {
 					m := &MyReq{req}
 					switch {
 					case req.Method == "GET" && req.URL.Path == "/api":
-						apiVersions := unversioned.APIVersions{
+						apiVersions := metav1.APIVersions{
 							Versions: []string{"v1"},
 						}
 						return genResponseWithJsonEncodedBody(apiVersions)
 					case req.Method == "GET" && req.URL.Path == "/apis":
-						groupList := unversioned.APIGroupList{
-							Groups: []unversioned.APIGroup{
+						groupList := metav1.APIGroupList{
+							Groups: []metav1.APIGroup{
 								{
 									Name: "policy",
-									PreferredVersion: unversioned.GroupVersionForDiscovery{
+									PreferredVersion: metav1.GroupVersionForDiscovery{
 										GroupVersion: "policy/v1beta1",
 									},
 								},
@@ -507,11 +507,11 @@ func TestDrain(t *testing.T) {
 						}
 						return genResponseWithJsonEncodedBody(groupList)
 					case req.Method == "GET" && req.URL.Path == "/api/v1":
-						resourceList := unversioned.APIResourceList{
+						resourceList := metav1.APIResourceList{
 							GroupVersion: "v1",
 						}
 						if testEviction {
-							resourceList.APIResources = []unversioned.APIResource{
+							resourceList.APIResources = []metav1.APIResource{
 								{
 									Name: EvictionSubresource,
 									Kind: EvictionKind,

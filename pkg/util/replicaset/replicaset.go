@@ -22,9 +22,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/labels"
 	errorsutil "k8s.io/kubernetes/pkg/util/errors"
@@ -99,7 +99,7 @@ func MatchingPodsFunc(rs *extensions.ReplicaSet) (func(v1.Pod) bool, error) {
 	if rs == nil {
 		return nil, nil
 	}
-	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("invalid label selector: %v", err)
 	}

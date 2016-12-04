@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -131,32 +131,32 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientMemory",
 					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{
 					Type:               v1.NodeDiskPressure,
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasNoDiskPressure",
 					Message:            fmt.Sprintf("kubelet has no disk pressure"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{
 					Type:               v1.NodeReady,
 					Status:             v1.ConditionTrue,
 					Reason:             "KubeletReady",
 					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 			},
 			NodeInfo: v1.NodeSystemInfo{
@@ -214,8 +214,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		if cond.LastTransitionTime.IsZero() {
 			t.Errorf("unexpected zero last transition timestamp for %v condition", cond.Type)
 		}
-		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
-		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 	}
 
 	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
@@ -268,8 +268,8 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 		Status:             v1.ConditionFalse,
 		Reason:             "KubeletHasSufficientDisk",
 		Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-		LastHeartbeatTime:  unversioned.Time{},
-		LastTransitionTime: unversioned.Time{},
+		LastHeartbeatTime:  metav1.Time{},
+		LastTransitionTime: metav1.Time{},
 	}
 
 	kubelet.updateRuntimeUp()
@@ -296,8 +296,8 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 		if cond.LastTransitionTime.IsZero() {
 			t.Errorf("unexpected zero last transition timestamp for %v condition", cond.Type)
 		}
-		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
-		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 		if cond.Type == v1.NodeOutOfDisk {
 			oodCondition = updatedNode.Status.Conditions[i]
 		}
@@ -323,32 +323,32 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						Status:             v1.ConditionTrue,
 						Reason:             "KubeletOutOfDisk",
 						Message:            "out of disk space",
-						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 					{
 						Type:               v1.NodeMemoryPressure,
 						Status:             v1.ConditionFalse,
 						Reason:             "KubeletHasSufficientMemory",
 						Message:            fmt.Sprintf("kubelet has sufficient memory available"),
-						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 					{
 						Type:               v1.NodeDiskPressure,
 						Status:             v1.ConditionFalse,
 						Reason:             "KubeletHasSufficientDisk",
 						Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 					{
 						Type:               v1.NodeReady,
 						Status:             v1.ConditionTrue,
 						Reason:             "KubeletReady",
 						Message:            fmt.Sprintf("kubelet is posting ready status"),
-						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 				},
 				Capacity: v1.ResourceList{
@@ -395,32 +395,32 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             v1.ConditionTrue,
 					Reason:             "KubeletOutOfDisk",
 					Message:            "out of disk space",
-					LastHeartbeatTime:  unversioned.Time{}, // placeholder
-					LastTransitionTime: unversioned.Time{}, // placeholder
+					LastHeartbeatTime:  metav1.Time{}, // placeholder
+					LastTransitionTime: metav1.Time{}, // placeholder
 				},
 				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientMemory",
 					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{
 					Type:               v1.NodeDiskPressure,
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{
 					Type:               v1.NodeReady,
 					Status:             v1.ConditionTrue,
 					Reason:             "KubeletReady",
 					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{}, // placeholder
-					LastTransitionTime: unversioned.Time{}, // placeholder
+					LastHeartbeatTime:  metav1.Time{}, // placeholder
+					LastTransitionTime: metav1.Time{}, // placeholder
 				},
 			},
 			NodeInfo: v1.NodeSystemInfo{
@@ -484,14 +484,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 	for i, cond := range updatedNode.Status.Conditions {
 		// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
-		if old := unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time; reflect.DeepEqual(cond.LastHeartbeatTime.Rfc3339Copy().UTC(), old) {
-			t.Errorf("Condition %v LastProbeTime: expected \n%v\n, got \n%v", cond.Type, unversioned.Now(), old)
+		if old := metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time; reflect.DeepEqual(cond.LastHeartbeatTime.Rfc3339Copy().UTC(), old) {
+			t.Errorf("Condition %v LastProbeTime: expected \n%v\n, got \n%v", cond.Type, metav1.Now(), old)
 		}
-		if got, want := cond.LastTransitionTime.Rfc3339Copy().UTC(), unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time; !reflect.DeepEqual(got, want) {
+		if got, want := cond.LastTransitionTime.Rfc3339Copy().UTC(), metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time; !reflect.DeepEqual(got, want) {
 			t.Errorf("Condition %v LastTransitionTime: expected \n%#v\n, got \n%#v", cond.Type, want, got)
 		}
-		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
-		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 	}
 
 	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
@@ -520,16 +520,16 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 						Status:             v1.ConditionTrue,
 						Reason:             "KubeletReady",
 						Message:            fmt.Sprintf("kubelet is posting ready status"),
-						LastHeartbeatTime:  unversioned.NewTime(clock.Now()),
-						LastTransitionTime: unversioned.NewTime(clock.Now()),
+						LastHeartbeatTime:  metav1.NewTime(clock.Now()),
+						LastTransitionTime: metav1.NewTime(clock.Now()),
 					},
 					{
 						Type:               v1.NodeOutOfDisk,
 						Status:             v1.ConditionTrue,
 						Reason:             "KubeletOutOfDisk",
 						Message:            "out of disk space",
-						LastHeartbeatTime:  unversioned.NewTime(clock.Now()),
-						LastTransitionTime: unversioned.NewTime(clock.Now()),
+						LastHeartbeatTime:  metav1.NewTime(clock.Now()),
+						LastTransitionTime: metav1.NewTime(clock.Now()),
 					},
 				},
 			},
@@ -564,16 +564,16 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 		Status:             v1.ConditionTrue,
 		Reason:             "KubeletOutOfDisk",
 		Message:            "out of disk space",
-		LastHeartbeatTime:  unversioned.NewTime(clock.Now()), // placeholder
-		LastTransitionTime: unversioned.NewTime(clock.Now()), // placeholder
+		LastHeartbeatTime:  metav1.NewTime(clock.Now()), // placeholder
+		LastTransitionTime: metav1.NewTime(clock.Now()), // placeholder
 	}
 	noOod := v1.NodeCondition{
 		Type:               v1.NodeOutOfDisk,
 		Status:             v1.ConditionFalse,
 		Reason:             "KubeletHasSufficientDisk",
 		Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-		LastHeartbeatTime:  unversioned.NewTime(clock.Now()), // placeholder
-		LastTransitionTime: unversioned.NewTime(clock.Now()), // placeholder
+		LastHeartbeatTime:  metav1.NewTime(clock.Now()), // placeholder
+		LastTransitionTime: metav1.NewTime(clock.Now()), // placeholder
 	}
 
 	testCases := []struct {
@@ -619,10 +619,10 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 		clock.Step(1 * time.Second)
 
 		// Setup expected times.
-		tc.expected.LastHeartbeatTime = unversioned.NewTime(clock.Now())
+		tc.expected.LastHeartbeatTime = metav1.NewTime(clock.Now())
 		// In the last case, there should be a status transition for NodeOutOfDisk
 		if tcIdx == len(testCases)-1 {
-			tc.expected.LastTransitionTime = unversioned.NewTime(clock.Now())
+			tc.expected.LastTransitionTime = metav1.NewTime(clock.Now())
 		}
 
 		// Make kubelet report that it has sufficient disk space
@@ -700,24 +700,24 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            "kubelet has sufficient disk space available",
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientMemory",
 					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{
 					Type:               v1.NodeDiskPressure,
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasNoDiskPressure",
 					Message:            fmt.Sprintf("kubelet has no disk pressure"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{}, //placeholder
 			},
@@ -787,8 +787,8 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			if cond.LastTransitionTime.IsZero() {
 				t.Errorf("unexpected zero last transition timestamp")
 			}
-			updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
-			updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+			updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
+			updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 		}
 
 		// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
@@ -804,8 +804,8 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			Type:               v1.NodeReady,
 			Status:             status,
 			Reason:             reason,
-			LastHeartbeatTime:  unversioned.Time{},
-			LastTransitionTime: unversioned.Time{},
+			LastHeartbeatTime:  metav1.Time{},
+			LastTransitionTime: metav1.Time{},
 		}
 		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
 			t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
@@ -902,7 +902,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		// Return an error on create.
 		return true, &v1.Node{}, &apierrors.StatusError{
-			ErrStatus: unversioned.Status{Reason: unversioned.StatusReasonAlreadyExists},
+			ErrStatus: metav1.Status{Reason: metav1.StatusReasonAlreadyExists},
 		}
 	})
 	kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
@@ -955,11 +955,11 @@ func TestRegisterWithApiServer(t *testing.T) {
 
 func TestTryRegisterWithApiServer(t *testing.T) {
 	alreadyExists := &apierrors.StatusError{
-		ErrStatus: unversioned.Status{Reason: unversioned.StatusReasonAlreadyExists},
+		ErrStatus: metav1.Status{Reason: metav1.StatusReasonAlreadyExists},
 	}
 
 	conflict := &apierrors.StatusError{
-		ErrStatus: unversioned.Status{Reason: unversioned.StatusReasonConflict},
+		ErrStatus: metav1.Status{Reason: metav1.StatusReasonConflict},
 	}
 
 	newNode := func(cmad bool, externalID string) *v1.Node {

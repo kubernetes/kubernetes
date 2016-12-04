@@ -23,12 +23,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -109,7 +109,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: int32(count),
-			Selector: &unversioned.LabelSelector{MatchLabels: labels},
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: labels,
@@ -292,7 +292,7 @@ func (JobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object
 			Labels: labels,
 		},
 		Spec: batch.JobSpec{
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
 			ManualSelector: newBool(true),

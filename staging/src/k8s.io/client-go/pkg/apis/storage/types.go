@@ -18,7 +18,7 @@ package storage
 
 import (
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 // +genclient=true
@@ -31,7 +31,7 @@ import (
 // called "profiles" in other storage systems.
 // The name of a StorageClass object is significant, and is how users can request a particular class.
 type StorageClass struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	api.ObjectMeta `json:"metadata,omitempty"`
 
@@ -52,11 +52,11 @@ type StorageClass struct {
 
 // StorageClassList is a collection of storage classes.
 type StorageClassList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of StorageClasses
 	Items []StorageClass `json:"items"`

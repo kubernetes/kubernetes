@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -58,7 +58,7 @@ func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *StatefulSetSpec
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(unversioned.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		if err := s.Convert(*in, *out, 0); err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSe
 	*out.Replicas = in.Replicas
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(unversioned.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		if err := s.Convert(*in, *out, 0); err != nil {
 			return err
 		}

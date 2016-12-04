@@ -138,6 +138,10 @@ func CloneTLSConfig(cfg *tls.Config) *tls.Config {
 	}
 }
 
+type TLSClientConfigHolder interface {
+	TLSClientConfig() *tls.Config
+}
+
 func TLSClientConfig(transport http.RoundTripper) (*tls.Config, error) {
 	if transport == nil {
 		return nil, nil
@@ -146,6 +150,8 @@ func TLSClientConfig(transport http.RoundTripper) (*tls.Config, error) {
 	switch transport := transport.(type) {
 	case *http.Transport:
 		return transport.TLSClientConfig, nil
+	case TLSClientConfigHolder:
+		return transport.TLSClientConfig(), nil
 	case RoundTripperWrapper:
 		return TLSClientConfig(transport.WrappedRoundTripper())
 	default:
