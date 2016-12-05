@@ -227,12 +227,15 @@ type KubeletDeps struct {
 // KubeletConfiguration or returns an error.
 func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName types.NodeName) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
-	if kubeCfg.ManifestURLHeader != "" {
-		pieces := strings.Split(kubeCfg.ManifestURLHeader, ":")
-		if len(pieces) != 2 {
-			return nil, fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", kubeCfg.ManifestURLHeader)
+	// Support multi HTTP headers
+	if len(kubeCfg.ManifestURLHeader) > 0 {
+		for _, urlHeader := range kubeCfg.ManifestURLHeader {
+			pieces := strings.Split(urlHeader, ":")
+			if len(pieces) != 2 {
+				return nil, fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", kubeCfg.ManifestURLHeader)
+			}
+			manifestURLHeader.Set(pieces[0], pieces[1])
 		}
-		manifestURLHeader.Set(pieces[0], pieces[1])
 	}
 
 	// source of all configuration

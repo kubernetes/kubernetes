@@ -195,7 +195,7 @@ type KubeletConfiguration struct {
 	ManifestURL string `json:"manifestURL"`
 	// manifestURLHeader is the HTTP header to use when accessing the manifest
 	// URL, with the key separated from the value with a ':', as in 'key:value'
-	ManifestURLHeader string `json:"manifestURLHeader"`
+	ManifestURLHeader []string `json:"manifestURLHeader"`
 	// enableServer enables the Kubelet's server
 	EnableServer *bool `json:"enableServer"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
