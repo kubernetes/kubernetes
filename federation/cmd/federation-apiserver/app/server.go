@@ -85,7 +85,9 @@ func Run(s *options.ServerRunOptions) error {
 	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
 	}
-	genericConfig.ApplyAuthenticationOptions(s.Authentication)
+	if _, err := genericConfig.ApplyAuthenticationOptions(s.Authentication); err != nil {
+		return fmt.Errorf("failed to configure authentication: %s", err)
+	}
 
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()

@@ -106,7 +106,9 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	if _, err := config.ApplySecureServingOptions(serverOptions.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
 	}
-	config.ApplyAuthenticationOptions(serverOptions.Authentication)
+	if _, err := config.ApplyAuthenticationOptions(serverOptions.Authentication); err != nil {
+		return fmt.Errorf("failed to configure authentication: %s", err)
+	}
 
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	s, err := config.Complete().New()
