@@ -232,7 +232,6 @@ func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingO
 		ServingInfo: ServingInfo{
 			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
 		},
-		ClientCA: secureServing.ClientCA,
 	}
 
 	serverCertFile, serverKeyFile := secureServing.ServerCert.CertKey.CertFile, secureServing.ServerCert.CertKey.KeyFile
@@ -303,6 +302,10 @@ func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOpt
 func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOptions) *Config {
 	if o == nil || o.PasswordFile == nil {
 		return c
+	}
+
+	if o.ClientCert != nil && c.SecureServingInfo != nil {
+		c.SecureServingInfo.ClientCA = o.ClientCert.ClientCA
 	}
 
 	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
