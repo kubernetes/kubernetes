@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
@@ -393,29 +395,26 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 	namespaceKubeClient := clientBuilder.ClientOrDie("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(rootClientBuilder.ConfigOrDie("namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
-	var gvrFn func() ([]schema.GroupVersionResource, error)
-	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
+	resources, err := namespaceKubeClient.Discovery().ServerResources()
 	if err != nil {
-		return fmt.Errorf("failed to get group version resources: %v", err)
+		return fmt.Errorf("failed to get preferred server resources: %v", err)
 	}
-	for _, rsrcList := range rsrcs {
-		for ix := range rsrcList.APIResources {
-			rsrc := &rsrcList.APIResources[ix]
-			if rsrc.Kind == "ThirdPartyResource" {
-				gvrFn = namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
-			}
-		}
+	gvrs, err := discovery.GroupVersionResources(resources)
+	if err != nil {
+		return fmt.Errorf("failed to parse preferred server resources: %v", err)
 	}
-	if gvrFn == nil {
-		gvr, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
+	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
+	if _, found := gvrs[extensions.SchemeGroupVersion.WithResource("thirdpartyresource")]; found {
+		// make discovery static
+		snapshot, err := discoverResourcesFn()
 		if err != nil {
-			return fmt.Errorf("failed to get resources: %v", err)
+			return fmt.Errorf("failed to get server resources: %v", err)
 		}
-		gvrFn = func() ([]schema.GroupVersionResource, error) {
-			return gvr, nil
+		discoverResourcesFn = func() ([]*metav1.APIResourceList, error) {
+			return snapshot, nil
 		}
 	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, gvrFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
+	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, discoverResourcesFn, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
 	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
@@ -548,9 +547,14 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 
 	if s.EnableGarbageCollector {
 		gcClientset := clientBuilder.ClientOrDie("generic-garbage-collector")
-		groupVersionResources, err := gcClientset.Discovery().ServerPreferredResources()
+		preferredResources, err := gcClientset.Discovery().ServerPreferredResources()
 		if err != nil {
 			return fmt.Errorf("failed to get supported resources from server: %v", err)
+		}
+		deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
+		deletableGroupVersionResources, err := discovery.GroupVersionResources(deletableResources)
+		if err != nil {
+			glog.Errorf("Failed to parse resources from server: %v", err)
 		}
 
 		config := rootClientBuilder.ConfigOrDie("generic-garbage-collector")
@@ -558,7 +562,7 @@ func StartControllers(s *options.CMServer, rootClientBuilder, clientBuilder cont
 		metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 		config.ContentConfig = dynamic.ContentConfig()
 		clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, groupVersionResources)
+		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources)
 		if err != nil {
 			glog.Errorf("Failed to start the generic garbage collector: %v", err)
 		} else {

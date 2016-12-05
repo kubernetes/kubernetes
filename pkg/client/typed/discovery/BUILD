@@ -53,6 +53,7 @@ go_test(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
         "//pkg/runtime/schema:go_default_library",
+        "//pkg/util/sets:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/stretchr/testify/assert",
@@ -73,5 +74,6 @@ go_test(
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
+        "//pkg/util/sets:go_default_library",
     ],
 )

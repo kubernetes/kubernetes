@@ -29,12 +29,14 @@ import (
 
 	"github.com/golang/glog"
 	dto "github.com/prometheus/client_model/go"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
@@ -128,16 +130,21 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	groupVersionResources, err := clientSet.Discovery().ServerPreferredResources()
+	preferredResources, err := clientSet.Discovery().ServerPreferredResources()
 	if err != nil {
 		t.Fatalf("Failed to get supported resources from server: %v", err)
+	}
+	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
+	deletableGroupVersionResources, err := discovery.GroupVersionResources(deletableResources)
+	if err != nil {
+		t.Fatalf("Failed to parse supported resources from server: %v", err)
 	}
 	config := &restclient.Config{Host: s.URL}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 	metaOnlyClientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, registered.RESTMapper(), groupVersionResources)
+	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, registered.RESTMapper(), deletableGroupVersionResources)
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}

@@ -86,19 +86,19 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 }
 
 // ServerResources returns the supported resources for all groups and versions.
-func (d *CachedDiscoveryClient) ServerResources() (map[string]*metav1.APIResourceList, error) {
+func (d *CachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
 	apiGroups, err := d.ServerGroups()
 	if err != nil {
 		return nil, err
 	}
 	groupVersions := metav1.ExtractGroupVersions(apiGroups)
-	result := map[string]*metav1.APIResourceList{}
+	result := []*metav1.APIResourceList{}
 	for _, groupVersion := range groupVersions {
 		resources, err := d.ServerResourcesForGroupVersion(groupVersion)
 		if err != nil {
 			return nil, err
 		}
-		result[groupVersion] = resources
+		result = append(result, resources)
 	}
 	return result, nil
 }
@@ -209,11 +209,11 @@ func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
 	return d.delegate.RESTClient()
 }
 
-func (d *CachedDiscoveryClient) ServerPreferredResources() ([]schema.GroupVersionResource, error) {
+func (d *CachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return d.delegate.ServerPreferredResources()
 }
 
-func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]schema.GroupVersionResource, error) {
+func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return d.delegate.ServerPreferredNamespacedResources()
 }
 

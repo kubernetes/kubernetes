@@ -18,7 +18,6 @@ package namespace
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -344,16 +344,13 @@ func deleteAllContent(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResources []schema.GroupVersionResource,
+	groupVersionResources map[schema.GroupVersionResource]struct{},
 	namespace string,
 	namespaceDeletedAt metav1.Time,
 ) (int64, error) {
 	estimate := int64(0)
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, gvrs: %v", namespace, groupVersionResources)
-	// iterate over each group version, and attempt to delete all of its resources
-	// we sort resources to delete in a priority order that deletes pods LAST
-	sort.Sort(sortableGroupVersionResources(groupVersionResources))
-	for _, gvr := range groupVersionResources {
+	for gvr := range groupVersionResources {
 		gvrEstimate, err := deleteAllContentForGroupVersionResource(kubeClient, clientPool, opCache, gvr, namespace, namespaceDeletedAt)
 		if err != nil {
 			return estimate, err
@@ -371,7 +368,7 @@ func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResourcesFn func() ([]schema.GroupVersionResource, error),
+	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	namespace *v1.Namespace,
 	finalizerToken v1.FinalizerName,
 ) error {
@@ -422,7 +419,13 @@ func syncNamespace(
 	}
 
 	// there may still be content for us to remove
-	groupVersionResources, err := groupVersionResourcesFn()
+	resources, err := discoverResourcesFn()
+	if err != nil {
+		return err
+	}
+	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
+	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
+	groupVersionResources, err := discovery.GroupVersionResources(deletableResources)
 	if err != nil {
 		return err
 	}
@@ -501,21 +504,4 @@ func estimateGracefulTerminationForPods(kubeClient clientset.Interface, ns strin
 		}
 	}
 	return estimate, nil
-}
-
-// sortableGroupVersionResources sorts the input set of resources for deletion, and orders pods to always be last.
-// the idea is that the namespace controller will delete all things that spawn pods first in order to reduce the time
-// those controllers spend creating pods only to be told NO in admission and potentially overwhelming cluster especially if they lack rate limiting.
-type sortableGroupVersionResources []schema.GroupVersionResource
-
-func (list sortableGroupVersionResources) Len() int {
-	return len(list)
-}
-
-func (list sortableGroupVersionResources) Swap(i, j int) {
-	list[i], list[j] = list[j], list[i]
-}
-
-func (list sortableGroupVersionResources) Less(i, j int) bool {
-	return list[j].Group == "" && list[j].Resource == "pods"
 }

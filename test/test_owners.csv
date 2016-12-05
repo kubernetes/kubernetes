@@ -571,6 +571,7 @@ k8s.io/kubernetes/pkg/apis/componentconfig,jbeda,1
 k8s.io/kubernetes/pkg/apis/extensions,bgrant0607,1
 k8s.io/kubernetes/pkg/apis/extensions/v1beta1,madhusudancs,1
 k8s.io/kubernetes/pkg/apis/extensions/validation,nikhiljindal,1
+k8s.io/kubernetes/pkg/apis/meta/v1,sttts,0
 k8s.io/kubernetes/pkg/apis/policy/validation,deads2k,1
 k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1

@@ -51,21 +51,14 @@ func (e ShortcutExpander) getAll() []schema.GroupResource {
 		return e.All
 	}
 
-	availableResources := []schema.GroupVersionResource{}
-	for groupVersionString, resourceList := range apiResources {
-		currVersion, err := schema.ParseGroupVersion(groupVersionString)
-		if err != nil {
-			return e.All
-		}
-
-		for _, resource := range resourceList.APIResources {
-			availableResources = append(availableResources, currVersion.WithResource(resource.Name))
-		}
+	availableResources, err := discovery.GroupVersionResources(apiResources)
+	if err != nil {
+		return e.All
 	}
 
 	availableAll := []schema.GroupResource{}
 	for _, requestedResource := range e.All {
-		for _, availableResource := range availableResources {
+		for availableResource := range availableResources {
 			if requestedResource.Group == availableResource.Group &&
 				requestedResource.Resource == availableResource.Resource {
 				availableAll = append(availableAll, requestedResource)
