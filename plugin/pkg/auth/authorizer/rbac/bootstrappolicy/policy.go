@@ -25,6 +25,8 @@ import (
 var (
 	ReadWrite = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 	Read      = []string{"get", "list", "watch"}
+
+	Label = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
 )
 
 const (
@@ -41,9 +43,33 @@ const (
 	storageGroup        = "storage.k8s.io"
 )
 
+func addClusterRoleLabel(roles []rbac.ClusterRole) {
+	for i := range roles {
+		if roles[i].ObjectMeta.Labels == nil {
+			roles[i].ObjectMeta.Labels = make(map[string]string)
+		}
+		for k, v := range Label {
+			roles[i].ObjectMeta.Labels[k] = v
+		}
+	}
+	return
+}
+
+func addClusterRoleBindingLabel(rolebindings []rbac.ClusterRoleBinding) {
+	for i := range rolebindings {
+		if rolebindings[i].ObjectMeta.Labels == nil {
+			rolebindings[i].ObjectMeta.Labels = make(map[string]string)
+		}
+		for k, v := range Label {
+			rolebindings[i].ObjectMeta.Labels[k] = v
+		}
+	}
+	return
+}
+
 // ClusterRoles returns the cluster roles to bootstrap an API server with
 func ClusterRoles() []rbac.ClusterRole {
-	return []rbac.ClusterRole{
+	roles := []rbac.ClusterRole{
 		{
 			// a "root" role which can do absolutely anything
 			ObjectMeta: api.ObjectMeta{Name: "cluster-admin"},
@@ -204,15 +230,19 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 	}
+	addClusterRoleLabel(roles)
+	return roles
 }
 
 // ClusterRoleBindings return default rolebindings to the default roles
 func ClusterRoleBindings() []rbac.ClusterRoleBinding {
-	return []rbac.ClusterRoleBinding{
+	rolebindings := []rbac.ClusterRoleBinding{
 		rbac.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:node").Groups(user.NodesGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:node-proxier").Groups(user.NodesGroup).BindingOrDie(),
 	}
+	addClusterRoleBindingLabel(rolebindings)
+	return rolebindings
 }

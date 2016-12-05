@@ -4,6 +4,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: admin
   rules:
   - apiGroups:
@@ -170,6 +172,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: cluster-admin
   rules:
   - apiGroups:
@@ -188,6 +192,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: edit
   rules:
   - apiGroups:
@@ -332,6 +338,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:auth-delegator
   rules:
   - apiGroups:
@@ -352,6 +360,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:basic-user
   rules:
   - apiGroups:
@@ -365,6 +375,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:discovery
   rules:
   - attributeRestrictions: null
@@ -380,6 +392,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:node
   rules:
   - apiGroups:
@@ -484,6 +498,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:node-proxier
   rules:
   - apiGroups:
@@ -499,6 +515,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: view
   rules:
   - apiGroups:

@@ -20,12 +20,14 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/ghodss/yaml"
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
@@ -230,6 +232,32 @@ func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 		} else {
 			t.Logf("Diff between bootstrap data and fixture data in %s:\n-------------\n%s", filename, diff.StringDiff(string(yamlData), string(expectedYAML)))
 			t.Logf("If the change is expected, re-run with %s=true to update the fixtures", updateEnvVar)
+		}
+	}
+}
+
+func TestClusterRoleLabel(t *testing.T) {
+	roles := bootstrappolicy.ClusterRoles()
+	for i := range roles {
+		role := roles[i]
+		accessor, err := meta.Accessor(&role)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("ClusterRole: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
+	}
+
+	rolebindings := bootstrappolicy.ClusterRoleBindings()
+	for i := range rolebindings {
+		rolebinding := rolebindings[i]
+		accessor, err := meta.Accessor(&rolebinding)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
 		}
 	}
 }
