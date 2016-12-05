@@ -14,6 +14,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "config.go",
+        "config_selfclient.go",
         "default_storage_factory_builder.go",
         "discovery.go",
         "doc.go",
@@ -117,6 +118,7 @@ go_test(
         "//pkg/storage/storagebackend:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//pkg/util/clock:go_default_library",
+        "//pkg/util/config:go_default_library",
         "//pkg/util/net:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/version:go_default_library",

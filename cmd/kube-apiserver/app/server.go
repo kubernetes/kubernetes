@@ -21,6 +21,7 @@ package app
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -49,7 +50,6 @@ import (
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -85,20 +85,25 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
-	genericConfig := genericapiserver.NewConfig(). // create the new config
-							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
-							ApplySecureServingOptions(s.SecureServing).
-							ApplyInsecureServingOptions(s.InsecureServing).
-							ApplyAuthenticationOptions(s.Authentication).
-							ApplyRBACSuperUser(s.Authorization.RBACSuperUser)
-
 	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
 	if err != nil {
-		glog.Fatalf("Error determining service IP ranges: %v", err)
+		return fmt.Errorf("error determining service IP ranges: %v", err)
 	}
-	if err := genericConfig.MaybeGenerateServingCerts(apiServerServiceIP); err != nil {
-		glog.Fatalf("Failed to generate service certificate: %v", err)
+
+	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), apiServerServiceIP); err != nil {
+		return fmt.Errorf("error creating self-signed certificates: %v", err)
+	}
+
+	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
+
+	genericConfig, err := genericapiserver.NewConfig(). // create the new config
+								ApplyOptions(s.GenericServerRunOptions). // apply the options selected
+								ApplyInsecureServingOptions(s.InsecureServing).
+								ApplyAuthenticationOptions(s.Authentication).
+								ApplyRBACSuperUser(s.Authorization.RBACSuperUser).
+								ApplySecureServingOptions(s.SecureServing)
+	if err != nil {
+		return fmt.Errorf("failed to configure https: %s", err)
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
@@ -120,7 +125,7 @@ func Run(s *options.ServerRunOptions) error {
 		var installSSH genericapiserver.InstallSSHKey
 		cloud, err := cloudprovider.InitCloudProvider(s.GenericServerRunOptions.CloudProvider, s.GenericServerRunOptions.CloudConfigFile)
 		if err != nil {
-			glog.Fatalf("Cloud provider could not be initialized: %v", err)
+			return fmt.Errorf("cloud provider could not be initialized: %v", err)
 		}
 		if cloud != nil {
 			if instances, supported := cloud.Instances(); supported {
@@ -128,7 +133,7 @@ func Run(s *options.ServerRunOptions) error {
 			}
 		}
 		if s.KubeletConfig.Port == 0 {
-			glog.Fatalf("Must enable kubelet port if proxy ssh-tunneling is specified.")
+			return fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
 		}
 		// Set up the tunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
@@ -173,7 +178,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
 	if err != nil {
-		glog.Fatalf("error generating storage version map: %s", err)
+		return fmt.Errorf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
 		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
@@ -182,7 +187,7 @@ func Run(s *options.ServerRunOptions) error {
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
 		master.DefaultAPIResourceConfigSource(), s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
-		glog.Fatalf("error in initializing storage factory: %s", err)
+		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
 	storageFactory.AddCohabitatingResources(batch.Resource("jobs"), extensions.Resource("jobs"))
 	storageFactory.AddCohabitatingResources(autoscaling.Resource("horizontalpodautoscalers"), extensions.Resource("horizontalpodautoscalers"))
@@ -221,20 +226,20 @@ func Run(s *options.ServerRunOptions) error {
 		// go directly to etcd to avoid recursive auth insanity
 		storageConfig, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
 		if err != nil {
-			glog.Fatalf("Unable to get serviceaccounts storage: %v", err)
+			return fmt.Errorf("unable to get serviceaccounts storage: %v", err)
 		}
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
 	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticatorConfig)
 	if err != nil {
-		glog.Fatalf("Invalid Authentication Config: %v", err)
+		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}
 
 	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := genericoptions.NewSelfClientConfig(s.SecureServing, s.InsecureServing, privilegedLoopbackToken)
+	selfClientConfig, err := genericapiserver.NewSelfClientConfig(genericConfig.SecureServingInfo, genericConfig.InsecureServingInfo, privilegedLoopbackToken)
 	if err != nil {
-		glog.Fatalf("Failed to create clientset: %v", err)
+		return fmt.Errorf("failed to create clientset: %v", err)
 	}
 	client, err := internalclientset.NewForConfig(selfClientConfig)
 	if err != nil {
@@ -245,14 +250,14 @@ func Run(s *options.ServerRunOptions) error {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationConfig)
 	if err != nil {
-		glog.Fatalf("Invalid Authorization Config: %v", err)
+		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
 	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
-		glog.Fatalf("Failed to initialize plugins: %v", err)
+		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}
 
 	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{

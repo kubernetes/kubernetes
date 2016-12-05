@@ -17,14 +17,14 @@ limitations under the License.
 package options
 
 import (
-	"errors"
 	"fmt"
 	"net"
-	"strconv"
+	"path"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
@@ -43,14 +43,10 @@ type SecureServingOptions struct {
 	SNICertKeys []config.NamedCertKey
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
-
-	// ServerCA is the certificate bundle for the signer of your serving certificate.  Used for building a loopback
-	// connection to the API server for admission.
-	ServerCA string
 }
 
 type CertKey struct {
-	// CertFile is a file containing a PEM-encoded certificate
+	// CertFile is a file containing a PEM-encoded certificate, and possibly the complete certificate chain
 	CertFile string
 	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
 	KeyFile string
@@ -59,6 +55,8 @@ type CertKey struct {
 type GeneratableKeyCert struct {
 	CertKey CertKey
 
+	// CACertFile is an optional file containing the certificate chain for CertKey.CertFile
+	CACertFile string
 	// CertDirectory is a directory that will contain the certificates.  If the cert and key aren't specifically set
 	// this will be used to derive a match with the "pair-name"
 	CertDirectory string
@@ -78,31 +76,6 @@ func NewSecureServingOptions() *SecureServingOptions {
 			CertDirectory: "/var/run/kubernetes",
 		},
 	}
-}
-
-func (s *SecureServingOptions) NewSelfClientConfig(token string) *restclient.Config {
-	if s == nil || s.ServingOptions.BindPort <= 0 || len(s.ServerCA) == 0 {
-		return nil
-	}
-
-	clientConfig := &restclient.Config{
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}
-
-	// Use secure port if the ServerCA is specified
-	host := s.ServingOptions.BindAddress.String()
-	if host == "0.0.0.0" {
-		host = "localhost"
-	}
-	clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.ServingOptions.BindPort))
-	clientConfig.CAFile = s.ServerCA
-	clientConfig.BearerToken = token
-
-	return clientConfig
 }
 
 func (s *SecureServingOptions) Validate() []error {
@@ -138,6 +111,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
 
+	fs.StringVar(&s.ServerCert.CACertFile, "tls-ca-file", s.ServerCert.CACertFile, "If set, this "+
+		"certificate authority will used for secure access from Admission "+
+		"Controllers. This must be a valid PEM-encoded CA bundle. Altneratively, the certificate authority "+
+		"can be appended to the certificate provided by --tls-cert-file.")
+
 	fs.Var(config.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
 		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
@@ -151,18 +129,12 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"If set, any request presenting a client certificate signed by one of "+
 		"the authorities in the client-ca-file is authenticated with an identity "+
 		"corresponding to the CommonName of the client certificate.")
-
-	fs.StringVar(&s.ServerCA, "tls-ca-file", s.ServerCA, "If set, this "+
-		"certificate authority will used for secure access from Admission "+
-		"Controllers. This must be a valid PEM-encoded CA bundle.")
-
 }
 
 func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.ServingOptions.BindAddress, "public-address-override", s.ServingOptions.BindAddress,
 		"DEPRECATED: see --bind-address instead.")
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
-
 }
 
 func NewInsecureServingOptions() *ServingOptions {
@@ -180,23 +152,6 @@ func (s ServingOptions) Validate(portArg string) []error {
 	}
 
 	return errors
-}
-
-func (s *ServingOptions) NewSelfClientConfig(token string) *restclient.Config {
-	if s == nil || s.BindPort <= 0 {
-		return nil
-	}
-	clientConfig := &restclient.Config{
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}
-
-	clientConfig.Host = net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
-
-	return clientConfig
 }
 
 func (s *ServingOptions) DefaultExternalAddress() (net.IP, error) {
@@ -224,14 +179,47 @@ func (s *ServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("port", "see --insecure-port instead.")
 }
 
-// Returns a clientconfig which can be used to talk to this apiserver.
-func NewSelfClientConfig(secureServingOptions *SecureServingOptions, insecureServingOptions *ServingOptions, token string) (*restclient.Config, error) {
-	if cfg := secureServingOptions.NewSelfClientConfig(token); cfg != nil {
-		return cfg, nil
-	}
-	if cfg := insecureServingOptions.NewSelfClientConfig(token); cfg != nil {
-		return cfg, nil
+func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress string, alternateIPs ...net.IP) error {
+	keyCert := &s.ServerCert.CertKey
+
+	if s == nil || len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
+		return nil
 	}
 
-	return nil, errors.New("Unable to set url for apiserver local client")
+	keyCert.CertFile = path.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".crt")
+	keyCert.KeyFile = path.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".key")
+
+	canReadCertAndKey, err := certutil.CanReadCertAndKey(keyCert.CertFile, keyCert.KeyFile)
+	if err != nil {
+		return err
+	}
+	if !canReadCertAndKey {
+		// TODO: It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
+		// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
+		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
+		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
+
+		// add either the bind address or localhost to the valid alternates
+		bindIP := s.ServingOptions.BindAddress.String()
+		if bindIP == "0.0.0.0" {
+			alternateDNS = append(alternateDNS, "localhost")
+		} else {
+			alternateIPs = append(alternateIPs, s.ServingOptions.BindAddress)
+		}
+
+		if cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress, alternateIPs, alternateDNS); err != nil {
+			return fmt.Errorf("unable to generate self signed cert: %v", err)
+		} else {
+			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
+				return err
+			}
+
+			if err := certutil.WriteKey(keyCert.KeyFile, key); err != nil {
+				return err
+			}
+			glog.Infof("Generated self-signed cert (%s, %s)", keyCert.CertFile, keyCert.KeyFile)
+		}
+	}
+
+	return nil
 }
