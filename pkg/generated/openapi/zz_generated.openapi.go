@@ -5968,8 +5968,22 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"verbs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
-				Required: []string{"name", "namespaced", "kind"},
+				Required: []string{"name", "namespaced", "kind", "verbs"},
 			},
 		},
 		Dependencies: []string{},
