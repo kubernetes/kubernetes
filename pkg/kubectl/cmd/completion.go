@@ -258,6 +258,7 @@ fi
 __kubectl_convert_bash_to_zsh() {
 	sed \
 	-e 's/declare -F/whence -w/' \
+	-e 's/\$\@/\$\{\*\}/' \
 	-e 's/local \([a-zA-Z0-9_]*\)=/local \1; \1=/' \
 	-e 's/flags+=("\(--.*\)=")/flags+=("\1"); two_word_flags+=("\1")/' \
 	-e 's/must_have_one_flag+=("\(--.*\)=")/must_have_one_flag+=("\1")/' \
