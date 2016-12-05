@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -29,17 +28,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	"k8s.io/kubernetes/pkg/apiserver/request"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {
 
-	// notAccountedPathsRegexp specifies paths requests to which we don't account into
-	// requests in flight.
-	notAccountedPathsRegexp := regexp.MustCompile(".*\\/watch")
-	longRunningRequestCheck := BasicLongRunningRequestCheck(notAccountedPathsRegexp, map[string]string{"watch": "true"})
+	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	requestContextMapper := api.NewRequestContextMapper()
-	requestInfoFactory := &request.RequestInfoFactory{}
+	requestInfoFactory := &request.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	handler := WithMaxInFlightLimit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// A short, accounted request that does not wait for block WaitGroup.
@@ -103,7 +100,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 	for i := 0; i < AllowedNonMutatingInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			if err := expectHTTPGet(server.URL+"/foo/bar?watch=true", http.StatusOK); err != nil {
+			if err := expectHTTPGet(server.URL+"/api/v1/namespaces/default/wait?watch=true", http.StatusOK); err != nil {
 				t.Error(err)
 			}
 			responses.Done()
@@ -139,7 +136,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 		}
 	}
 	// Validate that non-accounted URLs still work.  use a path regex match
-	if err := expectHTTPGet(server.URL+"/dontwait/watch", http.StatusOK); err != nil {
+	if err := expectHTTPGet(server.URL+"/api/v1/watch/namespaces/default/dontwait", http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
