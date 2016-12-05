@@ -74,87 +74,94 @@ const (
 )
 
 // Config is a structure used to configure a GenericAPIServer.
+// It's members are sorted rougly in order of importance for composers.
 type Config struct {
-	// Destination for audit logs
-	AuditWriter io.Writer
-	// Allow downstream consumers to disable swagger.
-	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
-	EnableSwaggerSupport bool
-	// Allow downstream consumers to disable swagger ui.
-	// Note that this is ignored if EnableSwaggerSupport is false
-	EnableSwaggerUI bool
-	// Allows api group versions or specific resources to be conditionally enabled/disabled.
-	APIResourceConfigSource APIResourceConfigSource
-	// allow downstream consumers to disable the index route
-	EnableIndex     bool
-	EnableProfiling bool
-	// Requires generic profiling enabled
-	EnableContentionProfiling bool
-	EnableMetrics             bool
-	EnableGarbageCollection   bool
-
-	Version               *version.Info
-	CorsAllowedOriginList []string
-	Authenticator         authenticator.Request
-	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth bool
-	Authorizer        authorizer.Authorizer
-	AdmissionControl  admission.Interface
+	// SecureServingInfo is required to serve https
+	SecureServingInfo *SecureServingInfo
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
+	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
 	LoopbackClientConfig *restclient.Config
+	// Authenticator determines which subject is making the request
+	Authenticator authenticator.Request
+	// Authorizer determines whether the subject is allowed to make the request based only
+	// on the RequestURI
+	Authorizer authorizer.Authorizer
+	// AdmissionControl performs deep inspection of a given request (including content)
+	// to set values and determine whether its allowed
+	AdmissionControl      admission.Interface
+	CorsAllowedOriginList []string
 
-	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
-	RequestContextMapper api.RequestContextMapper
+	EnableSwaggerSupport bool
+	EnableSwaggerUI      bool
+	EnableIndex          bool
+	EnableProfiling      bool
+	// Requires generic profiling enabled
+	EnableContentionProfiling bool
+	EnableGarbageCollection   bool
+	EnableMetrics             bool
+	EnableOpenAPISupport      bool
 
-	// Required, the interface for serializing and converting objects to and from the wire
-	Serializer runtime.NegotiatedSerializer
+	// Version will enable the /version endpoint if non-nil
+	Version *version.Info
+	// AuditWriter is the destination for audit logs.  If nil, they will not be written.
+	AuditWriter io.Writer
+	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
+	// If this is true, a basic auth challenge is returned on authentication failure
+	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
+	SupportsBasicAuth bool
+	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
+	// Will default to a value based on secure serving info and available ipv4 IPs.
+	ExternalAddress string
 
-	// If specified, requests will be allocated a random timeout between this value, and twice this value.
-	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
-	MinRequestTimeout int
+	//===========================================================================
+	// Fields you probably don't care about changing
+	//===========================================================================
 
-	SecureServingInfo   *SecureServingInfo
-	InsecureServingInfo *ServingInfo
-
+	// BuildHandlerChainsFunc allows you to build custom handler chains by decorating the apiHandler.
+	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
 	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses DiscoveryAddresses
-
-	// The port on PublicAddress where a read-write server will be installed.
-	// Defaults to 6443 if not set.
-	ReadWritePort int
-
-	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
-	ExternalAddress string
-
-	// PublicAddress is the IP address where members of the cluster (kubelet,
-	// kube-proxy, services, etc.) can reach the GenericAPIServer.
-	// If nil or 0.0.0.0, the host's default interface will be used.
-	PublicAddress net.IP
-
-	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
-	EnableOpenAPISupport bool
-
-	// OpenAPIConfig will be used in generating OpenAPI spec.
+	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
+	// to InstallLegacyAPIGroup.  New API servers don't generally have legacy groups at all.
+	LegacyAPIGroupPrefixes sets.String
+	// RequestContextMapper maps requests to contexts. Exported so downstream consumers can provider their own mappers
+	// TODO confirm that anyone downstream actually uses this and doesn't just need an accessor
+	RequestContextMapper api.RequestContextMapper
+	// Serializer is required and provides the interface for serializing and converting objects to and from the wire
+	// The default (api.Codecs) usually works fine.
+	Serializer runtime.NegotiatedSerializer
+	// OpenAPIConfig will be used in generating OpenAPI spec.  This has "working" defaults.
 	OpenAPIConfig *common.Config
-
+	// If specified, requests will be allocated a random timeout between this value, and twice this value.
+	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
+	MinRequestTimeout int
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait. Applies only to non-mutating requests.
 	MaxRequestsInFlight int
 	// MaxMutatingRequestsInFlight is the maximum number of parallel mutating requests. Every further
 	// request has to wait.
 	MaxMutatingRequestsInFlight int
-
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc genericfilters.LongRunningRequestCheck
 
-	// Build the handler chains by decorating the apiHandler.
-	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
+	// InsecureServingInfo is required to serve http.  HTTP does NOT include authentication or authorization.
+	// You shouldn't be using this.  It makes sig-auth sad.
+	InsecureServingInfo *ServingInfo
 
-	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
-	// to InstallLegacyAPIGroup
-	LegacyAPIGroupPrefixes sets.String
+	//===========================================================================
+	// values below here are targets for removal
+	//===========================================================================
+
+	APIResourceConfigSource APIResourceConfigSource
+	// The port on PublicAddress where a read-write server will be installed.
+	// Defaults to 6443 if not set.
+	ReadWritePort int
+	// PublicAddress is the IP address where members of the cluster (kubelet,
+	// kube-proxy, services, etc.) can reach the GenericAPIServer.
+	// If nil or 0.0.0.0, the host's default interface will be used.
+	PublicAddress net.IP
 }
 
 type ServingInfo struct {
