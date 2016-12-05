@@ -66,7 +66,7 @@
 {% if pillar['num_nodes'] is defined -%}
   # If the cluster is large, increase max-requests-inflight limit in apiserver.
   {% if pillar['num_nodes']|int >= 1000 -%}
-    {% set max_requests_inflight = "--max-requests-inflight=1500" -%}
+    {% set max_requests_inflight = "--max-requests-inflight=1500 --max-mutating-requests-inflight=500" -%}
   {% endif -%}
   # Set amount of memory available for apiserver based on number of nodes.
   # TODO: Once we start setting proper requests and limits for apiserver
