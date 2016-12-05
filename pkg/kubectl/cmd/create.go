@@ -23,8 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -162,12 +160,12 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 			if err != nil {
 				return err
 			}
-			if !generic {
-				decodedObj, decoded := decodeUnstructuredObject(info.Object)
-				if !decoded {
-					return fmt.Errorf("Unsupported output format for the current object")
+			if !generic || printer == nil {
+				printer, err := f.PrinterForMapping(cmd, nil, false)
+				if err != nil {
+					return err
 				}
-				return f.PrintObject(cmd, registered.RESTMapper(), decodedObj, out)
+				return printer.PrintObj(info.Object, out)
 			}
 			return printer.PrintObj(info.Object, out)
 		}
@@ -185,20 +183,6 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		return fmt.Errorf("no objects passed to create")
 	}
 	return nil
-}
-
-// decodeUnstructuredObject attempts to convert an unstructured object into a known type
-// If the object fails to be converted or printed, an error is returned.
-func decodeUnstructuredObject(obj runtime.Object) (runtime.Object, bool) {
-	switch obj.(type) {
-	case *runtime.UnstructuredList, *runtime.Unstructured, *runtime.Unknown:
-		if objBytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj); err == nil {
-			if decodedObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), objBytes); err == nil {
-				return decodedObj, true
-			}
-		}
-	}
-	return nil, false
 }
 
 func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
