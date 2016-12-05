@@ -56,6 +56,10 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		v1.Convert_api_ServiceSpec_To_v1_ServiceSpec,
 		v1.Convert_v1_ServiceStatus_To_api_ServiceStatus,
 		v1.Convert_api_ServiceStatus_To_v1_ServiceStatus,
+		v1.Convert_v1_Pod_To_api_Pod,
+		v1.Convert_api_Pod_To_v1_Pod,
+		v1.Convert_v1_PodList_To_api_PodList,
+		v1.Convert_api_PodList_To_v1_PodList,
 	)
 	if err != nil {
 		return err
