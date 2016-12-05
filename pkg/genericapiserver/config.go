@@ -141,8 +141,11 @@ type Config struct {
 	OpenAPIConfig *common.Config
 
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
-	// request has to wait.
+	// request has to wait. Applies only to non-mutating requests.
 	MaxRequestsInFlight int
+	// MaxMutatingRequestsInFlight is the maximum number of parallel mutating requests. Every further
+	// request has to wait.
+	MaxMutatingRequestsInFlight int
 
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc genericfilters.LongRunningRequestCheck
@@ -320,6 +323,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.EnableSwaggerUI = options.EnableSwaggerUI
 	c.ExternalAddress = options.ExternalHost
 	c.MaxRequestsInFlight = options.MaxRequestsInFlight
+	c.MaxMutatingRequestsInFlight = options.MaxMutatingRequestsInFlight
 	c.MinRequestTimeout = options.MinRequestTimeout
 	c.PublicAddress = options.AdvertiseAddress
 
@@ -488,10 +492,10 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 	generic := func(handler http.Handler) http.Handler {
 		handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 		handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
+		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
 		handler = apiserverfilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
 		handler = api.WithRequestContext(handler, c.RequestContextMapper)
-		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
-		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.LongRunningFunc)
 		return handler
 	}
 	audit := func(handler http.Handler) http.Handler {

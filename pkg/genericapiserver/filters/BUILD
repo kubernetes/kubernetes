@@ -28,6 +28,7 @@ go_library(
         "//pkg/httplog:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/runtime:go_default_library",
+        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )
@@ -41,5 +42,10 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api/errors:go_default_library"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/errors:go_default_library",
+        "//pkg/apiserver/filters:go_default_library",
+        "//pkg/apiserver/request:go_default_library",
+    ],
 )
