@@ -61,6 +61,7 @@ go_test(
         "//pkg/api/service:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
