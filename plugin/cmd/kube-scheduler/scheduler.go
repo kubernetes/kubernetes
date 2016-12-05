@@ -17,6 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
@@ -41,5 +44,9 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	app.Run(s)
+	if err := app.Run(s); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+
 }
