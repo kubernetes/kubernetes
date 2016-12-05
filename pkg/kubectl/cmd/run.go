@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -367,20 +368,11 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 }
 
 // TODO turn this into reusable method checking available resources
-func contains(resourcesList map[string]*metav1.APIResourceList, resource schema.GroupVersionResource) bool {
-	if resourcesList == nil {
-		return false
-	}
-	resourcesGroup, ok := resourcesList[resource.GroupVersion().String()]
-	if !ok {
-		return false
-	}
-	for _, item := range resourcesGroup.APIResources {
-		if resource.Resource == item.Name {
-			return true
-		}
-	}
-	return false
+func contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVersionResource) bool {
+	resources := discovery.FilteredBy(discovery.ResourcePredicateFunc(func(gv string, r *metav1.APIResource) bool {
+		return resource.GroupVersion().String() == gv && resource.Resource == r.Name
+	}), resourcesList)
+	return len(resources) != 0
 }
 
 // waitForPod watches the given pod until the exitCondition is true. Each two seconds
