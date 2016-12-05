@@ -201,7 +201,7 @@ func TestK8sVolume(t *testing.T) {
 		{
 			cfg: &kubeadmapi.MasterConfiguration{},
 			expected: api.Volume{
-				Name: "pki",
+				Name: "k8s",
 				VolumeSource: api.VolumeSource{
 					HostPath: &api.HostPathVolumeSource{
 						Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
@@ -234,7 +234,7 @@ func TestK8sVolumeMount(t *testing.T) {
 	}{
 		{
 			expected: api.VolumeMount{
-				Name:      "pki",
+				Name:      "k8s",
 				MountPath: "/etc/kubernetes/",
 				ReadOnly:  true,
 			},
