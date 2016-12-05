@@ -1002,7 +1002,7 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 				volumeToUnmount.OuterVolumeSpecName,
 				volumeToUnmount.PodName,
 				volumeToUnmount.PodUID,
-				unmountErr)
+				markVolMountedErr)
 		}
 
 		return nil
