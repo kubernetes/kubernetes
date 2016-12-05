@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -130,6 +131,14 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 		}
 	}
 
+	// TODO: this is a workaround for the unmount device issue caused by gci mounter.
+	// In GCI cluster, if gci mounter is used for mounting, the container started by mounter
+	// script will cause additional mounts created in the container. Since these mounts are
+	// irrelavant to the original mounts, they should be not considered when checking the
+	// mount references. By comparing the mount path prefix, those additional mounts can be
+	// filtered out.
+	// Plan to work on better approach to solve this issue.
+	podsDirPrefix := getPodsDirPrefix(mountPath, options.DefaultKubeletPluginsDirName)
 	// Find all references to the device.
 	var refs []string
 	if deviceName == "" {
@@ -137,11 +146,23 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 	} else {
 		for i := range mps {
 			if mps[i].Device == deviceName && mps[i].Path != slTarget {
-				refs = append(refs, mps[i].Path)
+				mpPrefix := getPodsDirPrefix(mps[i].Path, options.DefaultKubeletPodsDirName)
+				if mpPrefix == podsDirPrefix {
+					refs = append(refs, mps[i].Path)
+				}
 			}
 		}
 	}
 	return refs, nil
+}
+
+func getPodsDirPrefix(mountPath, prefixName string) string {
+	prefix := ""
+	parts := strings.Split(mountPath, prefixName)
+	if len(parts) > 0 {
+		prefix = parts[0]
+	}
+	return prefix
 }
 
 // GetDeviceNameFromMount: given a mnt point, find the device from /proc/mounts
