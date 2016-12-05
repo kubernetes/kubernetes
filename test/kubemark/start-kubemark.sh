@@ -20,7 +20,10 @@
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
 
-source "${KUBE_ROOT}/test/kubemark/common.sh"
+# TODO(shyamjvs): This variable should be read from a cloud_provider_config.sh file.
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-gce}"
+
+source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/common.sh"
 
 function writeEnvironmentFile() {
   cat > "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" <<EOF
@@ -66,6 +69,7 @@ CURR_DIR=`pwd`
 cd "${MAKE_DIR}"
 RETRIES=3
 for attempt in $(seq 1 ${RETRIES}); do
+  # TODO(shyamjvs): This makefile will depend on the cloud provider for image creation/pushing.
   if ! make; then
     if [[ $((attempt)) -eq "${RETRIES}" ]]; then
       echo "${color_red}Make failed. Exiting.${color_norm}"
@@ -79,6 +83,10 @@ for attempt in $(seq 1 ${RETRIES}); do
 done
 rm kubemark
 cd $CURR_DIR
+
+##################################################################################
+##################################################################################
+# TODO(shyamjvs): All this part should move out into cloud_provider specific code.
 
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
 
@@ -127,6 +135,10 @@ run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubema
   --source-ranges "0.0.0.0/0" \
   --target-tags "${MASTER_TAG}" \
   --allow "tcp:443"
+# MASTER_NAME and MASTER_IP have to be set by the time we reach this point to have
+# cert creation code below work.
+##################################################################################
+##################################################################################
 
 ensure-temp-dir
 gen-kube-bearertoken
@@ -138,6 +150,10 @@ echo "${CA_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/ca.crt"
 echo "${KUBECFG_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.crt"
 echo "${KUBECFG_KEY_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.key"
 
+##################################################################################
+##################################################################################
+# TODO(shyamjvs): All this part should move out into cloud_provider specific code.
+# Also some cert/key variables have to be set by the time we reach this point.
 until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" --command="ls" &> /dev/null; do
   sleep 1
 done
@@ -161,7 +177,7 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${SERVER_BINARY_TAR}" \
   "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" \
   "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
-  "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
+  "${KUBEMARK_DIRECTORY}/gce/configure-kubectl.sh" \
   "${RESOURCE_DIRECTORY}/manifests/etcd.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/etcd-events.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
@@ -173,6 +189,14 @@ gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
   --command="sudo chmod a+x /home/kubernetes/configure-kubectl.sh && \
     sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
     sudo bash /home/kubernetes/start-kubemark-master.sh"
+##################################################################################
+##################################################################################
+
+
+##################################################################################
+##################################################################################
+# The code below this line is provider-independent.
+# (Except for the image inside "hollow-node_template.json" has to be variable now)
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1

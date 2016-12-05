@@ -14,6 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
 source ${KUBE_ROOT}/cluster/gce/util.sh
-source ${KUBE_ROOT}/cluster/kubemark/config-default.sh
+source ${KUBE_ROOT}/cluster/kubemark/gce/config-default.sh

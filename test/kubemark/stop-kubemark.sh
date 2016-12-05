@@ -17,13 +17,25 @@
 # Script that destroys Kubemark clusters and deletes all GCE resources created for Master
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-source "${KUBE_ROOT}/test/kubemark/common.sh"
+# TODO(shyamjvs): This variable should be read from a cloud_provider_config.sh file.
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-gce}"
+
+source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/common.sh"
 
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-kubelet.json" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/addons" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/kubemark-ns.json" &> /dev/null || true
-rm -rf "${RESOURCE_DIRECTORY}/addons"
 
+rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.kubemark" &> /dev/null || true
+rm "${RESOURCE_DIRECTORY}/ca.crt" \
+	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
+	"${RESOURCE_DIRECTORY}/kubecfg.key" \
+	"${RESOURCE_DIRECTORY}/hollow-node.json" \
+	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
+
+##################################################################################
+##################################################################################
+# TODO(shyamjvs): All this part should move out into cloud_provider specific code.
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
 
 gcloud compute instances delete "${MASTER_NAME}" \
@@ -51,10 +63,5 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
 	gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
     	${GCLOUD_COMMON_ARGS} || true
 fi
-
-rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.kubemark" &> /dev/null || true
-rm "${RESOURCE_DIRECTORY}/ca.crt" \
-	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
-	"${RESOURCE_DIRECTORY}/kubecfg.key" \
-	"${RESOURCE_DIRECTORY}/hollow-node.json" \
-	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
+##################################################################################
+##################################################################################
