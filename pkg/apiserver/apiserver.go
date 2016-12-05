@@ -106,8 +106,6 @@ type APIGroupVersion struct {
 	ResourceLister APIResourceLister
 }
 
-type ProxyDialerFunc func(network, addr string) (net.Conn, error)
-
 // TODO: Pipe these in through the apiserver cmd line
 const (
 	// Minimum duration before timing out read/write requests
