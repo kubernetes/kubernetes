@@ -350,6 +350,9 @@ func (proxier *Proxier) sameConfig(info *serviceInfo, service *api.Service, port
 	if info.onlyNodeLocalEndpoints != onlyNodeLocalEndpoints {
 		return false
 	}
+	if !reflect.DeepEqual(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges) {
+		return false
+	}
 	return true
 }
 

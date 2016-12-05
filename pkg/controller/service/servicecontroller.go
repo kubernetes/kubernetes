@@ -429,6 +429,13 @@ func (s *ServiceController) needsUpdate(oldService *api.Service, newService *api
 			oldService.Spec.Type, newService.Spec.Type)
 		return true
 	}
+
+	if wantsLoadBalancer(newService) && !reflect.DeepEqual(oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges) {
+		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "LoadBalancerSourceRanges", "%v -> %v",
+			oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges)
+		return true
+	}
+
 	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
