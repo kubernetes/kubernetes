@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -26,10 +25,6 @@ import (
 
 	"github.com/spf13/pflag"
 )
-
-func init() {
-	healthz.DefaultHealthz()
-}
 
 func main() {
 	s := options.NewSchedulerServer()
