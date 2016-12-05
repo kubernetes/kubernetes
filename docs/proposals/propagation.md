@@ -4,7 +4,8 @@
 
 A proposal to add support for propagation mode in HostPath volume, which allows
 mounts within containers to visible outside the container and mounts after pods
-creation visible to containers.
+creation visible to containers. Propagation [modes] (https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt) contains "shared", "slave", "private",
+"unbindable". Out of them, docker supports "shared" / "slave" / "private".
 
 Several existing issues and PRs were already created regarding that particular
 subject:
@@ -106,6 +107,8 @@ Opinion against this:
 
 1. All containers use this volume will share the same propagation mode.
 
+1. (From @jonboulle) May cause cross-runtime compatibility issue.
+
 ### Make HostPath shared for privileged containers, slave for non-privileged.
 
 Given only HostPath needs this feature, and privileged access is needed when
@@ -130,13 +133,14 @@ Opinion against this:
 
 1. This changes the behavior of existing config.
 
-1. "shared" is not supported by some kernels, we need runtime support matrix
-and when that will be addressed
+1. (From @euank) "shared" is not correctly supported by some kernels, we need
+runtime support matrix and when that will be addressed.
 
 1. This may cause silently fail and be a debuggability nightmare on many
 distros.
 
-1. Changing those mountflags may make docker even less stable.
+1. (From @euank) Changing those mountflags may make docker even less stable,
+this may lock up kernel accidently or out of user's intention.
 
 
 ## Decision
