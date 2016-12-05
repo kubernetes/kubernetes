@@ -399,14 +399,14 @@ func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 	}
 	parallelism := int32(newSize)
 	job.Spec.Parallelism = &parallelism
-	udpatedJob, err := scaler.c.Jobs(namespace).Update(job)
+	updatedJob, err := scaler.c.Jobs(namespace).Update(job)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return "", ScaleError{ScaleUpdateConflictFailure, job.ResourceVersion, err}
 		}
 		return "", ScaleError{ScaleUpdateFailure, job.ResourceVersion, err}
 	}
-	return udpatedJob.ObjectMeta.ResourceVersion, nil
+	return updatedJob.ObjectMeta.ResourceVersion, nil
 }
 
 // Scale updates a Job to a new size, with optional precondition check (if preconditions is not nil),
