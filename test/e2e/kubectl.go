@@ -267,6 +267,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	// Reustable cluster state function.  This won't be adversly affected by lazy initialization of framework.
 	clusterState := func() *framework.ClusterVerification {
 		return f.NewClusterVerification(
+			f.Namespace,
 			framework.PodStateVerification{
 				Selectors:   map[string]string{"app": "redis"},
 				ValidPhases: []v1.PodPhase{v1.PodRunning /*v1.PodPending*/},
