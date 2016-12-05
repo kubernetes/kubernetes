@@ -121,6 +121,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "autoscale_test.go",
         "cluster_test.go",
         "configmap_test.go",
         "custom_column_printer_test.go",
@@ -159,6 +160,7 @@ go_test(
         "//pkg/api/testing:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
+        "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
