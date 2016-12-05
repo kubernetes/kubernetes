@@ -81,6 +81,13 @@ func DeepCopy_v1_APIResource(in interface{}, out interface{}, c *conversion.Clon
 		out.Name = in.Name
 		out.Namespaced = in.Namespaced
 		out.Kind = in.Kind
+		if in.Verbs != nil {
+			in, out := &in.Verbs, &out.Verbs
+			*out = make(Verbs, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Verbs = nil
+		}
 		return nil
 	}
 }
@@ -95,7 +102,9 @@ func DeepCopy_v1_APIResourceList(in interface{}, out interface{}, c *conversion.
 			in, out := &in.APIResources, &out.APIResources
 			*out = make([]APIResource, len(*in))
 			for i := range *in {
-				(*out)[i] = (*in)[i]
+				if err := DeepCopy_v1_APIResource(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		} else {
 			out.APIResources = nil

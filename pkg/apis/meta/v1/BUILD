@@ -38,6 +38,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/google/gofuzz",
+        "//vendor:github.com/ugorji/go/codec",
     ],
 )
 
@@ -48,6 +49,7 @@ go_test(
         "group_version_test.go",
         "helpers_test.go",
         "time_test.go",
+        "types_test.go",
     ],
     library = "go_default_library",
     tags = ["automanaged"],
