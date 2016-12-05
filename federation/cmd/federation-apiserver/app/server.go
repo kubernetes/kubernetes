@@ -161,7 +161,6 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
 	genericConfig.EnableOpenAPISupport = true
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions

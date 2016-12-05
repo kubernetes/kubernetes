@@ -154,7 +154,6 @@ type Config struct {
 	// values below here are targets for removal
 	//===========================================================================
 
-	APIResourceConfigSource APIResourceConfigSource
 	// The port on PublicAddress where a read-write server will be installed.
 	// Defaults to 6443 if not set.
 	ReadWritePort int
