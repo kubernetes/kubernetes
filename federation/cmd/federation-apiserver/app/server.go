@@ -126,7 +126,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig(s.SecureServing.ClientCA))
+	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig())
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}

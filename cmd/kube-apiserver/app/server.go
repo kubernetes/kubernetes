@@ -219,7 +219,7 @@ func Run(s *options.ServerRunOptions) error {
 		}
 	}
 
-	authenticatorConfig := s.Authentication.ToAuthenticationConfig(s.SecureServing.ClientCA)
+	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
 	if s.Authentication.ServiceAccounts.Lookup {
 		// If we need to look up service accounts and tokens,
 		// go directly to etcd to avoid recursive auth insanity
