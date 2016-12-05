@@ -75,8 +75,15 @@ KUBE_VERBOSE ?= 1
 #           Using these build options allows you to subsequently use source
 #           debugging tools like delve.
 .PHONY: all
-all: generated_files
+all: precheck generated_files
 	hack/make-rules/build.sh $(WHAT)
+
+.PHONY: precheck
+precheck: precheck-gopath
+
+.PHONY: precheck-gopath
+precheck-gopath:
+	hack/make-rules/precheck-gopath.sh
 
 # Build ginkgo
 #
