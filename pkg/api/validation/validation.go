@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/kubernetes/pkg/apis/meta/v1/validation"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
