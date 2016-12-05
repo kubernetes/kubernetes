@@ -134,6 +134,8 @@ func parseFlags() {
 	// Parse subcommand.
 	subcommand := os.Args[1]
 	switch subcommand {
+	case "conformance":
+		suite = remote.InitConformanceRemote()
 	// TODO: Add subcommand for node soaking, node conformance, cri validation.
 	default:
 		// Use node e2e suite by default if no subcommand is specified.
