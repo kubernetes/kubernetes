@@ -8,7 +8,7 @@
 		}
 	},
 	"spec": {
-		"replicas": ##numreplicas##,
+		"replicas": {{numreplicas}},
 		"selector": {
 			"name": "hollow-node"
 		},
@@ -36,7 +36,7 @@
 				"containers": [
 				{
 					"name": "hollow-kubelet",
-					"image": "gcr.io/##project##/kubemark:latest",
+					"image": "gcr.io/{{project}}/kubemark:latest",
 					"ports": [
 						{"containerPort": 4194},
 						{"containerPort": 10250},
@@ -89,7 +89,7 @@
 				},
 				{
 					"name": "hollow-proxy",
-					"image": "gcr.io/##project##/kubemark:latest",
+					"image": "gcr.io/{{project}}/kubemark:latest",
 					"env": [
 						{
 							"name": "CONTENT_TYPE",
