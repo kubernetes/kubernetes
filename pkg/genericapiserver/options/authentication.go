@@ -350,7 +350,8 @@ func (s *ClientCertAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // DelegatingAuthenticationOptions provides an easy way for composing API servers to delegate their authentication to
-// the root kube API server
+// the root kube API server.  The API federator will act as
+// a front proxy and direction connections will be able to delegate to the core kube API server
 type DelegatingAuthenticationOptions struct {
 	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
 	// TokenAccessReview.authentication.k8s.io endpoint for checking tokens.
@@ -358,11 +359,21 @@ type DelegatingAuthenticationOptions struct {
 
 	// CacheTTL is the length of time that a token authentication answer will be cached.
 	CacheTTL time.Duration
+
+	ClientCert    ClientCertAuthenticationOptions
+	RequestHeader RequestHeaderAuthenticationOptions
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 	return &DelegatingAuthenticationOptions{
-		CacheTTL: 5 * time.Minute,
+		// very low for responsiveness, but high enough to handle storms
+		CacheTTL:   10 * time.Second,
+		ClientCert: ClientCertAuthenticationOptions{},
+		RequestHeader: RequestHeaderAuthenticationOptions{
+			UsernameHeaders:     []string{"x-remote-user"},
+			GroupHeaders:        []string{"x-remote-group"},
+			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+		},
 	}
 }
 
@@ -374,10 +385,16 @@ func (s *DelegatingAuthenticationOptions) Validate() []error {
 func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RemoteKubeConfigFile, "authentication-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
-		" tokenaccessreviews.authentication.k8s.io.")
+		"tokenaccessreviews.authentication.k8s.io.")
+
+	fs.DurationVar(&s.CacheTTL, "authentication-token-webhook-cache-ttl", s.CacheTTL,
+		"The duration to cache responses from the webhook token authenticator.")
+
+	s.ClientCert.AddFlags(fs)
+	s.RequestHeader.AddFlags(fs)
 }
 
-func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) (authenticator.DelegatingAuthenticatorConfig, error) {
+func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticator.DelegatingAuthenticatorConfig, error) {
 	tokenClient, err := s.newTokenAccessReview()
 	if err != nil {
 		return authenticator.DelegatingAuthenticatorConfig{}, err
@@ -387,7 +404,8 @@ func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig(clientCAFile st
 		Anonymous:               true,
 		TokenAccessReviewClient: tokenClient,
 		CacheTTL:                s.CacheTTL,
-		ClientCAFile:            clientCAFile,
+		ClientCAFile:            s.ClientCert.ClientCA,
+		RequestHeaderConfig:     s.RequestHeader.ToAuthenticationRequestHeaderConfig(),
 	}
 	return ret, nil
 }
