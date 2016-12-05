@@ -36,7 +36,6 @@ type BuiltInAuthorizationOptions struct {
 	WebhookConfigFile           string
 	WebhookCacheAuthorizedTTL   time.Duration
 	WebhookCacheUnauthorizedTTL time.Duration
-	RBACSuperUser               string
 }
 
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
@@ -72,9 +71,10 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"authorization-webhook-cache-unauthorized-ttl", s.WebhookCacheUnauthorizedTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer. Default is 30s.")
 
-	fs.StringVar(&s.RBACSuperUser, "authorization-rbac-super-user", s.RBACSuperUser, ""+
+	fs.String("authorization-rbac-super-user", "", ""+
 		"If specified, a username which avoids RBAC authorization checks and role binding "+
 		"privilege escalation checks, to be used with --authorization-mode=RBAC.")
+	fs.MarkDeprecated("authorization-rbac-super-user", "Removed during alpha to beta.  The 'system:masters' group has privileged access.")
 
 }
 
@@ -90,7 +90,6 @@ func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory info
 		WebhookConfigFile:           s.WebhookConfigFile,
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,
 		WebhookCacheUnauthorizedTTL: s.WebhookCacheUnauthorizedTTL,
-		RBACSuperUser:               s.RBACSuperUser,
 		InformerFactory:             informerFactory,
 	}
 }
