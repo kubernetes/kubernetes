@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func RoleRefGroupKind(roleRef RoleRef) schema.GroupKind {
@@ -133,27 +134,27 @@ type PolicyRuleBuilder struct {
 
 func NewRule(verbs ...string) *PolicyRuleBuilder {
 	return &PolicyRuleBuilder{
-		PolicyRule: PolicyRule{Verbs: verbs},
+		PolicyRule: PolicyRule{Verbs: sets.NewString(verbs...).List()},
 	}
 }
 
 func (r *PolicyRuleBuilder) Groups(groups ...string) *PolicyRuleBuilder {
-	r.PolicyRule.APIGroups = append(r.PolicyRule.APIGroups, groups...)
+	r.PolicyRule.APIGroups = combine(r.PolicyRule.APIGroups, groups)
 	return r
 }
 
 func (r *PolicyRuleBuilder) Resources(resources ...string) *PolicyRuleBuilder {
-	r.PolicyRule.Resources = append(r.PolicyRule.Resources, resources...)
+	r.PolicyRule.Resources = combine(r.PolicyRule.Resources, resources)
 	return r
 }
 
 func (r *PolicyRuleBuilder) Names(names ...string) *PolicyRuleBuilder {
-	r.PolicyRule.ResourceNames = append(r.PolicyRule.ResourceNames, names...)
+	r.PolicyRule.ResourceNames = combine(r.PolicyRule.ResourceNames, names)
 	return r
 }
 
 func (r *PolicyRuleBuilder) URLs(urls ...string) *PolicyRuleBuilder {
-	r.PolicyRule.NonResourceURLs = append(r.PolicyRule.NonResourceURLs, urls...)
+	r.PolicyRule.NonResourceURLs = combine(r.PolicyRule.NonResourceURLs, urls)
 	return r
 }
 
@@ -163,6 +164,12 @@ func (r *PolicyRuleBuilder) RuleOrDie() PolicyRule {
 		panic(err)
 	}
 	return ret
+}
+
+func combine(s1, s2 []string) []string {
+	s := sets.NewString(s1...)
+	s.Insert(s2...)
+	return s.List()
 }
 
 func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
