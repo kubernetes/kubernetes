@@ -401,8 +401,19 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 		}
 	}
 
+	changedToReady := !api.IsPodReady(oldPod) && api.IsPodReady(curPod)
 	if curRC := rm.getPodController(curPod); curRC != nil {
 		rm.enqueueController(curRC)
+		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
+		// the Pod status which in turn will trigger a requeue of the owning replication controller
+		// thus having its status updated with the newly available replica. For now, we can fake the
+		// update by resyncing the controller MinReadySeconds after the it is requeued because a Pod
+		// transitioned to Ready.
+		// Note that this still suffers from #29229, we are just moving the problem one level
+		// "closer" to kubelet (from the deployment to the replication controller manager).
+		if changedToReady && curRC.Spec.MinReadySeconds > 0 {
+			rm.enqueueControllerAfter(curRC, time.Duration(curRC.Spec.MinReadySeconds)*time.Second)
+		}
 	}
 }
 
@@ -454,6 +465,23 @@ func (rm *ReplicationManager) enqueueController(obj interface{}) {
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
 	rm.queue.Add(key)
+}
+
+// obj could be an *v1.ReplicationController, or a DeletionFinalStateUnknown marker item.
+func (rm *ReplicationManager) enqueueControllerAfter(obj interface{}, after time.Duration) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return
+	}
+
+	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
+	// deterministically avoid syncing controllers that fight over pods. Currently, we only
+	// ensure that the same controller is synced for a given pod. When we periodically relist
+	// all controllers there will still be some replica instability. One way to handle this is
+	// by querying the store for all controllers that this rc overlaps, as well as all
+	// controllers that overlap this rc, and sorting them.
+	rm.queue.AddAfter(key, after)
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
