@@ -682,6 +682,7 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 }
 
 func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, err error) {
+	var clusterIds []string
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
@@ -695,7 +696,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		glog.Errorf("glusterfs: failed to create glusterfs rest client")
 		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
 	}
-	clusterIds := dstrings.Split(p.clusterId, ",")
+	if p.provisioningConfig.clusterId != "" {
+		clusterIds = dstrings.Split(p.clusterId, ",")
+		glog.V(4).Infof("glusterfs: provided clusterids: %v", clusterIds)
+	}
 	gid64 := int64(gid)
 	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIds, Gid: gid64, Durability: gapi.VolumeDurabilityInfo{Type: durabilityType, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}}
 	volume, err := cli.VolumeCreate(volumeReq)
@@ -852,7 +856,9 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		case "secretnamespace":
 			cfg.secretNamespace = v
 		case "clusterid":
-			cfg.clusterId = v
+			if len(v) != 0 {
+				cfg.clusterId = v
+			}
 		case "restauthenabled":
 			authEnabled = dstrings.ToLower(v) == "true"
 		case "gidmin":
