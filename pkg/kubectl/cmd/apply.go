@@ -114,7 +114,7 @@ func NewCmdApply(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.Force, "force", false, fmt.Sprintf("Delete and re-create the specified resource, when PATCH encounters conflict and has retried for %d times.", maxPatchRetry))
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
 	cmd.Flags().StringArray("prune-whitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmdutil.AddDryRunFlag(cmd)

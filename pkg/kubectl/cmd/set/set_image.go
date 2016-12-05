@@ -101,7 +101,7 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddRecordFlag(cmd)
 	return cmd

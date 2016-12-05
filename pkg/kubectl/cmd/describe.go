@@ -88,7 +88,7 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	}
 	usage := "containing the resource to describe"
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&describerSettings.ShowEvents, "show-events", true, "If true, display events related to the described object.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
