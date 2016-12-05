@@ -264,6 +264,7 @@ sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/h
 "${KUBECTL}" create -f "${KUBECONFIG_SECRET}" --namespace="kubemark"
 "${KUBECTL}" create -f "${NODE_CONFIGMAP}" --namespace="kubemark"
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
+"${KUBECTL}" create configmap node-problem-detector-config --from-file="${RESOURCE_DIRECTORY}/kernel-monitor.json" --namespace="kubemark"
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.json" --namespace="kubemark"
 
 rm "${KUBECONFIG_SECRET}"
