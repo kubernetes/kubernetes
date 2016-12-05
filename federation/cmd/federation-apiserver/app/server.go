@@ -82,7 +82,6 @@ func Run(s *options.ServerRunOptions) error {
 								ApplyOptions(s.GenericServerRunOptions). // apply the options selected
 								ApplyInsecureServingOptions(s.InsecureServing).
 								ApplyAuthenticationOptions(s.Authentication).
-								ApplyRBACSuperUser(s.Authorization.RBACSuperUser).
 								ApplySecureServingOptions(s.SecureServing)
 	if err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)

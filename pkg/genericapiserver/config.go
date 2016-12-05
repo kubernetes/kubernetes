@@ -100,8 +100,6 @@ type Config struct {
 	SupportsBasicAuth bool
 	Authorizer        authorizer.Authorizer
 	AdmissionControl  admission.Interface
-	// TODO(ericchiang): Determine if policy escalation checks should be an admission controller.
-	AuthorizerRBACSuperUser string
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
@@ -308,11 +306,6 @@ func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOpti
 	}
 
 	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
-	return c
-}
-
-func (c *Config) ApplyRBACSuperUser(rbacSuperUser string) *Config {
-	c.AuthorizerRBACSuperUser = rbacSuperUser
 	return c
 }
 

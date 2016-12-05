@@ -33,16 +33,10 @@ type RequestToRuleMapper interface {
 }
 
 type RBACAuthorizer struct {
-	superUser string
-
 	authorizationRuleResolver RequestToRuleMapper
 }
 
 func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (bool, string, error) {
-	if r.superUser != "" && requestAttributes.GetUser() != nil && requestAttributes.GetUser().GetName() == r.superUser {
-		return true, "", nil
-	}
-
 	rules, ruleResolutionError := r.authorizationRuleResolver.RulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace())
 	if RulesAllow(requestAttributes, rules...) {
 		return true, "", nil
@@ -51,9 +45,8 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	return false, "", ruleResolutionError
 }
 
-func New(roles validation.RoleGetter, roleBindings validation.RoleBindingLister, clusterRoles validation.ClusterRoleGetter, clusterRoleBindings validation.ClusterRoleBindingLister, superUser string) *RBACAuthorizer {
+func New(roles validation.RoleGetter, roleBindings validation.RoleBindingLister, clusterRoles validation.ClusterRoleGetter, clusterRoleBindings validation.ClusterRoleBindingLister) *RBACAuthorizer {
 	authorizer := &RBACAuthorizer{
-		superUser: superUser,
 		authorizationRuleResolver: validation.NewDefaultRuleResolver(
 			roles, roleBindings, clusterRoles, clusterRoleBindings,
 		),
