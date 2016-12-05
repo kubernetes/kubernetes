@@ -57,9 +57,19 @@ func filterPods(obj runtime.Object, options PrintOptions) bool {
 }
 
 // Filter loops through a collection of FilterFuncs until it finds one that can filter the given resource
-func (f Filters) Filter(obj runtime.Object, opts *PrintOptions) (bool, runtime.Object, error) {
-	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand
-	// before apply filter func.
+func (f Filters) Filter(obj runtime.Object, opts *PrintOptions) (bool, error) {	
+	for _, filter := range f {
+		if ok := filter(obj, *opts); ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand.
+func DecodeUnknownObject(obj runtime.Object) (runtime.Object, error) {
+	var err error
+
 	switch obj.(type) {
 	case runtime.Unstructured, *runtime.Unknown:
 		if objBytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj); err == nil {
@@ -69,10 +79,5 @@ func (f Filters) Filter(obj runtime.Object, opts *PrintOptions) (bool, runtime.O
 		}
 	}
 
-	for _, filter := range f {
-		if ok := filter(obj, *opts); ok {
-			return true, obj, nil
-		}
-	}
-	return false, obj, nil
+	return obj, err
 }

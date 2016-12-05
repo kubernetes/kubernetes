@@ -261,14 +261,8 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 		t.Fatal(actual)
 	}
 	for i, obj := range actual {
-		actualObj, err := runtime.Decode(
-			api.Codecs.UniversalDecoder(),
-			[]byte(runtime.EncodeOrDie(api.Codecs.LegacyCodec(), obj)))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !api.Semantic.DeepEqual(expected[i], actualObj) {
-			t.Errorf("unexpected object: \n%#v\n%#v", expected[i], actualObj)
+		if !api.Semantic.DeepEqual(expected[i], obj) {
+			t.Errorf("unexpected object: \n%#v\n%#v", expected[i], obj)
 		}
 	}
 }
