@@ -17,12 +17,14 @@ limitations under the License.
 package genericapiserver
 
 import (
+	"crypto/tls"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
-	"path"
 	"regexp"
 	goruntime "runtime"
 	"sort"
@@ -58,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
@@ -169,33 +170,19 @@ type ServingInfo struct {
 type SecureServingInfo struct {
 	ServingInfo
 
-	// ServerCert is the TLS cert info for serving secure traffic
-	ServerCert GeneratableKeyCert
-	// SNICerts are named CertKeys for serving secure traffic with SNI support.
-	SNICerts []NamedCertKey
+	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
+	// allowed to be in SNICerts.
+	Cert *tls.Certificate
+
+	// CACert is an optional certificate authority used for the loopback connection of the Admission controllers.
+	// If this is nil, the certificate authority is extracted from Cert or a matching SNI certificate.
+	CACert *tls.Certificate
+
+	// SNICerts are the TLS certificates by name used for SNI.
+	SNICerts map[string]*tls.Certificate
+
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
-}
-
-type CertKey struct {
-	// CertFile is a file containing a PEM-encoded certificate
-	CertFile string
-	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
-	KeyFile string
-}
-
-type NamedCertKey struct {
-	CertKey
-
-	// Names is a list of domain patterns: fully qualified domain names, possibly prefixed with
-	// wildcard segments.
-	Names []string
-}
-
-type GeneratableKeyCert struct {
-	CertKey
-	// Generate indicates that the cert/key pair should be generated if its not present.
-	Generate bool
 }
 
 // NewConfig returns a Config struct with the default values
@@ -238,45 +225,69 @@ func NewConfig() *Config {
 	return config.ApplyOptions(defaultOptions)
 }
 
-func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions) *Config {
+func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions) (*Config, error) {
 	if secureServing == nil || secureServing.ServingOptions.BindPort <= 0 {
-		return c
+		return c, nil
 	}
 
 	secureServingInfo := &SecureServingInfo{
 		ServingInfo: ServingInfo{
 			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
 		},
-		ServerCert: GeneratableKeyCert{
-			CertKey: CertKey{
-				CertFile: secureServing.ServerCert.CertKey.CertFile,
-				KeyFile:  secureServing.ServerCert.CertKey.KeyFile,
-			},
-		},
-		SNICerts: []NamedCertKey{},
 		ClientCA: secureServing.ClientCA,
 	}
-	if secureServing.ServerCert.CertKey.CertFile == "" && secureServing.ServerCert.CertKey.KeyFile == "" {
-		secureServingInfo.ServerCert.Generate = true
-		secureServingInfo.ServerCert.CertFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".crt")
-		secureServingInfo.ServerCert.KeyFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".key")
+
+	serverCertFile, serverKeyFile := secureServing.ServerCert.CertKey.CertFile, secureServing.ServerCert.CertKey.KeyFile
+
+	// load main cert
+	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
+		tlsCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load server certificate: %v", err)
+		}
+		secureServingInfo.Cert = &tlsCert
 	}
 
-	secureServingInfo.SNICerts = nil
-	for _, nkc := range secureServing.SNICertKeys {
-		secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
-			CertKey: CertKey{
-				KeyFile:  nkc.KeyFile,
-				CertFile: nkc.CertFile,
-			},
-			Names: nkc.Names,
+	// optionally load CA cert
+	if len(secureServing.ServerCert.CACertFile) != 0 {
+		pemData, err := ioutil.ReadFile(secureServing.ServerCert.CACertFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read certificate authority from %q: %v", secureServing.ServerCert.CACertFile, err)
+		}
+		block, pemData := pem.Decode(pemData)
+		if block == nil {
+			return nil, fmt.Errorf("no certificate found in certificate authority file %q", secureServing.ServerCert.CACertFile)
+		}
+		if block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("expected CERTIFICATE block in certiticate authority file %q, found: %s", secureServing.ServerCert.CACertFile, block.Type)
+		}
+		secureServingInfo.CACert = &tls.Certificate{
+			Certificate: [][]byte{block.Bytes},
+		}
+	}
+
+	// load SNI certs
+	namedTlsCerts := make([]namedTlsCert, 0, len(secureServing.SNICertKeys))
+	for _, nck := range secureServing.SNICertKeys {
+		tlsCert, err := tls.LoadX509KeyPair(nck.CertFile, nck.KeyFile)
+		namedTlsCerts = append(namedTlsCerts, namedTlsCert{
+			tlsCert: tlsCert,
+			names:   nck.Names,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to load SNI cert and key: %v", err)
+		}
+	}
+	var err error
+	secureServingInfo.SNICerts, err = getNamedCertificateMap(namedTlsCerts)
+	if err != nil {
+		return nil, err
 	}
 
 	c.SecureServingInfo = secureServingInfo
 	c.ReadWritePort = secureServing.ServingOptions.BindPort
 
-	return c
+	return c, nil
 }
 
 func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOptions) *Config {
@@ -454,38 +465,6 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	s.Handler, s.InsecureHandler = c.BuildHandlerChainsFunc(s.HandlerContainer.ServeMux, c.Config)
 
 	return s, nil
-}
-
-// MaybeGenerateServingCerts generates serving certificates if requested and needed.
-func (c *Config) MaybeGenerateServingCerts(alternateIPs ...net.IP) error {
-	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate {
-		canReadCertAndKey, err := certutil.CanReadCertAndKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile)
-		if err != nil {
-			return err
-		}
-		if canReadCertAndKey {
-			return nil
-		}
-		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
-		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
-
-		if cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
-			return fmt.Errorf("unable to generate self signed cert: %v", err)
-		} else {
-			if err := certutil.WriteCert(c.SecureServingInfo.ServerCert.CertFile, cert); err != nil {
-				return err
-			}
-
-			if err := certutil.WriteKey(c.SecureServingInfo.ServerCert.KeyFile, key); err != nil {
-				return err
-			}
-			glog.Infof("Generated self-signed cert (%s, %s)", c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile)
-		}
-	}
-
-	return nil
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {

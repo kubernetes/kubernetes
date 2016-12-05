@@ -140,6 +140,7 @@ Federated Services DNS non-local federated service missing local service should 
 Federated Services DNS non-local federated service should be able to discover a non-local federated service,jlowdermilk,1
 Federated Services DNS should be able to discover a federated service,derekwaynecarr,1
 Federated Services Service creation should create matching services in underlying clusters,jbeda,1
+Federated Services Service creation should not be deleted from underlying clusters when it is deleted,sttts,0
 Federated Services Service creation should succeed,rmmh,1
 Federated ingresses Federated Ingresses Ingress connectivity and DNS should be able to connect to a federated ingress via its load balancer,rmmh,1
 Federated ingresses Federated Ingresses should be created and deleted successfully,dchen1107,1
@@ -444,7 +445,7 @@ Services should be able to create a functioning NodePort service,bprashanth,0
 Services should be able to up and down services,bprashanth,0
 Services should check NodePort out-of-range,bprashanth,0
 Services should create endpoints for unready pods,maisem,0
-Serivces should only allow access from service loadbalancer source ranges,freehan,0
+Services should only allow access from service loadbalancer source ranges,sttts,0
 Services should preserve source pod IP for traffic thru service cluster IP,Random-Liu,1
 Services should prevent NodePort collisions,bprashanth,0
 Services should provide secure master service,bprashanth,0
@@ -546,7 +547,6 @@ k8s.io/kubernetes/pkg/api/errors,yifan-gu,1
 k8s.io/kubernetes/pkg/api/events,jlowdermilk,1
 k8s.io/kubernetes/pkg/api/install,timothysc,1
 k8s.io/kubernetes/pkg/api/meta,fabioy,1
-k8s.io/kubernetes/pkg/api/pod,piosz,1
 k8s.io/kubernetes/pkg/api/resource,smarterclayton,1
 k8s.io/kubernetes/pkg/api/service,spxtr,1
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1
@@ -554,6 +554,9 @@ k8s.io/kubernetes/pkg/api/unversioned,kevin-wangzefeng,1
 k8s.io/kubernetes/pkg/api/unversioned/validation,brendandburns,1
 k8s.io/kubernetes/pkg/api/util,ghodss,1
 k8s.io/kubernetes/pkg/api/v1,vulpecula,1
+k8s.io/kubernetes/pkg/api/v1/endpoints,sttts,0
+k8s.io/kubernetes/pkg/api/v1/pod,sttts,0
+k8s.io/kubernetes/pkg/api/v1/service,sttts,0
 k8s.io/kubernetes/pkg/api/validation,smarterclayton,1
 k8s.io/kubernetes/pkg/api/validation/path,luxas,1
 k8s.io/kubernetes/pkg/apimachinery,gmarek,1
@@ -787,6 +790,7 @@ k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd,xiang90,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass,brendandburns,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd,eparis,1
 k8s.io/kubernetes/pkg/runtime,wojtek-t,0
+k8s.io/kubernetes/pkg/runtime/schema,sttts,0
 k8s.io/kubernetes/pkg/runtime/serializer,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/json,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/protobuf,wojtek-t,0
