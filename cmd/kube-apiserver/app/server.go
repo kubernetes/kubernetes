@@ -125,7 +125,7 @@ func Run(s *options.ServerRunOptions) error {
 		var installSSH genericapiserver.InstallSSHKey
 		cloud, err := cloudprovider.InitCloudProvider(s.GenericServerRunOptions.CloudProvider, s.GenericServerRunOptions.CloudConfigFile)
 		if err != nil {
-			glog.Fatalf("Cloud provider could not be initialized: %v", err)
+			return fmt.Errorf("cloud provider could not be initialized: %v", err)
 		}
 		if cloud != nil {
 			if instances, supported := cloud.Instances(); supported {
@@ -133,7 +133,7 @@ func Run(s *options.ServerRunOptions) error {
 			}
 		}
 		if s.KubeletConfig.Port == 0 {
-			glog.Fatalf("Must enable kubelet port if proxy ssh-tunneling is specified.")
+			return fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
 		}
 		// Set up the tunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
@@ -178,7 +178,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
 	if err != nil {
-		glog.Fatalf("error generating storage version map: %s", err)
+		return fmt.Errorf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
 		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
@@ -187,7 +187,7 @@ func Run(s *options.ServerRunOptions) error {
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
 		master.DefaultAPIResourceConfigSource(), s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
-		glog.Fatalf("error in initializing storage factory: %s", err)
+		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
 	storageFactory.AddCohabitatingResources(batch.Resource("jobs"), extensions.Resource("jobs"))
 	storageFactory.AddCohabitatingResources(autoscaling.Resource("horizontalpodautoscalers"), extensions.Resource("horizontalpodautoscalers"))
@@ -226,20 +226,20 @@ func Run(s *options.ServerRunOptions) error {
 		// go directly to etcd to avoid recursive auth insanity
 		storageConfig, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
 		if err != nil {
-			glog.Fatalf("Unable to get serviceaccounts storage: %v", err)
+			return fmt.Errorf("unable to get serviceaccounts storage: %v", err)
 		}
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
 	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticatorConfig)
 	if err != nil {
-		glog.Fatalf("Invalid Authentication Config: %v", err)
+		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}
 
 	privilegedLoopbackToken := uuid.NewRandom().String()
 	selfClientConfig, err := genericapiserver.NewSelfClientConfig(genericConfig.SecureServingInfo, genericConfig.InsecureServingInfo, privilegedLoopbackToken)
 	if err != nil {
-		glog.Fatalf("Failed to create clientset: %v", err)
+		return fmt.Errorf("failed to create clientset: %v", err)
 	}
 	client, err := internalclientset.NewForConfig(selfClientConfig)
 	if err != nil {
@@ -250,14 +250,14 @@ func Run(s *options.ServerRunOptions) error {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationConfig)
 	if err != nil {
-		glog.Fatalf("Invalid Authorization Config: %v", err)
+		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
 	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
-		glog.Fatalf("Failed to initialize plugins: %v", err)
+		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}
 
 	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
