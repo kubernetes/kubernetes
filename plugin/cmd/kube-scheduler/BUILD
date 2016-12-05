@@ -15,7 +15,6 @@ go_binary(
     srcs = ["scheduler.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/healthz:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/util/logs:go_default_library",
         "//pkg/version/verflag:go_default_library",
