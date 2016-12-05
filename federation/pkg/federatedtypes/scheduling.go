@@ -37,6 +37,16 @@ import (
 	"github.com/golang/glog"
 )
 
+// ScheduleAction is used by the interface ScheduleObject of SchedulingAdapter
+// to sync controller reconcile to convey the action type needed for the
+// particular cluster local object in ScheduleObject
+type ScheduleAction string
+
+const (
+	ActionAdd    = "add"
+	ActionDelete = "delete"
+)
+
 // ReplicaSchedulingStatus contains the status of the replica type objects (rs or deployment)
 // that are being scheduled into joined clusters.
 type ReplicaSchedulingStatus struct {
@@ -58,26 +68,26 @@ type ReplicaSchedulingInfo struct {
 // federated type that requires more complex synchronization logic.
 type SchedulingAdapter interface {
 	GetSchedule(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (interface{}, error)
-	ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo interface{}) (pkgruntime.Object, bool, error)
-	UpdateFederatedStatus(obj pkgruntime.Object, status interface{}) error
+	ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo interface{}) (pkgruntime.Object, ScheduleAction, error)
+	UpdateFederatedStatus(obj pkgruntime.Object, schedulingInfo interface{}) error
 
 	// EquivalentIgnoringSchedule returns whether obj1 and obj2 are
 	// equivalent ignoring differences due to scheduling.
 	EquivalentIgnoringSchedule(obj1, obj2 pkgruntime.Object) bool
 }
 
-// schedulingAdapter is meant to be embedded in other type adapters that require
-// workload scheduling.
-type schedulingAdapter struct {
+// replicaSchedulingAdapter is meant to be embedded in other type adapters that require
+// workload scheduling with actual pod replicas.
+type replicaSchedulingAdapter struct {
 	preferencesAnnotationName string
 	updateStatusFunc          func(pkgruntime.Object, interface{}) error
 }
 
-func (a *schedulingAdapter) IsSchedulingAdapter() bool {
+func (a *replicaSchedulingAdapter) IsSchedulingAdapter() bool {
 	return true
 }
 
-func (a *schedulingAdapter) GetSchedule(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (interface{}, error) {
+func (a *replicaSchedulingAdapter) GetSchedule(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (interface{}, error) {
 	var clusterNames []string
 	for _, cluster := range clusters {
 		clusterNames = append(clusterNames, cluster.Name)
@@ -128,7 +138,7 @@ func (a *schedulingAdapter) GetSchedule(obj pkgruntime.Object, key string, clust
 	}, nil
 }
 
-func (a *schedulingAdapter) ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo interface{}) (pkgruntime.Object, bool, error) {
+func (a *replicaSchedulingAdapter) ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo interface{}) (pkgruntime.Object, ScheduleAction, error) {
 	typedSchedulingInfo := schedulingInfo.(*ReplicaSchedulingInfo)
 	replicas, ok := typedSchedulingInfo.Schedule[cluster.Name]
 	if !ok {
@@ -152,11 +162,15 @@ func (a *schedulingAdapter) ScheduleObject(cluster *federationapi.Cluster, clust
 			}
 		}
 	}
-	return federationObjCopy, replicas > 0, nil
+	var action ScheduleAction = ""
+	if replicas > 0 {
+		action = ActionAdd
+	}
+	return federationObjCopy, action, nil
 }
 
-func (a *schedulingAdapter) UpdateFederatedStatus(obj pkgruntime.Object, status interface{}) error {
-	return a.updateStatusFunc(obj, status)
+func (a *replicaSchedulingAdapter) UpdateFederatedStatus(obj pkgruntime.Object, schedulingInfo interface{}) error {
+	return a.updateStatusFunc(obj, schedulingInfo)
 }
 
 func schedule(planner *planner.Planner, obj pkgruntime.Object, key string, clusterNames []string, currentReplicasPerCluster map[string]int64, estimatedCapacity map[string]int64) map[string]int64 {
