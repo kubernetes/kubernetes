@@ -37,14 +37,14 @@
 					"resources": {
 						"requests": {
 							"cpu": "100m",
-							"memory": "##METRICS_MEM##Mi"
+							"memory": "{{METRICS_MEM}}Mi"
 						}
 					},
 					"command": [
 						"/heapster"
 					],
 					"args": [
-						"--source=kubernetes:https://##MASTER_IP##:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/kubeconfig"
+						"--source=kubernetes:https://{{MASTER_IP}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/kubeconfig"
 					],
 					"volumeMounts": [
 						{
@@ -59,7 +59,7 @@
 					"resources": {
 						"requests": {
 							"cpu": "100m",
-							"memory": "##EVENTER_MEM##Ki"
+							"memory": "{{EVENTER_MEM}}Ki"
 						}
 					},
 					"command": [
