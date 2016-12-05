@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 
 	"github.com/go-openapi/spec"
@@ -76,6 +77,16 @@ func (t Time) Before(u Time) bool {
 
 // Equal reports whether the time instant t is equal to u.
 func (t Time) Equal(u Time) bool {
+	return t.Time.Equal(u.Time)
+}
+
+// BeforeMicro reports whether the time instant t is before micro instance u.
+func (t Time) BeforeMicro(u v1.MicroTime) bool {
+	return t.Time.Before(u.Time)
+}
+
+// EqualMicro reports whether the time instant t is equal to micro instance u.
+func (t Time) EqualMicro(u v1.MicroTime) bool {
 	return t.Time.Equal(u.Time)
 }
 

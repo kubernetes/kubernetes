@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,47 +26,47 @@ import (
 	"github.com/google/gofuzz"
 )
 
-// Time is a wrapper around time.Time which supports correct
-// marshaling to YAML and JSON.  Wrappers are provided for many
-// of the factory methods that the time package offers.
+const RFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
+
+// MicroTime is version of Time with microsecond level precision.
 //
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
 // +protobuf.options.(gogoproto.goproto_stringer)=false
-type Time struct {
+type MicroTime struct {
 	time.Time `protobuf:"-"`
 }
 
-// DeepCopy returns a deep-copy of the Time value.  The underlying time.Time
+// DeepCopy returns a deep-copy of the MicroTime value.  The underlying time.Time
 // type is effectively immutable in the time API, so it is safe to
 // copy-by-assign, despite the presence of (unexported) Pointer fields.
-func (t Time) DeepCopy() Time {
+func (t MicroTime) DeepCopy() MicroTime {
 	return t
 }
 
 // String returns the representation of the time.
-func (t Time) String() string {
+func (t MicroTime) String() string {
 	return t.Time.String()
 }
 
-// NewTime returns a wrapped instance of the provided time
-func NewTime(time time.Time) Time {
-	return Time{time}
+// NewMicroTime returns a wrapped instance of the provided time
+func NewMicroTime(time time.Time) MicroTime {
+	return MicroTime{time}
 }
 
-// Date returns the Time corresponding to the supplied parameters
+// DateMicro returns the MicroTime corresponding to the supplied parameters
 // by wrapping time.Date.
-func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) Time {
-	return Time{time.Date(year, month, day, hour, min, sec, nsec, loc)}
+func DateMicro(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) MicroTime {
+	return MicroTime{time.Date(year, month, day, hour, min, sec, nsec, loc)}
 }
 
-// Now returns the current local time.
-func Now() Time {
-	return Time{time.Now()}
+// NowMicro returns the current local time.
+func NowMicro() MicroTime {
+	return MicroTime{time.Now()}
 }
 
 // IsZero returns true if the value is nil or time is zero.
-func (t *Time) IsZero() bool {
+func (t *MicroTime) IsZero() bool {
 	if t == nil {
 		return true
 	}
@@ -74,39 +74,39 @@ func (t *Time) IsZero() bool {
 }
 
 // Before reports whether the time instant t is before u.
-func (t Time) Before(u Time) bool {
+func (t MicroTime) Before(u MicroTime) bool {
 	return t.Time.Before(u.Time)
 }
 
 // Equal reports whether the time instant t is equal to u.
-func (t Time) Equal(u Time) bool {
+func (t MicroTime) Equal(u MicroTime) bool {
 	return t.Time.Equal(u.Time)
 }
 
-// BeforeMicro reports whether the time instant t is before micro instance u.
-func (t Time) BeforeMicro(u MicroTime) bool {
+// BeforeTime reports whether the time instant t is before second-lever precision u.
+func (t MicroTime) BeforeTime(u Time) bool {
 	return t.Time.Before(u.Time)
 }
 
-// EqualMicro reports whether the time instant t is equal to micro instance u.
-func (t Time) EqualMicro(u MicroTime) bool {
+// EqualTime reports whether the time instant t is equal to second-lever precision u.
+func (t MicroTime) EqualTime(u Time) bool {
 	return t.Time.Equal(u.Time)
 }
 
-// Unix returns the local time corresponding to the given Unix time
+// UnixMicro returns the local time corresponding to the given Unix time
 // by wrapping time.Unix.
-func Unix(sec int64, nsec int64) Time {
-	return Time{time.Unix(sec, nsec)}
+func UnixMicro(sec int64, nsec int64) MicroTime {
+	return MicroTime{time.Unix(sec, nsec)}
 }
 
-// Rfc3339Copy returns a copy of the Time at second-level precision.
-func (t Time) Rfc3339Copy() Time {
-	copied, _ := time.Parse(time.RFC3339, t.Format(time.RFC3339))
-	return Time{copied}
+// Rfc3339Copy returns a copy of the MicroTime at second-level precision.
+func (t MicroTime) Rfc3339MicroCopy() MicroTime {
+	copied, _ := time.Parse(RFC3339Micro, t.Format(RFC3339Micro))
+	return MicroTime{copied}
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
-func (t *Time) UnmarshalJSON(b []byte) error {
+func (t *MicroTime) UnmarshalJSON(b []byte) error {
 	if len(b) == 4 && string(b) == "null" {
 		t.Time = time.Time{}
 		return nil
@@ -115,7 +115,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	var str string
 	json.Unmarshal(b, &str)
 
-	pt, err := time.Parse(time.RFC3339, str)
+	pt, err := time.Parse(RFC3339Micro, str)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 }
 
 // UnmarshalQueryParameter converts from a URL query parameter value to an object
-func (t *Time) UnmarshalQueryParameter(str string) error {
+func (t *MicroTime) UnmarshalQueryParameter(str string) error {
 	if len(str) == 0 {
 		t.Time = time.Time{}
 		return nil
@@ -136,7 +136,7 @@ func (t *Time) UnmarshalQueryParameter(str string) error {
 		return nil
 	}
 
-	pt, err := time.Parse(time.RFC3339, str)
+	pt, err := time.Parse(RFC3339Micro, str)
 	if err != nil {
 		return err
 	}
@@ -146,16 +146,16 @@ func (t *Time) UnmarshalQueryParameter(str string) error {
 }
 
 // MarshalJSON implements the json.Marshaler interface.
-func (t Time) MarshalJSON() ([]byte, error) {
+func (t MicroTime) MarshalJSON() ([]byte, error) {
 	if t.IsZero() {
 		// Encode unset/nil objects as JSON's "null".
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.UTC().Format(time.RFC3339))
+	return json.Marshal(t.UTC().Format(RFC3339Micro))
 }
 
-func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
+func (_ MicroTime) OpenAPIDefinition() common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -167,17 +167,17 @@ func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
 }
 
 // MarshalQueryParameter converts to a URL query parameter value
-func (t Time) MarshalQueryParameter() (string, error) {
+func (t MicroTime) MarshalQueryParameter() (string, error) {
 	if t.IsZero() {
 		// Encode unset/nil objects as an empty string
 		return "", nil
 	}
 
-	return t.UTC().Format(time.RFC3339), nil
+	return t.UTC().Format(RFC3339Micro), nil
 }
 
 // Fuzz satisfies fuzz.Interface.
-func (t *Time) Fuzz(c fuzz.Continue) {
+func (t *MicroTime) Fuzz(c fuzz.Continue) {
 	if t == nil {
 		return
 	}
@@ -187,4 +187,4 @@ func (t *Time) Fuzz(c fuzz.Continue) {
 	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 0)
 }
 
-var _ fuzz.Interface = &Time{}
+var _ fuzz.Interface = &MicroTime{}
