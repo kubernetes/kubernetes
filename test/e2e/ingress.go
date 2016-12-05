@@ -55,7 +55,7 @@ const (
 	nameLenLimit = 62
 )
 
-var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
+var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 	defer GinkgoRecover()
 	var (
 		ns               string
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 	})
 
 	// Time: borderline 5m, slow by design
-	framework.KubeDescribe("Nginx [Slow]", func() {
+	framework.KubeDescribe("Nginx", func() {
 		var nginxController *NginxIngressController
 
 		BeforeEach(func() {

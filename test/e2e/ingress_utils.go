@@ -596,19 +596,18 @@ func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp stri
 }
 
 func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
-	gceCloud := cont.cloud.Provider.(*gcecloud.GCECloud)
-	fwName := fmt.Sprintf("k8s-fw-l7--%v", cont.UID)
-	fw, err := gceCloud.GetFirewall(fwName)
-	if err != nil {
-		if cont.isHTTPErrorCode(err, http.StatusNotFound) {
-			return msg
-		}
-		return fmt.Sprintf("Failed to get fw %v: %v", fwName, err)
-	}
-	msg = fmt.Sprintf("%v (firewall-rule)\n", fw.Name)
-	if del {
-		if err := gceCloud.DeleteFirewall(fw.Name); err != nil && cont.isHTTPErrorCode(err, http.StatusNotFound) {
-			msg += fmt.Sprintf("Failed to delete %v: %v\n", fw.Name, err)
+	fwList := []compute.Firewall{}
+	regex := fmt.Sprintf("%vfw-l7%v.*", k8sPrefix, clusterDelimiter)
+	gcloudList("firewall-rules", regex, cont.cloud.ProjectID, &fwList)
+	if len(fwList) != 0 {
+		for _, f := range fwList {
+			if !cont.canDelete(f.Name, f.CreationTimestamp, del) {
+				continue
+			}
+			msg += fmt.Sprintf("%v (firewall rule)\n", f.Name)
+			if del {
+				gcloudDelete("firewall-rules", f.Name, cont.cloud.ProjectID)
+			}
 		}
 	}
 	return msg
