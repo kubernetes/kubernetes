@@ -19,6 +19,7 @@ package rolebinding
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -28,7 +29,7 @@ type Registry interface {
 	ListRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.RoleBindingList, error)
 	CreateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error
 	UpdateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error
-	GetRoleBinding(ctx api.Context, name string) (*rbac.RoleBinding, error)
+	GetRoleBinding(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error)
 	DeleteRoleBinding(ctx api.Context, name string) error
 	WatchRoleBindings(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
@@ -68,8 +69,8 @@ func (s *storage) WatchRoleBindings(ctx api.Context, options *api.ListOptions) (
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetRoleBinding(ctx api.Context, name string) (*rbac.RoleBinding, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetRoleBinding(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

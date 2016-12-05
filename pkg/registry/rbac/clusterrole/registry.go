@@ -19,6 +19,7 @@ package clusterrole
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -28,7 +29,7 @@ type Registry interface {
 	ListClusterRoles(ctx api.Context, options *api.ListOptions) (*rbac.ClusterRoleList, error)
 	CreateClusterRole(ctx api.Context, clusterRole *rbac.ClusterRole) error
 	UpdateClusterRole(ctx api.Context, clusterRole *rbac.ClusterRole) error
-	GetClusterRole(ctx api.Context, name string) (*rbac.ClusterRole, error)
+	GetClusterRole(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error)
 	DeleteClusterRole(ctx api.Context, name string) error
 	WatchClusterRoles(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
@@ -67,8 +68,8 @@ func (s *storage) WatchClusterRoles(ctx api.Context, options *api.ListOptions) (
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetClusterRole(ctx api.Context, name string) (*rbac.ClusterRole, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetClusterRole(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -86,5 +87,5 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) GetClusterRole(name string) (*rbac.ClusterRole, error) {
-	return a.Registry.GetClusterRole(api.NewContext(), name)
+	return a.Registry.GetClusterRole(api.NewContext(), name, &metav1.GetOptions{})
 }

@@ -131,6 +131,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 			defer trace.LogIfLong(500 * time.Millisecond)
 
 			// check for export
+			options := metav1.GetOptions{}
 			if values := req.Request.URL.Query(); len(values) > 0 {
 				exports := metav1.ExportOptions{}
 				if err := scope.ParameterCodec.DecodeParameters(values, schema.GroupVersion{Version: "v1"}, &exports); err != nil {
@@ -142,9 +143,12 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 					}
 					return e.Export(ctx, name, exports)
 				}
+				if err := scope.ParameterCodec.DecodeParameters(values, schema.GroupVersion{Version: "v1"}, &options); err != nil {
+					return nil, err
+				}
 			}
 
-			return r.Get(ctx, name)
+			return r.Get(ctx, name, &options)
 		})
 }
 

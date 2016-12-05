@@ -479,14 +479,13 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 }
 
 // Get retrieves the item from storage.
-func (e *Store) Get(ctx api.Context, name string) (runtime.Object, error) {
+func (e *Store) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj := e.NewFunc()
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Once we pass GetOptions to this method, pass the ResourceVersion from it.
-	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
+	if err := e.Storage.Get(ctx, key, options.ResourceVersion, obj, false); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.QualifiedResource, name)
 	}
 	if e.Decorator != nil {
@@ -936,7 +935,7 @@ func exportObjectMeta(accessor meta.Object, exact bool) {
 
 // Implements the rest.Exporter interface
 func (e *Store) Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	obj, err := e.Get(ctx, name)
+	obj, err := e.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

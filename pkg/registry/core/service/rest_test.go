@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/service"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -107,7 +108,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	if !makeIPNet(t).Contains(net.ParseIP(created_service.Spec.ClusterIP)) {
 		t.Errorf("Unexpected ClusterIP: %s", created_service.Spec.ClusterIP)
 	}
-	srv, err := registry.GetService(ctx, svc.Name)
+	srv, err := registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -225,7 +226,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 		if !reflect.DeepEqual(serviceNodePorts, test.expectNodePorts) {
 			t.Errorf("Expected %v, but got %v", test.expectNodePorts, serviceNodePorts)
 		}
-		srv, err := registry.GetService(ctx, test.name)
+		srv, err := registry.GetService(ctx, test.name, &metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -410,7 +411,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create service: %#v", err)
 	}
-	srv, err := registry.GetService(ctx, svc.Name)
+	srv, err := registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -545,7 +546,7 @@ func TestServiceRegistryGet(t *testing.T) {
 			Selector: map[string]string{"bar": "baz"},
 		},
 	})
-	storage.Get(ctx, "foo")
+	storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if e, a := "foo", registry.GottenID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}

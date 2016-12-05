@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
@@ -74,7 +75,7 @@ func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 	return &api.ComponentStatusList{Items: reply}, nil
 }
 
-func (rs *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
+func (rs *REST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
 	if server, ok := servers[name]; !ok {

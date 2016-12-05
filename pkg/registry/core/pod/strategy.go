@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
@@ -196,11 +197,11 @@ func PodToSelectableFields(pod *api.Pod) fields.Set {
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
 type ResourceGetter interface {
-	Get(api.Context, string) (runtime.Object, error)
+	Get(api.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
 func getPod(getter ResourceGetter, ctx api.Context, name string) (*api.Pod, error) {
-	obj, err := getter.Get(ctx, name)
+	obj, err := getter.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,7 @@ package clusterrolebinding
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -28,7 +29,7 @@ type Registry interface {
 	ListClusterRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.ClusterRoleBindingList, error)
 	CreateClusterRoleBinding(ctx api.Context, clusterRoleBinding *rbac.ClusterRoleBinding) error
 	UpdateClusterRoleBinding(ctx api.Context, clusterRoleBinding *rbac.ClusterRoleBinding) error
-	GetClusterRoleBinding(ctx api.Context, name string) (*rbac.ClusterRoleBinding, error)
+	GetClusterRoleBinding(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRoleBinding, error)
 	DeleteClusterRoleBinding(ctx api.Context, name string) error
 	WatchClusterRoleBindings(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
@@ -67,8 +68,8 @@ func (s *storage) WatchClusterRoleBindings(ctx api.Context, options *api.ListOpt
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetClusterRoleBinding(ctx api.Context, name string) (*rbac.ClusterRoleBinding, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetClusterRoleBinding(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRoleBinding, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

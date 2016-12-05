@@ -383,7 +383,7 @@ type SimpleRESTStorage struct {
 }
 
 func (storage *SimpleRESTStorage) Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	obj, err := storage.Get(ctx, name)
+	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +444,7 @@ func (h *OutputConnect) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte(h.response))
 }
 
-func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
@@ -633,7 +633,7 @@ func (r *GetWithOptionsRESTStorage) Get(ctx api.Context, name string, options ru
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
 	}
 	r.optionsReceived = options
-	return r.SimpleRESTStorage.Get(ctx, name)
+	return r.SimpleRESTStorage.Get(ctx, name, &metav1.GetOptions{})
 }
 
 func (r *GetWithOptionsRESTStorage) NewGetOptions() (runtime.Object, bool, string) {
@@ -677,7 +677,7 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 	return storage.baseType
 }
 
-func (storage *SimpleTypedStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
+func (storage *SimpleTypedStorage) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	copied, err := api.Scheme.Copy(storage.item)
 	if err != nil {
@@ -3265,7 +3265,7 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 	return &SimpleXGSubresource{}
 }
 
-func (storage *SimpleXGSubresourceRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
+func (storage *SimpleXGSubresourceRESTStorage) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	copied, err := api.Scheme.Copy(&storage.item)
 	if err != nil {
 		panic(err)

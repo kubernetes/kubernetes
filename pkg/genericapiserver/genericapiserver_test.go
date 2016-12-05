@@ -593,7 +593,7 @@ func (p *testGetterStorage) New() runtime.Object {
 	}
 }
 
-func (p *testGetterStorage) Get(ctx api.Context, name string) (runtime.Object, error) {
+func (p *testGetterStorage) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return nil, nil
 }
 
