@@ -90,6 +90,9 @@ type testJig struct {
 	// `kubernetes.io/ingress.class`. It's added to all ingresses created by
 	// this jig.
 	class string
+
+	// The interval used to poll urls
+	pollInterval time.Duration
 }
 
 type conformanceTests struct {
@@ -170,7 +173,7 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 				})
 				By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.address, pathToFail)
-				ExpectNoError(pollURL(route, updateURLMapHost, lbCleanupTimeout, &http.Client{Timeout: reqTimeout}, true))
+				ExpectNoError(pollURL(route, updateURLMapHost, lbCleanupTimeout, jig.pollInterval, &http.Client{Timeout: reqTimeout}, true))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
@@ -179,9 +182,9 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 
 // pollURL polls till the url responds with a healthy http code. If
 // expectUnreachable is true, it breaks on first non-healthy http code instead.
-func pollURL(route, host string, timeout time.Duration, httpClient *http.Client, expectUnreachable bool) error {
+func pollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
 	var lastBody string
-	pollErr := wait.PollImmediate(lbPollInterval, timeout, func() (bool, error) {
+	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		var err error
 		lastBody, err = simpleGET(httpClient, route, host)
 		if err != nil {
@@ -596,19 +599,18 @@ func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp stri
 }
 
 func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
-	gceCloud := cont.cloud.Provider.(*gcecloud.GCECloud)
-	fwName := fmt.Sprintf("k8s-fw-l7--%v", cont.UID)
-	fw, err := gceCloud.GetFirewall(fwName)
-	if err != nil {
-		if cont.isHTTPErrorCode(err, http.StatusNotFound) {
-			return msg
-		}
-		return fmt.Sprintf("Failed to get fw %v: %v", fwName, err)
-	}
-	msg = fmt.Sprintf("%v (firewall-rule)\n", fw.Name)
-	if del {
-		if err := gceCloud.DeleteFirewall(fw.Name); err != nil && cont.isHTTPErrorCode(err, http.StatusNotFound) {
-			msg += fmt.Sprintf("Failed to delete %v: %v\n", fw.Name, err)
+	fwList := []compute.Firewall{}
+	regex := fmt.Sprintf("%vfw-l7%v.*", k8sPrefix, clusterDelimiter)
+	gcloudList("firewall-rules", regex, cont.cloud.ProjectID, &fwList)
+	if len(fwList) != 0 {
+		for _, f := range fwList {
+			if !cont.canDelete(f.Name, f.CreationTimestamp, del) {
+				continue
+			}
+			msg += fmt.Sprintf("%v (firewall rule)\n", f.Name)
+			if del {
+				gcloudDelete("firewall-rules", f.Name, cont.cloud.ProjectID)
+			}
 		}
 	}
 	return msg
@@ -833,7 +835,7 @@ func (j *testJig) waitForIngress() {
 			j.curlServiceNodePort(j.ing.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, timeoutClient, false))
+			ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, j.pollInterval, timeoutClient, false))
 		}
 	}
 }
@@ -857,7 +859,7 @@ func (j *testJig) curlServiceNodePort(ns, name string, port int) {
 	// TODO: Curl all nodes?
 	u, err := framework.GetNodePortURL(j.client, ns, name, port)
 	ExpectNoError(err)
-	ExpectNoError(pollURL(u, "", 30*time.Second, &http.Client{Timeout: reqTimeout}, false))
+	ExpectNoError(pollURL(u, "", 30*time.Second, j.pollInterval, &http.Client{Timeout: reqTimeout}, false))
 }
 
 // ingFromManifest reads a .json/yaml file and returns the rc in it.
@@ -911,7 +913,7 @@ type GCEIngressController struct {
 }
 
 func newTestJig(c clientset.Interface) *testJig {
-	return &testJig{client: c, rootCAs: map[string][]byte{}}
+	return &testJig{client: c, rootCAs: map[string][]byte{}, pollInterval: lbPollInterval}
 }
 
 // NginxIngressController manages implementation details of Ingress on Nginx.
