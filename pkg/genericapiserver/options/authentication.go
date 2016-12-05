@@ -29,6 +29,7 @@ import (
 type BuiltInAuthenticationOptions struct {
 	Anonymous       *AnonymousAuthenticationOptions
 	AnyToken        *AnyTokenAuthenticationOptions
+	ClientCert      *ClientCertAuthenticationOptions
 	Keystone        *KeystoneAuthenticationOptions
 	OIDC            *OIDCAuthenticationOptions
 	PasswordFile    *PasswordFileAuthenticationOptions
@@ -85,6 +86,7 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 	return s.
 		WithAnyonymous().
 		WithAnyToken().
+		WithClientCert().
 		WithKeystone().
 		WithOIDC().
 		WithPasswordFile().
@@ -101,6 +103,11 @@ func (s *BuiltInAuthenticationOptions) WithAnyonymous() *BuiltInAuthenticationOp
 
 func (s *BuiltInAuthenticationOptions) WithAnyToken() *BuiltInAuthenticationOptions {
 	s.AnyToken = &AnyTokenAuthenticationOptions{}
+	return s
+}
+
+func (s *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOptions {
+	s.ClientCert = &ClientCertAuthenticationOptions{}
 	return s
 }
 
@@ -159,6 +166,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"If set, your server will be INSECURE.  Any token will be allowed and user information will be parsed "+
 			"from the token as `username/group1,group2`")
 
+	}
+
+	if s.ClientCert != nil {
+		s.ClientCert.AddFlags(fs)
 	}
 
 	if s.Keystone != nil {
@@ -229,16 +240,19 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) authenticator.AuthenticatorConfig {
-	ret := authenticator.AuthenticatorConfig{
-		ClientCAFile: clientCAFile,
-	}
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.AuthenticatorConfig {
+	ret := authenticator.AuthenticatorConfig{}
+
 	if s.Anonymous != nil {
 		ret.Anonymous = s.Anonymous.Allow
 	}
 
 	if s.AnyToken != nil {
 		ret.AnyToken = s.AnyToken.Allow
+	}
+
+	if s.ClientCert != nil {
+		ret.ClientCAFile = s.ClientCert.ClientCA
 	}
 
 	if s.Keystone != nil {
@@ -321,6 +335,18 @@ func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig
 		ClientCA:            s.ClientCAFile,
 		AllowedClientNames:  s.AllowedNames,
 	}
+}
+
+type ClientCertAuthenticationOptions struct {
+	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
+	ClientCA string
+}
+
+func (s *ClientCertAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&s.ClientCA, "client-ca-file", s.ClientCA, ""+
+		"If set, any request presenting a client certificate signed by one of "+
+		"the authorities in the client-ca-file is authenticated with an identity "+
+		"corresponding to the CommonName of the client certificate.")
 }
 
 // DelegatingAuthenticationOptions provides an easy way for composing API servers to delegate their authentication to
