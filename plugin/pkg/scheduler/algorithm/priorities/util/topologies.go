@@ -25,7 +25,7 @@ import (
 // GetNamespacesFromPodAffinityTerm returns a set of names
 // according to the namespaces indicated in podAffinityTerm.
 // 1. If the namespaces is nil considers the given pod's namespace
-// 2. If the namespaces is empty list then considers all the namespaces
+// 2. If the namespaces is not empty  then considers all the namespaces
 func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
 	names := sets.String{}
 	if podAffinityTerm.Namespaces == nil {
@@ -59,7 +59,7 @@ type Topologies struct {
 }
 
 // NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.
-// If the topologyKey is nil/empty, check if the two nodes have any of the default topologyKeys, and have same corresponding label value.
+// If the topologyKey is empty, check if the two nodes have any of the default topologyKeys, and have same corresponding label value.
 func (tps *Topologies) NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
 	if len(topologyKey) == 0 {
 		// assumes this is allowed only for PreferredDuringScheduling pod anti-affinity (ensured by api/validation)
