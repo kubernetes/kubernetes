@@ -96,14 +96,14 @@ func Run(s *options.ServerRunOptions) error {
 
 	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
 
-	genericConfig, err := genericapiserver.NewConfig(). // create the new config
-								ApplyOptions(s.GenericServerRunOptions). // apply the options selected
-								ApplyInsecureServingOptions(s.InsecureServing).
-								ApplyAuthenticationOptions(s.Authentication).
-								ApplySecureServingOptions(s.SecureServing)
-	if err != nil {
+	genericConfig := genericapiserver.NewConfig(). // create the new config
+							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
+							ApplyInsecureServingOptions(s.InsecureServing)
+
+	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
 	}
+	genericConfig.ApplyAuthenticationOptions(s.Authentication)
 
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
