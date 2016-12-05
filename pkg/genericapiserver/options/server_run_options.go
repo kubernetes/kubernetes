@@ -31,11 +31,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const (
-	// TODO: This can be tightened up. It still matches objects named watch or proxy.
-	DefaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs?|portforward|exec|attach)/?$)"
-)
-
 var DefaultServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
 // ServerRunOptions contains the options while running a generic api server.
@@ -60,7 +55,6 @@ type ServerRunOptions struct {
 	EnableWatchCache            bool
 	ExternalHost                string
 	KubernetesServiceNodePort   int
-	LongRunningRequestRE        string
 	MasterCount                 int
 	MasterServiceNamespace      string
 	MaxRequestsInFlight         int
@@ -88,7 +82,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableProfiling:             true,
 		EnableContentionProfiling:   false,
 		EnableWatchCache:            true,
-		LongRunningRequestRE:        DefaultLongRunningRequestRE,
 		MasterCount:                 1,
 		MasterServiceNamespace:      api.NamespaceDefault,
 		MaxRequestsInFlight:         400,
@@ -243,9 +236,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
 		"service will be of type ClusterIP.")
 
-	fs.StringVar(&s.LongRunningRequestRE, "long-running-request-regexp", s.LongRunningRequestRE, ""+
+	// TODO: remove post-1.6
+	fs.String("long-running-request-regexp", "", ""+
 		"A regular expression matching long running requests which should "+
 		"be excluded from maximum inflight request handling.")
+	fs.MarkDeprecated("long-running-request-regexp", "regular expression matching of long-running requests is no longer supported")
 
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
 		"The number of apiservers running in the cluster.")

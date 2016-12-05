@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 )
 
 const globalTimeout = time.Minute
@@ -34,13 +35,23 @@ const globalTimeout = time.Minute
 var errConnKilled = fmt.Errorf("kill connection/stream")
 
 // WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by globalTimeout.
-func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning LongRunningRequestCheck) http.Handler {
+func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMapper api.RequestContextMapper, longRunning LongRunningRequestCheck) http.Handler {
 	if longRunning == nil {
 		return handler
 	}
 	timeoutFunc := func(req *http.Request) (<-chan time.Time, string) {
 		// TODO unify this with apiserver.MaxInFlightLimit
-		if longRunning(req) {
+		ctx, ok := requestContextMapper.Get(req)
+		if !ok {
+			return time.After(globalTimeout), ""
+		}
+
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			return time.After(globalTimeout), ""
+		}
+
+		if longRunning(req, requestInfo) {
 			return nil, ""
 		}
 		return time.After(globalTimeout), ""

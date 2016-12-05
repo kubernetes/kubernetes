@@ -62,13 +62,6 @@ func WithMaxInFlightLimit(
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: migrate to use requestInfo instead of having custom request parser.
-		if longRunningRequestCheck(r) {
-			// Skip tracking long running events.
-			handler.ServeHTTP(w, r)
-			return
-		}
-
 		ctx, ok := requestContextMapper.Get(r)
 		if !ok {
 			handleError(w, r, fmt.Errorf("no context found for request, handler chain must be wrong"))
@@ -77,6 +70,12 @@ func WithMaxInFlightLimit(
 		requestInfo, ok := request.RequestInfoFrom(ctx)
 		if !ok {
 			handleError(w, r, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
+			return
+		}
+
+		// Skip tracking long running events.
+		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) {
+			handler.ServeHTTP(w, r)
 			return
 		}
 

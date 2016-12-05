@@ -35,11 +35,13 @@ go_library(
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
+        "//pkg/genericapiserver/filters:go_default_library",
         "//pkg/master:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/net:go_default_library",
+        "//pkg/util/sets:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/version:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",
@@ -66,12 +68,4 @@ go_library(
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
     ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["server_test.go"],
-    library = "go_default_library",
-    tags = ["automanaged"],
-    deps = ["//cmd/kube-apiserver/app/options:go_default_library"],
 )

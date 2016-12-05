@@ -18,29 +18,23 @@ package filters
 
 import (
 	"net/http"
-	"regexp"
-	"strings"
+
+	"k8s.io/kubernetes/pkg/apiserver/request"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // LongRunningRequestCheck is a predicate which is true for long-running http requests.
-type LongRunningRequestCheck func(r *http.Request) bool
+type LongRunningRequestCheck func(r *http.Request, requestInfo *request.RequestInfo) bool
 
-// BasicLongRunningRequestCheck pathRegex operates against the url path, the queryParams match is case insensitive.
-// Any one match flags the request.
-// TODO tighten this check to eliminate the abuse potential by malicious clients that start setting queryParameters
-// to bypass the rate limitter.  This could be done using a full parse and special casing the bits we need.
-func BasicLongRunningRequestCheck(pathRegex *regexp.Regexp, queryParams map[string]string) LongRunningRequestCheck {
-	return func(r *http.Request) bool {
-		if pathRegex.MatchString(r.URL.Path) {
+// BasicLongRunningRequestCheck returns true if the given request has one of the specified verbs or one of the specified subresources
+func BasicLongRunningRequestCheck(longRunningVerbs, longRunningSubresources sets.String) LongRunningRequestCheck {
+	return func(r *http.Request, requestInfo *request.RequestInfo) bool {
+		if longRunningVerbs.Has(requestInfo.Verb) {
 			return true
 		}
-
-		for key, expectedValue := range queryParams {
-			if strings.ToLower(expectedValue) == strings.ToLower(r.URL.Query().Get(key)) {
-				return true
-			}
+		if requestInfo.IsResourceRequest && longRunningSubresources.Has(requestInfo.Subresource) {
+			return true
 		}
-
 		return false
 	}
 }

@@ -47,5 +47,6 @@ go_test(
         "//pkg/api/errors:go_default_library",
         "//pkg/apiserver/filters:go_default_library",
         "//pkg/apiserver/request:go_default_library",
+        "//pkg/util/sets:go_default_library",
     ],
 )
