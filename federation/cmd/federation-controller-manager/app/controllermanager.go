@@ -33,6 +33,7 @@ import (
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	autoscalercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/autoscaler"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
 	configmapcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/configmap"
 	daemonset "k8s.io/kubernetes/federation/pkg/federation-controller/daemonset"
@@ -42,6 +43,7 @@ import (
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
+
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -170,6 +172,11 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
 	glog.Infof("Running namespace controller")
 	namespaceController.Run(wait.NeverStop)
+
+	autoscalerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "federated-autoscaler-controller"))
+	autoscalerController := autoscalercontroller.NewAutoscalerController(autoscalerClientset)
+	glog.Infof("Running autoscaler controller")
+	autoscalerController.Run(wait.NeverStop)
 
 	secretcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "secret-controller"))
 	secretcontroller := secretcontroller.NewSecretController(secretcontrollerClientset)

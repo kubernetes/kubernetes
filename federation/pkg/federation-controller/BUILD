@@ -24,6 +24,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//federation/pkg/federation-controller/autoscaler:all-srcs",
         "//federation/pkg/federation-controller/cluster:all-srcs",
         "//federation/pkg/federation-controller/configmap:all-srcs",
         "//federation/pkg/federation-controller/daemonset:all-srcs",
