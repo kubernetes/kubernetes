@@ -662,7 +662,7 @@ kube::golang::build_binaries() {
       # Only try to generate bindata if the file exists, since in some cases
       # one-off builds of individual directories may exclude some files.
       if [[ -f "${KUBE_ROOT}/${bindata}" ]]; then
-        go "${goflags[@]:+${goflags[@]}}" generate "${KUBE_ROOT}/${bindata}"
+        go generate "${goflags[@]:+${goflags[@]}}" "${KUBE_ROOT}/${bindata}"
       fi
     done
 
