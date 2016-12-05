@@ -35,13 +35,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
-
-func init() {
-	integration.RequireEtcd()
-}
 
 func fakePodWithVol(namespace string) *v1.Pod {
 	fakePod := &v1.Pod{
@@ -142,11 +137,9 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	}
 
 	waitToObservePods(t, podInformer, 0)
-
 	// the populator loop turns every 1 minute
-	time.Sleep(2 * time.Minute)
+	time.Sleep(80 * time.Second)
 	podsToAdd = ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-
 	if len(podsToAdd) != 0 {
 		t.Fatalf("All pods should have been removed")
 	}

@@ -140,7 +140,6 @@ Federated Services DNS non-local federated service missing local service should 
 Federated Services DNS non-local federated service should be able to discover a non-local federated service,jlowdermilk,1
 Federated Services DNS should be able to discover a federated service,derekwaynecarr,1
 Federated Services Service creation should create matching services in underlying clusters,jbeda,1
-Federated Services Service creation should not be deleted from underlying clusters when it is deleted,gnufied,0
 Federated Services Service creation should succeed,rmmh,1
 Federated ingresses Federated Ingresses Ingress connectivity and DNS should be able to connect to a federated ingress via its load balancer,rmmh,1
 Federated ingresses Federated Ingresses should be created and deleted successfully,dchen1107,1
@@ -547,6 +546,7 @@ k8s.io/kubernetes/pkg/api/errors,yifan-gu,1
 k8s.io/kubernetes/pkg/api/events,jlowdermilk,1
 k8s.io/kubernetes/pkg/api/install,timothysc,1
 k8s.io/kubernetes/pkg/api/meta,fabioy,1
+k8s.io/kubernetes/pkg/api/pod,piosz,1
 k8s.io/kubernetes/pkg/api/resource,smarterclayton,1
 k8s.io/kubernetes/pkg/api/service,spxtr,1
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1
@@ -554,9 +554,6 @@ k8s.io/kubernetes/pkg/api/unversioned,kevin-wangzefeng,1
 k8s.io/kubernetes/pkg/api/unversioned/validation,brendandburns,1
 k8s.io/kubernetes/pkg/api/util,ghodss,1
 k8s.io/kubernetes/pkg/api/v1,vulpecula,1
-k8s.io/kubernetes/pkg/api/v1/endpoints,gnufied,0
-k8s.io/kubernetes/pkg/api/v1/pod,gnufied,0
-k8s.io/kubernetes/pkg/api/v1/service,gnufied,0
 k8s.io/kubernetes/pkg/api/validation,smarterclayton,1
 k8s.io/kubernetes/pkg/api/validation/path,luxas,1
 k8s.io/kubernetes/pkg/apimachinery,gmarek,1
@@ -789,7 +786,6 @@ k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd,xiang90,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass,brendandburns,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd,eparis,1
 k8s.io/kubernetes/pkg/runtime,wojtek-t,0
-k8s.io/kubernetes/pkg/runtime/schema,gnufied,0
 k8s.io/kubernetes/pkg/runtime/serializer,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/json,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/protobuf,wojtek-t,0
@@ -955,6 +951,7 @@ k8s.io/kubernetes/test/integration/master,fabioy,1
 k8s.io/kubernetes/test/integration/metrics,lavalamp,1
 k8s.io/kubernetes/test/integration/objectmeta,janetkuo,1
 k8s.io/kubernetes/test/integration/openshift,kevin-wangzefeng,1
+k8s.io/kubernetes/test/integration/persistentvolumes,cjcullen,1
 k8s.io/kubernetes/test/integration/pods,smarterclayton,1
 k8s.io/kubernetes/test/integration/quota,alex-mohr,1
 k8s.io/kubernetes/test/integration/replicaset,janetkuo,1
@@ -965,7 +962,6 @@ k8s.io/kubernetes/test/integration/secrets,rmmh,1
 k8s.io/kubernetes/test/integration/serviceaccount,deads2k,1
 k8s.io/kubernetes/test/integration/storageclasses,andyzheng0831,1
 k8s.io/kubernetes/test/integration/thirdparty,davidopp,1
-k8s.io/kubernetes/test/integration/volume,gnufied,0
 k8s.io/kubernetes/test/list,maisem,1
 kubelet Clean up pods on node kubelet should be able to delete * pods per node in *.,yujuhong,0
 "when we run containers that should cause * should eventually see *, and then evict all of the correct pods",Random-Liu,0
