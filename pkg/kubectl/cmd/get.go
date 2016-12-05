@@ -373,7 +373,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 
 		filteredResourceCount := 0
-		if isFiltered, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
+		if isFiltered, _, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
 			if err != nil {
 				glog.V(2).Infof("Unable to filter resource: %v", err)
 			} else if err := printer.PrintObj(obj, out); err != nil {
