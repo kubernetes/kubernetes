@@ -21,6 +21,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/validation:go_default_library",
         "//pkg/fields:go_default_library",
