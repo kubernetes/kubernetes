@@ -173,7 +173,6 @@ func NewAuthorizerFromAuthorizationConfig(config AuthorizationConfig) (authorize
 				config.InformerFactory.RoleBindings().Lister(),
 				config.InformerFactory.ClusterRoles().Lister(),
 				config.InformerFactory.ClusterRoleBindings().Lister(),
-				config.RBACSuperUser,
 			)
 			authorizers = append(authorizers, rbacAuthorizer)
 		default:
