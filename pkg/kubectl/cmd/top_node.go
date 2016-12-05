@@ -89,7 +89,7 @@ func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 		Aliases: []string{"nodes"},
 	}
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 	options.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
