@@ -44,3 +44,24 @@ go_library(
         "//pkg/util/wait:go_default_library",
     ],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "addons_test.go",
+        "apiclient_test.go",
+        "discovery_test.go",
+        "kubeconfig_test.go",
+        "manifests_test.go",
+        "pki_test.go",
+        "tokens_test.go",
+    ],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/util/cert:go_default_library",
+        "//pkg/util/intstr:go_default_library",
+    ],
+)

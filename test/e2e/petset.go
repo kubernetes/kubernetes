@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	klabels "k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -66,14 +65,9 @@ const (
 	readTimeout = 60 * time.Second
 )
 
-var (
-	StatefulSetGroupVersionResource = schema.GroupVersionResource{Group: apps.GroupName, Version: "v1beta1", Resource: "statefulsets"}
-)
-
-// Time: 25m, slow by design.
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
-var _ = framework.KubeDescribe("StatefulSet [Slow]", func() {
+var _ = framework.KubeDescribe("StatefulSet", func() {
 	f := framework.NewDefaultFramework("statefulset")
 	var ns string
 	var c clientset.Interface
@@ -81,7 +75,6 @@ var _ = framework.KubeDescribe("StatefulSet [Slow]", func() {
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.SkipIfMissingResource(f.ClientPool, StatefulSetGroupVersionResource, f.Namespace.Name)
 	})
 
 	framework.KubeDescribe("Basic StatefulSet functionality", func() {
@@ -355,7 +348,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet]", func() {
+	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
 		var pst *statefulSetTester
 		var appTester *clusterAppTester
 
@@ -394,7 +387,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow]", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("Stateful Set recreate [Slow]", func() {
+var _ = framework.KubeDescribe("Stateful Set recreate", func() {
 	f := framework.NewDefaultFramework("pet-set-recreate")
 	var c clientset.Interface
 	var ns string
@@ -409,7 +402,7 @@ var _ = framework.KubeDescribe("Stateful Set recreate [Slow]", func() {
 	petPodName := "web-0"
 
 	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.ClientPool, StatefulSetGroupVersionResource, f.Namespace.Name)
+		framework.SkipUnlessProviderIs("gce", "gke", "vagrant")
 		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
 		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)

@@ -79,6 +79,7 @@ func NewStorage(opts generic.RESTOptions, kubeletClientConfig client.KubeletClie
 		prefix,
 		node.Strategy,
 		newListFunc,
+		node.GetAttrs,
 		node.NodeNameTriggerFunc)
 
 	store := &registry.Store{

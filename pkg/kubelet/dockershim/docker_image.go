@@ -18,14 +18,14 @@ package dockershim
 
 import (
 	dockertypes "github.com/docker/engine-api/types"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 // This file implements methods in ImageManagerService.
 
 // ListImages lists existing images.
-func (ds *dockerService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeApi.Image, error) {
+func (ds *dockerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	opts := dockertypes.ImageListOptions{}
 	if filter != nil {
 		if imgSpec := filter.GetImage(); imgSpec != nil {
@@ -38,7 +38,7 @@ func (ds *dockerService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeA
 		return nil, err
 	}
 
-	result := []*runtimeApi.Image{}
+	result := []*runtimeapi.Image{}
 	for _, i := range images {
 		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {
@@ -51,7 +51,7 @@ func (ds *dockerService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeA
 }
 
 // ImageStatus returns the status of the image, returns nil if the image doesn't present.
-func (ds *dockerService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.Image, error) {
+func (ds *dockerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	imageInspect, err := ds.client.InspectImageByRef(image.GetImage())
 	if err != nil {
 		if dockertools.IsImageNotFoundError(err) {
@@ -63,7 +63,7 @@ func (ds *dockerService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.I
 }
 
 // PullImage pulls an image with authentication config.
-func (ds *dockerService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
+func (ds *dockerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
 	return ds.client.PullImage(image.GetImage(),
 		dockertypes.AuthConfig{
 			Username:      auth.GetUsername(),
@@ -77,7 +77,7 @@ func (ds *dockerService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi
 }
 
 // RemoveImage removes the image.
-func (ds *dockerService) RemoveImage(image *runtimeApi.ImageSpec) error {
+func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	// If the image has multiple tags, we need to remove all the tags
 	// TODO: We assume image.Image is image ID here, which is true in the current implementation
 	// of kubelet, but we should still clarify this in CRI.

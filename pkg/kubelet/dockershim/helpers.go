@@ -29,7 +29,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -62,7 +62,7 @@ func (v apiVersion) Compare(other string) (int, error) {
 
 // generateEnvList converts KeyValue list to a list of strings, in the form of
 // '<key>=<value>', which can be understood by docker.
-func generateEnvList(envs []*runtimeApi.KeyValue) (result []string) {
+func generateEnvList(envs []*runtimeapi.KeyValue) (result []string) {
 	for _, env := range envs {
 		result = append(result, fmt.Sprintf("%s=%s", env.GetKey(), env.GetValue()))
 	}
@@ -127,7 +127,7 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
 // relabeling and the pod provides an SELinux label
-func generateMountBindings(mounts []*runtimeApi.Mount) (result []string) {
+func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.GetHostPath(), m.GetContainerPath())
 		readOnly := m.GetReadonly()
@@ -150,7 +150,7 @@ func generateMountBindings(mounts []*runtimeApi.Mount) (result []string) {
 	return
 }
 
-func makePortsAndBindings(pm []*runtimeApi.PortMapping) (map[dockernat.Port]struct{}, map[dockernat.Port][]dockernat.PortBinding) {
+func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]struct{}, map[dockernat.Port][]dockernat.PortBinding) {
 	exposedPorts := map[dockernat.Port]struct{}{}
 	portBindings := map[dockernat.Port][]dockernat.PortBinding{}
 	for _, port := range pm {
@@ -198,7 +198,7 @@ func makePortsAndBindings(pm []*runtimeApi.PortMapping) (map[dockernat.Port]stru
 // getContainerSecurityOpt gets container security options from container and sandbox config, currently from sandbox
 // annotations.
 // It is an experimental feature and may be promoted to official runtime api in the future.
-func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeApi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
 	appArmorOpts, err := dockertools.GetAppArmorOpts(sandboxConfig.GetAnnotations(), containerName)
 	if err != nil {
 		return nil, err
@@ -216,7 +216,7 @@ func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeApi.Po
 	return opts, nil
 }
 
-func getSandboxSecurityOpts(sandboxConfig *runtimeApi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+func getSandboxSecurityOpts(sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
 	// sandboxContainerName doesn't exist in the pod, so pod security options will be returned by default.
 	return getContainerSecurityOpts(sandboxContainerName, sandboxConfig, seccompProfileRoot)
 }

@@ -43,6 +43,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		prefix,
 		configmap.Strategy,
 		newListFunc,
+		configmap.GetAttrs,
 		storage.NoTriggerPublisher)
 
 	store := &registry.Store{

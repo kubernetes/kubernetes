@@ -444,6 +444,7 @@ Services should be able to create a functioning NodePort service,bprashanth,0
 Services should be able to up and down services,bprashanth,0
 Services should check NodePort out-of-range,bprashanth,0
 Services should create endpoints for unready pods,maisem,0
+Serivces should only allow access from service loadbalancer source ranges,freehan,0
 Services should preserve source pod IP for traffic thru service cluster IP,Random-Liu,1
 Services should prevent NodePort collisions,bprashanth,0
 Services should provide secure master service,bprashanth,0
@@ -504,6 +505,8 @@ k8s.io/kubernetes/cmd/kube-discovery/app,pmorie,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
 k8s.io/kubernetes/cmd/kubeadm/app/cmd,caesarxuchao,1
 k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
+k8s.io/kubernetes/cmd/kubeadm/app/node,apprenda,0
+k8s.io/kubernetes/cmd/kubeadm/app/master,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
@@ -961,3 +964,4 @@ k8s.io/kubernetes/test/integration/storageclasses,andyzheng0831,1
 k8s.io/kubernetes/test/integration/thirdparty,davidopp,1
 k8s.io/kubernetes/test/list,maisem,1
 kubelet Clean up pods on node kubelet should be able to delete * pods per node in *.,yujuhong,0
+"when we run containers that should cause * should eventually see *, and then evict all of the correct pods",Random-Liu,0

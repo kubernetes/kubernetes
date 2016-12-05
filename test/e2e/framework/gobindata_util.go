@@ -16,7 +16,7 @@ limitations under the License.
 
 package framework
 
-//go:generate ../../../hack/update-bindata.sh
+//go:generate ../../../hack/generate-bindata.sh
 
 // See https://github.com/kubernetes/kubernetes/issues/23987
 import "k8s.io/kubernetes/test/e2e/generated"

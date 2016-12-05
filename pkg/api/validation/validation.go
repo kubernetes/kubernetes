@@ -34,6 +34,7 @@ import (
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
 	"k8s.io/kubernetes/pkg/api/v1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -347,6 +348,15 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	if !api.Semantic.DeepEqual(oldVal, newVal) {
 		allErrs = append(allErrs, field.Invalid(fldPath, newVal, fieldImmutableErrorMsg))
+	}
+	return allErrs
+}
+
+func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if oldVal != newVal {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("annotations", annotation), newVal, fieldImmutableErrorMsg))
 	}
 	return allErrs
 }
@@ -1262,11 +1272,15 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 		oldPvc.Spec.VolumeName = newPvc.Spec.VolumeName
 		defer func() { oldPvc.Spec.VolumeName = "" }()
 	}
-	// changes to Spec are not allowed, but updates to label/annotations are OK.
+	// changes to Spec are not allowed, but updates to label/and some annotations are OK.
 	// no-op updates pass validation.
 	if !api.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation"))
 	}
+
+	// storageclass annotation should be immutable after creation
+	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], oldPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], storageutil.StorageClassAnnotation, field.NewPath("metadata"))...)
+
 	newPvc.Status = oldPvc.Status
 	return allErrs
 }
@@ -1374,11 +1388,13 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 		allErrs = append(allErrs, validateSecretKeySelector(ev.ValueFrom.SecretKeyRef, fldPath.Child("secretKeyRef"))...)
 	}
 
-	if len(ev.Value) != 0 {
+	if numSources == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
+	} else if len(ev.Value) != 0 {
 		if numSources != 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
 		}
-	} else if numSources != 1 {
+	} else if numSources > 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "may not have more than one field specified at a time"))
 	}
 
@@ -2663,15 +2679,6 @@ func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 		if oldService.Spec.Type != api.ServiceTypeExternalName && oldService.Spec.ClusterIP != "" {
 			allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
 		}
-	}
-
-	// TODO(freehan): allow user to update loadbalancerSourceRanges
-	// Only allow removing LoadBalancerSourceRanges when change service type from LoadBalancer
-	// to non-LoadBalancer or adding LoadBalancerSourceRanges when change service type from
-	// non-LoadBalancer to LoadBalancer.
-	if service.Spec.Type != api.ServiceTypeLoadBalancer && oldService.Spec.Type != api.ServiceTypeLoadBalancer ||
-		service.Spec.Type == api.ServiceTypeLoadBalancer && oldService.Spec.Type == api.ServiceTypeLoadBalancer {
-		allErrs = append(allErrs, ValidateImmutableField(service.Spec.LoadBalancerSourceRanges, oldService.Spec.LoadBalancerSourceRanges, field.NewPath("spec", "loadBalancerSourceRanges"))...)
 	}
 
 	allErrs = append(allErrs, validateServiceFields(service)...)

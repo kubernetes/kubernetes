@@ -28,14 +28,26 @@ import (
 // Runtime options for the federation-apiserver.
 type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
-	EventTTL                time.Duration
+	Etcd                    *genericoptions.EtcdOptions
+	SecureServing           *genericoptions.SecureServingOptions
+	InsecureServing         *genericoptions.ServingOptions
+	Authentication          *genericoptions.BuiltInAuthenticationOptions
+	Authorization           *genericoptions.BuiltInAuthorizationOptions
+
+	EventTTL time.Duration
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default values.
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
-		EventTTL:                1 * time.Hour,
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		Etcd:            genericoptions.NewEtcdOptions(),
+		SecureServing:   genericoptions.NewSecureServingOptions(),
+		InsecureServing: genericoptions.NewInsecureServingOptions(),
+		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:   genericoptions.NewBuiltInAuthorizationOptions(),
+
+		EventTTL: 1 * time.Hour,
 	}
 	return &s
 }
@@ -44,8 +56,11 @@ func NewServerRunOptions() *ServerRunOptions {
 func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
-	//Add etcd specific flags.
-	s.GenericServerRunOptions.AddEtcdStorageFlags(fs)
+	s.Etcd.AddFlags(fs)
+	s.SecureServing.AddFlags(fs)
+	s.InsecureServing.AddFlags(fs)
+	s.Authentication.AddFlags(fs)
+	s.Authorization.AddFlags(fs)
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")

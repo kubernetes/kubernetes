@@ -34,6 +34,9 @@ const (
 
 	FederatedServiceName    = "federated-service"
 	FederatedServicePodName = "federated-service-test-pod"
+
+	KubeDNSConfigMapName      = "kube-dns"
+	KubeDNSConfigMapNamespace = "kube-system"
 )
 
 var FederatedServiceLabels = map[string]string{
@@ -110,6 +113,27 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				}()
 				waitForServiceShardsOrFail(nsName, service, clusters)
 			})
+
+			It("should not be deleted from underlying clusters when it is deleted", func() {
+				framework.SkipUnlessFederated(f.ClientSet)
+				nsName = f.FederationNamespace.Name
+				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
+				By(fmt.Sprintf("Successfully created federated service %q in namespace %q. Waiting for shards to appear in underlying clusters", service.Name, nsName))
+
+				waitForServiceShardsOrFail(nsName, service, clusters)
+
+				By(fmt.Sprintf("Deleting service %s", service.Name))
+				err := f.FederationClientset_1_5.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
+				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
+				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
+				By(fmt.Sprintf("Verifying that services in underlying clusters are not deleted"))
+				for clusterName, clusterClientset := range clusters {
+					_, err := clusterClientset.Core().Services(service.Namespace).Get(service.Name)
+					if err != nil {
+						framework.Failf("Unexpected error in fetching service %s in cluster %s, %s", service.Name, clusterName, err)
+					}
+				}
+			})
 		})
 
 		var _ = Describe("DNS", func() {
@@ -122,6 +146,27 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				framework.SkipUnlessFederated(f.ClientSet)
 
 				nsName := f.FederationNamespace.Name
+				// Create kube-dns configmap for kube-dns to accept federation queries.
+				federationsDomainMap := os.Getenv("FEDERATIONS_DOMAIN_MAP")
+				if federationsDomainMap == "" {
+					framework.Failf("missing required env var FEDERATIONS_DOMAIN_MAP")
+				}
+				kubeDNSConfigMap := v1.ConfigMap{
+					ObjectMeta: v1.ObjectMeta{
+						Name:      KubeDNSConfigMapName,
+						Namespace: KubeDNSConfigMapNamespace,
+					},
+					Data: map[string]string{
+						"federations": federationsDomainMap,
+					},
+				}
+				// Create this configmap in all clusters.
+				for clusterName, cluster := range clusters {
+					By(fmt.Sprintf("Creating kube dns config map in cluster: %s", clusterName))
+					_, err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Create(&kubeDNSConfigMap)
+					framework.ExpectNoError(err, fmt.Sprintf("Error in creating config map in cluster %s", clusterName))
+				}
+
 				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
 				waitForServiceShardsOrFail(nsName, service, clusters)
@@ -143,6 +188,12 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				} else {
 					By("No service to delete.  Service is nil")
 				}
+				// Delete the kube-dns config map from all clusters.
+				for clusterName, cluster := range clusters {
+					By(fmt.Sprintf("Deleting kube dns config map from cluster: %s", clusterName))
+					err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Delete(KubeDNSConfigMapName, nil)
+					framework.ExpectNoError(err, fmt.Sprintf("Error in deleting config map from cluster %s", clusterName))
+				}
 			})
 
 			It("should be able to discover a federated service", func() {
@@ -162,6 +213,15 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				for i, DNSName := range svcDNSNames {
 					discoverService(f, DNSName, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
 				}
+				By("Verified that DNS rules are working as expected")
+
+				By("Deleting the service to verify that DNS rules still work")
+				err := f.FederationClientset_1_5.Services(nsName).Delete(FederatedServiceName, &v1.DeleteOptions{})
+				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
+				for i, DNSName := range svcDNSNames {
+					discoverService(f, DNSName, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
+				}
+				By("Verified that deleting the service does not affect DNS records")
 			})
 
 			Context("non-local federated service", func() {

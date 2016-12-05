@@ -32,9 +32,11 @@ auth-provider
 auth-provider
 auth-provider-arg
 auth-provider-arg
+authentication-kubeconfig
 authentication-token-webhook
 authentication-token-webhook-cache-ttl
 authentication-token-webhook-config-file
+authorization-kubeconfig
 authorization-mode
 authorization-policy-file
 authorization-rbac-super-user
@@ -206,6 +208,7 @@ external-etcd-endpoints
 external-etcd-keyfile
 external-hostname
 external-ip
+external-name
 extra-peer-dirs
 experimental-fail-swap-on
 failover-timeout
@@ -333,6 +336,10 @@ kubelet-read-only-port
 kubelet-root-dir
 kubelet-sync-frequency
 kubelet-timeout
+kubernetes-anywhere-cluster
+kubernetes-anywhere-path
+kubernetes-anywhere-phase2-provider
+kubernetes-anywhere-up-timeout
 kubernetes-service-node-port
 label-columns
 large-cluster-size-threshold
@@ -351,7 +358,6 @@ long-running-request-regexp
 low-diskspace-threshold-mb
 make-iptables-util-chains
 make-symlinks
-manifest-path
 manifest-url
 manifest-url-header
 manifest-url-headers

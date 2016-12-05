@@ -38,6 +38,7 @@ import (
 	"github.com/coreos/etcd/store"
 	"github.com/coreos/etcd/wal"
 	"github.com/coreos/etcd/wal/walpb"
+	"github.com/coreos/go-semver/semver"
 	"github.com/golang/glog"
 )
 
@@ -263,6 +264,7 @@ func rebuild(datadir string) ([]byte, *raftpb.HardState, store.Store, error) {
 
 	cluster := membership.NewCluster("")
 	cluster.SetStore(st)
+	cluster.Recover(func(*semver.Version) {})
 
 	applier := etcdserver.NewApplierV2(st, cluster)
 	for _, ent := range ents {

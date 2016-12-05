@@ -23,6 +23,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",

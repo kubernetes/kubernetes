@@ -77,19 +77,21 @@ func (storageClassStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	cls, ok := obj.(*storage.StorageClass)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not of type StorageClass")
+	}
+	return labels.Set(cls.ObjectMeta.Labels), StorageClassToSelectableFields(cls), nil
+}
+
 // MatchStorageClass returns a generic matcher for a given label and field selector.
 func MatchStorageClasses(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
 	return apistorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			cls, ok := obj.(*storage.StorageClass)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not of type StorageClass")
-			}
-
-			return labels.Set(cls.ObjectMeta.Labels), StorageClassToSelectableFields(cls), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

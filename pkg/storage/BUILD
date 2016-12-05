@@ -85,6 +85,7 @@ go_test(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
+        "//pkg/registry/core/pod:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/etcd:go_default_library",

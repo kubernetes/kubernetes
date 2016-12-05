@@ -132,7 +132,6 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 
 			// check for export
 			if values := req.Request.URL.Query(); len(values) > 0 {
-				// TODO: this is internal version, not unversioned
 				exports := unversioned.ExportOptions{}
 				if err := scope.ParameterCodec.DecodeParameters(values, schema.GroupVersion{Version: "v1"}, &exports); err != nil {
 					return nil, err

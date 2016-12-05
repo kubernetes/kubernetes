@@ -42,6 +42,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		prefix,
 		podtemplate.Strategy,
 		newListFunc,
+		podtemplate.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

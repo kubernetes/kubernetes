@@ -47,6 +47,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *ApprovalREST) {
 		prefix,
 		csrregistry.Strategy,
 		newListFunc,
+		csrregistry.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

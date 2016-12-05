@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -42,7 +43,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Scale{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
-		&v1.ExportOptions{},
+		&unversioned.ExportOptions{},
 	)
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

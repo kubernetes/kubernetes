@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
-	quobyte_api "github.com/quobyte/api"
+	quobyteapi "github.com/quobyte/api"
 )
 
 type quobyteVolumeManager struct {
@@ -37,7 +37,7 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 	volumeSize := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 	// Quobyte has the concept of Volumes which doen't have a specific size (they can grow unlimited)
 	// to simulate a size constraint we could set here a Quota
-	volumeRequest := &quobyte_api.CreateVolumeRequest{
+	volumeRequest := &quobyteapi.CreateVolumeRequest{
 		Name:              provisioner.volume,
 		RootUserID:        provisioner.user,
 		RootGroupID:       provisioner.group,
@@ -62,8 +62,8 @@ func (manager *quobyteVolumeManager) deleteVolume(deleter *quobyteVolumeDeleter)
 	return manager.createQuobyteClient().DeleteVolumeByName(deleter.volume, deleter.tenant)
 }
 
-func (manager *quobyteVolumeManager) createQuobyteClient() *quobyte_api.QuobyteClient {
-	return quobyte_api.NewQuobyteClient(
+func (manager *quobyteVolumeManager) createQuobyteClient() *quobyteapi.QuobyteClient {
+	return quobyteapi.NewQuobyteClient(
 		manager.config.quobyteAPIServer,
 		manager.config.quobyteUser,
 		manager.config.quobytePassword,

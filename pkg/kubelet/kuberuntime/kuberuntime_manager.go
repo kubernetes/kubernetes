@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -101,8 +101,8 @@ type kubeGenericRuntimeManager struct {
 	imagePuller images.ImageManager
 
 	// gRPC service clients
-	runtimeService internalApi.RuntimeService
-	imageService   internalApi.ImageManagerService
+	runtimeService internalapi.RuntimeService
+	imageService   internalapi.ImageManagerService
 
 	// The version cache of runtime daemon.
 	versionCache *cache.ObjectCache
@@ -130,8 +130,8 @@ func NewKubeGenericRuntimeManager(
 	imagePullQPS float32,
 	imagePullBurst int,
 	cpuCFSQuota bool,
-	runtimeService internalApi.RuntimeService,
-	imageService internalApi.ImageManagerService,
+	runtimeService internalapi.RuntimeService,
+	imageService internalapi.ImageManagerService,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -231,7 +231,7 @@ func (r runtimeVersion) Compare(other string) (int, error) {
 	return 0, nil
 }
 
-func (m *kubeGenericRuntimeManager) getTypedVersion() (*runtimeApi.VersionResponse, error) {
+func (m *kubeGenericRuntimeManager) getTypedVersion() (*runtimeapi.VersionResponse, error) {
 	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
 	if err != nil {
 		glog.Errorf("Get remote runtime typed version failed: %v", err)
@@ -259,7 +259,7 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 	if err != nil {
 		return nil, err
 	}
-	typedVersion := versionObject.(*runtimeApi.VersionResponse)
+	typedVersion := versionObject.(*runtimeapi.VersionResponse)
 
 	return newRuntimeVersion(typedVersion.GetRuntimeApiVersion())
 }
@@ -396,14 +396,14 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 
 	readySandboxCount := 0
 	for _, s := range podStatus.SandboxStatuses {
-		if s.GetState() == runtimeApi.PodSandboxState_SANDBOX_READY {
+		if s.GetState() == runtimeapi.PodSandboxState_SANDBOX_READY {
 			readySandboxCount++
 		}
 	}
 
 	// Needs to create a new sandbox when readySandboxCount > 1 or the ready sandbox is not the latest one.
 	sandboxStatus := podStatus.SandboxStatuses[0]
-	if readySandboxCount > 1 || sandboxStatus.GetState() != runtimeApi.PodSandboxState_SANDBOX_READY {
+	if readySandboxCount > 1 || sandboxStatus.GetState() != runtimeapi.PodSandboxState_SANDBOX_READY {
 		glog.V(2).Infof("No ready sandbox for pod %q can be found. Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.GetAttempt() + 1, sandboxStatus.GetId()
 	}
@@ -857,7 +857,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	})
 	glog.V(4).Infof("getSandboxIDByPodUID got sandbox IDs %q for pod %q", podSandboxIDs, podFullName)
 
-	sandboxStatuses := make([]*runtimeApi.PodSandboxStatus, len(podSandboxIDs))
+	sandboxStatuses := make([]*runtimeapi.PodSandboxStatus, len(podSandboxIDs))
 	podIP := ""
 	for idx, podSandboxID := range podSandboxIDs {
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
@@ -868,7 +868,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 		sandboxStatuses[idx] = podSandboxStatus
 
 		// Only get pod IP from latest sandbox
-		if idx == 0 && podSandboxStatus.GetState() == runtimeApi.PodSandboxState_SANDBOX_READY {
+		if idx == 0 && podSandboxStatus.GetState() == runtimeapi.PodSandboxState_SANDBOX_READY {
 			podIP = m.determinePodSandboxIP(namespace, name, podSandboxStatus)
 		}
 	}
@@ -922,8 +922,8 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 	// field of the config?
 	glog.Infof("updating runtime config through cri with podcidr %v", podCIDR)
 	return m.runtimeService.UpdateRuntimeConfig(
-		&runtimeApi.RuntimeConfig{
-			NetworkConfig: &runtimeApi.NetworkConfig{
+		&runtimeapi.RuntimeConfig{
+			NetworkConfig: &runtimeapi.NetworkConfig{
 				PodCidr: &podCIDR,
 			},
 		})

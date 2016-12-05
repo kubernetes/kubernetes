@@ -58,6 +58,7 @@ INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
 CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
+ETCD_QUORUM_READ="${ENABLE_ETCD_QUORUM_READ:-false}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
@@ -169,3 +170,10 @@ EVICTION_HARD="${EVICTION_HARD:-memory.available<250Mi,nodefs.available<10%,node
 
 # Optional: custom scheduling algorithm
 SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
+
+# Optional: install a default StorageClass
+ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
+
+# TODO(dawn1107): Remove this once the flag is built into CVM image.
+# Kernel panic upon soft lockup issue
+SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false

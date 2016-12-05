@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -209,11 +209,11 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
 // TODO: Remove this once it becomes obsolete.
-func SandboxToContainerState(state runtimeApi.PodSandboxState) ContainerState {
+func SandboxToContainerState(state runtimeapi.PodSandboxState) ContainerState {
 	switch state {
-	case runtimeApi.PodSandboxState_SANDBOX_READY:
+	case runtimeapi.PodSandboxState_SANDBOX_READY:
 		return ContainerStateRunning
-	case runtimeApi.PodSandboxState_SANDBOX_NOTREADY:
+	case runtimeapi.PodSandboxState_SANDBOX_NOTREADY:
 		return ContainerStateExited
 	}
 	return ContainerStateUnknown
@@ -245,4 +245,19 @@ func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []str
 	// the command returned a nonzero exit code). Therefore, always return the output along with the
 	// error.
 	return buffer.Bytes(), err
+}
+
+// GetContainerSpec gets the container spec by containerName.
+func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
+	for i, c := range pod.Spec.Containers {
+		if containerName == c.Name {
+			return &pod.Spec.Containers[i]
+		}
+	}
+	for i, c := range pod.Spec.InitContainers {
+		if containerName == c.Name {
+			return &pod.Spec.InitContainers[i]
+		}
+	}
+	return nil
 }

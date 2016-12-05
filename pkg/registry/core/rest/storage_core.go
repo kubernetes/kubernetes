@@ -43,9 +43,7 @@ import (
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/core/endpoint/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/core/event/etcd"
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/core/limitrange/etcd"
-	"k8s.io/kubernetes/pkg/registry/core/namespace"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/core/namespace/etcd"
-	"k8s.io/kubernetes/pkg/registry/core/node"
 	nodeetcd "k8s.io/kubernetes/pkg/registry/core/node/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/core/persistentvolume/etcd"
 	pvcetcd "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim/etcd"
@@ -86,10 +84,6 @@ type LegacyRESTStorageProvider struct {
 // master.go for wiring controllers.
 // TODO remove this by running the controller as a poststarthook
 type LegacyRESTStorage struct {
-	NodeRegistry              node.Registry
-	NamespaceRegistry         namespace.Registry
-	ServiceRegistry           service.Registry
-	EndpointRegistry          endpoint.Registry
 	ServiceClusterIPAllocator rangeallocation.RangeRegistry
 	ServiceNodePortAllocator  rangeallocation.RangeRegistry
 }
@@ -132,16 +126,14 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	configMapStorage := configmapetcd.NewREST(restOptionsGetter(api.Resource("configMaps")))
 
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(restOptionsGetter(api.Resource("namespaces")))
-	restStorage.NamespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
 	endpointsStorage := endpointsetcd.NewREST(restOptionsGetter(api.Resource("endpoints")))
-	restStorage.EndpointRegistry = endpoint.NewRegistry(endpointsStorage)
+	endpointRegistry := endpoint.NewRegistry(endpointsStorage)
 
 	nodeStorage, err := nodeetcd.NewStorage(restOptionsGetter(api.Resource("nodes")), c.KubeletClientConfig, c.ProxyTransport)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
-	restStorage.NodeRegistry = node.NewRegistry(nodeStorage.Node)
 
 	podStorage := podetcd.NewStorage(
 		restOptionsGetter(api.Resource("pods")),
@@ -151,7 +143,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	)
 
 	serviceRESTStorage, serviceStatusStorage := serviceetcd.NewREST(restOptionsGetter(api.Resource("services")))
-	restStorage.ServiceRegistry = service.NewRegistry(serviceRESTStorage)
+	serviceRegistry := service.NewRegistry(serviceRESTStorage)
 
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
 	serviceClusterIPRange := c.ServiceIPRange
@@ -185,7 +177,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	controllerStorage := controlleretcd.NewStorage(restOptionsGetter(api.Resource("replicationControllers")))
 
-	serviceRest := service.NewStorage(restStorage.ServiceRegistry, restStorage.EndpointRegistry, ServiceClusterIPAllocator, ServiceNodePortAllocator, c.ProxyTransport)
+	serviceRest := service.NewStorage(serviceRegistry, endpointRegistry, ServiceClusterIPAllocator, ServiceNodePortAllocator, c.ProxyTransport)
 
 	restStorageMap := map[string]rest.Storage{
 		"pods":             podStorage.Pod,

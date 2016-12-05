@@ -131,10 +131,10 @@ func addGrouplessTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &unversioned.ExportOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{}, &unversioned.ExportOptions{},
 		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 }
 
@@ -149,20 +149,20 @@ func addTestTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &unversioned.ExportOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &v1.Pod{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{}, &unversioned.ExportOptions{},
 		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion, &api.Pod{})
 	// Register SimpleXGSubresource in both testGroupVersion and testGroup2Version, and also their
 	// their corresponding internal versions, to verify that the desired group version object is
 	// served in the tests.
-	api.Scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{})
-	api.Scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{})
+	api.Scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{}, &unversioned.ExportOptions{})
+	api.Scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{}, &unversioned.ExportOptions{})
 	versioned.AddToGroupVersion(api.Scheme, testGroupVersion)
 }
 
@@ -177,7 +177,7 @@ func addNewTestTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(newGroupVersion,
-		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{},
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &unversioned.ExportOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
 		&v1.Pod{},
 	)

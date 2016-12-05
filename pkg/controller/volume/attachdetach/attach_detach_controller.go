@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -76,8 +77,7 @@ func NewAttachDetachController(
 	pvcInformer kcache.SharedInformer,
 	pvInformer kcache.SharedInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin,
-	recorder record.EventRecorder) (AttachDetachController, error) {
+	plugins []volume.VolumePlugin) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -114,6 +114,11 @@ func NewAttachDetachController(
 	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "attachdetach"})
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
@@ -240,6 +245,23 @@ func (adc *attachDetachController) podDelete(obj interface{}) {
 
 func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	node, ok := obj.(*v1.Node)
+	// TODO: investigate if nodeName is empty then if we can return
+	// kubernetes/kubernetes/issues/37777
+	if node == nil || !ok {
+		return
+	}
+	nodeName := types.NodeName(node.Name)
+	adc.nodeUpdate(nil, obj)
+	// kubernetes/kubernetes/issues/37586
+	// This is to workaround the case when a node add causes to wipe out
+	// the attached volumes field. This function ensures that we sync with
+	// the actual status.
+	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+}
+
+func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
+	node, ok := newObj.(*v1.Node)
+	// TODO: investigate if nodeName is empty then if we can return
 	if node == nil || !ok {
 		return
 	}
@@ -250,13 +272,7 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
-
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
-}
-
-func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
-	// The flow for update is the same as add.
-	adc.nodeAdd(newObj)
 }
 
 func (adc *attachDetachController) nodeDelete(obj interface{}) {

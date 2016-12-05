@@ -18,8 +18,6 @@ package certificates
 
 import (
 	"fmt"
-	"reflect"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -30,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -42,6 +39,10 @@ import (
 	"github.com/golang/glog"
 )
 
+type AutoApprover interface {
+	AutoApprove(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
+}
+
 type CertificateController struct {
 	kubeClient clientset.Interface
 
@@ -51,14 +52,14 @@ type CertificateController struct {
 
 	syncHandler func(csrKey string) error
 
-	approveAllKubeletCSRsForGroup string
+	approver AutoApprover
 
 	signer *local.Signer
 
 	queue workqueue.RateLimitingInterface
 }
 
-func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approveAllKubeletCSRsForGroup string) (*CertificateController, error) {
+func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approver AutoApprover) (*CertificateController, error) {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -78,7 +79,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 		kubeClient: kubeClient,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
 		signer:     ca,
-		approveAllKubeletCSRsForGroup: approveAllKubeletCSRsForGroup,
+		approver:   approver,
 	}
 
 	// Manage the addition/update of certificate requests
@@ -195,9 +196,11 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 	}
 	csr := obj.(*certificates.CertificateSigningRequest)
 
-	csr, err = cc.maybeAutoApproveCSR(csr)
-	if err != nil {
-		return fmt.Errorf("error auto approving csr: %v", err)
+	if cc.approver != nil {
+		csr, err = cc.approver.AutoApprove(csr)
+		if err != nil {
+			return fmt.Errorf("error auto approving csr: %v", err)
+		}
 	}
 
 	// At this point, the controller needs to:
@@ -217,48 +220,4 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 
 	_, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateStatus(csr)
 	return err
-}
-
-func (cc *CertificateController) maybeAutoApproveCSR(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
-	// short-circuit if we're not auto-approving
-	if cc.approveAllKubeletCSRsForGroup == "" {
-		return csr, nil
-	}
-	// short-circuit if we're already approved or denied
-	if approved, denied := getCertApprovalCondition(&csr.Status); approved || denied {
-		return csr, nil
-	}
-
-	isKubeletBootstrapGroup := false
-	for _, g := range csr.Spec.Groups {
-		if g == cc.approveAllKubeletCSRsForGroup {
-			isKubeletBootstrapGroup = true
-			break
-		}
-	}
-	if !isKubeletBootstrapGroup {
-		return csr, nil
-	}
-
-	x509cr, err := certutil.ParseCSRV1alpha1(csr)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to parse csr %q: %v", csr.Name, err))
-		return csr, nil
-	}
-	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {
-		return csr, nil
-	}
-	if !strings.HasPrefix(x509cr.Subject.CommonName, "system:node:") {
-		return csr, nil
-	}
-	if len(x509cr.DNSNames)+len(x509cr.EmailAddresses)+len(x509cr.IPAddresses) != 0 {
-		return csr, nil
-	}
-
-	csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
-		Type:    certificates.CertificateApproved,
-		Reason:  "AutoApproved",
-		Message: "Auto approving of all kubelet CSRs is enabled on the controller manager",
-	})
-	return cc.kubeClient.Certificates().CertificateSigningRequests().UpdateApproval(csr)
 }

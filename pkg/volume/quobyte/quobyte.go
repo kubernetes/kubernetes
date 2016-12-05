@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-	goStrings "strings"
+	gostrings "strings"
 
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
@@ -358,7 +358,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 		return nil, err
 	}
 	for k, v := range provisioner.options.Parameters {
-		switch goStrings.ToLower(k) {
+		switch gostrings.ToLower(k) {
 		case "registry":
 			provisioner.registry = v
 		case "user":
@@ -434,7 +434,7 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 	deleteKeys := []string{}
 
 	for k, v := range params {
-		switch goStrings.ToLower(k) {
+		switch gostrings.ToLower(k) {
 		case "adminsecretname":
 			secretName = v
 			deleteKeys = append(deleteKeys, k)

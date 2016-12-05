@@ -350,6 +350,19 @@ func getTestArtifacts(host, testDir string) error {
 	return nil
 }
 
+// WriteLog is a temporary function to make it possible to write log
+// in the runner. This is used to collect serial console log.
+// TODO(random-liu): Use the log-dump script in cluster e2e.
+func WriteLog(host, filename, content string) error {
+	f, err := os.Create(filepath.Join(*resultsDir, host, filename))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(content)
+	return err
+}
+
 // getSSHCommand handles proper quoting so that multiple commands are executed in the same shell over ssh
 func getSSHCommand(sep string, args ...string) string {
 	return fmt.Sprintf("'%s'", strings.Join(args, sep))

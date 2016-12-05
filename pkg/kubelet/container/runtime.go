@@ -26,7 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -140,7 +140,7 @@ type DirectStreamingRuntime interface {
 // the runtime server.
 type IndirectStreamingRuntime interface {
 	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
-	GetAttach(id ContainerID, stdin, stdout, stderr bool) (*url.URL, error)
+	GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error)
 }
 
@@ -299,7 +299,7 @@ type PodStatus struct {
 	ContainerStatuses []*ContainerStatus
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
-	SandboxStatuses []*runtimeApi.PodSandboxStatus
+	SandboxStatuses []*runtimeapi.PodSandboxStatus
 }
 
 // ContainerStatus represents the status of a container.
@@ -347,13 +347,13 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Con
 
 // Get container status of all the running containers in a pod
 func (podStatus *PodStatus) GetRunningContainerStatuses() []*ContainerStatus {
-	runnningContainerStatues := []*ContainerStatus{}
+	runningContainerStatuses := []*ContainerStatus{}
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.State == ContainerStateRunning {
-			runnningContainerStatues = append(runnningContainerStatues, containerStatus)
+			runningContainerStatuses = append(runningContainerStatuses, containerStatus)
 		}
 	}
-	return runnningContainerStatues
+	return runningContainerStatuses
 }
 
 // Basic information about a container image.

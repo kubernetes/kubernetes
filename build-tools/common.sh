@@ -560,6 +560,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
     --env "KUBE_BUILD_PPC64LE=${KUBE_BUILD_PPC64LE}"  # TODO(IBM): remove
+    --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
   )
 
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'

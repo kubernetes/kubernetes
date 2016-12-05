@@ -422,6 +422,8 @@ runTests() {
   # make sure the server was properly bootstrapped with clusterroles and bindings
   kube::test::get_object_assert clusterroles/cluster-admin "{{.metadata.name}}" 'cluster-admin'
   kube::test::get_object_assert clusterrolebindings/cluster-admin "{{.metadata.name}}" 'cluster-admin'
+  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
+  kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
 
   ###########################
   # POD creation / deletion #
@@ -490,10 +492,8 @@ runTests() {
   # Pre-condition: valid-pod POD exists
   kubectl create "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
-  # Command fails without --force
-  ! kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0
-  # Command succeds with --force
-  kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0 --force
+  # Command succeeds without --force by waiting
+  kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -1163,7 +1163,7 @@ __EOF__
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl delete pvc b-pvc 2>&1 "${kube_flags[@]}"
 
-  ## kubectl apply --prune --prune-whitelist(-w)
+  ## kubectl apply --prune --prune-whitelist
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # apply pod a
@@ -1171,7 +1171,7 @@ __EOF__
   # check right pod exists
   kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
   # apply svc and don't prune pod a by overwriting whitelist
-  kubectl apply --prune -l prune-group=true -f hack/testdata/prune/svc.yaml -w core/v1/Service 2>&1 "${kube_flags[@]}"
+  kubectl apply --prune -l prune-group=true -f hack/testdata/prune/svc.yaml --prune-whitelist core/v1/Service 2>&1 "${kube_flags[@]}"
   kube::test::get_object_assert 'service prune-svc' "{{${id_field}}}" 'prune-svc'
   kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
   # apply svc and prune pod a with default whitelist
@@ -1998,6 +1998,22 @@ __EOF__
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
+  ### Create an ExternalName service
+  # Pre-condition: Only the default kubernetes service exist
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  # Command
+  kubectl create service externalname beep-boop --external-name bar.com
+  # Post-condition: beep-boop service is created
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'beep-boop:kubernetes:'
+
+  ### Delete beep-boop service by id
+  # Pre-condition: beep-boop service exists
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'beep-boop:kubernetes:'
+  # Command
+  kubectl delete service beep-boop "${kube_flags[@]}"
+  # Post-condition: Only the default kubernetes services exist
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+
 
   ###########################
   # Replication controllers #
@@ -2226,7 +2242,7 @@ __EOF__
   ## Set resource limits/request of a deployment
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Set resources of a local file without talking to the server 
+  # Set resources of a local file without talking to the server
   kubectl set resources -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --local -o yaml "${kube_flags[@]}"
   ! kubectl set resources -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --dry-run -o yaml "${kube_flags[@]}"
   # Create a deployment
@@ -2249,7 +2265,7 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "300m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.requests.cpu}}:{{end}}" "300m:"
-  # Show dry-run works on running deployments 
+  # Show dry-run works on running deployments
   kubectl set resources deployment nginx-deployment-resources -c=perl --limits=cpu=400m --requests=cpu=400m --dry-run -o yaml "${kube_flags[@]}"
   ! kubectl set resources deployment nginx-deployment-resources -c=perl --limits=cpu=400m --requests=cpu=400m --local -o yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"

@@ -77,7 +77,10 @@ var (
 		kubectl get rc,services
 
 		# List one or more resources by their type and names.
-		kubectl get rc/web service/frontend pods/web-pod-13je7`)
+		kubectl get rc/web service/frontend pods/web-pod-13je7
+
+		# List all resources with different types.
+		kubectl get all`)
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which

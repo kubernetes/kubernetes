@@ -17,6 +17,7 @@ limitations under the License.
 package preflight
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
 type PreFlightError struct {
@@ -75,6 +77,32 @@ func (sc ServiceCheck) Check() (warnings, errors []error) {
 		errors = append(errors,
 			fmt.Errorf("%s service is not active, please run 'systemctl start %s.service'",
 				sc.Service, sc.Service))
+	}
+
+	return warnings, errors
+}
+
+// FirewalldCheck checks if firewalld is enabled or active, and if so outputs a warning.
+type FirewalldCheck struct {
+	ports []int
+}
+
+func (fc FirewalldCheck) Check() (warnings, errors []error) {
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		return []error{err}, nil
+	}
+
+	warnings = []error{}
+
+	if !initSystem.ServiceExists("firewalld") {
+		return nil, nil
+	}
+
+	if initSystem.ServiceIsActive("firewalld") {
+		warnings = append(warnings,
+			fmt.Errorf("firewalld is active, please ensure ports %v are open or your cluster may not function correctly",
+				fc.ports))
 	}
 
 	return warnings, errors
@@ -213,15 +241,32 @@ func (hst HttpProxyCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+type SystemVerificationCheck struct{}
+
+func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
+	// Create a buffered writer and choose a quite large value (1M) and suppose the output from the system verification test won't exceed the limit
+	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
+
+	// Run the system verification check, but write to out buffered writer instead of stdout
+	err := system.Validate(system.DefaultSysSpec, &system.StreamReporter{WriteStream: bufw})
+	if err != nil {
+		// Only print the output from the system verification check if the check failed
+		fmt.Println("System verification failed. Printing the output from the verification...")
+		bufw.Flush()
+		return nil, []error{err}
+	}
+	return nil, nil
+}
+
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
-	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
+		SystemVerificationCheck{},
 		IsRootCheck{root: true},
 		HostnameCheck{},
 		ServiceCheck{Service: "kubelet"},
 		ServiceCheck{Service: "docker"},
+		FirewalldCheck{ports: []int{int(cfg.API.BindPort), int(cfg.Discovery.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
-		PortOpenCheck{port: 2379},
 		PortOpenCheck{port: 8080},
 		PortOpenCheck{port: int(cfg.Discovery.BindPort)},
 		PortOpenCheck{port: 10250},
@@ -230,7 +275,6 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		HttpProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
 		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
 		DirAvailableCheck{Path: "/etc/kubernetes/pki"},
-		DirAvailableCheck{Path: "/var/lib/etcd"},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: "/etc/kubernetes/admin.conf"},
 		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
@@ -245,12 +289,20 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		InPathCheck{executable: "touch", mandatory: false},
 	}
 
+	if len(cfg.Etcd.Endpoints) == 0 {
+		// Only do etcd related checks when no external endpoints were specified
+		checks = append(checks,
+			PortOpenCheck{port: 2379},
+			DirAvailableCheck{Path: "/var/lib/etcd"},
+		)
+	}
+
 	return runChecks(checks, os.Stderr)
 }
 
 func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
-	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
+		SystemVerificationCheck{},
 		IsRootCheck{root: true},
 		HostnameCheck{},
 		ServiceCheck{Service: "docker"},

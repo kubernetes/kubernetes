@@ -19,7 +19,7 @@ package util
 import (
 	"sync"
 
-	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -33,7 +33,7 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 	return &ClientCache{
 		clientsets:    make(map[schema.GroupVersion]*internalclientset.Clientset),
 		configs:       make(map[schema.GroupVersion]*restclient.Config),
-		fedClientSets: make(map[schema.GroupVersion]fed_clientset.Interface),
+		fedClientSets: make(map[schema.GroupVersion]fedclientset.Interface),
 		loader:        loader,
 	}
 }
@@ -43,7 +43,7 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 type ClientCache struct {
 	loader        clientcmd.ClientConfig
 	clientsets    map[schema.GroupVersion]*internalclientset.Clientset
-	fedClientSets map[schema.GroupVersion]fed_clientset.Interface
+	fedClientSets map[schema.GroupVersion]fedclientset.Interface
 	configs       map[schema.GroupVersion]*restclient.Config
 
 	matchVersion bool
@@ -158,7 +158,7 @@ func (c *ClientCache) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 	return clientset, nil
 }
 
-func (c *ClientCache) FederationClientSetForVersion(version *schema.GroupVersion) (fed_clientset.Interface, error) {
+func (c *ClientCache) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
 	if version != nil {
 		if clientSet, found := c.fedClientSets[*version]; found {
 			return clientSet, nil
@@ -170,7 +170,7 @@ func (c *ClientCache) FederationClientSetForVersion(version *schema.GroupVersion
 	}
 
 	// TODO: support multi versions of client with clientset
-	clientSet, err := fed_clientset.NewForConfig(config)
+	clientSet, err := fedclientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func (c *ClientCache) FederationClientSetForVersion(version *schema.GroupVersion
 
 	if version != nil {
 		configCopy := *config
-		clientSet, err := fed_clientset.NewForConfig(&configCopy)
+		clientSet, err := fedclientset.NewForConfig(&configCopy)
 		if err != nil {
 			return nil, err
 		}

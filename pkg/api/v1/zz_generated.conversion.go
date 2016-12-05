@@ -119,8 +119,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_EventSource_To_v1_EventSource,
 		Convert_v1_ExecAction_To_api_ExecAction,
 		Convert_api_ExecAction_To_v1_ExecAction,
-		Convert_v1_ExportOptions_To_api_ExportOptions,
-		Convert_api_ExportOptions_To_v1_ExportOptions,
 		Convert_v1_FCVolumeSource_To_api_FCVolumeSource,
 		Convert_api_FCVolumeSource_To_v1_FCVolumeSource,
 		Convert_v1_FlexVolumeSource_To_api_FlexVolumeSource,
@@ -1342,26 +1340,6 @@ func autoConvert_api_ExecAction_To_v1_ExecAction(in *api.ExecAction, out *ExecAc
 
 func Convert_api_ExecAction_To_v1_ExecAction(in *api.ExecAction, out *ExecAction, s conversion.Scope) error {
 	return autoConvert_api_ExecAction_To_v1_ExecAction(in, out, s)
-}
-
-func autoConvert_v1_ExportOptions_To_api_ExportOptions(in *ExportOptions, out *api.ExportOptions, s conversion.Scope) error {
-	out.Export = in.Export
-	out.Exact = in.Exact
-	return nil
-}
-
-func Convert_v1_ExportOptions_To_api_ExportOptions(in *ExportOptions, out *api.ExportOptions, s conversion.Scope) error {
-	return autoConvert_v1_ExportOptions_To_api_ExportOptions(in, out, s)
-}
-
-func autoConvert_api_ExportOptions_To_v1_ExportOptions(in *api.ExportOptions, out *ExportOptions, s conversion.Scope) error {
-	out.Export = in.Export
-	out.Exact = in.Exact
-	return nil
-}
-
-func Convert_api_ExportOptions_To_v1_ExportOptions(in *api.ExportOptions, out *ExportOptions, s conversion.Scope) error {
-	return autoConvert_api_ExportOptions_To_v1_ExportOptions(in, out, s)
 }
 
 func autoConvert_v1_FCVolumeSource_To_api_FCVolumeSource(in *FCVolumeSource, out *api.FCVolumeSource, s conversion.Scope) error {

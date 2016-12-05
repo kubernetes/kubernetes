@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
@@ -293,6 +294,13 @@ func parseCIDROrDie(cidr string) *net.IPNet {
 		glog.Fatalf("error while parsing CIDR: %s", cidr)
 	}
 	return parsed
+}
+
+// return the EtcdURL
+func GetEtcdURLFromEnv() string {
+	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
+	glog.V(4).Infof("Using KUBE_INTEGRATION_ETCD_URL=%q", url)
+	return url
 }
 
 // Returns a basic master config.

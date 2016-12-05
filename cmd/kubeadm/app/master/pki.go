@@ -49,7 +49,7 @@ func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {
 func newServerKeyAndCert(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames certutil.AltNames) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
-		return nil, nil, fmt.Errorf("unabel to create private key [%v]", err)
+		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
 	}
 
 	internalAPIServerFQDN := []string{

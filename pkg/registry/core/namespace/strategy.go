@@ -135,18 +135,21 @@ func (namespaceFinalizeStrategy) PrepareForUpdate(ctx api.Context, obj, old runt
 	newNamespace.Status = oldNamespace.Status
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	namespaceObj, ok := obj.(*api.Namespace)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a namespace")
+	}
+	return labels.Set(namespaceObj.Labels), NamespaceToSelectableFields(namespaceObj), nil
+}
+
 // MatchNamespace returns a generic matcher for a given label and field selector.
 func MatchNamespace(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
 	return apistorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			namespaceObj, ok := obj.(*api.Namespace)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a namespace")
-			}
-			return labels.Set(namespaceObj.Labels), NamespaceToSelectableFields(namespaceObj), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

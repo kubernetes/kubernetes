@@ -56,6 +56,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		prefix,
 		cluster.Strategy,
 		newListFunc,
+		cluster.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

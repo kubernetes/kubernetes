@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math"
 	"net"
-	goRuntime "runtime"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"time"
@@ -177,8 +177,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
 				unversioned.LabelHostname: kl.hostname,
-				unversioned.LabelOS:       goRuntime.GOOS,
-				unversioned.LabelArch:     goRuntime.GOARCH,
+				unversioned.LabelOS:       goruntime.GOOS,
+				unversioned.LabelArch:     goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
@@ -298,7 +298,7 @@ func (kl *Kubelet) syncNodeStatus() {
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
-		if err := kl.tryUpdateNodeStatus(); err != nil {
+		if err := kl.tryUpdateNodeStatus(i); err != nil {
 			glog.Errorf("Error updating node status, will retry: %v", err)
 		} else {
 			return nil
@@ -309,20 +309,23 @@ func (kl *Kubelet) updateNodeStatus() error {
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
 // is set, this function will also confirm that cbr0 is configured correctly.
-func (kl *Kubelet) tryUpdateNodeStatus() error {
+func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
 	// apiserver cache (the data might be slightly delayed but it doesn't
 	// seem to cause more confilict - the delays are pretty small).
+	// If it result in a conflict, all retries are served directly from etcd.
 	// TODO: Currently apiserver doesn't support serving GET operations
 	// from its cache. Thus we are hacking it by issuing LIST with
 	// field selector for the name of the node (field selectors with
 	// specified name are handled efficiently by apiserver). Once
 	// apiserver supports GET from cache, change it here.
 	opts := v1.ListOptions{
-		FieldSelector:   fields.Set{"metadata.name": string(kl.nodeName)}.AsSelector().String(),
-		ResourceVersion: "0",
+		FieldSelector: fields.Set{"metadata.name": string(kl.nodeName)}.AsSelector().String(),
+	}
+	if tryNumber == 0 {
+		opts.ResourceVersion = "0"
 	}
 	nodes, err := kl.kubeClient.Core().Nodes().List(opts)
 	if err != nil {
@@ -572,8 +575,8 @@ func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
 
 // Set the GOOS and GOARCH for this node
 func (kl *Kubelet) setNodeStatusGoRuntime(node *v1.Node) {
-	node.Status.NodeInfo.OperatingSystem = goRuntime.GOOS
-	node.Status.NodeInfo.Architecture = goRuntime.GOARCH
+	node.Status.NodeInfo.OperatingSystem = goruntime.GOOS
+	node.Status.NodeInfo.Architecture = goruntime.GOARCH
 }
 
 // Set status for the node.

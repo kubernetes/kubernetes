@@ -19,6 +19,8 @@ package objectmeta
 import (
 	"testing"
 
+	etcd "github.com/coreos/etcd/client"
+	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -32,6 +34,18 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+// TODO: Eliminate this v2 client dependency.
+func newEtcdClient() etcd.Client {
+	cfg := etcd.Config{
+		Endpoints: []string{framework.GetEtcdURLFromEnv()},
+	}
+	client, err := etcd.New(cfg)
+	if err != nil {
+		glog.Fatalf("unable to connect to etcd for testing: %v", err)
+	}
+	return client
+}
+
 func TestIgnoreClusterName(t *testing.T) {
 	config := framework.NewMasterConfig()
 	prefix := config.StorageFactory.(*genericapiserver.DefaultStorageFactory).StorageConfig.Prefix
@@ -39,7 +53,7 @@ func TestIgnoreClusterName(t *testing.T) {
 	defer s.Close()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
-	etcdClient := framework.NewEtcdClient()
+	etcdClient := newEtcdClient()
 	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(),
 		prefix+"/namespaces/", false, etcdtest.DeserializationCacheSize)
 	ctx := context.TODO()

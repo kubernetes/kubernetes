@@ -44,6 +44,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		prefix,
 		role.Strategy,
 		newListFunc,
+		role.GetAttrs,
 		storage.NoTriggerPublisher,
 	)
 

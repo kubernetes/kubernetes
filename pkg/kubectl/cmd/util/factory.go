@@ -193,6 +193,7 @@ const (
 	ServiceNodePortGeneratorV1Name              = "service-nodeport/v1"
 	ServiceClusterIPGeneratorV1Name             = "service-clusterip/v1"
 	ServiceLoadBalancerGeneratorV1Name          = "service-loadbalancer/v1"
+	ServiceExternalNameGeneratorV1Name          = "service-externalname/v1"
 	ServiceAccountV1GeneratorName               = "serviceaccount/v1"
 	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
 	HorizontalPodAutoscalerV1GeneratorName      = "horizontalpodautoscaler/v1"
@@ -208,6 +209,7 @@ const (
 	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
 	SecretForTLSV1GeneratorName                 = "secret-for-tls/v1"
 	ConfigMapV1GeneratorName                    = "configmap/v1"
+	ClusterRoleBindingV1GeneratorName           = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
 	ClusterV1Beta1GeneratorName                 = "cluster/v1beta1"
 )
 

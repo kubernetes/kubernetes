@@ -34,8 +34,8 @@ type Config struct {
 	// Bearer token for authentication
 	BearerToken string
 
-	// Impersonate is the username that this Config will impersonate
-	Impersonate string
+	// Impersonate is the config that this Config will impersonate using
+	Impersonate ImpersonationConfig
 
 	// Transport may be used for custom HTTP behavior. This attribute may
 	// not be specified with the TLS client certificate options. Use
@@ -48,6 +48,16 @@ type Config struct {
 	// config may layer other RoundTrippers on top of the returned
 	// RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+}
+
+// ImpersonationConfig has all the available impersonation options
+type ImpersonationConfig struct {
+	// UserName matches user.Info.GetName()
+	UserName string
+	// Groups matches user.Info.GetGroups()
+	Groups []string
+	// Extra matches user.Info.GetExtra()
+	Extra map[string][]string
 }
 
 // HasCA returns whether the configuration has a certificate authority or not.

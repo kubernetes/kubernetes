@@ -121,7 +121,6 @@ func TestRESTMapper(t *testing.T) {
 func TestUnversioned(t *testing.T) {
 	for _, obj := range []runtime.Object{
 		&unversioned.Status{},
-		&unversioned.ExportOptions{},
 	} {
 		if unversioned, ok := internal.Scheme.IsUnversioned(obj); !unversioned || !ok {
 			t.Errorf("%v is expected to be unversioned", reflect.TypeOf(obj))

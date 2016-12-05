@@ -17,6 +17,7 @@ go_library(
         "autoscale.go",
         "bash_comp_utils.go",
         "cluster.go",
+        "clusterrolebinding.go",
         "configmap.go",
         "custom_column_printer.go",
         "deployment.go",

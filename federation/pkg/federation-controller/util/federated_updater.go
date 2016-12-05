@@ -21,7 +21,7 @@ import (
 	"time"
 
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 )
 
 // Type of the operation that can be executed in Federated.
@@ -37,7 +37,7 @@ const (
 type FederatedOperation struct {
 	Type        FederatedOperationType
 	ClusterName string
-	Obj         pkg_runtime.Object
+	Obj         pkgruntime.Object
 }
 
 // A helper that executes the given set of updates on federation, in parallel.
@@ -52,7 +52,7 @@ type FederatedUpdater interface {
 }
 
 // A function that executes some operation using the passed client and object.
-type FederatedOperationHandler func(kubeclientset.Interface, pkg_runtime.Object) error
+type FederatedOperationHandler func(kubeclientset.Interface, pkgruntime.Object) error
 
 type federatedUpdaterImpl struct {
 	federation FederationView

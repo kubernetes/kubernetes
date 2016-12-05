@@ -103,6 +103,11 @@ func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
 	return newTestGenericStoreRegistry(t, false)
 }
 
+func getPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod := obj.(*api.Pod)
+	return labels.Set{"name": pod.ObjectMeta.Name}, nil, nil
+}
+
 // matchPodName returns selection predicate that matches any pod with name in the set.
 // Makes testing simpler.
 func matchPodName(names ...string) storage.SelectionPredicate {
@@ -113,12 +118,9 @@ func matchPodName(names ...string) storage.SelectionPredicate {
 		panic("Labels requirement must validate successfully")
 	}
 	return storage.SelectionPredicate{
-		Label: labels.Everything().Add(*l),
-		Field: fields.Everything(),
-		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
-			pod := obj.(*api.Pod)
-			return labels.Set{"name": pod.ObjectMeta.Name}, nil, nil
-		},
+		Label:    labels.Everything().Add(*l),
+		Field:    fields.Everything(),
+		GetAttrs: getPodAttrs,
 	}
 }
 
@@ -613,6 +615,43 @@ func TestStoreDelete(t *testing.T) {
 	_, err = registry.Get(testContext, podA.Name)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+// TestGracefulStoreCanDeleteIfExistingGracePeriodZero tests recovery from
+// race condition where the graceful delete is unable to complete
+// in prior operation, but the pod remains with deletion timestamp
+// and grace period set to 0.
+func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
+	deletionTimestamp := unversioned.NewTime(time.Now())
+	deletionGracePeriodSeconds := int64(0)
+	initialGeneration := int64(1)
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:                       "foo",
+			Generation:                 initialGeneration,
+			DeletionGracePeriodSeconds: &deletionGracePeriodSeconds,
+			DeletionTimestamp:          &deletionTimestamp,
+		},
+		Spec: api.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = false
+	defaultDeleteStrategy := testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+	defer destroyFunc()
+
+	graceful, gracefulPending, err := rest.BeforeDelete(registry.DeleteStrategy, testContext, pod, api.NewDeleteOptions(0))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if graceful {
+		t.Fatalf("graceful should be false if object has DeletionTimestamp and DeletionGracePeriodSeconds is 0")
+	}
+	if gracefulPending {
+		t.Fatalf("gracefulPending should be false if object has DeletionTimestamp and DeletionGracePeriodSeconds is 0")
 	}
 }
 
@@ -1212,6 +1251,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.De
 			Type:           &api.Pod{},
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
+			GetAttrsFunc:   getPodAttrs,
 			NewListFunc:    func() runtime.Object { return &api.PodList{} },
 			Codec:          sc.Codec,
 		}

@@ -13,23 +13,20 @@
 # limitations under the License.
 
 # The build rule builds a Docker image that logs all Docker contains logs to
-# Google Compute Platform using the Cloud Logging API. The push rule pushes
-# the image to DockerHub.
+# Google Compute Platform using the Cloud Logging API.
 
 # Procedure for change:
 # 1. Bump the tag number.
-# 2. Create an image for the kubernetes user on Dockerhub and push there: make kbuild kpush
-# 3. Temporarily adjust any config files etc. that reference gcr.io/google_containers/fluentd-gcp:$(TAG)
-#    to use kubernetes/fluentd-gcp:$(TAG) instead.
-# 4. Test etc.
-# 5. Issue PR.
-# 6. When PR is approved make the gcr.io version of the image: make build push
-# 7. Revert the referendes to kubernetes/fluentd-gcp:$(TAG) to gcr.io/google_containers/fluentd-gcp:$(TAG)
+# 2. Push to the private repo and test using newer version
+# 3. Issue PR.
+# 4. Assuming permissions to do so, when PR is approved
+#    make the gcr.io version of the image: make build push
+# 5. Issue PR with config files changes
 
 .PHONY:	build push
 
 PREFIX=gcr.io/google_containers
-TAG = 1.28
+TAG = 1.29
 
 build:
 	docker build -t $(PREFIX)/fluentd-gcp:$(TAG) .
