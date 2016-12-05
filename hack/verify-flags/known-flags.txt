@@ -374,6 +374,7 @@ max-connection-bytes-per-sec
 max-log-age
 max-log-backups
 max-log-size
+max-mutating-requests-inflight
 max-open-files
 max-outgoing-burst
 max-outgoing-qps
