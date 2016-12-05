@@ -44,7 +44,7 @@ INPUT="--input ${INPUT_APIS[@]}"
 CLIENTSET_PATH="--clientset-path k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated"
 
 ${CLIENTGEN} ${INPUT_BASE} ${INPUT} ${CLIENTSET_PATH} 
-${CLIENTGEN} --clientset-name="release_1_5" ${INPUT_BASE} --input apiregistration/v1alpha1 ${CLIENTSET_PATH} 
+${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input apiregistration/v1alpha1 ${CLIENTSET_PATH} 
 
 
 echo "Building lister-gen"
@@ -62,7 +62,7 @@ go build -o "${informergen}" ./cmd/libs/go2idl/informer-gen
 
 ${informergen} \
   --input-dirs k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration --input-dirs k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1 \
-  --versioned-clientset-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/release_1_5 \
+  --versioned-clientset-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset \
   --internal-clientset-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset \
   --listers-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers \
   --output-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers

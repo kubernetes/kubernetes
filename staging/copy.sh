@@ -33,7 +33,7 @@ readonly VERIFYONLY
 
 echo "**PLEASE** run \"godep restore\" before running this script"
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
-CLIENTSET="release_1_5"
+CLIENTSET="clientset"
 MAIN_REPO_FROM_SRC="k8s.io/kubernetes"
 MAIN_REPO="${GOPATH%:*}/src/${MAIN_REPO_FROM_SRC}"
 CLIENT_REPO_FROM_SRC="k8s.io/client-go"
