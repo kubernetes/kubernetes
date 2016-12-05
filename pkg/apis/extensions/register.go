@@ -73,6 +73,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ReplicaSet{},
 		&ReplicaSetList{},
 		&metav1.ExportOptions{},
+		&metav1.GetOptions{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
 		&NetworkPolicy{},
