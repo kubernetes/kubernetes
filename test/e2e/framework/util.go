@@ -3110,7 +3110,8 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
 	var deployment *extensions.Deployment
 	var newRS *extensions.ReplicaSet
-	err := wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
+	var reason string
+	err := wait.PollImmediate(Poll, 1*time.Minute, func() (bool, error) {
 		var err error
 		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
@@ -3118,25 +3119,51 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		}
 		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
 		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
-		if err != nil || newRS == nil || !labelsutil.SelectorHasLabel(newRS.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+		if err != nil {
 			return false, err
 		}
+		if newRS == nil {
+			reason = fmt.Sprintf("New replica set for deployment %q is yet to be created", deployment.Name)
+			Logf(reason)
+			return false, nil
+		}
+		if !labelsutil.SelectorHasLabel(newRS.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+			reason = fmt.Sprintf("New replica set %q doesn't have DefaultDeploymentUniqueLabelKey", newRS.Name)
+			Logf(reason)
+			return false, nil
+		}
 		// Check revision of this deployment, and of the new replica set of this deployment
-		if deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != revision ||
-			newRS.Annotations == nil || newRS.Annotations[deploymentutil.RevisionAnnotation] != revision ||
-			deployment.Spec.Template.Spec.Containers[0].Image != image || newRS.Spec.Template.Spec.Containers[0].Image != image {
+		if deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != revision {
+			reason = fmt.Sprintf("Deployment %q doesn't have the required revision set", deployment.Name)
+			Logf(reason)
+			return false, nil
+		}
+		if deployment.Spec.Template.Spec.Containers[0].Image != image {
+			reason = fmt.Sprintf("Deployment %q doesn't have the required image set", deployment.Name)
+			Logf(reason)
+			return false, nil
+		}
+		if newRS.Annotations == nil || newRS.Annotations[deploymentutil.RevisionAnnotation] != revision {
+			reason = fmt.Sprintf("New replica set %q doesn't have the required revision set", newRS.Name)
+			Logf(reason)
+			return false, nil
+		}
+		if newRS.Spec.Template.Spec.Containers[0].Image != image {
+			reason = fmt.Sprintf("New replica set %q doesn't have the required image set", newRS.Name)
+			Logf(reason)
 			return false, nil
 		}
 		return true, nil
 	})
 	if err == wait.ErrWaitTimeout {
 		logReplicaSetsOfDeployment(deployment, nil, newRS)
+		err = fmt.Errorf(reason)
 	}
 	if newRS == nil {
-		return fmt.Errorf("deployment %s failed to create new RS: %v", deploymentName, err)
+		return fmt.Errorf("deployment %q failed to create new replica set", deploymentName)
 	}
 	if err != nil {
-		return fmt.Errorf("error waiting for deployment %s (got %s / %s) and new RS %s (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
+		return fmt.Errorf("error waiting for deployment %q (got %s / %s) and new replica set %q (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
 	}
 	return nil
 }
