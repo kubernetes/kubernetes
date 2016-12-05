@@ -98,8 +98,15 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, junit
 		return "", false, fmt.Errorf("failed to extract test archive: %v, output: %q", err, output)
 	}
 
+	// Create the test result directory.
+	resultDir := filepath.Join(workspace, "results")
+	if output, err := SSHNoSudo(host, "mkdir", resultDir); err != nil {
+		// Exit failure with the error
+		return "", false, fmt.Errorf("failed to create test result directory %q on host %q: %v output: %q", resultDir, host, err, output)
+	}
+
 	glog.Infof("Running test on %q", host)
-	output, err := suite.RunTest(host, workspace, filepath.Join(workspace, "results"), junitFilePrefix, testArgs, ginkgoArgs, *testTimeoutSeconds)
+	output, err := suite.RunTest(host, workspace, resultDir, junitFilePrefix, testArgs, ginkgoArgs, *testTimeoutSeconds)
 
 	aggErrs := []error{}
 	// Do not log the output here, let the caller deal with the test output.
