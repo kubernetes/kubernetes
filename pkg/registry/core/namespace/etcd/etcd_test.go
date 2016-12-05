@@ -71,7 +71,7 @@ func TestCreateSetsFields(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	object, err := storage.Get(ctx, "foo")
+	object, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

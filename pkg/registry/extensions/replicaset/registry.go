@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +32,7 @@ import (
 type Registry interface {
 	ListReplicaSets(ctx api.Context, options *api.ListOptions) (*extensions.ReplicaSetList, error)
 	WatchReplicaSets(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetReplicaSet(ctx api.Context, replicaSetID string) (*extensions.ReplicaSet, error)
+	GetReplicaSet(ctx api.Context, replicaSetID string, options *metav1.GetOptions) (*extensions.ReplicaSet, error)
 	CreateReplicaSet(ctx api.Context, replicaSet *extensions.ReplicaSet) (*extensions.ReplicaSet, error)
 	UpdateReplicaSet(ctx api.Context, replicaSet *extensions.ReplicaSet) (*extensions.ReplicaSet, error)
 	DeleteReplicaSet(ctx api.Context, replicaSetID string) error
@@ -63,8 +64,8 @@ func (s *storage) WatchReplicaSets(ctx api.Context, options *api.ListOptions) (w
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetReplicaSet(ctx api.Context, replicaSetID string) (*extensions.ReplicaSet, error) {
-	obj, err := s.Get(ctx, replicaSetID)
+func (s *storage) GetReplicaSet(ctx api.Context, replicaSetID string, options *metav1.GetOptions) (*extensions.ReplicaSet, error) {
+	obj, err := s.Get(ctx, replicaSetID, options)
 	if err != nil {
 		return nil, err
 	}

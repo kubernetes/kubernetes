@@ -219,7 +219,7 @@ func TestScaleGet(t *testing.T) {
 			Selector: validDeployment.Spec.Selector,
 		},
 	}
-	obj, err := storage.Scale.Get(ctx, name)
+	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -250,7 +250,7 @@ func TestScaleUpdate(t *testing.T) {
 	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
-	obj, err := storage.Scale.Get(ctx, name)
+	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -289,7 +289,7 @@ func TestStatusUpdate(t *testing.T) {
 	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.Deployment.Get(ctx, name)
+	obj, err := storage.Deployment.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -344,7 +344,7 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
 			// If rollback succeeded, verify Rollback field of deployment
-			d, err := storage.Deployment.Get(ctx, validNewDeployment().ObjectMeta.Name)
+			d, err := storage.Deployment.Get(ctx, validNewDeployment().ObjectMeta.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
 			} else if !reflect.DeepEqual(*d.(*extensions.Deployment).Spec.RollbackTo, test.rollback.RollbackTo) {
@@ -377,7 +377,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 		t.Fatalf("Unexpected error returned: %#v", err)
 	}
 
-	_, err = storage.Deployment.Get(ctx, name)
+	_, err = storage.Deployment.Get(ctx, name, &metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}

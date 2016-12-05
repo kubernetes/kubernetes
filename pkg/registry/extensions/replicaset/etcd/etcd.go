@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/replicaset"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -123,8 +124,8 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
+func (r *StatusREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
 }
 
 // Update alters the status subset of an object.
@@ -144,8 +145,8 @@ func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
 
-func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	rs, err := r.registry.GetReplicaSet(ctx, name)
+func (r *ScaleREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	rs, err := r.registry.GetReplicaSet(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
 	}
@@ -157,7 +158,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 func (r *ScaleREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	rs, err := r.registry.GetReplicaSet(ctx, name)
+	rs, err := r.registry.GetReplicaSet(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
 	}

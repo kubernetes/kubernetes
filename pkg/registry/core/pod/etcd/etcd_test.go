@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -209,7 +210,7 @@ func TestCreateSetsFields(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	ctx := api.NewDefaultContext()
-	object, err := storage.Get(ctx, "foo")
+	object, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -400,7 +401,7 @@ func TestEtcdCreate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = storage.Get(ctx, "foo")
+	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -429,7 +430,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 		t.Fatalf("Unexpected error returned: %#v", err)
 	}
 
-	_, err = storage.Get(ctx, "foo")
+	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
@@ -474,7 +475,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	obj, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -535,7 +536,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = storage.Get(ctx, "foo")
+	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -587,7 +588,7 @@ func TestEtcdCreateBinding(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
 			// If bind succeeded, verify Host field in pod's Spec.
-			pod, err := storage.Get(ctx, validNewPod().ObjectMeta.Name)
+			pod, err := storage.Get(ctx, validNewPod().ObjectMeta.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
 			} else if pod.(*api.Pod).Spec.NodeName != test.binding.Target.Name {
@@ -614,7 +615,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, validNewPod().ObjectMeta.Name)
+	obj, err := storage.Get(ctx, validNewPod().ObjectMeta.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -682,7 +683,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	obj, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -762,7 +763,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

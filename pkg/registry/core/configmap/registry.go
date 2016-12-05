@@ -19,6 +19,7 @@ package configmap
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -26,7 +27,7 @@ import (
 type Registry interface {
 	ListConfigMaps(ctx api.Context, options *api.ListOptions) (*api.ConfigMapList, error)
 	WatchConfigMaps(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetConfigMap(ctx api.Context, name string) (*api.ConfigMap, error)
+	GetConfigMap(ctx api.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error)
 	CreateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
 	UpdateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
 	DeleteConfigMap(ctx api.Context, name string) error
@@ -56,8 +57,8 @@ func (s *storage) WatchConfigMaps(ctx api.Context, options *api.ListOptions) (wa
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetConfigMap(ctx api.Context, name string) (*api.ConfigMap, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetConfigMap(ctx api.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

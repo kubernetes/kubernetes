@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -83,7 +84,7 @@ func (r *NodeRegistry) UpdateNode(ctx api.Context, node *api.Node) error {
 	return r.Err
 }
 
-func (r *NodeRegistry) GetNode(ctx api.Context, nodeID string) (*api.Node, error) {
+func (r *NodeRegistry) GetNode(ctx api.Context, nodeID string, options *metav1.GetOptions) (*api.Node, error) {
 	r.Lock()
 	defer r.Unlock()
 	if r.Err != nil {

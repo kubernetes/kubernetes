@@ -62,8 +62,8 @@ func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
 
-func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	rc, err := (*r.registry).GetController(ctx, name)
+func (r *ScaleREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	rc, err := (*r.registry).GetController(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
 	}
@@ -71,7 +71,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 func (r *ScaleREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	rc, err := (*r.registry).GetController(ctx, name)
+	rc, err := (*r.registry).GetController(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
 	}
