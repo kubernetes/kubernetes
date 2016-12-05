@@ -29,6 +29,7 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -424,14 +425,19 @@ func DiffResources(before, clusterUp, clusterDown, after []byte, location string
 	}
 	lines = lines[2:]
 
-	var added []string
+	var added, report []string
+	resourceTypeRE := regexp.MustCompile(`^@@.+\s(\[\s\S+\s\])$`)
 	for _, l := range lines {
+		if matches := resourceTypeRE.FindStringSubmatch(l); matches != nil {
+			report = append(report, matches[1])
+		}
 		if strings.HasPrefix(l, "+") && len(strings.TrimPrefix(l, "+")) > 0 {
 			added = append(added, l)
+			report = append(report, l)
 		}
 	}
 	if len(added) > 0 {
-		return fmt.Errorf("Error: %d leaked resources\n%v", len(added), strings.Join(added, "\n"))
+		return fmt.Errorf("Error: %d leaked resources\n%v", len(added), strings.Join(report, "\n"))
 	}
 	return nil
 }
