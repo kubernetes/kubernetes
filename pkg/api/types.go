@@ -163,7 +163,7 @@ type ObjectMeta struct {
 	// then an entry in this list will point to this controller, with the controller field set to true.
 	// There cannot be more than one managing controller.
 	// +optional
-	OwnerReferences []OwnerReference
+	OwnerReferences []metav1.OwnerReference
 
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
@@ -2551,7 +2551,7 @@ type PreferAvoidPodsEntry struct {
 type PodSignature struct {
 	// Reference to controller whose pods should avoid this node.
 	// +optional
-	PodController *OwnerReference
+	PodController *metav1.OwnerReference
 }
 
 // Describe a container image
@@ -2916,26 +2916,6 @@ type ServiceProxyOptions struct {
 	// http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.
 	// Path is _search?q=user:kimchy.
 	Path string
-}
-
-// OwnerReference contains enough information to let you identify an owning
-// object. Currently, an owning object must be in the same namespace, so there
-// is no namespace field.
-type OwnerReference struct {
-	// API version of the referent.
-	APIVersion string
-	// Kind of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	Kind string
-	// Name of the referent.
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
-	Name string
-	// UID of the referent.
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
-	UID types.UID
-	// If true, this reference points to the managing controller.
-	// +optional
-	Controller *bool
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
