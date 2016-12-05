@@ -36,6 +36,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	pushTimeout = 5 * time.Second
+)
+
 // A structure that distributes eventes to multiple watchers.
 type WatcherDispatcher struct {
 	sync.Mutex
@@ -58,6 +62,7 @@ func (wd *WatcherDispatcher) Stop() {
 	wd.Lock()
 	defer wd.Unlock()
 	close(wd.stopChan)
+	glog.Infof("Stopping WatcherDispatcher")
 	for _, watcher := range wd.watchers {
 		watcher.Stop()
 	}
@@ -141,7 +146,7 @@ func RegisterFakeWatch(resource string, client *core.Fake) *WatcherDispatcher {
 	dispatcher := &WatcherDispatcher{
 		watchers:       make([]*watch.RaceFreeFakeWatcher, 0),
 		eventsSoFar:    make([]*watch.Event, 0),
-		orderExecution: make(chan func()),
+		orderExecution: make(chan func(), 100),
 		stopChan:       make(chan struct{}),
 	}
 	go func() {
@@ -199,12 +204,21 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 	client.AddReactor("update", resource, func(action core.Action) (bool, runtime.Object, error) {
 		updateAction := action.(core.UpdateAction)
 		originalObj := updateAction.GetObject()
+		glog.V(7).Infof("Updating %s: %v", resource, updateAction.GetObject())
+
 		// Create a copy of the object here to prevent data races while reading the object in go routine.
 		obj := copy(originalObj)
-		watcher.orderExecution <- func() {
+		operation := func() {
 			glog.V(4).Infof("Object updated. Writing to channel: %v", obj)
 			watcher.Modify(obj)
 			objChan <- obj
+		}
+		select {
+		case watcher.orderExecution <- operation:
+			break
+		case <-time.After(pushTimeout):
+			glog.Errorf("Fake client execution channel blocked")
+			glog.Errorf("Tried to push %v", updateAction)
 		}
 		return true, originalObj, nil
 	})
