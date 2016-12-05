@@ -23,6 +23,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -130,6 +132,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 	}
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
+	output := cmdutil.GetFlagString(cmd, "output")
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -153,7 +156,21 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		}
 
 		count++
-		shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+		shortOutput := output == "name"
+		if len(output) > 0 && !shortOutput {
+			printer, generic, err := cmdutil.PrinterForCommand(cmd)
+			if err != nil {
+				return err
+			}
+			if !generic {
+				decodedObj, decoded := decodeUnstructuredObject(info.Object)
+				if !decoded {
+					return fmt.Errorf("Unsupported output format for the current object")
+				}
+				return f.PrintObject(cmd, registered.RESTMapper(), decodedObj, out)
+			}
+			return printer.PrintObj(info.Object, out)
+		}
 		if !shortOutput {
 			f.PrintObjectSpecificMessage(info.Object, out)
 		}
@@ -168,6 +185,20 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		return fmt.Errorf("no objects passed to create")
 	}
 	return nil
+}
+
+// decodeUnstructuredObject attempts to convert an unstructured object into a known type
+// If the object fails to be converted or printed, an error is returned.
+func decodeUnstructuredObject(obj runtime.Object) (runtime.Object, bool) {
+	switch obj.(type) {
+	case *runtime.UnstructuredList, *runtime.Unstructured, *runtime.Unknown:
+		if objBytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj); err == nil {
+			if decodedObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), objBytes); err == nil {
+				return decodedObj, true
+			}
+		}
+	}
+	return nil, false
 }
 
 func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
