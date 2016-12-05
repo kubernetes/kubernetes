@@ -55,7 +55,7 @@ const (
 	nameLenLimit = 62
 )
 
-var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
+var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 	defer GinkgoRecover()
 	var (
 		ns               string
@@ -130,10 +130,10 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 
 			By("waiting for Ingress to come up with ip: " + ip)
 			httpClient := buildInsecureClient(reqTimeout)
-			ExpectNoError(pollURL(fmt.Sprintf("https://%v/", ip), "", lbPollTimeout, httpClient, false))
+			ExpectNoError(pollURL(fmt.Sprintf("https://%v/", ip), "", lbPollTimeout, jig.pollInterval, httpClient, false))
 
 			By("should reject HTTP traffic")
-			ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, httpClient, true))
+			ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, jig.pollInterval, httpClient, true))
 
 			// TODO: uncomment the restart test once we have a way to synchronize
 			// and know that the controller has resumed watching. If we delete
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 	})
 
 	// Time: borderline 5m, slow by design
-	framework.KubeDescribe("Nginx [Slow]", func() {
+	framework.KubeDescribe("Nginx", func() {
 		var nginxController *NginxIngressController
 
 		BeforeEach(func() {
@@ -188,6 +188,9 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 		})
 
 		It("should conform to Ingress spec", func() {
+			// Poll more frequently to reduce e2e completion time.
+			// This test runs in presubmit.
+			jig.pollInterval = 5 * time.Second
 			conformanceTests = createComformanceTests(jig, ns)
 			for _, t := range conformanceTests {
 				By(t.entryLog)
