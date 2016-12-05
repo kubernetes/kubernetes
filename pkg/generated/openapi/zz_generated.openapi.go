@@ -2239,8 +2239,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"manifestURLHeader": {
 						SchemaProps: spec.SchemaProps{
 							Description: "manifestURLHeader is the HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'",
-							Type:        []string{"string"},
-							Format:      "",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
 						},
 					},
 					"enableServer": {
@@ -14114,8 +14121,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"manifestURLHeader": {
 						SchemaProps: spec.SchemaProps{
 							Description: "manifestURLHeader is the HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'",
-							Type:        []string{"string"},
-							Format:      "",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
 						},
 					},
 					"enableServer": {
