@@ -58,7 +58,6 @@ FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 
 # RBAC Mode options
 ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
-ENABLE_AUTH_PROXY=${ENABLE_AUTH_PROXY:-false}
 ENABLE_RBAC=${ENABLE_RBAC:-false}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
@@ -406,12 +405,6 @@ function start_apiserver {
       anytoken_arg="--insecure-allow-any-token "
       KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-"system:admin/system:masters"}
     fi
-    auth_proxy_arg=""
-    if [[ "${ENABLE_AUTH_PROXY}" = true ]]; then
-      auth_proxy_arg="--requestheader-username-headers=X-Remote-User \
-      --requestheader-client-ca-file=${CERT_DIR}/auth-proxy-client-ca.crt \
-      --requestheader-allowed-names=system:auth-proxy "
-    fi
     authorizer_arg=""
     if [[ "${ENABLE_RBAC}" = true ]]; then
       authorizer_arg="--authorization-mode=RBAC "
@@ -458,7 +451,7 @@ EOF
     sudo bash -c "cat '${CERT_DIR}/client-ca.crt' '${CERT_DIR}/auth-proxy-client-ca.crt' > '${CERT_DIR}/client-ca-bundle.crt'"
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${auth_proxy_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
@@ -476,6 +469,11 @@ EOF
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
+      --requestheader-username-headers=X-Remote-User \
+      --requestheader-group-headers=X-Remote-Group \
+      --requestheader-extra-headers-prefix=X-Remote-Extra- \
+      --requestheader-client-ca-file=${CERT_DIR}/auth-proxy-client-ca.crt \
+      --requestheader-allowed-names=system:auth-proxy \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
