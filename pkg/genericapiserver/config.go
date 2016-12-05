@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	"k8s.io/kubernetes/pkg/apiserver/request"
@@ -50,7 +49,8 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
+	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
+	genericauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
@@ -382,10 +382,10 @@ func (c *Config) Complete() completedConfig {
 			Groups: []string{user.SystemPrivilegedGroup},
 		}
 
-		tokenAuthenticator := apiserverauthenticator.NewAuthenticatorFromTokens(tokens)
+		tokenAuthenticator := genericauthenticator.NewAuthenticatorFromTokens(tokens)
 		c.Authenticator = authenticatorunion.New(tokenAuthenticator, c.Authenticator)
 
-		tokenAuthorizer := apiserverauthorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		tokenAuthorizer := genericauthorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
 

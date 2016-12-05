@@ -39,7 +39,6 @@ import (
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	authauthenticator "k8s.io/kubernetes/pkg/auth/authenticator"
 	authauthorizer "k8s.io/kubernetes/pkg/auth/authorizer"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
@@ -53,6 +52,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -214,7 +214,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		Groups: []string{user.SystemPrivilegedGroup},
 	}
 
-	tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
+	tokenAuthenticator := genericauthenticator.NewAuthenticatorFromTokens(tokens)
 	if masterConfig.GenericConfig.Authenticator == nil {
 		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
 	} else {

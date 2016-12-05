@@ -21,9 +21,9 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 )
 
 type BuiltInAuthenticationOptions struct {
@@ -229,8 +229,8 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) authenticator.AuthenticatorConfig {
-	ret := authenticator.AuthenticatorConfig{
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) genericauthenticator.AuthenticatorConfig {
+	ret := genericauthenticator.AuthenticatorConfig{
 		ClientCAFile: clientCAFile,
 	}
 	if s.Anonymous != nil {
@@ -309,12 +309,12 @@ func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ToAuthenticationRequestHeaderConfig returns a RequestHeaderConfig config object for these options
 // if necessary, nil otherwise.
-func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() *authenticator.RequestHeaderConfig {
+func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() *genericauthenticator.RequestHeaderConfig {
 	if len(s.UsernameHeaders) == 0 {
 		return nil
 	}
 
-	return &authenticator.RequestHeaderConfig{
+	return &genericauthenticator.RequestHeaderConfig{
 		UsernameHeaders:     s.UsernameHeaders,
 		GroupHeaders:        s.GroupHeaders,
 		ExtraHeaderPrefixes: s.ExtraHeaderPrefixes,
@@ -351,13 +351,13 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		" tokenaccessreviews.authentication.k8s.io.")
 }
 
-func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) (authenticator.DelegatingAuthenticatorConfig, error) {
+func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) (genericauthenticator.DelegatingAuthenticatorConfig, error) {
 	tokenClient, err := s.newTokenAccessReview()
 	if err != nil {
-		return authenticator.DelegatingAuthenticatorConfig{}, err
+		return genericauthenticator.DelegatingAuthenticatorConfig{}, err
 	}
 
-	ret := authenticator.DelegatingAuthenticatorConfig{
+	ret := genericauthenticator.DelegatingAuthenticatorConfig{
 		Anonymous:               true,
 		TokenAccessReviewClient: tokenClient,
 		CacheTTL:                s.CacheTTL,
