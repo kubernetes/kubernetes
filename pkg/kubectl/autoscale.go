@@ -97,6 +97,11 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if min > max {
+		return nil, fmt.Errorf("'max' must be greater than or equal to 'min'.")
+	}
+
 	cpuString, found := params["cpu-percent"]
 	cpu := -1
 	if found {
