@@ -279,6 +279,21 @@ func minConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 	return nil
 }
 
+// maxRequestConstraint enforces the max constraint over the specified resource
+// use when specify LimitType resource doesn't recognize limit values
+func maxRequestConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	observedReqValue, _, enforcedValue := requestLimitEnforcedValues(req, resource.Quantity{}, enforced)
+
+	if !reqExists {
+		return fmt.Errorf("maximum %s usage per %s is %s.  No request is specified.", resourceName, limitType, enforced.String())
+	}
+	if observedReqValue > enforcedValue {
+		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
+	}
+	return nil
+}
+
 // maxConstraint enforces the max constraint over the specified resource
 func maxConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
 	req, reqExists := request[resourceName]
@@ -415,9 +430,9 @@ func PersistentVolumeClaimLimitFunc(limitRange *api.LimitRange, pvc *api.Persist
 				}
 			}
 			for k, v := range limit.Max {
-				// reverse usage of maxConstraint. We want to enforce the max of the LimitRange against what
+				// We want to enforce the max of the LimitRange against what
 				// the user requested.
-				if err := maxConstraint(limitType, k, v, api.ResourceList{}, pvc.Spec.Resources.Requests); err != nil {
+				if err := maxRequestConstraint(limitType, k, v, pvc.Spec.Resources.Requests); err != nil {
 					errs = append(errs, err)
 				}
 			}
