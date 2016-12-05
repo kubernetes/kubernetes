@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package componentstatus
 
 import (
 	"net/http"
@@ -43,19 +43,6 @@ type Server struct {
 	Path        string
 	EnableHTTPS bool
 	Validate    ValidatorFn
-}
-
-type ServerStatus struct {
-	// +optional
-	Component string `json:"component,omitempty"`
-	// +optional
-	Health string `json:"health,omitempty"`
-	// +optional
-	HealthCode probe.Result `json:"healthCode,omitempty"`
-	// +optional
-	Msg string `json:"msg,omitempty"`
-	// +optional
-	Err string `json:"err,omitempty"`
 }
 
 func (server *Server) DoServerCheck(prober httpprober.HTTPProber) (probe.Result, string, error) {

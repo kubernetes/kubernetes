@@ -22,25 +22,10 @@ import (
 	"strings"
 	"testing"
 
-	"net/http"
-	"net/url"
-	"time"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
-
-type fakeHttpProber struct {
-	result probe.Result
-	body   string
-	err    error
-}
-
-func (f *fakeHttpProber) Probe(*url.URL, http.Header, time.Duration) (probe.Result, string, error) {
-	return f.result, f.body, f.err
-}
 
 type testResponse struct {
 	result probe.Result
@@ -50,8 +35,8 @@ type testResponse struct {
 
 func NewTestREST(resp testResponse) *REST {
 	return &REST{
-		GetServersToValidate: func() map[string]apiserver.Server {
-			return map[string]apiserver.Server{
+		GetServersToValidate: func() map[string]Server {
+			return map[string]Server{
 				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz"},
 			}
 		},

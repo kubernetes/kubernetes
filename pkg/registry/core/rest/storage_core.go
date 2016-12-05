@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apiserver"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -243,8 +242,8 @@ type componentStatusStorage struct {
 	storageFactory genericapiserver.StorageFactory
 }
 
-func (s componentStatusStorage) serversToValidate() map[string]apiserver.Server {
-	serversToValidate := map[string]apiserver.Server{
+func (s componentStatusStorage) serversToValidate() map[string]componentstatus.Server {
+	serversToValidate := map[string]componentstatus.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
 	}
@@ -270,7 +269,7 @@ func (s componentStatusStorage) serversToValidate() map[string]apiserver.Server 
 			port = 2379
 		}
 		// TODO: etcd health checking should be abstracted in the storage tier
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = componentstatus.Server{
 			Addr:        addr,
 			EnableHTTPS: etcdUrl.Scheme == "https",
 			Port:        port,
