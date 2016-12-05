@@ -97,7 +97,7 @@ func (s *store) Versioner() storage.Versioner {
 
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, resourceVersion string, out runtime.Object, ignoreNotFound bool) error {
-	key = keyWithPrefix(s.pathPrefix, key)
+	key = path.Join(s.pathPrefix, key)
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	if err != nil {
 		return err
 	}
-	key = keyWithPrefix(s.pathPrefix, key)
+	key = path.Join(s.pathPrefix, key)
 
 	opts, err := s.ttlOpts(ctx, int64(ttl))
 	if err != nil {
@@ -154,7 +154,7 @@ func (s *store) Delete(ctx context.Context, key string, out runtime.Object, prec
 	if err != nil {
 		panic("unable to convert output object to pointer")
 	}
-	key = keyWithPrefix(s.pathPrefix, key)
+	key = path.Join(s.pathPrefix, key)
 	if precondtions == nil {
 		return s.unconditionalDelete(ctx, key, out)
 	}
@@ -223,7 +223,7 @@ func (s *store) GuaranteedUpdate(
 	if err != nil {
 		panic("unable to convert output object to pointer")
 	}
-	key = keyWithPrefix(s.pathPrefix, key)
+	key = path.Join(s.pathPrefix, key)
 
 	var origState *objState
 	if len(suggestion) == 1 && suggestion[0] != nil {
@@ -299,7 +299,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	if err != nil {
 		return err
 	}
-	key = keyWithPrefix(s.pathPrefix, key)
+	key = path.Join(s.pathPrefix, key)
 
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	if err != nil {
@@ -325,7 +325,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	if err != nil {
 		return err
 	}
-	key = keyWithPrefix(s.pathPrefix, key)
+	key = path.Join(s.pathPrefix, key)
 	// We need to make sure the key ended with "/" so that we only get children "directories".
 	// e.g. if we have key "/a", "/a/b", "/ab", getting keys with prefix "/a" will return all three,
 	// while with prefix "/a/" will return only "/a/b" which is the correct answer.
@@ -366,7 +366,7 @@ func (s *store) watch(ctx context.Context, key string, rv string, pred storage.S
 	if err != nil {
 		return nil, err
 	}
-	key = keyWithPrefix(s.pathPrefix, key)
+	key = path.Join(s.pathPrefix, key)
 	return s.watcher.Watch(ctx, key, int64(rev), recursive, pred)
 }
 
@@ -455,13 +455,6 @@ func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, er
 		return nil, err
 	}
 	return []clientv3.OpOption{clientv3.WithLease(clientv3.LeaseID(lcr.ID))}, nil
-}
-
-func keyWithPrefix(prefix, key string) string {
-	if strings.HasPrefix(key, prefix) {
-		return key
-	}
-	return path.Join(prefix, key)
 }
 
 // decode decodes value of bytes into object. It will also set the object resource version to rev.
