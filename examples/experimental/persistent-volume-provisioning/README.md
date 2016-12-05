@@ -347,7 +347,7 @@ Now modify `examples/experimental/persistent-volume-provisioning/rbd/rbd-storage
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
 ```
 
-The kube-controller-manager is now able to provision storage, however we still need to be able to map it. Mapping should be done with a non-privileged key, if you have existing users you can get all keys by running `ceph auth list` on your Ceph cluster with the admin key. For this example we will create a new user and pool.
+The kube-controller-manager is now able to provision storage, however we still need to be able to map the RBD volume to a node. Mapping should be done with a non-privileged key, if you have existing users you can get all keys by running `ceph auth list` on your Ceph cluster with the admin key. For this example we will create a new user and pool.
 
 ```
 $ ceph osd pool create kube 512
@@ -356,9 +356,18 @@ $ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rwx pool=kube'
 	key = AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==
 ```
 
+This key will be made into a secret, just like the admin secret. However this user secret will need to be created in every namespace where you intend to consume RBD volumes provisioned in our example storage class. Let's create a namespace called `myns`, and create the user secret in that namespace.
+
+```
+kubectl create namespace myns
+kubectl create secret generic ceph-secret-user --from-literal=key='AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==' --namespace=myns
+```
+
+You are now ready to provision and use RBD storage.
+
 ##### Usage
 
-Once configured, create a PVC in a user's namespace (e.g. myns):
+With the storageclass configured, let's create a PVC in our example namespace, `myns`:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json --namespace=myns
