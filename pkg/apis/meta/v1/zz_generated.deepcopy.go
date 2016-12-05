@@ -149,6 +149,16 @@ func DeepCopy_v1_ExportOptions(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
+func DeepCopy_v1_GetOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*GetOptions)
+		out := out.(*GetOptions)
+		out.TypeMeta = in.TypeMeta
+		out.ResourceVersion = in.ResourceVersion
+		return nil
+	}
+}
+
 func DeepCopy_v1_GroupKind(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*GroupKind)
