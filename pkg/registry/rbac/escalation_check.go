@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
-func EscalationAllowed(ctx api.Context, superUser string) bool {
+func EscalationAllowed(ctx api.Context) bool {
 	u, ok := api.UserFrom(ctx)
 	if !ok {
 		// the only way to be without a user is to either have no authenticators by explicitly saying that's your preference
@@ -29,10 +29,6 @@ func EscalationAllowed(ctx api.Context, superUser string) bool {
 		return true
 	}
 
-	// check to see if this subject is allowed to escalate
-	if len(superUser) != 0 && u.GetName() == superUser {
-		return true
-	}
 	// system:masters is special because the API server uses it for privileged loopback connections
 	// therefore we know that a member of system:masters can always do anything
 	for _, group := range u.GetGroups() {

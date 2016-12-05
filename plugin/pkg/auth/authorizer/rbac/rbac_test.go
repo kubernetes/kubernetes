@@ -122,8 +122,6 @@ func TestAuthorizer(t *testing.T) {
 		clusterRoles        []*rbac.ClusterRole
 		clusterRoleBindings []*rbac.ClusterRoleBinding
 
-		superUser string
-
 		shouldPass []authorizer.Attributes
 		shouldFail []authorizer.Attributes
 	}{
@@ -222,7 +220,7 @@ func TestAuthorizer(t *testing.T) {
 	}
 	for i, tt := range tests {
 		ruleResolver, _ := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
-		a := RBACAuthorizer{tt.superUser, ruleResolver}
+		a := RBACAuthorizer{ruleResolver}
 		for _, attr := range tt.shouldPass {
 			if authorized, _, _ := a.Authorize(attr); !authorized {
 				t.Errorf("case %d: incorrectly restricted %s", i, attr)

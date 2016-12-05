@@ -19,7 +19,6 @@ limitations under the License.
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -38,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
@@ -53,18 +51,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func newFakeAuthenticator() authenticator.Request {
-	return bearertoken.New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
-		if token == "" {
-			return nil, false, errors.New("no bearer token found")
-		}
-		// Set the bearer token as the user name.
-		return &user.DefaultInfo{Name: token, UID: token}, true, nil
-	}))
+	return bearertoken.New(anytoken.AnyTokenAuthenticator{})
 }
 
 func clientForUser(user string) *http.Client {
@@ -82,7 +75,7 @@ func clientsetForUser(user string, config *restclient.Config) clientset.Interfac
 	return clientset.NewForConfigOrDie(&configCopy)
 }
 
-func newRBACAuthorizer(t *testing.T, superUser string, config *master.Config) authorizer.Authorizer {
+func newRBACAuthorizer(t *testing.T, config *master.Config) authorizer.Authorizer {
 	newRESTOptions := func(resource string) generic.RESTOptions {
 		storageConfig, err := config.StorageFactory.NewConfig(rbacapi.Resource(resource))
 		if err != nil {
@@ -95,7 +88,7 @@ func newRBACAuthorizer(t *testing.T, superUser string, config *master.Config) au
 	roleBindingRegistry := rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(newRESTOptions("rolebindings")))}
 	clusterRoleRegistry := clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(newRESTOptions("clusterroles")))}
 	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(newRESTOptions("clusterrolebindings")))}
-	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry, superUser)
+	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry)
 }
 
 // bootstrapRoles are a set of RBAC roles which will be populated before the test.
@@ -240,7 +233,7 @@ var (
 )
 
 func TestRBAC(t *testing.T) {
-	superUser := "admin"
+	superUser := "admin/system:masters"
 
 	tests := []struct {
 		bootstrapRoles bootstrapRoles
@@ -339,9 +332,8 @@ func TestRBAC(t *testing.T) {
 	for i, tc := range tests {
 		// Create an API Server.
 		masterConfig := framework.NewIntegrationTestMasterConfig()
-		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
+		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, masterConfig)
 		masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
-		masterConfig.GenericConfig.AuthorizerRBACSuperUser = superUser
 		_, s := framework.RunAMaster(masterConfig)
 		defer s.Close()
 
@@ -435,12 +427,11 @@ func TestRBAC(t *testing.T) {
 }
 
 func TestBootstrapping(t *testing.T) {
-	superUser := "admin"
+	superUser := "admin/system:masters"
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
+	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, masterConfig)
 	masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
-	masterConfig.GenericConfig.AuthorizerRBACSuperUser = superUser
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
