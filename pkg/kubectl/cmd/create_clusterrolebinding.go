@@ -40,7 +40,7 @@ var (
 func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--dry-run]",
-		Aliases: []string{"cm"},
+		Aliases: []string{"cb"},
 		Short:   "Create a ClusterRoleBinding for a particular ClusterRole",
 		Long:    clusterRoleBindingLong,
 		Example: clusterRoleBindingExample,
