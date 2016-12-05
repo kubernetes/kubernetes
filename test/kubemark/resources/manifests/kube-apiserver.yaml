@@ -37,7 +37,7 @@ spec:
       protocol: TCP
     volumeMounts:
     - name: srvkube
-      mountPath: /srv/kubernetes
+      mountPath: /etc/srv/kubernetes
       readOnly: true
     - name: logfile
       mountPath: /var/log/kube-apiserver.log
@@ -48,11 +48,11 @@ spec:
       mountPath: /usr/share/ca-certificates
       readOnly: true
     - name: srvsshproxy
-      mountPath: /srv/sshproxy
+      mountPath: /etc/srv/sshproxy
   volumes:
   - name: srvkube
     hostPath:
-      path: /srv/kubernetes
+      path: /etc/srv/kubernetes
   - name: logfile
     hostPath:
       path: /var/log/kube-apiserver.log
@@ -64,4 +64,4 @@ spec:
       path: /usr/share/ca-certificates
   - name: srvsshproxy
     hostPath:
-      path: /srv/sshproxy
+      path: /etc/srv/sshproxy
