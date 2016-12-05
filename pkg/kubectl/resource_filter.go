@@ -57,7 +57,7 @@ func filterPods(obj runtime.Object, options PrintOptions) bool {
 }
 
 // Filter loops through a collection of FilterFuncs until it finds one that can filter the given resource
-func (f Filters) Filter(obj runtime.Object, opts *PrintOptions) (bool, error) {
+func (f Filters) Filter(obj runtime.Object, opts *PrintOptions) (bool, runtime.Object, error) {
 	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand
 	// before apply filter func.
 	switch obj.(type) {
@@ -71,8 +71,8 @@ func (f Filters) Filter(obj runtime.Object, opts *PrintOptions) (bool, error) {
 
 	for _, filter := range f {
 		if ok := filter(obj, *opts); ok {
-			return true, nil
+			return true, obj, nil
 		}
 	}
-	return false, nil
+	return false, obj, nil
 }

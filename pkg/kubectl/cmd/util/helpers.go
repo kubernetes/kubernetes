@@ -671,7 +671,7 @@ func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterO
 	filterCount := 0
 	list := make([]runtime.Object, 0, len(items))
 	for _, obj := range items {
-		if isFiltered, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
+		if isFiltered, _, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
 			if err != nil {
 				glog.V(2).Infof("Unable to filter resource: %v", err)
 				continue

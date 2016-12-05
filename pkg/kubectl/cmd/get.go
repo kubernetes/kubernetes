@@ -459,7 +459,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 
 		// filter objects if filter has been defined for current object
-		if isFiltered, err := filterFuncs.Filter(original, filterOpts); isFiltered {
+		if isFiltered, decodedObj, err := filterFuncs.Filter(original, filterOpts); isFiltered {
 			if err == nil {
 				filteredResourceCount++
 				continue
@@ -468,6 +468,9 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				errs.Insert(err.Error())
 				allErrs = append(allErrs, err)
 			}
+			original = decodedObj
+		} else {
+			original = decodedObj
 		}
 
 		if resourcePrinter, found := printer.(*kubectl.HumanReadablePrinter); found {
