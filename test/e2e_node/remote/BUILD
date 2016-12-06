@@ -12,7 +12,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["remote.go"],
+    srcs = [
+        "remote.go",
+        "ssh.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/util/errors:go_default_library",
