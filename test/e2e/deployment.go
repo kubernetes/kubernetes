@@ -97,6 +97,7 @@ var _ = framework.KubeDescribe("Deployment", func() {
 		testScaledRolloutDeployment(f)
 	})
 	It("overlapping deployment should not fight with each other", func() {
+		framework.SkipIfProviderIs("gke") // #32947
 		testOverlappingDeployment(f)
 	})
 	It("lack of progress should be reported in the deployment status", func() {
