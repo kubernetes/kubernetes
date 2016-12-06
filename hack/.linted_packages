@@ -22,6 +22,9 @@ cmd/kubeadm/app/apis/kubeadm/install
 cmd/kubectl
 cmd/kubelet
 cmd/kubernetes-discovery
+cmd/kubernetes-discovery/pkg/apis/apiregistration/install
+cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion
+cmd/kubernetes-discovery/pkg/client/listers/apiregistration/v1alpha1
 cmd/libs/go2idl/client-gen
 cmd/libs/go2idl/client-gen/generators
 cmd/libs/go2idl/client-gen/test_apis/testgroup/install

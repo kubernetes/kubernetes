@@ -12,13 +12,12 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "discoverysummarizer.go",
-        "doc.go",
-    ],
+    srcs = ["apiserver.go"],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubernetes-discovery/discoverysummarizer/apis/config/v1alpha1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/genericapiserver:go_default_library",
+        "//pkg/registry/generic:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
+        "//pkg/version:go_default_library",
     ],
 )
