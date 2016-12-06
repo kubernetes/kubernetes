@@ -20,6 +20,7 @@ go_library(
         "namespace_controller.go",
         "server.go",
         "services.go",
+        "util.go",
     ],
     tags = ["automanaged"],
     deps = [
