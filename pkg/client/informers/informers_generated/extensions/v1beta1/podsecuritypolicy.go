@@ -23,7 +23,7 @@ import (
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	release_1_5 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internal_interfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internal_interfaces"
 	v1beta1 "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -38,7 +38,7 @@ type PodSecurityPolicyInformer interface {
 }
 
 type podSecurityPolicyInformer struct {
-	factory interfaces.SharedInformerFactory
+	factory internal_interfaces.SharedInformerFactory
 }
 
 func newPodSecurityPolicyInformer(client release_1_5.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {

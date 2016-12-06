@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internal_interfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internal_interfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -38,7 +38,7 @@ type ServiceInformer interface {
 }
 
 type serviceInformer struct {
-	factory interfaces.SharedInformerFactory
+	factory internal_interfaces.SharedInformerFactory
 }
 
 func newServiceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {

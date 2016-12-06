@@ -24,7 +24,7 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internal_interfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internal_interfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -39,7 +39,7 @@ type NetworkPolicyInformer interface {
 }
 
 type networkPolicyInformer struct {
-	factory interfaces.SharedInformerFactory
+	factory internal_interfaces.SharedInformerFactory
 }
 
 func newNetworkPolicyInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {

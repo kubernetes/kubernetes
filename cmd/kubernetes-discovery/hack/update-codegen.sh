@@ -26,6 +26,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 function cleanup {
   rm -f "${CLIENTGEN:-}"
   rm -f "${listergen:-}"
+  rm -f "${informergen:-}"
 }
 trap cleanup EXIT
 
@@ -55,15 +56,14 @@ LISTER_PATH="--output-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/cli
 ${listergen} ${LISTER_INPUT} ${LISTER_PATH}
 
 
-# TODO generated code has the wrong internal package name
-# echo "Building informer-gen"
-# informergen="${PWD}/informer-gen"
-# go build -o "${informergen}" ./cmd/libs/go2idl/informer-gen
+echo "Building informer-gen"
+informergen="${PWD}/informer-gen"
+go build -o "${informergen}" ./cmd/libs/go2idl/informer-gen
 
-# ${informergen} \
-#   --input-dirs k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration --input-dirs k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1 \
-#   --versioned-clientset-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/release_1_5 \
-#   --internal-clientset-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset \
-#   --listers-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers \
-#   --output-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers
-#   "$@"
+${informergen} \
+  --input-dirs k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration --input-dirs k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1 \
+  --versioned-clientset-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/release_1_5 \
+  --internal-clientset-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset \
+  --listers-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers \
+  --output-package k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers
+  "$@"
