@@ -1126,22 +1126,22 @@ var _ = framework.KubeDescribe("Services", func() {
 		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
 		jig.RunOrFail(namespace, nil)
 		// Create loadbalancer service with source range from node[0] and podAccept
-		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeLoadBalancer
 			svc.Spec.LoadBalancerSourceRanges = []string{accpetPod.Status.PodIP + "/32"}
 		})
 
 		// Clean up loadbalancer service
 		defer func() {
-			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
-				svc.Spec.Type = v1.ServiceTypeNodePort
+			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeNodePort
 				svc.Spec.LoadBalancerSourceRanges = nil
 			})
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
 		}()
 
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
-		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+		jig.SanityCheckService(svc, api.ServiceTypeLoadBalancer)
 
 		By("check reachability from different sources")
 		svcIP := getIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
@@ -1149,7 +1149,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		checkReachabilityFromPod(false, namespace, dropPodName, svcIP)
 
 		By("Update service LoadBalancerSourceRange and check reachability")
-		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
 			// only allow access from dropPod
 			svc.Spec.LoadBalancerSourceRanges = []string{dropPod.Status.PodIP + "/32"}
 		})
@@ -1157,7 +1157,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		checkReachabilityFromPod(true, namespace, dropPodName, svcIP)
 
 		By("Delete LoadBalancerSourceRange field and check reachability")
-		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
 			svc.Spec.LoadBalancerSourceRanges = nil
 		})
 		checkReachabilityFromPod(true, namespace, acceptPodName, svcIP)
