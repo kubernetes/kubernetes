@@ -152,18 +152,7 @@ func CreateTestArchive() (string, error) {
 }
 
 // Returns the command output, whether the exit was ok, and any errors
-func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string, setupNode bool, testArgs string, ginkgoFlags string) (string, bool, error) {
-	if setupNode {
-		uname, err := user.Current()
-		if err != nil {
-			return "", false, fmt.Errorf("could not find username: %v", err)
-		}
-		output, err := SSH(host, "usermod", "-a", "-G", "docker", uname.Username)
-		if err != nil {
-			return "", false, fmt.Errorf("instance %s not running docker daemon - Command failed: %s", host, output)
-		}
-	}
-
+func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string, testArgs string, ginkgoFlags string) (string, bool, error) {
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
 	workspace := fmt.Sprintf("/tmp/node-e2e-%s", getTimestamp())
