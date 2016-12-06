@@ -32,6 +32,9 @@ import (
 // NewSelfClientConfig returns a clientconfig which can be used to talk to this apiserver.
 func NewSelfClientConfig(secureServingInfo *SecureServingInfo, insecureServingInfo *ServingInfo, token string) (*restclient.Config, error) {
 	if cfg, err := secureServingInfo.NewSelfClientConfig(token); err != nil || cfg != nil {
+		if err == nil {
+			return cfg, nil
+		}
 		if insecureServingInfo == nil {
 			// be fatal if insecure port is not available
 			return cfg, err
