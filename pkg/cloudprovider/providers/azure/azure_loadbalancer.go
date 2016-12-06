@@ -272,18 +272,29 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 
 	// Ensure LoadBalancer's Backend Pool Configuration
 	if wantLb {
-		if lb.Properties.BackendAddressPools == nil ||
-			len(*lb.Properties.BackendAddressPools) == 0 {
-			lb.Properties.BackendAddressPools = &[]network.BackendAddressPool{
-				{
-					Name: to.StringPtr(lbBackendPoolName),
-				},
+		newBackendPools := []network.BackendAddressPool{}
+		if lb.Properties.BackendAddressPools != nil {
+			newBackendPools = *lb.Properties.BackendAddressPools
+		}
+
+		foundBackendPool := false
+		for _, bp := range newBackendPools {
+			if strings.EqualFold(*bp.Name, lbBackendPoolName) {
+				glog.V(10).Infof("reconcile(%s)(%t): lb backendpool - found wanted backendpool. not adding anything", serviceName, wantLb)
+				foundBackendPool = true
+				break
+			} else {
+				glog.V(10).Infof("reconcile(%s)(%t): lb backendpool - found other backendpool %s", serviceName, wantLb, *bp.Name)
 			}
-			glog.V(10).Infof("reconcile(%s)(%t): lb backendpool - adding", serviceName, wantLb)
+		}
+		if !foundBackendPool {
+			newBackendPools = append(newBackendPools, network.BackendAddressPool{
+				Name: to.StringPtr(lbBackendPoolName),
+			})
+			glog.V(10).Infof("reconcile(%s)(%t): lb backendpool - adding backendpool", serviceName, wantLb)
+
 			dirtyLb = true
-		} else if len(*lb.Properties.BackendAddressPools) != 1 ||
-			!strings.EqualFold(*(*lb.Properties.BackendAddressPools)[0].Name, lbBackendPoolName) {
-			return lb, false, fmt.Errorf("loadbalancer is misconfigured with a different backend pool")
+			lb.Properties.BackendAddressPools = &newBackendPools
 		}
 	}
 
