@@ -359,9 +359,6 @@ func (w *etcdWatcher) sendAdd(res *etcd.Response) {
 		return
 	}
 	action := watch.Added
-	if res.Node.ModifiedIndex != res.Node.CreatedIndex {
-		action = watch.Modified
-	}
 	w.emit(watch.Event{
 		Type:   action,
 		Object: obj,
@@ -454,6 +451,8 @@ func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	switch res.Action {
 	case EtcdCreate, EtcdGet:
+		// "Get" will only happen in watch 0 case, where we explicitly want ADDED event
+		// for initial state.
 		w.sendAdd(res)
 	case EtcdSet, EtcdCAS:
 		w.sendModify(res)
