@@ -40,6 +40,7 @@ type informerGenerator struct {
 	versionedClientSetPackage string
 	internalClientSetPackage  string
 	listersPackage            string
+	internalInterfacesPackage string
 }
 
 var _ generator.Generator = &informerGenerator{}
@@ -92,7 +93,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"clientSetInterface":              clientSetInterface,
 		"group":                           namer.IC(g.groupVersion.Group.NonEmpty()),
 		"informerFor":                     informerFor,
-		"interfacesSharedInformerFactory": c.Universe.Type(interfacesSharedInformerFactory),
+		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"listOptions":                     c.Universe.Type(listOptions),
 		"lister":                          c.Universe.Type(types.Name{Package: listerPackage, Name: t.Name.Name + "Lister"}),
 		"namespaceAll":                    namespaceAll,
