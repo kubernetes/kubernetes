@@ -629,12 +629,8 @@ func MaybeConvertObject(obj runtime.Object, gv schema.GroupVersion, converter ru
 // with multiple resource kinds, in which case it will
 // return true, indicating resource kind will be
 // included as part of printer output
-func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort, printAll bool) bool {
+func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort) bool {
 	var lastMap *meta.RESTMapping
-
-	if len(infos) == 1 && printAll {
-		return true
-	}
 
 	for ix := range objs {
 		var mapping *meta.RESTMapping
