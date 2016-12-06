@@ -105,13 +105,13 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 	falseVar := false
 	testCases := []struct {
 		description          string
-		ownerReferences      []api.OwnerReference
+		ownerReferences      []metav1.OwnerReference
 		expectError          bool
 		expectedErrorMessage string
 	}{
 		{
 			description: "simple success - third party extension.",
-			ownerReferences: []api.OwnerReference{
+			ownerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "thirdpartyVersion",
 					Kind:       "thirdpartyKind",
@@ -124,7 +124,7 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 		},
 		{
 			description: "simple failures - event shouldn't be set as an owner",
-			ownerReferences: []api.OwnerReference{
+			ownerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",
 					Kind:       "Event",
@@ -137,7 +137,7 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 		},
 		{
 			description: "simple controller ref success - one reference with Controller set",
-			ownerReferences: []api.OwnerReference{
+			ownerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "thirdpartyVersion",
 					Kind:       "thirdpartyKind",
@@ -171,7 +171,7 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 		},
 		{
 			description: "simple controller ref failure - two references with Controller set",
-			ownerReferences: []api.OwnerReference{
+			ownerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "thirdpartyVersion",
 					Kind:       "thirdpartyKind",

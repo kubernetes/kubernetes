@@ -90,7 +90,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicationController", Name: "foo", UID: "abcdef123456", Controller: &trueVar},
 					},
 				},
@@ -103,7 +103,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "RandomController", Name: "foo", UID: "abcdef123456", Controller: &trueVar},
 					},
 				},
@@ -116,7 +116,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicationController", Name: "foo", UID: "abcdef123456"},
 					},
 				},
@@ -129,7 +129,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicaSet", Name: "foo", UID: "qwert12345", Controller: &trueVar},
 					},
 				},

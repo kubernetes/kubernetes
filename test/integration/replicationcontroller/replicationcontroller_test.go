@@ -172,46 +172,46 @@ func TestAdoption(t *testing.T) {
 	var trueVar = true
 	testCases := []struct {
 		name                    string
-		existingOwnerReferences func(rc *v1.ReplicationController) []v1.OwnerReference
-		expectedOwnerReferences func(rc *v1.ReplicationController) []v1.OwnerReference
+		existingOwnerReferences func(rc *v1.ReplicationController) []metav1.OwnerReference
+		expectedOwnerReferences func(rc *v1.ReplicationController) []metav1.OwnerReference
 	}{
 		{
 			"pod refers rc as an owner, not a controller",
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"}}
 			},
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
 			},
 		},
 		{
 			"pod doesn't have owner references",
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{}
 			},
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
 			},
 		},
 		{
 			"pod refers rc as a controller",
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
 			},
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
 			},
 		},
 		{
 			"pod refers other rc as the controller, refers the rc as an owner",
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{
 					{UID: "1", Name: "anotherRC", APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar},
 					{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"},
 				}
 			},
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{
 					{UID: "1", Name: "anotherRC", APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar},
 					{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"},
 				}

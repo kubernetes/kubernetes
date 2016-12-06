@@ -982,19 +982,6 @@ func (ObjectReference) SwaggerDoc() map[string]string {
 	return map_ObjectReference
 }
 
-var map_OwnerReference = map[string]string{
-	"":           "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
-	"apiVersion": "API version of the referent.",
-	"kind":       "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-	"name":       "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
-	"uid":        "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
-	"controller": "If true, this reference points to the managing controller.",
-}
-
-func (OwnerReference) SwaggerDoc() map[string]string {
-	return map_OwnerReference
-}
-
 var map_PersistentVolume = map[string]string{
 	"":         "PersistentVolume (PV) is a storage resource provisioned by an administrator. It is analogous to a node. More info: http://kubernetes.io/docs/user-guide/persistent-volumes",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",

@@ -80,7 +80,7 @@ func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerRefe
 		})
 	}
 	if len(references) == 0 {
-		objectMeta.OwnerReferences = make([]api.OwnerReference, 0)
+		objectMeta.OwnerReferences = make([]metav1.OwnerReference, 0)
 	}
 	return objectMeta, metaOwnerReferences
 }

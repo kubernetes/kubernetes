@@ -193,7 +193,7 @@ func ValidateEndpointsSpecificAnnotations(annotations map[string]string, fldPath
 	return allErrs
 }
 
-func validateOwnerReference(ownerReference api.OwnerReference, fldPath *field.Path) field.ErrorList {
+func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	gvk := schema.FromAPIVersionAndKind(ownerReference.APIVersion, ownerReference.Kind)
 	// gvk.Group is empty for the legacy group.
@@ -215,7 +215,7 @@ func validateOwnerReference(ownerReference api.OwnerReference, fldPath *field.Pa
 	return allErrs
 }
 
-func ValidateOwnerReferences(ownerReferences []api.OwnerReference, fldPath *field.Path) field.ErrorList {
+func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	controllerName := ""
 	for _, ref := range ownerReferences {

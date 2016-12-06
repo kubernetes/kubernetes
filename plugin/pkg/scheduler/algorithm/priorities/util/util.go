@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
-func GetControllerRef(pod *v1.Pod) *v1.OwnerReference {
+func GetControllerRef(pod *v1.Pod) *metav1.OwnerReference {
 	if len(pod.OwnerReferences) == 0 {
 		return nil
 	}
