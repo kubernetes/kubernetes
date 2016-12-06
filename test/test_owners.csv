@@ -2,6 +2,7 @@ name,owner,auto-assigned
 DEFAULT,rmmh/spxtr/ixdy/apelisse/fejta,0
 Addon update should propagate add-on file changes,eparis,1
 AppArmor should enforce an AppArmor profile,kevin-wangzefeng,1
+AppArmor should enforce an AppArmor profile,smarterclayton,0
 AppArmor when running with AppArmor should enforce a permissive profile,yujuhong,1
 AppArmor when running with AppArmor should enforce a profile blocking writes,freehan,1
 AppArmor when running with AppArmor should reject an unloaded profile,kargakis,1
@@ -360,6 +361,7 @@ Pods should support retrieving logs from the container over websockets,vishh,0
 "Port forwarding With a server that expects no client request should support a client that connects, sends no data, and disconnects",sttts,0
 PreStop should call prestop when killing a pod,ncdc,1
 PrivilegedPod should enable privileged commands,dchen1107,1
+PrivilegedPod should enable privileged commands,smarterclayton,0
 Probing container should *not* be restarted with a /healthz http liveness probe,Random-Liu,0
 "Probing container should *not* be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0
 Probing container should be restarted with a /healthz http liveness probe,Random-Liu,0
@@ -581,6 +583,8 @@ k8s.io/kubernetes/pkg/apis/extensions/v1beta1,madhusudancs,1
 k8s.io/kubernetes/pkg/apis/extensions/validation,nikhiljindal,1
 k8s.io/kubernetes/pkg/apis/meta/v1,sttts,0
 k8s.io/kubernetes/pkg/apis/meta/v1/validation,jszczepkowski,1
+k8s.io/kubernetes/pkg/apis/meta/v1/unstructured,smarterclayton,0
+k8s.io/kubernetes/pkg/apis/meta/v1/validation,smarterclayton,0
 k8s.io/kubernetes/pkg/apis/policy/validation,deads2k,1
 k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1
