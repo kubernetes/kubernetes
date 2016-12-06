@@ -468,91 +468,56 @@ func (o resourceByPreferredGroupVersion) Less(i, j int) bool {
 // RESTClient should use to operate on the provided group/kind in order of versions. If a version search
 // order is not provided, the search order provided to DefaultRESTMapper will be used to resolve which
 // version should be used to access the named group/kind.
-// TODO: consider refactoring to use RESTMappings in a way that preserves version ordering and preference
 func (m *DefaultRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error) {
-	// Pick an appropriate version
-	var gvk *schema.GroupVersionKind
+	mappings, err := m.RESTMappings(gk, versions...)
+	if err != nil {
+		return nil, err
+	}
+	if len(mappings) == 0 {
+		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
+	}
+	// since we rely on RESTMappings method
+	// take the first match and return to the caller
+	// as this was the existing behavior.
+	return mappings[0], nil
+}
+
+// RESTMappings returns the RESTMappings for the provided group kind. If a version search order
+// is not provided, the search order provided to DefaultRESTMapper will be used.
+func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error) {
+	mappings := make([]*RESTMapping, 0)
+	potentialGVK := make([]schema.GroupVersionKind, 0)
 	hadVersion := false
+
+	// Pick an appropriate version
 	for _, version := range versions {
 		if len(version) == 0 || version == runtime.APIVersionInternal {
 			continue
 		}
-
 		currGVK := gk.WithVersion(version)
 		hadVersion = true
 		if _, ok := m.kindToPluralResource[currGVK]; ok {
-			gvk = &currGVK
+			potentialGVK = append(potentialGVK, currGVK)
 			break
 		}
 	}
 	// Use the default preferred versions
-	if !hadVersion && (gvk == nil) {
+	if !hadVersion && len(potentialGVK) == 0 {
 		for _, gv := range m.defaultGroupVersions {
 			if gv.Group != gk.Group {
 				continue
 			}
-
-			currGVK := gk.WithVersion(gv.Version)
-			if _, ok := m.kindToPluralResource[currGVK]; ok {
-				gvk = &currGVK
-				break
-			}
+			potentialGVK = append(potentialGVK, gk.WithVersion(gv.Version))
 		}
 	}
-	if gvk == nil {
+
+	if len(potentialGVK) == 0 {
 		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
 	}
 
-	// Ensure we have a REST mapping
-	resource, ok := m.kindToPluralResource[*gvk]
-	if !ok {
-		found := []schema.GroupVersion{}
-		for _, gv := range m.defaultGroupVersions {
-			if _, ok := m.kindToPluralResource[*gvk]; ok {
-				found = append(found, gv)
-			}
-		}
-		if len(found) > 0 {
-			return nil, fmt.Errorf("object with kind %q exists in versions %v, not %v", gvk.Kind, found, gvk.GroupVersion().String())
-		}
-		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported object", gvk.GroupVersion().String(), gvk.Kind)
-	}
-
-	// Ensure we have a REST scope
-	scope, ok := m.kindToScope[*gvk]
-	if !ok {
-		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", gvk.GroupVersion().String(), gvk.Kind)
-	}
-
-	interfaces, err := m.interfacesFunc(gvk.GroupVersion())
-	if err != nil {
-		return nil, fmt.Errorf("the provided version %q has no relevant versions: %v", gvk.GroupVersion().String(), err)
-	}
-
-	retVal := &RESTMapping{
-		Resource:         resource.Resource,
-		GroupVersionKind: *gvk,
-		Scope:            scope,
-
-		ObjectConvertor:  interfaces.ObjectConvertor,
-		MetadataAccessor: interfaces.MetadataAccessor,
-	}
-
-	return retVal, nil
-}
-
-// RESTMappings returns the RESTMappings for the provided group kind in a rough internal preferred order. If no
-// kind is found it will return a NoResourceMatchError.
-func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind) ([]*RESTMapping, error) {
-	// Use the default preferred versions
-	var mappings []*RESTMapping
-	for _, gv := range m.defaultGroupVersions {
-		if gv.Group != gk.Group {
-			continue
-		}
-
-		gvk := gk.WithVersion(gv.Version)
-		gvr, ok := m.kindToPluralResource[gvk]
+	for _, gvk := range potentialGVK {
+		//Ensure we have a REST mapping
+		res, ok := m.kindToPluralResource[gvk]
 		if !ok {
 			continue
 		}
@@ -569,7 +534,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind) ([]*RESTMapping, e
 		}
 
 		mappings = append(mappings, &RESTMapping{
-			Resource:         gvr.Resource,
+			Resource:         res.Resource,
 			GroupVersionKind: gvk,
 			Scope:            scope,
 

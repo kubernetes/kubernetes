@@ -152,7 +152,7 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(gk schema.GroupKind, versions
 	return mapping, nil
 }
 
-func (t *thirdPartyResourceDataMapper) RESTMappings(gk schema.GroupKind) ([]*meta.RESTMapping, error) {
+func (t *thirdPartyResourceDataMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
 	if gk.Group != t.group {
 		return nil, fmt.Errorf("unknown group %q expected %s", gk.Group, t.group)
 	}
@@ -163,7 +163,7 @@ func (t *thirdPartyResourceDataMapper) RESTMappings(gk schema.GroupKind) ([]*met
 	// TODO figure out why we're doing this rewriting
 	extensionGK := schema.GroupKind{Group: extensions.GroupName, Kind: "ThirdPartyResourceData"}
 
-	mappings, err := t.mapper.RESTMappings(extensionGK)
+	mappings, err := t.mapper.RESTMappings(extensionGK, versions...)
 	if err != nil {
 		return nil, err
 	}
