@@ -36,8 +36,8 @@ fi
 readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws"
 
-readonly master_logfiles="kube-apiserver kube-scheduler rescheduler kube-controller-manager etcd glbc cluster-autoscaler kube-addon-manager"
-readonly node_logfiles="kube-proxy"
+readonly master_logfiles="kube-apiserver kube-scheduler rescheduler kube-controller-manager etcd glbc cluster-autoscaler kube-addon-manager fluentd"
+readonly node_logfiles="kube-proxy fluentd"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
 readonly kern_logfile="kern"
