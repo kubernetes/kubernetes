@@ -457,7 +457,7 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		fnp := nettest.NewMockNetworkPlugin(ctrl)
-		dm.networkPlugin = fnp
+		dm.network = network.NewPluginManager(fnp)
 
 		fakeDocker.SetFakeRunningContainers([]*FakeContainer{
 			{
