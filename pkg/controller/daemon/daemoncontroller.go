@@ -646,15 +646,14 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return dsc.updateDaemonSetStatus(ds)
 }
 
+// nodeShouldRunDaemonPod checks if the node should run the daemonset pod, returns whether the node matches the NodeName or pod's selector.
 func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) bool {
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
 		return false
 	}
 
-	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
-	newPod.Namespace = ds.Namespace
-	newPod.Spec.NodeName = node.Name
+	newPod := getNewPodToNodeDaemon(node.Name, ds)
 
 	pods := []*v1.Pod{}
 
@@ -667,6 +666,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	return fit
 }
 
+// nodeCanRunDaemonPodNow checks if the node can run the daemonset pod now, returns whether the node fits GeneralPredicates.
 func (dsc *DaemonSetsController) nodeCanRunDaemonPodNow(node *v1.Node, ds *extensions.DaemonSet) bool {
 	// TODO: Move it to the predicates
 	for _, c := range node.Status.Conditions {
@@ -675,9 +675,7 @@ func (dsc *DaemonSetsController) nodeCanRunDaemonPodNow(node *v1.Node, ds *exten
 		}
 	}
 
-	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
-	newPod.Namespace = ds.Namespace
-	newPod.Spec.NodeName = node.Name
+	newPod := getNewPodToNodeDaemon(node.Name, ds)
 
 	pods := []*v1.Pod{}
 
@@ -715,6 +713,14 @@ func (dsc *DaemonSetsController) nodeCanRunDaemonPodNow(node *v1.Node, ds *exten
 		}
 	}
 	return fit
+}
+
+// getNewPodToNodeDaemon returns a pod to daemonset on the specified node.
+func getNewPodToNodeDaemon(nodeName string, ds *extensions.DaemonSet) *v1.Pod {
+	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
+	newPod.Namespace = ds.Namespace
+	newPod.Spec.NodeName = nodeName
+	return newPod
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
