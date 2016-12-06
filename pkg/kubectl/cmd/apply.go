@@ -252,18 +252,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 
 			count++
 			if len(output) > 0 && !shortOutput {
-				printer, generic, err := cmdutil.PrinterForCommand(cmd)
-				if err != nil {
-					return err
-				}
-				if !generic || printer == nil {
-					printer, err := f.PrinterForMapping(cmd, nil, false)
-					if err != nil {
-						return err
-					}
-					return printer.PrintObj(info.Object, out)
-				}
-				return printer.PrintObj(info.Object, out)
+				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 			}
 			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
@@ -310,18 +299,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 		}
 		count++
 		if len(output) > 0 && !shortOutput {
-			printer, generic, err := cmdutil.PrinterForCommand(cmd)
-			if err != nil {
-				return err
-			}
-			if !generic || printer == nil {
-				printer, err := f.PrinterForMapping(cmd, nil, false)
-				if err != nil {
-					return err
-				}
-				return printer.PrintObj(info.Object, out)
-			}
-			return printer.PrintObj(info.Object, out)
+			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 		}
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
