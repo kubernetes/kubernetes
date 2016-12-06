@@ -23,6 +23,13 @@ import (
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/cmd/server"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/logs"
+
+	// force compilation of packages we'll later rely upon
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/install"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/validation"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/v1alpha1"
 )
 
 func main() {
