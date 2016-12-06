@@ -17,21 +17,31 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer"
+	"os"
+	"runtime"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/cmd/server"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/logs"
+
+	// force compilation of packages we'll later rely upon
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/install"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/validation"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/v1alpha1"
 )
 
 func main() {
-	// TODO: move them to flags.
-	configFilePath := "config.json"
-	port := "9090"
-	s, err := discoverysummarizer.NewDiscoverySummarizer(configFilePath)
-	if err != nil {
-		glog.Fatalf("%v\n", err)
+	logs.InitLogs()
+	defer logs.FlushLogs()
+
+	if len(os.Getenv("GOMAXPROCS")) == 0 {
+		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
-	err = s.Run(port)
-	if err != nil {
-		glog.Fatalf("%v\n", err)
+
+	cmd := server.NewCommandStartDiscoveryServer(os.Stdout, os.Stderr)
+	if err := cmd.Execute(); err != nil {
+		cmdutil.CheckErr(err)
 	}
 }
