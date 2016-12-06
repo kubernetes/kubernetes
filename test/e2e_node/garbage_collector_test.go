@@ -38,10 +38,9 @@ const (
 	maxTotalContainers = -1
 
 	defaultRuntimeRequestTimeoutDuration = 1 * time.Minute
-	garbageCollectDuration               = 2 * time.Minute
+	garbageCollectDuration               = 3 * time.Minute
 	setupDuration                        = 10 * time.Minute
 	runtimePollInterval                  = 10 * time.Second
-	deleteTimeout                        = 4 * time.Minute
 )
 
 type testPodSpec struct {
