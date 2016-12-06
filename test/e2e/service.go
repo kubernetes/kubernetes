@@ -1096,6 +1096,73 @@ var _ = framework.KubeDescribe("Services", func() {
 			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.name, kubeProxyLagTimeout, stdout)
 		}
 	})
+
+	It("should only allow access from service loadbalancer source ranges [Slow]", func() {
+		// this feature currently supported only on GCE/GKE/AWS
+		framework.SkipUnlessProviderIs("gce", "gke", "aws")
+
+		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > largeClusterMinNodesNumber {
+			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
+		}
+
+		namespace := f.Namespace.Name
+		serviceName := "lb-sourcerange"
+		jig := NewServiceTestJig(cs, serviceName)
+
+		By("Prepare allow source ips")
+		// prepare the exec pods
+		// acceptPod are allowed to access the loadbalancer
+		acceptPodName := createExecPodOrFail(cs, namespace, "execpod-accept")
+		dropPodName := createExecPodOrFail(cs, namespace, "execpod-drop")
+
+		accpetPod, err := cs.Core().Pods(namespace).Get(acceptPodName)
+		Expect(err).NotTo(HaveOccurred())
+		dropPod, err := cs.Core().Pods(namespace).Get(dropPodName)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating a pod to be part of the service " + serviceName)
+		// This container is an nginx container listening on port 80
+		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
+		jig.RunOrFail(namespace, nil)
+		// Create loadbalancer service with source range from node[0] and podAccept
+		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeLoadBalancer
+			svc.Spec.LoadBalancerSourceRanges = []string{accpetPod.Status.PodIP + "/32"}
+		})
+
+		// Clean up loadbalancer service
+		defer func() {
+			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeNodePort
+				svc.Spec.LoadBalancerSourceRanges = nil
+			})
+			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
+		}()
+
+		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
+		jig.SanityCheckService(svc, api.ServiceTypeLoadBalancer)
+
+		By("check reachability from different sources")
+		svcIP := getIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+		checkReachabilityFromPod(true, namespace, acceptPodName, svcIP)
+		checkReachabilityFromPod(false, namespace, dropPodName, svcIP)
+
+		By("Update service LoadBalancerSourceRange and check reachability")
+		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
+			// only allow access from dropPod
+			svc.Spec.LoadBalancerSourceRanges = []string{dropPod.Status.PodIP + "/32"}
+		})
+		checkReachabilityFromPod(false, namespace, acceptPodName, svcIP)
+		checkReachabilityFromPod(true, namespace, dropPodName, svcIP)
+
+		By("Delete LoadBalancerSourceRange field and check reachability")
+		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
+			svc.Spec.LoadBalancerSourceRanges = nil
+		})
+		checkReachabilityFromPod(true, namespace, acceptPodName, svcIP)
+		checkReachabilityFromPod(true, namespace, dropPodName, svcIP)
+	})
 })
 
 var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]", func() {
@@ -2763,4 +2830,22 @@ func describeSvc(ns string) {
 	desc, _ := framework.RunKubectl(
 		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	framework.Logf(desc)
+}
+
+func checkReachabilityFromPod(expectToBeReachable bool, namespace, pod, target string) {
+	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
+	err := wait.PollImmediate(framework.Poll, 2*time.Minute, func() (bool, error) {
+		_, err := framework.RunHostCmd(namespace, pod, cmd)
+		if expectToBeReachable && err != nil {
+			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
+			return false, nil
+		}
+
+		if !expectToBeReachable && err == nil {
+			framework.Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
+			return false, nil
+		}
+		return true, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
 }

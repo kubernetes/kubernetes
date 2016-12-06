@@ -89,47 +89,57 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &")
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by triggering kernel panic and ensure they function upon restart", func() {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && (sudo ifdown eth0 || sudo ip link set eth0 down) && sleep 120 && (sudo ifup eth0 || sudo ip link set eth0 up)' >/dev/null 2>&1 &")
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && (sudo ifdown eth0 || sudo ip link set eth0 down) && sleep 120 && (sudo ifup eth0 || sudo ip link set eth0 up)' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I INPUT 2 -j DROP && "+
-			" sleep 120 && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
+		tmpLogPath := "/tmp/drop-inbound.log"
+		testReboot(f.ClientSet, fmt.Sprintf("nohup sh -c 'set -x && sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT"+
+			" && sudo iptables -I INPUT 2 -j DROP && sudo iptables -t filter -nL INPUT && date && sleep 120 && sudo iptables -t filter -nL INPUT"+
+			" && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >%v 2>&1 &", tmpLogPath), catLogHook(tmpLogPath))
 	})
 
 	It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I OUTPUT 2 -j DROP && "+
-			" sleep 120 && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
+		tmpLogPath := "/tmp/drop-outbound.log"
+		testReboot(f.ClientSet, fmt.Sprintf("nohup sh -c 'set -x && sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT"+
+			" && sudo iptables -I OUTPUT 2 -j DROP && sudo iptables -t filter -nL OUTPUT && date && sleep 120 && sudo iptables -t filter -nL OUTPUT"+
+			" && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >%v 2>&1 &", tmpLogPath), catLogHook(tmpLogPath))
 	})
 })
 
-func testReboot(c clientset.Interface, rebootCmd string) {
+func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	// Get all nodes, and kick off the test on each.
 	nodelist := framework.GetReadySchedulableNodesOrDie(c)
+	if hook != nil {
+		defer func() {
+			framework.Logf("Executing termination hook on nodes")
+			hook(framework.TestContext.Provider, nodelist)
+		}()
+	}
 	result := make([]bool, len(nodelist.Items))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodelist.Items))
@@ -277,4 +287,18 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 	framework.Logf("Reboot successful on node %s", name)
 	return true
+}
+
+type terminationHook func(provider string, nodes *api.NodeList)
+
+func catLogHook(logPath string) terminationHook {
+	return func(provider string, nodes *api.NodeList) {
+		for _, n := range nodes.Items {
+			cmd := fmt.Sprintf("cat %v && rm %v", logPath, logPath)
+			if _, err := framework.IssueSSHCommandWithResult(cmd, provider, &n); err != nil {
+				framework.Logf("Error while issuing ssh command: %v", err)
+			}
+		}
+
+	}
 }
