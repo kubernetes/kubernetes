@@ -39,6 +39,7 @@ import (
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/healthz"
@@ -50,6 +51,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 const (
@@ -155,6 +159,12 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(restClientCfg)
+	serverResources, err := discoveryClient.ServerResources()
+	if err != nil {
+		glog.Fatalf("Could not find resources from API Server: %v", err)
+	}
+
 	glog.Infof("Loading client config for namespace controller %q", "namespace-controller")
 	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
 	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
@@ -182,11 +192,13 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	// TODO: rename s.ConcurentReplicaSetSyncs
 	go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 
-	glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
-	ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
-	ingressController := ingresscontroller.NewIngressController(ingClientset)
-	glog.Infof("Running ingress controller")
-	ingressController.Run(wait.NeverStop)
+	if controllerEnabled(s.Controllers, serverResources, ingresscontroller.ControllerName, ingresscontroller.RequiredResources, true) {
+		glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
+		ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
+		ingressController := ingresscontroller.NewIngressController(ingClientset)
+		glog.Infof("Running ingress controller")
+		ingressController.Run(wait.NeverStop)
+	}
 
 	glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
 	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
@@ -208,4 +220,47 @@ func restClientConfigFromSecret(master string) (*restclient.Config, error) {
 		return nil, fmt.Errorf("failed to find the Federation API server kubeconfig, tried the --kubeconfig flag and the deprecated secret %s: %v", DeprecatedKubeconfigSecretName, err)
 	}
 	return restClientCfg, nil
+}
+
+func controllerEnabled(controllers config.ConfigurationMap, serverResources []*metav1.APIResourceList, controller string, requiredResources []schema.GroupVersionResource, defaultValue bool) bool {
+	controllerConfig, ok := controllers[controller]
+	if ok {
+		if controllerConfig == "false" {
+			glog.Infof("%s controller disabled by config", controller)
+			return false
+		}
+		if controllerConfig == "true" {
+			if !hasRequiredResources(serverResources, requiredResources) {
+				glog.Fatalf("%s controller enabled explicitly but API Server does not have required resources", controller)
+				panic("unreachable")
+			}
+			return true
+		}
+	} else if defaultValue {
+		if !hasRequiredResources(serverResources, requiredResources) {
+			glog.Warningf("%s controller disabled because API Server does not have required resources", controller)
+			return false
+		}
+	}
+	return defaultValue
+}
+
+func hasRequiredResources(serverResources []*metav1.APIResourceList, requiredResources []schema.GroupVersionResource) bool {
+	for _, resource := range requiredResources {
+		found := false
+		for _, serverResource := range serverResources {
+			if serverResource.GroupVersion == resource.GroupVersion().String() {
+				for _, apiResource := range serverResource.APIResources {
+					if apiResource.Name == resource.Resource {
+						found = true
+						break
+					}
+				}
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
