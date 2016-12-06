@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -48,8 +47,6 @@ func TestRun(t *testing.T) {
 	s := options.NewServerRunOptions()
 	s.SecureServing.ServingOptions.BindPort = securePort
 	s.InsecureServing.BindPort = insecurePort
-	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
-	s.GenericServerRunOptions.ServiceClusterIPRange = *ipNet
 	s.Etcd.StorageConfig.ServerList = []string{"http://localhost:2379"}
 	go func() {
 		if err := app.Run(s); err != nil {
