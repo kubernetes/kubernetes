@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.
@@ -29,11 +29,11 @@ type Interface interface {
 }
 
 type version struct {
-	interfaces.SharedInformerFactory
+	internalinterfaces.SharedInformerFactory
 }
 
 // New returns a new Interface.
-func New(f interfaces.SharedInformerFactory) Interface {
+func New(f internalinterfaces.SharedInformerFactory) Interface {
 	return &version{f}
 }
 

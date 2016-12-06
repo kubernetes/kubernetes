@@ -23,7 +23,7 @@ import (
 	rbac_v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	release_1_5 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	v1alpha1 "k8s.io/kubernetes/pkg/client/listers/rbac/v1alpha1"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -38,7 +38,7 @@ type RoleBindingInformer interface {
 }
 
 type roleBindingInformer struct {
-	factory interfaces.SharedInformerFactory
+	factory internalinterfaces.SharedInformerFactory
 }
 
 func newRoleBindingInformer(client release_1_5.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {

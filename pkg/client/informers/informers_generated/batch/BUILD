@@ -18,6 +18,6 @@ go_library(
         "//pkg/client/informers/informers_generated/batch/internalversion:go_default_library",
         "//pkg/client/informers/informers_generated/batch/v1:go_default_library",
         "//pkg/client/informers/informers_generated/batch/v2alpha1:go_default_library",
-        "//pkg/client/informers/interfaces:go_default_library",
+        "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
     ],
 )

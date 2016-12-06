@@ -15,8 +15,8 @@ go_library(
     srcs = ["interface.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
         "//pkg/client/informers/informers_generated/policy/internalversion:go_default_library",
         "//pkg/client/informers/informers_generated/policy/v1beta1:go_default_library",
-        "//pkg/client/informers/interfaces:go_default_library",
     ],
 )

@@ -26,7 +26,7 @@ go_library(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/informers/interfaces:go_default_library",
+        "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
         "//pkg/client/listers/rbac/internalversion:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/watch:go_default_library",
