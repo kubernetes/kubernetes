@@ -213,7 +213,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
-	versionedObject := indirectArbitraryPointer(versionedPtr)
+	defaultVersionedObject := indirectArbitraryPointer(versionedPtr)
 	kind := fqKindToRegister.Kind
 	hasSubresource := len(subresource) > 0
 
@@ -520,6 +520,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Kind:        fqKindToRegister,
 	}
 	for _, action := range actions {
+		versionedObject := storageMeta.ProducesObject(action.Verb)
+		if versionedObject == nil {
+			versionedObject = defaultVersionedObject
+		}
 		reqScope.Namer = action.Namer
 		namespaced := ""
 		if apiResource.Namespaced {
@@ -1051,6 +1055,10 @@ type defaultStorageMetadata struct{}
 var _ rest.StorageMetadata = defaultStorageMetadata{}
 
 func (defaultStorageMetadata) ProducesMIMETypes(verb string) []string {
+	return nil
+}
+
+func (defaultStorageMetadata) ProducesObject(verb string) interface{} {
 	return nil
 }
 
