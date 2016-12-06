@@ -489,6 +489,7 @@ registry-burst
 registry-qps
 reject-methods
 reject-paths
+remove-node
 repair-malformed-updates
 replicaset-lookup-cache-size
 replication-controller-lookup-cache-size
