@@ -392,6 +392,9 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			eventClientConfig.QPS = float32(s.EventRecordQPS)
 			eventClientConfig.Burst = int(s.EventBurst)
 			eventClient, err = clientset.NewForConfig(&eventClientConfig)
+			if err != nil {
+				glog.Warningf("Failed to create API Server client: %v", err)
+			}
 		} else {
 			if s.RequireKubeConfig {
 				return fmt.Errorf("invalid kubeconfig: %v", err)
