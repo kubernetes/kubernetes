@@ -181,7 +181,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	switch obj.(type) {
-	case *runtime.Unknown, *runtime.Unstructured, *runtime.UnstructuredList:
+	case *runtime.Unknown, runtime.Unstructured:
 		return c.encoder.Encode(obj, w)
 	}
 

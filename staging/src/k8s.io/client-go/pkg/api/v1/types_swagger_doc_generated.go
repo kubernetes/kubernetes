@@ -698,7 +698,7 @@ var map_ListOptions = map[string]string{
 	"labelSelector":   "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
 	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
 	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
 	"timeoutSeconds":  "Timeout for the list/watch call.",
 }
 
@@ -980,19 +980,6 @@ var map_ObjectReference = map[string]string{
 
 func (ObjectReference) SwaggerDoc() map[string]string {
 	return map_ObjectReference
-}
-
-var map_OwnerReference = map[string]string{
-	"":           "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
-	"apiVersion": "API version of the referent.",
-	"kind":       "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-	"name":       "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
-	"uid":        "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
-	"controller": "If true, this reference points to the managing controller.",
-}
-
-func (OwnerReference) SwaggerDoc() map[string]string {
-	return map_OwnerReference
 }
 
 var map_PersistentVolume = map[string]string{

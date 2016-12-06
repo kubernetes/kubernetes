@@ -29,9 +29,8 @@ func IsListType(obj runtime.Object) bool {
 	// if we're a runtime.Unstructured, check to see if we have an `items` key
 	// This is a list type for recognition, but other Items type methods will fail on it
 	// and give you errors.
-	if unstructured, ok := obj.(*runtime.Unstructured); ok {
-		_, ok := unstructured.Object["items"]
-		return ok
+	if unstructured, ok := obj.(runtime.Unstructured); ok {
+		return unstructured.IsList()
 	}
 
 	_, err := GetItemsPtr(obj)
