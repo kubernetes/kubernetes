@@ -18,6 +18,7 @@ go_library(
         "docker.go",
         "docker_manager.go",
         "docker_manager_linux.go",
+        "docker_network.go",
         "exec.go",
         "fake_docker_client.go",
         "fake_manager.go",
