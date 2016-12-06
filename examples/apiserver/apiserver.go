@@ -99,13 +99,15 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 		glog.Fatalf("Error creating self-signed certificates: %v", err)
 	}
 
-	config, err := genericapiserver.NewConfig().
+	config := genericapiserver.NewConfig().
 		ApplyOptions(serverOptions.GenericServerRunOptions).
-		ApplyInsecureServingOptions(serverOptions.InsecureServing).
-		ApplyAuthenticationOptions(serverOptions.Authentication).
-		ApplySecureServingOptions(serverOptions.SecureServing)
-	if err != nil {
+		ApplyInsecureServingOptions(serverOptions.InsecureServing)
+
+	if _, err := config.ApplySecureServingOptions(serverOptions.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
+	}
+	if _, err := config.ApplyAuthenticationOptions(serverOptions.Authentication); err != nil {
+		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()

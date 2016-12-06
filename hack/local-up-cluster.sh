@@ -461,14 +461,12 @@ EOF
 EOF
     create_client_certkey auth-proxy-client-ca auth-proxy system:auth-proxy
 
-    sudo bash -c "cat '${CERT_DIR}/client-ca.crt' '${CERT_DIR}/auth-proxy-client-ca.crt' > '${CERT_DIR}/client-ca-bundle.crt'"
-
     APISERVER_LOG=/tmp/kube-apiserver.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${auth_proxy_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
-      --client-ca-file="${CERT_DIR}/client-ca-bundle.crt" \
+      --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \

@@ -78,13 +78,15 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
-	genericConfig, err := genericapiserver.NewConfig(). // create the new config
-								ApplyOptions(s.GenericServerRunOptions). // apply the options selected
-								ApplyInsecureServingOptions(s.InsecureServing).
-								ApplyAuthenticationOptions(s.Authentication).
-								ApplySecureServingOptions(s.SecureServing)
-	if err != nil {
+	genericConfig := genericapiserver.NewConfig(). // create the new config
+							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
+							ApplyInsecureServingOptions(s.InsecureServing)
+
+	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
+	}
+	if _, err := genericConfig.ApplyAuthenticationOptions(s.Authentication); err != nil {
+		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
 	// TODO: register cluster federation resources here.
@@ -126,7 +128,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig(s.SecureServing.ClientCA))
+	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig())
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}

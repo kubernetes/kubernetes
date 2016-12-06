@@ -30,6 +30,7 @@ import (
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/anonymous"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/headerrequest"
 	unionauth "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
 	webhooktoken "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
@@ -47,11 +48,29 @@ type DelegatingAuthenticatorConfig struct {
 
 	// ClientCAFile is the CA bundle file used to authenticate client certificates
 	ClientCAFile string
+
+	RequestHeaderConfig *RequestHeaderConfig
 }
 
 func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticators := []authenticator.Request{}
 	securityDefinitions := spec.SecurityDefinitions{}
+
+	// front-proxy first, then remote
+	// Add the front proxy authenticator if requested
+	if c.RequestHeaderConfig != nil {
+		requestHeaderAuthenticator, err := headerrequest.NewSecure(
+			c.RequestHeaderConfig.ClientCA,
+			c.RequestHeaderConfig.AllowedClientNames,
+			c.RequestHeaderConfig.UsernameHeaders,
+			c.RequestHeaderConfig.GroupHeaders,
+			c.RequestHeaderConfig.ExtraHeaderPrefixes,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		authenticators = append(authenticators, requestHeaderAuthenticator)
+	}
 
 	// x509 client cert auth
 	if len(c.ClientCAFile) > 0 {
@@ -93,5 +112,4 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 		authenticator = unionauth.NewFailOnError(authenticator, anonymous.NewAuthenticator())
 	}
 	return authenticator, &securityDefinitions, nil
-
 }
