@@ -98,7 +98,6 @@ func NewCmdApply(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: apply_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			cmdutil.CheckErr(validatePruneAll(options.Prune, cmdutil.GetFlagBool(cmd, "all"), options.Selector))
 			cmdutil.CheckErr(RunApply(f, cmd, out, &options))
 		},
@@ -162,7 +161,6 @@ func parsePruneResources(gvks []string) ([]pruneResource, error) {
 }
 
 func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *ApplyOptions) error {
-	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
@@ -195,6 +193,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 	}
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
+	output := cmdutil.GetFlagString(cmd, "output")
+	shortOutput := output == "name"
 
 	encoder := f.JSONEncoder()
 	decoder := f.Decoder(false)
@@ -251,6 +251,20 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 			}
 
 			count++
+			if len(output) > 0 && !shortOutput {
+				printer, generic, err := cmdutil.PrinterForCommand(cmd)
+				if err != nil {
+					return err
+				}
+				if !generic || printer == nil {
+					printer, err := f.PrinterForMapping(cmd, nil, false)
+					if err != nil {
+						return err
+					}
+					return printer.PrintObj(info.Object, out)
+				}
+				return printer.PrintObj(info.Object, out)
+			}
 			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
 		}
@@ -295,6 +309,20 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 			}
 		}
 		count++
+		if len(output) > 0 && !shortOutput {
+			printer, generic, err := cmdutil.PrinterForCommand(cmd)
+			if err != nil {
+				return err
+			}
+			if !generic || printer == nil {
+				printer, err := f.PrinterForMapping(cmd, nil, false)
+				if err != nil {
+					return err
+				}
+				return printer.PrintObj(info.Object, out)
+			}
+			return printer.PrintObj(info.Object, out)
+		}
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
