@@ -110,8 +110,9 @@ containers which were not created by Kubernetes.
 Other than from an PodSpec from the apiserver, there are three ways that a container
 manifest can be provided to the Kubelet.
 
-File: Path passed as a flag on the command line. This file is rechecked every 20
-seconds (configurable with a flag).
+File: Path passed as a flag on the command line. Files under this path will be monitored
+periodically for updates. The monitoring period is 20s by default and is configurable
+via a flag.
 
 HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint
 is checked every 20 seconds (also configurable with a flag).
