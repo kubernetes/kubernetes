@@ -135,7 +135,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube cmd/kubernetes-discovery"
 else
     echo "skipped the build."
 fi
@@ -198,6 +198,8 @@ ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # cur
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
+DISCOVERY_SECURE_PORT=${DISCOVERY_SECURE_PORT:-9090}
+
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
@@ -299,6 +301,10 @@ cleanup()
   # Check if the API server is still running
   [[ -n "${APISERVER_PID-}" ]] && APISERVER_PIDS=$(pgrep -P ${APISERVER_PID} ; ps -o pid= -p ${APISERVER_PID})
   [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS}
+
+  # Check if the discovery server is still running
+  [[ -n "${DISCOVERY_PID-}" ]] && DISCOVERY_PIDS=$(pgrep -P ${DISCOVERY_PID} ; ps -o pid= -p ${DISCOVERY_PID})
+  [[ -n "${DISCOVERY_PIDS-}" ]] && sudo kill ${DISCOVERY_PIDS}
 
   # Check if the controller-manager is still running
   [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(pgrep -P ${CTLRMGR_PID} ; ps -o pid= -p ${CTLRMGR_PID})
@@ -503,6 +509,26 @@ EOF
         fi
     fi
 }
+
+# start_discovery relies on certificates created by start_apiserver
+function start_discovery {
+    # TODO generate serving certificates
+    
+    DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
+      --cert-dir="${CERT_DIR}" \
+      --client-ca-file="${CERT_DIR}/client-ca-bundle.crt" \
+      --bind-address="${API_BIND_ADDR}" \
+      --secure-port="${DISCOVERY_SECURE_PORT}" \
+      --tls-ca-file="${ROOT_CA_FILE}" \
+      --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}"  >"${DISCOVERY_SERVER_LOG}" 2>&1 &
+    DISCOVERY_PID=$!
+
+    # Wait for kubernetes-discovery to come up before launching the rest of the components.
+    echo "Waiting for kubernetes-discovery to come up"
+    kube::util::wait_for_url "https://${API_HOST}:${DISCOVERY_SECURE_PORT}/version" "kubernetes-discovery: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+}
+
 
 function start_controller_manager {
     node_cidr_args=""
@@ -778,6 +804,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_etcd
   set_service_accounts
   start_apiserver
+  start_discovery
   start_controller_manager
   start_kubeproxy
   start_kubedns
