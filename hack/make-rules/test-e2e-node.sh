@@ -128,7 +128,7 @@ if [ $remote = true ] ; then
     --zone="$zone" --project="$project" --gubernator="$gubernator" \
     --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
-    --image-project="$image_project" --instance-name-prefix="$instance_prefix" --setup-node="true" \
+    --image-project="$image_project" --instance-name-prefix="$instance_prefix" \
     --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
