@@ -80,12 +80,10 @@ func NewServerRunOptions() *ServerRunOptions {
 }
 
 func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
-	// Set ServiceClusterIPRange
-	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	serverOptions.GenericServerRunOptions.ServiceClusterIPRange = *serviceClusterIPRange
 	serverOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
 
-	genericvalidation.ValidateRunOptions(serverOptions.GenericServerRunOptions)
+	// TODO(sttts): unify signature of DefaultAndValidateRunOptions with the others
+	genericapiserver.DefaultAndValidateRunOptions(serverOptions.GenericServerRunOptions)
 	if errs := serverOptions.Etcd.Validate(); len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)
 	}

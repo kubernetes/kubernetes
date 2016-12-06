@@ -26,12 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/config"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/spf13/pflag"
 )
-
-var DefaultServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
@@ -54,14 +51,10 @@ type ServerRunOptions struct {
 	EnableSwaggerUI             bool
 	EnableWatchCache            bool
 	ExternalHost                string
-	KubernetesServiceNodePort   int
-	MasterCount                 int
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	MinRequestTimeout           int
 	RuntimeConfig               config.ConfigurationMap
-	ServiceClusterIPRange       net.IPNet // TODO: make this a list
-	ServiceNodePortRange        utilnet.PortRange
 	StorageVersions             string
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
@@ -81,12 +74,10 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableProfiling:             true,
 		EnableContentionProfiling:   false,
 		EnableWatchCache:            true,
-		MasterCount:                 1,
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
 		MinRequestTimeout:           1800,
 		RuntimeConfig:               make(config.ConfigurationMap),
-		ServiceNodePortRange:        DefaultServiceNodePortRange,
 		StorageVersions:             registered.AllPreferredGroupVersions(),
 	}
 }
@@ -227,21 +218,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")
 
-	// See #14282 for details on how to test/try this option out.
-	// TODO: remove this comment once this option is tested in CI.
-	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, ""+
-		"If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be "+
-		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
-		"service will be of type ClusterIP.")
-
 	// TODO: remove post-1.6
 	fs.String("long-running-request-regexp", "", ""+
 		"A regular expression matching long running requests which should "+
 		"be excluded from maximum inflight request handling.")
 	fs.MarkDeprecated("long-running-request-regexp", "regular expression matching of long-running requests is no longer supported")
-
-	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
-		"The number of apiservers running in the cluster.")
 
 	deprecatedMasterServiceNamespace := api.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
@@ -266,20 +247,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. "+
 		"apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and "+
 		"api/legacy are special keys to control all and legacy api versions respectively.")
-
-	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
-		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
-		"overlap with any IP ranges assigned to nodes for pods.")
-
-	fs.IPNetVar(&s.ServiceClusterIPRange, "portal-net", s.ServiceClusterIPRange,
-		"DEPRECATED: see --service-cluster-ip-range instead.")
-	fs.MarkDeprecated("portal-net", "see --service-cluster-ip-range instead")
-
-	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", ""+
-		"A port range to reserve for services with NodePort visibility. "+
-		"Example: '30000-32767'. Inclusive at both ends of the range.")
-	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "DEPRECATED: see --service-node-port-range instead")
-	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead")
 
 	deprecatedStorageVersion := ""
 	fs.StringVar(&deprecatedStorageVersion, "storage-version", deprecatedStorageVersion,
