@@ -3137,7 +3137,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	var deployment *extensions.Deployment
 	var newRS *extensions.ReplicaSet
 	var reason string
-	err := wait.PollImmediate(Poll, 1*time.Minute, func() (bool, error) {
+	err := wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
 		var err error
 		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
