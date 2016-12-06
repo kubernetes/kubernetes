@@ -76,7 +76,7 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
-func (f *sharedInformerFactory) InternalInformerFor(obj runtime.Object, newFunc NewInternalInformerFunc) cache.SharedIndexInformer {
+func (f *sharedInformerFactory) InternalInformerFor(obj runtime.Object, newFunc internal_interfaces.NewInternalInformerFunc) cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -93,7 +93,7 @@ func (f *sharedInformerFactory) InternalInformerFor(obj runtime.Object, newFunc 
 
 // VersionedInformerFor returns the SharedIndexInformer for obj using a
 // versioned client.
-func (f *sharedInformerFactory) VersionedInformerFor(obj runtime.Object, newFunc NewVersionedInformerFunc) cache.SharedIndexInformer {
+func (f *sharedInformerFactory) VersionedInformerFor(obj runtime.Object, newFunc internal_interfaces.NewVersionedInformerFunc) cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
