@@ -100,14 +100,14 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
 	if err != nil {
-		glog.Fatalf("error generating storage version map: %s", err)
+		return fmt.Errorf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
 		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
 		[]schema.GroupVersionResource{}, resourceConfig, s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
-		glog.Fatalf("error in initializing storage factory: %s", err)
+		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
 
 	for _, override := range s.Etcd.EtcdServersOverrides {
@@ -132,31 +132,31 @@ func Run(s *options.ServerRunOptions) error {
 
 	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig())
 	if err != nil {
-		glog.Fatalf("Invalid Authentication Config: %v", err)
+		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}
 
 	privilegedLoopbackToken := uuid.NewRandom().String()
 	selfClientConfig, err := genericapiserver.NewSelfClientConfig(genericConfig.SecureServingInfo, genericConfig.InsecureServingInfo, privilegedLoopbackToken)
 	if err != nil {
-		glog.Fatalf("Failed to create clientset: %v", err)
+		return fmt.Errorf("failed to create clientset: %v", err)
 	}
 	client, err := internalclientset.NewForConfig(selfClientConfig)
 	if err != nil {
-		glog.Errorf("Failed to create clientset: %v", err)
+		return fmt.Errorf("failed to create clientset: %v", err)
 	}
 	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
 	authorizerconfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizerconfig)
 	if err != nil {
-		glog.Fatalf("Invalid Authorization Config: %v", err)
+		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
 	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
-		glog.Fatalf("Failed to initialize plugins: %v", err)
+		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}
 
 	kubeVersion := version.Get()
