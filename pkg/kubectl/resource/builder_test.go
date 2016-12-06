@@ -1235,3 +1235,57 @@ func TestHasNames(t *testing.T) {
 		}
 	}
 }
+
+func TestMultipleTypesRequested(t *testing.T) {
+	tests := []struct {
+		args                  []string
+		expectedMultipleTypes bool
+	}{
+		{
+			args: []string{""},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"all"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"rc"},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"rc,pod,svc"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"rc/foo"},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"rc/foo", "rc/bar"},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"rc", "foo"},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"rc,pod,svc", "foo"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"rc,secrets"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"rc/foo", "rc/bar", "svc/svc"},
+			expectedMultipleTypes: true,
+		},
+	}
+	for _, test := range tests {
+		hasMultipleTypes := MultipleTypesRequested(test.args)
+		if hasMultipleTypes != test.expectedMultipleTypes {
+			t.Errorf("expected HasName to return %v for %s", test.expectedMultipleTypes, test.args)
+		}
+	}
+}
