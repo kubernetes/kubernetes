@@ -144,12 +144,39 @@ Hopefully this won't cause too much confusion.
 
 ## Examples
 
-** TODO: fill in this section **
-
 * Run this pod on a node with an Intel or AMD CPU
+```go
+affinity: `{
+	"nodeAffinity": {
+		"requiredDuringSchedulingIgnoredDuringExecution": {
+			"nodeSelectorTerms": [{
+				"matchExpressions": [{
+					"key": "kubernetes.io/cpu-vendor",
+					"operator": "In",
+					"values": ["Intel", "AMD"]
+				}]
+			}]
+		}
+	}
+}`
+```
 
 * Run this pod on a node in availability zone Z
-
+```go
+affinity: `{
+	"nodeAffinity": {
+		"requiredDuringSchedulingIgnoredDuringExecution": {
+			"nodeSelectorTerms": [{
+				"matchExpressions": [{
+					"key": "kubernetes.io/az-name",
+					"operator": "In",
+					"values": ["Z"]
+				}]
+			}]
+		}
+	}
+}`
+```
 
 ## Backward compatibility
 
