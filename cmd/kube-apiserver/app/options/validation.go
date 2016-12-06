@@ -14,18 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package options
 
 import (
 	"fmt"
 
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
-func verifyClusterIPFlags(options *options.ServerRunOptions) []error {
+func verifyClusterIPFlags(options *ServerRunOptions) []error {
 	errors := []error{}
 	if options.ServiceClusterIPRange.IP == nil {
 		errors = append(errors, fmt.Errorf("No --service-cluster-ip-range specified"))
@@ -37,7 +35,7 @@ func verifyClusterIPFlags(options *options.ServerRunOptions) []error {
 	return errors
 }
 
-func verifyServiceNodePort(options *options.ServerRunOptions) []error {
+func verifyServiceNodePort(options *ServerRunOptions) []error {
 	errors := []error{}
 	if options.KubernetesServiceNodePort < 0 || options.KubernetesServiceNodePort > 65535 {
 		errors = append(errors, fmt.Errorf("--kubernetes-service-node-port %v must be between 0 and 65535, inclusive. If 0, the Kubernetes master service will be of type ClusterIP.", options.KubernetesServiceNodePort))
@@ -49,7 +47,7 @@ func verifyServiceNodePort(options *options.ServerRunOptions) []error {
 	return errors
 }
 
-func ValidateRunOptions(options *options.ServerRunOptions) {
+func ValidateRunOptions(options *ServerRunOptions) error {
 	errors := []error{}
 	if errs := verifyClusterIPFlags(options); len(errs) > 0 {
 		errors = append(errors, errs...)
@@ -58,6 +56,7 @@ func ValidateRunOptions(options *options.ServerRunOptions) {
 		errors = append(errors, errs...)
 	}
 	if err := utilerrors.NewAggregate(errors); err != nil {
-		glog.Fatalf("Validate server run options failed: %v", err)
+		return fmt.Errorf("validate server run options failed: %v", err)
 	}
+	return nil
 }

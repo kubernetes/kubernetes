@@ -59,7 +59,6 @@ import (
 	openapicommon "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
@@ -631,8 +630,6 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
-	genericvalidation.ValidateRunOptions(options)
-
 	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
 
 	// Set default value for ExternalAddress if not specified.

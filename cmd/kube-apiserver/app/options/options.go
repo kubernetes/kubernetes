@@ -18,6 +18,7 @@ limitations under the License.
 package options
 
 import (
+	"net"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -25,9 +26,13 @@ import (
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/spf13/pflag"
 )
+
+// DefaultServiceNodePortRange is the default port range for NodePort services.
+var DefaultServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
@@ -38,12 +43,16 @@ type ServerRunOptions struct {
 	Authentication          *genericoptions.BuiltInAuthenticationOptions
 	Authorization           *genericoptions.BuiltInAuthorizationOptions
 
-	AllowPrivileged          bool
-	EventTTL                 time.Duration
-	KubeletConfig            kubeletclient.KubeletClientConfig
-	MaxConnectionBytesPerSec int64
-	SSHKeyfile               string
-	SSHUser                  string
+	AllowPrivileged           bool
+	EventTTL                  time.Duration
+	KubeletConfig             kubeletclient.KubeletClientConfig
+	KubernetesServiceNodePort int
+	MasterCount               int
+	MaxConnectionBytesPerSec  int64
+	ServiceClusterIPRange     net.IPNet // TODO: make this a list
+	ServiceNodePortRange      utilnet.PortRange
+	SSHKeyfile                string
+	SSHUser                   string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -56,7 +65,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:   genericoptions.NewBuiltInAuthorizationOptions(),
 
-		EventTTL: 1 * time.Hour,
+		EventTTL:    1 * time.Hour,
+		MasterCount: 1,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port: ports.KubeletPort,
 			PreferredAddressTypes: []string{
@@ -68,6 +78,7 @@ func NewServerRunOptions() *ServerRunOptions {
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
+		ServiceNodePortRange: DefaultServiceNodePortRange,
 	}
 	return &s
 }
@@ -103,6 +114,30 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
 		"Currently only applies to long-running requests.")
+
+	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
+		"The number of apiservers running in the cluster.")
+
+	// See #14282 for details on how to test/try this option out.
+	// TODO: remove this comment once this option is tested in CI.
+	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, ""+
+		"If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be "+
+		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
+		"service will be of type ClusterIP.")
+
+	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
+		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
+		"overlap with any IP ranges assigned to nodes for pods.")
+
+	fs.IPNetVar(&s.ServiceClusterIPRange, "portal-net", s.ServiceClusterIPRange,
+		"DEPRECATED: see --service-cluster-ip-range instead.")
+	fs.MarkDeprecated("portal-net", "see --service-cluster-ip-range instead")
+
+	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", ""+
+		"A port range to reserve for services with NodePort visibility. "+
+		"Example: '30000-32767'. Inclusive at both ends of the range.")
+	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "DEPRECATED: see --service-node-port-range instead")
+	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead")
 
 	// Kubelet related flags:
 	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps,

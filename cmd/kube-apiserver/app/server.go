@@ -88,7 +88,7 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
 	if err != nil {
 		return fmt.Errorf("error determining service IP ranges: %v", err)
 	}
@@ -97,7 +97,13 @@ func Run(s *options.ServerRunOptions) error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
+	// TODO(sttts): change signature of DefaultAndValidateRunOptions to aggregate errors
 	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
+
+	// TODO(sttts): move all defaulting and validation above into cmd/kube-apiserver/app/options.DefaultAndValidateRunOptions()
+	if err != options.ValidateRunOptions(s) {
+		return err
+	}
 
 	genericConfig := genericapiserver.NewConfig(). // create the new config
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
@@ -313,10 +319,10 @@ func Run(s *options.ServerRunOptions) error {
 		APIServerServiceIP:   apiServerServiceIP,
 		APIServerServicePort: 443,
 
-		ServiceNodePortRange:      s.GenericServerRunOptions.ServiceNodePortRange,
-		KubernetesServiceNodePort: s.GenericServerRunOptions.KubernetesServiceNodePort,
+		ServiceNodePortRange:      s.ServiceNodePortRange,
+		KubernetesServiceNodePort: s.KubernetesServiceNodePort,
 
-		MasterCount: s.GenericServerRunOptions.MasterCount,
+		MasterCount: s.MasterCount,
 	}
 
 	if s.GenericServerRunOptions.EnableWatchCache {
