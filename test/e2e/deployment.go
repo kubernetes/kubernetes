@@ -552,6 +552,10 @@ func testRolloverDeployment(f *framework.Framework) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	// Wait for replica set to become ready before adopting it.
+	framework.Logf("Waiting for pods owned by replica set %q to become ready", rsName)
+	Expect(framework.WaitForReadyReplicaSet(c, ns, rsName)).NotTo(HaveOccurred())
+
 	// Create a deployment to delete nginx pods and instead bring up redis-slave pods.
 	// We use a nonexistent image here, so that we make sure it won't finish
 	deploymentName, deploymentImageName := "test-rollover-deployment", "redis-slave"
