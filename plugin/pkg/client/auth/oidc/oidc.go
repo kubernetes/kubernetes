@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coreos/go-oidc/jose"
@@ -44,6 +45,12 @@ const (
 	cfgRefreshToken             = "refresh-token"
 )
 
+func init() {
+	if err := restclient.RegisterAuthProviderPlugin("oidc", newOIDCAuthProvider); err != nil {
+		glog.Fatalf("Failed to register oidc auth plugin: %v", err)
+	}
+}
+
 var (
 	backoff = wait.Backoff{
 		Duration: 1 * time.Second,
@@ -51,12 +58,40 @@ var (
 		Jitter:   .1,
 		Steps:    5,
 	}
+	cache = clientCache{cache: make(map[cacheKey]*oidc.Client)}
 )
 
-func init() {
-	if err := restclient.RegisterAuthProviderPlugin("oidc", newOIDCAuthProvider); err != nil {
-		glog.Fatalf("Failed to register oidc auth plugin: %v", err)
-	}
+// Like TLS transports, keep a cache of OIDC clients indexed by issuer URL.
+type clientCache struct {
+	mu    sync.RWMutex
+	cache map[cacheKey]*oidc.Client
+}
+
+type cacheKey struct {
+	// Canonical issuer URL string of the provider.
+	issuerURL string
+
+	// TODO(ericchiang): github.com/coreos/go-oidc/oidc can't create a client without
+	// associating a client ID and secret. When we switch to the new go-oidc, we can
+	// switch this key to only use the issuer URL.
+	clientID     string
+	clientSecret string
+
+	// Don't use CA as cache key because we only add a cache entry if we can connect
+	// to the issuer in the first place. A valid CA is a prerequisite.
+}
+
+func (c *clientCache) getClient(issuer, clientID, clientSecret string) (*oidc.Client, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	client, ok := c.cache[cacheKey{issuer, clientID, clientSecret}]
+	return client, ok
+}
+
+func (c *clientCache) setClient(issuer, clientID, clientSecret string, client *oidc.Client) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cache[cacheKey{issuer, clientID, clientSecret}] = client
 }
 
 func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
@@ -75,57 +110,61 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 		return nil, fmt.Errorf("Must provide %s", cfgClientSecret)
 	}
 
-	var certAuthData []byte
-	var err error
-	if cfg[cfgCertificateAuthorityData] != "" {
-		certAuthData, err = base64.StdEncoding.DecodeString(cfg[cfgCertificateAuthorityData])
+	client, ok := cache.getClient(issuer, clientID, clientSecret)
+	if !ok {
+		var certAuthData []byte
+		var err error
+		if cfg[cfgCertificateAuthorityData] != "" {
+			certAuthData, err = base64.StdEncoding.DecodeString(cfg[cfgCertificateAuthorityData])
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		clientConfig := restclient.Config{
+			TLSClientConfig: restclient.TLSClientConfig{
+				CAFile: cfg[cfgCertificateAuthority],
+				CAData: certAuthData,
+			},
+		}
+
+		trans, err := restclient.TransportFor(&clientConfig)
 		if err != nil {
 			return nil, err
 		}
-	}
+		hc := &http.Client{Transport: trans}
 
-	clientConfig := restclient.Config{
-		TLSClientConfig: restclient.TLSClientConfig{
-			CAFile: cfg[cfgCertificateAuthority],
-			CAData: certAuthData,
-		},
-	}
+		providerCfg, err := oidc.FetchProviderConfig(hc, issuer)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching provider config: %v", err)
+		}
 
-	trans, err := restclient.TransportFor(&clientConfig)
-	if err != nil {
-		return nil, err
-	}
-	hc := &http.Client{Transport: trans}
-
-	providerCfg, err := oidc.FetchProviderConfig(hc, issuer)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching provider config: %v", err)
-	}
-
-	scopes := strings.Split(cfg[cfgExtraScopes], ",")
-	oidcCfg := oidc.ClientConfig{
-		HTTPClient: hc,
-		Credentials: oidc.ClientCredentials{
-			ID:     clientID,
-			Secret: clientSecret,
-		},
-		ProviderConfig: providerCfg,
-		Scope:          append(scopes, oidc.DefaultScope...),
-	}
-
-	client, err := oidc.NewClient(oidcCfg)
-	if err != nil {
-		return nil, fmt.Errorf("error creating OIDC Client: %v", err)
+		scopes := strings.Split(cfg[cfgExtraScopes], ",")
+		oidcCfg := oidc.ClientConfig{
+			HTTPClient: hc,
+			Credentials: oidc.ClientCredentials{
+				ID:     clientID,
+				Secret: clientSecret,
+			},
+			ProviderConfig: providerCfg,
+			Scope:          append(scopes, oidc.DefaultScope...),
+		}
+		client, err = oidc.NewClient(oidcCfg)
+		if err != nil {
+			return nil, fmt.Errorf("error creating OIDC Client: %v", err)
+		}
+		cache.setClient(issuer, clientID, clientSecret, client)
 	}
 
 	oClient := &oidcClient{client}
 
 	var initialIDToken jose.JWT
 	if cfg[cfgIDToken] != "" {
-		initialIDToken, err = jose.ParseJWT(cfg[cfgIDToken])
+		idToken, err := jose.ParseJWT(cfg[cfgIDToken])
 		if err != nil {
 			return nil, err
 		}
+		initialIDToken = idToken
 	}
 
 	return &oidcAuthProvider{
