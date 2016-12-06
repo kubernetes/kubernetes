@@ -289,10 +289,10 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	return true
 }
 
-type terminationHook func(provider string, nodes *v1.NodeList)
+type terminationHook func(provider string, nodes *api.NodeList)
 
 func catLogHook(logPath string) terminationHook {
-	return func(provider string, nodes *v1.NodeList) {
+	return func(provider string, nodes *api.NodeList) {
 		for _, n := range nodes.Items {
 			cmd := fmt.Sprintf("cat %v && rm %v", logPath, logPath)
 			if _, err := framework.IssueSSHCommandWithResult(cmd, provider, &n); err != nil {
