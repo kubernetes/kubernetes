@@ -27,11 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -50,11 +49,8 @@ type PodGCController struct {
 	// will be null
 	internalPodInformer cache.SharedIndexInformer
 
-	podStore  cache.StoreToPodLister
-	nodeStore cache.StoreToNodeLister
-
-	podController  cache.ControllerInterface
-	nodeController cache.ControllerInterface
+	podStore      cache.StoreToPodLister
+	podController cache.ControllerInterface
 
 	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int
@@ -76,20 +72,6 @@ func NewPodGC(kubeClient clientset.Interface, podInformer cache.SharedIndexInfor
 	gcc.podStore.Indexer = podInformer.GetIndexer()
 	gcc.podController = podInformer.GetController()
 
-	gcc.nodeStore.Store, gcc.nodeController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return gcc.kubeClient.Core().Nodes().List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return gcc.kubeClient.Core().Nodes().Watch(options)
-			},
-		},
-		&v1.Node{},
-		controller.NoResyncPeriodFunc(),
-		cache.ResourceEventHandlerFuncs{},
-	)
-
 	return gcc
 }
 
@@ -107,13 +89,12 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 	if gcc.internalPodInformer != nil {
 		go gcc.podController.Run(stop)
 	}
-	go gcc.nodeController.Run(stop)
 	go wait.Until(gcc.gc, gcCheckPeriod, stop)
 	<-stop
 }
 
 func (gcc *PodGCController) gc() {
-	if !gcc.podController.HasSynced() || !gcc.nodeController.HasSynced() {
+	if !gcc.podController.HasSynced() {
 		glog.V(2).Infof("PodGCController is waiting for informer sync...")
 		return
 	}
@@ -173,12 +154,21 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 // gcOrphaned deletes pods that are bound to nodes that don't exist.
 func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
 	glog.V(4).Infof("GC'ing orphaned")
+	// We want to get list of Nodes from the etcd, to make sure that it's as fresh as possible.
+	nodes, err := gcc.kubeClient.Core().Nodes().List(v1.ListOptions{})
+	if err != nil {
+		return
+	}
+	nodeNames := sets.NewString()
+	for i := range nodes.Items {
+		nodeNames.Insert(nodes.Items[i].Name)
+	}
 
 	for _, pod := range pods {
 		if pod.Spec.NodeName == "" {
 			continue
 		}
-		if _, exists, _ := gcc.nodeStore.GetByKey(pod.Spec.NodeName); exists {
+		if nodeNames.Has(pod.Spec.NodeName) {
 			continue
 		}
 		glog.V(2).Infof("Found orphaned Pod %v assigned to the Node %v. Deleting.", pod.Name, pod.Spec.NodeName)
