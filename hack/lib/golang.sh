@@ -144,6 +144,7 @@ kube::golang::test_targets() {
     federation/cmd/genfeddocs
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
+    cmd/localkube
   )
   echo "${targets[@]}"
 }
