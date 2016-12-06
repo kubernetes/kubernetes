@@ -36,12 +36,12 @@ type FakeBalancer struct {
 	Region         string
 	LoadBalancerIP string
 	Ports          []v1.ServicePort
-	Hosts          []string
+	Hosts          []*v1.Node
 }
 
 type FakeUpdateBalancerCall struct {
 	Service *v1.Service
-	Hosts   []string
+	Hosts   []*v1.Node
 }
 
 // FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
@@ -131,7 +131,7 @@ func (f *FakeCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v
 
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, hosts []string) (*v1.LoadBalancerStatus, error) {
+func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	f.addCall("create")
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]FakeBalancer)
@@ -146,7 +146,7 @@ func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, 
 	}
 	region := zone.Region
 
-	f.Balancers[name] = FakeBalancer{name, region, spec.LoadBalancerIP, spec.Ports, hosts}
+	f.Balancers[name] = FakeBalancer{name, region, spec.LoadBalancerIP, spec.Ports, nodes}
 
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
@@ -156,9 +156,9 @@ func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, 
 
 // UpdateLoadBalancer is a test-spy implementation of LoadBalancer.UpdateLoadBalancer.
 // It adds an entry "update" into the internal method call record.
-func (f *FakeCloud) UpdateLoadBalancer(clusterName string, service *v1.Service, hosts []string) error {
+func (f *FakeCloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	f.addCall("update")
-	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{service, hosts})
+	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{service, nodes})
 	return f.Err
 }
 
