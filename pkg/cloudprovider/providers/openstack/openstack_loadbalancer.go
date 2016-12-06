@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 // Note: when creating a new Loadbalancer (VM), it can take some time before it is ready for use,
@@ -565,13 +564,32 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (
 	return status, true, err
 }
 
+// The LB needs to be configured with instance addresses on the same
+// subnet as the LB (aka opts.SubnetId).  Currently we're just
+// guessing that the node's InternalIP is the right address - and that
+// should be sufficient for all "normal" cases.
+func nodeAddressForLB(node *v1.Node) (string, error) {
+	addrs := node.Status.Addresses
+	if len(addrs) == 0 {
+		return "", ErrNoAddressFound
+	}
+
+	for _, addr := range addrs {
+		if addr.Type == v1.NodeInternalIP {
+			return addr.Address, nil
+		}
+	}
+
+	return addrs[0].Address, nil
+}
+
 // TODO: This code currently ignores 'region' and always creates a
 // loadbalancer in only the current OpenStack region.  We should take
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodeNames []string) (*v1.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodeNames, apiService.Annotations)
+func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
 	ports := apiService.Spec.Ports
 	if len(ports) == 0 {
@@ -681,15 +699,15 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		if err != nil && !isNotFound(err) {
 			return nil, fmt.Errorf("Error getting pool members %s: %v", pool.ID, err)
 		}
-		for _, nodeName := range nodeNames {
-			addr, err := getAddressByName(lbaas.compute, types.NodeName(nodeName))
+		for _, node := range nodes {
+			addr, err := nodeAddressForLB(node)
 			if err != nil {
 				if err == ErrNotFound {
 					// Node failure, do not create member
-					glog.Warningf("Failed to create LB pool member for node %s: %v", nodeName, err)
+					glog.Warningf("Failed to create LB pool member for node %s: %v", node.Name, err)
 					continue
 				} else {
-					return nil, fmt.Errorf("Error getting address for node %s: %v", nodeName, err)
+					return nil, fmt.Errorf("Error getting address for node %s: %v", node.Name, err)
 				}
 			}
 
@@ -701,7 +719,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 					SubnetID:     lbaas.opts.SubnetId,
 				}).Extract()
 				if err != nil {
-					return nil, fmt.Errorf("Error creating LB pool member for node: %s, %v", nodeName, err)
+					return nil, fmt.Errorf("Error creating LB pool member for node: %s, %v", node.Name, err)
 				}
 
 				waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
@@ -710,7 +728,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 				members = popMember(members, addr, int(port.NodePort))
 			}
 
-			glog.V(4).Infof("Ensured pool %s has member for %s at %s", pool.ID, nodeName, addr)
+			glog.V(4).Infof("Ensured pool %s has member for %s at %s", pool.ID, node.Name, addr)
 		}
 
 		// Delete obsolete members for this pool
@@ -939,9 +957,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	return status, nil
 }
 
-func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) error {
+func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodeNames)
+	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
 	ports := service.Spec.Ports
 	if len(ports) == 0 {
@@ -1012,8 +1030,8 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 
 	// Compose Set of member (addresses) that _should_ exist
 	addrs := map[string]empty{}
-	for _, nodeName := range nodeNames {
-		addr, err := getAddressByName(lbaas.compute, types.NodeName(nodeName))
+	for _, node := range nodes {
+		addr, err := nodeAddressForLB(node)
 		if err != nil {
 			return err
 		}
@@ -1277,8 +1295,8 @@ func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodeNames []string) (*v1.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodeNames, apiService.Annotations)
+func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
 	ports := apiService.Spec.Ports
 	if len(ports) > 1 {
@@ -1343,8 +1361,8 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 		return nil, err
 	}
 
-	for _, nodeName := range nodeNames {
-		addr, err := getAddressByName(lb.compute, types.NodeName(nodeName))
+	for _, node := range nodes {
+		addr, err := nodeAddressForLB(node)
 		if err != nil {
 			return nil, err
 		}
@@ -1426,9 +1444,9 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 
 }
 
-func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) error {
+func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodeNames)
+	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
 	vip, err := getVipByName(lb.network, loadBalancerName)
 	if err != nil {
@@ -1437,8 +1455,8 @@ func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *v1.Service, n
 
 	// Set of member (addresses) that _should_ exist
 	addrs := map[string]bool{}
-	for _, nodeName := range nodeNames {
-		addr, err := getAddressByName(lb.compute, types.NodeName(nodeName))
+	for _, node := range nodes {
+		addr, err := nodeAddressForLB(node)
 		if err != nil {
 			return err
 		}
