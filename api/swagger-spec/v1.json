@@ -8980,7 +8980,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Pod",
+      "type": "string",
       "method": "GET",
       "summary": "read log of the specified Pod",
       "nickname": "readNamespacedPodLog",
@@ -9070,7 +9070,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Pod"
+        "responseModel": "string"
        }
       ],
       "produces": [
