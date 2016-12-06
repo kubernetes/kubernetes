@@ -1172,7 +1172,7 @@ var _ = framework.KubeDescribe("Services", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]", func() {
+var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
 
@@ -1201,7 +1201,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		serviceLBNames = []string{}
 	})
 
-	It("should work for type=LoadBalancer [Slow][Feature:ExternalTrafficLocalOnly]", func() {
+	It("should work for type=LoadBalancer", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := NewServiceTestJig(cs, serviceName)
@@ -1240,7 +1240,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		}
 	})
 
-	It("should work for type=NodePort [Slow][Feature:ExternalTrafficLocalOnly]", func() {
+	It("should work for type=NodePort", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := NewServiceTestJig(cs, serviceName)
@@ -1266,7 +1266,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		}
 	})
 
-	It("should only target nodes with endpoints [Slow][Feature:ExternalTrafficLocalOnly]", func() {
+	It("should only target nodes with endpoints [Feature:ExternalTrafficLocalOnly]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := NewServiceTestJig(cs, serviceName)
@@ -1326,7 +1326,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		}
 	})
 
-	It("should work from pods [Slow][Feature:ExternalTrafficLocalOnly]", func() {
+	It("should work from pods [Feature:ExternalTrafficLocalOnly]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := NewServiceTestJig(cs, serviceName)
@@ -1371,7 +1371,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		}
 	})
 
-	It("should handle updates to source ip annotation [Slow][Feature:ExternalTrafficLocalOnly]", func() {
+	It("should handle updates to source ip annotation [Feature:ExternalTrafficLocalOnly]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := NewServiceTestJig(cs, serviceName)
