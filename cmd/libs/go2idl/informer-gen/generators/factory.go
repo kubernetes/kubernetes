@@ -36,6 +36,7 @@ type factoryGenerator struct {
 	groupVersions             map[string]clientgentypes.GroupVersions
 	internalClientSetPackage  string
 	versionedClientSetPackage string
+	internalInterfacesPackage string
 	filtered                  bool
 }
 
@@ -72,19 +73,17 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		gvNewFuncs[groupName] = c.Universe.Function(types.Name{Package: packageForGroup(g.outputPackage, g.groupVersions[groupName].Group), Name: "New"})
 	}
 	m := map[string]interface{}{
-		"cacheSharedIndexInformer":           c.Universe.Type(cacheSharedIndexInformer),
-		"groupVersions":                      g.groupVersions,
-		"gvInterfaces":                       gvInterfaces,
-		"gvNewFuncs":                         gvNewFuncs,
-		"interfacesNewInternalInformerFunc":  c.Universe.Type(interfacesNewInternalInformerFunc),
-		"interfacesNewVersionedInformerFunc": c.Universe.Type(interfacesNewVersionedInformerFunc),
-		"interfacesSharedInformerFactory":    c.Universe.Type(interfacesSharedInformerFactory),
-		"internalClientSetInterface":         c.Universe.Type(types.Name{Package: g.internalClientSetPackage, Name: "Interface"}),
-		"reflectType":                        c.Universe.Type(reflectType),
-		"runtimeObject":                      c.Universe.Type(runtimeObject),
-		"syncMutex":                          c.Universe.Type(syncMutex),
-		"timeDuration":                       c.Universe.Type(timeDuration),
-		"versionedClientSetInterface":        c.Universe.Type(types.Name{Package: g.versionedClientSetPackage, Name: "Interface"}),
+		"cacheSharedIndexInformer":    c.Universe.Type(cacheSharedIndexInformer),
+		"groupVersions":               g.groupVersions,
+		"gvInterfaces":                gvInterfaces,
+		"gvNewFuncs":                  gvNewFuncs,
+		"informerFactoryInterface":    c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"internalClientSetInterface":  c.Universe.Type(types.Name{Package: g.internalClientSetPackage, Name: "Interface"}),
+		"reflectType":                 c.Universe.Type(reflectType),
+		"runtimeObject":               c.Universe.Type(runtimeObject),
+		"syncMutex":                   c.Universe.Type(syncMutex),
+		"timeDuration":                c.Universe.Type(timeDuration),
+		"versionedClientSetInterface": c.Universe.Type(types.Name{Package: g.versionedClientSetPackage, Name: "Interface"}),
 	}
 
 	sw.Do(sharedInformerFactoryStruct, m)
@@ -107,7 +106,7 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(internalClient {{.internalClientSetInterface|raw}}, versionedClient {{.versionedClientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}) {{.interfacesSharedInformerFactory|raw}} {
+func NewSharedInformerFactory(internalClient {{.internalClientSetInterface|raw}}, versionedClient {{.versionedClientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}) SharedInformerFactory {
   return &sharedInformerFactory{
 		internalClient: internalClient,
 		versionedClient: versionedClient,
@@ -132,7 +131,7 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
-func (f *sharedInformerFactory) InternalInformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInternalInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
+func (f *sharedInformerFactory) InternalInformerFor(obj {{.runtimeObject|raw}}, newFunc NewInternalInformerFunc) {{.cacheSharedIndexInformer|raw}} {
   f.lock.Lock()
   defer f.lock.Unlock()
 
@@ -149,7 +148,7 @@ func (f *sharedInformerFactory) InternalInformerFor(obj {{.runtimeObject|raw}}, 
 
 // VersionedInformerFor returns the SharedIndexInformer for obj using a
 // versioned client.
-func (f *sharedInformerFactory) VersionedInformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewVersionedInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
+func (f *sharedInformerFactory) VersionedInformerFor(obj {{.runtimeObject|raw}}, newFunc NewVersionedInformerFunc) {{.cacheSharedIndexInformer|raw}} {
   f.lock.Lock()
   defer f.lock.Unlock()
 
@@ -169,7 +168,7 @@ var sharedInformerFactoryInterface = `
 // SharedInformerFactory provides shared informers for resources in all known
 // API group versions.
 type SharedInformerFactory interface {
-  {{.interfacesSharedInformerFactory|raw}}
+	{{.informerFactoryInterface|raw}}
 
 	{{$gvInterfaces := .gvInterfaces}}
 	{{range $groupName, $group := .groupVersions}}{{$groupName}}() {{index $gvInterfaces $groupName|raw}}
