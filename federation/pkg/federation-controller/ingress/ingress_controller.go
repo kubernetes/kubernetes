@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/conversion"
 	pkgruntime "k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
@@ -58,6 +59,11 @@ const (
 	// We wait for ingress to be created in this cluster before creating it any
 	// other cluster.
 	firstClusterAnnotation = "ingress.federation.kubernetes.io/first-cluster"
+	ControllerName         = "ingress"
+)
+
+var (
+	RequiredResources = []schema.GroupVersionResource{extensionsv1beta1.SchemeGroupVersion.WithResource("ingresses")}
 )
 
 type IngressController struct {
@@ -491,6 +497,12 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 
 	if !ic.isSynced() {
 		ic.configMapDeliverer.DeliverAfter(clusterName, nil, ic.clusterAvailableDelay)
+		return
+	}
+
+	ingressList := ic.ingressInformerStore.List()
+	if len(ingressList) <= 0 {
+		glog.V(4).Infof("No federated ingresses, ignore reconcile config map.")
 		return
 	}
 
