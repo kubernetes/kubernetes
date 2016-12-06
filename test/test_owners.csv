@@ -579,6 +579,9 @@ k8s.io/kubernetes/pkg/apis/extensions/v1beta1,madhusudancs,1
 k8s.io/kubernetes/pkg/apis/extensions/validation,nikhiljindal,1
 k8s.io/kubernetes/pkg/apis/meta/v1,sttts,0
 k8s.io/kubernetes/pkg/apis/meta/v1/validation,derekwaynecarr,0
+k8s.io/kubernetes/pkg/apis/meta/v1/validation,jszczepkowski,1
+k8s.io/kubernetes/pkg/apis/meta/v1/unstructured,smarterclayton,0
+k8s.io/kubernetes/pkg/apis/meta/v1/validation,smarterclayton,0
 k8s.io/kubernetes/pkg/apis/policy/validation,deads2k,1
 k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1
