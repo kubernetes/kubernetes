@@ -26,8 +26,8 @@ import (
 	"github.com/golang/glog"
 )
 
-// factoryInterfaceGenerator produces a file of listers for a given GroupVersion and
-// type.
+// factoryInterfaceGenerator produces a file of interfaces used to break a dependency cycle for
+// informer registration
 type factoryInterfaceGenerator struct {
 	generator.DefaultGen
 	outputPackage             string
