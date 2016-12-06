@@ -150,7 +150,7 @@ type DockerManager struct {
 	containerLogsDir string
 
 	// Network plugin.
-	networkPlugin network.NetworkPlugin
+	network *dockerNetwork
 
 	// Health check results.
 	livenessManager proberesults.Manager
@@ -273,7 +273,7 @@ func NewDockerManager(
 		dockerRoot:             dockerRoot,
 		cgroupDriver:           cgroupDriver,
 		containerLogsDir:       containerLogsDir,
-		networkPlugin:          networkPlugin,
+		network:                newDockerNetwork(networkPlugin),
 		livenessManager:        livenessManager,
 		runtimeHelper:          runtimeHelper,
 		execHandler:            execHandler,
@@ -359,29 +359,6 @@ var (
 	ErrContainerCannotRun = errors.New("ContainerCannotRun")
 )
 
-// determineContainerIP determines the IP address of the given container.  It is expected
-// that the container passed is the infrastructure container of a pod and the responsibility
-// of the caller to ensure that the correct container is passed.
-func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *dockertypes.ContainerJSON) (string, error) {
-	result := getContainerIP(container)
-
-	networkMode := getDockerNetworkMode(container)
-	isHostNetwork := networkMode == namespaceModeHost
-
-	// For host networking or default network plugin, GetPodNetworkStatus doesn't work
-	if !isHostNetwork && dm.networkPlugin.Name() != network.DefaultPluginName {
-		netStatus, err := dm.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.DockerID(container.ID).ContainerID())
-		if err != nil {
-			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), podName, err)
-			return result, err
-		} else if netStatus != nil {
-			result = netStatus.IP.String()
-		}
-	}
-
-	return result, nil
-}
-
 func (dm *DockerManager) inspectContainer(id string, podName, podNamespace string) (*kubecontainer.ContainerStatus, string, error) {
 	var ip string
 	iResult, err := dm.client.InspectContainer(id)
@@ -445,9 +422,10 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = startedAt
 		if containerProvidesPodIP(dockerName) {
-			ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
+			ip, err = dm.network.determineContainerIP(podNamespace, podName, iResult)
 			// Kubelet doesn't handle the network error scenario
 			if err != nil {
+				glog.Errorf(err.Error())
 				status.State = kubecontainer.ContainerStateUnknown
 				status.Message = fmt.Sprintf("Network error: %#v", err)
 			}
@@ -1000,7 +978,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *v1.Pod, podInfraContainer
 			glog.V(4).Infof("host: %v, %v", pod.Spec.HostNetwork, networkMode)
 			return true, nil
 		}
-	} else if dm.networkPlugin.Name() != "cni" && dm.networkPlugin.Name() != "kubenet" {
+	} else if !dm.network.pluginDisablesDockerNetworking() {
 		// Docker only exports ports from the pod infra container. Let's
 		// collect all of the relevant ports and export them.
 		for _, container := range pod.Spec.InitContainers {
@@ -1023,14 +1001,6 @@ func (dm *DockerManager) podInfraContainerChanged(pod *v1.Pod, podInfraContainer
 // determine if the container root should be a read only filesystem.
 func readOnlyRootFilesystem(container *v1.Container) bool {
 	return container.SecurityContext != nil && container.SecurityContext.ReadOnlyRootFilesystem != nil && *container.SecurityContext.ReadOnlyRootFilesystem
-}
-
-// container must not be nil
-func getDockerNetworkMode(container *dockertypes.ContainerJSON) string {
-	if container.HostConfig != nil {
-		return string(container.HostConfig.NetworkMode)
-	}
-	return ""
 }
 
 // dockerVersion implements kubecontainer.Version interface by implementing
@@ -1486,11 +1456,9 @@ func (dm *DockerManager) killPodWithSyncResult(pod *v1.Pod, runningPod kubeconta
 		if getDockerNetworkMode(ins) != namespaceModeHost {
 			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
 			result.AddSyncResult(teardownNetworkResult)
-			glog.V(3).Infof("Calling network plugin %s to tear down pod for %s", dm.networkPlugin.Name(), kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
-			if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, networkContainer.ID); err != nil {
-				message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", runningPod.ID, dm.networkPlugin.Name(), err)
-				teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
-				glog.Error(message)
+			if err := dm.network.tearDownPod(runningPod.Namespace, runningPod.Name, networkContainer.ID); err != nil {
+				teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, err.Error())
+				glog.Error(err)
 			}
 		}
 		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, networkContainer.Name)
@@ -1893,7 +1861,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *v1.Pod) (kubecontainer.Doc
 
 	if kubecontainer.IsHostNetworkPod(pod) {
 		netNamespace = namespaceModeHost
-	} else if dm.networkPlugin.Name() == "cni" || dm.networkPlugin.Name() == "kubenet" {
+	} else if dm.network.pluginDisablesDockerNetworking() {
 		netNamespace = "none"
 	} else {
 		// Docker only exports ports from the pod infra container.  Let's
@@ -1965,7 +1933,6 @@ func (dm *DockerManager) computePodContainerChanges(pod *v1.Pod, podStatus *kube
 	var changed bool
 	podInfraContainerStatus := podStatus.FindContainerStatusByName(PodInfraContainerName)
 	if podInfraContainerStatus != nil && podInfraContainerStatus.State == kubecontainer.ContainerStateRunning {
-		glog.V(4).Infof("Found pod infra container for %q", format.Pod(pod))
 		changed, err = dm.podInfraContainerChanged(pod, podInfraContainerStatus)
 		if err != nil {
 			return podContainerChangesSpec{}, err
@@ -2194,20 +2161,14 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
 		if !kubecontainer.IsHostNetworkPod(pod) {
-			glog.V(3).Infof("Calling network plugin %s to setup pod for %s", dm.networkPlugin.Name(), format.Pod(pod))
-			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID())
-			if err != nil {
-				// TODO: (random-liu) There shouldn't be "Skipping pod" in sync result message
-				message := fmt.Sprintf("Failed to setup network for pod %q using network plugins %q: %v; Skipping pod", format.Pod(pod), dm.networkPlugin.Name(), err)
-				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, message)
-				glog.Error(message)
+			if err := dm.network.setUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID()); err != nil {
+				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, err.Error())
+				glog.Error(err)
 
 				// Delete infra container
 				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, PodInfraContainerName)
 				result.AddSyncResult(killContainerResult)
-				if delErr := dm.KillContainerInPod(kubecontainer.ContainerID{
-					ID:   string(podInfraContainerID),
-					Type: "docker"}, nil, pod, message, nil); delErr != nil {
+				if delErr := dm.KillContainerInPod(podInfraContainerID.ContainerID(), nil, pod, err.Error(), nil); delErr != nil {
 					killContainerResult.Fail(kubecontainer.ErrKillContainer, delErr.Error())
 					glog.Warningf("Clear infra container failed for pod %q: %v", format.Pod(pod), delErr)
 				}
@@ -2229,7 +2190,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 			}
 
 			// Overwrite the podIP passed in the pod status, since we just started the infra container.
-			podIP, err = dm.determineContainerIP(pod.Namespace, pod.Name, podInfraContainer)
+			podIP, err = dm.network.determineContainerIP(pod.Namespace, pod.Name, podInfraContainer)
 			if err != nil {
 				glog.Errorf("Network error: %v; Skipping pod %q", err, format.Pod(pod))
 				result.Fail(err)

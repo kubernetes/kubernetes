@@ -2271,7 +2271,7 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 		dm, fakeDocker := newTestDockerManager()
 		ctrl := gomock.NewController(t)
 		fnp := mock_network.NewMockNetworkPlugin(ctrl)
-		dm.networkPlugin = fnp
+		dm.network = newDockerNetwork(fnp)
 
 		fakeDocker.SetFakeRunningContainers([]*FakeContainer{
 			{
@@ -2332,7 +2332,7 @@ func TestSyncPodGetsPodIPFromNetworkPlugin(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	fnp := mock_network.NewMockNetworkPlugin(ctrl)
-	dm.networkPlugin = fnp
+	dm.network = newDockerNetwork(fnp)
 
 	pod := makePod("foo", &v1.PodSpec{
 		Containers: []v1.Container{

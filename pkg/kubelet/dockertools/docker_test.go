@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"hash/adler32"
 	"math/rand"
+	"net"
 	"path"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -44,6 +46,7 @@ import (
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	utilsets "k8s.io/kubernetes/pkg/util/sets"
 )
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
@@ -1001,4 +1004,187 @@ func TestLogSymLink(t *testing.T) {
 	// The file name cannot exceed 255 characters. Since .log suffix is required, the prefix cannot exceed 251 characters.
 	expectedPath := path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerId)[:251]+".log")
 	as.Equal(expectedPath, LogSymlink(containerLogsDir, podFullName, containerName, dockerId))
+}
+
+type fakeNetworkPlugin struct {
+	mu        sync.Mutex
+	setups    map[string]uint
+	statuses  map[string]uint
+	teardowns map[string]uint
+
+	waitPodName string
+	waitPodWg   *sync.WaitGroup
+}
+
+func newFakeNetworkPlugin(waitPod string, waitWg *sync.WaitGroup) *fakeNetworkPlugin {
+	return &fakeNetworkPlugin{
+		setups:      make(map[string]uint),
+		statuses:    make(map[string]uint),
+		teardowns:   make(map[string]uint),
+		waitPodName: waitPod,
+		waitPodWg:   waitWg,
+	}
+}
+
+func (p *fakeNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
+	return nil
+}
+
+func (p *fakeNetworkPlugin) Event(name string, details map[string]interface{}) {
+}
+
+func (p *fakeNetworkPlugin) Name() string {
+	return "fakeplugin"
+}
+
+func (p *fakeNetworkPlugin) Capabilities() utilsets.Int {
+	return utilsets.NewInt()
+}
+
+func (p *fakeNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	if name == p.waitPodName {
+		p.waitPodWg.Wait()
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	num := p.setups[id.ID]
+	p.setups[id.ID] = num + 1
+	return nil
+}
+
+func (p *fakeNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	num := p.teardowns[id.ID]
+	p.teardowns[id.ID] = num + 1
+	return nil
+}
+
+func (p *fakeNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	num := p.statuses[id.ID]
+	p.statuses[id.ID] = num + 1
+	return &network.PodNetworkStatus{IP: net.ParseIP("10.1.2.3")}, nil
+}
+
+func (p *fakeNetworkPlugin) Status() error {
+	return nil
+}
+
+func TestNetwork(t *testing.T) {
+	fakePlugin := newFakeNetworkPlugin("", nil)
+	network := newDockerNetwork(fakePlugin)
+
+	// 10 pods, 4 setup/status/teardown runs each.  Ensure that network locking
+	// works and the pod map isn't concurrently accessed
+	wg := sync.WaitGroup{}
+	podList := make([]string, 0, 10)
+	for i := 0; i < 10; i++ {
+		podName := fmt.Sprintf("pod%d", i)
+		podList = append(podList, podName)
+
+		for x := 0; x < 4; x++ {
+			wg.Add(1)
+			go func(name string) {
+				defer wg.Done()
+
+				containerID := kubecontainer.DockerID(name).ContainerID()
+				if err := network.setUpPod("", name, containerID); err != nil {
+					t.Errorf("Failed to set up pod %q: %v", name, err)
+					return
+				}
+
+				inspectResult := &dockertypes.ContainerJSON{
+					ContainerJSONBase: &dockertypes.ContainerJSONBase{
+						ID:   name,
+						Name: name,
+					},
+					NetworkSettings: &dockertypes.NetworkSettings{},
+				}
+				_, err := network.determineContainerIP("", name, inspectResult)
+				if err != nil {
+					t.Errorf("Failed to inspect pod %q: %v", name, err)
+					return
+				}
+
+				if err := network.tearDownPod("", name, containerID); err != nil {
+					t.Errorf("Failed to tear down pod %q: %v", name, err)
+					return
+				}
+			}(podName)
+		}
+	}
+	wg.Wait()
+
+	for _, podName := range podList {
+		num, ok := fakePlugin.setups[podName]
+		if !ok || num != 4 {
+			t.Errorf("Expected 4 setup operations for %q, got %d", podName, num)
+		}
+
+		num, ok = fakePlugin.statuses[podName]
+		if !ok || num != 4 {
+			t.Errorf("Expected 4 status operations for %q, got %d", podName, num)
+		}
+
+		num, ok = fakePlugin.teardowns[podName]
+		if !ok || num != 4 {
+			t.Errorf("Expected 4 teardown operations for %q, got %d", podName, num)
+		}
+	}
+}
+
+// Ensure that one pod's network operations don't block another's.  If the
+// test is successful (eg, first pod doesn't block on second) the test
+// will complete.  If unsuccessful, it will hang and get killed.
+func TestMultiPodParallelNetworkOps(t *testing.T) {
+	podWg := sync.WaitGroup{}
+	podWg.Add(1)
+	plugin := newFakeNetworkPlugin("waiter", &podWg)
+	network := newDockerNetwork(plugin)
+
+	opsWg := sync.WaitGroup{}
+
+	// Start the pod that will wait for the other to complete
+	opsWg.Add(1)
+	go func() {
+		defer opsWg.Done()
+		podName := "waiter"
+		containerID := kubecontainer.DockerID(podName).ContainerID()
+		// Setup will block on the runner pod completing.  If network
+		// operations locking isn't correct (eg pod network operations
+		// block other pods) setUpPod() will never return.
+		if err := network.setUpPod("", podName, containerID); err != nil {
+			t.Errorf("Failed to set up waiter pod: %v", err)
+			return
+		}
+
+		if err := network.tearDownPod("", podName, containerID); err != nil {
+			t.Errorf("Failed to tear down waiter pod: %v", err)
+			return
+		}
+	}()
+
+	opsWg.Add(1)
+	go func() {
+		defer opsWg.Done()
+		podName := "runner"
+		containerID := kubecontainer.DockerID(podName).ContainerID()
+		if err := network.setUpPod("", podName, containerID); err != nil {
+			t.Errorf("Failed to set up runner pod: %v", err)
+			return
+		}
+
+		if err := network.tearDownPod("", podName, containerID); err != nil {
+			t.Errorf("Failed to tear down runner pod: %v", err)
+			return
+		}
+
+		// Let other pod proceed
+		podWg.Done()
+	}()
+
+	opsWg.Wait()
 }
