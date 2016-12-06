@@ -159,7 +159,7 @@ func TestGenerateService(t *testing.T) {
 				"protocol":                      "UDP",
 				"container-port":                "foobar",
 				"external-ip":                   "1.2.3.4",
-				"create-external-load-balancer": "true",
+				"type":                          "LoadBalancer",
 			},
 			expected: api.Service{
 				ObjectMeta: api.ObjectMeta{
