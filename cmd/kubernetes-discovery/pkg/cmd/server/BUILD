@@ -15,10 +15,10 @@ go_library(
     srcs = ["start.go"],
     tags = ["automanaged"],
     deps = [
+        "//cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1:go_default_library",
         "//cmd/kubernetes-discovery/pkg/apiserver:go_default_library",
         "//cmd/kubernetes-discovery/pkg/legacy:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/options:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
