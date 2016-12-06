@@ -17,10 +17,15 @@ limitations under the License.
 package apiserver
 
 import (
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/version"
+
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration"
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1"
+	apiservicestorage "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/registry/apiservice"
 )
 
 // TODO move to genericapiserver or something like that
@@ -71,19 +76,17 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 		GenericAPIServer: genericServer,
 	}
 
-	// TODO switch to constants once we have an API
-	// TODO install RESTStorage for API
-	// apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo("apifederation.k8s.io")
-	// apiGroupInfo.GroupMeta.GroupVersion = schema.GroupVersion{Group: "apifederation.k8s.io", Version: "v1alpha1"}
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName)
+	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 
-	// v1alpha1storage := map[string]rest.Storage{}
-	// // v1alpha1storage["apiservices"] = apiserverstorage.NewREST(c.RESTOptionsGetter.NewFor(apifederation.Resource("apiservices")))
+	v1alpha1storage := map[string]rest.Storage{}
+	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.RESTOptionsGetter.NewFor(apiregistration.Resource("apiservices")))
 
-	// apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
+	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 
-	// if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
-	// 	return nil, err
-	// }
+	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
+		return nil, err
+	}
 
 	return s, nil
 }
