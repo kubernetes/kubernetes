@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package framework
 
 import (
 	"fmt"
@@ -26,13 +26,12 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // TODO: These should really just use the GCE API client library or at least use
 // better formatted output from the --format flag.
 
-func createGCEStaticIP(name string) (string, error) {
+func CreateGCEStaticIP(name string) (string, error) {
 	// gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
 	// abshah@abhidesk:~/go/src/code.google.com/p/google-api-go-client/compute/v1$ gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
 	// Created [https://www.googleapis.com/compute/v1/projects/abshah-kubernetes-001/regions/us-central1/addresses/test-static-ip].
@@ -41,14 +40,14 @@ func createGCEStaticIP(name string) (string, error) {
 
 	var outputBytes []byte
 	var err error
-	region, err := gce.GetGCERegion(framework.TestContext.CloudConfig.Zone)
+	region, err := gce.GetGCERegion(TestContext.CloudConfig.Zone)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert zone to region: %v", err)
 	}
-	glog.Infof("Creating static IP with name %q in project %q in region %q", name, framework.TestContext.CloudConfig.ProjectID, region)
+	glog.Infof("Creating static IP with name %q in project %q in region %q", name, TestContext.CloudConfig.ProjectID, region)
 	for attempts := 0; attempts < 4; attempts++ {
 		outputBytes, err = exec.Command("gcloud", "compute", "addresses", "create",
-			name, "--project", framework.TestContext.CloudConfig.ProjectID,
+			name, "--project", TestContext.CloudConfig.ProjectID,
 			"--region", region, "-q").CombinedOutput()
 		if err == nil {
 			break
@@ -75,20 +74,20 @@ func createGCEStaticIP(name string) (string, error) {
 	}
 }
 
-func deleteGCEStaticIP(name string) error {
+func DeleteGCEStaticIP(name string) error {
 	// gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
 	// abshah@abhidesk:~/go/src/code.google.com/p/google-api-go-client/compute/v1$ gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
 	// Created [https://www.googleapis.com/compute/v1/projects/abshah-kubernetes-001/regions/us-central1/addresses/test-static-ip].
 	// NAME           REGION      ADDRESS       STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
-	region, err := gce.GetGCERegion(framework.TestContext.CloudConfig.Zone)
+	region, err := gce.GetGCERegion(TestContext.CloudConfig.Zone)
 	if err != nil {
 		return fmt.Errorf("failed to convert zone to region: %v", err)
 	}
-	glog.Infof("Deleting static IP with name %q in project %q in region %q", name, framework.TestContext.CloudConfig.ProjectID, region)
+	glog.Infof("Deleting static IP with name %q in project %q in region %q", name, TestContext.CloudConfig.ProjectID, region)
 	outputBytes, err := exec.Command("gcloud", "compute", "addresses", "delete",
-		name, "--project", framework.TestContext.CloudConfig.ProjectID,
+		name, "--project", TestContext.CloudConfig.ProjectID,
 		"--region", region, "-q").CombinedOutput()
 	if err != nil {
 		// Ditch the error, since the stderr in the output is what actually contains
