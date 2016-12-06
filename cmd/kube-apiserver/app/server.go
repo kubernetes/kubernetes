@@ -246,7 +246,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	client, err := internalclientset.NewForConfig(selfClientConfig)
 	if err != nil {
-		glog.Errorf("Failed to create clientset: %v", err)
+		return fmt.Errorf("failed to create clientset: %v", err)
 	}
 	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
