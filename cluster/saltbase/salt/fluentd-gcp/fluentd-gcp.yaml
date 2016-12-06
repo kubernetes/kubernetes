@@ -11,7 +11,16 @@ spec:
   dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.29
+    image: gcr.io/google_containers/fluentd-gcp:1.30
+    # If fluentd consumes its own logs, the following situation may happen:
+    # fluentd fails to send a chunk to the server => writes it to the log =>
+    # tries to send this message to the server => fails to send a chunk and so on.
+    # Writing to a file, which is not exported to the back-end prevents it.
+    # It also allows to increase the fluentd verbosity by default.
+    command:
+      - '/bin/sh'
+      - '-c'
+      - '/run.sh $FLUENTD_ARGS 2>&1 >>/var/log/fluentd.log'
     resources:
       limits:
         memory: 200Mi
@@ -20,9 +29,6 @@ spec:
         # requests of other per-node add-ons (e.g. kube-proxy).
         cpu: 100m
         memory: 200Mi
-    env:
-    - name: FLUENTD_ARGS
-      value: -q
     volumeMounts:
     - name: varlog
       mountPath: /var/log
