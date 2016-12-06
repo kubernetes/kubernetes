@@ -113,7 +113,7 @@ func testEncodeDecodeStatus(t *testing.T, codec runtime.Codec) {
 		t.Errorf("Kind is not set to \"Status\". Got %s", encoded)
 	}
 	if typeMeta.APIVersion != "v1" {
-		t.Errorf("APIVersion is not set to \"\". Got %s", encoded)
+		t.Errorf("APIVersion is not set to \"v1\". Got %s", encoded)
 	}
 	decoded, err := runtime.Decode(codec, encoded)
 	if err != nil {
