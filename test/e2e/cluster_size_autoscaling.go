@@ -237,13 +237,19 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			// However at this moment we DO WANT it to crash so that we don't check all test runs for the
 			// rare behavior, but only the broken ones.
 		}
-
-		defer removeLabels(newNodesSet)
-		By(fmt.Sprintf("Setting labels for new nodes: %v", newNodesSet.List()))
-		updateNodeLabels(c, newNodesSet, labels, nil)
-
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+		By(fmt.Sprintf("New nodes: %v\n", newNodesSet))
+		registeredNodes := sets.NewString()
+		for nodeName := range newNodesSet {
+			node, err := f.ClientSet.Core().Nodes().Get(nodeName)
+			if err == nil && node != nil {
+				registeredNodes.Insert(nodeName)
+			} else {
+				glog.Errorf("Failed to get node %v: %v", nodeName, err)
+			}
+		}
+		By(fmt.Sprintf("Setting labels for registered new nodes: %v", registeredNodes.List()))
+		updateNodeLabels(c, registeredNodes, labels, nil)
+		defer removeLabels(registeredNodes)
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 		framework.ExpectNoError(framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "node-selector"))
