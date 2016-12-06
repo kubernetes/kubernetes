@@ -464,9 +464,9 @@ func (o *DrainOptions) deleteOrEvictPods(pods []api.Pod) error {
 
 	if len(policyGroupVersion) > 0 {
 		return o.evictPods(pods, policyGroupVersion, getPodFn)
-	} else {
-		return o.deletePods(pods, getPodFn)
 	}
+	return o.deletePods(pods, getPodFn)
+
 }
 
 func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*api.Pod, error)) error {

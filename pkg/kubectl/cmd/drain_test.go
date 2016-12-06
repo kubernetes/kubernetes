@@ -638,14 +638,13 @@ func TestDeletePods(t *testing.T) {
 					if _, ok := ifHasBeenCalled[name]; !ok {
 						ifHasBeenCalled[name] = true
 						return &oldPod, nil
-					} else {
-						if oldPod.ObjectMeta.Generation < 4 {
-							newPod := newPodMap[name]
-							return &newPod, nil
-						} else {
-							return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
-						}
 					}
+					if oldPod.ObjectMeta.Generation < 4 {
+						newPod := newPodMap[name]
+						return &newPod, nil
+					}
+					return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
+
 				}
 				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
 			},
@@ -662,7 +661,7 @@ func TestDeletePods(t *testing.T) {
 				if oldPod, found := oldPodMap[name]; found {
 					return &oldPod, nil
 				}
-				return nil, errors.New(fmt.Sprintf("%q: not found", name))
+				return nil, fmt.Errorf("%q: not found", name)
 			},
 		},
 		{
