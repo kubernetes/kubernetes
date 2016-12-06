@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"path"
 	rt "runtime"
@@ -105,8 +104,6 @@ type APIGroupVersion struct {
 	// for this API Group.
 	ResourceLister APIResourceLister
 }
-
-type ProxyDialerFunc func(network, addr string) (net.Conn, error)
 
 // TODO: Pipe these in through the apiserver cmd line
 const (

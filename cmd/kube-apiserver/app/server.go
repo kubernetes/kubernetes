@@ -40,8 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -49,6 +47,7 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -118,7 +117,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	// Setup tunneler if needed
 	var tunneler genericapiserver.Tunneler
-	var proxyDialerFn apiserver.ProxyDialerFunc
+	var proxyDialerFn func(network, addr string) (net.Conn, error)
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSH genericapiserver.InstallSSHKey
@@ -230,7 +229,7 @@ func Run(s *options.ServerRunOptions) error {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticatorConfig)
+	apiAuthenticator, securityDefinitions, err := genericauthenticator.New(authenticatorConfig)
 	if err != nil {
 		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}

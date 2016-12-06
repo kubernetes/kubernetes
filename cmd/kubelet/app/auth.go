@@ -22,12 +22,12 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
 	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1"
+	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	alwaysallowauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubelet/server"
@@ -61,7 +61,7 @@ func buildAuth(nodeName types.NodeName, client clientset.Interface, config compo
 }
 
 func buildAuthn(client authenticationclient.TokenReviewInterface, authn componentconfig.KubeletAuthentication) (authenticator.Request, error) {
-	authenticatorConfig := apiserverauthenticator.DelegatingAuthenticatorConfig{
+	authenticatorConfig := genericauthenticator.DelegatingAuthenticatorConfig{
 		Anonymous:    authn.Anonymous.Enabled,
 		CacheTTL:     authn.Webhook.CacheTTL.Duration,
 		ClientCAFile: authn.X509.ClientCAFile,

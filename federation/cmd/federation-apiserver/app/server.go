@@ -32,11 +32,11 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -126,7 +126,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig(s.SecureServing.ClientCA))
+	apiAuthenticator, securityDefinitions, err := genericauthenticator.New(s.Authentication.ToAuthenticationConfig(s.SecureServing.ClientCA))
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
