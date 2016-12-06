@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -139,7 +140,8 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 		var _ = Describe("DNS", func() {
 
 			var (
-				service *v1.Service
+				service      *v1.Service
+				serviceShard *v1.Service
 			)
 
 			BeforeEach(func() {
@@ -168,8 +170,37 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				}
 
 				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
+
 				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
-				waitForServiceShardsOrFail(nsName, service, clusters)
+				obj, err := conversion.NewCloner().DeepCopy(service)
+				// Cloning shouldn't fail. On the off-chance it does, we
+				// should shallow copy service to serviceShard before
+				// failing. If we don't do this we will never really
+				// get a chance to clean up the underlying services
+				// when the cloner fails for reasons not in our
+				// control. For example, cloner bug. That will cause
+				// the resources to leak, which in turn causes the
+				// test project to run out of quota and the entire
+				// suite starts failing. So we must try as hard as
+				// possible to cleanup the underlying services. So
+				// if DeepCopy fails, we are going to try with shallow
+				// copy as a last resort.
+				if err != nil {
+					serviceCopy := *service
+					serviceShard = &serviceCopy
+					framework.ExpectNoError(err, fmt.Sprintf("Error in deep copying service %q", service.Name))
+				}
+				var ok bool
+				serviceShard, ok = obj.(*v1.Service)
+				// Same argument as above about using shallow copy
+				// as a last resort.
+				if !ok {
+					serviceCopy := *service
+					serviceShard = &serviceCopy
+					framework.ExpectNoError(err, fmt.Sprintf("Unexpected service object copied %T", obj))
+				}
+
+				waitForServiceShardsOrFail(nsName, serviceShard, clusters)
 			})
 
 			AfterEach(func() {
@@ -180,14 +211,19 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 				if service != nil {
 					deleteServiceOrFail(f.FederationClientset_1_5, nsName, service.Name)
-
-					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", service.Name, nsName))
-					cleanupServiceShardsAndProviderResources(nsName, service, clusters)
-
 					service = nil
 				} else {
 					By("No service to delete.  Service is nil")
 				}
+
+				if serviceShard != nil {
+					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", service.Name, nsName))
+					cleanupServiceShardsAndProviderResources(nsName, service, clusters)
+					serviceShard = nil
+				} else {
+					By("No service shards to delete. `serviceShard` is nil")
+				}
+
 				// Delete the kube-dns config map from all clusters.
 				for clusterName, cluster := range clusters {
 					By(fmt.Sprintf("Deleting kube dns config map from cluster: %s", clusterName))
@@ -218,6 +254,9 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				By("Deleting the service to verify that DNS rules still work")
 				err := f.FederationClientset_1_5.Services(nsName).Delete(FederatedServiceName, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
+				// Service is deleted, unset the test block-global service variable.
+				service = nil
+
 				for i, DNSName := range svcDNSNames {
 					discoverService(f, DNSName, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
 				}
