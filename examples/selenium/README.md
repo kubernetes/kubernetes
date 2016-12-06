@@ -59,7 +59,7 @@ curl http://localhost:4444
 If you are using Google Container Engine, you can expose your hub via the internet. This is a bad idea for many reasons, but you can do it as follows:
 
 ```console
-kubectl expose rc selenium-hub --name=selenium-hub-external --labels="app=selenium-hub,external=true" --create-external-load-balancer=true
+kubectl expose rc selenium-hub --name=selenium-hub-external --labels="app=selenium-hub,external=true" --type=LoadBalancer
 ```
 
 Then wait a few minutes, eventually your new `selenium-hub-external` service will be assigned a load balanced IP from gcloud. Once `kubectl get svc selenium-hub-external` shows two IPs, run this snippet.

@@ -61,7 +61,6 @@ func paramNames() []GeneratorParam {
 		{"ports", false},
 		{"labels", false},
 		{"external-ip", false},
-		{"create-external-load-balancer", false},
 		{"load-balancer-ip", false},
 		{"type", false},
 		{"protocol", false},
@@ -203,9 +202,6 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 			port := service.Spec.Ports[i].Port
 			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
 		}
-	}
-	if params["create-external-load-balancer"] == "true" {
-		service.Spec.Type = api.ServiceTypeLoadBalancer
 	}
 	if len(params["external-ip"]) > 0 {
 		service.Spec.ExternalIPs = []string{params["external-ip"]}
