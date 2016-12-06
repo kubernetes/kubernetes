@@ -1,6 +1,7 @@
 name,owner,auto-assigned
 DEFAULT,rmmh/spxtr/ixdy/apelisse/fejta,0
 Addon update should propagate add-on file changes,eparis,1
+AppArmor should enforce an AppArmor profile,kevin-wangzefeng,1
 AppArmor when running with AppArmor should enforce a permissive profile,yujuhong,1
 AppArmor when running with AppArmor should enforce a profile blocking writes,freehan,1
 AppArmor when running with AppArmor should reject an unloaded profile,kargakis,1
@@ -123,7 +124,7 @@ Empty does nothing,cjcullen,1
 "EmptyDir volumes should support (root,0666,tmpfs)",davidopp,1
 "EmptyDir volumes should support (root,0777,default)",spxtr,1
 "EmptyDir volumes should support (root,0777,tmpfs)",alex-mohr,1
-EmptyDir volumes volume on default medium should have the correct mode,girishkalele,1
+EmptyDir volumes volume on default medium should have the correct mode,yifan-gu,1
 EmptyDir volumes volume on tmpfs should have the correct mode,mwielgus,1
 "EmptyDir volumes when FSGroup is specified files with FSGroup ownership should support (root,0644,tmpfs)",justinsb,1
 EmptyDir volumes when FSGroup is specified new files should be created with FSGroup ownership when container is non-root,brendandburns,1
@@ -131,7 +132,7 @@ EmptyDir volumes when FSGroup is specified new files should be created with FSGr
 EmptyDir volumes when FSGroup is specified volume on default medium should have the correct mode using FSGroup,eparis,1
 EmptyDir volumes when FSGroup is specified volume on tmpfs should have the correct mode using FSGroup,timothysc,1
 EmptyDir wrapper volumes should not cause race condition when used for configmaps,mtaufen,1
-EmptyDir wrapper volumes should not cause race condition when used for git_repo,girishkalele,1
+EmptyDir wrapper volumes should not cause race condition when used for git_repo,brendandburns,1
 EmptyDir wrapper volumes should not conflict,deads2k,1
 Etcd failure should recover from SIGKILL,pmorie,1
 Etcd failure should recover from network partition with master,justinsb,1
@@ -357,7 +358,7 @@ Pods should support retrieving logs from the container over websockets,vishh,0
 "Port forwarding With a server that expects a client request should support a client that connects, sends no data, and disconnects",sttts,0
 "Port forwarding With a server that expects no client request should support a client that connects, sends no data, and disconnects",sttts,0
 PreStop should call prestop when killing a pod,ncdc,1
-PrivilegedPod should test privileged pod,vishh,0
+PrivilegedPod should enable privileged commands,dchen1107,1
 Probing container should *not* be restarted with a /healthz http liveness probe,Random-Liu,0
 "Probing container should *not* be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0
 Probing container should be restarted with a /healthz http liveness probe,Random-Liu,0
@@ -404,7 +405,7 @@ SSH should SSH to all nodes and run commands,quinton-hoole,0
 SchedulerPredicates validates MaxPods limit number of pods that are allowed to run,gmarek,0
 SchedulerPredicates validates resource limits of pods that are allowed to run,gmarek,0
 SchedulerPredicates validates that Inter-pod-Affinity is respected if not matching,hurf,1
-SchedulerPredicates validates that InterPod Affinity and AntiAffinity is respected if matching,girishkalele,1
+SchedulerPredicates validates that InterPod Affinity and AntiAffinity is respected if matching,yifan-gu,1
 SchedulerPredicates validates that InterPodAffinity is respected if matching,kevin-wangzefeng,1
 SchedulerPredicates validates that InterPodAffinity is respected if matching with multiple Affinities,caesarxuchao,1
 SchedulerPredicates validates that InterPodAntiAffinity is respected if matching 2,sttts,0
@@ -425,7 +426,7 @@ Secrets should be consumable from pods in volume,ghodss,1
 Secrets should be consumable from pods in volume with defaultMode set,derekwaynecarr,1
 Secrets should be consumable from pods in volume with mappings,jbeda,1
 Secrets should be consumable from pods in volume with mappings and Item Mode set,quinton-hoole,1
-Secrets should be consumable in multiple volumes in a pod,girishkalele,1
+Secrets should be consumable in multiple volumes in a pod,alex-mohr,1
 Security Context should support container.SecurityContext.RunAsUser,alex-mohr,1
 Security Context should support pod.Spec.SecurityContext.RunAsUser,bgrant0607,1
 Security Context should support pod.Spec.SecurityContext.SupplementalGroups,andyzheng0831,1
@@ -456,13 +457,13 @@ Services should use same NodePort with same port but different protocols,timothy
 Services should work after restarting apiserver,bprashanth,0
 Services should work after restarting kube-proxy,bprashanth,0
 SimpleMount should be able to mount an emptydir on a container,karlkfi,1
-"Spark should start spark master, driver and workers",girishkalele,1
+"Spark should start spark master, driver and workers",jszczepkowski,1
 "Staging client repo client should create pods, delete pods, watch pods",jbeda,1
 Stateful Set recreate should recreate evicted statefulset,derekwaynecarr,0
 StatefulSet Basic StatefulSet functionality Scaling down before scale up is finished should wait until current pod will be running and ready before it will be removed,derekwaynecarr,0
 StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any pet is unhealthy,derekwaynecarr,0
 StatefulSet Basic StatefulSet functionality should allow template updates,derekwaynecarr,0
-StatefulSet Basic StatefulSet functionality should handle healthy pet restarts during scale,girishkalele,1
+StatefulSet Basic StatefulSet functionality should handle healthy pet restarts during scale,kevin-wangzefeng,1
 StatefulSet Basic StatefulSet functionality should provide basic identity,bprashanth,1
 StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,derekwaynecarr,0
 StatefulSet Deploy clustered applications should creating a working mysql cluster,yujuhong,1
@@ -475,7 +476,7 @@ Sysctls should reject invalid sysctls,davidopp,1
 Sysctls should support sysctls,Random-Liu,1
 Sysctls should support unsafe sysctls which are actually whitelisted,deads2k,1
 ThirdParty resources Simple Third Party creating/deleting thirdparty objects works,luxas,1
-Upgrade cluster upgrade should maintain a functioning cluster,girishkalele,1
+Upgrade cluster upgrade should maintain a functioning cluster,luxas,1
 Upgrade cluster upgrade should maintain responsive services,mikedanese,1
 Upgrade master upgrade should maintain responsive services,mikedanese,1
 Upgrade node upgrade should maintain a functioning cluster,zmerlynn,1
@@ -506,8 +507,8 @@ k8s.io/kubernetes/cmd/kube-discovery/app,pmorie,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
 k8s.io/kubernetes/cmd/kubeadm/app/cmd,caesarxuchao,1
 k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
-k8s.io/kubernetes/cmd/kubeadm/app/node,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/master,apprenda,0
+k8s.io/kubernetes/cmd/kubeadm/app/node,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
@@ -550,8 +551,6 @@ k8s.io/kubernetes/pkg/api/meta,fabioy,1
 k8s.io/kubernetes/pkg/api/resource,smarterclayton,1
 k8s.io/kubernetes/pkg/api/service,spxtr,1
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1
-k8s.io/kubernetes/pkg/api/unversioned,kevin-wangzefeng,1
-k8s.io/kubernetes/pkg/api/unversioned/validation,brendandburns,1
 k8s.io/kubernetes/pkg/api/util,ghodss,1
 k8s.io/kubernetes/pkg/api/v1,vulpecula,1
 k8s.io/kubernetes/pkg/api/v1/endpoints,sttts,0
@@ -575,6 +574,7 @@ k8s.io/kubernetes/pkg/apis/extensions,bgrant0607,1
 k8s.io/kubernetes/pkg/apis/extensions/v1beta1,madhusudancs,1
 k8s.io/kubernetes/pkg/apis/extensions/validation,nikhiljindal,1
 k8s.io/kubernetes/pkg/apis/meta/v1,sttts,0
+k8s.io/kubernetes/pkg/apis/meta/v1/validation,jszczepkowski,1
 k8s.io/kubernetes/pkg/apis/policy/validation,deads2k,1
 k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1
@@ -610,7 +610,7 @@ k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack,roberthbailey,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/gce,yifan-gu,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/mesos,mml,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/openstack,Q-Lee,1
-k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt,girishkalele,1
+k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt,dchen1107,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/photon,luomiao,0
 k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace,caesarxuchao,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere,apelisse,1
@@ -734,7 +734,7 @@ k8s.io/kubernetes/pkg/registry/core/controller,freehan,1
 k8s.io/kubernetes/pkg/registry/core/controller/etcd,fabioy,1
 k8s.io/kubernetes/pkg/registry/core/endpoint,bprashanth,1
 k8s.io/kubernetes/pkg/registry/core/endpoint/etcd,mikedanese,1
-k8s.io/kubernetes/pkg/registry/core/event,girishkalele,1
+k8s.io/kubernetes/pkg/registry/core/event,ixdy,1
 k8s.io/kubernetes/pkg/registry/core/event/etcd,yujuhong,1
 k8s.io/kubernetes/pkg/registry/core/limitrange,yifan-gu,1
 k8s.io/kubernetes/pkg/registry/core/limitrange/etcd,mikedanese,1
@@ -821,7 +821,7 @@ k8s.io/kubernetes/pkg/util/bandwidth,thockin,1
 k8s.io/kubernetes/pkg/util/cache,thockin,1
 k8s.io/kubernetes/pkg/util/cert,karlkfi,1
 k8s.io/kubernetes/pkg/util/clock,zmerlynn,1
-k8s.io/kubernetes/pkg/util/config,girishkalele,1
+k8s.io/kubernetes/pkg/util/config,jszczepkowski,1
 k8s.io/kubernetes/pkg/util/configz,ixdy,1
 k8s.io/kubernetes/pkg/util/dbus,roberthbailey,1
 k8s.io/kubernetes/pkg/util/diff,piosz,1
@@ -872,7 +872,7 @@ k8s.io/kubernetes/pkg/util/yaml,rmmh,1
 k8s.io/kubernetes/pkg/version,spxtr,1
 k8s.io/kubernetes/pkg/volume,saad-ali,0
 k8s.io/kubernetes/pkg/volume/aws_ebs,caesarxuchao,1
-k8s.io/kubernetes/pkg/volume/azure_dd,girishkalele,1
+k8s.io/kubernetes/pkg/volume/azure_dd,bgrant0607,1
 k8s.io/kubernetes/pkg/volume/azure_file,maisem,1
 k8s.io/kubernetes/pkg/volume/cephfs,eparis,1
 k8s.io/kubernetes/pkg/volume/cinder,jsafrane,1
