@@ -1,0 +1,14 @@
+apiVersion: extensions/v1beta1
+kind: ReplicaSet
+metadata:
+  name: myrs
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx

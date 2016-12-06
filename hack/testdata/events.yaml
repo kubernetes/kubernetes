@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Event
+metadata:
+  name: myevents
+involvedObject:
+  apiVersion: v1
+  kind: Namespace
+  name: default
