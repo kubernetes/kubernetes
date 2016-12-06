@@ -1357,7 +1357,7 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 		// since whether the process is running in a TTY cannot be changed after it has started.  We
 		// need the api.Pod to get the TTY status.
 		pod, found := kl.GetPodByFullName(podFullName)
-		if !found || pod.UID != podUID {
+		if !found || (string(podUID) != "" && pod.UID != podUID) {
 			return nil, fmt.Errorf("pod %s not found", podFullName)
 		}
 		containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
