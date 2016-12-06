@@ -54,6 +54,52 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 			},
 		},
 	})
+	validClaimGoldStorageClass := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		Selector: &metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      "key2",
+					Operator: "Exists",
+				},
+			},
+		},
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
+			},
+		},
+	})
+	validClaimGoldStorageClass.Annotations = map[string]string{
+		util.StorageClassAnnotation: "gold",
+	}
+
+	validClaimBronzeStorageClass := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		Selector: &metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      "key2",
+					Operator: "Exists",
+				},
+			},
+		},
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
+			},
+		},
+	})
+	validClaimBronzeStorageClass.Annotations = map[string]string{
+		util.StorageClassAnnotation: "bronze",
+	}
+
 	missingStorage := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 		Selector: &metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -72,6 +118,27 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 		},
 	})
 
+	missingGoldStorage := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		Selector: &metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      "key2",
+					Operator: "Exists",
+				},
+			},
+		},
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{},
+		},
+	})
+	missingGoldStorage.Annotations = map[string]string{
+		util.StorageClassAnnotation: "gold",
+	}
+
 	testCases := map[string]struct {
 		pvc      *api.PersistentVolumeClaim
 		required []api.ResourceName
@@ -80,6 +147,11 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 		"missing storage": {
 			pvc:      missingStorage,
 			required: []api.ResourceName{api.ResourceRequestsStorage},
+			err:      `must specify requests.storage`,
+		},
+		"missing gold storage": {
+			pvc:      missingStorage,
+			required: []api.ResourceName{ResourceByStorageClass("gold", api.ResourceRequestsStorage)},
 			err:      `must specify requests.storage`,
 		},
 		"valid-claim-quota-storage": {
@@ -93,6 +165,24 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 		"valid-claim-quota-storage-and-pvc": {
 			pvc:      validClaim,
 			required: []api.ResourceName{api.ResourceRequestsStorage, api.ResourcePersistentVolumeClaims},
+		},
+		"valid-claim-gold-quota-gold": {
+			pvc: validClaimGoldStorageClass,
+			required: []api.ResourceName{
+				api.ResourceRequestsStorage,
+				api.ResourcePersistentVolumeClaims,
+				ResourceByStorageClass("gold", api.ResourceRequestsStorage),
+				ResourceByStorageClass("gold", api.ResourcePersistentVolumeClaims),
+			},
+		},
+		"valid-claim-bronze-with-quota-gold": {
+			pvc: validClaimBronzeStorageClass,
+			required: []api.ResourceName{
+				api.ResourceRequestsStorage,
+				api.ResourcePersistentVolumeClaims,
+				ResourceByStorageClass("gold", api.ResourceRequestsStorage),
+				ResourceByStorageClass("gold", api.ResourcePersistentVolumeClaims),
+			},
 		},
 	}
 

@@ -34,7 +34,19 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+// pvcResources are the set of static resources managed by quota associated with pvcs.
+// for each resouce in this list, it may be refined dynamically based on storage class.
+var pvcResources = []api.ResourceName{
+	api.ResourcePersistentVolumeClaims,
+	api.ResourceRequestsStorage,
+}
+
 // storageClassSuffix is the suffix to the qualified portion of storage class resource name.
+// For example, if you want to quota storage by storage class, you would have a declaration
+// that follows <storage-class>.storage-class.kubernetes.io/<resource>.
+// For example:
+// * gold.storage-class.kubernetes.io/requests.storage: 500Gi
+// * bronze.storage-class.kubernetes.io/requests.storage: 500Gi
 const storageClassSuffix string = ".storage-class.kubernetes.io/"
 
 // ResourceByStorageClass returns a quota resource name by storage class.
@@ -73,23 +85,14 @@ func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface, f informe
 		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, schema.GroupResource{Resource: "persistentvolumeclaims"})
 	}
 	return &pvcEvaluator{
-		fixedResources: []api.ResourceName{
-			api.ResourcePersistentVolumeClaims,
-			api.ResourceRequestsStorage,
-		},
 		listFuncByNamespace: listFuncByNamespace,
-		operations:          []admission.Operation{admission.Create},
 	}
 }
 
 // pvcEvaluator knows how to evaluate quota usage for persistent volume claims
 type pvcEvaluator struct {
-	// fixedResources are the set of resource names tracked by quota.
-	fixedResources []api.ResourceName
 	// listFuncByNamespace knows how to list pvc claims
 	listFuncByNamespace generic.ListFuncByNamespace
-	// operations are the set of operations that are handled by this evaluator
-	operations []admission.Operation
 }
 
 // Constraints verifies that all required resources are present on the item.
@@ -100,7 +103,7 @@ func (p *pvcEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 	}
 
 	// these are the items that we will be handling based on the objects actual storage-class
-	pvcRequiredSet := []api.ResourceName{api.ResourceRequestsStorage, api.ResourcePersistentVolumeClaims}
+	pvcRequiredSet := append([]api.ResourceName{}, pvcResources...)
 	if storageClassRef := util.GetClaimStorageClass(pvc); len(storageClassRef) > 0 {
 		pvcRequiredSet = append(pvcRequiredSet, ResourceByStorageClass(storageClassRef, api.ResourcePersistentVolumeClaims))
 		pvcRequiredSet = append(pvcRequiredSet, ResourceByStorageClass(storageClassRef, api.ResourceRequestsStorage))
@@ -137,7 +140,7 @@ func (p *pvcEvaluator) GroupKind() schema.GroupKind {
 
 // Handles returns true if the evalutor should handle the specified operation.
 func (p *pvcEvaluator) Handles(operation admission.Operation) bool {
-	return generic.Contains(p.operations, operation)
+	return admission.Create == operation
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -149,12 +152,12 @@ func (p *pvcEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 func (p *pvcEvaluator) MatchingResources(items []api.ResourceName) []api.ResourceName {
 	result := []api.ResourceName{}
 	for _, item := range items {
-		if quota.Contains(p.fixedResources, item) {
+		if quota.Contains(pvcResources, item) {
 			result = append(result, item)
 			continue
 		}
 		// match pvc resources scoped by storage class (<storage-class-name>.storage-class.kubernetes.io/<resource>)
-		for _, resource := range p.fixedResources {
+		for _, resource := range pvcResources {
 			byStorageClass := storageClassSuffix + string(resource)
 			if strings.HasSuffix(string(item), byStorageClass) {
 				result = append(result, item)

@@ -62,16 +62,6 @@ func MatchesNoScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) (bo
 	return false, nil
 }
 
-// Contains returns true if the specified operation is in the list.
-func Contains(operations []admission.Operation, operation admission.Operation) bool {
-	for _, op := range operations {
-		if op == operation {
-			return true
-		}
-	}
-	return false
-}
-
 // Matches returns true if the quota matches the specified item.
 func Matches(resourceQuota *api.ResourceQuota, item runtime.Object, matchFunc MatchingResourceNamesFunc, scopeFunc MatchesScopeFunc) (bool, error) {
 	if resourceQuota == nil {

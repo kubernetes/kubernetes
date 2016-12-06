@@ -32,14 +32,16 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+// serviceResources are the set of resources managed by quota associated with services.
+var serviceResources = []api.ResourceName{
+	api.ResourceServices,
+	api.ResourceServicesNodePorts,
+	api.ResourceServicesLoadBalancers,
+}
+
 // NewServiceEvaluator returns an evaluator that can evaluate service quotas
 func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	return &serviceEvaluator{
-		resources: []api.ResourceName{
-			api.ResourceServices,
-			api.ResourceServicesNodePorts,
-			api.ResourceServicesLoadBalancers,
-		},
 		listFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().Services(namespace).List(options)
 			if err != nil {
@@ -51,18 +53,13 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 			}
 			return results, nil
 		},
-		operations: []admission.Operation{admission.Create, admission.Update},
 	}
 }
 
 // serviceEvaluator knows how to measure usage for services.
 type serviceEvaluator struct {
-	// list of resources tracked with services
-	resources []api.ResourceName
 	// knows how to list items by namespace
 	listFuncByNamespace generic.ListFuncByNamespace
-	// set of operations tracked by this evaluator
-	operations []admission.Operation
 }
 
 // Constraints verifies that all required resources are present on the item
@@ -96,7 +93,8 @@ func (p *serviceEvaluator) GroupKind() schema.GroupKind {
 
 // Handles returns true of the evalutor should handle the specified operation.
 func (p *serviceEvaluator) Handles(operation admission.Operation) bool {
-	return generic.Contains(p.operations, operation)
+	// We handle create and update because a service type can change.
+	return admission.Create == operation || admission.Update == operation
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -106,9 +104,10 @@ func (p *serviceEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtim
 
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (p *serviceEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
-	return quota.Intersection(input, p.resources)
+	return quota.Intersection(input, serviceResources)
 }
 
+// convert the input object to an internal service object or error.
 func toInternalServiceOrError(obj runtime.Object) (*api.Service, error) {
 	svc := &api.Service{}
 	switch t := obj.(type) {

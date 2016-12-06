@@ -36,6 +36,17 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
+// podResources are the set of resources managed by quota associated with pods.
+var podResources = []api.ResourceName{
+	api.ResourceCPU,
+	api.ResourceMemory,
+	api.ResourceRequestsCPU,
+	api.ResourceRequestsMemory,
+	api.ResourceLimitsCPU,
+	api.ResourceLimitsMemory,
+	api.ResourcePods,
+}
+
 // listPodsByNamespaceFuncUsingClient returns a pod listing function based on the provided client.
 func listPodsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.ListFuncByNamespace {
 	// TODO: ideally, we could pass dynamic client pool down into this code, and have one way of doing this.
@@ -57,35 +68,19 @@ func listPodsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.
 // NewPodEvaluator returns an evaluator that can evaluate pods
 // if the specified shared informer factory is not nil, evaluator may use it to support listing functions.
 func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
-	computeResources := []api.ResourceName{
-		api.ResourceCPU,
-		api.ResourceMemory,
-		api.ResourceRequestsCPU,
-		api.ResourceRequestsMemory,
-		api.ResourceLimitsCPU,
-		api.ResourceLimitsMemory,
-	}
-	allResources := append(computeResources, api.ResourcePods)
 	listFuncByNamespace := listPodsByNamespaceFuncUsingClient(kubeClient)
 	if f != nil {
 		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, schema.GroupResource{Resource: "pods"})
 	}
 	return &podEvaluator{
-		resources:           allResources,
 		listFuncByNamespace: listFuncByNamespace,
-		// TODO: update if and when pods support updating resource requirements.
-		operations: []admission.Operation{admission.Create},
 	}
 }
 
 // podEvaluator knows how to measure usage of pods.
 type podEvaluator struct {
-	// set of resources matched by this evaluator
-	resources []api.ResourceName
 	// knows how to list pods
 	listFuncByNamespace generic.ListFuncByNamespace
-	//operations are the set of operations that are handled by this evaluator
-	operations []admission.Operation
 }
 
 // Constraints verifies that all required resources are present on the pod
@@ -136,7 +131,8 @@ func (p *podEvaluator) GroupKind() schema.GroupKind {
 
 // Handles returns true of the evalutor should handle the specified operation.
 func (p *podEvaluator) Handles(operation admission.Operation) bool {
-	return generic.Contains(p.operations, operation)
+	// TODO: update this if/when pods support resizing resource requirements.
+	return admission.Create == operation
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -146,7 +142,7 @@ func (p *podEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (p *podEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
-	return quota.Intersection(input, p.resources)
+	return quota.Intersection(input, podResources)
 }
 
 // Usage knows how to measure usage associated with pods
