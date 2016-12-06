@@ -177,7 +177,10 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := evaluator.Usage(testCase.pvc)
+		actual, err := evaluator.Usage(testCase.pvc)
+		if err != nil {
+			t.Errorf("%s unexpected error: %v", testName, err)
+		}
 		if !quota.Equals(testCase.usage, actual) {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
 		}

@@ -49,11 +49,11 @@ type Evaluator interface {
 	// If true, admission control must perform quota processing for the operation, otherwise it is safe to ignore quota.
 	Handles(operation admission.Operation) bool
 	// Matches returns true if the specified quota matches the input item
-	Matches(resourceQuota *api.ResourceQuota, item runtime.Object) bool
-	// MatchingResources takes the input specified list of resources and returns the set of resources it matches.
+	Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error)
+	// MatchingResources takes the input specified list of resources and returns the set of resources evaluator matches.
 	MatchingResources(input []api.ResourceName) []api.ResourceName
 	// Usage returns the resource usage for the specified object
-	Usage(item runtime.Object) api.ResourceList
+	Usage(item runtime.Object) (api.ResourceList, error)
 	// UsageStats calculates latest observed usage stats for all objects
 	UsageStats(options UsageStatsOptions) (UsageStats, error)
 }

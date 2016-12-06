@@ -49,17 +49,17 @@ func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, groupResou
 type ListFuncByNamespace func(namespace string, options v1.ListOptions) ([]runtime.Object, error)
 
 // MatchesScopeFunc knows how to evaluate if an object matches a scope
-type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) bool
+type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) (bool, error)
 
 // UsageFunc knows how to measure usage associated with an object
-type UsageFunc func(object runtime.Object) api.ResourceList
+type UsageFunc func(object runtime.Object) (api.ResourceList, error)
 
 // MatchingResourceNamesFunc is a function that returns the list of resources matched
 type MatchingResourceNamesFunc func(input []api.ResourceName) []api.ResourceName
 
 // MatchesNoScopeFunc returns false on all match checks
-func MatchesNoScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bool {
-	return false
+func MatchesNoScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) (bool, error) {
+	return false, nil
 }
 
 // Contains returns true if the specified operation is in the list.
@@ -73,18 +73,22 @@ func Contains(operations []admission.Operation, operation admission.Operation) b
 }
 
 // Matches returns true if the quota matches the specified item.
-func Matches(resourceQuota *api.ResourceQuota, item runtime.Object, matchFunc MatchingResourceNamesFunc, scopeFunc MatchesScopeFunc) bool {
+func Matches(resourceQuota *api.ResourceQuota, item runtime.Object, matchFunc MatchingResourceNamesFunc, scopeFunc MatchesScopeFunc) (bool, error) {
 	if resourceQuota == nil {
-		return false
+		return false, fmt.Errorf("expected non-nil quota")
 	}
 	// verify the quota matches on at least one resource
 	matchResource := len(matchFunc(quota.ResourceNames(resourceQuota.Status.Hard))) > 0
 	// by default, no scopes matches all
 	matchScope := true
 	for _, scope := range resourceQuota.Spec.Scopes {
-		matchScope = matchScope && scopeFunc(scope, item)
+		innerMatch, err := scopeFunc(scope, item)
+		if err != nil {
+			return false, err
+		}
+		matchScope = matchScope && innerMatch
 	}
-	return matchResource && matchScope
+	return matchResource && matchScope, nil
 }
 
 // CalculateUsageStats is a utility function that knows how to calculate aggregate usage.
@@ -107,13 +111,21 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 		// need to verify that the item matches the set of scopes
 		matchesScopes := true
 		for _, scope := range options.Scopes {
-			if !scopeFunc(scope, item) {
+			innerMatch, err := scopeFunc(scope, item)
+			if err != nil {
+				return result, nil
+			}
+			if !innerMatch {
 				matchesScopes = false
 			}
 		}
 		// only count usage if there was a match
 		if matchesScopes {
-			result.Used = quota.Add(result.Used, usageFunc(item))
+			usage, err := usageFunc(item)
+			if err != nil {
+				return result, err
+			}
+			result.Used = quota.Add(result.Used, usage)
 		}
 	}
 	return result, nil
@@ -154,7 +166,7 @@ func (o *ObjectCountEvaluator) Handles(operation admission.Operation) bool {
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
-func (o *ObjectCountEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) bool {
+func (o *ObjectCountEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error) {
 	return Matches(resourceQuota, item, o.MatchingResources, MatchesNoScopeFunc)
 }
 
@@ -164,11 +176,11 @@ func (o *ObjectCountEvaluator) MatchingResources(input []api.ResourceName) []api
 }
 
 // Usage returns the resource usage for the specified object
-func (o *ObjectCountEvaluator) Usage(object runtime.Object) api.ResourceList {
+func (o *ObjectCountEvaluator) Usage(object runtime.Object) (api.ResourceList, error) {
 	quantity := resource.NewQuantity(1, resource.DecimalSI)
 	return api.ResourceList{
 		o.ResourceName: *quantity,
-	}
+	}, nil
 }
 
 // UsageStats calculates aggregate usage for the object.

@@ -74,7 +74,10 @@ func (p *serviceEvaluator) Constraints(required []api.ResourceName, item runtime
 
 	requiredSet := quota.ToSet(required)
 	missingSet := sets.NewString()
-	serviceUsage := ServiceUsageFunc(service)
+	serviceUsage, err := p.Usage(service)
+	if err != nil {
+		return err
+	}
 	serviceSet := quota.ToSet(quota.ResourceNames(serviceUsage))
 	if diff := requiredSet.Difference(serviceSet); len(diff) > 0 {
 		missingSet.Insert(diff.List()...)
@@ -97,7 +100,7 @@ func (p *serviceEvaluator) Handles(operation admission.Operation) bool {
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
-func (p *serviceEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) bool {
+func (p *serviceEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error) {
 	return generic.Matches(resourceQuota, item, p.MatchingResources, generic.MatchesNoScopeFunc)
 }
 
@@ -106,40 +109,34 @@ func (p *serviceEvaluator) MatchingResources(input []api.ResourceName) []api.Res
 	return quota.Intersection(input, p.resources)
 }
 
-// Usage knows how to measure usage associated with pods
-func (p *serviceEvaluator) Usage(item runtime.Object) api.ResourceList {
-	return ServiceUsageFunc(item)
-}
-
-// UsageStats calculates aggregate usage for the object.
-func (p *serviceEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
-}
-
-var _ quota.Evaluator = &serviceEvaluator{}
-
-// ServiceUsageFunc knows how to measure usage associated with services
-func ServiceUsageFunc(object runtime.Object) api.ResourceList {
-	result := api.ResourceList{}
-	var serviceType api.ServiceType
-	var ports int
-
-	switch t := object.(type) {
+func toInternalServiceOrError(obj runtime.Object) (*api.Service, error) {
+	svc := &api.Service{}
+	switch t := obj.(type) {
 	case *v1.Service:
-		serviceType = api.ServiceType(t.Spec.Type)
-		ports = len(t.Spec.Ports)
+		if err := v1.Convert_v1_Service_To_api_Service(t, svc, nil); err != nil {
+			return nil, err
+		}
 	case *api.Service:
-		serviceType = t.Spec.Type
-		ports = len(t.Spec.Ports)
+		svc = t
 	default:
-		panic(fmt.Sprintf("expect *api.Service or *v1.Service, got %v", t))
+		return nil, fmt.Errorf("expect *api.Service or *v1.Service, got %v", t)
 	}
+	return svc, nil
+}
 
+// Usage knows how to measure usage associated with pods
+func (p *serviceEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
+	result := api.ResourceList{}
+	svc, err := toInternalServiceOrError(item)
+	if err != nil {
+		return result, err
+	}
+	ports := len(svc.Spec.Ports)
 	// default service usage
 	result[api.ResourceServices] = *(resource.NewQuantity(1, resource.DecimalSI))
 	result[api.ResourceServicesLoadBalancers] = resource.Quantity{Format: resource.DecimalSI}
 	result[api.ResourceServicesNodePorts] = resource.Quantity{Format: resource.DecimalSI}
-	switch serviceType {
+	switch svc.Spec.Type {
 	case api.ServiceTypeNodePort:
 		// node port services need to count node ports
 		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
@@ -148,8 +145,15 @@ func ServiceUsageFunc(object runtime.Object) api.ResourceList {
 		// load balancer services need to count load balancers
 		result[api.ResourceServicesLoadBalancers] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
-	return result
+	return result, nil
 }
+
+// UsageStats calculates aggregate usage for the object.
+func (p *serviceEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
+}
+
+var _ quota.Evaluator = &serviceEvaluator{}
 
 // QuotaServiceType returns true if the service type is eligible to track against a quota
 func QuotaServiceType(service *v1.Service) bool {

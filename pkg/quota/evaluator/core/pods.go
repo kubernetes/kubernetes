@@ -140,7 +140,7 @@ func (p *podEvaluator) Handles(operation admission.Operation) bool {
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
-func (p *podEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) bool {
+func (p *podEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error) {
 	return generic.Matches(resourceQuota, item, p.MatchingResources, podMatchesScopeFunc)
 }
 
@@ -150,7 +150,7 @@ func (p *podEvaluator) MatchingResources(input []api.ResourceName) []api.Resourc
 }
 
 // Usage knows how to measure usage associated with pods
-func (p *podEvaluator) Usage(item runtime.Object) api.ResourceList {
+func (p *podEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
 	return PodUsageFunc(item)
 }
 
@@ -196,43 +196,49 @@ func podUsageHelper(requests api.ResourceList, limits api.ResourceList) api.Reso
 	return result
 }
 
-func toInternalPodOrDie(obj runtime.Object) *api.Pod {
+func toInternalPodOrError(obj runtime.Object) (*api.Pod, error) {
 	pod := &api.Pod{}
 	switch t := obj.(type) {
 	case *v1.Pod:
 		if err := v1.Convert_v1_Pod_To_api_Pod(t, pod, nil); err != nil {
-			panic(err)
+			return nil, err
 		}
 	case *api.Pod:
 		pod = t
 	default:
-		panic(fmt.Sprintf("expect *api.Pod or *v1.Pod, got %v", t))
+		return nil, fmt.Errorf("expect *api.Pod or *v1.Pod, got %v", t)
 	}
-	return pod
+	return pod, nil
 }
 
 // podMatchesScopeFunc is a function that knows how to evaluate if a pod matches a scope
-func podMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bool {
-	pod := toInternalPodOrDie(object)
+func podMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) (bool, error) {
+	pod, err := toInternalPodOrError(object)
+	if err != nil {
+		return false, err
+	}
 	switch scope {
 	case api.ResourceQuotaScopeTerminating:
-		return isTerminating(pod)
+		return isTerminating(pod), nil
 	case api.ResourceQuotaScopeNotTerminating:
-		return !isTerminating(pod)
+		return !isTerminating(pod), nil
 	case api.ResourceQuotaScopeBestEffort:
-		return isBestEffort(pod)
+		return isBestEffort(pod), nil
 	case api.ResourceQuotaScopeNotBestEffort:
-		return !isBestEffort(pod)
+		return !isBestEffort(pod), nil
 	}
-	return false
+	return false, nil
 }
 
 // PodUsageFunc knows how to measure usage associated with pods
-func PodUsageFunc(obj runtime.Object) api.ResourceList {
-	pod := toInternalPodOrDie(obj)
+func PodUsageFunc(obj runtime.Object) (api.ResourceList, error) {
+	pod, err := toInternalPodOrError(obj)
+	if err != nil {
+		return api.ResourceList{}, err
+	}
 	// by convention, we do not quota pods that have reached an end-of-life state
 	if !QuotaPod(pod) {
-		return api.ResourceList{}
+		return api.ResourceList{}, nil
 	}
 	requests := api.ResourceList{}
 	limits := api.ResourceList{}
@@ -250,7 +256,7 @@ func PodUsageFunc(obj runtime.Object) api.ResourceList {
 		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
-	return podUsageHelper(requests, limits)
+	return podUsageHelper(requests, limits), nil
 }
 
 func isBestEffort(pod *api.Pod) bool {

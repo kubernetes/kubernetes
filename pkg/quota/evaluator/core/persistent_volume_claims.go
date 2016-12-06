@@ -113,7 +113,10 @@ func (p *pvcEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 	requiredSet := quota.ToSet(requiredResources)
 
 	// usage for this pvc will only include global pvc items + this storage class specific items
-	pvcUsage := p.Usage(item)
+	pvcUsage, err := p.Usage(item)
+	if err != nil {
+		return err
+	}
 
 	// determine what required resources were not tracked by usage.
 	missingSet := sets.NewString()
@@ -138,7 +141,7 @@ func (p *pvcEvaluator) Handles(operation admission.Operation) bool {
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
-func (p *pvcEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) bool {
+func (p *pvcEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error) {
 	return generic.Matches(resourceQuota, item, p.MatchingResources, generic.MatchesNoScopeFunc)
 }
 
@@ -163,9 +166,12 @@ func (p *pvcEvaluator) MatchingResources(items []api.ResourceName) []api.Resourc
 }
 
 // Usage knows how to measure usage associated with item.
-func (p *pvcEvaluator) Usage(item runtime.Object) api.ResourceList {
+func (p *pvcEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
 	result := api.ResourceList{}
-	pvc := toInternalPersistentVolumeClaimOrDie(item)
+	pvc, err := toInternalPersistentVolumeClaimOrError(item)
+	if err != nil {
+		return result, err
+	}
 	storageClassRef := util.GetClaimStorageClass(pvc)
 
 	// charge for claim
@@ -184,7 +190,7 @@ func (p *pvcEvaluator) Usage(item runtime.Object) api.ResourceList {
 			result[storageClassStorage] = request
 		}
 	}
-	return result
+	return result, nil
 }
 
 // UsageStats calculates aggregate usage for the object.
@@ -195,17 +201,17 @@ func (p *pvcEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageS
 // ensure we implement required interface
 var _ quota.Evaluator = &pvcEvaluator{}
 
-func toInternalPersistentVolumeClaimOrDie(obj runtime.Object) *api.PersistentVolumeClaim {
+func toInternalPersistentVolumeClaimOrError(obj runtime.Object) (*api.PersistentVolumeClaim, error) {
 	pvc := &api.PersistentVolumeClaim{}
 	switch t := obj.(type) {
 	case *v1.PersistentVolumeClaim:
 		if err := v1.Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(t, pvc, nil); err != nil {
-			panic(err)
+			return nil, err
 		}
 	case *api.PersistentVolumeClaim:
 		pvc = t
 	default:
-		panic(fmt.Sprintf("expect *api.PersistentVolumeClaim or *v1.PersistentVolumeClaim, got %v", t))
+		return nil, fmt.Errorf("expect *api.PersistentVolumeClaim or *v1.PersistentVolumeClaim, got %v", t)
 	}
-	return pvc
+	return pvc, nil
 }
