@@ -18,6 +18,7 @@ package genericapiserver
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -60,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/runtime"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
@@ -180,7 +182,7 @@ type SecureServingInfo struct {
 	SNICerts map[string]*tls.Certificate
 
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
-	ClientCA string
+	ClientCA *x509.CertPool
 }
 
 // NewConfig returns a Config struct with the default values
@@ -232,7 +234,6 @@ func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingO
 		ServingInfo: ServingInfo{
 			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
 		},
-		ClientCA: secureServing.ClientCA,
 	}
 
 	serverCertFile, serverKeyFile := secureServing.ServerCert.CertKey.CertFile, secureServing.ServerCert.CertKey.KeyFile
@@ -300,13 +301,40 @@ func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOpt
 	return c
 }
 
-func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOptions) *Config {
+func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOptions) (*Config, error) {
 	if o == nil || o.PasswordFile == nil {
-		return c
+		return c, nil
+	}
+
+	if c.SecureServingInfo != nil {
+		if o.ClientCert != nil && len(o.ClientCert.ClientCA) > 0 {
+			clientCAs, err := certutil.CertsFromFile(o.ClientCert.ClientCA)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load client CA file: %v", err)
+			}
+			if c.SecureServingInfo.ClientCA == nil {
+				c.SecureServingInfo.ClientCA = x509.NewCertPool()
+			}
+			for _, cert := range clientCAs {
+				c.SecureServingInfo.ClientCA.AddCert(cert)
+			}
+		}
+		if o.RequestHeader != nil && len(o.RequestHeader.ClientCAFile) > 0 {
+			clientCAs, err := certutil.CertsFromFile(o.RequestHeader.ClientCAFile)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load requestheader client CA file: %v", err)
+			}
+			if c.SecureServingInfo.ClientCA == nil {
+				c.SecureServingInfo.ClientCA = x509.NewCertPool()
+			}
+			for _, cert := range clientCAs {
+				c.SecureServingInfo.ClientCA.AddCert(cert)
+			}
+		}
 	}
 
 	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
-	return c
+	return c, nil
 }
 
 // ApplyOptions applies the run options to the method receiver and returns self
