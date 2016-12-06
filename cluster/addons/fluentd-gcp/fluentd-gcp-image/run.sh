@@ -26,4 +26,4 @@ fi
 LD_PRELOAD=/opt/td-agent/embedded/lib/libjemalloc.so
 RUBY_GC_HEAP_OLDOBJECT_LIMIT_FACTOR=0.9
 
-/usr/sbin/td-agent "$@"
+/usr/sbin/td-agent $@
