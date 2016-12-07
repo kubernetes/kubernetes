@@ -288,6 +288,7 @@ pkg/util/replicaset
 pkg/util/restoptions
 pkg/util/runtime
 pkg/util/sets
+pkg/util/tail
 pkg/util/validation
 pkg/util/validation/field
 pkg/util/version
