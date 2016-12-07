@@ -1,19 +1,19 @@
 package ansiterm
 
-type OscStringState struct {
-	BaseState
+type oscStringState struct {
+	baseState
 }
 
-func (oscState OscStringState) Handle(b byte) (s State, e error) {
+func (oscState oscStringState) Handle(b byte) (s state, e error) {
 	logger.Infof("OscString::Handle %#x", b)
-	nextState, err := oscState.BaseState.Handle(b)
+	nextState, err := oscState.baseState.Handle(b)
 	if nextState != nil || err != nil {
 		return nextState, err
 	}
 
 	switch {
 	case isOscStringTerminator(b):
-		return oscState.parser.Ground, nil
+		return oscState.parser.ground, nil
 	}
 
 	return oscState, nil
