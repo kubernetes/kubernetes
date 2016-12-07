@@ -42,7 +42,7 @@ const (
 	defaultTimeout = 10 * time.Minute
 )
 
-func newPodwithReadyCondition(podName string) *v1.Pod {
+func newPod(podName string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:   podName,
@@ -56,13 +56,16 @@ func newPodwithReadyCondition(podName string) *v1.Pod {
 				},
 			},
 		},
-		Status: v1.PodStatus{
-			Phase: v1.PodRunning,
-			Conditions: []v1.PodCondition{
-				{
-					Type:   v1.PodReady,
-					Status: v1.ConditionTrue,
-				},
+	}
+}
+
+func addPodConditionReady(pod *v1.Pod) {
+	pod.Status = v1.PodStatus{
+		Phase: v1.PodRunning,
+		Conditions: []v1.PodCondition{
+			{
+				Type:   v1.PodReady,
+				Status: v1.ConditionTrue,
 			},
 		},
 	}
@@ -142,12 +145,13 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	// Generate 10 pods to evict
 	for i := 0; i < 10; i++ {
 		podName := fmt.Sprintf(podNameFormat, i)
-		pod := newPodwithReadyCondition(podName)
+		pod := newPod(podName)
 
 		if _, err := clientSet.Core().Pods(ns.Name).Create(pod); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
+		addPodConditionReady(pod)
 		clientSet.Core().Pods(ns.Name).UpdateStatus(pod)
 	}
 
@@ -179,7 +183,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			}
 			if e != nil {
 				if errors.IsConflict(err) {
-					errCh <- fmt.Errorf("Failed to handle concurrent updates on PDB because of conflict: %v", e)
+					fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
 				} else {
 					errCh <- e
 				}
