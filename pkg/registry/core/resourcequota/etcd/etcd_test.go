@@ -188,6 +188,9 @@ func TestUpdateStatus(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	rqOut := obj.(*api.ResourceQuota)
 	// only compare the meaningful update b/c we can't compare due to metadata
 	if !api.Semantic.DeepEqual(resourcequotaIn.Status, rqOut.Status) {
