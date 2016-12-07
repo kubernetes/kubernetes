@@ -57,7 +57,10 @@ spec:
       privileged: true
     volumeMounts:
     - mountPath: /etc/ssl/certs
-      name: ssl-certs-host
+      name: etc-ssl-certs
+      readOnly: true
+    - mountPath: /usr/share/ca-certificates
+      name: usr-ca-certs
       readOnly: true
     - mountPath: /var/log
       name: varlog
@@ -68,7 +71,10 @@ spec:
   volumes:
   - hostPath:
       path: /usr/share/ca-certificates
-    name: ssl-certs-host
+    name: usr-ca-certs
+  - hostPath:
+      path: /etc/ssl/certs
+    name: etc-ssl-certs
   - hostPath:
       path: /var/lib/kube-proxy/kubeconfig
     name: kubeconfig
