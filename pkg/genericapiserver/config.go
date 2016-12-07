@@ -343,6 +343,46 @@ func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOpti
 	return c, nil
 }
 
+func (c *Config) ApplyDelegatingAuthenticationOptions(o *options.DelegatingAuthenticationOptions) (*Config, error) {
+	if o == nil {
+		return c, nil
+	}
+
+	cfg, err := o.ToAuthenticationConfig()
+	if err != nil {
+		return nil, err
+	}
+	authenticator, securityDefinitions, err := cfg.New()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Authenticator = authenticator
+	c.OpenAPIConfig.SecurityDefinitions = securityDefinitions
+	c.SupportsBasicAuth = false
+
+	return c, nil
+}
+
+func (c *Config) ApplyDelegatingAuthorizationOptions(o *options.DelegatingAuthorizationOptions) (*Config, error) {
+	if o == nil {
+		return c, nil
+	}
+
+	cfg, err := o.ToAuthorizationConfig()
+	if err != nil {
+		return nil, err
+	}
+	authorizer, err := cfg.New()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Authorizer = authorizer
+
+	return c, nil
+}
+
 // ApplyOptions applies the run options to the method receiver and returns self
 func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	if len(options.AuditLogPath) != 0 {
