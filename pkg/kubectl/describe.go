@@ -2389,7 +2389,8 @@ func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 
 		w.Write(LEVEL_0, "\nData\n====\n")
 		for k, v := range configMap.Data {
-			w.Write(LEVEL_0, "%s:\t%d bytes\n", k, len(v))
+			w.Write(LEVEL_0, "%s:\n----\n", k)
+			w.Write(LEVEL_0, "%s\n", string(v))
 		}
 
 		return nil
