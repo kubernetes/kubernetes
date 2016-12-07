@@ -12,7 +12,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["interface.go"],
+    srcs = ["internal_interfaces.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/client/cache:go_default_library",

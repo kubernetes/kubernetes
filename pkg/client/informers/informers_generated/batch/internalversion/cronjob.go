@@ -24,7 +24,7 @@ import (
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/batch/internalversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -39,7 +39,7 @@ type CronJobInformer interface {
 }
 
 type cronJobInformer struct {
-	factory interfaces.SharedInformerFactory
+	factory internalinterfaces.SharedInformerFactory
 }
 
 func newCronJobInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {

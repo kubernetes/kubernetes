@@ -103,6 +103,10 @@ func packageForGroup(base string, group clientgentypes.Group) string {
 	return filepath.Join(base, group.NonEmpty())
 }
 
+func packageForInternalInterfaces(base string) string {
+	return filepath.Join(base, "internalinterfaces")
+}
+
 // Packages makes the client package definition.
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
@@ -185,6 +189,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		packageList = append(packageList, versionPackage(arguments.OutputPackagePath, gv, boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
 	}
 
+	packageList = append(packageList, factoryInterfacePackage(arguments.OutputPackagePath, boilerplate, customArgs.InternalClientSetPackage, customArgs.VersionedClientSetPackage, typesForGroupVersion))
 	packageList = append(packageList, factoryPackage(arguments.OutputPackagePath, boilerplate, groupVersions, customArgs.InternalClientSetPackage, customArgs.VersionedClientSetPackage, typesForGroupVersion))
 	for _, groupVersionsEntry := range groupVersions {
 		packageList = append(packageList, groupPackage(arguments.OutputPackagePath, groupVersionsEntry, boilerplate))
@@ -208,6 +213,7 @@ func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[st
 				groupVersions:             groupVersions,
 				internalClientSetPackage:  internalClientSetPackage,
 				versionedClientSetPackage: versionedClientSetPackage,
+				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
 			})
 
 			generators = append(generators, &genericGenerator{
@@ -218,6 +224,29 @@ func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[st
 				imports:              generator.NewImportTracker(),
 				groupVersions:        groupVersions,
 				typesForGroupVersion: typesForGroupVersion,
+			})
+
+			return generators
+		},
+	}
+}
+
+func factoryInterfacePackage(basePackage string, boilerplate []byte, internalClientSetPackage, versionedClientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
+	packagePath := packageForInternalInterfaces(basePackage)
+
+	return &generator.DefaultPackage{
+		PackageName: filepath.Base(packagePath),
+		PackagePath: packagePath,
+		HeaderText:  boilerplate,
+		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+			generators = append(generators, &factoryInterfaceGenerator{
+				DefaultGen: generator.DefaultGen{
+					OptionalName: "internal_interfaces",
+				},
+				outputPackage:             packagePath,
+				imports:                   generator.NewImportTracker(),
+				internalClientSetPackage:  internalClientSetPackage,
+				versionedClientSetPackage: versionedClientSetPackage,
 			})
 
 			return generators
@@ -237,9 +266,10 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 				DefaultGen: generator.DefaultGen{
 					OptionalName: "interface",
 				},
-				outputPackage: packagePath,
-				groupVersions: groupVersions,
-				imports:       generator.NewImportTracker(),
+				outputPackage:             packagePath,
+				groupVersions:             groupVersions,
+				imports:                   generator.NewImportTracker(),
+				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
 			})
 			return generators
 		},
@@ -265,6 +295,7 @@ func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerpl
 				outputPackage: packagePath,
 				imports:       generator.NewImportTracker(),
 				types:         typesToGenerate,
+				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
 			})
 
 			for _, t := range typesToGenerate {
@@ -279,6 +310,7 @@ func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerpl
 					internalClientSetPackage:  internalClientSetPackage,
 					versionedClientSetPackage: versionedClientSetPackage,
 					listersPackage:            listersPackage,
+					internalInterfacesPackage: packageForInternalInterfaces(basePackage),
 				})
 			}
 			return generators

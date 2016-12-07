@@ -23,6 +23,10 @@ cmd/kubectl
 cmd/kubelet
 cmd/kubernetes-discovery
 cmd/kubernetes-discovery/pkg/apis/apiregistration/install
+cmd/kubernetes-discovery/pkg/client/informers
+cmd/kubernetes-discovery/pkg/client/informers/apiregistration
+cmd/kubernetes-discovery/pkg/client/informers/apiregistration/internalversion
+cmd/kubernetes-discovery/pkg/client/informers/apiregistration/v1alpha1
 cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion
 cmd/kubernetes-discovery/pkg/client/listers/apiregistration/v1alpha1
 cmd/libs/go2idl/client-gen
