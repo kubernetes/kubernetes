@@ -1,0 +1,18 @@
+version: "build-{branch}-{build}"
+image: Visual Studio 2015
+clone_folder: c:\gopath\src\github.com\hashicorp\hil
+environment:
+  GOPATH: c:\gopath
+init:
+  - git config --global core.autocrlf true
+install:
+- cmd: >-
+    echo %Path%
+
+    go version
+
+    go env
+
+    go get -d -v -t ./...
+build_script:
+- cmd: go test -v ./...

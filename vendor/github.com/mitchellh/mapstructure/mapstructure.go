@@ -8,6 +8,7 @@
 package mapstructure
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -19,10 +20,20 @@ import (
 // DecodeHookFunc is the callback function that can be used for
 // data transformations. See "DecodeHook" in the DecoderConfig
 // struct.
-type DecodeHookFunc func(
-	from reflect.Kind,
-	to reflect.Kind,
-	data interface{}) (interface{}, error)
+//
+// The type should be DecodeHookFuncType or DecodeHookFuncKind.
+// Either is accepted. Types are a superset of Kinds (Types can return
+// Kinds) and are generally a richer thing to use, but Kinds are simpler
+// if you only need those.
+//
+// The reason DecodeHookFunc is multi-typed is for backwards compatibility:
+// we started with Kinds and then realized Types were the better solution,
+// but have a promise to not break backwards compat so we now support
+// both.
+type DecodeHookFunc interface{}
+
+type DecodeHookFuncType func(reflect.Type, reflect.Type, interface{}) (interface{}, error)
+type DecodeHookFuncKind func(reflect.Kind, reflect.Kind, interface{}) (interface{}, error)
 
 // DecoderConfig is the configuration that is used to create a new decoder
 // and allows customization of various aspects of decoding.
@@ -40,6 +51,11 @@ type DecoderConfig struct {
 	// (extra keys).
 	ErrorUnused bool
 
+	// ZeroFields, if set to true, will zero fields before writing them.
+	// For example, a map will be emptied before decoded values are put in
+	// it. If this is false, a map will be merged.
+	ZeroFields bool
+
 	// If WeaklyTypedInput is true, the decoder will make the following
 	// "weak" conversions:
 	//
@@ -51,6 +67,8 @@ type DecoderConfig struct {
 	//   - string to bool (accepts: 1, t, T, TRUE, true, True, 0, f, F,
 	//     FALSE, false, False. Anything else is an error)
 	//   - empty array = empty map and vice versa
+	//   - negative numbers to overflowed uint values (base 10)
+	//   - slice of maps to a merged map
 	//
 	WeaklyTypedInput bool
 
@@ -180,7 +198,9 @@ func (d *Decoder) decode(name string, data interface{}, val reflect.Value) error
 	if d.config.DecodeHook != nil {
 		// We have a DecodeHook, so let's pre-process the data.
 		var err error
-		data, err = d.config.DecodeHook(getKind(dataVal), getKind(val), data)
+		data, err = DecodeHookExec(
+			d.config.DecodeHook,
+			dataVal.Type(), val.Type(), data)
 		if err != nil {
 			return err
 		}
@@ -227,6 +247,10 @@ func (d *Decoder) decode(name string, data interface{}, val reflect.Value) error
 // value to "data" of that type.
 func (d *Decoder) decodeBasic(name string, data interface{}, val reflect.Value) error {
 	dataVal := reflect.ValueOf(data)
+	if !dataVal.IsValid() {
+		dataVal = reflect.Zero(val.Type())
+	}
+
 	dataValType := dataVal.Type()
 	if !dataValType.AssignableTo(val.Type()) {
 		return fmt.Errorf(
@@ -283,6 +307,7 @@ func (d *Decoder) decodeString(name string, data interface{}, val reflect.Value)
 func (d *Decoder) decodeInt(name string, data interface{}, val reflect.Value) error {
 	dataVal := reflect.ValueOf(data)
 	dataKind := getKind(dataVal)
+	dataType := dataVal.Type()
 
 	switch {
 	case dataKind == reflect.Int:
@@ -304,6 +329,14 @@ func (d *Decoder) decodeInt(name string, data interface{}, val reflect.Value) er
 		} else {
 			return fmt.Errorf("cannot parse '%s' as int: %s", name, err)
 		}
+	case dataType.PkgPath() == "encoding/json" && dataType.Name() == "Number":
+		jn := data.(json.Number)
+		i, err := jn.Int64()
+		if err != nil {
+			return fmt.Errorf(
+				"error decoding json.Number into %s: %s", name, err)
+		}
+		val.SetInt(i)
 	default:
 		return fmt.Errorf(
 			"'%s' expected type '%s', got unconvertible type '%s'",
@@ -319,11 +352,21 @@ func (d *Decoder) decodeUint(name string, data interface{}, val reflect.Value) e
 
 	switch {
 	case dataKind == reflect.Int:
-		val.SetUint(uint64(dataVal.Int()))
+		i := dataVal.Int()
+		if i < 0 && !d.config.WeaklyTypedInput {
+			return fmt.Errorf("cannot parse '%s', %d overflows uint",
+				name, i)
+		}
+		val.SetUint(uint64(i))
 	case dataKind == reflect.Uint:
 		val.SetUint(dataVal.Uint())
 	case dataKind == reflect.Float32:
-		val.SetUint(uint64(dataVal.Float()))
+		f := dataVal.Float()
+		if f < 0 && !d.config.WeaklyTypedInput {
+			return fmt.Errorf("cannot parse '%s', %f overflows uint",
+				name, f)
+		}
+		val.SetUint(uint64(f))
 	case dataKind == reflect.Bool && d.config.WeaklyTypedInput:
 		if dataVal.Bool() {
 			val.SetUint(1)
@@ -380,6 +423,7 @@ func (d *Decoder) decodeBool(name string, data interface{}, val reflect.Value) e
 func (d *Decoder) decodeFloat(name string, data interface{}, val reflect.Value) error {
 	dataVal := reflect.ValueOf(data)
 	dataKind := getKind(dataVal)
+	dataType := dataVal.Type()
 
 	switch {
 	case dataKind == reflect.Int:
@@ -401,6 +445,14 @@ func (d *Decoder) decodeFloat(name string, data interface{}, val reflect.Value) 
 		} else {
 			return fmt.Errorf("cannot parse '%s' as float: %s", name, err)
 		}
+	case dataType.PkgPath() == "encoding/json" && dataType.Name() == "Number":
+		jn := data.(json.Number)
+		i, err := jn.Float64()
+		if err != nil {
+			return fmt.Errorf(
+				"error decoding json.Number into %s: %s", name, err)
+		}
+		val.SetFloat(i)
 	default:
 		return fmt.Errorf(
 			"'%s' expected type '%s', got unconvertible type '%s'",
@@ -415,22 +467,43 @@ func (d *Decoder) decodeMap(name string, data interface{}, val reflect.Value) er
 	valKeyType := valType.Key()
 	valElemType := valType.Elem()
 
-	// Make a new map to hold our result
-	mapType := reflect.MapOf(valKeyType, valElemType)
-	valMap := reflect.MakeMap(mapType)
+	// By default we overwrite keys in the current map
+	valMap := val
+
+	// If the map is nil or we're purposely zeroing fields, make a new map
+	if valMap.IsNil() || d.config.ZeroFields {
+		// Make a new map to hold our result
+		mapType := reflect.MapOf(valKeyType, valElemType)
+		valMap = reflect.MakeMap(mapType)
+	}
 
 	// Check input type
 	dataVal := reflect.Indirect(reflect.ValueOf(data))
 	if dataVal.Kind() != reflect.Map {
-		// Accept empty array/slice instead of an empty map in weakly typed mode
-		if d.config.WeaklyTypedInput &&
-			(dataVal.Kind() == reflect.Slice || dataVal.Kind() == reflect.Array) &&
-			dataVal.Len() == 0 {
-			val.Set(valMap)
-			return nil
-		} else {
-			return fmt.Errorf("'%s' expected a map, got '%s'", name, dataVal.Kind())
+		// In weak mode, we accept a slice of maps as an input...
+		if d.config.WeaklyTypedInput {
+			switch dataVal.Kind() {
+			case reflect.Array, reflect.Slice:
+				// Special case for BC reasons (covered by tests)
+				if dataVal.Len() == 0 {
+					val.Set(valMap)
+					return nil
+				}
+
+				for i := 0; i < dataVal.Len(); i++ {
+					err := d.decode(
+						fmt.Sprintf("%s[%d]", name, i),
+						dataVal.Index(i).Interface(), val)
+					if err != nil {
+						return err
+					}
+				}
+
+				return nil
+			}
 		}
+
+		return fmt.Errorf("'%s' expected a map, got '%s'", name, dataVal.Kind())
 	}
 
 	// Accumulate errors
@@ -530,6 +603,14 @@ func (d *Decoder) decodeSlice(name string, data interface{}, val reflect.Value) 
 
 func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value) error {
 	dataVal := reflect.Indirect(reflect.ValueOf(data))
+
+	// If the type of the value to write to and the data match directly,
+	// then we just set it directly instead of recursing into the structure.
+	if dataVal.Type() == val.Type() {
+		val.Set(dataVal)
+		return nil
+	}
+
 	dataValKind := dataVal.Kind()
 	if dataValKind != reflect.Map {
 		return fmt.Errorf("'%s' expected a map, got '%s'", name, dataValKind)
@@ -565,32 +646,37 @@ func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value)
 		structs = structs[1:]
 
 		structType := structVal.Type()
+
 		for i := 0; i < structType.NumField(); i++ {
 			fieldType := structType.Field(i)
+			fieldKind := fieldType.Type.Kind()
 
 			if fieldType.Anonymous {
-				fieldKind := fieldType.Type.Kind()
 				if fieldKind != reflect.Struct {
 					errors = appendErrors(errors,
 						fmt.Errorf("%s: unsupported type: %s", fieldType.Name, fieldKind))
 					continue
 				}
+			}
 
-				// We have an embedded field. We "squash" the fields down
-				// if specified in the tag.
-				squash := false
-				tagParts := strings.Split(fieldType.Tag.Get(d.config.TagName), ",")
-				for _, tag := range tagParts[1:] {
-					if tag == "squash" {
-						squash = true
-						break
-					}
+			// If "squash" is specified in the tag, we squash the field down.
+			squash := false
+			tagParts := strings.Split(fieldType.Tag.Get(d.config.TagName), ",")
+			for _, tag := range tagParts[1:] {
+				if tag == "squash" {
+					squash = true
+					break
 				}
+			}
 
-				if squash {
+			if squash {
+				if fieldKind != reflect.Struct {
+					errors = appendErrors(errors,
+						fmt.Errorf("%s: unsupported type for squash: %s", fieldType.Name, fieldKind))
+				} else {
 					structs = append(structs, val.FieldByName(fieldType.Name))
-					continue
 				}
+				continue
 			}
 
 			// Normal struct field, store it away
