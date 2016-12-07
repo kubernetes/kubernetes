@@ -1119,12 +1119,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 }
 
 func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
-	taints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
+	taints, err := nodeInfo.Taints()
 	if err != nil {
 		return false, nil, err
 	}
@@ -1174,11 +1169,6 @@ func isPodBestEffort(pod *v1.Pod) bool {
 // CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node
 // reporting memory pressure condition.
 func CheckNodeMemoryPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
 	var podBestEffort bool
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		podBestEffort = predicateMeta.podBestEffort
@@ -1186,36 +1176,24 @@ func CheckNodeMemoryPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 		// We couldn't parse metadata - fallback to computing it.
 		podBestEffort = isPodBestEffort(pod)
 	}
-
 	// pod is not BestEffort pod
 	if !podBestEffort {
 		return true, nil, nil
 	}
 
-	// is node under pressure?
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == v1.NodeMemoryPressure && cond.Status == v1.ConditionTrue {
-			return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
-		}
+	// is node under presure?
+	if nodeInfo.MemoryPressureCondition() == v1.ConditionTrue {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
 	}
-
 	return true, nil, nil
 }
 
 // CheckNodeDiskPressurePredicate checks if a pod can be scheduled on a node
 // reporting disk pressure condition.
 func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
+	// is node under presure?
+	if nodeInfo.DiskPressureCondition() == v1.ConditionTrue {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
 	}
-
-	// is node under pressure?
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == v1.NodeDiskPressure && cond.Status == v1.ConditionTrue {
-			return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
-		}
-	}
-
 	return true, nil, nil
 }
