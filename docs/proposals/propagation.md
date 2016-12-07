@@ -111,9 +111,9 @@ Opinion against this:
 
 ### Make HostPath shared for privileged containers, slave for non-privileged.
 
-Given only HostPath needs this feature, and privileged access is needed when
+Given only HostPath needs this feature, and CAP_SYS_ADMIN access is needed when
 making mounts inside container, we can bind propagation mode with existing option
-privileged.
+privileged, or we can introduce a new option in SecurityContext to control this.
 
 The propagation mode could be determined by the following logic:
 
@@ -140,7 +140,7 @@ runtime support matrix and when that will be addressed.
 distros.
 
 1. (From @euank) Changing those mountflags may make docker even less stable,
-this may lock up kernel accidently or out of user's intention.
+this may lock up kernel accidently or potentially leak mounts.
 
 
 ## Decision
