@@ -431,10 +431,10 @@ function start_apiserver {
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
 
-    # Let the API server pick a default address when API_HOST
+    # Let the API server pick a default address when API_HOST_IP
     # is set to 127.0.0.1
     advertise_address=""
-    if [[ "${API_HOST}" != "127.0.0.1" ]]; then
+    if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
         advertise_address="--advertise_address=${API_HOST_IP}"
     fi
 
