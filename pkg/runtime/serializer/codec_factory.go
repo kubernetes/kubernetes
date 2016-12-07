@@ -220,9 +220,10 @@ type DirectCodecFactory struct {
 	CodecFactory
 }
 
-// EncoderForVersion returns an encoder that does not do conversion. gv is ignored.
-func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, _ runtime.GroupVersioner) runtime.Encoder {
+// EncoderForVersion returns an encoder that does not do conversion.
+func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, version runtime.GroupVersioner) runtime.Encoder {
 	return versioning.DirectEncoder{
+		Version:     version,
 		Encoder:     serializer,
 		ObjectTyper: f.CodecFactory.scheme,
 	}
