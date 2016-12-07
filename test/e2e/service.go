@@ -580,12 +580,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		if framework.ProviderIs("gce", "gke") {
 			By("creating a static load balancer IP")
 			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunId)
-			requestedIP, err = createGCEStaticIP(staticIPName)
+			requestedIP, err = framework.CreateGCEStaticIP(staticIPName)
 			Expect(err).NotTo(HaveOccurred())
 			defer func() {
 				if staticIPName != "" {
 					// Release GCE static IP - this is not kube-managed and will not be automatically released.
-					if err := deleteGCEStaticIP(staticIPName); err != nil {
+					if err := framework.DeleteGCEStaticIP(staticIPName); err != nil {
 						framework.Logf("failed to release static IP %s: %v", staticIPName, err)
 					}
 				}
@@ -632,7 +632,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			if staticIPName != "" {
 				// Deleting it after it is attached "demotes" it to an
 				// ephemeral IP, which can be auto-released.
-				if err := deleteGCEStaticIP(staticIPName); err != nil {
+				if err := framework.DeleteGCEStaticIP(staticIPName); err != nil {
 					framework.Failf("failed to release static IP %s: %v", staticIPName, err)
 				}
 				staticIPName = ""

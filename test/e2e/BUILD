@@ -57,7 +57,6 @@ go_library(
         "generated_clientset.go",
         "gke_local_ssd.go",
         "gke_node_pools.go",
-        "google_compute.go",
         "ha_master.go",
         "horizontal_pod_autoscaling.go",
         "ingress.go",
