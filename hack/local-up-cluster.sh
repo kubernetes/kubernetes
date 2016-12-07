@@ -515,7 +515,6 @@ function start_discovery {
     DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
       --cert-dir="${CERT_DIR}" \
-      --client-ca-file="${CERT_DIR}/client-ca-bundle.crt" \
       --bind-address="${API_BIND_ADDR}" \
       --secure-port="${DISCOVERY_SECURE_PORT}" \
       --tls-ca-file="${ROOT_CA_FILE}" \
