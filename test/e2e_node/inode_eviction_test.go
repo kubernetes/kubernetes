@@ -35,7 +35,7 @@ const (
 	evictionPollInterval              = 5 * time.Second
 	// pressure conditions often surface after evictions because of delay in propegation of metrics to pressure
 	// we wait this period after evictions to make sure that we wait out this delay
-	pressureDelay			  = 20 * time.Second
+	pressureDelay = 20 * time.Second
 )
 
 var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", func() {
