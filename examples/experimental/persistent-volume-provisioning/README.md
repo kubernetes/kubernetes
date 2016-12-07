@@ -335,10 +335,10 @@ First we must identify the Ceph client admin key. This is usually found in `/etc
   caps osd = "allow *"
 ```
 
-From the key value, we will create a secret. We must create the Ceph admin Secret in the namespace defined in our `StorageClass`. In this example we set the namespace to `kube-system`.
+From the key value, we will create a secret. We must create the Ceph admin Secret in the namespace defined in our `StorageClass`. In this example we've set the namespace to `kube-system`.
 
 ```
-$ kubectl create secret generic ceph-secret-admin --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system
+$ kubectl create secret generic ceph-secret-admin --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system --type=kubernetes.io/rbd
 ```
 
 Now modify `examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml` to reflect your environment, particularly the `monitors` field.  We are now ready to create our RBD Storage Class:
@@ -360,7 +360,7 @@ This key will be made into a secret, just like the admin secret. However this us
 
 ```
 kubectl create namespace myns
-kubectl create secret generic ceph-secret-user --from-literal=key='AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==' --namespace=myns
+kubectl create secret generic ceph-secret-user --from-literal=key='AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==' --namespace=myns --type=kubernetes.io/rbd
 ```
 
 You are now ready to provision and use RBD storage.
