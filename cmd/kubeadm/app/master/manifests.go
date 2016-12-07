@@ -148,6 +148,15 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
+func DeleteStaticManifests() error {
+	apiServerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
+		"manifests", kubeAPIServer+".json")
+	if err := os.Remove(apiServerStaticManifestPath); err != nil {
+		return fmt.Errorf("unable to delete temporary API server manifest [%v]", err)
+	}
+	return nil
+}
+
 // etcdVolume exposes a path on the host in order to guarantee data survival during reboot.
 func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
