@@ -129,6 +129,10 @@
 			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
 		},
 		{
+			"ImportPath": "github.com/armon/circbuf",
+			"Rev": "bbbad097214e2918d8543d5201d12bfd7bca254d"
+		},
+		{
 			"ImportPath": "github.com/asaskevich/govalidator",
 			"Comment": "v4-12-g593d645",
 			"Rev": "593d64559f7600f29581a3ee42177f5dbded27a9"
