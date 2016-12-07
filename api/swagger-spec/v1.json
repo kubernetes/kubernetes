@@ -19821,9 +19821,6 @@
    "v1.ServiceSpec": {
     "id": "v1.ServiceSpec",
     "description": "ServiceSpec describes the attributes that a user creates on a service.",
-    "required": [
-     "ports"
-    ],
     "properties": {
      "ports": {
       "type": "array",
