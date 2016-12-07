@@ -329,8 +329,9 @@ func (c *checkConvertor) ConvertFieldLabel(version, kind, label, value string) (
 }
 
 type mockSerializer struct {
-	err error
-	obj runtime.Object
+	err            error
+	obj            runtime.Object
+	encodingObjGVK unversioned.GroupVersionKind
 
 	defaults, actual *unversioned.GroupVersionKind
 	into             runtime.Object
@@ -344,6 +345,7 @@ func (s *mockSerializer) Decode(data []byte, defaults *unversioned.GroupVersionK
 
 func (s *mockSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	s.obj = obj
+	s.encodingObjGVK = obj.GetObjectKind().GroupVersionKind()
 	return s.err
 }
 
@@ -368,4 +370,30 @@ func (t *mockTyper) ObjectKinds(obj runtime.Object) ([]unversioned.GroupVersionK
 
 func (t *mockTyper) Recognizes(_ unversioned.GroupVersionKind) bool {
 	return true
+}
+
+func TestDirectCodecEncode(t *testing.T) {
+	serializer := mockSerializer{}
+	typer := mockTyper{
+		gvks: []unversioned.GroupVersionKind{
+			{
+				Group: "wrong_group",
+				Kind:  "some_kind",
+			},
+			{
+				Group: "expected_group",
+				Kind:  "some_kind",
+			},
+		},
+	}
+
+	c := DirectEncoder{
+		Version:     unversioned.GroupVersion{Group: "expected_group"},
+		Encoder:     &serializer,
+		ObjectTyper: &typer,
+	}
+	c.Encode(&testDecodable{}, ioutil.Discard)
+	if e, a := "expected_group", serializer.encodingObjGVK.Group; e != a {
+		t.Errorf("expected group to be %v, got %v", e, a)
+	}
 }
