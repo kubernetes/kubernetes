@@ -513,6 +513,10 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 // kubelet temporarily.
 // TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
 func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
+	bytesPerStatus := kubecontainer.MaxPodTerminationMessageLogLength
+	if containers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers); containers > 0 {
+		bytesPerStatus = bytesPerStatus / containers
+	}
 	normalizeTimeStamp := func(t *metav1.Time) {
 		*t = t.Rfc3339Copy()
 	}
@@ -523,6 +527,9 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 		if c.Terminated != nil {
 			normalizeTimeStamp(&c.Terminated.StartedAt)
 			normalizeTimeStamp(&c.Terminated.FinishedAt)
+			if len(c.Terminated.Message) > bytesPerStatus {
+				c.Terminated.Message = c.Terminated.Message[:bytesPerStatus]
+			}
 		}
 	}
 
