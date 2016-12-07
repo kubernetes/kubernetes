@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -120,7 +121,7 @@ func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters ma
 	By(fmt.Sprintf("Waiting for daemonset %s to be created in all underlying clusters", daemonsetName))
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
-			_, err := cluster.Extensions().DaemonSets(nsName).Get(daemonsetName)
+			_, err := cluster.Extensions().DaemonSets(nsName).Get(daemonsetName, metav1.GetOptions{})
 			if err != nil && errors.IsNotFound(err) {
 				return false, nil
 			}
@@ -140,7 +141,7 @@ func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters ma
 	// daemon set should be present in underlying clusters unless orphanDependents is false.
 	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Extensions().DaemonSets(nsName).Get(daemonsetName)
+		_, err := clusterClientset.Extensions().DaemonSets(nsName).Get(daemonsetName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for daemonset %s in cluster %s, expected daemonset to exist", daemonsetName, clusterName))
 		} else if !shouldExist && !errors.IsNotFound(err) {
@@ -193,7 +194,7 @@ func deleteDaemonSetOrFail(clientset *fedclientset.Clientset, nsName string, dae
 
 	// Wait for the daemonset to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := clientset.Extensions().DaemonSets(nsName).Get(daemonsetName)
+		_, err := clientset.Extensions().DaemonSets(nsName).Get(daemonsetName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
 		}
@@ -211,7 +212,7 @@ func updateDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) 
 
 	var newDaemonSet *v1beta1.DaemonSet
 	for retryCount := 0; retryCount < FederatedDaemonSetMaxRetries; retryCount++ {
-		daemonset, err := clientset.Extensions().DaemonSets(namespace).Get(FederatedDaemonSetName)
+		daemonset, err := clientset.Extensions().DaemonSets(namespace).Get(FederatedDaemonSetName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get daemonset %q: %v", FederatedDaemonSetName, err)
 		}
@@ -241,7 +242,7 @@ func waitForDaemonSetOrFail(clientset *kubeclientset.Clientset, namespace string
 	By(fmt.Sprintf("Fetching a federated daemonset shard of daemonset %q in namespace %q from cluster", daemonset.Name, namespace))
 	var clusterDaemonSet *v1beta1.DaemonSet
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterDaemonSet, err := clientset.Extensions().DaemonSets(namespace).Get(daemonset.Name)
+		clusterDaemonSet, err := clientset.Extensions().DaemonSets(namespace).Get(daemonset.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated daemonset %q in namespace %q in cluster is absent", daemonset.Name, namespace))
 			return true, nil // Success
@@ -270,7 +271,7 @@ func waitForDaemonSetShardsUpdatedOrFail(namespace string, daemonset *v1beta1.Da
 func waitForDaemonSetUpdateOrFail(clientset *kubeclientset.Clientset, namespace string, daemonset *v1beta1.DaemonSet, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated daemonset shard of daemonset %q in namespace %q from cluster", daemonset.Name, namespace))
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterDaemonSet, err := clientset.Extensions().DaemonSets(namespace).Get(daemonset.Name)
+		clusterDaemonSet, err := clientset.Extensions().DaemonSets(namespace).Get(daemonset.Name, metav1.GetOptions{})
 		if err == nil { // We want it present, and the Get succeeded, so we're all good.
 			if util.ObjectMetaAndSpecEquivalent(clusterDaemonSet, daemonset) {
 				By(fmt.Sprintf("Success: shard of federated daemonset %q in namespace %q in cluster is updated", daemonset.Name, namespace))

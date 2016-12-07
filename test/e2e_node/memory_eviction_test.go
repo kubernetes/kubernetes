@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -150,15 +151,15 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				By("polling the Status.Phase of each pod and checking for violations of the eviction order.")
 				Eventually(func() error {
 
-					gteed, gtErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(guaranteed.Name)
+					gteed, gtErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(guaranteed.Name, metav1.GetOptions{})
 					framework.ExpectNoError(gtErr, fmt.Sprintf("getting pod %s", guaranteed.Name))
 					gteedPh := gteed.Status.Phase
 
-					burst, buErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(burstable.Name)
+					burst, buErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(burstable.Name, metav1.GetOptions{})
 					framework.ExpectNoError(buErr, fmt.Sprintf("getting pod %s", burstable.Name))
 					burstPh := burst.Status.Phase
 
-					best, beErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(besteffort.Name)
+					best, beErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(besteffort.Name, metav1.GetOptions{})
 					framework.ExpectNoError(beErr, fmt.Sprintf("getting pod %s", besteffort.Name))
 					bestPh := best.Status.Phase
 

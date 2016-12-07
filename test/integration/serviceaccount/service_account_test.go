@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -139,7 +140,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Trigger creation of a new referenced token
-	serviceAccount, err = c.Core().ServiceAccounts(ns).Get(name)
+	serviceAccount, err = c.Core().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,13 +436,13 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 func getServiceAccount(c *clientset.Clientset, ns string, name string, shouldWait bool) (*v1.ServiceAccount, error) {
 	if !shouldWait {
-		return c.Core().ServiceAccounts(ns).Get(name)
+		return c.Core().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 	}
 
 	var user *v1.ServiceAccount
 	var err error
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
-		user, err = c.Core().ServiceAccounts(ns).Get(name)
+		user, err = c.Core().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
@@ -458,7 +459,7 @@ func getReferencedServiceAccountToken(c *clientset.Clientset, ns string, name st
 	token := ""
 
 	findToken := func() (bool, error) {
-		user, err := c.Core().ServiceAccounts(ns).Get(name)
+		user, err := c.Core().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
@@ -467,7 +468,7 @@ func getReferencedServiceAccountToken(c *clientset.Clientset, ns string, name st
 		}
 
 		for _, ref := range user.Secrets {
-			secret, err := c.Core().Secrets(ns).Get(ref.Name)
+			secret, err := c.Core().Secrets(ns).Get(ref.Name, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				continue
 			}

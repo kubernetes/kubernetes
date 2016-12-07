@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -50,7 +51,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		p := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
 		f.WaitForPodReady(p.Name)
 
-		p, err := podClient.Get(p.Name)
+		p, err := podClient.Get(p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
@@ -76,14 +77,14 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	It("with readiness probe that fails should never be ready and never restart [Conformance]", func() {
 		p := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
 		Consistently(func() (bool, error) {
-			p, err := podClient.Get(p.Name)
+			p, err := podClient.Get(p.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
 			return v1.IsPodReady(p), nil
 		}, 1*time.Minute, 1*time.Second).ShouldNot(BeTrue(), "pod should not be ready")
 
-		p, err := podClient.Get(p.Name)
+		p, err := podClient.Get(p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		isReady, err := testutils.PodRunningReady(p)
@@ -366,7 +367,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 
 	// Check the pod's current state and verify that restartCount is present.
 	By("checking the pod's current state and verifying that restartCount is present")
-	pod, err := podClient.Get(pod.Name)
+	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
@@ -376,7 +377,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
-		pod, err = podClient.Get(pod.Name)
+		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {

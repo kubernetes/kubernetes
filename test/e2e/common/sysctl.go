@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -107,7 +108,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		By("Waiting for pod completion")
 		err = f.WaitForPodNoLongerRunning(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err = podClient.Get(pod.Name)
+		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking that the pod succeeded")
@@ -148,7 +149,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		By("Waiting for pod completion")
 		err = f.WaitForPodNoLongerRunning(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err = podClient.Get(pod.Name)
+		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking that the pod succeeded")

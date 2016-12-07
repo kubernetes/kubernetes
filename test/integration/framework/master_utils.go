@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
@@ -452,7 +453,7 @@ func ScaleRC(name, ns string, replicas int32, clientset internalclientset.Interf
 	if err != nil {
 		return nil, err
 	}
-	scaled, err := clientset.Core().ReplicationControllers(ns).Get(name)
+	scaled, err := clientset.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

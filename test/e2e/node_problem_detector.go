@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/fields"
@@ -411,7 +412,7 @@ func verifyNoEvents(e coreclientset.EventInterface, options v1.ListOptions) erro
 
 // verifyCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
 func verifyCondition(n coreclientset.NodeInterface, nodeName string, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
-	node, err := n.Get(nodeName)
+	node, err := n.Get(nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

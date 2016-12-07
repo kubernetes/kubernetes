@@ -156,7 +156,7 @@ func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clu
 	By(fmt.Sprintf("Waiting for replica sets %s to be created in all underlying clusters", replicaSetName))
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
-			_, err := cluster.Extensions().ReplicaSets(nsName).Get(replicaSetName)
+			_, err := cluster.Extensions().ReplicaSets(nsName).Get(replicaSetName, metav1.GetOptions{})
 			if err != nil && errors.IsNotFound(err) {
 				return false, nil
 			}
@@ -174,7 +174,7 @@ func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clu
 	By(fmt.Sprintf("Verifying replica sets %s in underlying clusters", replicaSetName))
 	errMessages := []string{}
 	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Extensions().ReplicaSets(nsName).Get(replicaSetName)
+		_, err := clusterClientset.Extensions().ReplicaSets(nsName).Get(replicaSetName, metav1.GetOptions{})
 		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for replica set %s in cluster %s, expected replica set to exist", replicaSetName, clusterName))
 		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
@@ -193,13 +193,13 @@ func waitForReplicaSetOrFail(c *fedclientset.Clientset, namespace string, replic
 
 func waitForReplicaSet(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters map[string]*cluster) error {
 	err := wait.Poll(10*time.Second, FederatedReplicaSetTimeout, func() (bool, error) {
-		frs, err := c.ReplicaSets(namespace).Get(replicaSetName)
+		frs, err := c.ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		specReplicas, statusReplicas := int32(0), int32(0)
 		for _, cluster := range clusters {
-			rs, err := cluster.ReplicaSets(namespace).Get(replicaSetName)
+			rs, err := cluster.ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				By(fmt.Sprintf("Failed getting replicaset: %q/%q/%q, err: %v", cluster.name, namespace, replicaSetName, err))
 				return false, err
@@ -251,7 +251,7 @@ func deleteReplicaSetOrFail(clientset *fedclientset.Clientset, nsName string, re
 
 	// Wait for the replicaSet to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := clientset.Extensions().ReplicaSets(nsName).Get(replicaSetName)
+		_, err := clientset.Extensions().ReplicaSets(nsName).Get(replicaSetName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
 		}

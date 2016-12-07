@@ -173,7 +173,7 @@ func TestAtomicPut(t *testing.T) {
 		go func(l, v string) {
 			defer wg.Done()
 			for {
-				tmpRC, err := rcs.Get(rc.Name)
+				tmpRC, err := rcs.Get(rc.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Error getting atomicRC: %v", err)
 					continue
@@ -199,7 +199,7 @@ func TestAtomicPut(t *testing.T) {
 		}(label, value)
 	}
 	wg.Wait()
-	rc, err = rcs.Get(rc.Name)
+	rc, err = rcs.Get(rc.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed getting atomicRC after writers are complete: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name)
+		pod, err = pods.Get(name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -294,7 +294,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name)
+		pod, err = pods.Get(name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -307,7 +307,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name)
+		pod, err = pods.Get(name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -712,7 +712,7 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		go func(i int) {
 			name := fmt.Sprintf("multi-watch-%v", i)
-			pod, err := client.Core().Pods(ns.Name).Get(name)
+			pod, err := client.Core().Pods(ns.Name).Get(name, metav1.GetOptions{})
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't get %v: %v", name, err))
 			}

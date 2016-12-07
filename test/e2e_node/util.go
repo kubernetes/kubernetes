@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	// utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -86,7 +87,7 @@ func getCurrentKubeletConfig() (*componentconfig.KubeletConfiguration, error) {
 
 // Queries the API server for a Kubelet configuration for the node described by framework.TestContext.NodeName
 func getCurrentKubeletConfigMap(f *framework.Framework) (*v1.ConfigMap, error) {
-	return f.ClientSet.Core().ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", framework.TestContext.NodeName))
+	return f.ClientSet.Core().ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", framework.TestContext.NodeName), metav1.GetOptions{})
 }
 
 // Creates or updates the configmap for KubeletConfiguration, waits for the Kubelet to restart
