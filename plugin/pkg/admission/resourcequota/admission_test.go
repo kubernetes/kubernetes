@@ -31,10 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -896,44 +894,22 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: namespace, ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("3"),
+				api.ResourcePods: resource.MustParse("3"),
 			},
 			Used: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("1"),
+				api.ResourcePods: resource.MustParse("1"),
 			},
 		},
 	}
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 
-	computeResources := []api.ResourceName{
-		api.ResourcePods,
-		api.ResourceCPU,
+	// create a dummy evaluator so we can trigger quota
+	podEvaluator := &generic.ObjectCountEvaluator{
+		AllowCreateOnUpdate: false,
+		InternalGroupKind:   api.Kind("Pod"),
+		ResourceName:        api.ResourcePods,
 	}
-
-	usageFunc := func(object runtime.Object) api.ResourceList {
-		pod, ok := object.(*api.Pod)
-		if !ok {
-			t.Fatalf("Expected pod, got %T", object)
-		}
-		if pod.Namespace != namespace {
-			t.Errorf("Expected pod with different namespace: %q != %q", pod.Namespace, namespace)
-		}
-		return core.PodUsageFunc(pod)
-	}
-
-	podEvaluator := &generic.GenericEvaluator{
-		Name:              "Test-Evaluator.Pod",
-		InternalGroupKind: api.Kind("Pod"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: computeResources,
-		},
-		ConstraintsFunc:      core.PodConstraintsFunc,
-		MatchedResourceNames: computeResources,
-		MatchesScopeFunc:     core.PodMatchesScopeFunc,
-		UsageFunc:            usageFunc,
-	}
-
 	registry := &generic.GenericRegistry{
 		InternalEvaluators: map[schema.GroupKind]quota.Evaluator{
 			podEvaluator.GroupKind(): podEvaluator,

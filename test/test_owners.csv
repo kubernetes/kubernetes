@@ -1,11 +1,11 @@
 name,owner,auto-assigned
 DEFAULT,rmmh/spxtr/ixdy/apelisse/fejta,0
 Addon update should propagate add-on file changes,eparis,1
-AppArmor should enforce an AppArmor profile,kevin-wangzefeng,1
+AppArmor should enforce an AppArmor profile,derekwaynecarr,0
 AppArmor when running with AppArmor should enforce a permissive profile,yujuhong,1
 AppArmor when running with AppArmor should enforce a profile blocking writes,freehan,1
 AppArmor when running with AppArmor should reject an unloaded profile,kargakis,1
-AppArmor when running without AppArmor should reject a pod with an AppArmor profile,vulpecula,1
+AppArmor when running without AppArmor should reject a pod with an AppArmor profile,derekwaynecarr,0
 Cadvisor should be healthy on every node.,vishh,0
 Cassandra should create and scale cassandra,fabioy,1
 CassandraStatefulSet should create statefulset,wojtek-t,1
@@ -19,13 +19,14 @@ Cluster size autoscaling should increase cluster size if pending pods are small,
 Cluster size autoscaling should increase cluster size if pending pods are small and there is another node pool that is not autoscaled,apelisse,1
 Cluster size autoscaling should increase cluster size if pods are pending due to host port conflict,brendandburns,1
 Cluster size autoscaling should scale up correct target pool,mikedanese,1
-Cluster size autoscaling shouldn't increase cluster size if pending pod is too large,karlkfi,1
+Cluster size autoscaling shouldn't increase cluster size if pending pod is too large,derekwaynecarr,0
 ClusterDns should create pod that uses dns,sttts,0
 ConfigMap should be consumable from pods in volume,alex-mohr,1
-ConfigMap should be consumable from pods in volume as non-root,hurf,1
+ConfigMap should be consumable from pods in volume as non-root,derekwaynecarr,0
 ConfigMap should be consumable from pods in volume as non-root with FSGroup,roberthbailey,1
+ConfigMap should be consumable from pods in volume as non-root with defaultMode and fsGroup set,derekwaynecarr,0
 ConfigMap should be consumable from pods in volume with defaultMode set,Random-Liu,1
-ConfigMap should be consumable from pods in volume with mappings,karlkfi,1
+ConfigMap should be consumable from pods in volume with mappings,derekwaynecarr,0
 ConfigMap should be consumable from pods in volume with mappings and Item mode set,eparis,1
 ConfigMap should be consumable from pods in volume with mappings as non-root,apelisse,1
 ConfigMap should be consumable from pods in volume with mappings as non-root with FSGroup,zmerlynn,1
@@ -33,7 +34,7 @@ ConfigMap should be consumable in multiple volumes in the same pod,caesarxuchao,
 ConfigMap should be consumable via environment variable,ncdc,1
 ConfigMap updates should be reflected in volume,kevin-wangzefeng,1
 Container Lifecycle Hook when create a pod with lifecycle hook when it is exec hook should execute poststart exec hook properly,kargakis,1
-Container Lifecycle Hook when create a pod with lifecycle hook when it is exec hook should execute prestop exec hook properly,jdef,1
+Container Lifecycle Hook when create a pod with lifecycle hook when it is exec hook should execute prestop exec hook properly,derekwaynecarr,0
 Container Lifecycle Hook when create a pod with lifecycle hook when it is http hook should execute poststart http hook properly,vishh,1
 Container Lifecycle Hook when create a pod with lifecycle hook when it is http hook should execute prestop http hook properly,freehan,1
 Container Runtime Conformance Test container runtime conformance blackbox test when running a container with a new image *,Random-Liu,0
@@ -55,14 +56,14 @@ DNS should provide DNS for the cluster,roberthbailey,1
 Daemon set should run and stop complex daemon,jlowdermilk,1
 Daemon set should run and stop complex daemon with node affinity,erictune,1
 Daemon set should run and stop simple daemon,mtaufen,1
-DaemonRestart Controller Manager should not create/delete replicas across restart,vulpecula,1
+DaemonRestart Controller Manager should not create/delete replicas across restart,derekwaynecarr,0
 DaemonRestart Kubelet should not restart containers across restart,madhusudancs,1
 DaemonRestart Scheduler should continue assigning pods to nodes across restart,lavalamp,1
 Density create a batch of pods latency/resource should be within limit when create * pods with * interval,apelisse,1
 Density create a batch of pods with higher API QPS latency/resource should be within limit when create * pods with * interval (QPS *),jlowdermilk,1
 Density create a sequence of pods latency/resource should be within limit when create * pods with * background pods,wojtek-t,1
 Density should allow running maximum capacity pods on nodes,smarterclayton,1
-Density should allow starting * pods per node,gmarek,0
+Density should allow starting * pods per node using *,derekwaynecarr,0
 Deployment RecreateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should scale up and down in the right order,pwittrock,0
@@ -97,17 +98,18 @@ Downward API volume should provide container's memory limit,krousey,1
 Downward API volume should provide container's memory request,mikedanese,1
 Downward API volume should provide node allocatable (cpu) as default cpu limit if the limit is not set,lavalamp,1
 Downward API volume should provide node allocatable (memory) as default memory limit if the limit is not set,freehan,1
-Downward API volume should provide podname as non-root with fsgroup,karlkfi,1
+Downward API volume should provide podname as non-root with fsgroup,derekwaynecarr,0
+Downward API volume should provide podname as non-root with fsgroup and defaultMode,derekwaynecarr,0
 Downward API volume should provide podname only,mwielgus,1
 Downward API volume should set DefaultMode on files,davidopp,1
 Downward API volume should set mode on item file,mtaufen,1
 Downward API volume should update annotations on modification,eparis,1
 Downward API volume should update labels on modification,timothysc,1
-Dynamic provisioning DynamicProvisioner Alpha should create and delete alpha persistent volumes,andyzheng0831,1
+Dynamic provisioning DynamicProvisioner Alpha should create and delete alpha persistent volumes,derekwaynecarr,0
 Dynamic provisioning DynamicProvisioner should create and delete persistent volumes,jsafrane,0
 DynamicKubeletConfiguration When a configmap called `kubelet-<node-name>` is added to the `kube-system` namespace The Kubelet on that node should restart to take up the new config,mwielgus,1
 ESIPP should handle updates to source ip annotation,jsafrane,1
-ESIPP should only target nodes with endpoints,karlkfi,1
+ESIPP should only target nodes with endpoints,derekwaynecarr,0
 ESIPP should work for type=LoadBalancer,fgrzadkowski,1
 ESIPP should work for type=NodePort,kargakis,1
 ESIPP should work from pods,cjcullen,1
@@ -141,20 +143,19 @@ Federated Services DNS non-local federated service missing local service should 
 Federated Services DNS non-local federated service should be able to discover a non-local federated service,jlowdermilk,1
 Federated Services DNS should be able to discover a federated service,derekwaynecarr,1
 Federated Services Service creation should create matching services in underlying clusters,jbeda,1
-Federated Services Service creation should not be deleted from underlying clusters when it is deleted,sttts,0
-Federated Services Service creation should not be deleted from underlying clusters when it is deleted,madhusudancs,0
+Federated Services Service creation should not be deleted from underlying clusters when it is deleted,derekwaynecarr,0
 Federated Services Service creation should succeed,rmmh,1
 Federated ingresses Federated Ingresses Ingress connectivity and DNS should be able to connect to a federated ingress via its load balancer,rmmh,1
 Federated ingresses Federated Ingresses should be created and deleted successfully,dchen1107,1
 Federated ingresses Federated Ingresses should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
-Federated ingresses Federated Ingresses should create and update matching ingresses in underlying clusters,ghodss,1
+Federated ingresses Federated Ingresses should create and update matching ingresses in underlying clusters,derekwaynecarr,0
 Federated ingresses Federated Ingresses should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0
 Federated ingresses Federated Ingresses should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
 Federation API server authentication should accept cluster resources when the client has right authentication credentials,davidopp,1
 Federation API server authentication should not accept cluster resources when the client has invalid authentication credentials,yujuhong,1
 Federation API server authentication should not accept cluster resources when the client has no authentication credentials,nikhiljindal,1
 Federation apiserver Admission control should not be able to create resources if namespace does not exist,alex-mohr,1
-Federation apiserver Cluster objects should be created and deleted successfully,ghodss,1
+Federation apiserver Cluster objects should be created and deleted successfully,derekwaynecarr,0
 Federation daemonsets DaemonSet objects should be created and deleted successfully,nikhiljindal,0
 Federation daemonsets DaemonSet objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
 Federation daemonsets DaemonSet objects should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0
@@ -164,7 +165,7 @@ Federation deployments Federated Deployment should be deleted from underlying cl
 Federation deployments Federated Deployment should create and update matching deployments in underling clusters,soltysh,1
 Federation deployments Federated Deployment should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0
 Federation deployments Federated Deployment should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
-Federation events Event objects should be created and deleted successfully,karlkfi,1
+Federation events Event objects should be created and deleted successfully,derekwaynecarr,0
 Federation namespace Namespace objects all resources in the namespace should be deleted when namespace is deleted,nikhiljindal,0
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
 Federation namespace Namespace objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
@@ -187,7 +188,7 @@ Garbage Collection Test: * Should eventually garbage collect containers when we 
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1
 Garbage collector should orphan pods created by rc if delete options say so,fabioy,1
 Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1
-"Generated release_1_5 clientset should create pods, delete pods, watch pods",ghodss,1
+"Generated release_1_5 clientset should create pods, delete pods, watch pods",derekwaynecarr,0
 "Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1
 HA-master survive addition/removal replicas different zones,derekwaynecarr,0
 HA-master survive addition/removal replicas same zone,derekwaynecarr,0
@@ -202,9 +203,9 @@ Horizontal pod autoscaling (scale resource: CPU) ReplicationController light Sho
 HostPath should give a volume the correct mode,thockin,1
 HostPath should support r/w,luxas,1
 HostPath should support subPath,sttts,1
-ImageID should be set to the manifest digest (from RepoDigests) when available,hurf,1
+ImageID should be set to the manifest digest (from RepoDigests) when available,derekwaynecarr,0
 InitContainer should invoke init containers on a RestartAlways pod,saad-ali,1
-InitContainer should invoke init containers on a RestartNever pod,vulpecula,1
+InitContainer should invoke init containers on a RestartNever pod,derekwaynecarr,0
 InitContainer should not start app containers and fail the pod if init containers fail on a RestartNever pod,maisem,0
 InitContainer should not start app containers if init containers fail on a RestartAlways pod,maisem,0
 Initial Resources should set initial resources based on historical data,piosz,0
@@ -224,7 +225,7 @@ Kubectl client Kubectl api-versions should check if v1 is in available api versi
 Kubectl client Kubectl apply should apply a new configuration to an existing RC,pwittrock,0
 Kubectl client Kubectl apply should reuse port when apply to an existing SVC,deads2k,0
 Kubectl client Kubectl cluster-info should check if Kubernetes master services is included in cluster-info,pwittrock,0
-Kubectl client Kubectl create quota should create a quota with scopes,jdef,1
+Kubectl client Kubectl create quota should create a quota with scopes,derekwaynecarr,0
 Kubectl client Kubectl create quota should create a quota without scopes,xiang90,1
 Kubectl client Kubectl create quota should reject quota with invalid scopes,brendandburns,1
 Kubectl client Kubectl describe should check if kubectl describe prints relevant information for rc and pods,pwittrock,0
@@ -232,7 +233,7 @@ Kubectl client Kubectl expose should create services for rc,pwittrock,0
 Kubectl client Kubectl label should update the label on a resource,pwittrock,0
 Kubectl client Kubectl logs should be able to retrieve and filter logs,jlowdermilk,0
 Kubectl client Kubectl patch should add annotations for pods in rc,janetkuo,0
-Kubectl client Kubectl replace should update a single-container pod's image,karlkfi,1
+Kubectl client Kubectl replace should update a single-container pod's image,derekwaynecarr,0
 Kubectl client Kubectl rolling-update should support rolling-update to same image,janetkuo,0
 "Kubectl client Kubectl run --rm job should create a job from an image, then delete the job",soltysh,1
 Kubectl client Kubectl run default should create an rc or deployment from an image,janetkuo,0
@@ -262,7 +263,7 @@ Kubelet Container Manager Validate OOM score adjustments once the node is setup 
 Kubelet Container Manager Validate OOM score adjustments once the node is setup docker daemon's oom-score-adj should be -999,thockin,1
 Kubelet Container Manager Validate OOM score adjustments once the node is setup guaranteed container's oom-score-adj should be -998,kargakis,1
 Kubelet Container Manager Validate OOM score adjustments once the node is setup pod infra containers oom-score-adj should be -998 and best effort container's should be 1000,timothysc,1
-Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,karlkfi,1
+Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,derekwaynecarr,0
 Kubelet Volume Manager Volume Manager On terminatation of pod with memory backed volume should remove the volume from the node,derekwaynecarr,0
 Kubelet experimental resource usage tracking resource tracking for * pods per node,yujuhong,0
 Kubelet regular resource usage tracking resource tracking for * pods per node,yujuhong,0
@@ -273,10 +274,10 @@ Kubelet when scheduling a read only busybox container it should not write to roo
 KubeletManagedEtcHosts should test kubelet managed /etc/hosts file,Random-Liu,1
 Kubernetes Dashboard should check that the kubernetes-dashboard instance is alive,wonderfly,0
 LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied.,cjcullen,1
-Liveness liveness pods should be automatically restarted,andyzheng0831,1
-Load capacity should be able to handle * pods per node,gmarek,0
-Loadbalancing: L7 GCE shoud create ingress with given static-ip,vulpecula,1
-Loadbalancing: L7 GCE should conform to Ingress spec,andyzheng0831,1
+Liveness liveness pods should be automatically restarted,derekwaynecarr,0
+Load capacity should be able to handle * pods per node *,derekwaynecarr,0
+Loadbalancing: L7 GCE shoud create ingress with given static-ip,derekwaynecarr,0
+Loadbalancing: L7 GCE should conform to Ingress spec,derekwaynecarr,0
 Loadbalancing: L7 Nginx should conform to Ingress spec,ncdc,1
 "Logging soak should survive logging 1KB every * seconds, for a duration of *, scaling up to * pods per node",justinsb,1
 "MemoryEviction when there is memory pressure should evict pods in the correct order (besteffort first, then burstable, then guaranteed)",ixdy,1
@@ -314,7 +315,7 @@ Networking Granular Checks: Services should function for node-Service: http,thoc
 Networking Granular Checks: Services should function for node-Service: udp,yifan-gu,1
 Networking Granular Checks: Services should function for pod-Service: http,childsb,1
 Networking Granular Checks: Services should function for pod-Service: udp,brendandburns,1
-Networking Granular Checks: Services should update endpoints: http,jdef,1
+Networking Granular Checks: Services should update endpoints: http,derekwaynecarr,0
 Networking Granular Checks: Services should update endpoints: udp,freehan,1
 Networking Granular Checks: Services should update nodePort: http,nikhiljindal,1
 Networking Granular Checks: Services should update nodePort: udp,smarterclayton,1
@@ -339,7 +340,7 @@ PersistentVolumes with multiple PVs and PVCs all in same ns should create 3 PVs 
 PersistentVolumes with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,caesarxuchao,1
 Pet Store should scale to persist a nominal number ( * ) of transactions in * seconds,xiang90,1
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",alex-mohr,1
-"Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",ghodss,1
+"Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",derekwaynecarr,0
 "Pod Disks should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession",saad-ali,0
 "Pod Disks should schedule a pod w/ a RW PD, ungracefully remove it, then schedule it on another host",mml,1
 "Pod Disks should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully.",saad-ali,1
@@ -359,7 +360,7 @@ Pods should support retrieving logs from the container over websockets,vishh,0
 "Port forwarding With a server that expects a client request should support a client that connects, sends no data, and disconnects",sttts,0
 "Port forwarding With a server that expects no client request should support a client that connects, sends no data, and disconnects",sttts,0
 PreStop should call prestop when killing a pod,ncdc,1
-PrivilegedPod should enable privileged commands,dchen1107,1
+PrivilegedPod should enable privileged commands,derekwaynecarr,0
 Probing container should *not* be restarted with a /healthz http liveness probe,Random-Liu,0
 "Probing container should *not* be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0
 Probing container should be restarted with a /healthz http liveness probe,Random-Liu,0
@@ -368,11 +369,11 @@ Probing container should be restarted with a docker exec liveness probe with tim
 Probing container should have monotonically increasing restart count,Random-Liu,0
 Probing container with readiness probe should not be ready before initial delay and never restart,Random-Liu,0
 Probing container with readiness probe that fails should never be ready and never restart,Random-Liu,0
-Proxy * should proxy logs on node,karlkfi,1
-Proxy * should proxy logs on node using proxy subresource,hurf,1
+Proxy * should proxy logs on node,derekwaynecarr,0
+Proxy * should proxy logs on node using proxy subresource,derekwaynecarr,0
 Proxy * should proxy logs on node with explicit kubelet port,ixdy,1
 Proxy * should proxy logs on node with explicit kubelet port using proxy subresource,dchen1107,1
-Proxy * should proxy through a service and a pod,karlkfi,1
+Proxy * should proxy through a service and a pod,derekwaynecarr,0
 Proxy * should proxy to cadvisor,jszczepkowski,1
 Proxy * should proxy to cadvisor using proxy subresource,roberthbailey,1
 Reboot each node by dropping all inbound packets for a while and ensure they function afterwards,quinton-hoole,0
@@ -391,21 +392,22 @@ ReplicationController should surface a failure condition on a common issue like 
 Rescheduler should ensure that critical pod is scheduled in case there is no resources available,mtaufen,1
 Resource-usage regular resource usage tracking resource tracking for * pods per node,janetkuo,1
 ResourceQuota should create a ResourceQuota and capture the life of a configMap.,timstclair,1
+ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim with a storage class.,derekwaynecarr,0
 ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim.,bgrant0607,1
 ResourceQuota should create a ResourceQuota and capture the life of a pod.,pmorie,1
-ResourceQuota should create a ResourceQuota and capture the life of a replication controller.,jdef,1
+ResourceQuota should create a ResourceQuota and capture the life of a replication controller.,derekwaynecarr,0
 ResourceQuota should create a ResourceQuota and capture the life of a secret.,ncdc,1
 ResourceQuota should create a ResourceQuota and capture the life of a service.,timstclair,1
 ResourceQuota should create a ResourceQuota and ensure its status is promptly calculated.,krousey,1
 ResourceQuota should verify ResourceQuota with best effort scope.,mml,1
 ResourceQuota should verify ResourceQuota with terminating scopes.,ncdc,1
 Restart Docker Daemon Network should recover from ip leak,bprashanth,0
-Restart should restart all nodes and ensure all nodes and pods recover,andyzheng0831,1
+Restart should restart all nodes and ensure all nodes and pods recover,derekwaynecarr,0
 RethinkDB should create and stop rethinkdb servers,mwielgus,1
 SSH should SSH to all nodes and run commands,quinton-hoole,0
 SchedulerPredicates validates MaxPods limit number of pods that are allowed to run,gmarek,0
 SchedulerPredicates validates resource limits of pods that are allowed to run,gmarek,0
-SchedulerPredicates validates that Inter-pod-Affinity is respected if not matching,hurf,1
+SchedulerPredicates validates that Inter-pod-Affinity is respected if not matching,derekwaynecarr,0
 SchedulerPredicates validates that InterPod Affinity and AntiAffinity is respected if matching,yifan-gu,1
 SchedulerPredicates validates that InterPodAffinity is respected if matching,kevin-wangzefeng,1
 SchedulerPredicates validates that InterPodAffinity is respected if matching with multiple Affinities,caesarxuchao,1
@@ -416,21 +418,22 @@ SchedulerPredicates validates that NodeSelector is respected if not matching,gma
 SchedulerPredicates validates that a pod with an invalid NodeAffinity is rejected,deads2k,1
 SchedulerPredicates validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid,smarterclayton,1
 SchedulerPredicates validates that embedding the JSON NodeAffinity setting as a string in the annotation value work,kevin-wangzefeng,1
-SchedulerPredicates validates that embedding the JSON PodAffinity and PodAntiAffinity setting as a string in the annotation value work,hurf,1
+SchedulerPredicates validates that embedding the JSON PodAffinity and PodAntiAffinity setting as a string in the annotation value work,derekwaynecarr,0
 SchedulerPredicates validates that required NodeAffinity setting is respected if matching,mml,1
 SchedulerPredicates validates that taints-tolerations is respected if matching,jlowdermilk,1
 SchedulerPredicates validates that taints-tolerations is respected if not matching,derekwaynecarr,1
 Secret should create a pod that reads a secret,luxas,1
 Secrets should be able to mount in a volume regardless of a different secret existing with same name in different namespace,rkouj,0
 Secrets should be consumable from pods in env vars,mml,1
-Secrets should be consumable from pods in volume,ghodss,1
+Secrets should be consumable from pods in volume,derekwaynecarr,0
+Secrets should be consumable from pods in volume as non-root with defaultMode and fsGroup set,derekwaynecarr,0
 Secrets should be consumable from pods in volume with defaultMode set,derekwaynecarr,1
 Secrets should be consumable from pods in volume with mappings,jbeda,1
 Secrets should be consumable from pods in volume with mappings and Item Mode set,quinton-hoole,1
 Secrets should be consumable in multiple volumes in a pod,alex-mohr,1
 Security Context should support container.SecurityContext.RunAsUser,alex-mohr,1
 Security Context should support pod.Spec.SecurityContext.RunAsUser,bgrant0607,1
-Security Context should support pod.Spec.SecurityContext.SupplementalGroups,andyzheng0831,1
+Security Context should support pod.Spec.SecurityContext.SupplementalGroups,derekwaynecarr,0
 Security Context should support seccomp alpha docker/default annotation,freehan,1
 Security Context should support seccomp alpha unconfined annotation on the container,childsb,1
 Security Context should support seccomp alpha unconfined annotation on the pod,krousey,1
@@ -447,8 +450,7 @@ Services should be able to create a functioning NodePort service,bprashanth,0
 Services should be able to up and down services,bprashanth,0
 Services should check NodePort out-of-range,bprashanth,0
 Services should create endpoints for unready pods,maisem,0
-Services should only allow access from service loadbalancer source ranges,sttts,0
-Services should only allow access from service loadbalancer source ranges,madhusudancs,0
+Services should only allow access from service loadbalancer source ranges,derekwaynecarr,0
 Services should preserve source pod IP for traffic thru service cluster IP,Random-Liu,1
 Services should prevent NodePort collisions,bprashanth,0
 Services should provide secure master service,bprashanth,0
@@ -458,7 +460,7 @@ Services should serve multiport endpoints from pods,bprashanth,0
 Services should use same NodePort with same port but different protocols,timothysc,1
 Services should work after restarting apiserver,bprashanth,0
 Services should work after restarting kube-proxy,bprashanth,0
-SimpleMount should be able to mount an emptydir on a container,karlkfi,1
+SimpleMount should be able to mount an emptydir on a container,derekwaynecarr,0
 "Spark should start spark master, driver and workers",jszczepkowski,1
 "Staging client repo client should create pods, delete pods, watch pods",jbeda,1
 Stateful Set recreate should recreate evicted statefulset,derekwaynecarr,0
@@ -491,19 +493,18 @@ V1Job should run a job to completion when tasks sometimes fail and are not local
 V1Job should run a job to completion when tasks succeed,soltysh,1
 V1Job should scale a job down,soltysh,1
 V1Job should scale a job up,soltysh,1
-Variable Expansion should allow composing env vars into new env vars,ghodss,1
+Variable Expansion should allow composing env vars into new env vars,derekwaynecarr,0
 Variable Expansion should allow substituting values in a container's args,dchen1107,1
 Variable Expansion should allow substituting values in a container's command,mml,1
 Volumes Ceph RBD should be mountable,fabioy,1
 Volumes CephFS should be mountable,Q-Lee,1
 Volumes Cinder should be mountable,cjcullen,1
 Volumes GlusterFS should be mountable,eparis,1
-Volumes NFS should be mountable,andyzheng0831,1
+Volumes NFS should be mountable,derekwaynecarr,0
 Volumes PD should be mountable,caesarxuchao,1
 Volumes iSCSI should be mountable,jsafrane,1
 k8s.io/kubernetes/cmd/genutils,rmmh,1
 k8s.io/kubernetes/cmd/hyperkube,jbeda,0
-k8s.io/kubernetes/cmd/kube-apiserver/app,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-apiserver/app/options,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-discovery/app,pmorie,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
@@ -514,7 +515,7 @@ k8s.io/kubernetes/cmd/kubeadm/app/node,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
-k8s.io/kubernetes/cmd/kubelet/app,hurf,1
+k8s.io/kubernetes/cmd/kubelet/app,derekwaynecarr,0
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1
@@ -531,7 +532,7 @@ k8s.io/kubernetes/federation/pkg/federation-controller/configmap,mwielgus,0
 k8s.io/kubernetes/federation/pkg/federation-controller/daemonset,childsb,1
 k8s.io/kubernetes/federation/pkg/federation-controller/deployment,zmerlynn,1
 k8s.io/kubernetes/federation/pkg/federation-controller/ingress,vishh,1
-k8s.io/kubernetes/federation/pkg/federation-controller/namespace,hurf,1
+k8s.io/kubernetes/federation/pkg/federation-controller/namespace,derekwaynecarr,0
 k8s.io/kubernetes/federation/pkg/federation-controller/replicaset,roberthbailey,1
 k8s.io/kubernetes/federation/pkg/federation-controller/secret,apelisse,1
 k8s.io/kubernetes/federation/pkg/federation-controller/service,pmorie,1
@@ -554,14 +555,11 @@ k8s.io/kubernetes/pkg/api/meta,fabioy,1
 k8s.io/kubernetes/pkg/api/resource,smarterclayton,1
 k8s.io/kubernetes/pkg/api/service,spxtr,1
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1
-k8s.io/kubernetes/pkg/api/util,ghodss,1
-k8s.io/kubernetes/pkg/api/v1,vulpecula,1
-k8s.io/kubernetes/pkg/api/v1/endpoints,sttts,0
-k8s.io/kubernetes/pkg/api/v1/pod,sttts,0
-k8s.io/kubernetes/pkg/api/v1/service,sttts,0
-k8s.io/kubernetes/pkg/api/v1/endpoints,madhusudancs,0
-k8s.io/kubernetes/pkg/api/v1/pod,madhusudancs,0
-k8s.io/kubernetes/pkg/api/v1/service,madhusudancs,0
+k8s.io/kubernetes/pkg/api/util,derekwaynecarr,0
+k8s.io/kubernetes/pkg/api/v1,derekwaynecarr,0
+k8s.io/kubernetes/pkg/api/v1/endpoints,derekwaynecarr,0
+k8s.io/kubernetes/pkg/api/v1/pod,derekwaynecarr,0
+k8s.io/kubernetes/pkg/api/v1/service,derekwaynecarr,0
 k8s.io/kubernetes/pkg/api/validation,smarterclayton,1
 k8s.io/kubernetes/pkg/api/validation/path,luxas,1
 k8s.io/kubernetes/pkg/apimachinery,gmarek,1
@@ -580,7 +578,7 @@ k8s.io/kubernetes/pkg/apis/extensions,bgrant0607,1
 k8s.io/kubernetes/pkg/apis/extensions/v1beta1,madhusudancs,1
 k8s.io/kubernetes/pkg/apis/extensions/validation,nikhiljindal,1
 k8s.io/kubernetes/pkg/apis/meta/v1,sttts,0
-k8s.io/kubernetes/pkg/apis/meta/v1/validation,jszczepkowski,1
+k8s.io/kubernetes/pkg/apis/meta/v1/validation,derekwaynecarr,0
 k8s.io/kubernetes/pkg/apis/policy/validation,deads2k,1
 k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1
@@ -590,13 +588,13 @@ k8s.io/kubernetes/pkg/apiserver/request,lavalamp,1
 k8s.io/kubernetes/pkg/auth/authenticator/bearertoken,liggitt,0
 k8s.io/kubernetes/pkg/auth/authorizer/abac,liggitt,0
 k8s.io/kubernetes/pkg/auth/authorizer/union,liggitt,0
-k8s.io/kubernetes/pkg/auth/group,andyzheng0831,1
+k8s.io/kubernetes/pkg/auth/group,derekwaynecarr,0
 k8s.io/kubernetes/pkg/auth/handlers,liggitt,0
 k8s.io/kubernetes/pkg/client/cache,xiang90,1
 k8s.io/kubernetes/pkg/client/chaosclient,deads2k,1
 k8s.io/kubernetes/pkg/client/leaderelection,xiang90,1
 k8s.io/kubernetes/pkg/client/listers/batch/internalversion,mqliang,0
-k8s.io/kubernetes/pkg/client/record,karlkfi,1
+k8s.io/kubernetes/pkg/client/record,derekwaynecarr,0
 k8s.io/kubernetes/pkg/client/restclient,kargakis,1
 k8s.io/kubernetes/pkg/client/retry,caesarxuchao,1
 k8s.io/kubernetes/pkg/client/testing/cache,mikedanese,1
@@ -609,7 +607,7 @@ k8s.io/kubernetes/pkg/client/unversioned/auth,jbeda,1
 k8s.io/kubernetes/pkg/client/unversioned/clientcmd,yifan-gu,1
 k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api,thockin,1
 k8s.io/kubernetes/pkg/client/unversioned/portforward,lavalamp,1
-k8s.io/kubernetes/pkg/client/unversioned/remotecommand,andyzheng0831,1
+k8s.io/kubernetes/pkg/client/unversioned/remotecommand,derekwaynecarr,0
 k8s.io/kubernetes/pkg/cloudprovider/providers/aws,eparis,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/azure,saad-ali,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack,roberthbailey,1
@@ -630,20 +628,20 @@ k8s.io/kubernetes/pkg/controller/endpoint,mwielgus,1
 k8s.io/kubernetes/pkg/controller/garbagecollector,rmmh,1
 k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly,cjcullen,1
 k8s.io/kubernetes/pkg/controller/job,soltysh,1
-k8s.io/kubernetes/pkg/controller/namespace,karlkfi,1
+k8s.io/kubernetes/pkg/controller/namespace,derekwaynecarr,0
 k8s.io/kubernetes/pkg/controller/node,gmarek,0
 k8s.io/kubernetes/pkg/controller/petset,fgrzadkowski,1
 k8s.io/kubernetes/pkg/controller/podautoscaler,piosz,0
 k8s.io/kubernetes/pkg/controller/podautoscaler/metrics,piosz,0
-k8s.io/kubernetes/pkg/controller/podgc,jdef,1
+k8s.io/kubernetes/pkg/controller/podgc,derekwaynecarr,0
 k8s.io/kubernetes/pkg/controller/replicaset,fgrzadkowski,0
 k8s.io/kubernetes/pkg/controller/replication,fgrzadkowski,0
-k8s.io/kubernetes/pkg/controller/resourcequota,ghodss,1
+k8s.io/kubernetes/pkg/controller/resourcequota,derekwaynecarr,0
 k8s.io/kubernetes/pkg/controller/route,gmarek,0
 k8s.io/kubernetes/pkg/controller/service,asalkeld,0
 k8s.io/kubernetes/pkg/controller/serviceaccount,liggitt,0
 k8s.io/kubernetes/pkg/controller/volume/attachdetach,luxas,1
-k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache,hurf,1
+k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache,derekwaynecarr,0
 k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler,jsafrane,1
 k8s.io/kubernetes/pkg/controller/volume/persistentvolume,jsafrane,0
 k8s.io/kubernetes/pkg/conversion,ixdy,1
@@ -651,7 +649,7 @@ k8s.io/kubernetes/pkg/conversion/queryparams,caesarxuchao,1
 k8s.io/kubernetes/pkg/credentialprovider,justinsb,1
 k8s.io/kubernetes/pkg/credentialprovider/aws,zmerlynn,1
 k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
-k8s.io/kubernetes/pkg/dns,jdef,1
+k8s.io/kubernetes/pkg/dns,derekwaynecarr,0
 k8s.io/kubernetes/pkg/dns/config,derekwaynecarr,0
 k8s.io/kubernetes/pkg/dns/federation,derekwaynecarr,0
 k8s.io/kubernetes/pkg/dns/treecache,bowei,0
@@ -670,7 +668,7 @@ k8s.io/kubernetes/pkg/kubectl/cmd,rmmh,1
 k8s.io/kubernetes/pkg/kubectl/cmd/config,asalkeld,0
 k8s.io/kubernetes/pkg/kubectl/cmd/set,erictune,1
 k8s.io/kubernetes/pkg/kubectl/cmd/util,asalkeld,0
-k8s.io/kubernetes/pkg/kubectl/cmd/util/editor,jdef,1
+k8s.io/kubernetes/pkg/kubectl/cmd/util/editor,derekwaynecarr,0
 k8s.io/kubernetes/pkg/kubectl/resource,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet,vishh,0
 k8s.io/kubernetes/pkg/kubelet/cadvisor,sttts,1
@@ -681,7 +679,7 @@ k8s.io/kubernetes/pkg/kubelet/container,yujuhong,0
 k8s.io/kubernetes/pkg/kubelet/custommetrics,kevin-wangzefeng,0
 k8s.io/kubernetes/pkg/kubelet/dockershim,zmerlynn,1
 k8s.io/kubernetes/pkg/kubelet/dockertools,deads2k,1
-k8s.io/kubernetes/pkg/kubelet/envvars,karlkfi,1
+k8s.io/kubernetes/pkg/kubelet/envvars,derekwaynecarr,0
 k8s.io/kubernetes/pkg/kubelet/eviction,childsb,1
 k8s.io/kubernetes/pkg/kubelet/images,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet/kuberuntime,yifan-gu,1
@@ -709,7 +707,7 @@ k8s.io/kubernetes/pkg/kubelet/types,jlowdermilk,1
 k8s.io/kubernetes/pkg/kubelet/util/cache,timothysc,1
 k8s.io/kubernetes/pkg/kubelet/util/format,ncdc,1
 k8s.io/kubernetes/pkg/kubelet/util/queue,yujuhong,0
-k8s.io/kubernetes/pkg/kubelet/volumemanager,jdef,1
+k8s.io/kubernetes/pkg/kubelet/volumemanager,derekwaynecarr,0
 k8s.io/kubernetes/pkg/kubelet/volumemanager/cache,janetkuo,1
 k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler,timstclair,1
 k8s.io/kubernetes/pkg/labels,ixdy,1
@@ -718,7 +716,7 @@ k8s.io/kubernetes/pkg/probe/exec,bgrant0607,1
 k8s.io/kubernetes/pkg/probe/http,mtaufen,1
 k8s.io/kubernetes/pkg/probe/tcp,mtaufen,1
 k8s.io/kubernetes/pkg/proxy/config,ixdy,1
-k8s.io/kubernetes/pkg/proxy/healthcheck,ghodss,1
+k8s.io/kubernetes/pkg/proxy/healthcheck,derekwaynecarr,0
 k8s.io/kubernetes/pkg/proxy/iptables,freehan,0
 k8s.io/kubernetes/pkg/proxy/userspace,luxas,1
 k8s.io/kubernetes/pkg/proxy/winuserspace,jbhurat,0
@@ -751,16 +749,16 @@ k8s.io/kubernetes/pkg/registry/core/node/etcd,deads2k,1
 k8s.io/kubernetes/pkg/registry/core/persistentvolume,lavalamp,1
 k8s.io/kubernetes/pkg/registry/core/persistentvolume/etcd,derekwaynecarr,1
 k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim,bgrant0607,1
-k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim/etcd,vulpecula,1
+k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim/etcd,derekwaynecarr,0
 k8s.io/kubernetes/pkg/registry/core/pod,Random-Liu,1
 k8s.io/kubernetes/pkg/registry/core/pod/etcd,alex-mohr,1
 k8s.io/kubernetes/pkg/registry/core/pod/rest,jsafrane,1
 k8s.io/kubernetes/pkg/registry/core/podtemplate,thockin,1
 k8s.io/kubernetes/pkg/registry/core/podtemplate/etcd,brendandburns,1
-k8s.io/kubernetes/pkg/registry/core/resourcequota,vulpecula,1
-k8s.io/kubernetes/pkg/registry/core/resourcequota/etcd,ghodss,1
+k8s.io/kubernetes/pkg/registry/core/resourcequota,derekwaynecarr,0
+k8s.io/kubernetes/pkg/registry/core/resourcequota/etcd,derekwaynecarr,0
 k8s.io/kubernetes/pkg/registry/core/rest,deads2k,0
-k8s.io/kubernetes/pkg/registry/core/secret,jdef,1
+k8s.io/kubernetes/pkg/registry/core/secret,derekwaynecarr,0
 k8s.io/kubernetes/pkg/registry/core/secret/etcd,freehan,1
 k8s.io/kubernetes/pkg/registry/core/service,madhusudancs,1
 k8s.io/kubernetes/pkg/registry/core/service/allocator,jbeda,1
@@ -769,24 +767,24 @@ k8s.io/kubernetes/pkg/registry/core/service/etcd,apelisse,1
 k8s.io/kubernetes/pkg/registry/core/service/ipallocator,eparis,1
 k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller,mtaufen,1
 k8s.io/kubernetes/pkg/registry/core/service/ipallocator/etcd,kargakis,1
-k8s.io/kubernetes/pkg/registry/core/service/portallocator,jdef,1
+k8s.io/kubernetes/pkg/registry/core/service/portallocator,derekwaynecarr,0
 k8s.io/kubernetes/pkg/registry/core/serviceaccount,caesarxuchao,1
 k8s.io/kubernetes/pkg/registry/core/serviceaccount/etcd,bprashanth,1
 k8s.io/kubernetes/pkg/registry/extensions/controller/etcd,mwielgus,1
 k8s.io/kubernetes/pkg/registry/extensions/daemonset,nikhiljindal,1
 k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd,spxtr,1
 k8s.io/kubernetes/pkg/registry/extensions/deployment,dchen1107,1
-k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd,ghodss,1
+k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd,derekwaynecarr,0
 k8s.io/kubernetes/pkg/registry/extensions/ingress,apelisse,1
 k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd,apelisse,1
 k8s.io/kubernetes/pkg/registry/extensions/networkpolicy,deads2k,1
 k8s.io/kubernetes/pkg/registry/extensions/networkpolicy/etcd,ncdc,1
 k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/etcd,erictune,1
-k8s.io/kubernetes/pkg/registry/extensions/replicaset,andyzheng0831,1
+k8s.io/kubernetes/pkg/registry/extensions/replicaset,derekwaynecarr,0
 k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd,fabioy,1
-k8s.io/kubernetes/pkg/registry/extensions/rest,karlkfi,1
+k8s.io/kubernetes/pkg/registry/extensions/rest,derekwaynecarr,0
 k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource,mwielgus,1
-k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource/etcd,vulpecula,1
+k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource/etcd,derekwaynecarr,0
 k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata,sttts,1
 k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd,sttts,1
 k8s.io/kubernetes/pkg/registry/generic/registry,jsafrane,1
@@ -796,8 +794,7 @@ k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd,xiang90,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass,brendandburns,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd,eparis,1
 k8s.io/kubernetes/pkg/runtime,wojtek-t,0
-k8s.io/kubernetes/pkg/runtime/schema,sttts,0
-k8s.io/kubernetes/pkg/runtime/schema,madhusudancs,0
+k8s.io/kubernetes/pkg/runtime/schema,derekwaynecarr,0
 k8s.io/kubernetes/pkg/runtime/serializer,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/json,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/protobuf,wojtek-t,0
@@ -806,12 +803,12 @@ k8s.io/kubernetes/pkg/runtime/serializer/streaming,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/versioning,wojtek-t,0
 k8s.io/kubernetes/pkg/security/apparmor,bgrant0607,1
 k8s.io/kubernetes/pkg/security/podsecuritypolicy,erictune,0
-k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor,vulpecula,1
+k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor,derekwaynecarr,0
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities,erictune,0
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/group,erictune,0
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp,rmmh,1
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux,erictune,0
-k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl,andyzheng0831,1
+k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl,derekwaynecarr,0
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/user,erictune,0
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/util,erictune,0
 k8s.io/kubernetes/pkg/securitycontext,erictune,1
@@ -826,7 +823,7 @@ k8s.io/kubernetes/pkg/util,jbeda,1
 k8s.io/kubernetes/pkg/util/async,spxtr,1
 k8s.io/kubernetes/pkg/util/bandwidth,thockin,1
 k8s.io/kubernetes/pkg/util/cache,thockin,1
-k8s.io/kubernetes/pkg/util/cert,karlkfi,1
+k8s.io/kubernetes/pkg/util/cert,derekwaynecarr,0
 k8s.io/kubernetes/pkg/util/clock,zmerlynn,1
 k8s.io/kubernetes/pkg/util/config,jszczepkowski,1
 k8s.io/kubernetes/pkg/util/configz,ixdy,1
@@ -836,7 +833,7 @@ k8s.io/kubernetes/pkg/util/env,asalkeld,0
 k8s.io/kubernetes/pkg/util/errors,jlowdermilk,1
 k8s.io/kubernetes/pkg/util/exec,krousey,1
 k8s.io/kubernetes/pkg/util/flowcontrol,ixdy,1
-k8s.io/kubernetes/pkg/util/flushwriter,vulpecula,1
+k8s.io/kubernetes/pkg/util/flushwriter,derekwaynecarr,0
 k8s.io/kubernetes/pkg/util/framer,piosz,1
 k8s.io/kubernetes/pkg/util/goroutinemap,saad-ali,0
 k8s.io/kubernetes/pkg/util/hash,timothysc,1
@@ -845,7 +842,7 @@ k8s.io/kubernetes/pkg/util/httpstream/spdy,zmerlynn,1
 k8s.io/kubernetes/pkg/util/integer,childsb,1
 k8s.io/kubernetes/pkg/util/intstr,brendandburns,1
 k8s.io/kubernetes/pkg/util/io,mtaufen,1
-k8s.io/kubernetes/pkg/util/iptables,hurf,1
+k8s.io/kubernetes/pkg/util/iptables,derekwaynecarr,0
 k8s.io/kubernetes/pkg/util/json,liggitt,0
 k8s.io/kubernetes/pkg/util/jsonpath,spxtr,1
 k8s.io/kubernetes/pkg/util/keymutex,saad-ali,0
@@ -853,20 +850,20 @@ k8s.io/kubernetes/pkg/util/labels,rmmh,1
 k8s.io/kubernetes/pkg/util/limitwriter,deads2k,1
 k8s.io/kubernetes/pkg/util/mount,xiang90,1
 k8s.io/kubernetes/pkg/util/net,spxtr,1
-k8s.io/kubernetes/pkg/util/net/sets,jdef,1
+k8s.io/kubernetes/pkg/util/net/sets,derekwaynecarr,0
 k8s.io/kubernetes/pkg/util/node,liggitt,0
 k8s.io/kubernetes/pkg/util/oom,vishh,0
 k8s.io/kubernetes/pkg/util/parsers,derekwaynecarr,1
 k8s.io/kubernetes/pkg/util/procfs,roberthbailey,1
 k8s.io/kubernetes/pkg/util/proxy,cjcullen,1
 k8s.io/kubernetes/pkg/util/rand,madhusudancs,1
-k8s.io/kubernetes/pkg/util/ratelimit,justinsb,1
 k8s.io/kubernetes/pkg/util/runtime,davidopp,1
 k8s.io/kubernetes/pkg/util/sets,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/slice,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/strategicpatch,brendandburns,1
 k8s.io/kubernetes/pkg/util/strings,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/system,mwielgus,0
+k8s.io/kubernetes/pkg/util/taints,derekwaynecarr,0
 k8s.io/kubernetes/pkg/util/term,davidopp,1
 k8s.io/kubernetes/pkg/util/testing,jlowdermilk,1
 k8s.io/kubernetes/pkg/util/threading,roberthbailey,1
@@ -886,7 +883,7 @@ k8s.io/kubernetes/pkg/volume/cinder,jsafrane,1
 k8s.io/kubernetes/pkg/volume/configmap,derekwaynecarr,1
 k8s.io/kubernetes/pkg/volume/downwardapi,mikedanese,1
 k8s.io/kubernetes/pkg/volume/empty_dir,quinton-hoole,1
-k8s.io/kubernetes/pkg/volume/fc,andyzheng0831,1
+k8s.io/kubernetes/pkg/volume/fc,derekwaynecarr,0
 k8s.io/kubernetes/pkg/volume/flexvolume,Q-Lee,1
 k8s.io/kubernetes/pkg/volume/flocker,jbeda,1
 k8s.io/kubernetes/pkg/volume/gce_pd,saad-ali,0
@@ -916,11 +913,11 @@ k8s.io/kubernetes/plugin/pkg/admission/limitranger,ncdc,1
 k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision,derekwaynecarr,0
 k8s.io/kubernetes/plugin/pkg/admission/namespace/exists,derekwaynecarr,0
 k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle,derekwaynecarr,0
-k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label,jdef,1
+k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label,derekwaynecarr,0
 k8s.io/kubernetes/plugin/pkg/admission/podnodeselector,ixdy,1
 k8s.io/kubernetes/plugin/pkg/admission/resourcequota,fabioy,1
 k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy,maisem,1
-k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny,vulpecula,1
+k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny,derekwaynecarr,0
 k8s.io/kubernetes/plugin/pkg/admission/serviceaccount,liggitt,0
 k8s.io/kubernetes/plugin/pkg/admission/storageclass/default,pmorie,1
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/allow,liggitt,0
@@ -933,10 +930,10 @@ k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509,liggitt,0
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken,krousey,1
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc,brendandburns,1
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile,liggitt,0
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook,ghodss,1
-k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac,hurf,1
+k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook,derekwaynecarr,0
+k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac,derekwaynecarr,0
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy,mml,1
-k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook,hurf,1
+k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook,derekwaynecarr,0
 k8s.io/kubernetes/plugin/pkg/client/auth/gcp,jlowdermilk,0
 k8s.io/kubernetes/plugin/pkg/client/auth/oidc,cjcullen,1
 k8s.io/kubernetes/plugin/pkg/scheduler,fgrzadkowski,0
@@ -956,14 +953,13 @@ k8s.io/kubernetes/test/integration/client,Q-Lee,1
 k8s.io/kubernetes/test/integration/configmap,Q-Lee,1
 k8s.io/kubernetes/test/integration/discoverysummarizer,fabioy,1
 k8s.io/kubernetes/test/integration/examples,maisem,1
-k8s.io/kubernetes/test/integration/federation,vulpecula,1
+k8s.io/kubernetes/test/integration/federation,derekwaynecarr,0
 k8s.io/kubernetes/test/integration/garbagecollector,jlowdermilk,1
-k8s.io/kubernetes/test/integration/kubectl,vulpecula,1
+k8s.io/kubernetes/test/integration/kubectl,derekwaynecarr,0
 k8s.io/kubernetes/test/integration/master,fabioy,1
 k8s.io/kubernetes/test/integration/metrics,lavalamp,1
 k8s.io/kubernetes/test/integration/objectmeta,janetkuo,1
 k8s.io/kubernetes/test/integration/openshift,kevin-wangzefeng,1
-k8s.io/kubernetes/test/integration/persistentvolumes,cjcullen,1
 k8s.io/kubernetes/test/integration/pods,smarterclayton,1
 k8s.io/kubernetes/test/integration/quota,alex-mohr,1
 k8s.io/kubernetes/test/integration/replicaset,janetkuo,1
@@ -972,8 +968,9 @@ k8s.io/kubernetes/test/integration/scheduler,mikedanese,1
 k8s.io/kubernetes/test/integration/scheduler_perf,roberthbailey,1
 k8s.io/kubernetes/test/integration/secrets,rmmh,1
 k8s.io/kubernetes/test/integration/serviceaccount,deads2k,1
-k8s.io/kubernetes/test/integration/storageclasses,andyzheng0831,1
+k8s.io/kubernetes/test/integration/storageclasses,derekwaynecarr,0
 k8s.io/kubernetes/test/integration/thirdparty,davidopp,1
+k8s.io/kubernetes/test/integration/volume,derekwaynecarr,0
 k8s.io/kubernetes/test/list,maisem,1
 kubelet Clean up pods on node kubelet should be able to delete * pods per node in *.,yujuhong,0
 "when we run containers that should cause * should eventually see *, and then evict all of the correct pods",Random-Liu,0
