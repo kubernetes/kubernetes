@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -77,7 +78,7 @@ func (c *FakePodDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, 
 	return err
 }
 
-func (c *FakePodDisruptionBudgets) Get(name string) (result *policy.PodDisruptionBudget, err error) {
+func (c *FakePodDisruptionBudgets) Get(name string, options v1.GetOptions) (result *policy.PodDisruptionBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(poddisruptionbudgetsResource, c.ns, name), &policy.PodDisruptionBudget{})
 

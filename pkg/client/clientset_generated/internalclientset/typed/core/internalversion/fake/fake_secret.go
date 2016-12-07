@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -66,7 +67,7 @@ func (c *FakeSecrets) DeleteCollection(options *api.DeleteOptions, listOptions a
 	return err
 }
 
-func (c *FakeSecrets) Get(name string) (result *api.Secret, err error) {
+func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *api.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(secretsResource, c.ns, name), &api.Secret{})
 

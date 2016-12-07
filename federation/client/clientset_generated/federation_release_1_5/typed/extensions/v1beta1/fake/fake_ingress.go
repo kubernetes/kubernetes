@@ -20,6 +20,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -78,7 +79,7 @@ func (c *FakeIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions 
 	return err
 }
 
-func (c *FakeIngresses) Get(name string) (result *v1beta1.Ingress, err error) {
+func (c *FakeIngresses) Get(name string, options meta_v1.GetOptions) (result *v1beta1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(ingressesResource, c.ns, name), &v1beta1.Ingress{})
 

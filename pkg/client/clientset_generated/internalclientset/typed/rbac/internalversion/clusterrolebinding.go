@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -35,7 +36,7 @@ type ClusterRoleBindingInterface interface {
 	Update(*rbac.ClusterRoleBinding) (*rbac.ClusterRoleBinding, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*rbac.ClusterRoleBinding, error)
+	Get(name string, options v1.GetOptions) (*rbac.ClusterRoleBinding, error)
 	List(opts api.ListOptions) (*rbac.ClusterRoleBindingList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRoleBinding, err error)
@@ -98,11 +99,12 @@ func (c *clusterRoleBindings) DeleteCollection(options *api.DeleteOptions, listO
 }
 
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
-func (c *clusterRoleBindings) Get(name string) (result *rbac.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *rbac.ClusterRoleBinding, err error) {
 	result = &rbac.ClusterRoleBinding{}
 	err = c.client.Get().
 		Resource("clusterrolebindings").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

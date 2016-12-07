@@ -20,6 +20,7 @@ import (
 	v1alpha1 "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -37,7 +38,7 @@ type APIServiceInterface interface {
 	UpdateStatus(*v1alpha1.APIService) (*v1alpha1.APIService, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1alpha1.APIService, error)
+	Get(name string, options meta_v1.GetOptions) (*v1alpha1.APIService, error)
 	List(opts v1.ListOptions) (*v1alpha1.APIServiceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error)
@@ -115,11 +116,12 @@ func (c *aPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 }
 
 // Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
-func (c *aPIServices) Get(name string) (result *v1alpha1.APIService, err error) {
+func (c *aPIServices) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.APIService, err error) {
 	result = &v1alpha1.APIService{}
 	err = c.client.Get().
 		Resource("apiservices").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

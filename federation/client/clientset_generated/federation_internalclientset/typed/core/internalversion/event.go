@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -34,7 +35,7 @@ type EventInterface interface {
 	Update(*api.Event) (*api.Event, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*api.Event, error)
+	Get(name string, options v1.GetOptions) (*api.Event, error)
 	List(opts api.ListOptions) (*api.EventList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Event, err error)
@@ -103,12 +104,13 @@ func (c *events) DeleteCollection(options *api.DeleteOptions, listOptions api.Li
 }
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *events) Get(name string) (result *api.Event, err error) {
+func (c *events) Get(name string, options v1.GetOptions) (result *api.Event, err error) {
 	result = &api.Event{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

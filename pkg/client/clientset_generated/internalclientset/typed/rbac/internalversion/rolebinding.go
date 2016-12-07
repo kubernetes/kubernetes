@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -35,7 +36,7 @@ type RoleBindingInterface interface {
 	Update(*rbac.RoleBinding) (*rbac.RoleBinding, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*rbac.RoleBinding, error)
+	Get(name string, options v1.GetOptions) (*rbac.RoleBinding, error)
 	List(opts api.ListOptions) (*rbac.RoleBindingList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.RoleBinding, err error)
@@ -104,12 +105,13 @@ func (c *roleBindings) DeleteCollection(options *api.DeleteOptions, listOptions 
 }
 
 // Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
-func (c *roleBindings) Get(name string) (result *rbac.RoleBinding, err error) {
+func (c *roleBindings) Get(name string, options v1.GetOptions) (result *rbac.RoleBinding, err error) {
 	result = &rbac.RoleBinding{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -77,7 +78,7 @@ func (c *FakeDaemonSets) DeleteCollection(options *api.DeleteOptions, listOption
 	return err
 }
 
-func (c *FakeDaemonSets) Get(name string) (result *extensions.DaemonSet, err error) {
+func (c *FakeDaemonSets) Get(name string, options v1.GetOptions) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(daemonsetsResource, c.ns, name), &extensions.DaemonSet{})
 
