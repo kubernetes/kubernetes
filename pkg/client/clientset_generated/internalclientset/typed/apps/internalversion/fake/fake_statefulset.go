@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -77,7 +78,7 @@ func (c *FakeStatefulSets) DeleteCollection(options *api.DeleteOptions, listOpti
 	return err
 }
 
-func (c *FakeStatefulSets) Get(name string) (result *apps.StatefulSet, err error) {
+func (c *FakeStatefulSets) Get(name string, options v1.GetOptions) (result *apps.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(statefulsetsResource, c.ns, name), &apps.StatefulSet{})
 

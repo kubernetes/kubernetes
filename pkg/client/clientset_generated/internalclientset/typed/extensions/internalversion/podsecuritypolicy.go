@@ -19,6 +19,7 @@ package internalversion
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -35,7 +36,7 @@ type PodSecurityPolicyInterface interface {
 	Update(*extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*extensions.PodSecurityPolicy, error)
+	Get(name string, options v1.GetOptions) (*extensions.PodSecurityPolicy, error)
 	List(opts api.ListOptions) (*extensions.PodSecurityPolicyList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.PodSecurityPolicy, err error)
@@ -98,11 +99,12 @@ func (c *podSecurityPolicies) DeleteCollection(options *api.DeleteOptions, listO
 }
 
 // Get takes name of the podSecurityPolicy, and returns the corresponding podSecurityPolicy object, and an error if there is any.
-func (c *podSecurityPolicies) Get(name string) (result *extensions.PodSecurityPolicy, err error) {
+func (c *podSecurityPolicies) Get(name string, options v1.GetOptions) (result *extensions.PodSecurityPolicy, err error) {
 	result = &extensions.PodSecurityPolicy{}
 	err = c.client.Get().
 		Resource("podsecuritypolicies").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

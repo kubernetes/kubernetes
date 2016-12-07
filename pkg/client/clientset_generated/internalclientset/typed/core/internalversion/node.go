@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -35,7 +36,7 @@ type NodeInterface interface {
 	UpdateStatus(*api.Node) (*api.Node, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*api.Node, error)
+	Get(name string, options v1.GetOptions) (*api.Node, error)
 	List(opts api.ListOptions) (*api.NodeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Node, err error)
@@ -113,11 +114,12 @@ func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions api.Lis
 }
 
 // Get takes name of the node, and returns the corresponding node object, and an error if there is any.
-func (c *nodes) Get(name string) (result *api.Node, err error) {
+func (c *nodes) Get(name string, options v1.GetOptions) (result *api.Node, err error) {
 	result = &api.Node{}
 	err = c.client.Get().
 		Resource("nodes").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

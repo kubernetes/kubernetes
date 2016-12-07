@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -34,7 +35,7 @@ type SecretInterface interface {
 	Update(*api.Secret) (*api.Secret, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*api.Secret, error)
+	Get(name string, options v1.GetOptions) (*api.Secret, error)
 	List(opts api.ListOptions) (*api.SecretList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Secret, err error)
@@ -103,12 +104,13 @@ func (c *secrets) DeleteCollection(options *api.DeleteOptions, listOptions api.L
 }
 
 // Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
-func (c *secrets) Get(name string) (result *api.Secret, err error) {
+func (c *secrets) Get(name string, options v1.GetOptions) (result *api.Secret, err error) {
 	result = &api.Secret{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

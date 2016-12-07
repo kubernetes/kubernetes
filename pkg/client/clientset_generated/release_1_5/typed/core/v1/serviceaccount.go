@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -35,7 +36,7 @@ type ServiceAccountInterface interface {
 	Update(*v1.ServiceAccount) (*v1.ServiceAccount, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.ServiceAccount, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.ServiceAccount, error)
 	List(opts v1.ListOptions) (*v1.ServiceAccountList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
@@ -104,12 +105,13 @@ func (c *serviceAccounts) DeleteCollection(options *v1.DeleteOptions, listOption
 }
 
 // Get takes name of the serviceAccount, and returns the corresponding serviceAccount object, and an error if there is any.
-func (c *serviceAccounts) Get(name string) (result *v1.ServiceAccount, err error) {
+func (c *serviceAccounts) Get(name string, options meta_v1.GetOptions) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

@@ -19,6 +19,7 @@ package internalversion
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type StatefulSetInterface interface {
 	UpdateStatus(*apps.StatefulSet) (*apps.StatefulSet, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*apps.StatefulSet, error)
+	Get(name string, options v1.GetOptions) (*apps.StatefulSet, error)
 	List(opts api.ListOptions) (*apps.StatefulSetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error)
@@ -121,12 +122,13 @@ func (c *statefulSets) DeleteCollection(options *api.DeleteOptions, listOptions 
 }
 
 // Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
-func (c *statefulSets) Get(name string) (result *apps.StatefulSet, err error) {
+func (c *statefulSets) Get(name string, options v1.GetOptions) (result *apps.StatefulSet, err error) {
 	result = &apps.StatefulSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

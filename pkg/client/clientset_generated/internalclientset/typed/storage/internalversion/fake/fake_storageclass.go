@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -63,7 +64,7 @@ func (c *FakeStorageClasses) DeleteCollection(options *api.DeleteOptions, listOp
 	return err
 }
 
-func (c *FakeStorageClasses) Get(name string) (result *storage.StorageClass, err error) {
+func (c *FakeStorageClasses) Get(name string, options v1.GetOptions) (result *storage.StorageClass, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootGetAction(storageclassesResource, name), &storage.StorageClass{})
 	if obj == nil {

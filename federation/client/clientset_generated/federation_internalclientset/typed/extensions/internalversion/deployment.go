@@ -19,6 +19,7 @@ package internalversion
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type DeploymentInterface interface {
 	UpdateStatus(*extensions.Deployment) (*extensions.Deployment, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*extensions.Deployment, error)
+	Get(name string, options v1.GetOptions) (*extensions.Deployment, error)
 	List(opts api.ListOptions) (*extensions.DeploymentList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error)
@@ -121,12 +122,13 @@ func (c *deployments) DeleteCollection(options *api.DeleteOptions, listOptions a
 }
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
-func (c *deployments) Get(name string) (result *extensions.Deployment, err error) {
+func (c *deployments) Get(name string, options v1.GetOptions) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

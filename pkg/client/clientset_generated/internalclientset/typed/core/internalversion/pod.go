@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -35,7 +36,7 @@ type PodInterface interface {
 	UpdateStatus(*api.Pod) (*api.Pod, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*api.Pod, error)
+	Get(name string, options v1.GetOptions) (*api.Pod, error)
 	List(opts api.ListOptions) (*api.PodList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Pod, err error)
@@ -120,12 +121,13 @@ func (c *pods) DeleteCollection(options *api.DeleteOptions, listOptions api.List
 }
 
 // Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
-func (c *pods) Get(name string) (result *api.Pod, err error) {
+func (c *pods) Get(name string, options v1.GetOptions) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

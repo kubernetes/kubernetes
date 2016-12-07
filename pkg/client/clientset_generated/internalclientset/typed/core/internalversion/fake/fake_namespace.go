@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -71,7 +72,7 @@ func (c *FakeNamespaces) DeleteCollection(options *api.DeleteOptions, listOption
 	return err
 }
 
-func (c *FakeNamespaces) Get(name string) (result *api.Namespace, err error) {
+func (c *FakeNamespaces) Get(name string, options v1.GetOptions) (result *api.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootGetAction(namespacesResource, name), &api.Namespace{})
 	if obj == nil {
