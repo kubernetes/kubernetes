@@ -3056,6 +3056,61 @@ func waitForReplicaSetPodsGone(c clientset.Interface, rs *extensions.ReplicaSet)
 	})
 }
 
+// WaitForReadyReplicaSet waits until the replica set has all of its replicas ready.
+func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
+	rs, err := c.Extensions().ReplicaSets(ns).Get(name)
+	if err != nil {
+		return err
+	}
+	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+	if err != nil {
+		return err
+	}
+	options := v1.ListOptions{LabelSelector: selector.String()}
+	podList, err := c.Core().Pods(rs.Namespace).List(options)
+	if err != nil {
+		return err
+	}
+	readyPods := int32(0)
+	unready := sets.NewString()
+	for i := range podList.Items {
+		pod := podList.Items[i]
+
+		if v1.IsPodReady(&pod) {
+			readyPods++
+		} else {
+			unready.Insert(pod.Name)
+		}
+	}
+
+	// All pods for our replica set are ready.
+	if *(rs.Spec.Replicas) == rs.Status.Replicas && *(rs.Spec.Replicas) == readyPods {
+		return nil
+	}
+	options.ResourceVersion = podList.ResourceVersion
+	w, err := c.Core().Pods(ns).Watch(options)
+	if err != nil {
+		return err
+	}
+	defer w.Stop()
+	condition := func(event watch.Event) (bool, error) {
+		if event.Type != watch.Modified {
+			return false, nil
+		}
+		pod := event.Object.(*v1.Pod)
+		if v1.IsPodReady(pod) && unready.Has(pod.Name) {
+			unready.Delete(pod.Name)
+		}
+		return unready.Len() == 0, nil
+	}
+
+	_, err = watch.Until(Poll, w, condition)
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("replica set %q never became ready", name)
+	}
+	return err
+}
+
 // Waits for the deployment status to become valid (i.e. max unavailable and max surge aren't violated anymore).
 // Note that the status should stay valid at all times unless shortly after a scaling event or the deployment is just created.
 // To verify that the deployment status is valid and wait for the rollout to finish, use WaitForDeploymentStatus instead.
