@@ -106,6 +106,7 @@ go_library(
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
+        "//pkg/util/taints:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/util/validation:go_default_library",
         "//pkg/util/validation/field:go_default_library",
