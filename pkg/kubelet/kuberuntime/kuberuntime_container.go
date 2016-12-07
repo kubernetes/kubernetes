@@ -28,7 +28,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/circbuf"
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -323,29 +325,68 @@ func makeUID() string {
 	return fmt.Sprintf("%08x", rand.Uint32())
 }
 
-// getTerminationMessage gets termination message of the container.
-func getTerminationMessage(status *runtimeapi.ContainerStatus, kubeStatus *kubecontainer.ContainerStatus, terminationMessagePath string) string {
-	message := ""
+const maxMessageLength = 1024 * 4
 
-	if !kubeStatus.FinishedAt.IsZero() || kubeStatus.ExitCode != 0 {
-		if terminationMessagePath == "" {
-			return ""
-		}
-
+// getTerminationMessage looks on the filesystem for the provided termination message path, returning a limited
+// amount of those bytes, or returns true if the logs should be checked.
+func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessagePath string, fallbackToLogs bool) (string, bool) {
+	if len(terminationMessagePath) != 0 {
 		for _, mount := range status.Mounts {
-			if mount.GetContainerPath() == terminationMessagePath {
-				path := mount.GetHostPath()
-				if data, err := ioutil.ReadFile(path); err != nil {
-					message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
-				} else {
-					message = string(data)
-				}
-				break
+			if mount.ContainerPath == nil || mount.HostPath == nil || *mount.ContainerPath != terminationMessagePath {
+				continue
+			}
+			path := *mount.HostPath
+			data, _, err := readLastBytesFromFile(path, maxMessageLength)
+			if err != nil {
+				return fmt.Sprintf("Error on reading termination log %s: %v", path, err), false
+			}
+			if !fallbackToLogs || len(data) != 0 {
+				return string(data), false
 			}
 		}
 	}
+	return "", fallbackToLogs
+}
 
-	return message
+// readLastBytesFromFile reads at most max bytes from the provided file or returns an error.
+// It returns true if it the file was longer than max.
+func readLastBytesFromFile(path string, max int64) ([]byte, bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, false, err
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, false, err
+	}
+	size := fi.Size()
+	if size == 0 {
+		return nil, true, nil
+	}
+	if size < max {
+		max = size
+	}
+	offset, err := f.Seek(-max, os.SEEK_END)
+	if err != nil {
+		return nil, false, err
+	}
+	data, err := ioutil.ReadAll(f)
+	return data, offset > 0, err
+}
+
+// readLastStringFromContainerLogs attempts to read up to maxMessageLength from the end of the CRI log represented
+// by path. It reads up to maxMessageLength lines (on the assumption every line is at least one byte).
+func readLastStringFromContainerLogs(path string) string {
+	logOptions := &v1.PodLogOptions{}
+	// TODO: more efficient byte search option
+	value := int64(maxMessageLength)
+	logOptions.TailLines = &value
+	buf, _ := circbuf.NewBuffer(maxMessageLength)
+	if err := ReadLogs(path, logOptions, buf, buf); err != nil {
+		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
+	}
+	return buf.String()
 }
 
 // getPodContainerStatuses gets all containers' statuses for the pod.
@@ -391,13 +432,20 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			cStatus.Message = status.GetMessage()
 			cStatus.ExitCode = int(status.GetExitCode())
 			cStatus.FinishedAt = time.Unix(0, status.GetFinishedAt())
+
+			// TODO: how is OOMKill represented in CRI?
+			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.FallbackToLogsOnErrorTerminationMessage && (cStatus.ExitCode != 0 /* || cStatus.OOMKilled */)
+			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
+			if checkLogs {
+				path := buildFullContainerLogsPath(uid, labeledInfo.ContainerName, annotatedInfo.RestartCount)
+				tMessage = readLastStringFromContainerLogs(path)
+			}
+			// Use the termination message written by the application is not empty
+			if len(tMessage) != 0 {
+				cStatus.Message = tMessage
+			}
 		}
 
-		tMessage := getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)
-		// Use the termination message written by the application is not empty
-		if len(tMessage) != 0 {
-			cStatus.Message = tMessage
-		}
 		statuses[i] = cStatus
 	}
 
