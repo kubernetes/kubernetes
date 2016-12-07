@@ -134,6 +134,9 @@
         { "name": "etcssl",
         "mountPath": "/etc/ssl",
         "readOnly": true},
+        { "name": "usrsharecacerts",
+        "mountPath": "/usr/share/ca-certificates",
+        "readOnly": true},
         { "name": "varssl",
         "mountPath": "/var/ssl",
         "readOnly": true},
@@ -160,6 +163,10 @@
   { "name": "etcssl",
     "hostPath": {
         "path": "/etc/ssl"}
+  },
+  { "name": "usrsharecacerts",
+    "hostPath": {
+        "path": "/usr/share/ca-certificates"}
   },
   { "name": "varssl",
     "hostPath": {
