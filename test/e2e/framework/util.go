@@ -294,7 +294,7 @@ func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 }
 
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
-	if TestContext.CloudConfig.NumNodes <= maxNodeCount {
+	if TestContext.CloudConfig.NumNodes > maxNodeCount {
 		Skipf("Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
 	}
 }
