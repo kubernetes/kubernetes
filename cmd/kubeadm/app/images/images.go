@@ -31,18 +31,20 @@ const (
 	KubeSchedulerImage         = "scheduler"
 	KubeProxyImage             = "proxy"
 
-	KubeDNSImage         = "kube-dns"
-	KubeDNSmasqImage     = "dnsmasq"
-	KubeExechealthzImage = "exechealthz"
-	Pause                = "pause"
+	KubeDNSImage            = "kubedns"
+	KubeDNSmasqImage        = "kube-dnsmasq"
+	KubeDNSmasqMetricsImage = "dnsmasq-metrics"
+	KubeExechealthzImage    = "exechealthz"
+	Pause                   = "pause"
 
 	gcrPrefix   = "gcr.io/google_containers"
 	etcdVersion = "3.0.14-kubeadm"
 
-	kubeDNSVersion     = "1.7"
-	dnsmasqVersion     = "1.3"
-	exechealthzVersion = "1.1"
-	pauseVersion       = "3.0"
+	kubeDNSVersion        = "1.9"
+	dnsmasqVersion        = "1.4"
+	exechealthzVersion    = "1.2"
+	dnsmasqMetricsVersion = "1.0"
+	pauseVersion          = "3.0"
 )
 
 func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideImage string) string {
@@ -62,9 +64,10 @@ func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideIma
 func GetAddonImage(image string) string {
 	repoPrefix := kubeadmapi.GlobalEnvParams.RepositoryPrefix
 	return map[string]string{
-		KubeDNSImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kubedns", runtime.GOARCH, kubeDNSVersion),
-		KubeDNSmasqImage:     fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-dnsmasq", runtime.GOARCH, dnsmasqVersion),
-		KubeExechealthzImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "exechealthz", runtime.GOARCH, exechealthzVersion),
-		Pause:                fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "pause", runtime.GOARCH, pauseVersion),
+		KubeDNSImage:            fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kubedns", runtime.GOARCH, kubeDNSVersion),
+		KubeDNSmasqImage:        fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-dnsmasq", runtime.GOARCH, dnsmasqVersion),
+		KubeDNSmasqMetricsImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "dnsmasq-metrics", runtime.GOARCH, dnsmasqMetricsVersion),
+		KubeExechealthzImage:    fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "exechealthz", runtime.GOARCH, exechealthzVersion),
+		Pause:                   fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "pause", runtime.GOARCH, pauseVersion),
 	}[image]
 }
