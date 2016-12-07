@@ -45,6 +45,7 @@ go_library(
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/credentialprovider/aws:go_default_library",
+        "//pkg/credentialprovider/azure:go_default_library",
         "//pkg/credentialprovider/gcp:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/healthz:go_default_library",
