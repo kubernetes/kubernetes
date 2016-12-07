@@ -303,7 +303,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 	var newNode *v1.Node
 	var newLabels map[string]string
 	err := wait.Poll(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
-		node, err := nodeClient.Get(nodeName)
+		node, err := nodeClient.Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -385,7 +385,7 @@ func checkRunningOnNoNodes(f *framework.Framework, selector map[string]string) f
 }
 
 func checkDaemonStatus(f *framework.Framework, dsName string) error {
-	ds, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Get(dsName)
+	ds, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Get(dsName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("Could not get daemon set from v1.")
 	}

@@ -182,7 +182,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		// wait for rc to create pods
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			rc, err := rcClient.Get(rc.Name)
+			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to get rc: %v", err)
 			}
@@ -242,7 +242,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		// wait for rc to create some pods
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			rc, err := rcClient.Get(rc.Name)
+			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to get rc: %v", err)
 			}

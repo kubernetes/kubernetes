@@ -26,6 +26,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -180,7 +181,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	Expect(err).To(BeNil())
 	Expect(content).To(ContainSubstring(testContent))
 
-	foundPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name)
+	foundPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Confirm that the file can be accessed from a second

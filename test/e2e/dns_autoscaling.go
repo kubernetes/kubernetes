@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -230,7 +231,7 @@ func getScheduableCores(nodes []v1.Node) int64 {
 }
 
 func fetchDNSScalingConfigMap(c clientset.Interface) (*v1.ConfigMap, error) {
-	cm, err := c.Core().ConfigMaps(api.NamespaceSystem).Get(DNSAutoscalerLabelName)
+	cm, err := c.Core().ConfigMaps(api.NamespaceSystem).Get(DNSAutoscalerLabelName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

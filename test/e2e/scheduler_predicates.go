@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -59,7 +60,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	ignoreLabels := framework.ImagePullerLabels
 
 	AfterEach(func() {
-		rc, err := cs.Core().ReplicationControllers(ns).Get(RCName)
+		rc, err := cs.Core().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			By("Cleaning up the replication controller")
 			err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, RCName)
@@ -284,7 +285,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName, pod.ResourceVersion))
-		labelPod, err := cs.Core().Pods(ns).Get(labelPodName)
+		labelPod, err := cs.Core().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -368,7 +369,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName, pod.ResourceVersion))
-		labelPod, err := cs.Core().Pods(ns).Get(labelPodName)
+		labelPod, err := cs.Core().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -393,7 +394,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, pod.Name, ""))
-		labelPod, err := cs.Core().Pods(ns).Get(pod.Name)
+		labelPod, err := cs.Core().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -499,7 +500,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName, pod.ResourceVersion))
-		labelPod, err := cs.Core().Pods(ns).Get(labelPodName)
+		labelPod, err := cs.Core().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -610,7 +611,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName, pod.ResourceVersion))
-		labelPod, err := cs.Core().Pods(ns).Get(labelPodName)
+		labelPod, err := cs.Core().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -635,7 +636,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, pod.Name, pod.ResourceVersion))
-		labelPod, err := cs.Core().Pods(ns).Get(pod.Name)
+		labelPod, err := cs.Core().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -659,7 +660,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, pod.Name, pod.ResourceVersion))
-		labelPod, err := cs.Core().Pods(ns).Get(pod.Name)
+		labelPod, err := cs.Core().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -711,7 +712,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, tolerationPodName, pod.ResourceVersion))
-		deployedPod, err := cs.Core().Pods(ns).Get(tolerationPodName)
+		deployedPod, err := cs.Core().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -799,7 +800,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
-	pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(conf.Name)
+	pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }

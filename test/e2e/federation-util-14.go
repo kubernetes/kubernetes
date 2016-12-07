@@ -22,13 +22,14 @@ import (
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func createClusterObjectOrFail_14(f *framework.Framework, context *framework.E2EContext) {
 	framework.Logf("Looking up cluster: %s", context.Name)
-	foundCluster, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name)
+	foundCluster, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name, metav1.GetOptions{})
 	if err == nil && foundCluster != nil {
 		return
 	}
@@ -68,7 +69,7 @@ func buildClustersOrFail_14(f *framework.Framework) []*federationapi.Cluster {
 	// Wait for all clusters to become ready for up to 5 min.
 	if err := wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
 		for _, context := range contexts {
-			cluster, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name)
+			cluster, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}

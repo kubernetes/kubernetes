@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -125,7 +126,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 
 					// The pod should be evicted.
 					if !evictionOccurred {
-						podData, err := podClient.Get(busyPodName)
+						podData, err := podClient.Get(busyPodName, metav1.GetOptions{})
 						if err != nil {
 							return err
 						}
@@ -135,7 +136,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 							return err
 						}
 
-						podData, err = podClient.Get(idlePodName)
+						podData, err = podClient.Get(idlePodName, metav1.GetOptions{})
 						if err != nil {
 							return err
 						}
@@ -170,7 +171,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 					}
 
 					// The new pod should be able to be scheduled and run after the disk pressure is relieved.
-					podData, err := podClient.Get(verifyPodName)
+					podData, err := podClient.Get(verifyPodName, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}

@@ -150,7 +150,7 @@ func getZoneCount(c clientset.Interface) (int, error) {
 // Find the name of the zone in which the pod is scheduled
 func getZoneNameForPod(c clientset.Interface, pod v1.Pod) (string, error) {
 	By(fmt.Sprintf("Getting zone name for pod %s, on node %s", pod.Name, pod.Spec.NodeName))
-	node, err := c.Core().Nodes().Get(pod.Spec.NodeName)
+	node, err := c.Core().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	return getZoneNameForNode(*node)
 }

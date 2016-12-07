@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -133,7 +134,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		By("Creating the pod")
 		podClient.CreateSync(pod)
 
-		pod, err := podClient.Get(pod.Name)
+		pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "Failed to get pod %q", pod.Name)
 
 		Eventually(func() (string, error) {

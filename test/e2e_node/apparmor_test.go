@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/watch"
@@ -163,7 +164,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		})
 		framework.ExpectNoError(err)
 	}
-	p, err := f.PodClient().Get(pod.Name)
+	p, err := f.PodClient().Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return p.Status
 }

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -247,21 +248,21 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 func (rc *ResourceConsumer) GetReplicas() int {
 	switch rc.kind {
 	case kindRC:
-		replicationController, err := rc.framework.ClientSet.Core().ReplicationControllers(rc.framework.Namespace.Name).Get(rc.name)
+		replicationController, err := rc.framework.ClientSet.Core().ReplicationControllers(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if replicationController == nil {
 			framework.Failf(rcIsNil)
 		}
 		return int(replicationController.Status.Replicas)
 	case kindDeployment:
-		deployment, err := rc.framework.ClientSet.Extensions().Deployments(rc.framework.Namespace.Name).Get(rc.name)
+		deployment, err := rc.framework.ClientSet.Extensions().Deployments(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if deployment == nil {
 			framework.Failf(deploymentIsNil)
 		}
 		return int(deployment.Status.Replicas)
 	case kindReplicaSet:
-		rs, err := rc.framework.ClientSet.Extensions().ReplicaSets(rc.framework.Namespace.Name).Get(rc.name)
+		rs, err := rc.framework.ClientSet.Extensions().ReplicaSets(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if rs == nil {
 			framework.Failf(rsIsNil)

@@ -179,7 +179,7 @@ func rsConditionCheck(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		quota, err = c.Core().ResourceQuotas(namespace).Get(name)
+		quota, err = c.Core().ResourceQuotas(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -201,7 +201,7 @@ func rsConditionCheck(f *framework.Framework) {
 	generation := rs.Generation
 	conditions := rs.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err = c.Extensions().ReplicaSets(namespace).Get(name)
+		rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -231,7 +231,7 @@ func rsConditionCheck(f *framework.Framework) {
 	generation = rs.Generation
 	conditions = rs.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err = c.Extensions().ReplicaSets(namespace).Get(name)
+		rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

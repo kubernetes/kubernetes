@@ -367,7 +367,7 @@ func SkipUnlessFederated(c clientset.Interface) {
 		federationNS = "federation"
 	}
 
-	_, err := c.Core().Namespaces().Get(federationNS)
+	_, err := c.Core().Namespaces().Get(federationNS, metav1.GetOptions{})
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Skipf("Could not find federation namespace %s: skipping federated test", federationNS)
@@ -756,7 +756,7 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
 	Logf("Waiting up to %[1]v for pod %[2]s status to be %[3]s", timeout, podName, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pod, err := c.Core().Pods(ns).Get(podName)
+		pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
 		if err != nil {
 			if apierrs.IsNotFound(err) {
 				Logf("Pod %q in namespace %q disappeared. Error: %v", podName, ns, err)
@@ -828,7 +828,7 @@ func WaitForFederationApiserverReady(c *federation_release_1_5.Clientset) error 
 func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.Interface, pvName string, Poll, timeout time.Duration) error {
 	Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pv, err := c.Core().PersistentVolumes().Get(pvName)
+		pv, err := c.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 			continue
@@ -848,7 +848,7 @@ func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.In
 func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, timeout time.Duration) error {
 	Logf("Waiting up to %v for PersistentVolume %s to get deleted", timeout, pvName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pv, err := c.Core().PersistentVolumes().Get(pvName)
+		pv, err := c.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 		if err == nil {
 			Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
 			continue
@@ -868,7 +868,7 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
 	Logf("Waiting up to %v for PersistentVolumeClaim %s to have phase %s", timeout, pvcName, phase)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pvc, err := c.Core().PersistentVolumeClaims(ns).Get(pvcName)
+		pvc, err := c.Core().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get persistent volume claim %s in failed, ignoring for %v: %v", pvcName, Poll, err)
 			continue
@@ -973,7 +973,7 @@ func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace st
 
 	// wait for namespace to delete or timeout.
 	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
-		if _, err := c.Core().Namespaces().Get(namespace); err != nil {
+		if _, err := c.Core().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
 			}
@@ -1046,7 +1046,7 @@ func logNamespaces(c clientset.Interface, namespace string) {
 
 // logNamespace logs detail about a namespace
 func logNamespace(c clientset.Interface, namespace string) {
-	ns, err := c.Core().Namespaces().Get(namespace)
+	ns, err := c.Core().Namespaces().Get(namespace, metav1.GetOptions{})
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("namespace: %v no longer exists", namespace)
@@ -1452,7 +1452,7 @@ func WaitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) 
 // WaitForService waits until the service appears (exist == true), or disappears (exist == false)
 func WaitForService(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := c.Core().Services(namespace).Get(name)
+		_, err := c.Core().Services(namespace).Get(name, metav1.GetOptions{})
 		switch {
 		case err == nil:
 			if !exist {
@@ -1507,7 +1507,7 @@ func countEndpointsNum(e *v1.Endpoints) int {
 // WaitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
 func WaitForReplicationController(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := c.Core().ReplicationControllers(namespace).Get(name)
+		_, err := c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
@@ -1525,7 +1525,7 @@ func WaitForReplicationController(c clientset.Interface, namespace, name string,
 
 func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 	for t := time.Now(); time.Since(t) < EndpointRegisterTimeout; time.Sleep(Poll) {
-		endpoint, err := c.Core().Endpoints(ns).Get(name)
+		endpoint, err := c.Core().Endpoints(ns).Get(name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
@@ -2178,7 +2178,7 @@ func (f *Framework) MatchContainerOutput(
 	}
 
 	// Grab its logs.  Get host first.
-	podStatus, err := podClient.Get(createdPod.Name)
+	podStatus, err := podClient.Get(createdPod.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get pod status: %v", err)
 	}
@@ -2309,7 +2309,7 @@ func dumpAllNodeInfo(c clientset.Interface) {
 func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{})) {
 	for _, n := range nodeNames {
 		logFunc("\nLogging node info for node %v", n)
-		node, err := c.Core().Nodes().Get(n)
+		node, err := c.Core().Nodes().Get(n, metav1.GetOptions{})
 		if err != nil {
 			logFunc("Error getting node info %v", err)
 		}
@@ -2482,7 +2482,7 @@ func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, la
 
 func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
 	By("verifying the node has the label " + labelKey + " " + labelValue)
-	node, err := c.Core().Nodes().Get(nodeName)
+	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
 	Expect(node.Labels[labelKey]).To(Equal(labelValue))
 }
@@ -2499,7 +2499,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string)
 
 func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
 	for attempt := 0; attempt < UpdateRetries; attempt++ {
-		node, err := c.Core().Nodes().Get(nodeName)
+		node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 		ExpectNoError(err)
 
 		nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
@@ -2553,7 +2553,7 @@ func taintExists(taints []v1.Taint, taintToFind v1.Taint) bool {
 
 func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint v1.Taint) {
 	By("verifying the node has the taint " + taint.ToString())
-	node, err := c.Core().Nodes().Get(nodeName)
+	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
 
 	nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
@@ -2586,7 +2586,7 @@ func deleteTaint(oldTaints []v1.Taint, taintToDelete v1.Taint) ([]v1.Taint, erro
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
 	By("removing the taint " + taint.ToString() + " off the node " + nodeName)
 	for attempt := 0; attempt < UpdateRetries; attempt++ {
-		node, err := c.Core().Nodes().Get(nodeName)
+		node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 		ExpectNoError(err)
 
 		nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
@@ -2622,7 +2622,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	nodeUpdated, err := c.Core().Nodes().Get(nodeName)
+	nodeUpdated, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
 	By("verifying the node doesn't have the taint " + taint.ToString())
 	taintsGot, err := v1.GetTaintsFromNodeAnnotations(nodeUpdated.Annotations)
@@ -2774,11 +2774,11 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, name string) (runtime.Object, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
-		return c.Core().ReplicationControllers(ns).Get(name)
+		return c.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("ReplicaSet"):
-		return c.Extensions().ReplicaSets(ns).Get(name)
+		return c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("Deployment"):
-		return c.Extensions().Deployments(ns).Get(name)
+		return c.Extensions().Deployments(ns).Get(name, metav1.GetOptions{})
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
 	}
@@ -3020,7 +3020,7 @@ func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) er
 // Delete a ReplicaSet and all pods it spawned
 func DeleteReplicaSet(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
 	By(fmt.Sprintf("deleting ReplicaSet %s in namespace %s", name, ns))
-	rc, err := clientset.Extensions().ReplicaSets(ns).Get(name)
+	rc, err := clientset.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("ReplicaSet %s was already deleted: %v", name, err)
@@ -3068,7 +3068,7 @@ func waitForReplicaSetPodsGone(c clientset.Interface, rs *extensions.ReplicaSet)
 
 // WaitForReadyReplicaSet waits until the replica set has all of its replicas ready.
 func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
-	rs, err := c.Extensions().ReplicaSets(ns).Get(name)
+	rs, err := c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -3134,7 +3134,7 @@ func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deploymen
 
 	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		var err error
-		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name)
+		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -3206,7 +3206,7 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 
 	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		var err error
-		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name)
+		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -3260,7 +3260,7 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 // WaitForDeploymentUpdatedReplicasLTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
 func WaitForDeploymentUpdatedReplicasLTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int, desiredGeneration int64) error {
 	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -3279,7 +3279,7 @@ func WaitForDeploymentUpdatedReplicasLTE(c clientset.Interface, ns, deploymentNa
 // Note that rollback should be cleared shortly, so we only wait for 1 minute here to fail early.
 func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName string) error {
 	err := wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -3303,7 +3303,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	var reason string
 	err := wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
 		var err error
-		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -3360,7 +3360,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 
 func WaitForOverlappingAnnotationMatch(c clientset.Interface, ns, deploymentName, expected string) error {
 	return wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -3373,7 +3373,7 @@ func WaitForOverlappingAnnotationMatch(c clientset.Interface, ns, deploymentName
 
 // CheckNewRSAnnotations check if the new RS's annotation is as expected
 func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, expectedAnnotations map[string]string) error {
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -3410,7 +3410,7 @@ func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds in
 // Waits for the deployment to clean up old rcs.
 func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string, desiredRSNum int) error {
 	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -3435,13 +3435,15 @@ func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 }
 
 func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string, desiredGeneration int64) error {
-	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, Poll, 1*time.Minute)
+	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
+		return c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	}, desiredGeneration, Poll, 1*time.Minute)
 }
 
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType extensions.DeploymentConditionType) error {
 	var conditions []extensions.DeploymentCondition
 	pollErr := wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -3516,7 +3518,7 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 	deployments := c.Extensions().Deployments(namespace)
 	var updateErr error
 	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if deployment, err = deployments.Get(name); err != nil {
+		if deployment, err = deployments.Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
@@ -3541,7 +3543,7 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		var err error
-		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name); err != nil {
+		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
@@ -3566,7 +3568,7 @@ func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		var err error
-		if rc, err = c.Core().ReplicationControllers(namespace).Get(name); err != nil {
+		if rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
@@ -3590,7 +3592,7 @@ func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string,
 	statefulSets := c.Apps().StatefulSets(namespace)
 	var updateErr error
 	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if statefulSet, err = statefulSets.Get(name); err != nil {
+		if statefulSet, err = statefulSets.Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
@@ -3614,7 +3616,7 @@ func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 	jobs := c.Batch().Jobs(namespace)
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if job, err = jobs.Get(name); err != nil {
+		if job, err = jobs.Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
@@ -3932,7 +3934,7 @@ func IsNodeConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) boo
 func WaitForNodeToBe(c clientset.Interface, name string, conditionType v1.NodeConditionType, wantTrue bool, timeout time.Duration) bool {
 	Logf("Waiting up to %v for node %s condition %s to be %t", timeout, name, conditionType, wantTrue)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		node, err := c.Core().Nodes().Get(name)
+		node, err := c.Core().Nodes().Get(name, metav1.GetOptions{})
 		if err != nil {
 			Logf("Couldn't get node %s", name)
 			continue
@@ -4259,7 +4261,7 @@ func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 // address. Returns an error if the node the pod is on doesn't have an External
 // address.
 func GetHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddress string, err error) {
-	node, err := client.Core().Nodes().Get(p.Spec.NodeName)
+	node, err := client.Core().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -4335,7 +4337,7 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 
 // getIngressAddress returns the ips/hostnames associated with the Ingress.
 func getIngressAddress(client clientset.Interface, ns, name string) ([]string, error) {
-	ing, err := client.Extensions().Ingresses(ns).Get(name)
+	ing, err := client.Extensions().Ingresses(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -4406,7 +4408,7 @@ func LookForString(expectedString string, timeout time.Duration, fn func() strin
 
 // getSvcNodePort returns the node port for the given service:port.
 func getSvcNodePort(client clientset.Interface, ns, name string, svcPort int) (int, error) {
-	svc, err := client.Core().Services(ns).Get(name)
+	svc, err := client.Core().Services(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -4471,7 +4473,7 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 		if err := ScaleRC(clientset, internalClientset, ns, name, replicas, false); err != nil {
 			return err
 		}
-		rc, err := clientset.Core().ReplicationControllers(ns).Get(name)
+		rc, err := clientset.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -4739,7 +4741,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	_, err := podClient.Create(pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
-	createdPod, err := podClient.Get(podName)
+	createdPod, err := podClient.Get(podName, metav1.GetOptions{})
 	ExpectNoError(err)
 	ip = fmt.Sprintf("%s:%d", createdPod.Status.PodIP, port)
 	Logf("Target pod IP:port is %s", ip)
@@ -4799,7 +4801,7 @@ func CoreDump(dir string) {
 
 func UpdatePodWithRetries(client clientset.Interface, ns, name string, update func(*v1.Pod)) (*v1.Pod, error) {
 	for i := 0; i < 3; i++ {
-		pod, err := client.Core().Pods(ns).Get(name)
+		pod, err := client.Core().Pods(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get pod %q: %v", name, err)
 		}
@@ -5061,7 +5063,7 @@ func getMaster(c clientset.Interface) Address {
 	master := Address{}
 
 	// Populate the internal IP.
-	eps, err := c.Core().Endpoints(v1.NamespaceDefault).Get("kubernetes")
+	eps, err := c.Core().Endpoints(v1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to get kubernetes endpoints: %v", err)
 	}

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clienttypedv1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -407,7 +408,7 @@ func TestMasterService(t *testing.T) {
 			}
 		}
 		if found {
-			ep, err := client.Core().Endpoints(api.NamespaceDefault).Get("kubernetes")
+			ep, err := client.Core().Endpoints(api.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -451,7 +452,7 @@ func TestServiceAlloc(t *testing.T) {
 
 	// Wait until the default "kubernetes" service is created.
 	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.Core().Services(api.NamespaceDefault).Get("kubernetes")
+		_, err := client.Core().Services(api.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return false, err
 		}
@@ -595,7 +596,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 					break
 				}
 
-				n, err := c.Nodes().Get(fmt.Sprintf("node-%d", node))
+				n, err := c.Nodes().Get(fmt.Sprintf("node-%d", node), metav1.GetOptions{})
 				if err != nil {
 					fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 					break

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -398,7 +399,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				err := framework.WaitForPodNameRunningInNamespace(c, podName, ns)
 				Expect(err).NotTo(HaveOccurred())
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-					pod, err := c.Core().Pods(ns).Get(podName)
+					pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
 					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)

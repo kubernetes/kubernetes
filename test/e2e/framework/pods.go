@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -66,7 +67,7 @@ func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
 	p := c.Create(pod)
 	ExpectNoError(c.f.WaitForPodRunning(p.Name))
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
-	p, err := c.Get(p.Name)
+	p, err := c.Get(p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return p
 }
@@ -92,7 +93,7 @@ func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
 // pod object.
 func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
-		pod, err := c.PodInterface.Get(name)
+		pod, err := c.PodInterface.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
 		}

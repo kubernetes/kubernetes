@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
@@ -276,7 +277,7 @@ func newTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 }
 
 func getJob(c clientset.Interface, ns, name string) (*batch.Job, error) {
-	return c.Batch().Jobs(ns).Get(name)
+	return c.Batch().Jobs(ns).Get(name, metav1.GetOptions{})
 }
 
 func createJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
@@ -313,7 +314,7 @@ func waitForAllPodsRunning(c clientset.Interface, ns, jobName string, parallelis
 // Wait for job to reach completions.
 func waitForJobFinish(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
-		curr, err := c.Batch().Jobs(ns).Get(jobName)
+		curr, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -324,7 +325,7 @@ func waitForJobFinish(c clientset.Interface, ns, jobName string, completions int
 // Wait for job fail.
 func waitForJobFail(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
 	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
-		curr, err := c.Batch().Jobs(ns).Get(jobName)
+		curr, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -101,7 +102,7 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 		var node *v1.Node
 		var err error
 		for i := 0; i < maxRetries; i++ {
-			node, err = c.Core().Nodes().Get(nodeName)
+			node, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Error getting node %s: %v", nodeName, err)
 				continue

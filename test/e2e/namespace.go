@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -116,7 +117,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	maxWaitSeconds := int64(60) + *pod.Spec.TerminationGracePeriodSeconds
 	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
-			_, err = f.ClientSet.Core().Namespaces().Get(namespace.Name)
+			_, err = f.ClientSet.Core().Namespaces().Get(namespace.Name, metav1.GetOptions{})
 			if err != nil && errors.IsNotFound(err) {
 				return true, nil
 			}
@@ -124,7 +125,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		}))
 
 	By("Verifying there is no pod in the namespace")
-	_, err = f.ClientSet.Core().Pods(namespace.Name).Get(pod.Name)
+	_, err = f.ClientSet.Core().Pods(namespace.Name).Get(pod.Name, metav1.GetOptions{})
 	Expect(err).To(HaveOccurred())
 }
 
@@ -168,7 +169,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	maxWaitSeconds := int64(60)
 	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
-			_, err = f.ClientSet.Core().Namespaces().Get(namespace.Name)
+			_, err = f.ClientSet.Core().Namespaces().Get(namespace.Name, metav1.GetOptions{})
 			if err != nil && errors.IsNotFound(err) {
 				return true, nil
 			}
@@ -176,7 +177,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		}))
 
 	By("Verifying there is no service in the namespace")
-	_, err = f.ClientSet.Core().Services(namespace.Name).Get(service.Name)
+	_, err = f.ClientSet.Core().Services(namespace.Name).Get(service.Name, metav1.GetOptions{})
 	Expect(err).To(HaveOccurred())
 }
 

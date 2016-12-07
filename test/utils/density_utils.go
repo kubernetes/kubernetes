@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 
 	"github.com/golang/glog"
@@ -61,7 +62,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 	var node *v1.Node
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
-		node, err = c.Core().Nodes().Get(nodeName)
+		node, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -92,7 +93,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 // VerifyLabelsRemoved checks if Node for given nodeName does not have any of labels from labelKeys.
 // Return non-nil error if it does.
 func VerifyLabelsRemoved(c clientset.Interface, nodeName string, labelKeys []string) error {
-	node, err := c.Core().Nodes().Get(nodeName)
+	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -235,7 +236,7 @@ func createCronJob(c clientset.Interface, ns string, cronJob *batch.CronJob) (*b
 }
 
 func getCronJob(c clientset.Interface, ns, name string) (*batch.CronJob, error) {
-	return c.BatchV2alpha1().CronJobs(ns).Get(name)
+	return c.BatchV2alpha1().CronJobs(ns).Get(name, metav1.GetOptions{})
 }
 
 func deleteCronJob(c clientset.Interface, ns, name string) error {
@@ -245,7 +246,7 @@ func deleteCronJob(c clientset.Interface, ns, name string) error {
 // Wait for at least given amount of active jobs.
 func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV2alpha1().CronJobs(ns).Get(cronJobName)
+		curr, err := c.BatchV2alpha1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -256,7 +257,7 @@ func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int
 // Wait for no jobs to appear.
 func waitForNoJobs(c clientset.Interface, ns, jobName string) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV2alpha1().CronJobs(ns).Get(jobName)
+		curr, err := c.BatchV2alpha1().CronJobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -312,7 +313,7 @@ func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 // checkNoUnexpectedEvents checks unexpected events didn't happen.
 // Currently only "UnexpectedJob" is checked.
 func checkNoUnexpectedEvents(c clientset.Interface, ns, cronJobName string) error {
-	sj, err := c.BatchV2alpha1().CronJobs(ns).Get(cronJobName)
+	sj, err := c.BatchV2alpha1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("error in getting cronjob %s/%s: %v", ns, cronJobName, err)
 	}
