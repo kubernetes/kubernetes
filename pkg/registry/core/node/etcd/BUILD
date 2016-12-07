@@ -18,6 +18,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/node:go_default_library",

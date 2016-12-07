@@ -19,6 +19,7 @@ package serviceaccount
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
@@ -61,7 +62,7 @@ func NewGetterFromRegistries(serviceAccounts serviceaccountregistry.Registry, se
 }
 func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
 	ctx := api.WithNamespace(api.NewContext(), namespace)
-	internalServiceAccount, err := r.serviceAccounts.GetServiceAccount(ctx, name)
+	internalServiceAccount, err := r.serviceAccounts.GetServiceAccount(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +73,7 @@ func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceA
 }
 func (r *registryGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 	ctx := api.WithNamespace(api.NewContext(), namespace)
-	internalSecret, err := r.secrets.GetSecret(ctx, name)
+	internalSecret, err := r.secrets.GetSecret(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

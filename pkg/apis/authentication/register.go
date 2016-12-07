@@ -49,6 +49,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&api.ListOptions{},
 		&api.DeleteOptions{},
 		&metav1.ExportOptions{},
+		&metav1.GetOptions{},
 
 		&TokenReview{},
 	)

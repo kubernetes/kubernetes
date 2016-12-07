@@ -153,7 +153,7 @@ func TestGenerationNumber(t *testing.T) {
 	modifiedSno.Status.ObservedGeneration = 10
 	ctx := api.NewDefaultContext()
 	rs, err := createReplicaSet(storage.ReplicaSet, modifiedSno, t)
-	etcdRS, err := storage.ReplicaSet.Get(ctx, rs.Name)
+	etcdRS, err := storage.ReplicaSet.Get(ctx, rs.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestGenerationNumber(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	etcdRS, err = storage.ReplicaSet.Get(ctx, rs.Name)
+	etcdRS, err = storage.ReplicaSet.Get(ctx, rs.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestGenerationNumber(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	etcdRS, err = storage.ReplicaSet.Get(ctx, rs.Name)
+	etcdRS, err = storage.ReplicaSet.Get(ctx, rs.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestScaleGet(t *testing.T) {
 			Selector: validReplicaSet.Spec.Selector,
 		},
 	}
-	obj, err := storage.Scale.Get(ctx, name)
+	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
 	got := obj.(*extensions.Scale)
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
@@ -312,7 +312,7 @@ func TestScaleUpdate(t *testing.T) {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 
-	obj, err := storage.Scale.Get(ctx, name)
+	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -352,7 +352,7 @@ func TestStatusUpdate(t *testing.T) {
 	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.ReplicaSet.Get(ctx, "foo")
+	obj, err := storage.ReplicaSet.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

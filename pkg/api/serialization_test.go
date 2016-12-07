@@ -238,6 +238,7 @@ func TestList(t *testing.T) {
 
 var nonRoundTrippableTypes = sets.NewString(
 	"ExportOptions",
+	"GetOptions",
 	// WatchEvent does not include kind and version and can only be deserialized
 	// implicitly (if the caller expects the specific object). The watch call defines
 	// the schema by content type, rather than via kind/version included in each

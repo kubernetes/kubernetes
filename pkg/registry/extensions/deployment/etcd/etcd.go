@@ -124,8 +124,8 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
+func (r *StatusREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
 }
 
 // Update alters the status subset of an object.
@@ -214,8 +214,8 @@ func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
 
-func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	deployment, err := r.registry.GetDeployment(ctx, name)
+func (r *ScaleREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	deployment, err := r.registry.GetDeployment(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
 	}
@@ -227,7 +227,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 func (r *ScaleREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	deployment, err := r.registry.GetDeployment(ctx, name)
+	deployment, err := r.registry.GetDeployment(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
 	}

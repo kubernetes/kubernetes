@@ -19,13 +19,14 @@ package endpoint
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store endpoints.
 type Registry interface {
 	ListEndpoints(ctx api.Context, options *api.ListOptions) (*api.EndpointsList, error)
-	GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error)
+	GetEndpoints(ctx api.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error)
 	WatchEndpoints(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	UpdateEndpoints(ctx api.Context, e *api.Endpoints) error
 	DeleteEndpoints(ctx api.Context, name string) error
@@ -54,8 +55,8 @@ func (s *storage) WatchEndpoints(ctx api.Context, options *api.ListOptions) (wat
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetEndpoints(ctx api.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

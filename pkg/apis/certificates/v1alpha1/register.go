@@ -53,6 +53,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 		&metav1.ExportOptions{},
+		&metav1.GetOptions{},
 	)
 
 	// Add the watch version that applies

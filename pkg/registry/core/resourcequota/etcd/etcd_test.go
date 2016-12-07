@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -84,7 +85,7 @@ func TestCreateSetsFields(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	object, err := storage.Get(ctx, "foo")
+	object, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -187,7 +188,7 @@ func TestUpdateStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	rqOut := obj.(*api.ResourceQuota)
 	// only compare the meaningful update b/c we can't compare due to metadata
 	if !api.Semantic.DeepEqual(resourcequotaIn.Status, rqOut.Status) {

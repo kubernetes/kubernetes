@@ -20,6 +20,7 @@ go_library(
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/extensions/replicaset:go_default_library",
         "//pkg/registry/generic:go_default_library",

@@ -22,12 +22,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // Registry is an interface for things that know how to store Deployments.
 type Registry interface {
 	ListDeployments(ctx api.Context, options *api.ListOptions) (*extensions.DeploymentList, error)
-	GetDeployment(ctx api.Context, deploymentID string) (*extensions.Deployment, error)
+	GetDeployment(ctx api.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error)
 	CreateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
 	UpdateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
 	DeleteDeployment(ctx api.Context, deploymentID string) error
@@ -54,8 +55,8 @@ func (s *storage) ListDeployments(ctx api.Context, options *api.ListOptions) (*e
 	return obj.(*extensions.DeploymentList), err
 }
 
-func (s *storage) GetDeployment(ctx api.Context, deploymentID string) (*extensions.Deployment, error) {
-	obj, err := s.Get(ctx, deploymentID)
+func (s *storage) GetDeployment(ctx api.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error) {
+	obj, err := s.Get(ctx, deploymentID, options)
 	if err != nil {
 		return nil, err
 	}

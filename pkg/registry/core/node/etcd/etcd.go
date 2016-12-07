@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/node"
@@ -58,8 +59,8 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
+func (r *StatusREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
 }
 
 // Update alters the status subset of an object.
@@ -118,7 +119,7 @@ func NewStorage(opts generic.RESTOptions, kubeletClientConfig client.KubeletClie
 
 	// Build a NodeGetter that looks up nodes using the REST handler
 	nodeGetter := client.NodeGetterFunc(func(nodeName string) (*v1.Node, error) {
-		obj, err := nodeREST.Get(api.NewContext(), nodeName)
+		obj, err := nodeREST.Get(api.NewContext(), nodeName, &metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

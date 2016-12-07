@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
@@ -132,7 +133,7 @@ func (nodeStatusStrategy) Canonicalize(obj runtime.Object) {
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
 type ResourceGetter interface {
-	Get(api.Context, string) (runtime.Object, error)
+	Get(api.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
 // NodeToSelectableFields returns a field set that represents the object.

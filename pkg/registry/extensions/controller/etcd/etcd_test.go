@@ -95,7 +95,7 @@ func TestGet(t *testing.T) {
 	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestUpdate(t *testing.T) {
 	if _, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

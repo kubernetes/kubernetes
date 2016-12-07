@@ -296,7 +296,7 @@ func TestStoreCreate(t *testing.T) {
 	}
 
 	// get the object
-	checkobj, err := registry.Get(testContext, podA.Name)
+	checkobj, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -344,7 +344,7 @@ func updateAndVerify(t *testing.T, ctx api.Context, registry *Store, pod *api.Po
 		t.Errorf("Unexpected error: %v", err)
 		return false
 	}
-	checkObj, err := registry.Get(ctx, pod.Name)
+	checkObj, err := registry.Get(ctx, pod.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return false
@@ -429,7 +429,7 @@ func TestNoOpUpdates(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	createdPod, err := registry.Get(api.NewDefaultContext(), "foo")
+	createdPod, err := registry.Get(api.NewDefaultContext(), "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -445,7 +445,7 @@ func TestNoOpUpdates(t *testing.T) {
 		t.Errorf("no-op update should return a correct value, got: %#v", updateResult)
 	}
 
-	updatedPod, err := registry.Get(api.NewDefaultContext(), "foo")
+	updatedPod, err := registry.Get(api.NewDefaultContext(), "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -572,7 +572,7 @@ func TestStoreGet(t *testing.T) {
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
-	_, err := registry.Get(testContext, podA.Name)
+	_, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -612,7 +612,7 @@ func TestStoreDelete(t *testing.T) {
 	}
 
 	// try to get a item which should be deleted
-	_, err = registry.Get(testContext, podA.Name)
+	_, err = registry.Get(testContext, podA.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -679,7 +679,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -694,7 +694,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	// the object should still exist, because it still has a finalizer
-	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -708,7 +708,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	// the pod should be removed, because its finalizer is removed
-	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -738,7 +738,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	// the object should still exist
-	obj, err := registry.Get(testContext, podWithFinalizer.Name)
+	obj, err := registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -766,7 +766,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	// the object should still exist, because it still has a finalizer
-	obj, err = registry.Get(testContext, podWithFinalizer.Name)
+	obj, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -784,7 +784,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	// the pod should be removed, because its finalizer is removed
-	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1032,7 +1032,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		obj, err := registry.Get(testContext, tc.pod.Name)
+		obj, err := registry.Get(testContext, tc.pod.Name, &metav1.GetOptions{})
 		if tc.expectNotFound && (err == nil || !errors.IsNotFound(err)) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -1085,10 +1085,10 @@ func TestStoreDeleteCollection(t *testing.T) {
 		t.Errorf("Unexpected number of pods deleted: %d, expected: 2", len(deletedPods.Items))
 	}
 
-	if _, err := registry.Get(testContext, podA.Name); !errors.IsNotFound(err) {
+	if _, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if _, err := registry.Get(testContext, podB.Name); !errors.IsNotFound(err) {
+	if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
@@ -1125,10 +1125,10 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 		}
 		wg.Wait()
 
-		if _, err := registry.Get(testContext, podA.Name); !errors.IsNotFound(err) {
+		if _, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		if _, err := registry.Get(testContext, podB.Name); !errors.IsNotFound(err) {
+		if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	}
