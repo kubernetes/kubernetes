@@ -379,6 +379,27 @@ function create_client_certkey {
 EOF
 }
 
+function create_serving_certkey {
+    local CA=$1
+    local ID=$2
+    local CN=${3:-$2}
+    local NAMES=""
+    local SEP=""
+    shift 3
+    while [ -n "${1:-}" ]; do
+        NAMES+="${SEP}\"$1\""
+        SEP=","
+        shift 1
+    done
+    ${CONTROLPLANE_SUDO} /bin/bash -e <<EOF
+    cd ${CERT_DIR}
+    echo '{"CN":"${CN}","hosts":[${NAMES}],"key":{"algo":"rsa","size":2048}}' | cfssl gencert -ca=${CA}.crt -ca-key=${CA}.key -config=serving-ca-config.json - | cfssljson -bare serving-${ID}
+    mv "${CERT_DIR}/serving-${ID}-key.pem" "${CERT_DIR}/serving-${ID}.key"
+    mv "${CERT_DIR}/serving-${ID}.pem" "${CERT_DIR}/serving-${ID}.crt"
+    rm -f "${CERT_DIR}/serving-${ID}.csr"
+EOF
+}
+
 function write_client_kubeconfig {
     cat <<EOF | ${CONTROLPLANE_SUDO} tee "${CERT_DIR}"/$1.kubeconfig > /dev/null
 apiVersion: v1
@@ -529,16 +550,7 @@ EOF
 
 # start_discovery relies on certificates created by start_apiserver
 function start_discovery {
-    # TODO generate serving certificates
-    create_client_certkey client-ca discovery-auth system:discovery-auth
-    write_client_kubeconfig discovery-auth
-
-    # grant permission to run delegated authentication and authorization checks
-    if [[ "${ENABLE_RBAC}" = true ]]; then
-        ${KUBECTL} ${AUTH_ARGS} create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --user=system:discovery-auth
-    fi
-
-    curl --silent -k -g $API_HOST:$DISCOVERY_SECURE_PORT
+    curl --silent -k -g $API_HOST:31090
     if [ ! $? -eq 0 ]; then
         echo "Kubernetes Discovery secure port is free, proceeding..."
     else
@@ -546,32 +558,53 @@ function start_discovery {
         return
     fi
 
-    ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-discovery.kubeconfig"
-    ${CONTROLPLANE_SUDO} ${GO_OUT}/kubectl config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" --insecure-skip-tls-verify --server="https://${API_HOST}:${DISCOVERY_SECURE_PORT}"
+     # Create serving ca
+    sudo /bin/bash -e <<EOF
+    rm -f "${CERT_DIR}/serving-ca.crt" "${CERT_DIR}/serving-ca.key"
+    openssl req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/serving-ca.key" -out "${CERT_DIR}/serving-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","server auth","client auth"]}}}' > "${CERT_DIR}/serving-ca-config.json"
+EOF
+    create_serving_certkey serving-ca etcd etcd.kube-public.svc
+    create_serving_certkey serving-ca kubernetes-discovery api.kube-public.svc "localhost" ${API_HOST_IP}
+    # etcd doesn't seem to have separate signers for serving and client trust
+    create_client_certkey serving-ca discovery-etcd discovery-etcd
 
-    DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
-      --cert-dir="${CERT_DIR}" \
-      --client-ca-file="${CERT_DIR}/client-ca.crt" \
-      --authentication-kubeconfig="${CERT_DIR}/discovery-auth.kubeconfig" \
-      --authorization-kubeconfig="${CERT_DIR}/discovery-auth.kubeconfig" \
-      --requestheader-username-headers=X-Remote-User \
-      --requestheader-group-headers=X-Remote-Group \
-      --requestheader-extra-headers-prefix=X-Remote-Extra- \
-      --requestheader-client-ca-file="${CERT_DIR}/auth-proxy-client-ca.crt" \
-      --requestheader-allowed-names=system:auth-proxy \
-      --bind-address="${API_BIND_ADDR}" \
-      --secure-port="${DISCOVERY_SECURE_PORT}" \
-      --tls-ca-file="${ROOT_CA_FILE}" \
-      --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}"  >"${DISCOVERY_SERVER_LOG}" 2>&1 &
-    DISCOVERY_PID=$!
+    create_client_certkey client-ca discovery-auth system:discovery-auth
+    write_client_kubeconfig discovery-auth
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/discovery-auth.kubeconfig" config set-cluster local-up-cluster --insecure-skip-tls-verify --server="https://kubernetes.default.svc"
+
+    # grant permission to run delegated authentication and authorization checks
+    if [[ "${ENABLE_RBAC}" = true ]]; then
+        ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --user=system:discovery-auth
+    fi
+
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" create namespace kube-public
+    ${CONTROLPLANE_SUDO} ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create secret tls auth-proxy-client --cert="${CERT_DIR}/client-auth-proxy.crt" --key="${CERT_DIR}/client-auth-proxy.key"
+    ${CONTROLPLANE_SUDO} ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create secret tls etcd-serving --cert="${CERT_DIR}/serving-etcd.crt" --key="${CERT_DIR}/serving-etcd.key"
+    ${CONTROLPLANE_SUDO} ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create secret tls kubernetes-discovery-serving --cert="${CERT_DIR}/serving-kubernetes-discovery.crt" --key="${CERT_DIR}/serving-kubernetes-discovery.key"
+    ${CONTROLPLANE_SUDO} ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create secret tls discovery-etcd --cert="${CERT_DIR}/client-discovery-etcd.crt" --key="${CERT_DIR}/client-discovery-etcd.key"
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create secret generic discovery-auth-client --from-file="${CERT_DIR}/discovery-auth.kubeconfig"
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create configmap serving-ca --from-file="${CERT_DIR}/serving-ca.crt"
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create configmap client-ca --from-file="${CERT_DIR}/client-ca.crt"
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create configmap auth-proxy-client-ca --from-file="${CERT_DIR}/auth-proxy-client-ca.crt"
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create configmap discovery-options \
+      --from-literal="etcd-servers=http://${ETCD_HOST}:${ETCD_PORT}"
+
+    ${CONTROLPLANE_SUDO} ${KUBE_ROOT}/cmd/kubernetes-discovery/hack/build-image.sh
+
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-public create -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/local-cluster-up" --validate=false
+
+    ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-discovery.kubeconfig"
+    ${CONTROLPLANE_SUDO} chown ${username} "${CERT_DIR}/admin-discovery.kubeconfig"
+    ${GO_OUT}/kubectl config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" --certificate-authority="${CERT_DIR}/serving-ca.crt" --embed-certs --server="https://${API_HOST_IP}:31090"
 
     # Wait for kubernetes-discovery to come up before launching the rest of the components.
-    echo "Waiting for kubernetes-discovery to come up"
-    kube::util::wait_for_url "https://${API_HOST}:${DISCOVERY_SECURE_PORT}/version" "kubernetes-discovery: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+    # this should work since we're creating a node port service
+    echo "Waiting for kubernetes-discovery to come up: https://${API_HOST_IP}:31090/version"
+    kube::util::wait_for_url "https://${API_HOST_IP}:31090/version" "kubernetes-discovery: " 1 60 || exit 1
 
     # create the "normal" api services for the core API server
-    ${CONTROLPLANE_SUDO} ${GO_OUT}/kubectl create -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/core-apiservices" --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig"
+    ${GO_OUT}/kubectl  --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" create -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/core-apiservices"
 }
 
 

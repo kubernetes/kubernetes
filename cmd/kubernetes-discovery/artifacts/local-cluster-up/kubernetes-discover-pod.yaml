@@ -1,0 +1,81 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: kubernetes-discovery
+  labels:
+    kubernetes-discovery: "true"
+spec:
+  replicas: 1
+  selector:
+    kubernetes-discovery: "true"
+  template:
+    metadata:
+      labels:
+        kubernetes-discovery: "true"
+    spec:
+      containers:
+      - name: kubernetes-discovery
+        image: kubernetes-discovery:latest
+        imagePullPolicy: Never
+        args:
+        - "--tls-cert-file=/var/run/serving-cert/tls.crt"
+        - "--tls-private-key-file=/var/run/serving-cert/tls.key"
+        - "--tls-ca-file=/var/run/serving-ca/serving-ca.crt"
+        - "--client-ca-file=/var/run/client-ca/client-ca.crt"
+        - "--authentication-kubeconfig=/var/run/discovery-auth-client/discovery-auth.kubeconfig"
+        - "--authorization-kubeconfig=/var/run/discovery-auth-client/discovery-auth.kubeconfig"
+        - "--requestheader-username-headers=X-Remote-User"
+        - "--requestheader-group-headers=X-Remote-Group"
+        - "--requestheader-extra-headers-prefix=X-Remote-Extra-"
+        - "--requestheader-client-ca-file=/var/run/auth-proxy-client-ca/auth-proxy-client-ca.crt"
+        - "--requestheader-allowed-names=system:auth-proxy"
+        - "--etcd-servers=https://etcd.kube-public.svc:4001"
+        - "--etcd-certfile=/var/run/etcd-client-cert/tls.crt"
+        - "--etcd-keyfile=/var/run/etcd-client-cert/tls.key"
+        - "--etcd-cafile=/var/run/serving-ca/serving-ca.crt"
+        ports:
+        - containerPort: 443
+        volumeMounts:
+        - mountPath: /var/run/auth-proxy-client-ca
+          name: volume-j7mz4
+        - mountPath: /var/run/client-ca
+          name: volume-sexcq
+        - mountPath: /var/run/auth-proxy-client
+          name: volume-vnv2y
+        - mountPath: /var/run/discovery-auth-client
+          name: volume-34gpa
+        - mountPath: /var/run/etcd-client-cert
+          name: etcd-client-cert
+        - mountPath: /var/run/serving-ca
+          name: serving-ca
+        - mountPath: /var/run/serving-cert
+          name: serving-cert
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: auth-proxy-client-ca
+        name: volume-j7mz4
+      - configMap:
+          defaultMode: 420
+          name: client-ca
+        name: volume-sexcq
+      - name: volume-vnv2y
+        secret:
+          defaultMode: 420
+          secretName: auth-proxy-client
+      - name: volume-34gpa
+        secret:
+          defaultMode: 420
+          secretName: discovery-auth-client
+      - name: etcd-client-cert
+        secret:
+          defaultMode: 420
+          secretName: discovery-etcd
+      - name: serving-cert
+        secret:
+          defaultMode: 420
+          secretName: kubernetes-discovery-serving
+      - configMap:
+          defaultMode: 420
+          name: serving-ca
+        name: serving-ca

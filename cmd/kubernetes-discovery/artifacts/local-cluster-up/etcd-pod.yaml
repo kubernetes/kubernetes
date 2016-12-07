@@ -1,0 +1,50 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: etcd
+  labels:
+    etcd: "true"
+spec:
+  replicas: 1
+  selector:
+    etcd: "true"
+  template:
+    metadata:
+      labels:
+        etcd: "true"
+    spec:
+      containers:
+      - name: etcd
+        image: quay.io/coreos/etcd:v3.0.15
+        command:
+        - "etcd"
+        - "--listen-client-urls=https://0.0.0.0:4001"
+        - "--advertise-client-urls=https://etcd.kube-public.svc:4001"
+        - "--trusted-ca-file=/var/run/serving-ca/serving-ca.crt"
+        - "--cert-file=/var/run/etcd-serving/tls.crt"
+        - "--key-file=/var/run/etcd-serving/tls.key"
+        - "--client-cert-auth=true"
+        - "--listen-peer-urls=https://0.0.0.0:7001"
+        - "--initial-advertise-peer-urls=https://etcd.kube-public.svc:7001"
+        - "--peer-trusted-ca-file=/var/run/serving-ca/serving-ca.crt"
+        - "--peer-cert-file=/var/run/etcd-serving/tls.crt"
+        - "--peer-key-file=/var/run/etcd-serving/tls.key"
+        - "--peer-client-cert-auth=true"
+        - "--initial-cluster=default=https://etcd.kube-public.svc:7001"
+        ports:
+        - containerPort: 4001
+        volumeMounts:
+        - mountPath: /var/run/etcd-serving
+          name: volume-j7mz4
+        - mountPath: /var/run/serving-ca
+          name: volume-serving-ca
+      volumes:
+      - secret:
+          defaultMode: 420
+          secretName: etcd-serving
+        name: volume-j7mz4
+      - configMap:
+          defaultMode: 420
+          name: serving-ca
+        name: volume-serving-ca
+
