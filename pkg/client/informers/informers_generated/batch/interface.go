@@ -22,7 +22,7 @@ import (
 	internalversion "k8s.io/kubernetes/pkg/client/informers/informers_generated/batch/internalversion"
 	v1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/batch/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/batch/v2alpha1"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.
@@ -36,11 +36,11 @@ type Interface interface {
 }
 
 type group struct {
-	interfaces.SharedInformerFactory
+	internalinterfaces.SharedInformerFactory
 }
 
 // New returns a new Interface.
-func New(f interfaces.SharedInformerFactory) Interface {
+func New(f internalinterfaces.SharedInformerFactory) Interface {
 	return &group{f}
 }
 

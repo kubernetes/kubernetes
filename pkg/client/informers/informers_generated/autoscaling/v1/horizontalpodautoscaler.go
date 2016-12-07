@@ -23,7 +23,7 @@ import (
 	autoscaling_v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	release_1_5 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	v1 "k8s.io/kubernetes/pkg/client/listers/autoscaling/v1"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -38,7 +38,7 @@ type HorizontalPodAutoscalerInformer interface {
 }
 
 type horizontalPodAutoscalerInformer struct {
-	factory interfaces.SharedInformerFactory
+	factory internalinterfaces.SharedInformerFactory
 }
 
 func newHorizontalPodAutoscalerInformer(client release_1_5.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {

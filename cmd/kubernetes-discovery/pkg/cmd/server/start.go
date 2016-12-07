@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/legacy"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -35,6 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/wait"
+
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1"
 )
 
 const defaultEtcdPathPrefix = "/registry/kubernetes.io/kubernetes-discovery"
@@ -57,7 +58,7 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 		StdErr: err,
 	}
 	o.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
-	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(registered.EnabledVersionsForGroup(api.GroupName)...)
+	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
 	o.SecureServing.ServingOptions.BindPort = 9090
 
 	cmd := &cobra.Command{

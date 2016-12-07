@@ -18,6 +18,8 @@ go_binary(
         "//cmd/kubernetes-discovery/pkg/apis/apiregistration/install:go_default_library",
         "//cmd/kubernetes-discovery/pkg/apis/apiregistration/validation:go_default_library",
         "//cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//cmd/kubernetes-discovery/pkg/client/informers/apiregistration/internalversion:go_default_library",
+        "//cmd/kubernetes-discovery/pkg/client/informers/apiregistration/v1alpha1:go_default_library",
         "//cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion:go_default_library",
         "//cmd/kubernetes-discovery/pkg/client/listers/apiregistration/v1alpha1:go_default_library",
         "//cmd/kubernetes-discovery/pkg/cmd/server:go_default_library",

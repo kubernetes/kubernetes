@@ -19,9 +19,9 @@ limitations under the License.
 package policy
 
 import (
+	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/informers/informers_generated/policy/internalversion"
 	v1beta1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/policy/v1beta1"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 )
 
 // Interface provides access to each of this group's versions.
@@ -33,11 +33,11 @@ type Interface interface {
 }
 
 type group struct {
-	interfaces.SharedInformerFactory
+	internalinterfaces.SharedInformerFactory
 }
 
 // New returns a new Interface.
-func New(f interfaces.SharedInformerFactory) Interface {
+func New(f internalinterfaces.SharedInformerFactory) Interface {
 	return &group{f}
 }
 

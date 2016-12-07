@@ -25,7 +25,7 @@ go_library(
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
-        "//pkg/client/informers/interfaces:go_default_library",
+        "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
         "//pkg/client/listers/rbac/v1alpha1:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/watch:go_default_library",

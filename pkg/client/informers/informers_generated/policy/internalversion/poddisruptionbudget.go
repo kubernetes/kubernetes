@@ -24,7 +24,7 @@ import (
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
+	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/policy/internalversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -39,7 +39,7 @@ type PodDisruptionBudgetInformer interface {
 }
 
 type podDisruptionBudgetInformer struct {
-	factory interfaces.SharedInformerFactory
+	factory internalinterfaces.SharedInformerFactory
 }
 
 func newPodDisruptionBudgetInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {

@@ -17,6 +17,6 @@ go_library(
     deps = [
         "//pkg/client/informers/informers_generated/extensions/internalversion:go_default_library",
         "//pkg/client/informers/informers_generated/extensions/v1beta1:go_default_library",
-        "//pkg/client/informers/interfaces:go_default_library",
+        "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
     ],
 )
