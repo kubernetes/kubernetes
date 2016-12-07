@@ -271,7 +271,9 @@ func createDummyDeployment(client *clientset.Clientset) {
 
 	fmt.Println("[apiclient] Test deployment succeeded")
 
-	if err := client.Extensions().Deployments(api.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
-		fmt.Printf("[apiclient] Failed to delete test deployment [%v] (will ignore)\n", err)
-	}
+	// TODO(sig-api-machinery) Fix the versioned client to handle v1.DeleteOptions regardless of where it's registered:
+	// https://github.com/kubernetes/kubeadm/issues/52#issuecomment-265319266
+	//if err := client.Extensions().Deployments(api.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
+	//	fmt.Printf("[apiclient] Failed to delete test deployment [%v] (will ignore)\n", err)
+	//}
 }
