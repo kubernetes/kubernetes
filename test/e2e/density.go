@@ -66,6 +66,7 @@ type DensityTestConfig struct {
 	// What kind of resource we want to create
 	kind          schema.GroupKind
 	SecretConfigs []*testutils.SecretConfig
+	DaemonConfig  *testutils.DaemonConfig
 }
 
 func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceConstraint {
@@ -197,6 +198,11 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 	for i := range dtc.SecretConfigs {
 		dtc.SecretConfigs[i].Run()
 	}
+
+	if dtc.DaemonConfig != nil {
+		dtc.DaemonConfig.Run()
+	}
+
 	// Start all replication controllers.
 	startTime := time.Now()
 	wg := sync.WaitGroup{}
@@ -258,7 +264,7 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 			framework.ExpectNoError(err)
 		} else {
 			By(fmt.Sprintf("Cleaning up the %v and pods", kind))
-			err := framework.DeleteResourceAndPods(dtc.ClientSet, dtc.InternalClientset, kind, dtc.Configs[i].GetNamespace(), name)
+			err := framework.DeleteResourceAndPods(dtc.ClientSet, dtc.InternalClientset, kind, namespace, name)
 			framework.ExpectNoError(err)
 		}
 	}
@@ -266,6 +272,16 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 	// Delete all secrets
 	for i := range dtc.SecretConfigs {
 		dtc.SecretConfigs[i].Stop()
+	}
+
+	if dtc.DaemonConfig != nil {
+		framework.ExpectNoError(framework.DeleteResourceAndPods(
+			dtc.ClientSet,
+			dtc.InternalClientset,
+			extensions.Kind("DaemonSet"),
+			dtc.DaemonConfig.Namespace,
+			dtc.DaemonConfig.Name,
+		))
 	}
 }
 
@@ -369,6 +385,7 @@ var _ = framework.KubeDescribe("Density", func() {
 		// What kind of resource we should be creating. Default: ReplicationController
 		kind          schema.GroupKind
 		secretsPerPod int
+		startDeamons  bool
 	}
 
 	densityTests := []Density{
@@ -406,6 +423,9 @@ var _ = framework.KubeDescribe("Density", func() {
 				f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
 			}
 			totalPods = podsPerNode * nodeCount
+			if itArg.startDeamons {
+				totalPods -= nodeCount
+			}
 			fileHndl, err := os.Create(fmt.Sprintf(framework.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
 			framework.ExpectNoError(err)
 			defer fileHndl.Close()
@@ -476,6 +496,15 @@ var _ = framework.KubeDescribe("Density", func() {
 				PollInterval:      DensityPollInterval,
 				kind:              itArg.kind,
 				SecretConfigs:     secretConfigs,
+			}
+
+			if itArg.startDeamons {
+				dConfig.DaemonConfig = &testutils.DaemonConfig{
+					Client:    f.ClientSet,
+					Name:      "density-daemon",
+					Namespace: f.Namespace.Name,
+					LogFunc:   framework.Logf,
+				}
 			}
 			e2eStartupTime = runDensityTest(dConfig)
 			if itArg.runLatencyTest {
