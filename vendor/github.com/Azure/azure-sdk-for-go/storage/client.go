@@ -128,6 +128,7 @@ func NewBasicClient(accountName, accountKey string) (Client, error) {
 		return NewEmulatorClient()
 	}
 	return NewClient(accountName, accountKey, DefaultBaseURL, DefaultAPIVersion, defaultUseHTTPS)
+
 }
 
 //NewEmulatorClient contructs a Client intended to only work with Azure
@@ -305,7 +306,7 @@ func (c Client) buildCanonicalizedResourceTable(uri string) (string, error) {
 	cr := "/" + c.getCanonicalizedAccountName()
 
 	if len(u.Path) > 0 {
-		cr += u.Path
+		cr += u.EscapedPath()
 	}
 
 	return cr, nil

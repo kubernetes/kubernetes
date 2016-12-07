@@ -21,12 +21,13 @@ package network
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
 // VirtualNetworkGatewaysClient is the the Microsoft Azure Network management
 // API provides a RESTful set of web services that interact with Microsoft
-// Azure Networks service to manage your network resrources. The API has
+// Azure Networks service to manage your network resources. The API has
 // entities that capture the relationship between an end user and the
 // Microsoft Azure Networks service.
 type VirtualNetworkGatewaysClient struct {
@@ -45,17 +46,25 @@ func NewVirtualNetworkGatewaysClientWithBaseURI(baseURI string, subscriptionID s
 	return VirtualNetworkGatewaysClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// CreateOrUpdate the Put VirtualNetworkGateway operation creates/updates a
-// virtual network gateway in the specified resource group through Network
-// resource provider. This method may poll for completion. Polling can be
-// canceled by passing the cancel channel argument. The channel will be used
-// to cancel polling and any outstanding HTTP requests.
+// CreateOrUpdate creates or updates a virtual network gateway in the
+// specified resource group. This method may poll for completion. Polling can
+// be canceled by passing the cancel channel argument. The channel will be
+// used to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayName is the name of the virtual network gateway.
-// parameters is parameters supplied to the Begin Create or update Virtual
-// Network Gateway operation through Network resource provider.
+// parameters is parameters supplied to create or update virtual network
+// gateway operation.
 func (client VirtualNetworkGatewaysClient) CreateOrUpdate(resourceGroupName string, virtualNetworkGatewayName string, parameters VirtualNetworkGateway, cancel <-chan struct{}) (result autorest.Response, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayPropertiesFormat.IPConfigurations", Name: validation.Null, Rule: true, Chain: nil},
+					{Target: "parameters.VirtualNetworkGatewayPropertiesFormat.ProvisioningState", Name: validation.ReadOnly, Rule: true, Chain: nil},
+				}}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "network.VirtualNetworkGatewaysClient", "CreateOrUpdate")
+	}
+
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, virtualNetworkGatewayName, parameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewaysClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -117,9 +126,8 @@ func (client VirtualNetworkGatewaysClient) CreateOrUpdateResponder(resp *http.Re
 	return
 }
 
-// Delete the Delete VirtualNetworkGateway operation deletes the specifed
-// virtual network Gateway through Network resource provider. This method may
-// poll for completion. Polling can be canceled by passing the cancel channel
+// Delete deletes the specified virtual network gateway. This method may poll
+// for completion. Polling can be canceled by passing the cancel channel
 // argument. The channel will be used to cancel polling and any outstanding
 // HTTP requests.
 //
@@ -185,14 +193,13 @@ func (client VirtualNetworkGatewaysClient) DeleteResponder(resp *http.Response) 
 	return
 }
 
-// Generatevpnclientpackage the Generatevpnclientpackage operation generates
-// Vpn client package for P2S client of the virtual network gateway in the
-// specified resource group through Network resource provider.
+// Generatevpnclientpackage generates VPN client package for P2S client of the
+// virtual network gateway in the specified resource group.
 //
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayName is the name of the virtual network gateway.
-// parameters is parameters supplied to the Begin Generating  Virtual Network
-// Gateway Vpn client package operation through Network resource provider.
+// parameters is parameters supplied to the generate virtual network gateway
+// VPN client package operation.
 func (client VirtualNetworkGatewaysClient) Generatevpnclientpackage(resourceGroupName string, virtualNetworkGatewayName string, parameters VpnClientParameters) (result String, err error) {
 	req, err := client.GeneratevpnclientpackagePreparer(resourceGroupName, virtualNetworkGatewayName, parameters)
 	if err != nil {
@@ -254,8 +261,7 @@ func (client VirtualNetworkGatewaysClient) GeneratevpnclientpackageResponder(res
 	return
 }
 
-// Get the Get VirtualNetworkGateway operation retrieves information about the
-// specified virtual network gateway through Network resource provider.
+// Get gets the specified virtual network gateway by resource group.
 //
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayName is the name of the virtual network gateway.
@@ -318,8 +324,7 @@ func (client VirtualNetworkGatewaysClient) GetResponder(resp *http.Response) (re
 	return
 }
 
-// List the List VirtualNetworkGateways operation retrieves all the virtual
-// network gateways stored.
+// List gets all virtual network gateways by resource group.
 //
 // resourceGroupName is the name of the resource group.
 func (client VirtualNetworkGatewaysClient) List(resourceGroupName string) (result VirtualNetworkGatewayListResult, err error) {
@@ -384,7 +389,7 @@ func (client VirtualNetworkGatewaysClient) ListResponder(resp *http.Response) (r
 func (client VirtualNetworkGatewaysClient) ListNextResults(lastResults VirtualNetworkGatewayListResult) (result VirtualNetworkGatewayListResult, err error) {
 	req, err := lastResults.VirtualNetworkGatewayListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewaysClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewaysClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -393,29 +398,28 @@ func (client VirtualNetworkGatewaysClient) ListNextResults(lastResults VirtualNe
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewaysClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewaysClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.VirtualNetworkGatewaysClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.VirtualNetworkGatewaysClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return
 }
 
-// Reset the Reset VirtualNetworkGateway operation resets the primary of the
-// virtual network gateway in the specified resource group through Network
-// resource provider. This method may poll for completion. Polling can be
+// Reset resets the primary of the virtual network gateway in the specified
+// resource group. This method may poll for completion. Polling can be
 // canceled by passing the cancel channel argument. The channel will be used
 // to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayName is the name of the virtual network gateway.
-// parameters is parameters supplied to the Begin Reset Virtual Network
-// Gateway operation through Network resource provider.
-func (client VirtualNetworkGatewaysClient) Reset(resourceGroupName string, virtualNetworkGatewayName string, parameters VirtualNetworkGateway, cancel <-chan struct{}) (result autorest.Response, err error) {
-	req, err := client.ResetPreparer(resourceGroupName, virtualNetworkGatewayName, parameters, cancel)
+// gatewayVip is virtual network gateway vip address supplied to the begin
+// reset of the active-active feature enabled gateway.
+func (client VirtualNetworkGatewaysClient) Reset(resourceGroupName string, virtualNetworkGatewayName string, gatewayVip string, cancel <-chan struct{}) (result autorest.Response, err error) {
+	req, err := client.ResetPreparer(resourceGroupName, virtualNetworkGatewayName, gatewayVip, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewaysClient", "Reset", nil, "Failure preparing request")
 	}
@@ -435,7 +439,7 @@ func (client VirtualNetworkGatewaysClient) Reset(resourceGroupName string, virtu
 }
 
 // ResetPreparer prepares the Reset request.
-func (client VirtualNetworkGatewaysClient) ResetPreparer(resourceGroupName string, virtualNetworkGatewayName string, parameters VirtualNetworkGateway, cancel <-chan struct{}) (*http.Request, error) {
+func (client VirtualNetworkGatewaysClient) ResetPreparer(resourceGroupName string, virtualNetworkGatewayName string, gatewayVip string, cancel <-chan struct{}) (*http.Request, error) {
 	pathParameters := map[string]interface{}{
 		"resourceGroupName":         autorest.Encode("path", resourceGroupName),
 		"subscriptionId":            autorest.Encode("path", client.SubscriptionID),
@@ -445,13 +449,14 @@ func (client VirtualNetworkGatewaysClient) ResetPreparer(resourceGroupName strin
 	queryParameters := map[string]interface{}{
 		"api-version": client.APIVersion,
 	}
+	if len(gatewayVip) > 0 {
+		queryParameters["gatewayVip"] = autorest.Encode("query", gatewayVip)
+	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
 		autorest.AsPost(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/virtualNetworkGateways/{virtualNetworkGatewayName}/reset", pathParameters),
-		autorest.WithJSON(parameters),
 		autorest.WithQueryParameters(queryParameters))
 	return preparer.Prepare(&http.Request{Cancel: cancel})
 }

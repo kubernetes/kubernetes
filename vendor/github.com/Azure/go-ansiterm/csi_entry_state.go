@@ -1,41 +1,41 @@
 package ansiterm
 
-type CsiEntryState struct {
-	BaseState
+type csiEntryState struct {
+	baseState
 }
 
-func (csiState CsiEntryState) Handle(b byte) (s State, e error) {
+func (csiState csiEntryState) Handle(b byte) (s state, e error) {
 	logger.Infof("CsiEntry::Handle %#x", b)
 
-	nextState, err := csiState.BaseState.Handle(b)
+	nextState, err := csiState.baseState.Handle(b)
 	if nextState != nil || err != nil {
 		return nextState, err
 	}
 
 	switch {
-	case sliceContains(Alphabetics, b):
-		return csiState.parser.Ground, nil
-	case sliceContains(CsiCollectables, b):
-		return csiState.parser.CsiParam, nil
-	case sliceContains(Executors, b):
+	case sliceContains(alphabetics, b):
+		return csiState.parser.ground, nil
+	case sliceContains(csiCollectables, b):
+		return csiState.parser.csiParam, nil
+	case sliceContains(executors, b):
 		return csiState, csiState.parser.execute()
 	}
 
 	return csiState, nil
 }
 
-func (csiState CsiEntryState) Transition(s State) error {
+func (csiState csiEntryState) Transition(s state) error {
 	logger.Infof("CsiEntry::Transition %s --> %s", csiState.Name(), s.Name())
-	csiState.BaseState.Transition(s)
+	csiState.baseState.Transition(s)
 
 	switch s {
-	case csiState.parser.Ground:
+	case csiState.parser.ground:
 		return csiState.parser.csiDispatch()
-	case csiState.parser.CsiParam:
+	case csiState.parser.csiParam:
 		switch {
-		case sliceContains(CsiParams, csiState.parser.context.currentChar):
+		case sliceContains(csiParams, csiState.parser.context.currentChar):
 			csiState.parser.collectParam()
-		case sliceContains(Intermeds, csiState.parser.context.currentChar):
+		case sliceContains(intermeds, csiState.parser.context.currentChar):
 			csiState.parser.collectInter()
 		}
 	}
@@ -43,7 +43,7 @@ func (csiState CsiEntryState) Transition(s State) error {
 	return nil
 }
 
-func (csiState CsiEntryState) Enter() error {
+func (csiState csiEntryState) Enter() error {
 	csiState.parser.clear()
 	return nil
 }

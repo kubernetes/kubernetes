@@ -21,6 +21,7 @@ package storage
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -40,12 +41,20 @@ func NewAccountsClientWithBaseURI(baseURI string, subscriptionID string) Account
 	return AccountsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// CheckNameAvailability checks that account name is valid and is not in use.
+// CheckNameAvailability checks that the storage account name is valid and is
+// not already in use.
 //
 // accountName is the name of the storage account within the specified
 // resource group. Storage account names must be between 3 and 24 characters
 // in length and use numbers and lower-case letters only.
 func (client AccountsClient) CheckNameAvailability(accountName AccountCheckNameAvailabilityParameters) (result CheckNameAvailabilityResult, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: accountName,
+			Constraints: []validation.Constraint{{Target: "accountName.Name", Name: validation.Null, Rule: true, Chain: nil},
+				{Target: "accountName.Type", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "storage.AccountsClient", "CheckNameAvailability")
+	}
+
 	req, err := client.CheckNameAvailabilityPreparer(accountName)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "storage.AccountsClient", "CheckNameAvailability", nil, "Failure preparing request")
@@ -105,13 +114,13 @@ func (client AccountsClient) CheckNameAvailabilityResponder(resp *http.Response)
 }
 
 // Create asynchronously creates a new storage account with the specified
-// parameters. If an account is already created and subsequent create request
-// is issued with different properties, the account properties will be
-// updated. If an account is already created and subsequent create or update
-// request is issued with exact same set of properties, the request will
-// succeed. This method may poll for completion. Polling can be canceled by
-// passing the cancel channel argument. The channel will be used to cancel
-// polling and any outstanding HTTP requests.
+// parameters. If an account is already created and a subsequent create
+// request is issued with different properties, the account properties will
+// be updated. If an account is already created and a subsequent create or
+// update request is issued with the exact same set of properties, the
+// request will succeed. This method may poll for completion. Polling can be
+// canceled by passing the cancel channel argument. The channel will be used
+// to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group within the user's
 // subscription. accountName is the name of the storage account within the
@@ -119,6 +128,28 @@ func (client AccountsClient) CheckNameAvailabilityResponder(resp *http.Response)
 // characters in length and use numbers and lower-case letters only.
 // parameters is the parameters to provide for the created account.
 func (client AccountsClient) Create(resourceGroupName string, accountName string, parameters AccountCreateParameters, cancel <-chan struct{}) (result autorest.Response, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: accountName,
+			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
+		{TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.Sku", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{{Target: "parameters.Sku.Tier", Name: validation.ReadOnly, Rule: true, Chain: nil}}},
+				{Target: "parameters.Location", Name: validation.Null, Rule: true, Chain: nil},
+				{Target: "parameters.AccountPropertiesCreateParameters", Name: validation.Null, Rule: false,
+					Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.CustomDomain", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.CustomDomain.Name", Name: validation.Null, Rule: true, Chain: nil}}},
+						{Target: "parameters.AccountPropertiesCreateParameters.Encryption", Name: validation.Null, Rule: false,
+							Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.Encryption.Services", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.Encryption.Services.Blob", Name: validation.Null, Rule: false,
+									Chain: []validation.Constraint{{Target: "parameters.AccountPropertiesCreateParameters.Encryption.Services.Blob.LastEnabledTime", Name: validation.ReadOnly, Rule: true, Chain: nil}}},
+								}},
+								{Target: "parameters.AccountPropertiesCreateParameters.Encryption.KeySource", Name: validation.Null, Rule: true, Chain: nil},
+							}},
+					}}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "storage.AccountsClient", "Create")
+	}
+
 	req, err := client.CreatePreparer(resourceGroupName, accountName, parameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "storage.AccountsClient", "Create", nil, "Failure preparing request")
@@ -174,7 +205,7 @@ func (client AccountsClient) CreateResponder(resp *http.Response) (result autore
 	err = autorest.Respond(
 		resp,
 		client.ByInspecting(),
-		azure.WithErrorUnlessStatusCode(http.StatusAccepted, http.StatusOK),
+		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted),
 		autorest.ByClosing())
 	result.Response = resp
 	return
@@ -187,6 +218,13 @@ func (client AccountsClient) CreateResponder(resp *http.Response) (result autore
 // specified resource group. Storage account names must be between 3 and 24
 // characters in length and use numbers and lower-case letters only.
 func (client AccountsClient) Delete(resourceGroupName string, accountName string) (result autorest.Response, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: accountName,
+			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "storage.AccountsClient", "Delete")
+	}
+
 	req, err := client.DeletePreparer(resourceGroupName, accountName)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "storage.AccountsClient", "Delete", nil, "Failure preparing request")
@@ -245,14 +283,21 @@ func (client AccountsClient) DeleteResponder(resp *http.Response) (result autore
 }
 
 // GetProperties returns the properties for the specified storage account
-// including but not limited to name, account type, location, and account
-// status. The ListKeys operation should be used to retrieve storage keys.
+// including but not limited to name, SKU name, location, and account status.
+// The ListKeys operation should be used to retrieve storage keys.
 //
 // resourceGroupName is the name of the resource group within the user's
 // subscription. accountName is the name of the storage account within the
 // specified resource group. Storage account names must be between 3 and 24
 // characters in length and use numbers and lower-case letters only.
 func (client AccountsClient) GetProperties(resourceGroupName string, accountName string) (result Account, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: accountName,
+			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "storage.AccountsClient", "GetProperties")
+	}
+
 	req, err := client.GetPropertiesPreparer(resourceGroupName, accountName)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "storage.AccountsClient", "GetProperties", nil, "Failure preparing request")
@@ -436,9 +481,18 @@ func (client AccountsClient) ListByResourceGroupResponder(resp *http.Response) (
 
 // ListKeys lists the access keys for the specified storage account.
 //
-// resourceGroupName is the name of the resource group. accountName is the
-// name of the storage account.
+// resourceGroupName is the name of the resource group within the user's
+// subscription. accountName is the name of the storage account within the
+// specified resource group. Storage account names must be between 3 and 24
+// characters in length and use numbers and lower-case letters only.
 func (client AccountsClient) ListKeys(resourceGroupName string, accountName string) (result AccountListKeysResult, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: accountName,
+			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "storage.AccountsClient", "ListKeys")
+	}
+
 	req, err := client.ListKeysPreparer(resourceGroupName, accountName)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "storage.AccountsClient", "ListKeys", nil, "Failure preparing request")
@@ -497,15 +551,25 @@ func (client AccountsClient) ListKeysResponder(resp *http.Response) (result Acco
 	return
 }
 
-// RegenerateKey regenerates the access keys for the specified storage account.
+// RegenerateKey regenerates one of the access keys for the specified storage
+// account.
 //
 // resourceGroupName is the name of the resource group within the user's
 // subscription. accountName is the name of the storage account within the
 // specified resource group. Storage account names must be between 3 and 24
 // characters in length and use numbers and lower-case letters only.
-// regenerateKey is specifies name of the key which should be regenerated.
-// key1 or key2 for the default keys
+// regenerateKey is specifies name of the key which should be regenerated --
+// key1 or key2.
 func (client AccountsClient) RegenerateKey(resourceGroupName string, accountName string, regenerateKey AccountRegenerateKeyParameters) (result AccountListKeysResult, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: accountName,
+			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
+		{TargetValue: regenerateKey,
+			Constraints: []validation.Constraint{{Target: "regenerateKey.KeyName", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "storage.AccountsClient", "RegenerateKey")
+	}
+
 	req, err := client.RegenerateKeyPreparer(resourceGroupName, accountName, regenerateKey)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "storage.AccountsClient", "RegenerateKey", nil, "Failure preparing request")
@@ -566,15 +630,15 @@ func (client AccountsClient) RegenerateKeyResponder(resp *http.Response) (result
 	return
 }
 
-// Update the update operation can be used to update the account type,
-// encryption, or tags for a storage account. It can also be used to map the
+// Update the update operation can be used to update the SKU, encryption,
+// access tier, or tags for a storage account. It can also be used to map the
 // account to a custom domain. Only one custom domain is supported per
-// storage account and. replacement/change of custom domain is not supported.
+// storage account; the replacement/change of custom domain is not supported.
 // In order to replace an old custom domain, the old value must be
-// cleared/unregistered before a new value may be set. Update of multiple
+// cleared/unregistered before a new value can be set. The update of multiple
 // properties is supported. This call does not change the storage keys for
-// the account. If you want to change storage account keys, use the
-// regenerate keys operation.  The location and name of the storage account
+// the account. If you want to change the storage account keys, use the
+// regenerate keys operation. The location and name of the storage account
 // cannot be changed after creation.
 //
 // resourceGroupName is the name of the resource group within the user's
@@ -583,6 +647,13 @@ func (client AccountsClient) RegenerateKeyResponder(resp *http.Response) (result
 // characters in length and use numbers and lower-case letters only.
 // parameters is the parameters to provide for the updated account.
 func (client AccountsClient) Update(resourceGroupName string, accountName string, parameters AccountUpdateParameters) (result Account, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: accountName,
+			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "storage.AccountsClient", "Update")
+	}
+
 	req, err := client.UpdatePreparer(resourceGroupName, accountName, parameters)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "storage.AccountsClient", "Update", nil, "Failure preparing request")
