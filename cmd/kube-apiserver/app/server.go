@@ -141,7 +141,7 @@ func Run(s *options.ServerRunOptions) error {
 			return fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
 		}
 		if s.KubeletConfig.ReadOnlyPort == 0 {
-			return fmt.Errorf("Must enable kubelet readonly port if proxy ssh-tunneling is specified.")
+			return fmt.Errorf("must enable kubelet readonly port if proxy ssh-tunneling is specified")
 		}
 		// Set up the tunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other

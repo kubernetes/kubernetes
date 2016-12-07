@@ -233,6 +233,9 @@ function prepare-node-upgrade() {
   KUBELET_CERT_BASE64=$(get-env-val "${node_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${node_env}" "KUBELET_KEY")
 
+  local master_env=$(get-master-env)
+  KUBELET_AUTH_CA_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_AUTH_CA_CERT")
+
   # TODO(zmerlynn): How do we ensure kube-env is written in a ${version}-
   #                 compatible way?
   write-node-env
