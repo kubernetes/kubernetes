@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -179,7 +180,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 
 	var newRc *api.ReplicationController
 	// fetch rc
-	oldRc, err := coreClient.ReplicationControllers(cmdNamespace).Get(oldName)
+	oldRc, err := coreClient.ReplicationControllers(cmdNamespace).Get(oldName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) || len(image) == 0 || len(args) > 1 {
 			return err
@@ -375,7 +376,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	} else {
 		message = fmt.Sprintf("rolling updated to %q", newRc.Name)
 	}
-	newRc, err = coreClient.ReplicationControllers(cmdNamespace).Get(newRc.Name)
+	newRc, err = coreClient.ReplicationControllers(cmdNamespace).Get(newRc.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

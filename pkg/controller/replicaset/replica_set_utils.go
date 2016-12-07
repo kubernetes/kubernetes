@@ -75,7 +75,7 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs exte
 			return updateErr
 		}
 		// Update the ReplicaSet with the latest resource version for the next poll
-		if rs, getErr = c.Get(rs.Name); getErr != nil {
+		if rs, getErr = c.Get(rs.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			return getErr
