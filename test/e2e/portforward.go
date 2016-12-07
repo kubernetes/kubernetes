@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -54,6 +55,21 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *v
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
+				{
+					Name:  "readiness",
+					Image: "gcr.io/google_containers/netexec:1.7",
+					ReadinessProbe: &v1.Probe{
+						Handler: v1.Handler{
+							Exec: &v1.ExecAction{
+								Command: []string{
+									"sh", "-c", "netstat -na | grep LISTEN | grep -v 8080 | grep 80",
+								}},
+						},
+						InitialDelaySeconds: 5,
+						TimeoutSeconds:      60,
+						PeriodSeconds:       1,
+					},
+				},
 				{
 					Name:  "portforwardtester",
 					Image: "gcr.io/google_containers/portforwardtester:1.2",
@@ -84,6 +100,15 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *v
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
+}
+
+func WaitForTerminatedContainer(f *framework.Framework, pod *v1.Pod, containerName string) error {
+	return framework.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+		if len(testutils.TerminatedContainers(pod)[containerName]) > 0 {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 type portForwardCommand struct {
@@ -180,7 +205,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
 				framework.Failf("Couldn't create pod: %v", err)
 			}
-			if err := f.WaitForPodRunning(pod.Name); err != nil {
+			if err := f.WaitForPodReady(pod.Name); err != nil {
 				framework.Failf("Pod did not start running: %v", err)
 			}
 			defer func() {
@@ -206,8 +231,8 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			conn.Close()
 
 			By("Waiting for the target pod to stop running")
-			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not stop running: %v", err)
+			if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+				framework.Failf("Container did not terminate: %v", err)
 			}
 
 			By("Verifying logs")
@@ -225,7 +250,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
 				framework.Failf("Couldn't create pod: %v", err)
 			}
-			if err := f.WaitForPodRunning(pod.Name); err != nil {
+			if err := f.WaitForPodReady(pod.Name); err != nil {
 				framework.Failf("Pod did not start running: %v", err)
 			}
 			defer func() {
@@ -272,8 +297,8 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 
 			By("Waiting for the target pod to stop running")
-			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not stop running: %v", err)
+			if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+				framework.Failf("Container did not terminate: %v", err)
 			}
 
 			By("Verifying logs")
@@ -293,7 +318,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
 				framework.Failf("Couldn't create pod: %v", err)
 			}
-			if err := f.WaitForPodRunning(pod.Name); err != nil {
+			if err := f.WaitForPodReady(pod.Name); err != nil {
 				framework.Failf("Pod did not start running: %v", err)
 			}
 			defer func() {
@@ -330,8 +355,8 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 
 			By("Waiting for the target pod to stop running")
-			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not stop running: %v", err)
+			if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+				framework.Failf("Container did not terminate: %v", err)
 			}
 
 			By("Verifying logs")
