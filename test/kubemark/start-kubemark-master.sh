@@ -223,16 +223,16 @@ function prepare-log-file {
 function start-etcd-servers {
 	echo "Start etcd pods"
 	if [[ -d /etc/etcd ]]; then
-  		rm -rf /etc/etcd
+		rm -rf /etc/etcd
 	fi
 	if [[ -e /etc/default/etcd ]]; then
-  		rm -f /etc/default/etcd
+		rm -f /etc/default/etcd
 	fi
 	if [[ -e /etc/systemd/system/etcd.service ]]; then
-  		rm -f /etc/systemd/system/etcd.service
+		rm -f /etc/systemd/system/etcd.service
 	fi
 	if [[ -e /etc/init.d/etcd ]]; then
-  		rm -f /etc/init.d/etcd
+		rm -f /etc/init.d/etcd
 	fi
 
 	prepare-log-file /var/log/etcd.log
@@ -265,7 +265,7 @@ function start-kube-apiserver {
 	prepare-log-file /var/log/kube-apiserver.log
 
 	# Calculate variables and assemble the command line.
-  	local params="${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
+	local params="${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
 	params+=" --insecure-bind-address=0.0.0.0"
 	params+=" --etcd-servers=http://127.0.0.1:2379"
 	params+=" --etcd-servers-overrides=/events#${EVENT_STORE_URL}"
