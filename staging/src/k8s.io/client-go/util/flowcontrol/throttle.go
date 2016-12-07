@@ -18,8 +18,9 @@ package flowcontrol
 
 import (
 	"sync"
+	"time"
 
-	"github.com/juju/ratelimit"
+	"golang.org/x/time/rate"
 )
 
 type RateLimiter interface {
@@ -40,7 +41,7 @@ type RateLimiter interface {
 }
 
 type tokenBucketRateLimiter struct {
-	limiter *ratelimit.Bucket
+	limiter *rate.Limiter
 	qps     float32
 }
 
@@ -50,26 +51,25 @@ type tokenBucketRateLimiter struct {
 // The bucket is initially filled with 'burst' tokens, and refills at a rate of 'qps'.
 // The maximum number of tokens in the bucket is capped at 'burst'.
 func NewTokenBucketRateLimiter(qps float32, burst int) RateLimiter {
-	limiter := ratelimit.NewBucketWithRate(float64(qps), int64(burst))
 	return &tokenBucketRateLimiter{
-		limiter: limiter,
+		limiter: rate.NewLimiter(rate.Limit(qps), burst),
 		qps:     qps,
 	}
 }
 
 func (t *tokenBucketRateLimiter) TryAccept() bool {
-	return t.limiter.TakeAvailable(1) == 1
+	return t.limiter.Allow()
 }
 
 func (t *tokenBucketRateLimiter) Saturation() float64 {
-	capacity := t.limiter.Capacity()
+	capacity := t.limiter.Burst()
 	avail := t.limiter.Available()
 	return float64(capacity-avail) / float64(capacity)
 }
 
 // Accept will block until a token becomes available
 func (t *tokenBucketRateLimiter) Accept() {
-	t.limiter.Wait(1)
+	time.Sleep(t.limiter.Reserve().Delay())
 }
 
 func (t *tokenBucketRateLimiter) Stop() {
