@@ -48,6 +48,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	// Reusable cluster state function.  This won't be adversly affected by lazy initialization of framework.
 	clusterState := func(selectorKey string, selectorValue string) *framework.ClusterVerification {
 		return f.NewClusterVerification(
+			f.Namespace,
 			framework.PodStateVerification{
 				Selectors:   map[string]string{selectorKey: selectorValue},
 				ValidPhases: []v1.PodPhase{v1.PodRunning},
