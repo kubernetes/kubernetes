@@ -719,34 +719,21 @@ func (f *factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer,
 
 func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
 	if validate {
-		clientConfig, err := f.clients.ClientConfigForVersion(nil)
-		if err != nil {
-			return nil, err
-		}
-		restclient, err := restclient.RESTClientFor(clientConfig)
-		if err != nil {
-			return nil, err
-		}
-		clientset, err := f.clients.ClientSetForVersion(nil)
+		discovery, err := f.DiscoveryClient()
 		if err != nil {
 			return nil, err
 		}
 		dir := cacheDir
 		if len(dir) > 0 {
-			version, err := clientset.Discovery().ServerVersion()
+			version, err := discovery.ServerVersion()
 			if err == nil {
 				dir = path.Join(cacheDir, version.String())
 			} else {
 				dir = "" // disable caching as a fallback
 			}
 		}
-		fedClient, err := f.clients.FederationClientForVersion(nil)
-		if err != nil {
-			return nil, err
-		}
 		swaggerSchema := &clientSwaggerSchema{
-			c:        restclient,
-			fedc:     fedClient,
+			c:        discovery.RESTClient(),
 			cacheDir: dir,
 		}
 		return validation.ConjunctiveSchema{
@@ -759,11 +746,11 @@ func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, 
 
 func (f *factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
 	version := gvk.GroupVersion()
-	clientset, err := f.clients.ClientSetForVersion(&version)
+	discovery, err := f.DiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
-	return clientset.Discovery().SwaggerSchema(version)
+	return discovery.SwaggerSchema(version)
 }
 
 func (f *factory) DefaultNamespace() (string, bool, error) {
@@ -1017,8 +1004,7 @@ func getServiceProtocols(spec api.ServiceSpec) map[string]string {
 }
 
 type clientSwaggerSchema struct {
-	c        *restclient.RESTClient
-	fedc     *restclient.RESTClient
+	c        restclient.Interface
 	cacheDir string
 }
 
@@ -1150,12 +1136,6 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	}
 
 	switch gvk.Group {
-	case federation.GroupName:
-		if c.fedc == nil {
-			return errors.New("unable to validate: no federation client")
-		}
-		return getSchemaAndValidate(c.fedc, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-
 	case api.GroupName:
 		return getSchemaAndValidate(c.c, data, "api", gvk.GroupVersion().String(), c.cacheDir, c)
 
