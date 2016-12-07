@@ -1000,3 +1000,102 @@ func attachSecrets(template *v1.PodTemplateSpec, secretNames []string) {
 	template.Spec.Volumes = volumes
 	template.Spec.Containers[0].VolumeMounts = mounts
 }
+
+type DaemonConfig struct {
+	Client    clientset.Interface
+	Name      string
+	Namespace string
+	Image     string
+	// If set this function will be used to print log lines instead of glog.
+	LogFunc func(fmt string, args ...interface{})
+	// How long we wait for DaemonSet to become running.
+	Timeout time.Duration
+}
+
+func (config *DaemonConfig) Run() error {
+	if config.Image == "" {
+		config.Image = "kubernetes/pause"
+	}
+	nameLabel := map[string]string{
+		"name": config.Name + "-daemon",
+	}
+	daemon := &extensions.DaemonSet{
+		ObjectMeta: v1.ObjectMeta{
+			Name: config.Name,
+		},
+		Spec: extensions.DaemonSetSpec{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: nameLabel,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  config.Name,
+							Image: config.Image,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := config.Client.Extensions().DaemonSets(config.Namespace).Create(daemon)
+	if err != nil {
+		return fmt.Errorf("Error creating DaemonSet %v: %v", config.Name, err)
+	}
+
+	// Wait for all daemons to be running
+	nodes, err := config.Client.Core().Nodes().List(v1.ListOptions{ResourceVersion: "0"})
+	if err != nil {
+		return fmt.Errorf("Error listing Nodes while waiting for DaemonSet %v: %v", config.Name, err)
+	}
+
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+
+	startTime := time.Now()
+	for time.Now().Before(startTime.Add(timeout)) {
+		time.Sleep(time.Second)
+		pods, err := config.Client.Core().Pods(config.Namespace).List(v1.ListOptions{LabelSelector: labels.SelectorFromSet(nameLabel).String()})
+		if err != nil {
+			continue
+		}
+
+		nodeHasDaemon := map[string]bool{}
+		for _, node := range nodes.Items {
+			nodeHasDaemon[node.Name] = false
+		}
+
+		for _, pod := range pods.Items {
+			if pod.Spec.NodeName != "" && pod.Status.Phase == v1.PodRunning {
+				for _, c := range pod.Status.Conditions {
+					if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+						nodeHasDaemon[pod.Spec.NodeName] = true
+						break
+					}
+				}
+			}
+		}
+
+		running := 0
+		for _, v := range nodeHasDaemon {
+			if v {
+				running++
+			}
+		}
+		config.LogFunc("Found %v/%v Daemons %v running", running, config.Name, len(nodes.Items))
+		if running == len(nodes.Items) {
+			break
+		}
+	}
+	if !time.Now().Before(startTime.Add(timeout)) {
+		config.LogFunc("Timed out while waiting for DaemonsSet %v/%v to be running.", config.Namespace, config.Name)
+	} else {
+		config.LogFunc("Created Daemon %v/%v", config.Namespace, config.Name)
+	}
+
+	return nil
+}
