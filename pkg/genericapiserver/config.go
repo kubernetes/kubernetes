@@ -26,7 +26,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"regexp"
 	goruntime "runtime"
 	"sort"
 	"strconv"
@@ -193,8 +192,6 @@ type SecureServingInfo struct {
 
 // NewConfig returns a Config struct with the default values
 func NewConfig() *Config {
-	longRunningRE := regexp.MustCompile(options.DefaultLongRunningRequestRE)
-
 	config := &Config{
 		Serializer:             api.Codecs,
 		ReadWritePort:          6443,
@@ -220,7 +217,10 @@ func NewConfig() *Config {
 			},
 			GetOperationIDAndTags: apiserveropenapi.GetOperationIDAndTags,
 		},
-		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
+
+		// Default to treating watch as a long-running operation
+		// Generic API servers have no inherent long-running subresources
+		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 	}
 
 	// this keeps the defaults in sync
@@ -498,7 +498,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 	generic := func(handler http.Handler) http.Handler {
 		handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 		handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
-		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
 		handler = apiserverfilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
 		handler = api.WithRequestContext(handler, c.RequestContextMapper)
