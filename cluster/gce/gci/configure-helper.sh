@@ -559,6 +559,9 @@ function start-kubelet {
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
+    if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
+      flags+=" --anonymous-auth=false --client-ca-file=/var/lib/kubelet/kubelet_auth_ca.crt"
+    fi
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
@@ -587,9 +590,6 @@ function start-kubelet {
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     flags+=" --feature-gates=${FEATURE_GATES}"
-  fi
-  if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
-    flags+=" --anonymous-auth=false --client-ca-file=/var/lib/kubelet/kubelet_auth_ca.crt"
   fi
 
   local -r kubelet_env_file="/etc/default/kubelet"
