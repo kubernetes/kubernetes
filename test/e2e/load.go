@@ -122,9 +122,10 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		image       string
 		command     []string
 		// What kind of resource we want to create
-		kind          schema.GroupKind
-		services      bool
-		secretsPerPod int
+		kind           schema.GroupKind
+		services       bool
+		secretsPerPod  int
+		daemonsPerNode int
 	}
 
 	loadTests := []Load{
@@ -149,9 +150,8 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			namespaces, err := CreateNamespaces(f, namespaceCount, fmt.Sprintf("load-%v-nodepods", itArg.podsPerNode))
 			framework.ExpectNoError(err)
 
-			totalPods := itArg.podsPerNode * nodeCount
+			totalPods := (itArg.podsPerNode - itArg.daemonsPerNode) * nodeCount
 			configs, secretConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod)
-			var services []*v1.Service
 			if itArg.services {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
@@ -160,12 +160,41 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 					framework.ExpectNoError(err)
 				}
 				framework.Logf("%v Services created.", len(services))
+				defer func(services []*v1.Service) {
+					framework.Logf("Starting to delete services...")
+					for _, service := range services {
+						err := clientset.Core().Services(ns).Delete(service.Name, nil)
+						framework.ExpectNoError(err)
+					}
+					framework.Logf("Services deleted")
+				}(services)
 			} else {
 				framework.Logf("Skipping service creation")
 			}
 			// Create all secrets
 			for i := range secretConfigs {
 				secretConfigs[i].Run()
+				defer secretConfigs[i].Stop()
+			}
+			// StartDeamon if needed
+			for i := 0; i < itArg.daemonsPerNode; i++ {
+				daemonName := fmt.Sprintf("load-daemon-%v", i)
+				daemonConfig := &testutils.DaemonConfig{
+					Client:    f.ClientSet,
+					Name:      daemonName,
+					Namespace: f.Namespace.Name,
+					LogFunc:   framework.Logf,
+				}
+				daemonConfig.Run()
+				defer func(config *testutils.DaemonConfig) {
+					framework.ExpectNoError(framework.DeleteResourceAndPods(
+						f.ClientSet,
+						f.InternalClientset,
+						extensions.Kind("DaemonSet"),
+						config.Namespace,
+						config.Name,
+					))
+				}(daemonConfig)
 			}
 
 			// Simulate lifetime of RC:
@@ -207,18 +236,6 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			deletingTime := time.Duration(totalPods/throughput) * time.Second
 			framework.Logf("Starting to delete ReplicationControllers...")
 			deleteAllResources(configs, deletingTime)
-			// Delete all secrets
-			for i := range secretConfigs {
-				secretConfigs[i].Stop()
-			}
-			if itArg.services {
-				framework.Logf("Starting to delete services...")
-				for _, service := range services {
-					err := clientset.Core().Services(ns).Delete(service.Name, nil)
-					framework.ExpectNoError(err)
-				}
-				framework.Logf("Services deleted")
-			}
 		})
 	}
 })
