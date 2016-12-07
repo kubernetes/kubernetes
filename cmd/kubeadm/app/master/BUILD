@@ -15,6 +15,7 @@ go_library(
         "apiclient.go",
         "discovery.go",
         "manifests.go",
+        "selfhosted.go",
         "tokens.go",
     ],
     tags = ["automanaged"],
