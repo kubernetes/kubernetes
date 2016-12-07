@@ -53,7 +53,7 @@ const retryTimeout = 5
 func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kubeadmapi.ClusterInfo) (*ConnectionDetails, error) {
 	hostName, err := os.Hostname()
 	if err != nil {
-		return nil, fmt.Errorf("<node/bootstrap> failed to get node hostname [%v]", err)
+		return nil, fmt.Errorf("failed to get node hostname [%v]", err)
 	}
 	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33641
 	nodeName := types.NodeName(hostName)
@@ -67,20 +67,20 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 	for _, endpoint := range endpoints {
 		clientSet, err := createClients(caCert, endpoint, s.Secrets.BearerToken, nodeName)
 		if err != nil {
-			fmt.Printf("<node/bootstrap> warning: %s. Skipping endpoint %s\n", err, endpoint)
+			fmt.Printf("[bootstrap] Warning: %s. Skipping endpoint %s\n", err, endpoint)
 			continue
 		}
 		wg.Add(1)
 		go func(apiEndpoint string) {
 			defer wg.Done()
 			wait.Until(func() {
-				fmt.Printf("<node/bootstrap> trying to connect to endpoint %s\n", apiEndpoint)
+				fmt.Printf("[bootstrap] Trying to connect to endpoint %s\n", apiEndpoint)
 				err := checkAPIEndpoint(clientSet, apiEndpoint)
 				if err != nil {
-					fmt.Printf("<node/bootstrap> endpoint check failed [%v]\n", err)
+					fmt.Printf("[bootstrap] Endpoint check failed [%v]\n", err)
 					return
 				}
-				fmt.Printf("<node/bootstrap> successfully established connection with endpoint %s\n", apiEndpoint)
+				fmt.Printf("[bootstrap] Successfully established connection with endpoint %q\n", apiEndpoint)
 				// connection established, stop all wait threads
 				close(stopChan)
 				result <- &ConnectionDetails{
@@ -102,8 +102,7 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 
 	establishedConnection, ok := <-result
 	if !ok {
-		return nil, fmt.Errorf("<node/bootstrap> failed to create bootstrap clients " +
-			"for any of the provided API endpoints")
+		return nil, fmt.Errorf("failed to create bootstrap clients for any of the provided API endpoints")
 	}
 	return establishedConnection, nil
 }
@@ -122,7 +121,7 @@ func createClients(caCert []byte, endpoint, token string, nodeName types.NodeNam
 	}
 	clientSet, err := clientset.NewForConfig(bootstrapClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create clients for the API endpoint %s [%v]", endpoint, err)
+		return nil, fmt.Errorf("failed to create clients for the API endpoint %q: [%v]", endpoint, err)
 	}
 	return clientSet, nil
 }
@@ -150,9 +149,9 @@ func checkAPIEndpoint(clientSet *clientset.Clientset, endpoint string) error {
 	// check general connectivity
 	version, err := clientSet.DiscoveryClient.ServerVersion()
 	if err != nil {
-		return fmt.Errorf("failed to connect to %s [%v]", endpoint, err)
+		return fmt.Errorf("failed to connect to %q [%v]", endpoint, err)
 	}
-	fmt.Printf("<node/bootstrap> detected server version %s\n", version.String())
+	fmt.Printf("[bootstrap] Detected server version: %s\n", version.String())
 
 	// check certificates API
 	serverGroups, err := clientSet.DiscoveryClient.ServerGroups()
