@@ -853,10 +853,10 @@ type ClusterVerification struct {
 	podState  PodStateVerification
 }
 
-func (f *Framework) NewClusterVerification(filter PodStateVerification) *ClusterVerification {
+func (f *Framework) NewClusterVerification(namespace *v1.Namespace, filter PodStateVerification) *ClusterVerification {
 	return &ClusterVerification{
 		f.ClientSet,
-		f.Namespace,
+		namespace,
 		filter,
 	}
 }

@@ -119,6 +119,7 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 		iperfResults := &IPerfResults{}
 
 		iperfClusterVerification := f.NewClusterVerification(
+			f.Namespace,
 			framework.PodStateVerification{
 				Selectors:   iperfClientPodLabels,
 				ValidPhases: []v1.PodPhase{v1.PodSucceeded},
