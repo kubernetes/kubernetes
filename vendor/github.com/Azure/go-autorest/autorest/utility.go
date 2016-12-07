@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -104,6 +105,22 @@ func ensureValueString(value interface{}) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// MapToValues method converts map[string]interface{} to url.Values.
+func MapToValues(m map[string]interface{}) url.Values {
+	v := url.Values{}
+	for key, value := range m {
+		x := reflect.ValueOf(value)
+		if x.Kind() == reflect.Array || x.Kind() == reflect.Slice {
+			for i := 0; i < x.Len(); i++ {
+				v.Add(key, ensureValueString(x.Index(i)))
+			}
+		} else {
+			v.Add(key, ensureValueString(value))
+		}
+	}
+	return v
 }
 
 // String method converts interface v to string. If interface is a list, it
