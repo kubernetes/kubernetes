@@ -800,7 +800,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_etcd
   set_service_accounts
   start_apiserver
-  start_discovery
+  # start_discovery
   start_controller_manager
   start_kubeproxy
   start_kubedns
