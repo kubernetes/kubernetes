@@ -87,27 +87,6 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 		}
 	}
 
-	// ensure the subnet is properly configured
-	subnet, err := az.SubnetsClient.Get(az.ResourceGroup, az.VnetName, az.SubnetName, "")
-	if err != nil {
-		// 404 is fatal here
-		return err
-	}
-	if subnet.RouteTable != nil {
-		if *subnet.RouteTable.ID != *routeTable.ID {
-			return fmt.Errorf("The subnet has a route table, but it was unrecognized. Refusing to modify it. active_routetable=%q expected_routetable=%q", *subnet.RouteTable.ID, *routeTable.ID)
-		}
-	} else {
-		subnet.RouteTable = &network.RouteTable{
-			ID: routeTable.ID,
-		}
-		glog.V(3).Info("create: updating subnet")
-		_, err := az.SubnetsClient.CreateOrUpdate(az.ResourceGroup, az.VnetName, az.SubnetName, subnet, nil)
-		if err != nil {
-			return err
-		}
-	}
-
 	targetIP, err := az.getIPForMachine(kubeRoute.TargetNode)
 	if err != nil {
 		return err
