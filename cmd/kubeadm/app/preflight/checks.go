@@ -25,9 +25,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/api/validation"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -243,13 +245,28 @@ type SystemVerificationCheck struct{}
 
 func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 	// Create a buffered writer and choose a quite large value (1M) and suppose the output from the system verification test won't exceed the limit
-	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
-
 	// Run the system verification check, but write to out buffered writer instead of stdout
-	err := system.Validate(system.DefaultSysSpec, &system.StreamReporter{WriteStream: bufw})
+	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
+	reporter := &system.StreamReporter{WriteStream: bufw}
+
+	var errs []error
+	// All the validators we'd like to run:
+	var validators = []system.Validator{
+		&system.OSValidator{Reporter: reporter},
+		&system.KernelValidator{Reporter: reporter},
+		&system.CgroupsValidator{Reporter: reporter},
+		&system.DockerValidator{Reporter: reporter},
+	}
+
+	// Run all validators
+	for _, v := range validators {
+		errs = append(errs, v.Validate(system.DefaultSysSpec))
+	}
+
+	err := utilerrors.NewAggregate(errs)
 	if err != nil {
 		// Only print the output from the system verification check if the check failed
-		fmt.Println("System verification failed. Printing the output from the verification...")
+		fmt.Println("[preflight] The system verification failed. Printing the output from the verification:")
 		bufw.Flush()
 		return nil, []error{err}
 	}
@@ -271,11 +288,11 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
 		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
-		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
-		DirAvailableCheck{Path: "/etc/kubernetes/pki"},
+		DirAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
+		DirAvailableCheck{Path: kubeadmapi.GlobalEnvParams.HostPKIPath},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: "/etc/kubernetes/admin.conf"},
-		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf")},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
@@ -308,9 +325,9 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		PortOpenCheck{port: 10250},
 		HTTPProxyCheck{Proto: "https", Host: cfg.MasterAddresses[0], Port: int(cfg.APIPort)},
 		HTTPProxyCheck{Proto: "http", Host: cfg.MasterAddresses[0], Port: int(cfg.DiscoveryPort)},
-		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
+		DirAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},

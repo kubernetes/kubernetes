@@ -95,6 +95,9 @@ type Join struct {
 }
 
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
+
+	fmt.Println("[kubeadm] Bear in mind that kubeadm is in alpha, do not use it in production clusters.")
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -110,7 +113,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	}
 	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
 	if len(cfg.MasterAddresses) > 1 {
-		return nil, fmt.Errorf("Must not specify more than one master address  (see --help)")
+		return nil, fmt.Errorf("Must not specify more than one master address (see --help)")
 	}
 
 	if !skipPreFlight {
@@ -126,7 +129,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
-		fmt.Println("Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks...")
 	}
 
 	// Try to start the kubelet service in case it's inactive
@@ -137,9 +140,9 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	ok, err := kubeadmutil.UseGivenTokenIfValid(&cfg.Secrets)
 	if !ok {
 		if err != nil {
-			return nil, fmt.Errorf("%v (see --help)\n", err)
+			return nil, fmt.Errorf("%v (see --help)", err)
 		}
-		return nil, fmt.Errorf("Must specify --token (see --help)\n")
+		return nil, fmt.Errorf("Must specify --token (see --help)")
 	}
 
 	return &Join{cfg: cfg}, nil

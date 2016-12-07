@@ -47,7 +47,6 @@ const (
 	kubeControllerManager = "kube-controller-manager"
 	kubeScheduler         = "kube-scheduler"
 	kubeProxy             = "kube-proxy"
-	pkiDir                = "/etc/kubernetes/pki"
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -124,16 +123,16 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 
 	manifestsPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
-		return fmt.Errorf("<master/manifests> failed to create directory %q [%v]", manifestsPath, err)
+		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
 	}
 	for name, spec := range staticPodSpecs {
 		filename := path.Join(manifestsPath, name+".json")
 		serialized, err := json.MarshalIndent(spec, "", "  ")
 		if err != nil {
-			return fmt.Errorf("<master/manifests> failed to marshall manifest for %q to JSON [%v]", name, err)
+			return fmt.Errorf("failed to marshal manifest for %q to JSON [%v]", name, err)
 		}
 		if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), filename); err != nil {
-			return fmt.Errorf("<master/manifests> failed to create static pod manifest file for %q (%q) [%v]", name, filename, err)
+			return fmt.Errorf("failed to create static pod manifest file for %q (%q) [%v]", name, filename, err)
 		}
 	}
 	return nil
@@ -191,7 +190,7 @@ func isPkiVolumeMountNeeded() bool {
 
 func pkiVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
-		Name: "pki",
+		Name: "k8s",
 		VolumeSource: api.VolumeSource{
 			// TODO(phase1+) make path configurable
 			HostPath: &api.HostPathVolumeSource{Path: "/etc/pki"},
@@ -265,26 +264,24 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 	}
 }
 
-func getComponentBaseCommand(component string) (command []string) {
+func getComponentBaseCommand(component string) []string {
 	if kubeadmapi.GlobalEnvParams.HyperkubeImage != "" {
-		command = []string{"/hyperkube", component}
-	} else {
-		command = []string{"kube-" + component}
+		return []string{"/hyperkube", component}
 	}
-	command = append(command, kubeadmapi.GlobalEnvParams.ComponentLoglevel)
-	return
+
+	return []string{"kube-" + component}
 }
 
-func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) (command []string) {
-	command = append(getComponentBaseCommand(apiServer),
+func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+	command := append(getComponentBaseCommand(apiServer),
 		"--insecure-bind-address=127.0.0.1",
 		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
-		"--service-account-key-file="+pkiDir+"/apiserver-key.pem",
-		"--client-ca-file="+pkiDir+"/ca.pem",
-		"--tls-cert-file="+pkiDir+"/apiserver.pem",
-		"--tls-private-key-file="+pkiDir+"/apiserver-key.pem",
-		"--token-auth-file="+pkiDir+"/tokens.csv",
+		"--service-account-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
+		"--client-ca-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
+		"--tls-cert-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver.pem",
+		"--tls-private-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
+		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
 		fmt.Sprintf("--secure-port=%d", cfg.API.BindPort),
 		"--allow-privileged",
 	)
@@ -320,19 +317,19 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) (command []string)
 		}
 	}
 
-	return
+	return command
 }
 
-func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) (command []string) {
-	command = append(getComponentBaseCommand(controllerManager),
+func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+	command := append(getComponentBaseCommand(controllerManager),
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
 		"--cluster-name="+DefaultClusterName,
-		"--root-ca-file="+pkiDir+"/ca.pem",
-		"--service-account-private-key-file="+pkiDir+"/apiserver-key.pem",
-		"--cluster-signing-cert-file="+pkiDir+"/ca.pem",
-		"--cluster-signing-key-file="+pkiDir+"/ca-key.pem",
+		"--root-ca-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
+		"--service-account-private-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
+		"--cluster-signing-cert-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
+		"--cluster-signing-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca-key.pem",
 		"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
 	)
 
@@ -340,7 +337,6 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) (command [
 		command = append(command, "--cloud-provider="+cfg.CloudProvider)
 
 		// Only append the --cloud-config option if there's a such file
-		// TODO(phase1+) this won't work unless it's in one of the few directories we bind-mount
 		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
 			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
 		}
@@ -351,24 +347,19 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) (command [
 	if cfg.Networking.PodSubnet != "" {
 		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet)
 	}
-
-	return
+	return command
 }
 
-func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) (command []string) {
-	command = append(getComponentBaseCommand(scheduler),
+func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+	return append(getComponentBaseCommand(scheduler),
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
 	)
-
-	return
 }
 
-func getProxyCommand(cfg *kubeadmapi.MasterConfiguration) (command []string) {
-	command = getComponentBaseCommand(proxy)
-
-	return
+func getProxyCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+	return getComponentBaseCommand(proxy)
 }
 
 func getProxyEnvVars() []api.EnvVar {

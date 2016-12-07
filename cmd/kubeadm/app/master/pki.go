@@ -24,7 +24,7 @@ import (
 	"path"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
@@ -162,39 +162,32 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) (*rsa.PrivateKey, *x50
 
 	caKey, caCert, err := newCertificateAuthority()
 	if err != nil {
-		return nil, nil, fmt.Errorf("<master/pki> failure while creating CA keys and certificate - %v", err)
+		return nil, nil, fmt.Errorf("failure while creating CA keys and certificate [%v]", err)
 	}
 
 	if err := writeKeysAndCert(pkiPath, "ca", caKey, caCert); err != nil {
-		return nil, nil, fmt.Errorf("<master/pki> failure while saving CA keys and certificate - %v", err)
+		return nil, nil, fmt.Errorf("failure while saving CA keys and certificate [%v]", err)
 	}
-	fmt.Printf("<master/pki> generated Certificate Authority key and certificate:\n%s\n", certutil.FormatCert(caCert))
-	pub, prv, cert := pathsKeysCerts(pkiPath, "ca")
-	fmt.Printf("Public: %s\nPrivate: %s\nCert: %s\n", pub, prv, cert)
+	fmt.Println("[certificates] Generated Certificate Authority key and certificate.")
 
 	apiKey, apiCert, err := newServerKeyAndCert(cfg, caCert, caKey, altNames)
 	if err != nil {
-		return nil, nil, fmt.Errorf("<master/pki> failure while creating API server keys and certificate - %v", err)
+		return nil, nil, fmt.Errorf("failure while creating API server keys and certificate [%v]", err)
 	}
 
 	if err := writeKeysAndCert(pkiPath, "apiserver", apiKey, apiCert); err != nil {
-		return nil, nil, fmt.Errorf("<master/pki> failure while saving API server keys and certificate - %v", err)
+		return nil, nil, fmt.Errorf("failure while saving API server keys and certificate [%v]", err)
 	}
-	fmt.Printf("<master/pki> generated API Server key and certificate:\n%s\n", certutil.FormatCert(apiCert))
-	pub, prv, cert = pathsKeysCerts(pkiPath, "apiserver")
-	fmt.Printf("Public: %s\nPrivate: %s\nCert: %s\n", pub, prv, cert)
+	fmt.Println("[certificates] Generated API Server key and certificate")
 
 	saKey, err := newServiceAccountKey()
 	if err != nil {
-		return nil, nil, fmt.Errorf("<master/pki> failure while creating service account signing keys [%v]", err)
+		return nil, nil, fmt.Errorf("failure while creating service account signing keys [%v]", err)
 	}
 	if err := writeKeysAndCert(pkiPath, "sa", saKey, nil); err != nil {
-		return nil, nil, fmt.Errorf("<master/pki> failure while saving service account signing keys - %v", err)
+		return nil, nil, fmt.Errorf("failure while saving service account signing keys [%v]", err)
 	}
-	fmt.Printf("<master/pki> generated Service Account Signing keys:\n")
-	pub, prv, _ = pathsKeysCerts(pkiPath, "sa")
-	fmt.Printf("Public: %s\nPrivate: %s\n", pub, prv)
-
-	fmt.Printf("<master/pki> created keys and certificates in %q\n", pkiPath)
+	fmt.Println("[certificates] Generated Service Account signing keys")
+	fmt.Printf("[certificates] Created keys and certificates in %q\n", pkiPath)
 	return caKey, caCert, nil
 }

@@ -288,17 +288,17 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	SetNodeAffinity(&kubeProxyDaemonSet.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
 	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%v]", err)
+		return fmt.Errorf("failed creating essential kube-proxy addon [%v]", err)
 	}
 
-	fmt.Println("<master/addons> created essential addon: kube-proxy")
+	fmt.Println("[addons] Created essential addon: kube-proxy")
 
 	kubeDNSDeployment := NewDeployment("kube-dns", 1, createKubeDNSPodSpec(cfg))
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 	SetNodeAffinity(&kubeDNSDeployment.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
+		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
 
 	kubeDNSServiceSpec, err := createKubeDNSServiceSpec(cfg)
@@ -309,10 +309,10 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	kubeDNSService := NewService("kube-dns", *kubeDNSServiceSpec)
 	kubeDNSService.ObjectMeta.Labels["kubernetes.io/name"] = "KubeDNS"
 	if _, err := client.Services(api.NamespaceSystem).Create(kubeDNSService); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
+		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
 
-	fmt.Println("<master/addons> created essential addon: kube-dns")
+	fmt.Println("[addons] Created essential addon: kube-dns")
 
 	return nil
 }

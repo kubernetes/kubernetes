@@ -123,13 +123,13 @@ func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, cli
 	kd := newKubeDiscovery(cfg, caCert)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q deployment [%v]", kubeDiscoveryName, err)
+		return fmt.Errorf("failed to create %q deployment [%v]", kubeDiscoveryName, err)
 	}
 	if _, err := client.Secrets(api.NamespaceSystem).Create(kd.Secret); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q secret [%v]", kubeDiscoverySecretName, err)
+		return fmt.Errorf("failed to create %q secret [%v]", kubeDiscoverySecretName, err)
 	}
 
-	fmt.Println("<master/discovery> created essential addon: kube-discovery, waiting for it to become ready")
+	fmt.Println("[token-discovery] Created the kube-discovery deployment, waiting for it to become ready")
 
 	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
@@ -142,7 +142,7 @@ func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, cli
 		}
 		return true, nil
 	})
-	fmt.Printf("<master/discovery> kube-discovery is ready after %f seconds\n", time.Since(start).Seconds())
+	fmt.Printf("[token-discovery] kube-discovery is ready after %f seconds\n", time.Since(start).Seconds())
 
 	return nil
 }
