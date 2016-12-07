@@ -80,6 +80,17 @@ func (lim *Limiter) Burst() int {
 	return lim.burst
 }
 
+// Available returns the number of tokens currently available, but does not
+// guarantee a subsequent call to AllowN, WaitN, or ReserveN will succeed.
+// If consumers are waiting for tokens, the number can be negative.
+// It is primarily for metrics reporting and debugging.
+func (lim *Limiter) Available() int {
+	lim.mu.Lock()
+	defer lim.mu.Unlock()
+	_, _, tokens := lim.advance(time.Now())
+	return int(tokens)
+}
+
 // NewLimiter returns a new Limiter that allows events up to rate r and permits
 // bursts of at most b tokens.
 func NewLimiter(r Limit, b int) *Limiter {
