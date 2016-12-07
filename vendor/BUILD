@@ -16896,3 +16896,10 @@ go_test(
     library = ":k8s.io/apimachinery/pkg/api/testing",
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "golang.org/x/time/rate",
+    srcs = ["golang.org/x/time/rate/rate.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/context"],
+)
