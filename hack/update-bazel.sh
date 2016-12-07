@@ -20,5 +20,5 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-go get -u github.com/mikedanese/gazel
+go get -u gopkg.in/mikedanese/gazel.v4/gazel
 "${GOPATH}/bin/gazel" -root="$(kube::realpath ${KUBE_ROOT})"
