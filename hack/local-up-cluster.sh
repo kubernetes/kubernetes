@@ -444,7 +444,7 @@ EOF
     create_client_certkey client-ca kube-proxy system:kube-proxy system:nodes
     create_client_certkey client-ca controller system:controller system:masters
     create_client_certkey client-ca scheduler system:scheduler system:masters
-    create_client_certkey client-ca admin system:admin system:cluster-admins
+    create_client_certkey client-ca admin system:admin system:masters
 
     # Create auth proxy client ca
     sudo /bin/bash -e <<EOF
@@ -476,7 +476,7 @@ EOF
       --requestheader-username-headers=X-Remote-User \
       --requestheader-group-headers=X-Remote-Group \
       --requestheader-extra-headers-prefix=X-Remote-Extra- \
-      --requestheader-client-ca-file=${CERT_DIR}/auth-proxy-client-ca.crt \
+      --requestheader-client-ca-file="${CERT_DIR}/auth-proxy-client-ca.crt" \
       --requestheader-allowed-names=system:auth-proxy \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
@@ -486,6 +486,7 @@ EOF
     kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
 
     # Create kubeconfigs for all components, using client certs
+    write_client_kubeconfig admin
     write_client_kubeconfig kubelet
     write_client_kubeconfig kube-proxy
     write_client_kubeconfig controller
@@ -509,11 +510,23 @@ EOF
 # start_discovery relies on certificates created by start_apiserver
 function start_discovery {
     # TODO generate serving certificates
-    
+    create_client_certkey client-ca discovery-auth system:discovery-auth
+    write_client_kubeconfig discovery-auth
+
+    # grant permission to run delegated authentication and authorization checks
+    kubectl create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --user=system:discovery-auth
+
     DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca-bundle.crt" \
+      --authentication-kubeconfig="${CERT_DIR}/discovery-auth.kubeconfig" \
+      --authorization-kubeconfig="${CERT_DIR}/discovery-auth.kubeconfig" \
+      --requestheader-username-headers=X-Remote-User \
+      --requestheader-group-headers=X-Remote-Group \
+      --requestheader-extra-headers-prefix=X-Remote-Extra- \
+      --requestheader-client-ca-file="${CERT_DIR}/auth-proxy-client-ca.crt" \
+      --requestheader-allowed-names=system:auth-proxy \
       --bind-address="${API_BIND_ADDR}" \
       --secure-port="${DISCOVERY_SECURE_PORT}" \
       --tls-ca-file="${ROOT_CA_FILE}" \
@@ -800,7 +813,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_etcd
   set_service_accounts
   start_apiserver
-  # start_discovery
+  start_discovery
   start_controller_manager
   start_kubeproxy
   start_kubedns

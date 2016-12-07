@@ -111,8 +111,9 @@ type DelegatingAuthorizationOptions struct {
 
 func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
 	return &DelegatingAuthorizationOptions{
-		AllowCacheTTL: 5 * time.Minute,
-		DenyCacheTTL:  30 * time.Second,
+		// very low for responsiveness, but high enough to handle storms
+		AllowCacheTTL: 10 * time.Second,
+		DenyCacheTTL:  10 * time.Second,
 	}
 }
 
@@ -125,6 +126,14 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
 		" subjectaccessreviews.authorization.k8s.io.")
+
+	fs.DurationVar(&s.AllowCacheTTL, "authorization-webhook-cache-authorized-ttl",
+		s.AllowCacheTTL,
+		"The duration to cache 'authorized' responses from the webhook authorizer.")
+
+	fs.DurationVar(&s.DenyCacheTTL,
+		"authorization-webhook-cache-unauthorized-ttl", s.DenyCacheTTL,
+		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 }
 
 func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizer.DelegatingAuthorizerConfig, error) {
