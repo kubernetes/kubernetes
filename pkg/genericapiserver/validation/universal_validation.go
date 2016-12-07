@@ -57,6 +57,9 @@ func ValidateRunOptions(options *options.ServerRunOptions) {
 	if errs := verifyServiceNodePort(options); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
+	if options.MasterCount <= 0 {
+		errors = append(errors, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", options.MasterCount))
+	}
 	if err := utilerrors.NewAggregate(errors); err != nil {
 		glog.Fatalf("Validate server run options failed: %v", err)
 	}
