@@ -11786,3 +11786,10 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/selection",
     ],
 )
+
+go_library(
+    name = "golang.org/x/time/rate",
+    srcs = ["golang.org/x/time/rate/rate.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/context"],
+)
