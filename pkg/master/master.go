@@ -77,6 +77,7 @@ const (
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
+	APIResourceConfigSource  genericapiserver.APIResourceConfigSource
 	StorageFactory           genericapiserver.StorageFactory
 	EnableWatchCache         bool
 	EnableCoreControllers    bool
@@ -231,7 +232,7 @@ func (c completedConfig) New() (*Master, error) {
 	}
 
 	// install legacy rest storage
-	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 			StorageFactory:       c.StorageFactory,
 			ProxyTransport:       c.ProxyTransport,
@@ -256,7 +257,7 @@ func (c completedConfig) New() (*Master, error) {
 		rbacrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
 	}
-	m.InstallAPIs(c.Config.GenericConfig.APIResourceConfigSource, restOptionsFactory.NewFor, restStorageProviders...)
+	m.InstallAPIs(c.Config.APIResourceConfigSource, restOptionsFactory.NewFor, restStorageProviders...)
 
 	if c.Tunneler != nil {
 		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
