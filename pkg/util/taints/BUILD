@@ -12,15 +12,21 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["options.go"],
+    srcs = ["taints.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
-        "//pkg/util/config:go_default_library",
-        "//pkg/util/flag:go_default_library",
-        "//pkg/util/taints:go_default_library",
+        "//pkg/util/validation:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["taints_test.go"],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
         "//vendor:github.com/spf13/pflag",
     ],
 )
