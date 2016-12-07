@@ -168,7 +168,7 @@ type Init struct {
 
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
 
-	fmt.Println("[kubeadm] Bear in mind that kubeadm is in alpha, do not use it in production clusters.")
+	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
@@ -206,9 +206,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	if err := preflight.TryStartKubelet(); err != nil {
-		return nil, &preflight.PreFlightError{Msg: err.Error()}
-	}
+	preflight.TryStartKubelet()
 
 	// validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)

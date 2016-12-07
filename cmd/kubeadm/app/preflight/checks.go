@@ -349,7 +349,7 @@ func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 	for _, c := range checks {
 		warnings, errs := c.Check()
 		for _, w := range warnings {
-			io.WriteString(ww, fmt.Sprintf("[preflight] Warning: %s\n", w))
+			io.WriteString(ww, fmt.Sprintf("[preflight] WARNING: %s\n", w))
 		}
 		for _, e := range errs {
 			found = append(found, e)
@@ -365,16 +365,16 @@ func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 	return nil
 }
 
-func TryStartKubelet() error {
+func TryStartKubelet() {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		fmt.Println("[preflight] No supported init system detected, won't check if kubelet is running")
 	} else if !initSystem.ServiceIsActive("kubelet") {
-		fmt.Printf("[preflight] Starting the kubelet service by running %q\n", "systemctl start kubelet")
+
+		fmt.Printf("[preflight] Starting the kubelet systemd service by running %q\n", "systemctl start kubelet")
 		if err := initSystem.ServiceStart("kubelet"); err != nil {
-			return fmt.Errorf("Couldn't start the kubelet service. Please start the kubelet service manually and try again.")
+			fmt.Println("[preflight] Couldn't start the kubelet service via systemd. Please start the kubelet service manually and try again.")
 		}
 	}
-	return nil
 }

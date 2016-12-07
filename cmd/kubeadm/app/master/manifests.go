@@ -298,12 +298,14 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
 	}
 
-	// If the k8s version is v1.5-something, this argument is set and makes `kubectl logs` and `kubectl exec`
-	// work on bare-metal where hostnames aren't usually resolvable
-	// Omit the "v" in the beginning, otherwise semver will fail
-	k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
-	if err == nil && k8sVersion.GTE(preferredAddressMinimumVersion) {
-		command = append(command, "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname")
+	if len(cfg.KubernetesVersion) != 0 {
+		// If the k8s version is v1.5-something, this argument is set and makes `kubectl logs` and `kubectl exec`
+		// work on bare-metal where hostnames aren't usually resolvable
+		// Omit the "v" in the beginning, otherwise semver will fail
+		k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
+		if err == nil && k8sVersion.GTE(preferredAddressMinimumVersion) {
+			command = append(command, "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname")
+		}
 	}
 
 	// Check if the user decided to use an external etcd cluster

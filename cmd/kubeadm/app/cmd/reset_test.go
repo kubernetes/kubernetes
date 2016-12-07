@@ -19,7 +19,7 @@ package cmd
 import (
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -147,14 +147,14 @@ func TestConfigDirCleaner(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		for _, createDir := range test.setupDirs {
-			err := os.Mkdir(path.Join(tmpDir, createDir), 0700)
+			err := os.Mkdir(filepath.Join(tmpDir, createDir), 0700)
 			if err != nil {
 				t.Errorf("Unable to setup test config directory: %s", err)
 			}
 		}
 
 		for _, createFile := range test.setupFiles {
-			fullPath := path.Join(tmpDir, createFile)
+			fullPath := filepath.Join(tmpDir, createFile)
 			f, err := os.Create(fullPath)
 			defer f.Close()
 			if err != nil {
@@ -166,17 +166,17 @@ func TestConfigDirCleaner(t *testing.T) {
 
 		// Verify the files we cleanup implicitly in every test:
 		assertExists(t, tmpDir)
-		assertNotExists(t, path.Join(tmpDir, "admin.conf"))
-		assertNotExists(t, path.Join(tmpDir, "kubelet.conf"))
-		assertDirEmpty(t, path.Join(tmpDir, "manifests"))
-		assertDirEmpty(t, path.Join(tmpDir, "pki"))
+		assertNotExists(t, filepath.Join(tmpDir, "admin.conf"))
+		assertNotExists(t, filepath.Join(tmpDir, "kubelet.conf"))
+		assertDirEmpty(t, filepath.Join(tmpDir, "manifests"))
+		assertDirEmpty(t, filepath.Join(tmpDir, "pki"))
 
 		// Verify the files as requested by the test:
 		for _, path := range test.verifyExists {
-			assertExists(t, path.Join(tmpDir, path))
+			assertExists(t, filepath.Join(tmpDir, path))
 		}
 		for _, path := range test.verifyNotExists {
-			assertNotExists(t, path.Join(tmpDir, path))
+			assertNotExists(t, filepath.Join(tmpDir, path))
 		}
 	}
 }
