@@ -32,6 +32,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/meta:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
@@ -50,5 +51,8 @@ go_test(
     srcs = ["controller_policy_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/util/sets:go_default_library"],
+    deps = [
+        "//pkg/api/meta:go_default_library",
+        "//pkg/util/sets:go_default_library",
+    ],
 )
