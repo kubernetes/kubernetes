@@ -202,7 +202,7 @@ function create-master-auth {
     echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
-  if [[ ! -e "${basic_auth_csv}" ]]; then
+  if [[ ! -e "${basic_auth_csv}" && -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
@@ -758,7 +758,6 @@ function start-kube-apiserver {
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
   params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
-  params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --etcd-servers=http://127.0.0.1:2379"
@@ -767,6 +766,9 @@ function start-kube-apiserver {
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
+  if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
+    params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
+  fi
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     params+=" --storage-backend=${STORAGE_BACKEND}"
   fi
@@ -843,10 +845,14 @@ function start-kube-apiserver {
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
 
-  if [[ -n "${KUBE_USER:-}" ]]; then
+  if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
     local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
     remove-salt-config-comments "${abac_policy_json}"
-    sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
+    if [[ -n "${KUBE_USER:-}" ]]; then
+      sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
+    else
+      sed -i -e "/{{kube_user}}/d" "${abac_policy_json}"
+    fi
     cp "${abac_policy_json}" /etc/srv/kubernetes/
   fi
 
