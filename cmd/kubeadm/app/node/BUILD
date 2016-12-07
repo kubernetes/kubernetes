@@ -21,6 +21,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1:go_default_library",
