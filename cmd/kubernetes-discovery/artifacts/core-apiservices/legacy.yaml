@@ -1,0 +1,11 @@
+apiVersion: apiregistration.k8s.io/v1alpha1
+kind: APIService
+metadata:
+  name: v1.
+spec:
+  version: v1
+  service:
+    namespace: default
+    name: kubernetes
+  insecureSkipTLSVerify: true
+  priority: 100
