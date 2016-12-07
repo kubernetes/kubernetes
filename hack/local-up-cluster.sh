@@ -509,23 +509,23 @@ EOF
 }
 
 # start_discovery relies on certificates created by start_apiserver
-function start_discovery {
-    # TODO generate serving certificates
+# function start_discovery {
+#     # TODO generate serving certificates
     
-    DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
-      --cert-dir="${CERT_DIR}" \
-      --client-ca-file="${CERT_DIR}/client-ca-bundle.crt" \
-      --bind-address="${API_BIND_ADDR}" \
-      --secure-port="${DISCOVERY_SECURE_PORT}" \
-      --tls-ca-file="${ROOT_CA_FILE}" \
-      --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}"  >"${DISCOVERY_SERVER_LOG}" 2>&1 &
-    DISCOVERY_PID=$!
+#     DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
+#     ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
+#       --cert-dir="${CERT_DIR}" \
+#       --client-ca-file="${CERT_DIR}/client-ca-bundle.crt" \
+#       --bind-address="${API_BIND_ADDR}" \
+#       --secure-port="${DISCOVERY_SECURE_PORT}" \
+#       --tls-ca-file="${ROOT_CA_FILE}" \
+#       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}"  >"${DISCOVERY_SERVER_LOG}" 2>&1 &
+#     DISCOVERY_PID=$!
 
-    # Wait for kubernetes-discovery to come up before launching the rest of the components.
-    echo "Waiting for kubernetes-discovery to come up"
-    kube::util::wait_for_url "https://${API_HOST}:${DISCOVERY_SECURE_PORT}/version" "kubernetes-discovery: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
-}
+#     # Wait for kubernetes-discovery to come up before launching the rest of the components.
+#     echo "Waiting for kubernetes-discovery to come up"
+#     kube::util::wait_for_url "https://${API_HOST}:${DISCOVERY_SECURE_PORT}/version" "kubernetes-discovery: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+# }
 
 
 function start_controller_manager {
@@ -802,7 +802,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_etcd
   set_service_accounts
   start_apiserver
-  start_discovery
+  # start_discovery
   start_controller_manager
   start_kubeproxy
   start_kubedns
