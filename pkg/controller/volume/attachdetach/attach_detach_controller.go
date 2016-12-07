@@ -67,6 +67,7 @@ const (
 // AttachDetachController defines the operations supported by this controller.
 type AttachDetachController interface {
 	Run(stopCh <-chan struct{})
+	GetDesiredStateOfWorld() cache.DesiredStateOfWorld
 }
 
 // NewAttachDetachController returns a new instance of AttachDetachController.
@@ -220,13 +221,17 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 	if pod == nil || !ok {
 		return
 	}
-
 	if pod.Spec.NodeName == "" {
 		// Ignore pods without NodeName, indicating they are not scheduled.
 		return
 	}
 
 	adc.processPodVolumes(pod, true /* addVolumes */)
+}
+
+// GetDesiredStateOfWorld returns desired state of world associated with controller
+func (adc *attachDetachController) GetDesiredStateOfWorld() cache.DesiredStateOfWorld {
+	return adc.desiredStateOfWorld
 }
 
 func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
