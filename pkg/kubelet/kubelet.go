@@ -354,6 +354,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		PressureTransitionPeriod: kubeCfg.EvictionPressureTransitionPeriod.Duration,
 		MaxPodGracePeriodSeconds: int64(kubeCfg.EvictionMaxPodGracePeriod),
 		Thresholds:               thresholds,
+		KernelMemcgNotification:  kubeCfg.ExperimentalKernelMemcgNotification,
 	}
 
 	reservation, err := ParseReservation(kubeCfg.KubeReserved, kubeCfg.SystemReserved)
