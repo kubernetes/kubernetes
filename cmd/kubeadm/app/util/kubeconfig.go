@@ -21,7 +21,6 @@ import (
 	"os"
 	"path"
 
-	// TODO: "k8s.io/client-go/client/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -77,21 +76,21 @@ func MakeClientConfigWithToken(config *clientcmdapi.Config, clusterName string, 
 
 func WriteKubeconfigIfNotExists(name string, kubeconfig *clientcmdapi.Config) error {
 	if err := os.MkdirAll(kubeadmapi.GlobalEnvParams.KubernetesDir, 0700); err != nil {
-		return fmt.Errorf("<util/kubeconfig> failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.KubernetesDir, err)
+		return fmt.Errorf("failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.KubernetesDir, err)
 	}
 
 	filename := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, fmt.Sprintf("%s.conf", name))
 	// Create and open the file, only if it does not already exist.
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0600)
 	if err != nil {
-		return fmt.Errorf("<util/kubeconfig> failed to create %q, it already exists [%v]", filename, err)
+		return fmt.Errorf("failed to create %q, it already exists [%v]", filename, err)
 	}
 	f.Close()
 
 	if err := clientcmd.WriteToFile(*kubeconfig, filename); err != nil {
-		return fmt.Errorf("<util/kubeconfig> failed to write to %q [%v]", filename, err)
+		return fmt.Errorf("failed to write to %q [%v]", filename, err)
 	}
 
-	fmt.Printf("<util/kubeconfig> created %q\n", filename)
+	fmt.Printf("[kubeconfig] Wrote KubeConfig file to disk: %q\n", filename)
 	return nil
 }

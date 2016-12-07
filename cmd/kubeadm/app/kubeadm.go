@@ -24,13 +24,9 @@ import (
 	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/logs"
 )
 
 func Run() error {
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
 	// We do not want these flags to show up in --help
 	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")

@@ -52,7 +52,11 @@ const (
 
 var (
 	initDoneMsgf = dedent.Dedent(`
-		Kubernetes master initialised successfully!
+		Your Kubernetes master has initialized successfully!
+
+		But you still need to deploy a pod network to the cluster.
+		You should "kubectl apply -f" some pod network yaml file that's listed at:
+		    http://kubernetes.io/docs/admin/addons/
 
 		You can now join any number of machines by running the following on each node:
 
@@ -163,6 +167,9 @@ type Init struct {
 }
 
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
+
+	fmt.Println("[kubeadm] Bear in mind that kubeadm is in alpha, do not use it in production clusters.")
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -175,7 +182,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
-		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
 			return nil, err
@@ -196,7 +202,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
-		fmt.Println("Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks...")
 	}
 
 	// Try to start the kubelet service in case it's inactive
@@ -257,7 +263,7 @@ func (i *Init) Run(out io.Writer) error {
 	// write a file that has already been written (the kubelet will be up and
 	// running in that case - they'd need to stop the kubelet, remove the file, and
 	// start it again in that case).
-	// TODO(phase1+) this is no longer the right place to guard agains foo-shooting,
+	// TODO(phase1+) this is no longer the right place to guard against foo-shooting,
 	// we need to decide how to handle existing files (it may be handy to support
 	// importing existing files, may be we could even make our command idempotant,
 	// or at least allow for external PKI and stuff)
