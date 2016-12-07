@@ -87,7 +87,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		gid := int64(1234)
 		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podname", &mode, nil)
-		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+		pod.Spec.SecurityContext = &api.PodSecurityContext{
 			RunAsUser: &uid,
 			FSGroup:   &gid,
 		}

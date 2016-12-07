@@ -264,7 +264,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 	}
 
 	if fsGroup != nil || uid != nil {
-		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+		pod.Spec.SecurityContext = &api.PodSecurityContext{
 			FSGroup:   fsGroup,
 			RunAsUser: uid,
 		}
