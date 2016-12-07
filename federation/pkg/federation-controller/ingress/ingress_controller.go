@@ -489,7 +489,7 @@ func (ic *IngressController) reconcileIngressesOnClusterChange(clusterName strin
 
 /*
   reconcileConfigMapForCluster ensures that the configmap for the ingress controller in the cluster has objectmeta.data.UID
-  consistent with all the other clusters in the federation. If clusterName == allClustersKey, then all avaliable clusters
+  consistent with all the other clusters in the federation. If clusterName == allClustersKey, then all available clusters
   configmaps are reconciled.
 */
 func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
