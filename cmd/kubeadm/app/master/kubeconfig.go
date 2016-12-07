@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	// TODO: "k8s.io/client-go/client/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -44,7 +43,7 @@ func CreateCertsAndConfigForClients(cfg kubeadmapi.API, clientNames []string, ca
 	for _, client := range clientNames {
 		key, cert, err := newClientKeyAndCert(caCert, caKey)
 		if err != nil {
-			return nil, fmt.Errorf("<master/kubeconfig> failure while creating %s client certificate - %v", client, err)
+			return nil, fmt.Errorf("failure while creating %s client certificate - [%v]", client, err)
 		}
 		config := kubeadmutil.MakeClientConfigWithCerts(
 			basicClientConfig,

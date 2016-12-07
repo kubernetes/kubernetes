@@ -21,14 +21,13 @@ import (
 )
 
 type EnvParams struct {
-	KubernetesDir     string
-	HostPKIPath       string
-	HostEtcdPath      string
-	HyperkubeImage    string
-	RepositoryPrefix  string
-	DiscoveryImage    string
-	EtcdImage         string
-	ComponentLoglevel string
+	KubernetesDir    string
+	HostPKIPath      string
+	HostEtcdPath     string
+	HyperkubeImage   string
+	RepositoryPrefix string
+	DiscoveryImage   string
+	EtcdImage        string
 }
 
 type MasterConfiguration struct {
