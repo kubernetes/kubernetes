@@ -22,6 +22,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/api/validation:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/registry/generic:go_default_library",

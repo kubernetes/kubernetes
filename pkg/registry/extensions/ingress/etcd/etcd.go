@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	ingress "k8s.io/kubernetes/pkg/registry/extensions/ingress"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -99,8 +100,8 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
+func (r *StatusREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
 }
 
 // Update alters the status subset of an object.

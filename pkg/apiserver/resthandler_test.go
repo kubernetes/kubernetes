@@ -102,7 +102,7 @@ func (p *testPatcher) Update(ctx api.Context, name string, objInfo rest.UpdatedO
 	return inPod, false, nil
 }
 
-func (p *testPatcher) Get(ctx api.Context, name string) (runtime.Object, error) {
+func (p *testPatcher) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	p.t.Fatal("Unexpected call to testPatcher.Get")
 	return nil, errors.New("Unexpected call to testPatcher.Get")
 }

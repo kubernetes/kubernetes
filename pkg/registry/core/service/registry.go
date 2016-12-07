@@ -29,7 +29,7 @@ import (
 type Registry interface {
 	ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error)
 	CreateService(ctx api.Context, svc *api.Service) (*api.Service, error)
-	GetService(ctx api.Context, name string) (*api.Service, error)
+	GetService(ctx api.Context, name string, options *metav1.GetOptions) (*api.Service, error)
 	DeleteService(ctx api.Context, name string) error
 	UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error)
 	WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
@@ -63,8 +63,8 @@ func (s *storage) CreateService(ctx api.Context, svc *api.Service) (*api.Service
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) GetService(ctx api.Context, name string) (*api.Service, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetService(ctx api.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

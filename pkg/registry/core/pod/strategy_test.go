@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -149,7 +150,7 @@ type mockPodGetter struct {
 	pod *api.Pod
 }
 
-func (g mockPodGetter) Get(api.Context, string) (runtime.Object, error) {
+func (g mockPodGetter) Get(api.Context, string, *metav1.GetOptions) (runtime.Object, error) {
 	return g.pod, nil
 }
 

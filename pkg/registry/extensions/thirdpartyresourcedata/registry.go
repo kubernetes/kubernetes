@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -27,7 +28,7 @@ import (
 type Registry interface {
 	ListThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
 	WatchThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetThirdPartyResourceData(ctx api.Context, name string) (*extensions.ThirdPartyResourceData, error)
+	GetThirdPartyResourceData(ctx api.Context, name string, options *metav1.GetOptions) (*extensions.ThirdPartyResourceData, error)
 	CreateThirdPartyResourceData(ctx api.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
 	UpdateThirdPartyResourceData(ctx api.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
 	DeleteThirdPartyResourceData(ctx api.Context, name string) error
@@ -56,8 +57,8 @@ func (s *storage) WatchThirdPartyResourceData(ctx api.Context, options *api.List
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetThirdPartyResourceData(ctx api.Context, name string) (*extensions.ThirdPartyResourceData, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetThirdPartyResourceData(ctx api.Context, name string, options *metav1.GetOptions) (*extensions.ThirdPartyResourceData, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

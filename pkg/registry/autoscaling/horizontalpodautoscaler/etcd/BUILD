@@ -18,6 +18,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/generic:go_default_library",

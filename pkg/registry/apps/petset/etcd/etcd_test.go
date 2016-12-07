@@ -118,7 +118,7 @@ func TestStatusUpdate(t *testing.T) {
 	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

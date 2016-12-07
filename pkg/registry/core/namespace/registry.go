@@ -19,6 +19,7 @@ package namespace
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -26,7 +27,7 @@ import (
 type Registry interface {
 	ListNamespaces(ctx api.Context, options *api.ListOptions) (*api.NamespaceList, error)
 	WatchNamespaces(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetNamespace(ctx api.Context, namespaceID string) (*api.Namespace, error)
+	GetNamespace(ctx api.Context, namespaceID string, options *metav1.GetOptions) (*api.Namespace, error)
 	CreateNamespace(ctx api.Context, namespace *api.Namespace) error
 	UpdateNamespace(ctx api.Context, namespace *api.Namespace) error
 	DeleteNamespace(ctx api.Context, namespaceID string) error
@@ -55,8 +56,8 @@ func (s *storage) WatchNamespaces(ctx api.Context, options *api.ListOptions) (wa
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetNamespace(ctx api.Context, namespaceName string) (*api.Namespace, error) {
-	obj, err := s.Get(ctx, namespaceName)
+func (s *storage) GetNamespace(ctx api.Context, namespaceName string, options *metav1.GetOptions) (*api.Namespace, error) {
+	obj, err := s.Get(ctx, namespaceName, options)
 	if err != nil {
 		return nil, err
 	}

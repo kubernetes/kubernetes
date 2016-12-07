@@ -73,7 +73,7 @@ func (r *EvictionREST) New() runtime.Object {
 func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
 
-	obj, err := r.store.Get(ctx, eviction.Name)
+	obj, err := r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

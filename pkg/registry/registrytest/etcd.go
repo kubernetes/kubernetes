@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -180,7 +181,7 @@ func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object,
 		return nil, err
 	}
 
-	result, err := t.storage.Get(ctx, accessor.GetName())
+	result, err := t.storage.Get(ctx, accessor.GetName(), &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

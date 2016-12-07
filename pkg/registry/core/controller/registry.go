@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -30,7 +31,7 @@ import (
 type Registry interface {
 	ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error)
 	WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
+	GetController(ctx api.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error)
 	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteController(ctx api.Context, controllerID string) error
@@ -62,8 +63,8 @@ func (s *storage) WatchControllers(ctx api.Context, options *api.ListOptions) (w
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
-	obj, err := s.Get(ctx, controllerID)
+func (s *storage) GetController(ctx api.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error) {
+	obj, err := s.Get(ctx, controllerID, options)
 	if err != nil {
 		return nil, err
 	}

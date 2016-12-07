@@ -19,6 +19,7 @@ package node
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -27,7 +28,7 @@ type Registry interface {
 	ListNodes(ctx api.Context, options *api.ListOptions) (*api.NodeList, error)
 	CreateNode(ctx api.Context, node *api.Node) error
 	UpdateNode(ctx api.Context, node *api.Node) error
-	GetNode(ctx api.Context, nodeID string) (*api.Node, error)
+	GetNode(ctx api.Context, nodeID string, options *metav1.GetOptions) (*api.Node, error)
 	DeleteNode(ctx api.Context, nodeID string) error
 	WatchNodes(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
@@ -66,8 +67,8 @@ func (s *storage) WatchNodes(ctx api.Context, options *api.ListOptions) (watch.I
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetNode(ctx api.Context, name string) (*api.Node, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetNode(ctx api.Context, name string, options *metav1.GetOptions) (*api.Node, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

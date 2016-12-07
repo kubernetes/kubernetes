@@ -85,7 +85,7 @@ func (r *ServiceRegistry) CreateService(ctx api.Context, svc *api.Service) (*api
 	return svc, r.Err
 }
 
-func (r *ServiceRegistry) GetService(ctx api.Context, id string) (*api.Service, error) {
+func (r *ServiceRegistry) GetService(ctx api.Context, id string, options *metav1.GetOptions) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
