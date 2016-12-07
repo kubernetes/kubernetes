@@ -124,7 +124,7 @@ func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (
 		return nil, err
 	}
 
-	return labels, err
+	return labels, nil
 }
 
 // getEBSVolumes returns the AWS Volumes interface for ebs
@@ -169,7 +169,7 @@ func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (m
 		return nil, err
 	}
 
-	return labels, err
+	return labels, nil
 }
 
 // getGCECloudProvider returns the GCE cloud provider, for use for querying volume labels
