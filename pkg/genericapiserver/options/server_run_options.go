@@ -56,7 +56,6 @@ type ServerRunOptions struct {
 	ExternalHost                string
 	KubernetesServiceNodePort   int
 	MasterCount                 int
-	MasterServiceNamespace      string
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	MinRequestTimeout           int
@@ -83,7 +82,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableContentionProfiling:   false,
 		EnableWatchCache:            true,
 		MasterCount:                 1,
-		MasterServiceNamespace:      api.NamespaceDefault,
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
 		MinRequestTimeout:           1800,
@@ -245,7 +243,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
 		"The number of apiservers running in the cluster.")
 
-	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, ""+
+	deprecatedMasterServiceNamespace := api.NamespaceDefault
+	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
 		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
