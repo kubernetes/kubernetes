@@ -69,6 +69,8 @@ type Config struct {
 	MaxPodGracePeriodSeconds int64
 	// Thresholds define the set of conditions monitored to trigger eviction.
 	Thresholds []Threshold
+	// KernelMemcgNotification if true will integrate with the kernel memcg notification to determine if memory thresholds are crossed.
+	KernelMemcgNotification bool
 }
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity
