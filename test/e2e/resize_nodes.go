@@ -446,6 +446,9 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			err = framework.WaitForClusterSize(c, int(replicas-1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
+			By("waiting 1 minute for the pods to get cleaned up and recreated")
+			time.Sleep(time.Minute)
+
 			By("verifying whether the pods from the removed node are recreated")
 			err = framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
