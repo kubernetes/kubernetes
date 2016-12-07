@@ -174,7 +174,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 	f := framework.NewDefaultFramework("port-forwarding")
 
 	framework.KubeDescribe("With a server that expects a client request", func() {
-		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
+		It("should support a client that connects, sends no data, and disconnects [Conformance] [Flaky]", func() {
 			By("creating the target pod")
 			pod := pfPod("abc", "1", "1", "1")
 			if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
