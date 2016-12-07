@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"regexp"
 	"testing"
 	"time"
 
@@ -36,47 +35,6 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
-
-func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(options.NewServerRunOptions().GenericServerRunOptions.LongRunningRequestRE)
-	dontMatch := []string{
-		"/api/v1/watch-namespace/",
-		"/api/v1/namespace-proxy/",
-		"/api/v1/namespace-watch",
-		"/api/v1/namespace-proxy",
-		"/api/v1/namespace-portforward/pods",
-		"/api/v1/portforward/pods",
-		". anything",
-		"/ that",
-	}
-	doMatch := []string{
-		"/api/v1/pods/watch",
-		"/api/v1/watch/stuff",
-		"/api/v1/default/service/proxy",
-		"/api/v1/pods/proxy/path/to/thing",
-		"/api/v1/namespaces/myns/pods/mypod/log",
-		"/api/v1/namespaces/myns/pods/mypod/logs",
-		"/api/v1/namespaces/myns/pods/mypod/portforward",
-		"/api/v1/namespaces/myns/pods/mypod/exec",
-		"/api/v1/namespaces/myns/pods/mypod/attach",
-		"/api/v1/namespaces/myns/pods/mypod/log/",
-		"/api/v1/namespaces/myns/pods/mypod/logs/",
-		"/api/v1/namespaces/myns/pods/mypod/portforward/",
-		"/api/v1/namespaces/myns/pods/mypod/exec/",
-		"/api/v1/namespaces/myns/pods/mypod/attach/",
-		"/api/v1/watch/namespaces/myns/pods",
-	}
-	for _, path := range dontMatch {
-		if regexp.MatchString(path) {
-			t.Errorf("path should not have match regexp but did: %s", path)
-		}
-	}
-	for _, path := range doMatch {
-		if !regexp.MatchString(path) {
-			t.Errorf("path should have match regexp did not: %s", path)
-		}
-	}
-}
 
 var securePort = 6443 + 2
 var insecurePort = 8080 + 2
