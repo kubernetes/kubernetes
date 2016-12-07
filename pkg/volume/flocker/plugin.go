@@ -149,6 +149,13 @@ func (b flockerMounter) GetPath() string {
 	return b.flocker.path
 }
 
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b flockerMounter) CanMount() error {
+	return nil
+}
+
 func (b flockerMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.flocker.datasetName, fsGroup)
 }

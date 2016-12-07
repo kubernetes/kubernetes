@@ -180,6 +180,7 @@ experimental-keystone-url
 experimental-mounter-path
 experimental-nvidia-gpus
 experimental-prefix
+experimental-check-node-capabilities-before-mount
 external-hostname
 external-ip
 extra-peer-dirs

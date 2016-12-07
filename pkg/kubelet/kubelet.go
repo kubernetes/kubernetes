@@ -672,6 +672,11 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		return nil, err
 	}
 
+	// If the experimentalMounterPathFlag is set, we do not want to
+	// check node capabilities since the mount path is not the default
+	if len(kubeCfg.ExperimentalMounterPath) != 0 {
+		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount = false
+	}
 	// setup volumeManager
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
@@ -682,7 +687,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		klet.containerRuntime,
 		kubeDeps.Mounter,
 		klet.getPodsDir(),
-		kubeDeps.Recorder)
+		kubeDeps.Recorder,
+		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {

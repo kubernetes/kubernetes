@@ -46,6 +46,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/nfs" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
+
 	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}

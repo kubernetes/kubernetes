@@ -260,6 +260,13 @@ func (f flexVolumeMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (f *flexVolumeMounter) CanMount() error {
+	return nil
+}
+
 // flexVolumeManager is the abstract interface to flex volume ops.
 type flexVolumeManager interface {
 	// Attaches the disk to the kubelet's host machine.
