@@ -20,7 +20,8 @@ go_library(
     deps = [
         "//pkg/util/clock:go_default_library",
         "//pkg/util/integer:go_default_library",
-        "//vendor:github.com/juju/ratelimit",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/time/rate",
     ],
 )
 
