@@ -551,7 +551,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 		}
 
 		// Update the set with the latest resource version for the next poll
-		if ds, getErr = dsClient.Get(ds.Name); getErr != nil {
+		if ds, getErr = dsClient.Get(ds.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			return getErr

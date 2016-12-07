@@ -24,6 +24,7 @@ import (
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -277,7 +278,7 @@ func (c *ErrorJobs) Update(job *batch.Job) (*batch.Job, error) {
 	return nil, errors.New("Job update failure")
 }
 
-func (c *ErrorJobs) Get(name string) (*batch.Job, error) {
+func (c *ErrorJobs) Get(name string, options metav1.GetOptions) (*batch.Job, error) {
 	zero := int32(0)
 	return &batch.Job{
 		Spec: batch.JobSpec{
@@ -540,7 +541,7 @@ func (c *ErrorDeployments) Update(deployment *extensions.Deployment) (*extension
 	return nil, errors.New("deployment update failure")
 }
 
-func (c *ErrorDeployments) Get(name string) (*extensions.Deployment, error) {
+func (c *ErrorDeployments) Get(name string, options metav1.GetOptions) (*extensions.Deployment, error) {
 	return &extensions.Deployment{
 		Spec: extensions.DeploymentSpec{
 			Replicas: 0,

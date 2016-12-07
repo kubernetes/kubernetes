@@ -451,7 +451,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				break
 			}
 			name := node.Name
-			node, err = nc.kubeClient.Core().Nodes().Get(name)
+			node, err = nc.kubeClient.Core().Nodes().Get(name, metav1.GetOptions{})
 			if err != nil {
 				glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
 				break

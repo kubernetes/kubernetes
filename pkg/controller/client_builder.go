@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
@@ -99,13 +100,13 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	clientConfig := restclient.AnonymousClientConfig(b.ClientConfig)
 
 	// we need the SA UID to find a matching SA token
-	sa, err := b.CoreClient.ServiceAccounts(b.Namespace).Get(name)
+	sa, err := b.CoreClient.ServiceAccounts(b.Namespace).Get(name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	} else if apierrors.IsNotFound(err) {
 		// check to see if the namespace exists.  If it isn't a NotFound, just try to create the SA.
 		// It'll probably fail, but perhaps that will have a better message.
-		if _, err := b.CoreClient.Namespaces().Get(b.Namespace); apierrors.IsNotFound(err) {
+		if _, err := b.CoreClient.Namespaces().Get(b.Namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 			_, err = b.CoreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: v1.ObjectMeta{Name: b.Namespace}})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return nil, err

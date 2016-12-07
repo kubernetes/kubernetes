@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
@@ -710,7 +711,7 @@ func (oe *operationExecutor) generateDetachVolumeFunc(
 func (oe *operationExecutor) verifyVolumeIsSafeToDetach(
 	volumeToDetach AttachedVolume) error {
 	// Fetch current node object
-	node, fetchErr := oe.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName))
+	node, fetchErr := oe.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		if errors.IsNotFound(fetchErr) {
 			glog.Warningf("Node %q not found on API server. DetachVolume will skip safe to detach check.",
@@ -1185,7 +1186,7 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 		}
 
 		// Fetch current node object
-		node, fetchErr := oe.kubeClient.Core().Nodes().Get(string(nodeName))
+		node, fetchErr := oe.kubeClient.Core().Nodes().Get(string(nodeName), metav1.GetOptions{})
 		if fetchErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(

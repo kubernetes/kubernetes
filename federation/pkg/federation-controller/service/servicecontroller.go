@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -390,7 +391,7 @@ func (s *ServiceController) ensureClusterService(cachedService *cachedService, c
 	var err error
 	var needUpdate bool
 	for i := 0; i < clientRetryCount; i++ {
-		svc, err := client.Core().Services(service.Namespace).Get(service.Name)
+		svc, err := client.Core().Services(service.Namespace).Get(service.Name, metav1.GetOptions{})
 		if err == nil {
 			// service exists
 			glog.V(5).Infof("Found service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)

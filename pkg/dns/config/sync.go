@@ -19,6 +19,7 @@ package config
 import (
 	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	fed "k8s.io/kubernetes/pkg/dns/federation"
@@ -98,7 +99,7 @@ type kubeSync struct {
 var _ Sync = (*kubeSync)(nil)
 
 func (sync *kubeSync) Once() (*Config, error) {
-	cm, err := sync.client.Core().ConfigMaps(sync.ns).Get(sync.name)
+	cm, err := sync.client.Core().ConfigMaps(sync.ns).Get(sync.name, metav1.GetOptions{})
 
 	if err != nil {
 		glog.Errorf("Error getting ConfigMap %v:%v err: %v",

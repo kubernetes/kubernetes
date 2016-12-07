@@ -43,10 +43,10 @@ func NewGetterFromClient(c clientset.Interface) serviceaccount.ServiceAccountTok
 	return clientGetter{c}
 }
 func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
-	return c.client.Core().ServiceAccounts(namespace).Get(name)
+	return c.client.Core().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 }
 func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
-	return c.client.Core().Secrets(namespace).Get(name)
+	return c.client.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
 }
 
 // registryGetter implements ServiceAccountTokenGetter using a service account and secret registry

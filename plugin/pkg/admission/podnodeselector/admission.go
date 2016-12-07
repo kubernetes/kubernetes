@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -177,7 +178,7 @@ func (p *podNodeSelector) Validate() error {
 }
 
 func (p *podNodeSelector) defaultGetNamespace(name string) (*api.Namespace, error) {
-	namespace, err := p.client.Core().Namespaces().Get(name)
+	namespace, err := p.client.Core().Namespaces().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("namespace %s does not exist", name)
 	}

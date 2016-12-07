@@ -96,7 +96,7 @@ func retryOnConflictError(kubeClient clientset.Interface, namespace *v1.Namespac
 			return nil, err
 		}
 		prevNamespace := latestNamespace
-		latestNamespace, err = kubeClient.Core().Namespaces().Get(latestNamespace.Name)
+		latestNamespace, err = kubeClient.Core().Namespaces().Get(latestNamespace.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -379,7 +379,7 @@ func syncNamespace(
 	// multiple controllers may edit a namespace during termination
 	// first get the latest state of the namespace before proceeding
 	// if the namespace was deleted already, don't do anything
-	namespace, err := kubeClient.Core().Namespaces().Get(namespace.Name)
+	namespace, err := kubeClient.Core().Namespaces().Get(namespace.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
