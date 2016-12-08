@@ -516,8 +516,8 @@ var ReadyReplicaVersion = version.MustParse("v1.4.0")
 // even if there are minPods pods, some of which are in Running/Ready
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
-func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
-
+// If skipSucceeded is true, any pods that are Succeeded are not counted.
+func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string, skipSucceeded bool) error {
 	// This can be removed when we no longer have 1.3 servers running with upgrade tests.
 	hasReadyReplicas, err := ServerVersionGTE(ReadyReplicaVersion, c.Discovery())
 	if err != nil {
@@ -581,13 +581,22 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 				Logf("%v in state %v, ignoring", pod.Name, pod.Status.Phase)
 				continue
 			}
-			if res, err := testutils.PodRunningReady(&pod); res && err == nil {
+			res, err := testutils.PodRunningReady(&pod)
+			switch {
+			case res && err == nil:
 				nOk++
-			} else {
-				if pod.Status.Phase != v1.PodFailed {
-					Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
-					badPods = append(badPods, pod)
-				} else if _, ok := pod.Annotations[v1.CreatedByAnnotation]; !ok {
+			case pod.Status.Phase == v1.PodSucceeded && skipSucceeded:
+				continue
+			case pod.Status.Phase == v1.PodSucceeded:
+				Logf("The status of Pod %s is Succeeded which is unexpected", pod.ObjectMeta.Name)
+				badPods = append(badPods, pod)
+				// it doesn't make sense to wait for this pod
+				return false, errors.New("unexpected Succeeded pod state")
+			case pod.Status.Phase != v1.PodFailed:
+				Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
+				badPods = append(badPods, pod)
+			default:
+				if _, ok := pod.Annotations[v1.CreatedByAnnotation]; !ok {
 					Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}

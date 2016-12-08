@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, true)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
