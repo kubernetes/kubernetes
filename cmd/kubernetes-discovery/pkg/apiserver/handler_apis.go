@@ -44,7 +44,7 @@ func WithAPIs(handler http.Handler, informer informers.APIServiceInformer) http.
 	})
 }
 
-// apisHandler servers the `/apis` endpoint.
+// apisHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
 type apisHandler struct {
 	lister listers.APIServiceLister
@@ -79,7 +79,8 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	discoveryGroupList := &metav1.APIGroupList{
-		// always add OUR api group to the list first
+		// always add OUR api group to the list first.  Since we'll never have a registered APIService for it
+		// and since this is the crux of the API, having this first will give our names priority.  It's good to be king.
 		Groups: []metav1.APIGroup{discoveryGroup},
 	}
 
@@ -130,7 +131,7 @@ func newDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *metav1.
 	return discoveryGroup
 }
 
-// apiGroupHandler servers the `/apis/<group>` endpoint.
+// apiGroupHandler serves the `/apis/<group>` endpoint.
 type apiGroupHandler struct {
 	groupName string
 

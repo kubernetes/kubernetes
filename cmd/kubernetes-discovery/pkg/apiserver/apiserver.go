@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -47,6 +46,11 @@ const legacyAPIServiceName = "v1."
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
+	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
+	// this to confirm the proxy's identity
+	ProxyClientCert []byte
+	ProxyClientKey  []byte
+
 	// RESTOptionsGetter is used to construct storage for a particular resource
 	RESTOptionsGetter generic.RESTOptionsGetter
 }
@@ -55,13 +59,22 @@ type Config struct {
 type APIDiscoveryServer struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
-	// handledAPIServices tracks which APIServices have already been handled.  Once endpoints are added,
-	// the listers that are used keep bits in sync automatically.
-	handledAPIServices sets.String
+	contextMapper api.RequestContextMapper
+
+	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
+	// this to confirm the proxy's identity
+	proxyClientCert []byte
+	proxyClientKey  []byte
+
+	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
+	proxyHandlers map[string]*proxyHandler
 
 	// lister is used to add group handling for /apis/<group> discovery lookups based on
 	// controller state
 	lister listers.APIServiceLister
+
+	// proxyMux intercepts requests that need to be proxied to backing API servers
+	proxyMux *http.ServeMux
 }
 
 type completedConfig struct {
@@ -91,9 +104,12 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
 
+	proxyMux := http.NewServeMux()
+
 	// most API servers don't need to do this, but we need a custom handler chain to handle the special /apis handling here
 	c.Config.GenericConfig.BuildHandlerChainsFunc = (&handlerChainConfig{
 		informers: informerFactory,
+		proxyMux:  proxyMux,
 	}).handlerChain
 
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
@@ -102,9 +118,13 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 	}
 
 	s := &APIDiscoveryServer{
-		GenericAPIServer:   genericServer,
-		handledAPIServices: sets.String{},
-		lister:             informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		GenericAPIServer: genericServer,
+		contextMapper:    c.GenericConfig.RequestContextMapper,
+		proxyClientCert:  c.ProxyClientCert,
+		proxyClientKey:   c.ProxyClientKey,
+		proxyHandlers:    map[string]*proxyHandler{},
+		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		proxyMux:         proxyMux,
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName)
@@ -134,6 +154,7 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 // handlerChainConfig is the config used to build the custom handler chain for this api server
 type handlerChainConfig struct {
 	informers informers.SharedInformerFactory
+	proxyMux  *http.ServeMux
 }
 
 // handlerChain is a method to build the handler chain for this API server.  We need a custom handler chain so that we
@@ -144,6 +165,12 @@ func (h *handlerChainConfig) handlerChain(apiHandler http.Handler, c *genericapi
 	handler := WithAPIs(apiHandler, h.informers.Apiregistration().InternalVersion().APIServices())
 
 	handler = apiserverfilters.WithAuthorization(handler, c.RequestContextMapper, c.Authorizer)
+
+	// this mux is NOT protected by authorization, but DOES have authentication information
+	// this is so that everyone can hit the proxy and we can properly identify the user.  The backing
+	// API server will deal with authorization
+	handler = WithProxyMux(handler, h.proxyMux)
+
 	handler = apiserverfilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 	// audit to stdout to help with debugging as we get this started
 	handler = apiserverfilters.WithAudit(handler, c.RequestContextMapper, os.Stdout)
@@ -162,12 +189,34 @@ func (h *handlerChainConfig) handlerChain(apiHandler http.Handler, c *genericapi
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so its ok to run the controller on a single thread
 func (s *APIDiscoveryServer) AddAPIService(apiService *apiregistration.APIService) {
-	if s.handledAPIServices.Has(apiService.Name) {
+	// if the proxyHandler already exists, it needs to be updated. The discovery bits do not
+	// since they are wired against listers because they require multiple resources to respond
+	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
+		proxyHandler.updateAPIService(apiService)
 		return
 	}
+
+	proxyPath := "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.
+	if apiService.Name == "v1." {
+		proxyPath = "/api"
+	}
+
+	// register the proxy handler
+	proxyHandler := &proxyHandler{
+		contextMapper:          s.contextMapper,
+		proxyClientCert:        s.proxyClientCert,
+		proxyClientKey:         s.proxyClientKey,
+		transportBuildingError: nil,
+		proxyRoundTripper:      nil,
+	}
+	proxyHandler.updateAPIService(apiService)
+	s.proxyHandlers[apiService.Name] = proxyHandler
+	s.proxyMux.Handle(proxyPath, proxyHandler)
+	s.proxyMux.Handle(proxyPath+"/", proxyHandler)
+
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
-		s.handledAPIServices.Insert(apiService.Name)
 		return
 	}
 
@@ -186,7 +235,23 @@ func (s *APIDiscoveryServer) AddAPIService(apiService *apiregistration.APIServic
 // RemoveAPIService removes the APIService from being handled.  Later on it will disable the proxy endpoint.
 // Right now it does nothing because our handler has to properly 404 itself since muxes don't unregister
 func (s *APIDiscoveryServer) RemoveAPIService(apiServiceName string) {
-	if !s.handledAPIServices.Has(apiServiceName) {
+	proxyHandler, exists := s.proxyHandlers[apiServiceName]
+	if !exists {
 		return
 	}
+	proxyHandler.removeAPIService()
+}
+
+func WithProxyMux(handler http.Handler, mux *http.ServeMux) http.Handler {
+	if mux == nil {
+		return handler
+	}
+
+	// register the handler at this stage against everything under slash.  More specific paths that get registered will take precedence
+	// this effectively delegates by default unless something specific gets registered.
+	mux.Handle("/", handler)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		mux.ServeHTTP(w, req)
+	})
 }
