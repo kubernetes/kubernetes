@@ -6,6 +6,7 @@
 		"./third_party",
 		"./plugin",
 		"./test",
-		"./federation"
+		"./federation",
+		"./examples"
 	]
 }
