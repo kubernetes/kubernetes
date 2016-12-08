@@ -610,7 +610,7 @@ func GetAvailablePodsForReplicaSets(c clientset.Interface, deployment *extension
 // CountAvailablePodsForReplicaSets returns the number of available pods corresponding to the given pod list and replica sets.
 // Note that the input pod list should be the pods targeted by the deployment of input replica sets.
 func CountAvailablePodsForReplicaSets(podList *api.PodList, rss []*extensions.ReplicaSet, minReadySeconds int32) (int32, error) {
-	rsPods, err := filterPodsMatchingReplicaSets(rss, podList, minReadySeconds)
+	rsPods, err := filterPodsMatchingReplicaSets(rss, podList)
 	if err != nil {
 		return 0, err
 	}
@@ -663,8 +663,8 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 }
 
 // filterPodsMatchingReplicaSets filters the given pod list and only return the ones targeted by the input replicasets
-func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList *api.PodList, minReadySeconds int32) ([]api.Pod, error) {
-	allRSPods := []api.Pod{}
+func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList *api.PodList) ([]api.Pod, error) {
+	rsPods := []api.Pod{}
 	for _, rs := range replicaSets {
 		matchingFunc, err := rsutil.MatchingPodsFunc(rs)
 		if err != nil {
@@ -673,16 +673,9 @@ func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList
 		if matchingFunc == nil {
 			continue
 		}
-		rsPods := podutil.Filter(podList, matchingFunc)
-		avaPodsCount := countAvailablePods(rsPods, minReadySeconds)
-		if avaPodsCount > rs.Spec.Replicas {
-			msg := fmt.Sprintf("Found %s/%s with %d available pods, more than its spec replicas %d", rs.Namespace, rs.Name, avaPodsCount, rs.Spec.Replicas)
-			glog.Errorf("ERROR: %s", msg)
-			return nil, fmt.Errorf(msg)
-		}
-		allRSPods = append(allRSPods, podutil.Filter(podList, matchingFunc)...)
+		rsPods = append(rsPods, podutil.Filter(podList, matchingFunc)...)
 	}
-	return allRSPods, nil
+	return rsPods, nil
 }
 
 // Revision returns the revision number of the input replica set
