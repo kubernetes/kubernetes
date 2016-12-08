@@ -18,14 +18,17 @@ package openstack
 
 import (
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/rand"
-
 	"github.com/rackspace/gophercloud"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
+
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/rand"
 )
 
 const volumeAvailableStatus = "available"
@@ -115,6 +118,115 @@ func TestToAuthOptions(t *testing.T) {
 	}
 	if ao.Username != cfg.Global.Username {
 		t.Errorf("Username %s != %s", ao.Username, cfg.Global.Username)
+	}
+}
+
+func TestCaller(t *testing.T) {
+	called := false
+	myFunc := func() { called = true }
+
+	c := NewCaller()
+	c.Call(myFunc)
+
+	if !called {
+		t.Errorf("Caller failed to call function in default case")
+	}
+
+	c.Disarm()
+	called = false
+	c.Call(myFunc)
+
+	if called {
+		t.Error("Caller still called function when disarmed")
+	}
+
+	// Confirm the "usual" deferred Caller pattern works as expected
+
+	called = false
+	success_case := func() {
+		c := NewCaller()
+		defer c.Call(func() { called = true })
+		c.Disarm()
+	}
+	if success_case(); called {
+		t.Error("Deferred success case still invoked unwind")
+	}
+
+	called = false
+	failure_case := func() {
+		c := NewCaller()
+		defer c.Call(func() { called = true })
+	}
+	if failure_case(); !called {
+		t.Error("Deferred failure case failed to invoke unwind")
+	}
+}
+
+// An arbitrary sort.Interface, just for easier comparison
+type AddressSlice []v1.NodeAddress
+
+func (a AddressSlice) Len() int           { return len(a) }
+func (a AddressSlice) Less(i, j int) bool { return a[i].Address < a[j].Address }
+func (a AddressSlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+func TestNodeAddresses(t *testing.T) {
+	srv := servers.Server{
+		Status:     "ACTIVE",
+		HostID:     "29d3c8c896a45aa4c34e52247875d7fefc3d94bbcc9f622b5d204362",
+		AccessIPv4: "50.56.176.99",
+		AccessIPv6: "2001:4800:790e:510:be76:4eff:fe04:82a8",
+		Addresses: map[string]interface{}{
+			"private": []interface{}{
+				map[string]interface{}{
+					"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:7c:1b:2b",
+					"version":                 float64(4),
+					"addr":                    "10.0.0.32",
+					"OS-EXT-IPS:type":         "fixed",
+				},
+				map[string]interface{}{
+					"version":         float64(4),
+					"addr":            "50.56.176.36",
+					"OS-EXT-IPS:type": "floating",
+				},
+				map[string]interface{}{
+					"version": float64(4),
+					"addr":    "10.0.0.31",
+					// No OS-EXT-IPS:type
+				},
+			},
+			"public": []interface{}{
+				map[string]interface{}{
+					"version": float64(4),
+					"addr":    "50.56.176.35",
+				},
+				map[string]interface{}{
+					"version": float64(6),
+					"addr":    "2001:4800:780e:510:be76:4eff:fe04:84a8",
+				},
+			},
+		},
+	}
+
+	addrs, err := nodeAddresses(&srv)
+	if err != nil {
+		t.Fatalf("nodeAddresses returned error: %v", err)
+	}
+
+	sort.Sort(AddressSlice(addrs))
+	t.Logf("addresses is %v", addrs)
+
+	want := []v1.NodeAddress{
+		{Type: v1.NodeInternalIP, Address: "10.0.0.31"},
+		{Type: v1.NodeInternalIP, Address: "10.0.0.32"},
+		{Type: v1.NodeExternalIP, Address: "2001:4800:780e:510:be76:4eff:fe04:84a8"},
+		{Type: v1.NodeExternalIP, Address: "2001:4800:790e:510:be76:4eff:fe04:82a8"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.35"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.36"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.99"},
+	}
+
+	if !reflect.DeepEqual(want, addrs) {
+		t.Errorf("nodeAddresses returned incorrect value %v", addrs)
 	}
 }
 
