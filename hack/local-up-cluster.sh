@@ -528,7 +528,7 @@ function start_discovery {
     DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
       --cert-dir="${CERT_DIR}" \
-      --client-ca-file="${CERT_DIR}/client-ca-bundle.crt" \
+      --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --authentication-kubeconfig="${CERT_DIR}/discovery-auth.kubeconfig" \
       --authorization-kubeconfig="${CERT_DIR}/discovery-auth.kubeconfig" \
       --requestheader-username-headers=X-Remote-User \
