@@ -173,9 +173,11 @@ func (s *ServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 }
 
 func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress string, alternateIPs ...net.IP) error {
+	if s == nil {
+		return nil
+	}
 	keyCert := &s.ServerCert.CertKey
-
-	if s == nil || s.ServingOptions.BindPort == 0 || len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
+	if s.ServingOptions.BindPort == 0 || len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
 		return nil
 	}
 
