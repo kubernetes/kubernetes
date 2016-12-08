@@ -466,7 +466,7 @@ func (s *storageClassLister) List(selector labels.Selector) (ret []*storage.Stor
 	return ret, err
 }
 
-// List returns a list of storage classes
+// Get returns storage class with name 'name'.
 func (s *storageClassLister) Get(name string) (*storage.StorageClass, error) {
 	key := &storage.StorageClass{ObjectMeta: v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
