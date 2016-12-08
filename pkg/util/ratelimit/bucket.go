@@ -147,7 +147,7 @@ func (b *Bucket) refillAtTimestamp(now int64) {
 
 	// Compute units that have flowed into bucket
 	refillFloat := (float64(nanosSinceLastRefill) * b.unitsPerNano) + b.fractionalAvailable
-	if refillFloat > float64(b.capacity) {
+	if (float64(b.available) + refillFloat) > float64(b.capacity) {
 		// float64 > MaxInt64 can be converted to negative int64; side step this
 		b.available = b.capacity
 
