@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -56,11 +55,7 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	if !ok {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
-	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		glog.V(5).Infof("Invalid Affinity detected, but we will leave handling of this to validation phase")
-		return nil
-	}
+	affinity := pod.Spec.Affinity
 	if affinity != nil && affinity.PodAntiAffinity != nil {
 		var podAntiAffinityTerms []api.PodAffinityTerm
 		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
