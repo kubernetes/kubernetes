@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -100,7 +101,8 @@ type NetworkPluginSettings struct {
 var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings, cgroupsName string) (DockerService, error) {
+func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
@@ -135,6 +137,22 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	}
 	ds.networkPlugin = plug
 	glog.Infof("Docker cri networking managed by %v", plug.Name())
+
+	// NOTE: cgroup driver is only detectable in docker 1.11+
+	var cgroupDriver string
+	dockerInfo, err := ds.client.Info()
+	if err != nil {
+		glog.Errorf("failed to execute Info() call to the Docker client: %v", err)
+		glog.Warningf("Using fallback default of cgroupfs as cgroup driver")
+	} else {
+		cgroupDriver = dockerInfo.CgroupDriver
+		if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
+			return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
+		}
+		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
+	}
+	ds.cgroupDriver = cgroupDriver
+
 	return ds, nil
 }
 
@@ -157,6 +175,8 @@ type dockerService struct {
 	streamingServer    streaming.Server
 	networkPlugin      network.NetworkPlugin
 	containerManager   cm.ContainerManager
+	// cgroup driver used by Docker runtime.
+	cgroupDriver string
 }
 
 // Version returns the runtime name, runtime version and runtime API version
@@ -253,4 +273,23 @@ func (ds *dockerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.NotFound(w, r)
 	}
+}
+
+// GenerateExpectedCgroupParent returns cgroup parent in syntax expected by cgroup driver
+func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (string, error) {
+	if len(cgroupParent) > 0 {
+		// if docker uses the systemd cgroup driver, it expects *.slice style names for cgroup parent.
+		// if we configured kubelet to use --cgroup-driver=cgroupfs, and docker is configured to use systemd driver
+		// docker will fail to launch the container because the name we provide will not be a valid slice.
+		// this is a very good thing.
+		if ds.cgroupDriver == "systemd" {
+			systemdCgroupParent, err := kubecm.ConvertCgroupFsNameToSystemd(cgroupParent)
+			if err != nil {
+				return "", err
+			}
+			cgroupParent = systemdCgroupParent
+		}
+	}
+	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
+	return cgroupParent, nil
 }
