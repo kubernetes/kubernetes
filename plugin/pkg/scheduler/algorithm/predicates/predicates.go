@@ -90,7 +90,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 	return node.(*v1.Node), nil
 }
 
-//  Note that predicateMetdata and matchingPodAntiAffinityTerm need to be declared in the same file
+//  Note that predicateMetadata and matchingPodAntiAffinityTerm need to be declared in the same file
 //  due to the way declarations are processed in predicate declaration unit tests.
 type matchingPodAntiAffinityTerm struct {
 	term *v1.PodAffinityTerm
