@@ -273,6 +273,7 @@ image-gc-high-threshold
 image-gc-low-threshold
 image-project
 image-pull-policy
+image-pull-progress-deadline
 image-service-endpoint
 include-extended-apis
 include-extended-apis
