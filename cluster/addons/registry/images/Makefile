@@ -14,7 +14,7 @@
 
 .PHONY: build push vet test clean
 
-TAG = 0.3
+TAG = 0.4
 REPO = gcr.io/google_containers/kube-registry-proxy
 
 build:
