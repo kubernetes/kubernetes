@@ -134,17 +134,6 @@ TMP_LICENSE_FILE="/tmp/Godeps.LICENSES.$$"
 DEPS_DIR="vendor"
 declare -Ag CONTENT
 
-# Put the K8S LICENSE on top
-(
-echo "================================================================================"
-echo "= Kubernetes licensed under: ="
-echo
-cat ${LICENSE_ROOT}/LICENSE
-echo
-echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum)"
-echo "================================================================================"
-) > ${TMP_LICENSE_FILE}
-
 # Loop through every package in Godeps.json
 for PACKAGE in $(cat Godeps/Godeps.json | \
                  jq -r ".Deps[].ImportPath" | \
