@@ -27,7 +27,7 @@ import (
 // according to the namespaces indicated in podAffinityTerm.
 // 1. If the namespaces is nil considers the given pod's namespace
 // 2. If the namespaces is empty list then considers all the namespaces
-func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm v1.PodAffinityTerm) sets.String {
+func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm v1.PodAffinityTerm) sets.String {
 	names := sets.String{}
 	if podAffinityTerm.Namespaces == nil {
 		names.Insert(pod.Namespace)
@@ -38,9 +38,8 @@ func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm v1.PodAffinit
 }
 
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
-// matches the namespace and selector defined by <affinityPod>`s <term>.
-func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, affinityPod *v1.Pod, term *v1.PodAffinityTerm) (bool, error) {
-	namespaces := getNamespacesFromPodAffinityTerm(affinityPod, *term)
+// matches the <namespaces> and selector defined by <term>.
+func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, term *v1.PodAffinityTerm) (bool, error) {
 	if len(namespaces) != 0 && !namespaces.Has(pod.Namespace) {
 		return false, nil
 	}
