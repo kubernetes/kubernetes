@@ -130,7 +130,7 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 				&apiv1.Namespace{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some namespace opration succeeded.
+				// would be just confirmation that some namespace operation succeeded.
 				util.NewTriggerOnMetaAndSpecChanges(
 					func(obj runtime.Object) { nc.deliverNamespaceObj(obj, nc.namespaceReviewDelay, false) },
 				))

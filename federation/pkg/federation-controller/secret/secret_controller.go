@@ -131,7 +131,7 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 				&apiv1.Secret{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some secret opration succeeded.
+				// would be just confirmation that some secret operation succeeded.
 				util.NewTriggerOnAllChanges(
 					func(obj pkgruntime.Object) {
 						secretcontroller.deliverSecretObj(obj, secretcontroller.secretReviewDelay, false)
