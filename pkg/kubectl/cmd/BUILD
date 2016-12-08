@@ -38,6 +38,7 @@ go_library(
         "describe.go",
         "drain.go",
         "edit.go",
+        "edit_configmap.go",
         "exec.go",
         "explain.go",
         "expose.go",
