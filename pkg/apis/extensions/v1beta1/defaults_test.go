@@ -40,7 +40,6 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			Affinity:                      &v1.Affinity{},
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Labels: defaultLabels,
@@ -52,7 +51,6 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			Affinity:                      &v1.Affinity{},
 		},
 	}
 	tests := []struct {
@@ -157,7 +155,6 @@ func TestSetDefaultDeployment(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			Affinity:                      &v1.Affinity{},
 		},
 	}
 	tests := []struct {

@@ -101,10 +101,6 @@ func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList
 
 func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if annotations[api.AffinityAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateAffinityInPodAnnotations(annotations, fldPath)...)
-	}
-
 	if annotations[api.TolerationsAnnotationKey] != "" {
 		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
 	}
@@ -1672,7 +1668,14 @@ func validateAffinity(affinity *api.Affinity, fldPath *field.Path) field.ErrorLi
 				allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 			}
 		}
+		if affinity.PodAffinity != nil {
+			allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, fldPath.Child("podAffinity"))...)
+		}
+		if affinity.PodAntiAffinity != nil {
+			allErrs = append(allErrs, validatePodAntiAffinity(affinity.PodAntiAffinity, fldPath.Child("podAntiAffinity"))...)
+		}
 	}
+
 	return allErrs
 }
 
@@ -1965,30 +1968,6 @@ func validatePodAffinity(podAffinity *api.PodAffinity, fldPath *field.Path) fiel
 		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution, false,
 			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 	}
-	return allErrs
-}
-
-// ValidateAffinityInPodAnnotations tests that the serialized Affinity in Pod.Annotations has valid data
-func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	affinity, err := api.GetAffinityFromPodAnnotations(annotations)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, api.AffinityAnnotationKey, err.Error()))
-		return allErrs
-	}
-	if affinity == nil {
-		return allErrs
-	}
-
-	affinityFldPath := fldPath.Child(api.AffinityAnnotationKey)
-	if affinity.PodAffinity != nil {
-		allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, affinityFldPath.Child("podAffinity"))...)
-	}
-	if affinity.PodAntiAffinity != nil {
-		allErrs = append(allErrs, validatePodAntiAffinity(affinity.PodAntiAffinity, affinityFldPath.Child("podAntiAffinity"))...)
-	}
-
 	return allErrs
 }
 

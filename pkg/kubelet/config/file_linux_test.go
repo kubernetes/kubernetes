@@ -188,7 +188,6 @@ func getTestCases(hostname types.NodeName) []*testCase {
 				Spec: v1.PodSpec{
 					Containers:      []v1.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
 					SecurityContext: &v1.PodSecurityContext{},
-					Affinity:        &v1.Affinity{},
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,
@@ -214,7 +213,6 @@ func getTestCases(hostname types.NodeName) []*testCase {
 						ImagePullPolicy:        "Always",
 						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
 					SecurityContext: &v1.PodSecurityContext{},
-					Affinity:        &v1.Affinity{},
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,

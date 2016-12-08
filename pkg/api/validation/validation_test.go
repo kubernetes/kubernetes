@@ -3076,11 +3076,18 @@ func TestValidatePodSpec(t *testing.T) {
 }
 
 func TestValidatePod(t *testing.T) {
-	validPodSpec := api.PodSpec{
-		Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-		RestartPolicy: api.RestartPolicyAlways,
-		DNSPolicy:     api.DNSClusterFirst,
+	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
+		spec := api.PodSpec{
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		}
+		if affinity != nil {
+			spec.Affinity = affinity
+		}
+		return spec
 	}
+
 	successCases := []api.Pod{
 		{ // Basic fields.
 			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -3111,10 +3118,7 @@ func TestValidatePod(t *testing.T) {
 				Name:      "123",
 				Namespace: "ns",
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
+			Spec: validPodSpec(
 				// TODO: Uncomment and move this block and move inside NodeAffinity once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
 				//		RequiredDuringSchedulingRequiredDuringExecution: &api.NodeSelector{
@@ -3129,7 +3133,7 @@ func TestValidatePod(t *testing.T) {
 				//				},
 				//			},
 				//		},
-				Affinity: &api.Affinity{
+				&api.Affinity{
 					NodeAffinity: &api.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
 							NodeSelectorTerms: []api.NodeSelectorTerm{
@@ -3160,7 +3164,7 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				},
-			},
+			),
 		},
 		{ // Serialized pod affinity in affinity requirements in annotations.
 			ObjectMeta: api.ObjectMeta{
@@ -3179,38 +3183,44 @@ func TestValidatePod(t *testing.T) {
 				//			"namespaces":["ns"],
 				//			"topologyKey": "zone"
 				//		}]
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							},
-							"topologyKey": "zone",
-							"namespaces": ["ns"]
-						}],
-						"preferredDuringSchedulingIgnoredDuringExecution": [{
-							"weight": 10,
-							"podAffinityTerm": {
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "key2",
-										"operator": "NotIn",
-										"values": ["value1", "value2"]
-									}]
-								},
-								"namespaces": ["ns"],
-								"topologyKey": "region"
-							}
-						 }]
-					}}`,
-				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							TopologyKey: "zone",
+							Namespaces:  []string{"ns"},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			}),
 		},
 		{ // Serialized pod anti affinity with different Label Operators in affinity requirements in annotations.
 			ObjectMeta: api.ObjectMeta{
@@ -3229,36 +3239,42 @@ func TestValidatePod(t *testing.T) {
 				//			"namespaces":["ns"],
 				//			"topologyKey": "zone"
 				//		}]
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "Exists"
-								}]
-							},
-							"topologyKey": "zone",
-							"namespaces": ["ns"]
-						}],
-						"preferredDuringSchedulingIgnoredDuringExecution": [{
-							"weight": 10,
-							"podAffinityTerm": {
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "key2",
-										"operator": "DoesNotExist"
-									}]
-								},
-								"namespaces": ["ns"],
-								"topologyKey": "region"
-							}
-						}]
-					}}`,
-				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(&api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+							TopologyKey: "zone",
+							Namespaces:  []string{"ns"},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpDoesNotExist,
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			}),
 		},
 		{ // populate tolerations equal operator in annotations.
 			ObjectMeta: api.ObjectMeta{
@@ -3274,7 +3290,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // populate tolerations exists operator in annotations.
 			ObjectMeta: api.ObjectMeta{
@@ -3289,7 +3305,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // empty operator is ok for toleration
 			ObjectMeta: api.ObjectMeta{
@@ -3304,7 +3320,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // empty efffect is ok for toleration
 			ObjectMeta: api.ObjectMeta{
@@ -3319,7 +3335,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // docker default seccomp profile
 			ObjectMeta: api.ObjectMeta{
@@ -3329,7 +3345,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "docker/default",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // unconfined seccomp profile
 			ObjectMeta: api.ObjectMeta{
@@ -3339,7 +3355,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "unconfined",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // localhost seccomp profile
 			ObjectMeta: api.ObjectMeta{
@@ -3349,7 +3365,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "localhost/foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // localhost seccomp profile for a container
 			ObjectMeta: api.ObjectMeta{
@@ -3359,7 +3375,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // default AppArmor profile for a container
 			ObjectMeta: api.ObjectMeta{
@@ -3369,7 +3385,7 @@ func TestValidatePod(t *testing.T) {
 					apparmor.ContainerAnnotationKeyPrefix + "ctr": apparmor.ProfileRuntimeDefault,
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // default AppArmor profile for an init container
 			ObjectMeta: api.ObjectMeta{
@@ -3394,7 +3410,7 @@ func TestValidatePod(t *testing.T) {
 					apparmor.ContainerAnnotationKeyPrefix + "ctr": apparmor.ProfileNamePrefix + "foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // syntactically valid sysctls
 			ObjectMeta: api.ObjectMeta{
@@ -3405,7 +3421,7 @@ func TestValidatePod(t *testing.T) {
 					api.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		{ // valid opaque integer resources for init container
 			ObjectMeta: api.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
@@ -3502,271 +3518,234 @@ func TestValidatePod(t *testing.T) {
 				Name:      "123",
 				Namespace: "ns",
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Affinity: &api.Affinity{
-					NodeAffinity: &api.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{
-								{
-									MatchExpressions: []api.NodeSelectorRequirement{
-										{
+			Spec: validPodSpec(&api.Affinity{
+				NodeAffinity: &api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
 
-											Key: "key1",
-										},
+										Key: "key1",
 									},
 								},
 							},
 						},
 					},
 				},
-			},
+			}),
 		},
 		"invalid preferredSchedulingTerm in node affinity, weight should be in range 1-100": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Affinity: &api.Affinity{
-					NodeAffinity: &api.NodeAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{
-							{
-								Weight: 199,
-								Preference: api.NodeSelectorTerm{
-									MatchExpressions: []api.NodeSelectorRequirement{
-										{
-											Key:      "foo",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"bar"},
-										},
+			Spec: validPodSpec(&api.Affinity{
+				NodeAffinity: &api.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{
+						{
+							Weight: 199,
+							Preference: api.NodeSelectorTerm{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"bar"},
 									},
 								},
 							},
 						},
 					},
 				},
-			},
+			}),
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Affinity: &api.Affinity{
-					NodeAffinity: &api.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{},
-						},
+			Spec: validPodSpec(&api.Affinity{
+				NodeAffinity: &api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{},
 					},
 				},
-			},
+			}),
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Affinity: &api.Affinity{
-					NodeAffinity: &api.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{
-								{
-									MatchExpressions: []api.NodeSelectorRequirement{},
-								},
+			Spec: validPodSpec(&api.Affinity{
+				NodeAffinity: &api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{},
 							},
 						},
 					},
 				},
-			},
+			}),
 		},
 		"invalid weight in preferredDuringSchedulingIgnoredDuringExecution in pod affinity annotations, weight should be in range 1-100": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
-						"weight": 109,
-						"podAffinityTerm":
-						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "NotIn",
-									"values": ["value1", "value2"]
-								}]
-							},
-							"namespaces": ["ns"],
-							"topologyKey": "region"
-						}
-					}]}}`,
-				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 109,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			}),
 		},
 		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
-						"weight": 10,
-						"podAffinityTerm":
-						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "Exists",
-									"values": ["value1", "value2"]
-								}]
-							},
-							"namespaces": ["ns"],
-							"topologyKey": "region"
-						}
-					}]}}`,
-				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(&api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpExists,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			}),
 		},
 		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, name space shouldbe valid": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
-						"weight": 10,
-						"podAffinityTerm":
-						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "Exists",
-									"values": ["value1", "value2"]
-								}]
-							},
-							"namespaces": ["INVALID_NAMESPACE"],
-							"topologyKey": "region"
-						}
-					}]}}`,
-				},
 			},
-			Spec: validPodSpec,
-		},
-		"invalid labelOperator in preferredDuringSchedulingIgnoredDuringExecution in podantiaffinity annotations, labelOperator should be proper": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
-						"weight": 10,
-						"podAffinityTerm":
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
 						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "WrongOp",
-									"values": ["value1", "value2"]
-								}]
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpExists,
+										},
+									},
+								},
+								Namespaces:  []string{"INVALID_NAMESPACE"},
+								TopologyKey: "region",
 							},
-							"namespaces": ["ns"],
-							"topologyKey": "region"
-						}
-					}]}}`,
+						},
+					},
 				},
-			},
-			Spec: validPodSpec,
+			}),
 		},
 		"invalid pod affinity, empty topologyKey is not allowed for hard pod affinity": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"weight": 10,
-						"podAffinityTerm":
-						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							},
-							"namespaces": ["ns"],
-							"topologyKey": ""
-						}
-					}]}}`,
-				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							Namespaces: []string{"ns"},
+						},
+					},
+				},
+			}),
 		},
 		"invalid pod anti-affinity, empty topologyKey is not allowed for hard pod anti-affinity": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"weight": 10,
-						"podAffinityTerm":
-						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							},
-							"namespaces": ["ns"],
-							"topologyKey": ""
-						}
-					}]}}`,
-				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(&api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							Namespaces: []string{"ns"},
+						},
+					},
+				},
+			}),
 		},
 		"invalid pod anti-affinity, empty topologyKey is not allowed for soft pod affinity": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"podAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
-						"weight": 10,
-						"podAffinityTerm":
-						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							},
-							"namespaces": ["ns"],
-							"topologyKey": ""
-						}
-					}]}}`,
-				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(&api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces: []string{"ns"},
+							},
+						},
+					},
+				},
+			}),
 		},
 		"invalid toleration key": {
 			ObjectMeta: api.ObjectMeta{
@@ -3782,7 +3761,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"invalid toleration operator": {
 			ObjectMeta: api.ObjectMeta{
@@ -3798,7 +3777,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"value must be empty when `operator` is 'Exists'": {
 			ObjectMeta: api.ObjectMeta{
@@ -3814,7 +3793,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"must be a valid pod seccomp profile": {
 			ObjectMeta: api.ObjectMeta{
@@ -3824,7 +3803,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"must be a valid container seccomp profile": {
 			ObjectMeta: api.ObjectMeta{
@@ -3834,7 +3813,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"must be a non-empty container name in seccomp annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3844,7 +3823,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompContainerAnnotationKeyPrefix: "foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"must be a non-empty container profile in seccomp annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3854,7 +3833,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompContainerAnnotationKeyPrefix + "foo": "",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"must be a relative path in a node-local seccomp profile annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3864,7 +3843,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "localhost//foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"must not start with '../'": {
 			ObjectMeta: api.ObjectMeta{
@@ -3874,7 +3853,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "localhost/../foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"AppArmor profile must apply to a container": {
 			ObjectMeta: api.ObjectMeta{
@@ -3901,7 +3880,7 @@ func TestValidatePod(t *testing.T) {
 					apparmor.ContainerAnnotationKeyPrefix + "ctr": "bad-name",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"only default AppArmor profile may start with runtime/": {
 			ObjectMeta: api.ObjectMeta{
@@ -3911,7 +3890,7 @@ func TestValidatePod(t *testing.T) {
 					apparmor.ContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"invalid sysctl annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3921,7 +3900,7 @@ func TestValidatePod(t *testing.T) {
 					api.SysctlsPodAnnotationKey: "foo:",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"invalid comma-separated sysctl annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3931,7 +3910,7 @@ func TestValidatePod(t *testing.T) {
 					api.SysctlsPodAnnotationKey: "kernel.msgmax,",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"invalid unsafe sysctl annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3941,7 +3920,7 @@ func TestValidatePod(t *testing.T) {
 					api.SysctlsPodAnnotationKey: "foo:",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"intersecting safe sysctls and unsafe sysctls annotations": {
 			ObjectMeta: api.ObjectMeta{
@@ -3952,7 +3931,7 @@ func TestValidatePod(t *testing.T) {
 					api.UnsafeSysctlsPodAnnotationKey: "kernel.shmmax=10000000",
 				},
 			},
-			Spec: validPodSpec,
+			Spec: validPodSpec(nil),
 		},
 		"invalid opaque integer resource requirement: request must be <= limit": {
 			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
