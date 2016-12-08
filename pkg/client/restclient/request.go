@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -105,16 +106,13 @@ type Request struct {
 	resource     string
 	resourceName string
 	subresource  string
-	selector     labels.Selector
 	timeout      time.Duration
 
 	// output
 	err  error
 	body io.Reader
 
-	// The constructed request and the response
-	req  *http.Request
-	resp *http.Response
+	ctx context.Context
 
 	backoffMgr BackoffManager
 	throttle   flowcontrol.RateLimiter
@@ -566,6 +564,12 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
+// Context adds a context to the request.
+func (r *Request) Context(ctx context.Context) *Request {
+	r.ctx = ctx
+	return r
+}
+
 // URL returns the current working URL.
 func (r *Request) URL() *url.URL {
 	p := r.pathPrefix
@@ -651,6 +655,9 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.ctx != nil {
+		req = req.WithContext(r.ctx)
+	}
 	req.Header = r.headers
 	client := r.client
 	if client == nil {
@@ -719,6 +726,9 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	req, err := http.NewRequest(r.verb, url, nil)
 	if err != nil {
 		return nil, err
+	}
+	if r.ctx != nil {
+		req = req.WithContext(r.ctx)
 	}
 	req.Header = r.headers
 	client := r.client
@@ -793,6 +803,9 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		req, err := http.NewRequest(r.verb, url, r.body)
 		if err != nil {
 			return err
+		}
+		if r.ctx != nil {
+			req = req.WithContext(r.ctx)
 		}
 		req.Header = r.headers
 
