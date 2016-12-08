@@ -217,8 +217,8 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				}
 
 				if serviceShard != nil {
-					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", service.Name, nsName))
-					cleanupServiceShardsAndProviderResources(nsName, service, clusters)
+					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", serviceShard.Name, nsName))
+					cleanupServiceShardsAndProviderResources(nsName, serviceShard, clusters)
 					serviceShard = nil
 				} else {
 					By("No service shards to delete. `serviceShard` is nil")
