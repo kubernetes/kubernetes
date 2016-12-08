@@ -308,6 +308,25 @@ testCases:
       $patch: replace
     modified:
       other: a
+  - description: delete all duplicate entries in a merging list
+    original:
+      mergingList:
+        - name: 1
+        - name: 1
+        - name: 2
+          value: a
+        - name: 3
+        - name: 3
+    twoWay:
+      mergingList:
+        - name: 1
+          $patch: delete
+        - name: 3
+          $patch: delete
+    modified:
+      mergingList:
+        - name: 2
+          value: a
 `)
 
 func TestCustomStrategicMergePatch(t *testing.T) {
