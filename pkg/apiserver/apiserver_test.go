@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apiserver/filters"
 	"k8s.io/kubernetes/pkg/apiserver/request"
@@ -317,7 +318,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 }
 
 func TestSimpleSetupRight(t *testing.T) {
-	s := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "aName"}}
+	s := &apiservertesting.Simple{ObjectMeta: apiv1.ObjectMeta{Name: "aName"}}
 	wire, err := runtime.Encode(codec, s)
 	if err != nil {
 		t.Fatal(err)
@@ -470,7 +471,7 @@ func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string, options *ap
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
 	var err error
 	if storage.injectedFunction != nil {
-		obj, err = storage.injectedFunction(&apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: id}})
+		obj, err = storage.injectedFunction(&apiservertesting.Simple{ObjectMeta: apiv1.ObjectMeta{Name: id}})
 	}
 	return obj, err
 }
@@ -1119,7 +1120,7 @@ func TestNonEmptyList(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{
 		list: []apiservertesting.Simple{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "something", Namespace: "other"},
+				ObjectMeta: apiv1.ObjectMeta{Name: "something", Namespace: "other"},
 				Other:      "foo",
 			},
 		},
@@ -1170,7 +1171,7 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{
 		list: []apiservertesting.Simple{
 			{
-				ObjectMeta: api.ObjectMeta{Namespace: "other"},
+				ObjectMeta: apiv1.ObjectMeta{Namespace: "other"},
 				Other:      "foo",
 			},
 		},
@@ -1244,7 +1245,7 @@ func TestExport(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: apiservertesting.Simple{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: apiv1.ObjectMeta{
 				ResourceVersion:   "1234",
 				CreationTimestamp: metav1.NewTime(time.Unix(10, 10)),
 			},
@@ -2177,7 +2178,7 @@ func TestPatch(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	item := &apiservertesting.Simple{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
 			UID:       "uid",
@@ -2216,7 +2217,7 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	item := &apiservertesting.Simple{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
 			UID:       "uid",
@@ -2257,7 +2258,7 @@ func TestUpdate(t *testing.T) {
 	defer server.Close()
 
 	item := &apiservertesting.Simple{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
 		},
@@ -2294,7 +2295,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	defer server.Close()
 
 	item := &apiservertesting.Simple{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      ID,
 			Namespace: api.NamespaceDefault,
 		},
@@ -2356,7 +2357,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	defer server.Close()
 
 	item := &apiservertesting.Simple{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name: ID,
 		},
 		Other: "bar",
@@ -2393,7 +2394,7 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 	defer server.Close()
 
 	item := &apiservertesting.Simple{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      ID,
 			Namespace: "other", // does not match request
 		},
@@ -2430,7 +2431,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 	defer server.Close()
 
 	item := &apiservertesting.Simple{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      ID,
 			Namespace: "other",
 		},
@@ -2465,7 +2466,7 @@ func TestUpdateMissing(t *testing.T) {
 	defer server.Close()
 
 	item := &apiservertesting.Simple{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      ID,
 			Namespace: api.NamespaceDefault,
 		},
@@ -3226,7 +3227,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	simple := &apiservertesting.Simple{ObjectMeta: apiv1.ObjectMeta{Name: "bar"}}
 	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

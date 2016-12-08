@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
-	pkg2_api "k8s.io/kubernetes/pkg/api"
+	pkg2_v1 "k8s.io/kubernetes/pkg/api/v1"
 	pkg1_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	pkg3_types "k8s.io/kubernetes/pkg/types"
 	"reflect"
@@ -63,7 +63,7 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg2_api.ObjectMeta
+		var v0 pkg2_v1.ObjectMeta
 		var v1 pkg1_v1.TypeMeta
 		var v2 pkg3_types.UID
 		var v3 time.Time
@@ -299,7 +299,7 @@ func (x *Simple) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ObjectMeta = pkg2_api.ObjectMeta{}
+				x.ObjectMeta = pkg2_v1.ObjectMeta{}
 			} else {
 				yyv23 := &x.ObjectMeta
 				yyv23.CodecDecodeSelf(d)
@@ -380,7 +380,7 @@ func (x *Simple) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ObjectMeta = pkg2_api.ObjectMeta{}
+		x.ObjectMeta = pkg2_v1.ObjectMeta{}
 	} else {
 		yyv30 := &x.ObjectMeta
 		yyv30.CodecDecodeSelf(d)
@@ -667,7 +667,7 @@ func (x *SimpleRoot) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "metadata":
 			if r.TryDecodeAsNil() {
-				x.ObjectMeta = pkg2_api.ObjectMeta{}
+				x.ObjectMeta = pkg2_v1.ObjectMeta{}
 			} else {
 				yyv56 := &x.ObjectMeta
 				yyv56.CodecDecodeSelf(d)
@@ -748,7 +748,7 @@ func (x *SimpleRoot) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ObjectMeta = pkg2_api.ObjectMeta{}
+		x.ObjectMeta = pkg2_v1.ObjectMeta{}
 	} else {
 		yyv63 := &x.ObjectMeta
 		yyv63.CodecDecodeSelf(d)

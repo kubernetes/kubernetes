@@ -19,19 +19,19 @@ package etcd
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
 func TestObjectVersioner(t *testing.T) {
 	v := APIObjectVersioner{}
-	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "5"}}); err != nil || ver != 5 {
+	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{ResourceVersion: "5"}}); err != nil || ver != 5 {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
-	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}); err == nil || ver != 0 {
+	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{ResourceVersion: "a"}}); err == nil || ver != 0 {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
-	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
+	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{ResourceVersion: "a"}}
 	if err := v.UpdateObject(obj, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -41,8 +41,8 @@ func TestObjectVersioner(t *testing.T) {
 }
 
 func TestCompareResourceVersion(t *testing.T) {
-	five := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "5"}}
-	six := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "6"}}
+	five := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{ResourceVersion: "5"}}
+	six := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{ResourceVersion: "6"}}
 
 	versioner := APIObjectVersioner{}
 
