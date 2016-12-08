@@ -53,6 +53,9 @@ spec:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
+            - name: usr-ca-certs
+              mountPath: /usr/share/ca-certificates
+              readOnly: true
         - image: gcr.io/google_containers/heapster:v1.2.0
           name: eventer
           command:
@@ -62,6 +65,9 @@ spec:
           volumeMounts:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
+              readOnly: true
+            - name: usr-ca-certs
+              mountPath: /usr/share/ca-certificates
               readOnly: true
         - image: gcr.io/google_containers/addon-resizer:1.6
           name: heapster-nanny
@@ -125,3 +131,6 @@ spec:
         - name: ssl-certs
           hostPath:
             path: "/etc/ssl/certs"
+        - name: usr-ca-certs
+          hostPath:
+            path: "/usr/share/ca-certificates"
