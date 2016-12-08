@@ -1590,6 +1590,10 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	createAZ := volumeOptions.AvailabilityZone
 	if createAZ == "" {
 		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
+	} else if adminSetOfZones, err := volume.Zones2Set(createAZ); err != nil {
+		return "", err
+	} else {
+		createAZ = volume.ChooseZoneForVolume(adminSetOfZones, volumeOptions.PVCName)
 	}
 
 	var createType string
