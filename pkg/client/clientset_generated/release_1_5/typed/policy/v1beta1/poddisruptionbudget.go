@@ -83,6 +83,9 @@ func (c *podDisruptionBudgets) Update(podDisruptionBudget *v1beta1.PodDisruption
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *podDisruptionBudgets) UpdateStatus(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Put().

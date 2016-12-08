@@ -81,6 +81,9 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
 	err = c.client.Put().

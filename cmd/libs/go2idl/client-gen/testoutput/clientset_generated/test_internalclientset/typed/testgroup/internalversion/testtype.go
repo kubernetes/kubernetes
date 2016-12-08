@@ -82,6 +82,9 @@ func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.Test
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	result = &testgroup.TestType{}
 	err = c.client.Put().

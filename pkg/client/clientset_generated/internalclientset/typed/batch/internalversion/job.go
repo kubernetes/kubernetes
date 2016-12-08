@@ -82,6 +82,9 @@ func (c *jobs) Update(job *batch.Job) (result *batch.Job, err error) {
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *jobs) UpdateStatus(job *batch.Job) (result *batch.Job, err error) {
 	result = &batch.Job{}
 	err = c.client.Put().

@@ -17,9 +17,9 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -52,16 +52,25 @@ func (g *genFakeForType) Imports(c *generator.Context) (imports []string) {
 	return g.imports.ImportLines()
 }
 
-// Ideally, we'd like hasStatus to return true if there is a subresource path
+// Ideally, we'd like genStatus to return true if there is a subresource path
 // registered for "status" in the API server, but we do not have that
-// information, so hasStatus returns true if the type has a status field.
-func hasStatus(t *types.Type) bool {
+// information, so genStatus returns true if the type has a status field.
+func genStatus(t *types.Type) bool {
+	// Default to true if we have a Status member
+	hasStatus := false
 	for _, m := range t.Members {
-		if m.Name == "Status" && strings.Contains(m.Tags, `json:"status`) {
-			return true
+		if m.Name == "Status" {
+			hasStatus = true
+			break
 		}
 	}
-	return false
+
+	// Allow overriding via a comment on the type
+	genStatus, err := types.ExtractSingleBoolCommentTag("+", "genclientstatus", hasStatus, t.SecondClosestCommentLines)
+	if err != nil {
+		fmt.Printf("error looking up +genclientstatus: %v\n", err)
+	}
+	return genStatus
 }
 
 // hasObjectMeta returns true if the type has a ObjectMeta field.
@@ -155,7 +164,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		sw.Do(createTemplate, m)
 		sw.Do(updateTemplate, m)
 		// Generate the UpdateStatus method if the type has a status
-		if hasStatus(t) {
+		if genStatus(t) {
 			sw.Do(updateStatusTemplate, m)
 		}
 		sw.Do(deleteTemplate, m)
