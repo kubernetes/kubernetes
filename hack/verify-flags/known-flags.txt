@@ -469,6 +469,8 @@ prom-push-gateway
 protect-kernel-defaults
 proto-import
 proxy-bindall
+proxy-client-cert-file
+proxy-client-key-file
 proxy-kubeconfig
 proxy-logv
 proxy-mode

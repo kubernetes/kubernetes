@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 
 	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
@@ -45,6 +46,11 @@ type DiscoveryServerOptions struct {
 	SecureServing  *genericoptions.SecureServingOptions
 	Authentication *genericoptions.DelegatingAuthenticationOptions
 	Authorization  *genericoptions.DelegatingAuthorizationOptions
+
+	// ProxyClientCert/Key are the client cert use to identify this proxy. Backing APIServices use
+	// this to confirm the proxy's identity
+	ProxyClientCertFile string
+	ProxyClientKeyFile  string
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -81,6 +87,8 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o.SecureServing.AddFlags(flags)
 	o.Authentication.AddFlags(flags)
 	o.Authorization.AddFlags(flags)
+	flags.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
+	flags.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
 
 	return cmd
 }
@@ -124,6 +132,15 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 	config := apiserver.Config{
 		GenericConfig:     genericAPIServerConfig,
 		RESTOptionsGetter: &restOptionsFactory{storageConfig: &o.Etcd.StorageConfig},
+	}
+
+	config.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
+	if err != nil {
+		return err
+	}
+	config.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
+	if err != nil {
+		return err
 	}
 
 	server, err := config.Complete().New()
