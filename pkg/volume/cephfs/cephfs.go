@@ -154,13 +154,13 @@ func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UI
 	}, nil
 }
 
-func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, path string) (*volume.Spec, error) {
 	cephfsVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			CephFS: &v1.CephFSVolumeSource{
 				Monitors: []string{},
-				Path:     volumeName,
+				Path:     path,
 			},
 		},
 	}
