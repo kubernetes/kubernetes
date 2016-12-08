@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
@@ -300,7 +301,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 	key := "/some/key"
 	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
@@ -310,7 +311,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 	// Update an existing node.
 	callbackCalled := false
-	objUpdate := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
+	objUpdate := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 2}
 	err = helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
@@ -345,7 +346,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	key := "/some/key"
 	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
@@ -355,7 +356,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 
 	// Update an existing node with the same data
 	callbackCalled := false
-	objUpdate := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	objUpdate := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
 	err = helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 		return objUpdate, nil
@@ -376,7 +377,7 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// Create a new node.
-	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
 
 	f := storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
@@ -424,7 +425,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 				}
 
 				currValue := in.(*storagetesting.TestResource).Value
-				obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: currValue + 1}
+				obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: currValue + 1}
 				return obj, nil
 			}))
 			if err != nil {
