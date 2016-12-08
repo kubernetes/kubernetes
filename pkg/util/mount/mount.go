@@ -130,21 +130,13 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 		}
 	}
 
-	// TODO: this is a workaround for the unmount device issue caused by gci mounter.
-	// In GCI cluster, if gci mounter is used for mounting, the container started by mounter
-	// script will cause additional mounts created in the container. Since these mounts are
-	// irrelavant to the original mounts, they should be not considered when checking the
-	// mount references. Current solution is to filter out those mount paths that contain
-	// the string of original mount path.
-	// Plan to work on better approach to solve this issue.
-
 	// Find all references to the device.
 	var refs []string
 	if deviceName == "" {
 		glog.Warningf("could not determine device for path: %q", mountPath)
 	} else {
 		for i := range mps {
-			if mps[i].Device == deviceName && !strings.Contains(mps[i].Path, slTarget) {
+			if mps[i].Device == deviceName && mps[i].Path != slTarget {
 				refs = append(refs, mps[i].Path)
 			}
 		}
