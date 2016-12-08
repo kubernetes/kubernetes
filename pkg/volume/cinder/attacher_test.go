@@ -57,6 +57,24 @@ func TestGetDeviceName_PersistentVolume(t *testing.T) {
 	}
 }
 
+func TestGetDeviceMountPath(t *testing.T) {
+	spec := createVolSpec("cinder-volume-id", false)
+	host := volumetest.NewFakeVolumeHost("/var/lib/kubelet/", nil, nil)
+
+	attacher := &cinderDiskAttacher{
+		host: host,
+	}
+
+	//test the path
+	path, err := attacher.GetDeviceMountPath(spec)
+	if err != nil {
+		t.Errorf("get device mount path error")
+	}
+	if path != "/var/lib/kubelet/plugins/kubernetes.io/cinder/mounts/cinder-volume-id" {
+		t.Errorf("device mount path error: got %s", path)
+	}
+}
+
 // One testcase for TestAttachDetach table test below
 type testcase struct {
 	name string
