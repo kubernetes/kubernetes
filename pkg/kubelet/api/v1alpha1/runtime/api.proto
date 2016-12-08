@@ -167,6 +167,12 @@ message LinuxSandboxSecurityContext {
     // List of groups applied to the first process run in the sandbox, in
     // addition to the sandbox's primary GID.
     repeated int64 supplemental_groups = 5;
+    // Indicates whether the sandbox will be asked to run a privileged
+    // container. If a privileged container is to be executed within it, this
+    // MUST be true.
+    // This allows a sandbox to take additional security precautions if no
+    // privileged containers are expected to be run.
+    optional bool privileged = 6;
 }
 
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux
@@ -445,6 +451,22 @@ message LinuxContainerSecurityContext {
     // Capabilities to add or drop.
     optional Capability capabilities = 1;
     // If set, run container in privileged mode.
+    // Privileged mode is incompatible with the following options. If
+    // privileged is set, the following features MAY have no effect:
+    // 1. capabilities
+    // 2. selinux_options
+    // 4. seccomp
+    // 5. apparmor
+    //
+    // Privileged mode implies the following specific options are applied:
+    // 1. All capabilities are added.
+    // 2. Sensitive paths, such as kernel module paths within sysfs, are not masked.
+    // 3. Any sysfs and procfs mounts are mounted RW.
+    // 4. Apparmor confinement is not applied.
+    // 5. Seccomp restrictions are not applied.
+    // 6. The device cgroup does not restrict access to any devices.
+    // 7. All devices from the host's /dev are available within the container.
+    // 8. SELinux restrictions are not applied (e.g. label=disabled).
     optional bool privileged = 2;
     // Configurations for the container's namespaces.
     // Only used if the container uses namespace for isolation.
