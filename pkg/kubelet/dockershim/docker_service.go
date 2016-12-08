@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -135,6 +136,18 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	}
 	ds.networkPlugin = plug
 	glog.Infof("Docker cri networking managed by %v", plug.Name())
+
+	var cgroupDriver string
+	dockerInfo, err := ds.client.Info()
+	if err != nil {
+		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
+		glog.Warningf("Using fallback default of cgroupfs for pod level cgroup")
+	} else {
+		cgroupDriver = dockerInfo.CgroupDriver
+		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
+	}
+	ds.cgroupDriver = cgroupDriver
+
 	return ds, nil
 }
 
@@ -157,6 +170,8 @@ type dockerService struct {
 	streamingServer    streaming.Server
 	networkPlugin      network.NetworkPlugin
 	containerManager   cm.ContainerManager
+	// cgroup driver used by Docker runtime.
+	cgroupDriver string
 }
 
 // Version returns the runtime name, runtime version and runtime API version
@@ -253,4 +268,23 @@ func (ds *dockerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.NotFound(w, r)
 	}
+}
+
+// GenereateExpectedCgroupParent returns cgroup parent in syntax expected by cgroup driver
+func (ds *dockerService) GenereateExpectedCgroupParent(cgroupParent string) (string, error) {
+	if len(cgroupParent) > 0 {
+		// if docker uses the systemd cgroup driver, it expects *.slice style names for cgroup parent.
+		// if we configured kubelet to use --cgroup-driver=cgroupfs, and docker is configured to use systemd driver
+		// docker will fail to launch the container because the name we provide will not be a valid slice.
+		// this is a very good thing.
+		if ds.cgroupDriver == "systemd" {
+			systemdCgroupParent, err := kubecm.ConvertCgroupFsNameToSystemd(cgroupParent)
+			if err != nil {
+				return "", err
+			}
+			cgroupParent = systemdCgroupParent
+		}
+	}
+	glog.V(3).Infof("Detected cgroup driver is: %q, setting cgroup parent to: %q", ds.cgroupDriver, cgroupParent)
+	return cgroupParent, nil
 }
