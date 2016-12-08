@@ -64,9 +64,13 @@ func TestMultithreadedThrottling(t *testing.T) {
 	// record wall time
 	endTime := time.Now()
 
-	if duration := endTime.Sub(startTime); duration < time.Second {
+	duration := endTime.Sub(startTime)
+	if duration < time.Second {
 		// We shouldn't be able to get 100 tokens out of the bucket in less than 1 second of wall clock time, no matter what
 		t.Errorf("Expected it to take at least 1 second to get 100 tokens, took %v", duration)
+	} else if duration > 2 * time.Second {
+		// We expect the token bucket to give the expected qps: it shouldn't take more than 2x
+		t.Errorf("Expected it to take about 1 second to get 100 tokens, took %v", duration)
 	} else {
 		t.Logf("Took %v to get 100 tokens", duration)
 	}
