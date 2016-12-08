@@ -968,6 +968,9 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if e.NewListFunc == nil {
 		return fmt.Errorf("store for %s must have NewListFunc set", e.QualifiedResource.String())
 	}
+	if (e.KeyRootFunc == nil) != (e.KeyFunc == nil) {
+		return fmt.Errorf("store for %s must set both KeyRootFunc and KeyFunc or neither", e.QualifiedResource.String())
+	}
 
 	var isNamespaced bool
 	switch {
@@ -996,26 +999,23 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if !strings.HasPrefix(prefix, "/") {
 		prefix = "/" + prefix
 	}
+	if prefix == "/" {
+		return fmt.Errorf("store for %s has an invalid prefix %q", e.QualifiedResource.String(), opts.ResourcePrefix)
+	}
 
 	// Set the default behavior for storage key generation
-	if isNamespaced {
-		if e.KeyRootFunc == nil {
+	if e.KeyRootFunc == nil && e.KeyFunc == nil {
+		if isNamespaced {
 			e.KeyRootFunc = func(ctx api.Context) string {
 				return NamespaceKeyRootFunc(ctx, prefix)
 			}
-		}
-		if e.KeyFunc == nil {
 			e.KeyFunc = func(ctx api.Context, name string) (string, error) {
 				return NamespaceKeyFunc(ctx, prefix, name)
 			}
-		}
-	} else {
-		if e.KeyRootFunc == nil {
+		} else {
 			e.KeyRootFunc = func(ctx api.Context) string {
 				return prefix
 			}
-		}
-		if e.KeyFunc == nil {
 			e.KeyFunc = func(ctx api.Context, name string) (string, error) {
 				return NoNamespaceKeyFunc(ctx, prefix, name)
 			}
@@ -1037,9 +1037,9 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		return e.KeyFunc(api.NewContext(), accessor.GetName())
 	}
 
-	trigger := options.TriggerFunc
-	if trigger == nil {
-		trigger = storage.NoTriggerPublisher
+	triggerFunc := options.TriggerFunc
+	if triggerFunc == nil {
+		triggerFunc = storage.NoTriggerPublisher
 	}
 
 	if e.DeleteCollectionWorkers == 0 {
@@ -1057,7 +1057,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			keyFunc,
 			e.NewListFunc,
 			options.AttrFunc,
-			trigger,
+			triggerFunc,
 		)
 	}
 
