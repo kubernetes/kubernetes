@@ -138,6 +138,9 @@ func (s *Scheduler) scheduleOne() {
 		// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 		// it's atomic with setting host.
 		err := s.config.Binder.Bind(b)
+		if err := s.config.SchedulerCache.FinishBinding(&assumed); err != nil {
+			glog.Errorf("scheduler cache FinishBinding failed: %v", err)
+		}
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %v/%v", pod.Namespace, pod.Name)
 			if err := s.config.SchedulerCache.ForgetPod(&assumed); err != nil {
