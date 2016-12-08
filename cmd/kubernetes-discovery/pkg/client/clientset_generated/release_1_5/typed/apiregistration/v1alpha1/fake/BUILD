@@ -23,6 +23,7 @@ go_library(
         "//cmd/kubernetes-discovery/pkg/client/clientset_generated/release_1_5/typed/apiregistration/v1alpha1:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/labels:go_default_library",

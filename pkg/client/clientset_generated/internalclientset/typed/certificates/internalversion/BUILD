@@ -24,6 +24,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/certificates:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/watch:go_default_library",
     ],
