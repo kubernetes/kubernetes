@@ -24,9 +24,6 @@ import (
 	"sync"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
-	"github.com/miekg/dns"
-	skymsg "github.com/skynetservices/skydns/msg"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -40,7 +37,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
+	"github.com/miekg/dns"
+	skymsg "github.com/skynetservices/skydns/msg"
 )
 
 const (
@@ -117,9 +117,12 @@ type KubeDNS struct {
 	configLock sync.RWMutex
 	// configSync manages synchronization of the config map
 	configSync config.Sync
+
+	// Initial timeout for endpoints and services to be synced from APIServer
+	initialSyncTimeout time.Duration
 }
 
-func NewKubeDNS(client clientset.Interface, clusterDomain string, configSync config.Sync) *KubeDNS {
+func NewKubeDNS(client clientset.Interface, clusterDomain string, timeout time.Duration, configSync config.Sync) *KubeDNS {
 	kd := &KubeDNS{
 		kubeClient:          client,
 		domain:              clusterDomain,
@@ -129,6 +132,7 @@ func NewKubeDNS(client clientset.Interface, clusterDomain string, configSync con
 		reverseRecordMap:    make(map[string]*skymsg.Service),
 		clusterIPServiceMap: make(map[string]*v1.Service),
 		domainPath:          util.ReverseArray(strings.Split(strings.TrimRight(clusterDomain, "."), ".")),
+		initialSyncTimeout:  timeout,
 
 		configLock: sync.RWMutex{},
 		configSync: configSync,
@@ -149,38 +153,28 @@ func (kd *KubeDNS) Start() {
 
 	kd.startConfigMapSync()
 
-	// Wait synchronously for the Kubernetes service. This ensures that
-	// the Start function returns only after having received Service
-	// objects from APIServer.
-	//
-	// TODO: we might not have to wait for kubernetes service
-	// specifically. We should just wait for a list operation to be
-	// complete from APIServer.
-	kd.waitForKubernetesService()
+	// Wait synchronously for the initial list operations to be
+	// complete of endpoints and services from APIServer.
+	kd.waitForResourceSyncedOrDie()
 }
 
-func (kd *KubeDNS) waitForKubernetesService() {
-	glog.V(2).Infof("Waiting for Kubernetes service")
-
-	const kubernetesSvcName = "kubernetes"
-	const servicePollInterval = 1 * time.Second
-
-	name := fmt.Sprintf("%v/%v", v1.NamespaceDefault, kubernetesSvcName)
-	glog.V(2).Infof("Waiting for service: %v", name)
-
+func (kd *KubeDNS) waitForResourceSyncedOrDie() {
+	// Wait for both controllers have completed an initial resource listing
+	timeout := time.After(kd.initialSyncTimeout)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 	for {
-		svc, err := kd.kubeClient.Core().Services(v1.NamespaceDefault).Get(kubernetesSvcName)
-		if err != nil || svc == nil {
-			glog.V(3).Infof(
-				"Ignoring error while waiting for service %v: %v. Sleeping %v before retrying.",
-				name, err, servicePollInterval)
-			time.Sleep(servicePollInterval)
-			continue
+		select {
+		case <-timeout:
+			glog.Fatalf("Timeout waiting for initialization")
+		case <-ticker.C:
+			if kd.endpointsController.HasSynced() && kd.serviceController.HasSynced() {
+				glog.V(0).Infof("Initialized services and endpoints from apiserver")
+				return
+			}
+			glog.V(0).Infof("DNS server not ready, retry in 500 milliseconds")
 		}
-		break
 	}
-
-	return
 }
 
 func (kd *KubeDNS) startConfigMapSync() {
