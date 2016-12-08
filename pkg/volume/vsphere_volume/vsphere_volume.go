@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -119,6 +120,14 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 }
 
 func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	volumePath, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	volumePath = strings.Replace(volumePath, "\\040", " ", -1)
+	glog.V(5).Infof("vSphere volume path is %q", volumePath)
 	vsphereVolume := &api.Volume{
 		Name: volumeName,
 		VolumeSource: api.VolumeSource{
