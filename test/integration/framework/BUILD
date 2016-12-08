@@ -29,6 +29,7 @@ go_library(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/certificates/v1alpha1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/policy/v1alpha1:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
