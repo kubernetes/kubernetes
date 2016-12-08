@@ -297,6 +297,65 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	}
 }
 
+// Scheduler should preserve predicate constraint even if binding was longer
+// than cache ttl
+func TestSchedulerErrorWithLongBinding(t *testing.T) {
+	stop := make(chan struct{})
+	defer close(stop)
+
+	firstPod := podWithPort("foo", "", 8080)
+	conflictPod := podWithPort("bar", "", 8080)
+	pods := map[string]*v1.Pod{firstPod.Name: firstPod, conflictPod.Name: conflictPod}
+	for _, test := range []struct {
+		Expected        map[string]bool
+		CacheTTL        time.Duration
+		BindingDuration time.Duration
+	}{
+		{
+			Expected:        map[string]bool{firstPod.Name: true},
+			CacheTTL:        100 * time.Millisecond,
+			BindingDuration: 300 * time.Millisecond,
+		},
+		{
+			Expected:        map[string]bool{firstPod.Name: true},
+			CacheTTL:        10 * time.Second,
+			BindingDuration: 300 * time.Millisecond,
+		},
+	} {
+		queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
+		scache := schedulercache.New(test.CacheTTL, stop)
+
+		node := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine1"}}
+		scache.AddNode(&node)
+
+		nodeLister := algorithm.FakeNodeLister([]*v1.Node{&node})
+		predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
+
+		scheduler, bindingChan := setupTestSchedulerLongBindingWithRetry(
+			queuedPodStore, scache, nodeLister, predicateMap, stop, test.BindingDuration)
+		scheduler.Run()
+		queuedPodStore.Add(firstPod)
+		queuedPodStore.Add(conflictPod)
+
+		resultBindings := map[string]bool{}
+		waitChan := time.After(5 * time.Second)
+		for finished := false; !finished; {
+			select {
+			case b := <-bindingChan:
+				resultBindings[b.Name] = true
+				p := pods[b.Name]
+				p.Spec.NodeName = b.Target.Name
+				scache.AddPod(p)
+			case <-waitChan:
+				finished = true
+			}
+		}
+		if !reflect.DeepEqual(resultBindings, test.Expected) {
+			t.Errorf("Result binding are not equal to expected. %v != %v", resultBindings, test.Expected)
+		}
+	}
+}
+
 // queuedPodStore: pods queued before processing.
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache schedulercache.Cache,
@@ -428,4 +487,35 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 		PodConditionUpdater: fakePodConditionUpdater{},
 	}
 	return New(cfg), bindingChan, errChan
+}
+
+func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister algorithm.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
+	algo := NewGenericScheduler(
+		scache,
+		predicateMap,
+		algorithm.EmptyMetadataProducer,
+		[]algorithm.PriorityConfig{},
+		algorithm.EmptyMetadataProducer,
+		[]algorithm.SchedulerExtender{})
+	bindingChan := make(chan *v1.Binding, 2)
+	cfg := &Config{
+		SchedulerCache: scache,
+		NodeLister:     nodeLister,
+		Algorithm:      algo,
+		Binder: fakeBinder{func(b *v1.Binding) error {
+			time.Sleep(bindingTime)
+			bindingChan <- b
+			return nil
+		}},
+		NextPod: func() *v1.Pod {
+			return clientcache.Pop(queuedPodStore).(*v1.Pod)
+		},
+		Error: func(p *v1.Pod, err error) {
+			queuedPodStore.AddIfNotPresent(p)
+		},
+		Recorder:            &record.FakeRecorder{},
+		PodConditionUpdater: fakePodConditionUpdater{},
+		StopEverything:      stop,
+	}
+	return New(cfg), bindingChan
 }
