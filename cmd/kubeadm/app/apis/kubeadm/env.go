@@ -43,7 +43,7 @@ func SetEnvParams() *EnvParams {
 	}
 
 	for k := range envParams {
-		if v := os.Getenv(fmt.Sprintf("KUBE_%s", strings.ToUpper(k))); v != "" {
+		if v := strings.TrimSpace(os.Getenv(fmt.Sprintf("KUBE_%s", strings.ToUpper(k)))); v != "" {
 			envParams[k] = v
 		}
 	}
