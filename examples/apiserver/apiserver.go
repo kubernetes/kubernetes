@@ -131,12 +131,12 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	testTypeOpts := generic.RESTOptions{
 		StorageConfig:           storageConfig,
 		Decorator:               generic.UndecoratedStorage,
-		ResourcePrefix:          "testtype",
+		ResourcePrefix:          "testtypes",
 		DeleteCollectionWorkers: 1,
 	}
 
 	restStorageMap := map[string]rest.Storage{
-		"testtypes": testgroupetcd.NewREST(testTypeOpts),
+		testTypeOpts.ResourcePrefix: testgroupetcd.NewREST(testTypeOpts),
 	}
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *groupMeta,
