@@ -12,6 +12,7 @@ go_binary(
     srcs = ["webserver.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/util/sets:go_default_library",
