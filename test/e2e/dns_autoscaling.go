@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
 	}
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
 
 		Expect(len(framework.GetReadySchedulableNodesOrDie(c).Items)).NotTo(BeZero())
