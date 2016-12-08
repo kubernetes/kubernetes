@@ -37,6 +37,7 @@ func TestMostRequested(t *testing.T) {
 	}
 	noResources := v1.PodSpec{
 		Containers: []v1.Container{},
+		Affinity:   &v1.Affinity{},
 	}
 	cpuOnly := v1.PodSpec{
 		NodeName: "machine1",
@@ -58,6 +59,7 @@ func TestMostRequested(t *testing.T) {
 				},
 			},
 		},
+		Affinity: &v1.Affinity{},
 	}
 	cpuOnly2 := cpuOnly
 	cpuOnly2.NodeName = "machine2"
@@ -81,6 +83,7 @@ func TestMostRequested(t *testing.T) {
 				},
 			},
 		},
+		Affinity: &v1.Affinity{},
 	}
 	tests := []struct {
 		pod          *v1.Pod

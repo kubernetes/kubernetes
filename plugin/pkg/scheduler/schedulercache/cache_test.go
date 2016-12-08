@@ -545,6 +545,7 @@ func makeBasePod(nodeName, objName, cpu, mem string, ports []v1.ContainerPort) *
 				Ports: ports,
 			}},
 			NodeName: nodeName,
+			Affinity: &v1.Affinity{},
 		},
 	}
 }

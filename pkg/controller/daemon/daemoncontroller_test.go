@@ -125,6 +125,7 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 				},
 			},
 			DNSPolicy: v1.DNSDefault,
+			Affinity:  &v1.Affinity{},
 		},
 	}
 	v1.GenerateName(v1.SimpleNameGenerator, &pod.ObjectMeta)
@@ -240,6 +241,7 @@ func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 				Requests: allocatableResources(memory, cpu),
 			},
 		}},
+		Affinity: &v1.Affinity{},
 	}
 }
 
@@ -326,6 +328,7 @@ func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
 				HostPort: 666,
 			}},
 		}},
+		Affinity: &v1.Affinity{},
 	}
 	manager, podControl, _ := newTestController()
 	node := newNode("port-conflict", nil)
@@ -378,6 +381,7 @@ func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 				HostPort: 6661,
 			}},
 		}},
+		Affinity: &v1.Affinity{},
 	}
 	podSpec2 := v1.PodSpec{
 		NodeName: "no-port-conflict",

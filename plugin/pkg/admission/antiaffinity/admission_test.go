@@ -32,46 +32,120 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 		Spec: api.PodSpec{},
 	}
 	tests := []struct {
-		affinity      map[string]string
+		affinity      *api.Affinity
 		errorExpected bool
 	}{
 		// empty affinity its success.
 		{
-			affinity:      map[string]string{},
+			affinity:      &api.Affinity{},
 			errorExpected: false,
 		},
 		// what ever topologyKey in preferredDuringSchedulingIgnoredDuringExecution, the admission should success.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"preferredDuringSchedulingIgnoredDuringExecution": [{
-							"weight": 5,
-							"podAffinityTerm": {
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "security",
-										"operator": "In",
-										"values":["S2"]
-										}]
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 5,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "security",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"S2"},
+										},
 									},
-								"namespaces": [],
-								"topologyKey": "az"
-							}
-						}]
-					}}`,
+								},
+								Namespaces:  []string{""},
+								TopologyKey: "az",
+							},
+						},
+					},
+				},
 			},
+			/*
+				map[string]string{
+					api.AffinityAnnotationKey: `
+						{"podAntiAffinity": {
+							"preferredDuringSchedulingIgnoredDuringExecution": [{
+								"weight": 5,
+								"podAffinityTerm": {
+									"labelSelector": {
+										"matchExpressions": [{
+											"key": "security",
+											"operator": "In",
+											"values":["S2"]
+											}]
+										},
+									"namespaces": [],
+									"topologyKey": "az"
+								}
+							}]
+						}}`,
+				},
+			*/
 			errorExpected: false,
 		},
 		// valid topologyKey in requiredDuringSchedulingIgnoredDuringExecution,
 		// plus any topologyKey in preferredDuringSchedulingIgnoredDuringExecution, then admission success.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"preferredDuringSchedulingIgnoredDuringExecution": [{
-							"weight": 5,
-							"podAffinityTerm": {
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 5,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "security",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"S2"},
+										},
+									},
+								},
+								Namespaces:  []string{""},
+								TopologyKey: "az",
+							},
+						},
+					},
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
+							},
+							TopologyKey: metav1.LabelHostname,
+							Namespaces:  []string{""},
+						},
+					},
+				},
+			},
+			/*
+				map[string]string{
+					api.AffinityAnnotationKey: `
+						{"podAntiAffinity": {
+							"preferredDuringSchedulingIgnoredDuringExecution": [{
+								"weight": 5,
+								"podAffinityTerm": {
+									"labelSelector": {
+										"matchExpressions": [{
+											"key": "security",
+											"operator": "In",
+											"values":["S2"]
+										}]
+									},
+									"namespaces": [],
+									"topologyKey": "az"
+								}
+							}],
+							"requiredDuringSchedulingIgnoredDuringExecution": [{
 								"labelSelector": {
 									"matchExpressions": [{
 										"key": "security",
@@ -80,62 +154,93 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									}]
 								},
 								"namespaces": [],
-								"topologyKey": "az"
-							}
-						}],
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
-							},
-							"namespaces": [],
-							"topologyKey": "` + metav1.LabelHostname + `"
-						}]
-					}}`,
-			},
+								"topologyKey": "` + metav1.LabelHostname + `"
+							}]
+						}}`,
+				},
+			*/
 			errorExpected: false,
 		},
 		// valid topologyKey in requiredDuringSchedulingIgnoredDuringExecution then admission success.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
 							},
-							"namespaces":[],
-							"topologyKey": "` + metav1.LabelHostname + `"
-						}]
-					}}`,
+							Namespaces:  []string{""},
+							TopologyKey: metav1.LabelHostname,
+						},
+					},
+				},
 			},
+			/*
+				map[string]string{
+					api.AffinityAnnotationKey: `
+						{"podAntiAffinity": {
+							"requiredDuringSchedulingIgnoredDuringExecution": [{
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "security",
+										"operator": "In",
+										"values":["S2"]
+									}]
+								},
+								"namespaces":[],
+								"topologyKey": "` + metav1.LabelHostname + `"
+							}]
+						}}`,
+				},
+			*/
 			errorExpected: false,
 		},
 		// invalid topologyKey in requiredDuringSchedulingIgnoredDuringExecution then admission fails.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
 							},
-							"namespaces":[],
-							"topologyKey": " zone "
-						}]
-					}}`,
+							Namespaces:  []string{""},
+							TopologyKey: " zone ",
+						},
+					},
+				},
 			},
+			/*
+				map[string]string{
+					api.AffinityAnnotationKey: `
+						{"podAntiAffinity": {
+							"requiredDuringSchedulingIgnoredDuringExecution": [{
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "security",
+										"operator": "In",
+										"values":["S2"]
+									}]
+								},
+								"namespaces":[],
+								"topologyKey": " zone "
+							}]
+						}}`,
+				},
+			*/
 			errorExpected: true,
 		},
 		// invalid topologyKey in requiredDuringSchedulingRequiredDuringExecution then admission fails.
@@ -161,59 +266,106 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 		//  }
 		// list of requiredDuringSchedulingIgnoredDuringExecution middle element topologyKey is not valid.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
-							},
-							"namespaces":[],
-							"topologyKey": "` + metav1.LabelHostname + `"
-						},
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
 						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
 							},
-							"namespaces":[],
-							"topologyKey": " zone "
+							Namespaces:  []string{""},
+							TopologyKey: metav1.LabelHostname,
+						}, {
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
+							},
+							Namespaces:  []string{""},
+							TopologyKey: " zone ",
+						}, {
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
+							},
+							Namespaces:  []string{""},
+							TopologyKey: metav1.LabelHostname,
 						},
-						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
-							},
-							"namespaces": [],
-							"topologyKey": "` + metav1.LabelHostname + `"
-						}]
-					}}`,
+					},
+				},
 			},
+			/*
+				map[string]string{
+					api.AffinityAnnotationKey: `
+						{"podAntiAffinity": {
+							"requiredDuringSchedulingIgnoredDuringExecution": [{
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "security",
+										"operator": "In",
+										"values":["S2"]
+									}]
+								},
+								"namespaces":[],
+								"topologyKey": "` + metav1.LabelHostname + `"
+							},
+							{
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "security",
+										"operator": "In",
+										"values":["S2"]
+									}]
+								},
+								"namespaces":[],
+								"topologyKey": " zone "
+							},
+							{
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "security",
+										"operator": "In",
+										"values":["S2"]
+									}]
+								},
+								"namespaces": [],
+								"topologyKey": "` + metav1.LabelHostname + `"
+							}]
+						}}`,
+				},
+			*/
 			errorExpected: true,
 		},
-		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"thisIsAInvalidAffinity": [{}
-					}}`,
+		/*
+			{
+				affinity: map[string]string{
+					api.AffinityAnnotationKey: `
+						{"podAntiAffinity": {
+							"thisIsAInvalidAffinity": [{}
+						}}`,
+				},
+				// however, we should not get error here
+				errorExpected: false,
 			},
-			// however, we should not get error here
-			errorExpected: false,
-		},
+		*/
 	}
 	for _, test := range tests {
-		pod.ObjectMeta.Annotations = test.affinity
+		pod.Spec.Affinity = test.affinity
 		err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 
 		if test.errorExpected && err == nil {

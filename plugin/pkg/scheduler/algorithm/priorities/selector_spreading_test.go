@@ -49,9 +49,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	}
 	zone1Spec := v1.PodSpec{
 		NodeName: "machine1",
+		Affinity: &v1.Affinity{},
 	}
 	zone2Spec := v1.PodSpec{
 		NodeName: "machine2",
+		Affinity: &v1.Affinity{},
 	}
 	tests := []struct {
 		pod          *v1.Pod
@@ -303,7 +305,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 func buildPod(nodeName string, labels map[string]string, ownerRefs []metav1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{Labels: labels, OwnerReferences: ownerRefs},
-		Spec:       v1.PodSpec{NodeName: nodeName},
+		Spec:       v1.PodSpec{NodeName: nodeName, Affinity: &v1.Affinity{}},
 	}
 }
 
@@ -530,12 +532,15 @@ func TestZoneSpreadPriority(t *testing.T) {
 	}
 	zone0Spec := v1.PodSpec{
 		NodeName: "machine01",
+		Affinity: &v1.Affinity{},
 	}
 	zone1Spec := v1.PodSpec{
 		NodeName: "machine11",
+		Affinity: &v1.Affinity{},
 	}
 	zone2Spec := v1.PodSpec{
 		NodeName: "machine21",
+		Affinity: &v1.Affinity{},
 	}
 	labeledNodes := map[string]map[string]string{
 		"machine01": nozone, "machine02": nozone,

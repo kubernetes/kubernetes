@@ -54,6 +54,7 @@ func podWithID(id, desiredHost string) *v1.Pod {
 		ObjectMeta: v1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
 		Spec: v1.PodSpec{
 			NodeName: desiredHost,
+			Affinity: &v1.Affinity{},
 		},
 	}
 }

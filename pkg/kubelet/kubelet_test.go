@@ -345,6 +345,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 			Containers: []v1.Container{
 				{Name: "bar"},
 			},
+			Affinity: &v1.Affinity{},
 		}),
 	}
 	kubelet.podManager.SetPods(pods)
@@ -436,7 +437,7 @@ func TestHandlePortConflicts(t *testing.T) {
 		},
 	}}
 
-	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}
+	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}, Affinity: &v1.Affinity{}}
 	pods := []*v1.Pod{
 		podWithUidNameNsSpec("123456789", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
@@ -484,7 +485,8 @@ func TestCriticalPrioritySorting(t *testing.T) {
 			Requests: v1.ResourceList{
 				"memory": resource.MustParse("90"),
 			},
-		}}}}
+		}}},
+		Affinity: &v1.Affinity{}}
 	pods := []*v1.Pod{
 		podWithUidNameNsSpec("000000000", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
@@ -554,8 +556,8 @@ func TestHandleHostNameConflicts(t *testing.T) {
 
 	// default NodeName in test is 127.0.0.1
 	pods := []*v1.Pod{
-		podWithUidNameNsSpec("123456789", "notfittingpod", "foo", v1.PodSpec{NodeName: "127.0.0.2"}),
-		podWithUidNameNsSpec("987654321", "fittingpod", "foo", v1.PodSpec{NodeName: "127.0.0.1"}),
+		podWithUidNameNsSpec("123456789", "notfittingpod", "foo", v1.PodSpec{NodeName: "127.0.0.2", Affinity: &v1.Affinity{}}),
+		podWithUidNameNsSpec("987654321", "fittingpod", "foo", v1.PodSpec{NodeName: "127.0.0.1", Affinity: &v1.Affinity{}}),
 	}
 
 	notfittingPod := pods[0]
@@ -594,8 +596,8 @@ func TestHandleNodeSelector(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	pods := []*v1.Pod{
-		podWithUidNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "A"}}),
-		podWithUidNameNsSpec("987654321", "podB", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "B"}}),
+		podWithUidNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "A"}, Affinity: &v1.Affinity{}}),
+		podWithUidNameNsSpec("987654321", "podB", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "B"}, Affinity: &v1.Affinity{}}),
 	}
 	// The first pod should be rejected.
 	notfittingPod := pods[0]
@@ -637,7 +639,8 @@ func TestHandleMemExceeded(t *testing.T) {
 			Requests: v1.ResourceList{
 				"memory": resource.MustParse("90"),
 			},
-		}}}}
+		}}},
+		Affinity: &v1.Affinity{}}
 	pods := []*v1.Pod{
 		podWithUidNameNsSpec("123456789", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
@@ -860,6 +863,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 		Containers: []v1.Container{
 			{Name: "1234", Image: "foo"},
 		},
+		Affinity: &v1.Affinity{},
 	})
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 
@@ -868,6 +872,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 		Containers: []v1.Container{
 			{Name: "1234", Image: "bar"},
 		},
+		Affinity: &v1.Affinity{},
 	})
 	mirrorPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "api"
 	mirrorPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = "mirror"
@@ -1029,6 +1034,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 			{Name: "foo"},
 		},
 		HostNetwork: true,
+		Affinity:    &v1.Affinity{},
 	})
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 
@@ -1061,6 +1067,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			{Name: "foo"},
 		},
 		HostNetwork: true,
+		Affinity:    &v1.Affinity{},
 	})
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 
@@ -1090,6 +1097,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		Containers: []v1.Container{
 			{Name: "foo", SecurityContext: &v1.SecurityContext{Privileged: &privileged}},
 		},
+		Affinity: &v1.Affinity{},
 	})
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
@@ -1117,6 +1125,7 @@ func TestPrivilegedContainerDisallowed(t *testing.T) {
 		Containers: []v1.Container{
 			{Name: "foo", SecurityContext: &v1.SecurityContext{Privileged: &privileged}},
 		},
+		Affinity: &v1.Affinity{},
 	})
 
 	err := kubelet.syncPod(syncPodOptions{
@@ -1148,6 +1157,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 		Containers: []v1.Container{
 			{Name: "foo"},
 		},
+		Affinity: &v1.Affinity{},
 	})
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})

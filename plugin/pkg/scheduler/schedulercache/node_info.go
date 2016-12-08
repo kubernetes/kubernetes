@@ -209,10 +209,7 @@ func (n *NodeInfo) String() string {
 }
 
 func hasPodAffinityConstraints(pod *v1.Pod) bool {
-	affinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil || affinity == nil {
-		return false
-	}
+	affinity := pod.Spec.Affinity
 	return affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil
 }
 

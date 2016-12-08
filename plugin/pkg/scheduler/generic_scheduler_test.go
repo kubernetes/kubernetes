@@ -273,6 +273,7 @@ func TestGenericScheduler(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{Name: "2"},
 					Spec: v1.PodSpec{
 						NodeName: "2",
+						Affinity: &v1.Affinity{},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
@@ -348,7 +349,7 @@ func TestFindFitAllError(t *testing.T) {
 func TestFindFitSomeError(t *testing.T) {
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "match": matchesPredicate}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "1"}}
+	pod := &v1.Pod{Spec: v1.PodSpec{Affinity: &v1.Affinity{}}, ObjectMeta: v1.ObjectMeta{Name: "1"}}
 	nodeNameToInfo := map[string]*schedulercache.NodeInfo{
 		"3": schedulercache.NewNodeInfo(),
 		"2": schedulercache.NewNodeInfo(),
@@ -408,6 +409,7 @@ func TestZeroRequest(t *testing.T) {
 		Containers: []v1.Container{
 			{},
 		},
+		Affinity: &v1.Affinity{},
 	}
 	noResources1 := noResources
 	noResources1.NodeName = "machine1"
@@ -425,6 +427,7 @@ func TestZeroRequest(t *testing.T) {
 				},
 			},
 		},
+		Affinity: &v1.Affinity{},
 	}
 	small2 := small
 	small2.NodeName = "machine2"
@@ -442,6 +445,7 @@ func TestZeroRequest(t *testing.T) {
 				},
 			},
 		},
+		Affinity: &v1.Affinity{},
 	}
 	large1 := large
 	large1.NodeName = "machine1"
