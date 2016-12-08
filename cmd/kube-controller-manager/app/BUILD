@@ -13,8 +13,15 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "apps.go",
+        "autoscaling.go",
+        "batch.go",
+        "certificates.go",
         "controllermanager.go",
+        "core.go",
+        "extensions.go",
         "plugins.go",
+        "policy.go",
     ],
     tags = ["automanaged"],
     deps = [
