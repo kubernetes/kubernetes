@@ -371,6 +371,7 @@ function create_client_certkey {
         shift 1
     done
     ${CONTROLPLANE_SUDO} /bin/bash -e <<EOF
+    export PATH=${PATH}
     cd ${CERT_DIR}
     echo '{"CN":"${CN}","names":[${NAMES}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | cfssl gencert -ca=${CA}.crt -ca-key=${CA}.key -config=client-ca-config.json - | cfssljson -bare client-${ID}
     mv "client-${ID}-key.pem" "client-${ID}.key"
