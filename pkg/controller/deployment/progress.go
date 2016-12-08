@@ -19,6 +19,9 @@ package deployment
 import (
 	"fmt"
 	"reflect"
+	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -138,13 +141,21 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 
 	// Do not update if there is nothing new to add.
 	if reflect.DeepEqual(d.Status, newStatus) {
-		// TODO: If there is no sign of progress at this point then there is a high chance that the
-		// deployment is stuck. We should resync this deployment at some point[1] in the future[2] and
-		// check if it has timed out. We definitely need this, otherwise we depend on the controller
-		// resync interval. See https://github.com/kubernetes/kubernetes/issues/34458.
+		// If there is no sign of progress at this point then there is a high chance that the
+		// deployment is stuck. We should resync this deployment at some point[1] in the future
+		// and check if it has timed out. We definitely need this, otherwise we depend on the
+		// controller resync interval. See https://github.com/kubernetes/kubernetes/issues/34458.
 		//
 		// [1] time.Now() + progressDeadlineSeconds - lastUpdateTime (of the Progressing condition).
-		// [2] Use dc.queue.AddAfter
+		if d.Spec.ProgressDeadlineSeconds != nil &&
+			!util.DeploymentComplete(d, &newStatus) &&
+			!util.DeploymentTimedOut(d, &newStatus) &&
+			currentCond != nil {
+
+			after := time.Now().Add(time.Duration(*d.Spec.ProgressDeadlineSeconds) * time.Second).Sub(currentCond.LastUpdateTime.Time)
+			glog.V(4).Infof("Queueing up deployment %q for a progress check after %ds", d.Name, int(after.Seconds()))
+			dc.enqueueAfter(d, after)
+		}
 		return nil
 	}
 
