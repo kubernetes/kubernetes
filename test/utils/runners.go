@@ -27,6 +27,8 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -129,6 +131,10 @@ type DeploymentConfig struct {
 }
 
 type ReplicaSetConfig struct {
+	RCConfig
+}
+
+type JobConfig struct {
 	RCConfig
 }
 
@@ -324,6 +330,66 @@ func (config *ReplicaSetConfig) create() error {
 		return fmt.Errorf("Error creating replica set: %v", err)
 	}
 	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, rs.Spec.Replicas)
+	return nil
+}
+
+// RunJob baunches (and verifies correctness) of a Job
+// and will wait for all pods it spawns to become "Running".
+// It's the caller's responsibility to clean up externally (i.e. use the
+// namespace lifecycle for handling Cleanup).
+func RunJob(config JobConfig) error {
+	err := config.create()
+	if err != nil {
+		return err
+	}
+	return config.start()
+}
+
+func (config *JobConfig) Run() error {
+	return RunJob(*config)
+}
+
+func (config *JobConfig) GetKind() schema.GroupKind {
+	return batchinternal.Kind("Job")
+}
+
+func (config *JobConfig) create() error {
+	job := &batch.Job{
+		ObjectMeta: v1.ObjectMeta{
+			Name: config.Name,
+		},
+		Spec: batch.JobSpec{
+			Parallelism: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
+			Completions: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"name": config.Name},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    config.Name,
+							Image:   config.Image,
+							Command: config.Command,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyOnFailure,
+				},
+			},
+		},
+	}
+
+	if len(config.SecretNames) > 0 {
+		attachSecrets(&job.Spec.Template, config.SecretNames)
+	}
+
+	config.applyTo(&job.Spec.Template)
+
+	_, err := config.Client.Batch().Jobs(config.Namespace).Create(job)
+	if err != nil {
+		return fmt.Errorf("Error creating job: %v", err)
+	}
+	config.RCConfigLog("Created job with name: %v, namespace: %v, parallelism/completions: %v", job.Name, config.Namespace, job.Spec.Parallelism)
 	return nil
 }
 

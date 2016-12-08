@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -257,8 +258,7 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 		name := dtc.Configs[i].GetName()
 		namespace := dtc.Configs[i].GetNamespace()
 		kind := dtc.Configs[i].GetKind()
-		// TODO: Remove Deployment guard once GC is implemented for Deployments.
-		if framework.TestContext.GarbageCollectorEnabled && kind != extensions.Kind("Deployment") {
+		if framework.TestContext.GarbageCollectorEnabled && kindSupportsGarbageCollector(kind) {
 			By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
 			err := framework.DeleteResourceAndWaitForGC(dtc.ClientSet, kind, namespace, name)
 			framework.ExpectNoError(err)
@@ -480,6 +480,8 @@ var _ = framework.KubeDescribe("Density", func() {
 					configs[i] = &testutils.ReplicaSetConfig{RCConfig: *baseConfig}
 				case extensions.Kind("Deployment"):
 					configs[i] = &testutils.DeploymentConfig{RCConfig: *baseConfig}
+				case batch.Kind("Job"):
+					configs[i] = &testutils.JobConfig{RCConfig: *baseConfig}
 				default:
 					framework.Failf("Unsupported kind: %v", itArg.kind)
 				}
@@ -803,4 +805,8 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 	framework.ExpectNoError(err)
 	framework.ExpectNoError(framework.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
 	framework.Logf("Found pod '%s' running", name)
+}
+
+func kindSupportsGarbageCollector(kind schema.GroupKind) bool {
+	return kind != extensions.Kind("Deployment") && kind != batch.Kind("Job")
 }
