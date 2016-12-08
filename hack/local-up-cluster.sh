@@ -523,7 +523,17 @@ function start_discovery {
     write_client_kubeconfig discovery-auth
 
     # grant permission to run delegated authentication and authorization checks
-    kubectl create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --user=system:discovery-auth
+    if [[ "${ENABLE_RBAC}" = true ]]; then
+        ${KUBECTL} ${AUTH_ARGS} create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --user=system:discovery-auth
+    fi
+
+    curl --silent -k -g $API_HOST:$DISCOVERY_SECURE_PORT
+    if [ ! $? -eq 0 ]; then
+        echo "Kubernetes Discovery secure port is free, proceeding..."
+    else
+        echo "ERROR starting Kubernetes Discovery, exiting. Some process on $API_HOST is serving already on $DISCOVERY_SECURE_PORT"
+        return
+    fi
 
     DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
@@ -758,6 +768,7 @@ Logs:
   ${CTLRMGR_LOG:-}
   ${PROXY_LOG:-}
   ${SCHEDULER_LOG:-}
+  ${DISCOVERY_SERVER_LOG:-}
 EOF
 fi
 
