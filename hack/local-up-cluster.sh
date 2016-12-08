@@ -538,6 +538,9 @@ function start_discovery {
         return
     fi
 
+    ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-discovery.kubeconfig"
+    ${CONTROLPLANE_SUDO} ${GO_OUT}/kubectl config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" --insecure-skip-tls-verify --server="https://${API_HOST}:${DISCOVERY_SECURE_PORT}"
+
     DISCOVERY_SERVER_LOG=/tmp/kubernetes-discovery.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kubernetes-discovery" \
       --cert-dir="${CERT_DIR}" \
@@ -558,6 +561,9 @@ function start_discovery {
     # Wait for kubernetes-discovery to come up before launching the rest of the components.
     echo "Waiting for kubernetes-discovery to come up"
     kube::util::wait_for_url "https://${API_HOST}:${DISCOVERY_SECURE_PORT}/version" "kubernetes-discovery: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+
+    # create the "normal" api services for the core API server
+    ${CONTROLPLANE_SUDO} ${GO_OUT}/kubectl create -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/core-apiservices" --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig"
 }
 
 
@@ -832,7 +838,6 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_etcd
   set_service_accounts
   start_apiserver
-  start_discovery
   start_controller_manager
   start_kubeproxy
   start_kubedns
@@ -840,6 +845,11 @@ fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
   start_kubelet
+fi
+
+START_DISCOVERY=${START_DISCOVERY:-false}
+if [[ "${START_DISCOVERY}" = true ]]; then
+  start_discovery
 fi
 
 print_success
