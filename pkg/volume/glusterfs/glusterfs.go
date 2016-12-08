@@ -911,16 +911,16 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		cfg.secretValue = cfg.userKey
 	}
 
-	if cfg.gidMin == 0 {
+	if cfg.gidMin == 0 || cfg.gidMin < defaultGidMin{
 		cfg.gidMin = defaultGidMin
 	}
 
-	if cfg.gidMax == 0 {
+	if cfg.gidMax == 0 || cfg.gidMax > defaultGidMax {
 		cfg.gidMax = defaultGidMax
 	}
 
-	if cfg.gidMin > cfg.gidMax {
-		return nil, fmt.Errorf("StorageClass for provisioner %q must have gidMax value >= gidMin", glusterfsPluginName)
+	if cfg.gidMin > cfg.gidMax  {
+		return nil, fmt.Errorf("StorageClass for provisioner %q must have gidMax [%d ]value > gidMin [%d]", glusterfsPluginName, cfg.gidMax, cfg.gidMin)
 	}
 
 	return &cfg, nil
