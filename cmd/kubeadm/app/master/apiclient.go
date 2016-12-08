@@ -274,6 +274,6 @@ func createDummyDeployment(client *clientset.Clientset) {
 	fmt.Println("<master/apiclient> test deployment succeeded")
 
 	if err := client.Extensions().Deployments(api.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
-		fmt.Printf("<master/apiclient> failed to delete test deployment [%v] (will ignore)", err)
+		fmt.Printf("<master/apiclient> failed to delete test deployment [%v] (will ignore)\n", err)
 	}
 }
