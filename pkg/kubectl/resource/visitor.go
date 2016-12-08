@@ -263,7 +263,7 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 		}
 
 		// Error - Set the error condition from the StatusCode
-		if statusCode != 200 {
+		if statusCode != http.StatusOK {
 			err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
 		}
 
