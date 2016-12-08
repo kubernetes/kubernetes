@@ -147,6 +147,14 @@ function test_docker {
     fi
 }
 
+function test_cfssl_installed {
+    if ! command -v cfssl &>/dev/null || ! command -v cfssljson &>/dev/null; then
+      echo "Failed to successfully run 'cfssl', please verify that cfssl and cfssljson are in \$PATH."
+      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
+      exit 1
+    fi
+}
+
 function test_rkt {
     if [[ -n "${RKT_PATH}" ]]; then
       ${RKT_PATH} list 2> /dev/null 1> /dev/null
@@ -359,11 +367,12 @@ function create_client_certkey {
         SEP=","
         shift 1
     done
-    echo "{\"CN\":\"${CN}\",\"names\":[${NAMES}],\"hosts\":[\"\"],\"key\":{\"algo\":\"rsa\",\"size\":2048}}" | docker run -i  --entrypoint /bin/bash -v "${CERT_DIR}:/certs" -w /certs cfssl/cfssl:latest -ec "cfssl gencert -ca=${CA}.crt -ca-key=${CA}.key -config=client-ca-config.json - | cfssljson -bare client-${ID}"
     ${CONTROLPLANE_SUDO} /bin/bash -e <<EOF
-    mv "${CERT_DIR}/client-${ID}-key.pem" "${CERT_DIR}/client-${ID}.key"
-    mv "${CERT_DIR}/client-${ID}.pem" "${CERT_DIR}/client-${ID}.crt"
-    rm -f "${CERT_DIR}/client-${ID}.csr"
+    cd ${CERT_DIR}
+    echo '{"CN":"${CN}","names":[${NAMES}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | cfssl gencert -ca=${CA}.crt -ca-key=${CA}.key -config=client-ca-config.json - | cfssljson -bare client-${ID}
+    mv "client-${ID}-key.pem" "client-${ID}.key"
+    mv "client-${ID}.pem" "client-${ID}.crt"
+    rm -f "client-${ID}.csr"
 EOF
 }
 
@@ -796,6 +805,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 fi
 
 test_openssl_installed
+test_cfssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
