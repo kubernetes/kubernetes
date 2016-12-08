@@ -133,7 +133,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 				&extensionsv1.DaemonSet{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some daemonset opration succeeded.
+				// would be just confirmation that some daemonset operation succeeded.
 				util.NewTriggerOnAllChanges(
 					func(obj pkgruntime.Object) {
 						daemonsetcontroller.deliverDaemonSetObj(obj, daemonsetcontroller.daemonsetReviewDelay, false)

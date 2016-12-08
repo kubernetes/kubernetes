@@ -125,7 +125,7 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 				&apiv1.ConfigMap{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some configmap opration succeeded.
+				// would be just confirmation that some configmap operation succeeded.
 				util.NewTriggerOnAllChanges(
 					func(obj pkgruntime.Object) {
 						configmapcontroller.deliverConfigMapObj(obj, configmapcontroller.configmapReviewDelay, false)
