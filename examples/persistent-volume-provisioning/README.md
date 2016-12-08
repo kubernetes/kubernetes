@@ -45,11 +45,12 @@ metadata:
 provisioner: kubernetes.io/gce-pd
 parameters:
   type: pd-standard
-  zone: us-central1-a
+  zones: us-central1-a, us-central1-b
 ```
 
 * `type`: `pd-standard` or `pd-ssd`. Default: `pd-ssd`
-* `zone`: GCE zone. If not specified, a random zone in the same region as controller-manager will be chosen.
+* `zone`: GCE zone. If neither zone nor zones is specified, a random zone in the same region as controller-manager will be chosen. Note: zone and zones parameters must not be used at the same time.
+* `zones`: a comma separated list of GCE zone(s). If neither zone nor zones is specified, a random zone in the same region as controller-manager will be chosen. Note: zone and zones parameters must not be used at the same time.
 
 #### vSphere
 
