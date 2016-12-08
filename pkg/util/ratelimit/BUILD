@@ -12,25 +12,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "backoff.go",
-        "throttle.go",
-    ],
+    srcs = ["bucket.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/integer:go_default_library",
-        "//pkg/util/ratelimit:go_default_library",
-    ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "backoff_test.go",
-        "throttle_test.go",
-    ],
+    srcs = ["bucket_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/util/clock:go_default_library"],
+    deps = [],
 )
