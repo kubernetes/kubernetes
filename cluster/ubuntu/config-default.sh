@@ -86,8 +86,8 @@ FLANNEL_OTHER_NET_CONFIG=${FLANNEL_OTHER_NET_CONFIG:-""}
 
 export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
 
-# Path to the config file or directory of files of kubelet
-export KUBELET_CONFIG=${KUBELET_CONFIG:-""}
+# Path to the pod manifest file or directory of files of kubelet
+export KUBELET_POD_MANIFEST_PATH=${KUBELET_POD_MANIFEST_PATH:-""}
 
 # A port range to reserve for services with NodePort visibility
 SERVICE_NODE_PORT_RANGE=${SERVICE_NODE_PORT_RANGE:-"30000-32767"}
