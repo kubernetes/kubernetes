@@ -170,7 +170,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) (*rsa.PrivateKey, *x50
 	}
 	fmt.Printf("<master/pki> generated Certificate Authority key and certificate:\n%s\n", certutil.FormatCert(caCert))
 	pub, prv, cert := pathsKeysCerts(pkiPath, "ca")
-	fmt.Printf("Public: %s\nPrivate: %s\nCert: %s\n", pub, prv, cert)
+	fmt.Printf("\tPublic: %s\n\tPrivate: %s\n\tCert: %s\n", pub, prv, cert)
 
 	apiKey, apiCert, err := newServerKeyAndCert(cfg, caCert, caKey, altNames)
 	if err != nil {
@@ -182,7 +182,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) (*rsa.PrivateKey, *x50
 	}
 	fmt.Printf("<master/pki> generated API Server key and certificate:\n%s\n", certutil.FormatCert(apiCert))
 	pub, prv, cert = pathsKeysCerts(pkiPath, "apiserver")
-	fmt.Printf("Public: %s\nPrivate: %s\nCert: %s\n", pub, prv, cert)
+	fmt.Printf("\tPublic: %s\n\tPrivate: %s\n\tCert: %s\n", pub, prv, cert)
 
 	saKey, err := newServiceAccountKey()
 	if err != nil {
@@ -193,7 +193,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) (*rsa.PrivateKey, *x50
 	}
 	fmt.Printf("<master/pki> generated Service Account Signing keys:\n")
 	pub, prv, _ = pathsKeysCerts(pkiPath, "sa")
-	fmt.Printf("Public: %s\nPrivate: %s\n", pub, prv)
+	fmt.Printf("\tPublic: %s\n\tPrivate: %s\n", pub, prv)
 
 	fmt.Printf("<master/pki> created keys and certificates in %q\n", pkiPath)
 	return caKey, caCert, nil
