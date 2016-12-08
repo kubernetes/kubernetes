@@ -1441,21 +1441,9 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(
 // or it will not have the correct capabilities in the namespace.  This means that host user namespace
 // is enabled per pod, not per container.
 func (kl *Kubelet) enableHostUserNamespace(pod *v1.Pod) bool {
-	if hasPrivilegedContainer(pod) || hasHostNamespace(pod) ||
+	if kubecontainer.HasPrivilegedContainer(pod) || hasHostNamespace(pod) ||
 		hasHostVolume(pod) || hasNonNamespacedCapability(pod) || kl.hasHostMountPVC(pod) {
 		return true
-	}
-	return false
-}
-
-// hasPrivilegedContainer returns true if any of the containers in the pod are privileged.
-func hasPrivilegedContainer(pod *v1.Pod) bool {
-	for _, c := range pod.Spec.Containers {
-		if c.SecurityContext != nil &&
-			c.SecurityContext.Privileged != nil &&
-			*c.SecurityContext.Privileged {
-			return true
-		}
 	}
 	return false
 }

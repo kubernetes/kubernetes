@@ -1266,47 +1266,6 @@ func TestMakeDevices(t *testing.T) {
 	}
 }
 
-func TestHasPrivilegedContainer(t *testing.T) {
-	newBoolPtr := func(b bool) *bool {
-		return &b
-	}
-	tests := map[string]struct {
-		securityContext *v1.SecurityContext
-		expected        bool
-	}{
-		"nil sc": {
-			securityContext: nil,
-			expected:        false,
-		},
-		"nil privleged": {
-			securityContext: &v1.SecurityContext{},
-			expected:        false,
-		},
-		"false privleged": {
-			securityContext: &v1.SecurityContext{Privileged: newBoolPtr(false)},
-			expected:        false,
-		},
-		"true privleged": {
-			securityContext: &v1.SecurityContext{Privileged: newBoolPtr(true)},
-			expected:        true,
-		},
-	}
-
-	for k, v := range tests {
-		pod := &v1.Pod{
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{SecurityContext: v.securityContext},
-				},
-			},
-		}
-		actual := hasPrivilegedContainer(pod)
-		if actual != v.expected {
-			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
-		}
-	}
-}
-
 func TestHasHostMountPVC(t *testing.T) {
 	tests := map[string]struct {
 		pvError       error
