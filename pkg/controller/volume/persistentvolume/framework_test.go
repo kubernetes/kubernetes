@@ -888,7 +888,7 @@ func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(c
 			atomic.StoreInt32(&testFinished, 1)
 		}()
 
-		// Wait for the controler to finish the test function.
+		// Wait for the controller to finish the test function.
 		for atomic.LoadInt32(&testFinished) == 0 {
 			time.Sleep(time.Millisecond * 10)
 		}
