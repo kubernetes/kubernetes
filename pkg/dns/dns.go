@@ -242,13 +242,10 @@ func (kd *KubeDNS) setEndpointsStore() {
 		&v1.Endpoints{},
 		resyncPeriod,
 		kcache.ResourceEventHandlerFuncs{
-			AddFunc: kd.handleEndpointAdd,
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				// TODO: Avoid unwanted updates.
-				kd.handleEndpointAdd(newObj)
-			},
-			// No DeleteFunc for EndpointsStore because endpoint object will be deleted
-			// when corresponding service is deleted.
+			AddFunc:    kd.handleEndpointAdd,
+			UpdateFunc: kd.handleEndpointUpdate,
+			// If Service is named headless need to remove the reverse dns entries.
+			DeleteFunc: kd.handleEndpointDelete,
 		},
 	)
 }
@@ -320,6 +317,32 @@ func (kd *KubeDNS) updateService(oldObj, newObj interface{}) {
 func (kd *KubeDNS) handleEndpointAdd(obj interface{}) {
 	if e, ok := obj.(*v1.Endpoints); ok {
 		kd.addDNSUsingEndpoints(e)
+	}
+}
+
+func (kd *KubeDNS) handleEndpointUpdate(oldObj, newObj interface{}) {
+	kd.handleEndpointDelete(oldObj)
+	// TODO: Avoid unwanted updates.
+	kd.handleEndpointAdd(newObj)
+}
+
+func (kd *KubeDNS) handleEndpointDelete(obj interface{}) {
+	if e, ok := obj.(*v1.Endpoints); ok {
+		svc, err := kd.getServiceFromEndpoints(e)
+		if svc != nil && err == nil {
+			if !v1.IsServiceIPSet(svc) {
+				// When endpoints for Named headless services deleted, delete old reverse dns records.
+				for idx := range e.Subsets {
+					for subIdx := range e.Subsets[idx].Addresses {
+						address := &e.Subsets[idx].Addresses[subIdx]
+						endpointIP := address.IP
+						if _, has := getHostname(e.Subsets[idx].Addresses[subIdx]); has {
+							delete(kd.reverseRecordMap, endpointIP)
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -411,6 +434,12 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *v1.Endpoints, svc *v1.Se
 					l := []string{"_" + strings.ToLower(string(endpointPort.Protocol)), "_" + endpointPort.Name}
 					subCache.SetEntry(endpointName, srvValue, kd.fqdn(svc, append(l, endpointName)...), l...)
 				}
+			}
+
+			// Generate PTR records only for Named Headless service.
+			if _, has := getHostname(e.Subsets[idx].Addresses[subIdx]); has {
+				reverseRecord, _ := util.GetSkyMsg(kd.fqdn(svc, endpointName), 0)
+				kd.reverseRecordMap[endpointIP] = reverseRecord
 			}
 		}
 	}
