@@ -18,7 +18,6 @@ package util
 
 import (
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -27,7 +26,7 @@ import (
 // according to the namespaces indicated in podAffinityTerm.
 // 1. If the namespaces is nil considers the given pod's namespace
 // 2. If the namespaces is empty list then considers all the namespaces
-func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm v1.PodAffinityTerm) sets.String {
+func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
 	names := sets.String{}
 	if podAffinityTerm.Namespaces == nil {
 		names.Insert(pod.Namespace)
@@ -39,17 +38,15 @@ func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm v1.PodAffinit
 
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
 // matches the namespace and selector defined by <affinityPod>`s <term>.
-func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, affinityPod *v1.Pod, term *v1.PodAffinityTerm) (bool, error) {
-	namespaces := getNamespacesFromPodAffinityTerm(affinityPod, *term)
+func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, selector labels.Selector) bool {
 	if len(namespaces) != 0 && !namespaces.Has(pod.Namespace) {
-		return false, nil
+		return false
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-	if err != nil || !selector.Matches(labels.Set(pod.Labels)) {
-		return false, err
+	if !selector.Matches(labels.Set(pod.Labels)) {
+		return false
 	}
-	return true, nil
+	return true
 }
 
 // nodesHaveSameTopologyKeyInternal checks if nodeA and nodeB have same label value with given topologyKey as label key.
