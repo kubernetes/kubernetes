@@ -6856,7 +6856,10 @@ go_library(
         "golang.org/x/crypto/ssh/transport.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:golang.org/x/crypto/curve25519"],
+    deps = [
+        "//vendor:golang.org/x/crypto/curve25519",
+        "//vendor:golang.org/x/crypto/ed25519",
+    ],
 )
 
 go_library(
@@ -11809,4 +11812,20 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/runtime/schema",
         "//vendor:k8s.io/client-go/pkg/selection",
     ],
+)
+
+go_library(
+    name = "golang.org/x/crypto/ed25519",
+    srcs = ["golang.org/x/crypto/ed25519/ed25519.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/crypto/ed25519/internal/edwards25519"],
+)
+
+go_library(
+    name = "golang.org/x/crypto/ed25519/internal/edwards25519",
+    srcs = [
+        "golang.org/x/crypto/ed25519/internal/edwards25519/const.go",
+        "golang.org/x/crypto/ed25519/internal/edwards25519/edwards25519.go",
+    ],
+    tags = ["automanaged"],
 )
