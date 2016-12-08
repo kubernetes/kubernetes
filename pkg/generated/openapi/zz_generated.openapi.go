@@ -3736,6 +3736,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"readyReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Total number of ready pods targeted by this deployment.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"availableReplicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
@@ -16030,6 +16037,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"updatedReplicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"readyReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Total number of ready pods targeted by this deployment.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
