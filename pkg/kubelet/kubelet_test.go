@@ -484,7 +484,8 @@ func TestCriticalPrioritySorting(t *testing.T) {
 			Requests: v1.ResourceList{
 				"memory": resource.MustParse("90"),
 			},
-		}}}}
+		}}},
+	}
 	pods := []*v1.Pod{
 		podWithUidNameNsSpec("000000000", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
@@ -637,7 +638,8 @@ func TestHandleMemExceeded(t *testing.T) {
 			Requests: v1.ResourceList{
 				"memory": resource.MustParse("90"),
 			},
-		}}}}
+		}}},
+	}
 	pods := []*v1.Pod{
 		podWithUidNameNsSpec("123456789", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),

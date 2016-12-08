@@ -331,7 +331,6 @@ func TestEncode_Ptr(t *testing.T) {
 			TerminationGracePeriodSeconds: &grace,
 
 			SecurityContext: &api.PodSecurityContext{},
-			Affinity:        &api.Affinity{},
 		},
 	}
 	obj := runtime.Object(pod)
@@ -345,7 +344,6 @@ func TestEncode_Ptr(t *testing.T) {
 	}
 	if !api.Semantic.DeepEqual(obj2, pod) {
 		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, diff.ObjectDiff(obj2, pod))
-
 	}
 }
 

@@ -44,8 +44,7 @@ var masterNodes sets.String
 
 type pausePodConfig struct {
 	Name                              string
-	Affinity                          string
-	NodeAffinity                      *v1.Affinity
+	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
 }
@@ -241,7 +240,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		podName := "without-label"
 		_, err := cs.Core().Pods(ns).Create(initPausePod(f, pausePodConfig{
 			Name: podName,
-			NodeAffinity: &v1.Affinity{
+			Affinity: &v1.Affinity{
 				NodeAffinity: &v1.NodeAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
@@ -303,7 +302,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		createPausePod(f, pausePodConfig{
 			Name: podName,
-			NodeAffinity: &v1.Affinity{
+			Affinity: &v1.Affinity{
 				NodeAffinity: &v1.NodeAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
@@ -350,7 +349,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		labelPodName := "with-labels"
 		pod := createPausePod(f, pausePodConfig{
 			Name: labelPodName,
-			NodeAffinity: &v1.Affinity{
+			Affinity: &v1.Affinity{
 				NodeAffinity: &v1.NodeAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
@@ -392,24 +391,24 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		_, err := cs.Core().Pods(ns).Create(initPausePod(f, pausePodConfig{
 			Name:   podName,
 			Labels: map[string]string{"name": "without-label"},
-			Affinity: `{
-				"podAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"weight": 0,
-						"podAffinityTerm": {
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "service",
-									"operator": "DoesNotExist",
-									"values":["securityscan"]
-								}]
+			Affinity: &v1.Affinity{
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpDoesNotExist,
+										Values:   []string{"securityscan"},
+									},
+								},
 							},
-							"namespaces": [],
-							"topologyKey": "kubernetes.io/hostname"
-						}
-					}]
-				 }
-			}`,
+							TopologyKey: "kubernetes.io/hostname",
+						},
+					},
+				},
+			},
 		}))
 
 		if err == nil || !errors.IsInvalid(err) {
@@ -427,20 +426,24 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		podName := "without-label-" + string(uuid.NewUUID())
 		createPausePod(f, pausePodConfig{
 			Name: podName,
-			Affinity: `{
-				"podAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"labelSelector":{
-							"matchExpressions": [{
-								"key": "service",
-								"operator": "In",
-								"values": ["securityscan", "value2"]
-							}]
+			Affinity: &v1.Affinity{
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "service",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"securityscan", "value2"},
+									},
+								},
+							},
+							TopologyKey: "kubernetes.io/hostname",
 						},
-						"topologyKey": "kubernetes.io/hostname"
-					}]
-				}
-			}`,
+					},
+				},
+			},
 		})
 
 		waitForScheduler()
@@ -462,21 +465,25 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
 		pod := createPausePod(f, pausePodConfig{
 			Name: labelPodName,
-			Affinity: `{
-				"podAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"labelSelector": {
-							"matchExpressions": [{
-								"key": "security",
-								"operator": "In",
-								"values": ["S1", "value2"]
-							}]
+			Affinity: &v1.Affinity{
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S1", "value2"},
+									},
+								},
+							},
+							TopologyKey: k,
+							Namespaces:  []string{ns},
 						},
-						"topologyKey": "` + k + `",
-						"namespaces":["` + ns + `"]
-					}]
-				}
-			}`,
+					},
+				},
+			},
 		})
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
@@ -529,21 +536,25 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			Name:         labelPodName,
 			Labels:       map[string]string{"service": "Diff"},
 			NodeSelector: map[string]string{k: v}, // only launch on our two nodes, contradicting the podAntiAffinity
-			Affinity: `{
-				"podAntiAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"labelSelector":{
-							"matchExpressions": [{
-								"key": "service",
-								"operator": "In",
-								"values": ["S1", "value2"]
-							}]
+			Affinity: &v1.Affinity{
+				PodAntiAffinity: &v1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S1", "value2"},
+									},
+								},
+							},
+							TopologyKey: k,
+							Namespaces:  []string{ns},
 						},
-						"topologyKey": "` + k + `",
-						"namespaces": ["` + ns + `"]
-					}]
-				}
-			}`,
+					},
+				},
+			},
 		})
 
 		waitForScheduler()
@@ -565,29 +576,31 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
 		pod := createPausePod(f, pausePodConfig{
 			Name: labelPodName,
-			Affinity: `{
-				"podAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"labelSelector":{
-							"matchExpressions": [{
-								"key": "security",
-								"operator": "In",
-								"values": ["S1", "value2"]
+			Affinity: &v1.Affinity{
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S1", "value2"},
+									}, {
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"S2"},
+									}, {
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
 							},
-							{
-								"key": "security",
-								"operator": "NotIn",
-								"values": ["S2"]
-							},
-							{
-								"key": "security",
-								"operator":"Exists"
-							}]
+							TopologyKey: k,
 						},
-						"topologyKey": "` + k + `"
-					}]
-				}
-			}`,
+					},
+				},
+			},
 		})
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
@@ -745,15 +758,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 })
 
 func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	if conf.Affinity != "" {
-		if conf.Annotations == nil {
-			conf.Annotations = map[string]string{
-				v1.AffinityAnnotationKey: conf.Affinity,
-			}
-		} else {
-			conf.Annotations[v1.AffinityAnnotationKey] = conf.Affinity
-		}
-	}
 	pod := &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        conf.Name,
@@ -762,7 +766,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 		},
 		Spec: v1.PodSpec{
 			NodeSelector: conf.NodeSelector,
-			Affinity:     conf.NodeAffinity,
+			Affinity:     conf.Affinity,
 			Containers: []v1.Container{
 				{
 					Name:  podName,
@@ -808,7 +812,7 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 func createPodWithNodeAffinity(f *framework.Framework) *v1.Pod {
 	return createPausePod(f, pausePodConfig{
 		Name: "with-nodeaffinity-" + string(uuid.NewUUID()),
-		NodeAffinity: &v1.Affinity{
+		Affinity: &v1.Affinity{
 			NodeAffinity: &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
@@ -831,32 +835,40 @@ func createPodWithNodeAffinity(f *framework.Framework) *v1.Pod {
 func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *v1.Pod {
 	return createPausePod(f, pausePodConfig{
 		Name: "with-podantiaffinity-" + string(uuid.NewUUID()),
-		Affinity: `{
-			"podAffinity": {
-				"requiredDuringSchedulingIgnoredDuringExecution": [{
-				"labelSelector": {
-					"matchExpressions": [{
-						"key": "security",
-						"operator": "In",
-						"values":["S1"]
-					}]
+		Affinity: &v1.Affinity{
+			PodAffinity: &v1.PodAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"S1"},
+								},
+							},
+						},
+						TopologyKey: topologyKey,
+					},
 				},
-				"topologyKey": "` + topologyKey + `"
-				}]
 			},
-			"podAntiAffinity": {
-				"requiredDuringSchedulingIgnoredDuringExecution": [{
-				"labelSelector": {
-					"matchExpressions": [{
-						"key": "security",
-						"operator": "In",
-						"values":["S2"]
-					}]
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"S2"},
+								},
+							},
+						},
+						TopologyKey: topologyKey,
+					},
 				},
-				"topologyKey": "` + topologyKey + `"
-				}]
-			}
-		}`,
+			},
+		},
 	})
 }
 
