@@ -421,7 +421,7 @@ func (j *federationTestJig) waitForFederatedIngress() {
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, timeoutClient, false))
+			ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, lbPollInterval, timeoutClient, false))
 		}
 	}
 }
