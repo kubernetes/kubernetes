@@ -32,6 +32,7 @@ import (
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/labels"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/integer"
 	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
-	podutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -699,12 +699,11 @@ func WaitForPodsHashPopulated(c clientset.Interface, desiredGeneration int64, na
 
 // LabelPodsWithHash labels all pods in the given podList with the new hash label.
 // The returned bool value can be used to tell if all pods are actually labeled.
-func LabelPodsWithHash(podList *v1.PodList, rs *extensions.ReplicaSet, c clientset.Interface, namespace, hash string) (bool, error) {
-	allPodsLabeled := true
+func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister *cache.StoreToPodLister, namespace, name, hash string) error {
 	for _, pod := range podList.Items {
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			if _, podUpdated, err := podutil.UpdatePodWithRetries(c.Core().Pods(namespace), &pod,
+			_, err := UpdatePodWithRetries(c.Core().Pods(namespace), podLister, pod.Namespace, pod.Name,
 				func(podToUpdate *v1.Pod) error {
 					// Precondition: the pod doesn't contain the new hash in its label.
 					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
@@ -712,18 +711,14 @@ func LabelPodsWithHash(podList *v1.PodList, rs *extensions.ReplicaSet, c clients
 					}
 					podToUpdate.Labels = labelsutil.AddLabel(podToUpdate.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
 					return nil
-				}); err != nil {
-				return false, fmt.Errorf("error in adding template hash label %s to pod %+v: %s", hash, pod, err)
-			} else if podUpdated {
-				glog.V(4).Infof("Labeled %s %s/%s of %s %s/%s with hash %s.", pod.Kind, pod.Namespace, pod.Name, rs.Kind, rs.Namespace, rs.Name, hash)
-			} else {
-				// If the pod wasn't updated but didn't return error when we try to update it, we've hit "pod not found" or "precondition violated" error.
-				// Then we can't say all pods are labeled
-				allPodsLabeled = false
+				})
+			if err != nil {
+				return fmt.Errorf("error in adding template hash label %s to pod %q: %v", hash, pod.Name, err)
 			}
+			glog.V(4).Infof("Labeled pod %s/%s of ReplicaSet %s/%s with hash %s.", pod.Namespace, pod.Name, namespace, name, hash)
 		}
 	}
-	return allPodsLabeled, nil
+	return nil
 }
 
 // GetNewReplicaSetTemplate returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
@@ -736,7 +731,7 @@ func GetNewReplicaSetTemplate(deployment *extensions.Deployment) v1.PodTemplateS
 	newRSTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
 		deployment.Spec.Template.ObjectMeta.Labels,
 		extensions.DefaultDeploymentUniqueLabelKey,
-		podutil.GetPodTemplateSpecHash(newRSTemplate))
+		GetPodTemplateSpecHash(newRSTemplate))
 	return newRSTemplate
 }
 
@@ -751,7 +746,7 @@ func GetNewReplicaSetTemplateInternal(deployment *internalextensions.Deployment)
 	newRSTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
 		deployment.Spec.Template.ObjectMeta.Labels,
 		internalextensions.DefaultDeploymentUniqueLabelKey,
-		podutil.GetInternalPodTemplateSpecHash(newRSTemplate))
+		GetInternalPodTemplateSpecHash(newRSTemplate))
 	return newRSTemplate
 }
 
