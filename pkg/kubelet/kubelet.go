@@ -1443,7 +1443,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
-	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !podUsesHostNetwork(pod) {
+	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !kubecontainer.IsHostNetworkPod(pod) {
 		return fmt.Errorf("network is not ready: %v", rs)
 	}
 
@@ -1548,7 +1548,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		return err
 	}
 	if egress != nil || ingress != nil {
-		if podUsesHostNetwork(pod) {
+		if kubecontainer.IsHostNetworkPod(pod) {
 			kl.recorder.Event(pod, v1.EventTypeWarning, events.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
 		} else if kl.shaper != nil {
 			if len(apiPodStatus.PodIP) > 0 {
