@@ -83,6 +83,9 @@ func (c *daemonSets) Update(daemonSet *v1beta1.DaemonSet) (result *v1beta1.Daemo
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *daemonSets) UpdateStatus(daemonSet *v1beta1.DaemonSet) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
 	err = c.client.Put().

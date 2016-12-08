@@ -79,6 +79,9 @@ func (c *clusters) Update(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, er
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *clusters) UpdateStatus(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	result = &v1beta1.Cluster{}
 	err = c.client.Put().
