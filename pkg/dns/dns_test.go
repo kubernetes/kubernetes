@@ -364,9 +364,6 @@ func TestNamedHeadlessServiceEndpointAdd(t *testing.T) {
 		},
 		Ports: []v1.EndpointPort{},
 	})
-	endpoints.Annotations = map[string]string{
-		endpointsapi.PodHostnamesAnnotation: `{"10.0.0.1": {"HostName":"foo"}}`,
-	}
 	// add endpoints to store
 	assert.NoError(t, kd.endpointsStore.Add(endpoints))
 
@@ -400,9 +397,6 @@ func TestNamedHeadlessServiceEndpointUpdate(t *testing.T) {
 		},
 		Ports: []v1.EndpointPort{},
 	})
-	oldEndpoints.Annotations = map[string]string{
-		endpointsapi.PodHostnamesAnnotation: `{"10.0.0.1": {"HostName":"foo"}}`,
-	}
 	// add endpoints to store
 	assert.NoError(t, kd.endpointsStore.Add(oldEndpoints))
 
@@ -420,9 +414,6 @@ func TestNamedHeadlessServiceEndpointUpdate(t *testing.T) {
 		},
 		Ports: []v1.EndpointPort{},
 	})
-	newEndpoints.Annotations = map[string]string{
-		endpointsapi.PodHostnamesAnnotation: `{"10.0.0.2": {"HostName":"foo"}}`,
-	}
 
 	// add service
 	kd.newService(service)
@@ -455,9 +446,6 @@ func TestNamedHeadlessServiceEndpointDelete(t *testing.T) {
 		},
 		Ports: []v1.EndpointPort{},
 	})
-	endpoints.Annotations = map[string]string{
-		endpointsapi.PodHostnamesAnnotation: `{"10.0.0.1": {"HostName":"foo"}}`,
-	}
 	// add endpoints to store
 	assert.NoError(t, kd.endpointsStore.Add(endpoints))
 
@@ -858,15 +846,11 @@ func assertDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *v1.Endpoints) {
 }
 
 func assertReverseDNSForNamedHeadlessService(t *testing.T, kd *KubeDNS, e *v1.Endpoints) {
-	hostNames, err := getPodHostnamesFromAnnotation(e.Annotations)
-	assert.Nil(t, err)
 	for _, subset := range e.Subsets {
 		for _, endpointAddress := range subset.Addresses {
 			record := kd.reverseRecordMap[endpointAddress.IP]
-			podHost, ok := hostNames[endpointAddress.IP]
-			assert.True(t, ok)
 			t.Logf("got reverse host name %s", record.Host)
-			assert.Equal(t, record.Host, getPodsFQDN(kd, e, podHost.HostName))
+			assert.Equal(t, record.Host, getPodsFQDN(kd, e, endpointAddress.Hostname))
 		}
 	}
 }

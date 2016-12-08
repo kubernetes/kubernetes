@@ -331,9 +331,9 @@ func (kd *KubeDNS) handleEndpointUpdate(oldObj, newObj interface{}) {
 				if !v1.IsServiceIPSet(svc) {
 					for idx := range o.Subsets {
 						for subIdx := range o.Subsets[idx].Addresses {
-							address := o.Subsets[idx].Addresses[subIdx]
+							address := &o.Subsets[idx].Addresses[subIdx]
 							endpointIP := address.IP
-							if isHeadlessServiceNamed(o.Subsets[idx].Addresses[subIdx]) {
+							if _, has := getHostname(address); has {
 								oldAddressMap[endpointIP] = true
 							}
 						}
@@ -344,9 +344,10 @@ func (kd *KubeDNS) handleEndpointUpdate(oldObj, newObj interface{}) {
 							address := n.Subsets[idx].Addresses[subIdx]
 							endpointIP := address.IP
 							if _, ok := oldAddressMap[endpointIP]; ok {
+								address := &n.Subsets[idx].Addresses[subIdx]
 								// Entries are both in old and new endpoint. Remove from the `oldAddressMap`
 								// if the address is still named to the service.
-								if isHeadlessServiceNamed(n.Subsets[idx].Addresses[subIdx]) {
+								if _, has := getHostname(address); has {
 									// The service is still named in the Pod
 									delete(oldAddressMap, endpointIP)
 								}
@@ -379,7 +380,7 @@ func (kd *KubeDNS) handleEndpointDelete(obj interface{}) {
 					for subIdx := range e.Subsets[idx].Addresses {
 						address := &e.Subsets[idx].Addresses[subIdx]
 						endpointIP := address.IP
-						if _, has := getHostname(e.Subsets[idx].Addresses[subIdx]); has {
+						if _, has := getHostname(address); has {
 							delete(kd.reverseRecordMap, endpointIP)
 						}
 					}
@@ -480,7 +481,7 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *v1.Endpoints, svc *v1.Se
 			}
 
 			// Generate PTR records only for Named Headless service.
-			if _, has := getHostname(e.Subsets[idx].Addresses[subIdx]); has {
+			if _, has := getHostname(address); has {
 				reverseRecord, _ := util.GetSkyMsg(kd.fqdn(svc, endpointName), 0)
 				kd.reverseRecordMap[endpointIP] = reverseRecord
 			}
