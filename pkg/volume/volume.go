@@ -18,13 +18,12 @@ package volume
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	filepath "path/filepath"
 	"runtime"
+	"syscall"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -223,95 +222,133 @@ func (err deletedVolumeInUseError) Error() string {
 	return string(err)
 }
 
-func RenameDirectory(oldPath, newName string) (string, error) {
-	newPath, err := ioutil.TempDir(filepath.Dir(oldPath), newName)
+// RenameWithFallback attempts to rename a file or directory, but falls back to
+// copying in the event of a cross-link device error. If the fallback copy
+// succeeds, src is still removed, emulating normal rename behavior.
+func RenameWithFallback(src, dest string) error {
+	fi, err := os.Lstat(src)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	// os.Rename call fails on windows (https://github.com/golang/go/issues/14527)
-	// Replacing with copyFolder to the newPath and deleting the oldPath directory
-	if runtime.GOOS == "windows" {
-		err = copyFolder(oldPath, newPath)
-		if err != nil {
-			glog.Errorf("Error copying folder from: %s to: %s with error: %v", oldPath, newPath, err)
-			return "", err
+	// If renaming a directory make sure the destination does not exist.
+	if fi.IsDir() {
+		if _, err := os.Stat(dest); !os.IsNotExist(err) {
+			if err := os.RemoveAll(dest); err != nil {
+				return err
+			}
 		}
-		os.RemoveAll(oldPath)
-		return newPath, nil
 	}
 
-	err = os.Rename(oldPath, newPath)
-	if err != nil {
-		return "", err
+	err = os.Rename(src, dest)
+	if err == nil {
+		return nil
 	}
-	return newPath, nil
+
+	terr, ok := err.(*os.LinkError)
+	if !ok {
+		return err
+	}
+
+	// Rename may fail if src and dest are on different devices; fall back to
+	// copy if we detect that case. syscall.EXDEV is the common name for the
+	// cross device link error which has varying output text across different
+	// operating systems.
+	var cerr error
+	if terr.Err == syscall.EXDEV {
+		cerr = copyDir(src, dest)
+	} else if runtime.GOOS == "windows" {
+		// In windows it can drop down to an operating system call that
+		// returns an operating system error with a different number and
+		// message. Checking for that as a fall back.
+		noerr, ok := terr.Err.(syscall.Errno)
+		// 0x11 (ERROR_NOT_SAME_DEVICE) is the windows error.
+		// See https://msdn.microsoft.com/en-us/library/cc231199.aspx
+		if ok && noerr == 0x11 {
+			cerr = copyDir(src, dest)
+		}
+	} else {
+		return terr
+	}
+
+	if cerr != nil {
+		return cerr
+	}
+
+	return os.RemoveAll(src)
 }
 
-func copyFolder(source string, dest string) (err error) {
-	fi, err := os.Lstat(source)
+// copyDir takes in a directory and copies its contents to the destination.
+// It preserves the file mode on files as well.
+func copyDir(src string, dest string) error {
+	fi, err := os.Lstat(src)
 	if err != nil {
-		glog.Errorf("Error getting stats for %s. %v", source, err)
 		return err
 	}
 
 	err = os.MkdirAll(dest, fi.Mode())
 	if err != nil {
-		glog.Errorf("Unable to create %s directory %v", dest, err)
+		return err
 	}
 
-	directory, _ := os.Open(source)
+	dir, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
 
-	defer directory.Close()
-
-	objects, err := directory.Readdir(-1)
+	objects, err := dir.Readdir(-1)
+	if err != nil {
+		return err
+	}
 
 	for _, obj := range objects {
 		if obj.Mode()&os.ModeSymlink != 0 {
 			continue
 		}
 
-		sourceFilePointer := source + "\\" + obj.Name()
-		destinationFilePointer := dest + "\\" + obj.Name()
+		srcfile := filepath.Join(src, obj.Name())
+		destfile := filepath.Join(dest, obj.Name())
 
 		if obj.IsDir() {
-			err = copyFolder(sourceFilePointer, destinationFilePointer)
+			err = copyDir(srcfile, destfile)
 			if err != nil {
 				return err
 			}
-		} else {
-			err = copyFile(sourceFilePointer, destinationFilePointer)
-			if err != nil {
-				return err
-			}
+			continue
 		}
 
+		if err := copyFile(srcfile, destfile); err != nil {
+			return err
+		}
 	}
-	return
+
+	return nil
 }
 
-func copyFile(source string, dest string) (err error) {
-	sourceFile, err := os.Open(source)
+// copyFile copies a file from one place to another with the permission bits
+// preserved as well.
+func copyFile(src string, dest string) error {
+	srcfile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcfile.Close()
+
+	destfile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer destfile.Close()
+
+	if _, err := io.Copy(destfile, srcfile); err != nil {
+		return err
+	}
+
+	srcinfo, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
 
-	defer sourceFile.Close()
-
-	destFile, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	if err == nil {
-		sourceInfo, err := os.Stat(source)
-		if err != nil {
-			err = os.Chmod(dest, sourceInfo.Mode())
-		}
-
-	}
-	return
+	return os.Chmod(dest, srcinfo.Mode())
 }

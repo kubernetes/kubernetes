@@ -321,15 +321,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	tmpDir, err := volume.RenameDirectory(dir, ed.volName+".deleting~")
-	if err != nil {
-		return err
-	}
-	err = os.RemoveAll(tmpDir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return volume.RenameWithFallback(dir, ed.volName+".deleting~")
 }
 
 func (ed *emptyDir) teardownTmpfs(dir string) error {
