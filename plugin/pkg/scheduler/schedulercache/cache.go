@@ -60,6 +60,8 @@ type podState struct {
 	pod *v1.Pod
 	// Used by assumedPod to determinate expiration.
 	deadline *time.Time
+	// Used to block cache from expiring assumedPod if binding still runs
+	waitsBinding chan struct{}
 }
 
 func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedulerCache {
@@ -124,11 +126,29 @@ func (cache *schedulerCache) assumePod(pod *v1.Pod, now time.Time) error {
 	cache.addPod(pod)
 	dl := now.Add(cache.ttl)
 	ps := &podState{
-		pod:      pod,
-		deadline: &dl,
+		pod:          pod,
+		deadline:     &dl,
+		waitsBinding: make(chan struct{}),
 	}
 	cache.podStates[key] = ps
 	cache.assumedPods[key] = true
+	return nil
+}
+
+func (cache *schedulerCache) FinishBinding(pod *v1.Pod) error {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	glog.V(5).Infof("Finished binding for pod %v. Can be expired.", key)
+	currState, ok := cache.podStates[key]
+	if ok && cache.assumedPods[key] {
+		close(currState.waitsBinding)
+	}
 	return nil
 }
 
@@ -342,6 +362,18 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 		ps, ok := cache.podStates[key]
 		if !ok {
 			panic("Key found in assumed set but not in podStates. Potentially a logical error.")
+		}
+		var bindingDone bool
+		select {
+		case <-ps.waitsBinding:
+			bindingDone = true
+		default:
+			bindingDone = false
+		}
+		if !bindingDone {
+			glog.Warningf("Cant expire cache for pod %v/%v. Binding is still in progress.",
+				ps.pod.Namespace, ps.pod.Name)
+			continue
 		}
 		if now.After(*ps.deadline) {
 			glog.Warningf("Pod %s/%s expired", ps.pod.Namespace, ps.pod.Name)
