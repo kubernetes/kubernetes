@@ -186,7 +186,9 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			}
 			switch len(ports) {
 			case 0:
-				return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
+				if clusterIP, found := params["cluster-ip"]; !found || clusterIP != "None" {
+					return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
+				}
 			case 1:
 				params["port"] = ports[0]
 			default:

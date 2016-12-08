@@ -136,39 +136,41 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		}
 	}
 
-	portStringSlice := strings.Split(portString, ",")
-	for i, stillPortString := range portStringSlice {
-		port, err := strconv.Atoi(stillPortString)
-		if err != nil {
-			return nil, err
-		}
-		name := servicePortName
-		// If we are going to assign multiple ports to a service, we need to
-		// generate a different name for each one.
-		if len(portStringSlice) > 1 {
-			name = fmt.Sprintf("port-%d", i+1)
-		}
-		protocol := params["protocol"]
-
-		switch {
-		case len(protocol) == 0 && len(portProtocolMap) == 0:
-			// Default to TCP, what the flag was doing previously.
-			protocol = "TCP"
-		case len(protocol) > 0 && len(portProtocolMap) > 0:
-			// User has specified the --protocol while exposing a multiprotocol resource
-			// We should stomp multiple protocols with the one specified ie. do nothing
-		case len(protocol) == 0 && len(portProtocolMap) > 0:
-			// no --protocol and we expose a multiprotocol resource
-			protocol = "TCP" // have the default so we can stay sane
-			if exposeProtocol, found := portProtocolMap[stillPortString]; found {
-				protocol = exposeProtocol
+	if len(portString) > 0 {
+		portStringSlice := strings.Split(portString, ",")
+		for i, stillPortString := range portStringSlice {
+			port, err := strconv.Atoi(stillPortString)
+			if err != nil {
+				return nil, err
 			}
+			name := servicePortName
+			// If we are going to assign multiple ports to a service, we need to
+			// generate a different name for each one.
+			if len(portStringSlice) > 1 {
+				name = fmt.Sprintf("port-%d", i+1)
+			}
+			protocol := params["protocol"]
+
+			switch {
+			case len(protocol) == 0 && len(portProtocolMap) == 0:
+				// Default to TCP, what the flag was doing previously.
+				protocol = "TCP"
+			case len(protocol) > 0 && len(portProtocolMap) > 0:
+				// User has specified the --protocol while exposing a multiprotocol resource
+				// We should stomp multiple protocols with the one specified ie. do nothing
+			case len(protocol) == 0 && len(portProtocolMap) > 0:
+				// no --protocol and we expose a multiprotocol resource
+				protocol = "TCP" // have the default so we can stay sane
+				if exposeProtocol, found := portProtocolMap[stillPortString]; found {
+					protocol = exposeProtocol
+				}
+			}
+			ports = append(ports, api.ServicePort{
+				Name:     name,
+				Port:     int32(port),
+				Protocol: api.Protocol(protocol),
+			})
 		}
-		ports = append(ports, api.ServicePort{
-			Name:     name,
-			Port:     int32(port),
-			Protocol: api.Protocol(protocol),
-		})
 	}
 
 	service := api.Service{
