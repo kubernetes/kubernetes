@@ -130,23 +130,21 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 
 // generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from v1.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, cgroupParent string) *runtimeapi.LinuxPodSandboxConfig {
-	if pod.Spec.SecurityContext == nil && cgroupParent == "" {
-		return nil
+	lc := &runtimeapi.LinuxPodSandboxConfig{
+		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{},
 	}
 
-	lc := &runtimeapi.LinuxPodSandboxConfig{}
 	if cgroupParent != "" {
 		lc.CgroupParent = &cgroupParent
 	}
+
 	if pod.Spec.SecurityContext != nil {
 		sc := pod.Spec.SecurityContext
-		lc.SecurityContext = &runtimeapi.LinuxSandboxSecurityContext{
-			NamespaceOptions: &runtimeapi.NamespaceOption{
-				HostNetwork: &pod.Spec.HostNetwork,
-				HostIpc:     &pod.Spec.HostIPC,
-				HostPid:     &pod.Spec.HostPID,
-			},
-			RunAsUser: sc.RunAsUser,
+		lc.SecurityContext.RunAsUser = sc.RunAsUser
+		lc.SecurityContext.NamespaceOptions = &runtimeapi.NamespaceOption{
+			HostNetwork: &pod.Spec.HostNetwork,
+			HostIpc:     &pod.Spec.HostIPC,
+			HostPid:     &pod.Spec.HostPID,
 		}
 
 		if sc.FSGroup != nil {
@@ -166,6 +164,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, c
 				Level: &sc.SELinuxOptions.Level,
 			}
 		}
+	}
+
+	if kubecontainer.HasPrivilegedContainer(pod) {
+		privileged := true
+		lc.SecurityContext.Privileged = &privileged
 	}
 
 	return lc
