@@ -29,6 +29,7 @@ import (
 	skymsg "github.com/skynetservices/skydns/msg"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
+	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -249,13 +250,10 @@ func (kd *KubeDNS) setEndpointsStore() {
 		&v1.Endpoints{},
 		resyncPeriod,
 		kcache.ResourceEventHandlerFuncs{
-			AddFunc: kd.handleEndpointAdd,
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				// TODO: Avoid unwanted updates.
-				kd.handleEndpointAdd(newObj)
-			},
-			// No DeleteFunc for EndpointsStore because endpoint object will be deleted
-			// when corresponding service is deleted.
+			AddFunc:    kd.handleEndpointAdd,
+			UpdateFunc: kd.handleEndpointUpdate,
+			// If Service is named headless need to remove the reverse dns entries.
+			DeleteFunc: kd.handleEndpointDelete,
 		},
 	)
 }
@@ -327,6 +325,32 @@ func (kd *KubeDNS) updateService(oldObj, newObj interface{}) {
 func (kd *KubeDNS) handleEndpointAdd(obj interface{}) {
 	if e, ok := obj.(*v1.Endpoints); ok {
 		kd.addDNSUsingEndpoints(e)
+	}
+}
+
+func (kd *KubeDNS) handleEndpointUpdate(oldObj, newObj interface{}) {
+	kd.handleEndpointDelete(oldObj)
+	// TODO: Avoid unwanted updates.
+	kd.handleEndpointAdd(newObj)
+}
+
+func (kd *KubeDNS) handleEndpointDelete(obj interface{}) {
+	if e, ok := obj.(*v1.Endpoints); ok {
+		svc, err := kd.getServiceFromEndpoints(e)
+		if svc != nil && err == nil {
+			if !v1.IsServiceIPSet(svc) {
+				// When endpoints for Named headless services deleted, delete old reverse dns records.
+				for idx := range e.Subsets {
+					for subIdx := range e.Subsets[idx].Addresses {
+						address := &e.Subsets[idx].Addresses[subIdx]
+						endpointIP := address.IP
+						if kd.isHeadlessServiceNamed(svc, e.Subsets[idx].Addresses[subIdx].TargetRef) {
+							delete(kd.reverseRecordMap, endpointIP)
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -403,6 +427,7 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *v1.Endpoints, svc *v1.Se
 	if err != nil {
 		return err
 	}
+
 	subCache := treecache.NewTreeCache()
 	glog.V(4).Infof("Endpoints Annotations: %v", e.Annotations)
 	for idx := range e.Subsets {
@@ -424,6 +449,12 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *v1.Endpoints, svc *v1.Se
 					subCache.SetEntry(endpointName, srvValue, kd.fqdn(svc, append(l, endpointName)...), l...)
 				}
 			}
+
+			// Generate PTR records only for Named Headless service.
+			if kd.isHeadlessServiceNamed(svc, e.Subsets[idx].Addresses[subIdx].TargetRef) {
+				reverseRecord, _ := util.GetSkyMsg(kd.fqdn(svc, endpointName), 0)
+				kd.reverseRecordMap[endpointIP] = reverseRecord
+			}
 		}
 	}
 	subCachePath := append(kd.domainPath, serviceSubdomain, svc.Namespace)
@@ -431,6 +462,28 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *v1.Endpoints, svc *v1.Se
 	defer kd.cacheLock.Unlock()
 	kd.cache.SetSubCache(svc.Name, subCache, subCachePath...)
 	return nil
+}
+
+func (kd *KubeDNS) isHeadlessServiceNamed(svc *v1.Service, podReference *v1.ObjectReference) bool {
+	if podReference != nil {
+		pod, err := kd.kubeClient.Core().Pods(podReference.Namespace).Get(podReference.Name)
+		if pod != nil && err == nil {
+			if svc.Name == getPodSubdomain(pod) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func getPodSubdomain(pod *v1.Pod) string {
+	if len(pod.Spec.Subdomain) > 0 {
+		return pod.Spec.Subdomain
+	}
+	if pod.Annotations != nil {
+		return pod.Annotations[utilpod.PodSubdomainAnnotation]
+	}
+	return ""
 }
 
 func getHostname(address *v1.EndpointAddress, podHostnames map[string]endpoints.HostRecord) (string, bool) {
