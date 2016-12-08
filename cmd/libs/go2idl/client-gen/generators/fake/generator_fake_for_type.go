@@ -17,9 +17,9 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -56,12 +56,21 @@ func (g *genFakeForType) Imports(c *generator.Context) (imports []string) {
 // registered for "status" in the API server, but we do not have that
 // information, so hasStatus returns true if the type has a status field.
 func hasStatus(t *types.Type) bool {
+	// Default to true if we have a Status member
+	hasStatus := false
 	for _, m := range t.Members {
-		if m.Name == "Status" && strings.Contains(m.Tags, `json:"status`) {
-			return true
+		if m.Name == "Status" {
+			hasStatus = true
+			break
 		}
 	}
-	return false
+
+	// Allow overriding via a comment on the type
+	genStatus, err := types.ExtractSingleBoolCommentTag("+", "genclientstatus", hasStatus, t.SecondClosestCommentLines)
+	if err != nil {
+		fmt.Printf("error looking up +genclientstatus: %v\n", err)
+	}
+	return genStatus
 }
 
 // hasObjectMeta returns true if the type has a ObjectMeta field.

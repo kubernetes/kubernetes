@@ -17,9 +17,9 @@ limitations under the License.
 package generators
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -55,12 +55,21 @@ func (g *genClientForType) Imports(c *generator.Context) (imports []string) {
 // registered for "status" in the API server, but we do not have that
 // information, so hasStatus returns true if the type has a status field.
 func hasStatus(t *types.Type) bool {
+	// Default to true if we have a Status member
+	hasStatus := false
 	for _, m := range t.Members {
-		if m.Name == "Status" && strings.Contains(m.Tags, `json:"status`) {
-			return true
+		if m.Name == "Status" {
+			hasStatus = true
+			break
 		}
 	}
-	return false
+
+	// Allow overriding via a comment on the type
+	genStatus, err := types.ExtractSingleBoolCommentTag("+", "genclientstatus", hasStatus, t.SecondClosestCommentLines)
+	if err != nil {
+		fmt.Printf("error looking up +genclientstatus: %v\n", err)
+	}
+	return genStatus
 }
 
 // GenerateType makes the body of a file implementing the individual typed client for type t.
@@ -296,6 +305,9 @@ func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.
 `
 
 var updateStatusTemplate = `
+// UpdateStatus was generated because the type contains a Status member.
+// add a +genclientstatus=false comment above the type to avoid generating UpdateStatus 
+
 func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Put().
