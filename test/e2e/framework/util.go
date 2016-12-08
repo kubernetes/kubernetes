@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -2642,16 +2643,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) 
 }
 
 func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Scaler, error) {
-	switch kind {
-	case api.Kind("ReplicationController"):
-		return kubectl.ScalerFor(api.Kind("ReplicationController"), internalClientset)
-	case extensionsinternal.Kind("ReplicaSet"):
-		return kubectl.ScalerFor(extensionsinternal.Kind("ReplicaSet"), internalClientset)
-	case extensionsinternal.Kind("Deployment"):
-		return kubectl.ScalerFor(extensionsinternal.Kind("Deployment"), internalClientset)
-	default:
-		return nil, fmt.Errorf("Unsupported kind for getting Scaler: %v", kind)
-	}
+	return kubectl.ScalerFor(kind, internalClientset)
 }
 
 func ScaleResource(
@@ -2790,6 +2782,8 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 		return c.Extensions().Deployments(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("DaemonSet"):
 		return c.Extensions().DaemonSets(ns).Get(name, metav1.GetOptions{})
+	case batchinternal.Kind("Job"):
+		return c.Batch().Jobs(ns).Get(name, metav1.GetOptions{})
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
 	}
@@ -2803,6 +2797,10 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name strin
 		return c.Extensions().ReplicaSets(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("Deployment"):
 		return c.Extensions().Deployments(ns).Delete(name, deleteOption)
+	case extensionsinternal.Kind("DaemonSet"):
+		return c.Extensions().DaemonSets(ns).Delete(name, deleteOption)
+	case batchinternal.Kind("Job"):
+		return c.Batch().Jobs(ns).Delete(name, deleteOption)
 	default:
 		return fmt.Errorf("Unsupported kind when deleting: %v", kind)
 	}
@@ -2817,6 +2815,8 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	case *extensions.Deployment:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.DaemonSet:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *batch.Job:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
@@ -2840,24 +2840,20 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
+	case *batch.Job:
+		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods
+		// that actually finish we need a better way to do this.
+		if typed.Spec.Parallelism != nil {
+			return *typed.Spec.Parallelism, nil
+		}
+		return 0, nil
 	default:
 		return -1, fmt.Errorf("Unsupported kind when getting number of replicas: %v", obj)
 	}
 }
 
 func getReaperForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Reaper, error) {
-	switch kind {
-	case api.Kind("ReplicationController"):
-		return kubectl.ReaperFor(api.Kind("ReplicationController"), internalClientset)
-	case extensionsinternal.Kind("ReplicaSet"):
-		return kubectl.ReaperFor(extensionsinternal.Kind("ReplicaSet"), internalClientset)
-	case extensionsinternal.Kind("Deployment"):
-		return kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClientset)
-	case extensionsinternal.Kind("DaemonSet"):
-		return kubectl.ReaperFor(extensionsinternal.Kind("DaemonSet"), internalClientset)
-	default:
-		return nil, fmt.Errorf("Unsupported kind: %v", kind)
-	}
+	return kubectl.ReaperFor(kind, internalClientset)
 }
 
 // DeleteResourceAndPods deletes a given resource and all pods it spawned
