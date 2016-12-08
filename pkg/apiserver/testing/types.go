@@ -17,14 +17,14 @@ limitations under the License.
 package testing
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type Simple struct {
-	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta  `json:"metadata"`
+	metav1.TypeMeta  `json:",inline"`
+	apiv1.ObjectMeta `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional
@@ -34,8 +34,8 @@ type Simple struct {
 func (obj *Simple) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleRoot struct {
-	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta  `json:"metadata"`
+	metav1.TypeMeta  `json:",inline"`
+	apiv1.ObjectMeta `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional
