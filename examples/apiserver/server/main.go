@@ -29,7 +29,7 @@ func main() {
 	serverRunOptions := apiserver.NewServerRunOptions()
 
 	// Parse command line flags.
-	serverRunOptions.AddUniversalFlags(pflag.CommandLine)
+	serverRunOptions.GenericServerRunOptions.AddUniversalFlags(pflag.CommandLine)
 	serverRunOptions.Etcd.AddFlags(pflag.CommandLine)
 	serverRunOptions.SecureServing.AddFlags(pflag.CommandLine)
 	serverRunOptions.SecureServing.AddDeprecatedFlags(pflag.CommandLine)

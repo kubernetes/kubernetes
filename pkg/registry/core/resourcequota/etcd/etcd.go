@@ -20,12 +20,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/resourcequota"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
@@ -33,45 +31,24 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against resource quotas.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.ResourceQuotaList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.ResourceQuotas),
-		&api.ResourceQuota{},
-		prefix,
-		resourcequota.Strategy,
-		newListFunc,
-		resourcequota.GetAttrs,
-		storage.NoTriggerPublisher,
-	)
-
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
-		},
+		NewListFunc: func() runtime.Object { return &api.ResourceQuotaList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.ResourceQuota).Name, nil
 		},
-		PredicateFunc:           resourcequota.MatchResourceQuota,
-		QualifiedResource:       api.Resource("resourcequotas"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     resourcequota.MatchResourceQuota,
+		QualifiedResource: api.Resource("resourcequotas"),
 
 		CreateStrategy:      resourcequota.Strategy,
 		UpdateStrategy:      resourcequota.Strategy,
 		DeleteStrategy:      resourcequota.Strategy,
 		ReturnDeletedObject: true,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
+	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: resourcequota.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 
 	statusStore := *store

@@ -34,7 +34,9 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 	restOptions := generic.RESTOptions{
 		StorageConfig:           storageConfig,
 		Decorator:               generic.UndecoratedStorage,
-		DeleteCollectionWorkers: 1}
+		DeleteCollectionWorkers: 1,
+		ResourcePrefix:          "clusters",
+	}
 	storage, _ := NewREST(restOptions)
 	return storage, server
 }

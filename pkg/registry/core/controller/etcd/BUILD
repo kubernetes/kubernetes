@@ -22,12 +22,10 @@ go_library(
         "//pkg/apis/autoscaling/validation:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/labels:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/controller:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/runtime:go_default_library",
-        "//pkg/storage:go_default_library",
     ],
 )
 

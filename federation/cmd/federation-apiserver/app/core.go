@@ -30,7 +30,6 @@ import (
 	_ "k8s.io/kubernetes/federation/apis/core/install"
 	"k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -39,14 +38,15 @@ import (
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/core/namespace/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/core/service/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
-func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {
-	serviceStore, serviceStatusStore := serviceetcd.NewREST(restOptionsFactory.NewFor(api.Resource("service")))
-	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespaceetcd.NewREST(restOptionsFactory.NewFor(api.Resource("namespaces")))
-	secretStore := secretetcd.NewREST(restOptionsFactory.NewFor(api.Resource("secrets")))
-	configMapStore := configmapetcd.NewREST(restOptionsFactory.NewFor(api.Resource("configmaps")))
-	eventStore := eventetcd.NewREST(restOptionsFactory.NewFor(api.Resource("events")), uint64(s.EventTTL.Seconds()))
+func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
+	serviceStore, serviceStatusStore := serviceetcd.NewREST(optsGetter)
+	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespaceetcd.NewREST(optsGetter)
+	secretStore := secretetcd.NewREST(optsGetter)
+	configMapStore := configmapetcd.NewREST(optsGetter)
+	eventStore := eventetcd.NewREST(optsGetter, uint64(s.EventTTL.Seconds()))
 	coreResources := map[string]rest.Storage{
 		"secrets":             secretStore,
 		"services":            serviceStore,
