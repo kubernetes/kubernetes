@@ -74,7 +74,12 @@ const (
 	gciGlusterMountBinariesPath = "/sbin/mount.glusterfs"
 	defaultGidMin               = 2000
 	defaultGidMax               = math.MaxInt32
-	absoluteGidMax              = math.MaxInt32
+	// absoluteGidMin/Max are currently the same as the
+	// default values, but they play a different role and
+	// could take a different value. Only thing we need is:
+	// absGidMin <= defGidMin <= defGidMax <= absGidMax
+	absoluteGidMin = 2000
+	absoluteGidMax = math.MaxInt32
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -850,6 +855,9 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	var cfg provisioningConfig
 	var err error
 
+	cfg.gidMin = defaultGidMin
+	cfg.gidMax = defaultGidMax
+
 	authEnabled := true
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
@@ -874,11 +882,23 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			if err != nil {
 				return nil, fmt.Errorf("glusterfs: invalid value %q for volume plugin %s", k, glusterfsPluginName)
 			}
+			if parseGidMin < absoluteGidMin {
+				return nil, fmt.Errorf("glusterfs: gidMin must be >= %v", absoluteGidMin)
+			}
+			if parseGidMin > absoluteGidMax {
+				return nil, fmt.Errorf("glusterfs: gidMin must be <= %v", absoluteGidMax)
+			}
 			cfg.gidMin = parseGidMin
 		case "gidmax":
 			parseGidMax, err := convertGid(v)
 			if err != nil {
 				return nil, fmt.Errorf("glusterfs: invalid value %q for volume plugin %s", k, glusterfsPluginName)
+			}
+			if parseGidMax < absoluteGidMin {
+				return nil, fmt.Errorf("glusterfs: gidMax must be >= %v", absoluteGidMin)
+			}
+			if parseGidMax > absoluteGidMax {
+				return nil, fmt.Errorf("glusterfs: gidMax must be <= %v", absoluteGidMax)
 			}
 			cfg.gidMax = parseGidMax
 		default:
@@ -910,14 +930,6 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		}
 	} else {
 		cfg.secretValue = cfg.userKey
-	}
-
-	if cfg.gidMin == 0 {
-		cfg.gidMin = defaultGidMin
-	}
-
-	if cfg.gidMax == 0 {
-		cfg.gidMax = defaultGidMax
 	}
 
 	if cfg.gidMin > cfg.gidMax {
