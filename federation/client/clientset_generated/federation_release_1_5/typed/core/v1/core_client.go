@@ -30,6 +30,7 @@ type CoreV1Interface interface {
 	ConfigMapsGetter
 	EventsGetter
 	NamespacesGetter
+	PodsGetter
 	SecretsGetter
 	ServicesGetter
 }
@@ -49,6 +50,10 @@ func (c *CoreV1Client) Events(namespace string) EventInterface {
 
 func (c *CoreV1Client) Namespaces() NamespaceInterface {
 	return newNamespaces(c)
+}
+
+func (c *CoreV1Client) Pods(namespace string) PodInterface {
+	return newPods(c, namespace)
 }
 
 func (c *CoreV1Client) Secrets(namespace string) SecretInterface {

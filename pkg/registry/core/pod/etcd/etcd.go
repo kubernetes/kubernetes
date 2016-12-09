@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 
+	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
@@ -96,6 +97,71 @@ func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTr
 		ReturnDeletedObject: true,
 
 		Storage:     storageInterface,
+		DestroyFunc: dFunc,
+	}
+
+	statusStore := *store
+	statusStore.UpdateStrategy = pod.StatusStrategy
+
+	return PodStorage{
+		Pod:         &REST{store, proxyTransport},
+		Binding:     &BindingREST{store: store},
+		Eviction:    newEvictionStorage(store, podDisruptionBudgetClient),
+		Status:      &StatusREST{store: &statusStore},
+		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
+		Proxy:       &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
+		Exec:        &podrest.ExecREST{Store: store, KubeletConn: k},
+		Attach:      &podrest.AttachREST{Store: store, KubeletConn: k},
+		PortForward: &podrest.PortForwardREST{Store: store, KubeletConn: k},
+	}
+}
+
+// NewFedStorage returns a RESTStorage object that will work against pods.
+func NewFedStorage(ip []string, opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
+	prefix := "/" + opts.ResourcePrefix
+
+	newListFunc := func() runtime.Object { return &api.PodList{} }
+	storageInterface, dFunc := opts.Decorator(
+		opts.StorageConfig,
+		cachesize.GetWatchCacheSizeByResource(cachesize.Pods),
+		&api.Pod{},
+		prefix,
+		pod.Strategy,
+		newListFunc,
+		pod.GetAttrs,
+		pod.NodeNameTriggerFunc,
+	)
+
+	sourCli, _ := etcdclient.New(etcdclient.Config{
+		Endpoints: ip,
+		Transport: etcdclient.DefaultTransport,
+	})
+
+	fedStorage := genericregistry.NewPodStore(sourCli, storageInterface)
+
+	store := &genericregistry.Store{
+		NewFunc:     func() runtime.Object { return &api.Pod{} },
+		NewListFunc: newListFunc,
+		KeyRootFunc: func(ctx api.Context) string {
+			return genericregistry.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return genericregistry.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.Pod).Name, nil
+		},
+		PredicateFunc:           pod.MatchPod,
+		QualifiedResource:       api.Resource("pods"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+
+		CreateStrategy:      pod.Strategy,
+		UpdateStrategy:      pod.Strategy,
+		DeleteStrategy:      pod.Strategy,
+		ReturnDeletedObject: true,
+
+		Storage:     fedStorage,
 		DestroyFunc: dFunc,
 	}
 

@@ -1203,6 +1203,403 @@
      }
     ]
    },
+   "/api/v1/namespaces/{namespace}/pods": {
+    "get": {
+     "description": "list or watch objects of kind Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.PodList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "createCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.Pod"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1CollectionNamespacedPod",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/namespaces/{namespace}/pods/{name}": {
+    "get": {
+     "description": "read the specified Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "readCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "replaceCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.Pod"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified Pod",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "patchCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Pod",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/namespaces/{namespace}/secrets": {
     "get": {
      "description": "list or watch objects of kind Secret",
@@ -2514,6 +2911,455 @@
      }
     ]
    },
+   "/api/v1/pods": {
+    "get": {
+     "description": "list or watch objects of kind Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listCoreV1PodForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.PodList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/proxy/namespaces/{namespace}/pods/{name}": {
+    "get": {
+     "description": "proxy GET requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1GETNamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "proxy PUT requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1PUTNamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "proxy POST requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1POSTNamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "proxy DELETE requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1DELETENamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "options": {
+     "description": "proxy OPTIONS requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1OPTIONSNamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "head": {
+     "description": "proxy HEAD requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1HEADNamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Pod",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     }
+    ]
+   },
+   "/api/v1/proxy/namespaces/{namespace}/pods/{name}/{path}": {
+    "get": {
+     "description": "proxy GET requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1GETNamespacedPodWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "proxy PUT requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1PUTNamespacedPodWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "proxy POST requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1POSTNamespacedPodWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "proxy DELETE requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1DELETENamespacedPodWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "options": {
+     "description": "proxy OPTIONS requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1OPTIONSNamespacedPodWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "head": {
+     "description": "proxy HEAD requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1HEADNamespacedPodWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Pod",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "path to the resource",
+      "name": "path",
+      "in": "path",
+      "required": true
+     }
+    ]
+   },
    "/api/v1/secrets": {
     "get": {
      "description": "list or watch objects of kind Secret",
@@ -3255,6 +4101,184 @@
      }
     ]
    },
+   "/api/v1/watch/namespaces/{namespace}/pods": {
+    "get": {
+     "description": "watch individual changes to a list of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1NamespacedPodList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/namespaces/{namespace}/pods/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1NamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Pod",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/watch/namespaces/{namespace}/secrets": {
     "get": {
      "description": "watch individual changes to a list of Secret",
@@ -3665,6 +4689,83 @@
       "name": "name",
       "in": "path",
       "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/pods": {
+    "get": {
+     "description": "watch individual changes to a list of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1PodListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
      },
      {
       "uniqueItems": true,
@@ -8814,6 +9915,128 @@
      }
     }
    },
+   "v1.ContainerState": {
+    "description": "ContainerState holds a possible state of container. Only one of its members may be specified. If none of them is specified, the default one is ContainerStateWaiting.",
+    "properties": {
+     "running": {
+      "description": "Details about a running container",
+      "$ref": "#/definitions/v1.ContainerStateRunning"
+     },
+     "terminated": {
+      "description": "Details about a terminated container",
+      "$ref": "#/definitions/v1.ContainerStateTerminated"
+     },
+     "waiting": {
+      "description": "Details about a waiting container",
+      "$ref": "#/definitions/v1.ContainerStateWaiting"
+     }
+    }
+   },
+   "v1.ContainerStateRunning": {
+    "description": "ContainerStateRunning is a running state of a container.",
+    "properties": {
+     "startedAt": {
+      "description": "Time at which the container was last (re-)started",
+      "$ref": "#/definitions/v1.Time"
+     }
+    }
+   },
+   "v1.ContainerStateTerminated": {
+    "description": "ContainerStateTerminated is a terminated state of a container.",
+    "required": [
+     "exitCode"
+    ],
+    "properties": {
+     "containerID": {
+      "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'",
+      "type": "string"
+     },
+     "exitCode": {
+      "description": "Exit status from the last termination of the container",
+      "type": "integer",
+      "format": "int32"
+     },
+     "finishedAt": {
+      "description": "Time at which the container last terminated",
+      "$ref": "#/definitions/v1.Time"
+     },
+     "message": {
+      "description": "Message regarding the last termination of the container",
+      "type": "string"
+     },
+     "reason": {
+      "description": "(brief) reason from the last termination of the container",
+      "type": "string"
+     },
+     "signal": {
+      "description": "Signal from the last termination of the container",
+      "type": "integer",
+      "format": "int32"
+     },
+     "startedAt": {
+      "description": "Time at which previous execution of the container started",
+      "$ref": "#/definitions/v1.Time"
+     }
+    }
+   },
+   "v1.ContainerStateWaiting": {
+    "description": "ContainerStateWaiting is a waiting state of a container.",
+    "properties": {
+     "message": {
+      "description": "Message regarding why the container is not yet running.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "(brief) reason the container is not yet running.",
+      "type": "string"
+     }
+    }
+   },
+   "v1.ContainerStatus": {
+    "description": "ContainerStatus contains details for the current status of this container.",
+    "required": [
+     "name",
+     "ready",
+     "restartCount",
+     "image",
+     "imageID"
+    ],
+    "properties": {
+     "containerID": {
+      "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'. More info: http://kubernetes.io/docs/user-guide/container-environment#container-information",
+      "type": "string"
+     },
+     "image": {
+      "description": "The image the container is running. More info: http://kubernetes.io/docs/user-guide/images",
+      "type": "string"
+     },
+     "imageID": {
+      "description": "ImageID of the container's image.",
+      "type": "string"
+     },
+     "lastState": {
+      "description": "Details about the container's last termination condition.",
+      "$ref": "#/definitions/v1.ContainerState"
+     },
+     "name": {
+      "description": "This must be a DNS_LABEL. Each container in a pod must have a unique name. Cannot be updated.",
+      "type": "string"
+     },
+     "ready": {
+      "description": "Specifies whether the container has passed its readiness probe.",
+      "type": "boolean"
+     },
+     "restartCount": {
+      "description": "The number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed. Note that this is calculated from dead containers. But those containers are subject to garbage collection. This value will get capped at 5 by GC.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "state": {
+      "description": "Details about the container's current condition.",
+      "$ref": "#/definitions/v1.ContainerState"
+     }
+    }
+   },
    "v1.DeleteOptions": {
     "description": "DeleteOptions may be provided when deleting an API object",
     "properties": {
@@ -9367,6 +10590,75 @@
    "v1.Patch": {
     "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body."
    },
+   "v1.Pod": {
+    "description": "Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.",
+    "properties": {
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Specification of the desired behavior of the pod. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v1.PodSpec"
+     },
+     "status": {
+      "description": "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v1.PodStatus"
+     }
+    }
+   },
+   "v1.PodCondition": {
+    "description": "PodCondition contains details for the current condition of this pod.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/v1.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/v1.Time"
+     },
+     "message": {
+      "description": "Human-readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Unique, one-word, CamelCase reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status is the status of the condition. Can be True, False, Unknown. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type is the type of the condition. Currently only Ready. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions",
+      "type": "string"
+     }
+    }
+   },
+   "v1.PodList": {
+    "description": "PodList is a list of Pods.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "description": "List of pods. More info: http://kubernetes.io/docs/user-guide/pods",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.Pod"
+      }
+     },
+     "metadata": {
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "$ref": "#/definitions/v1.ListMeta"
+     }
+    }
+   },
    "v1.PodSecurityContext": {
     "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
     "properties": {
@@ -9485,6 +10777,49 @@
       "items": {
        "$ref": "#/definitions/v1.Volume"
       }
+     }
+    }
+   },
+   "v1.PodStatus": {
+    "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
+    "properties": {
+     "conditions": {
+      "description": "Current service state of pod. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.PodCondition"
+      }
+     },
+     "containerStatuses": {
+      "description": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.ContainerStatus"
+      }
+     },
+     "hostIP": {
+      "description": "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
+      "type": "string"
+     },
+     "message": {
+      "description": "A human readable message indicating details about why the pod is in this condition.",
+      "type": "string"
+     },
+     "phase": {
+      "description": "Current condition of the pod. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-phase",
+      "type": "string"
+     },
+     "podIP": {
+      "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'",
+      "type": "string"
+     },
+     "startTime": {
+      "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
+      "$ref": "#/definitions/v1.Time"
      }
     }
    },

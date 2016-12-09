@@ -27,5 +27,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 		v1.SetDefaults_Secret,
 		v1.SetDefaults_ServiceSpec,
 		v1.SetDefaults_NamespaceStatus,
+		v1.SetDefaults_Pod,
 	)
 }
