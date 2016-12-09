@@ -38,6 +38,7 @@ const (
 	maxTotalContainers = -1
 
 	defaultRuntimeRequestTimeoutDuration = 1 * time.Minute
+	defaultImagePullProgressDeadline     = 1 * time.Minute
 	garbageCollectDuration               = 3 * time.Minute
 	setupDuration                        = 10 * time.Minute
 	runtimePollInterval                  = 10 * time.Second
@@ -258,7 +259,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 func dockerContainerGCTest(f *framework.Framework, test testRun) {
 	var runtime docker.DockerInterface
 	BeforeEach(func() {
-		runtime = docker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration)
+		runtime = docker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration, defaultImagePullProgressDeadline)
 	})
 	for _, pod := range test.testPods {
 		// Initialize the getContainerNames function to use the dockertools api

@@ -321,6 +321,10 @@ type KubeletConfiguration struct {
 	// requests - pull, logs, exec and attach.
 	// +optional
 	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout,omitempty"`
+	// If no pulling progress is made before the deadline imagePullProgressDeadline,
+	// the image pulling will be cancelled. Defaults to 1m0s.
+	// +optional
+	ImagePullProgressDeadline metav1.Duration `json:"imagePullProgressDeadline,omitempty"`
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	// +optional
