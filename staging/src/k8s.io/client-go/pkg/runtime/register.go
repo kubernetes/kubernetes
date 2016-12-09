@@ -30,9 +30,6 @@ func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
 
 func (obj *Unknown) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
-func (obj *Unstructured) GetObjectKind() schema.ObjectKind     { return obj }
-func (obj *UnstructuredList) GetObjectKind() schema.ObjectKind { return obj }
-
 // GetObjectKind implements Object for VersionedObjects, returning an empty ObjectKind
 // interface if no objects are provided, or the ObjectKind interface of the object in the
 // highest array position.

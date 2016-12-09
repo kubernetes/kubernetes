@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	v1 "k8s.io/client-go/pkg/apis/autoscaling/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
@@ -37,7 +38,7 @@ type HorizontalPodAutoscalerInterface interface {
 	UpdateStatus(*v1.HorizontalPodAutoscaler) (*v1.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api_v1.DeleteOptions) error
 	DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error
-	Get(name string) (*v1.HorizontalPodAutoscaler, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.HorizontalPodAutoscaler, error)
 	List(opts api_v1.ListOptions) (*v1.HorizontalPodAutoscalerList, error)
 	Watch(opts api_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error)
@@ -83,6 +84,9 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *v1.Horizontal
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *v1.HorizontalPodAutoscaler) (result *v1.HorizontalPodAutoscaler, err error) {
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Put().
@@ -119,12 +123,13 @@ func (c *horizontalPodAutoscalers) DeleteCollection(options *api_v1.DeleteOption
 }
 
 // Get takes name of the horizontalPodAutoscaler, and returns the corresponding horizontalPodAutoscaler object, and an error if there is any.
-func (c *horizontalPodAutoscalers) Get(name string) (result *v1.HorizontalPodAutoscaler, err error) {
+func (c *horizontalPodAutoscalers) Get(name string, options meta_v1.GetOptions) (result *v1.HorizontalPodAutoscaler, err error) {
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
@@ -36,7 +37,7 @@ type ResourceQuotaInterface interface {
 	UpdateStatus(*v1.ResourceQuota) (*v1.ResourceQuota, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.ResourceQuota, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.ResourceQuota, error)
 	List(opts v1.ListOptions) (*v1.ResourceQuotaList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ResourceQuota, err error)
@@ -82,6 +83,9 @@ func (c *resourceQuotas) Update(resourceQuota *v1.ResourceQuota) (result *v1.Res
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *resourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
 	err = c.client.Put().
@@ -118,12 +122,13 @@ func (c *resourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions
 }
 
 // Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
-func (c *resourceQuotas) Get(name string) (result *v1.ResourceQuota, err error) {
+func (c *resourceQuotas) Get(name string, options meta_v1.GetOptions) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

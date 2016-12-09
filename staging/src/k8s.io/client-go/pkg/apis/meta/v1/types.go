@@ -25,7 +25,14 @@ limitations under the License.
 // separate packages.
 package v1
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/ugorji/go/codec"
+
+	"k8s.io/client-go/pkg/types"
+)
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
@@ -66,6 +73,26 @@ type ListMeta struct {
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 
+// OwnerReference contains enough information to let you identify an owning
+// object. Currently, an owning object must be in the same namespace, so there
+// is no namespace field.
+type OwnerReference struct {
+	// API version of the referent.
+	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
+	// Kind of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
+	// Name of the referent.
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
+	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
+	// UID of the referent.
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+	UID types.UID `json:"uid" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
+	// If true, this reference points to the managing controller.
+	// +optional
+	Controller *bool `json:"controller,omitempty" protobuf:"varint,6,opt,name=controller"`
+}
+
 // ExportOptions is the query options to the standard REST get call.
 type ExportOptions struct {
 	TypeMeta `json:",inline"`
@@ -73,6 +100,16 @@ type ExportOptions struct {
 	Export bool `json:"export" protobuf:"varint,1,opt,name=export"`
 	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
+}
+
+// GetOptions is the standard query options to the standard REST get call.
+type GetOptions struct {
+	TypeMeta `json:",inline"`
+	// When specified:
+	// - if unset, then the result is returned from remote storage based on quorum-read flag;
+	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
+	// - if set to non zero, then the result is at least as fresh as given rv.
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,1,opt,name=resourceVersion"`
 }
 
 // Status is a return value for calls that don't return other objects.
@@ -393,6 +430,40 @@ type APIResource struct {
 	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
 	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
 	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
+	// verbs is a list of supported kube verbs (this includes get, list, watch, create,
+	// update, patch, delete, deletecollection, and proxy)
+	Verbs Verbs `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
+}
+
+// Verbs masks the value so protobuf can generate
+//
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type Verbs []string
+
+func (vs Verbs) String() string {
+	return fmt.Sprintf("%v", []string(vs))
+}
+
+// CodecEncodeSelf is part of the codec.Selfer interface.
+func (vs *Verbs) CodecEncodeSelf(encoder *codec.Encoder) {
+	encoder.Encode(vs)
+}
+
+// CodecDecodeSelf is part of the codec.Selfer interface. It is overwritten here to make sure
+// that an empty verbs list is not decoded as nil. On the other hand, an undefined verbs list
+// will lead to nil because this decoding for Verbs is not invoked.
+//
+// TODO(sttts): this is due to a ugorji regression: https://github.com/ugorji/go/issues/119. Remove the
+// workaround when the regression is fixed.
+func (vs *Verbs) CodecDecodeSelf(decoder *codec.Decoder) {
+	m := []string{}
+	decoder.Decode(&m)
+	if len(m) == 0 {
+		*vs = []string{}
+	} else {
+		*vs = m
+	}
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
