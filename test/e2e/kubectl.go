@@ -456,7 +456,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("execing into a container with a successful command")
 			_, err := framework.NewKubectlCommand(nsFlag, "exec", "nginx", "--", "/bin/sh", "-c", "exit 0").Exec()
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 
 			By("execing into a container with a failing command")
 			_, err = framework.NewKubectlCommand(nsFlag, "exec", "nginx", "--", "/bin/sh", "-c", "exit 42").Exec()
@@ -466,7 +466,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("running a successful command")
 			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "success", "--", "/bin/sh", "-c", "exit 0").Exec()
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 
 			By("running a failing command")
 			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
@@ -478,20 +478,20 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
 				WithStdinData("abcd1234").
 				Exec()
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 
 			By("running a failing command without --restart=Never, but with --rm")
 			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
 				WithStdinData("abcd1234").
 				Exec()
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 			framework.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
 
 			By("running a failing command with --leave-stdin-open")
 			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
 				WithStdinData("abcd1234").
 				Exec()
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 		})
 
 		It("should support inline execution and attach", func() {
