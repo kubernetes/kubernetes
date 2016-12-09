@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Makefile for the skydns underscore templates to Salt/Pillar and other formats.
+# Makefile for the kubedns underscore templates to Salt/Pillar and other formats.
 
 # If you update the *.base templates, please run this Makefile before pushing.
 #
@@ -29,6 +29,6 @@ all: transform
 %.sed: %.base
 	sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
 
-transform: skydns-rc.yaml.in skydns-svc.yaml.in skydns-rc.yaml.sed skydns-svc.yaml.sed
+transform: kubedns-controller.yaml.in kubedns-svc.yaml.in kubedns-controller.yaml.sed kubedns-svc.yaml.sed
 
 .PHONY: transform

@@ -41,15 +41,15 @@ function init {
 
 function deploy_dns {
   echo "Deploying DNS on Kubernetes"
-  sed -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.sed" > skydns-rc.yaml
-  sed -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.sed" > skydns-svc.yaml
+  sed -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.sed" > kubedns-controller.yaml
+  sed -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.sed" > kubedns-svc.yaml
 
   KUBEDNS=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat"`
 
   if [ ! "$KUBEDNS" ]; then
-    # use kubectl to create skydns rc and service
-    ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
-    ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+    # use kubectl to create kubedns controller and service
+    ${KUBECTL} --namespace=kube-system create -f kubedns-controller.yaml 
+    ${KUBECTL} --namespace=kube-system create -f kubedns-svc.yaml
 
     echo "Kube-dns controller and service are successfully deployed."
   else

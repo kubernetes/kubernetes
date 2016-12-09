@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
 # Should keep target in cluster/addons/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml
 # in sync with this file.
 
-# Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
+# __MACHINE_GENERATED_WARNING__
 
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -78,10 +77,11 @@ spec:
           initialDelaySeconds: 3
           timeoutSeconds: 5
         args:
-        - --domain=$DNS_DOMAIN.
+        - --domain=__PILLAR__DNS__DOMAIN__.
         - --dns-port=10053
         - --config-map=kube-dns
         - --v=2
+        __PILLAR__FEDERATIONS__DOMAIN__MAP__
         env:
         - name: PROMETHEUS_PORT
           value: "10055"
@@ -157,9 +157,9 @@ spec:
             # net memory requested by the pod constant.
             memory: 50Mi
         args:
-        - --cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null
+        - --cmd=nslookup kubernetes.default.svc.__PILLAR__DNS__DOMAIN__ 127.0.0.1 >/dev/null
         - --url=/healthz-dnsmasq
-        - --cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1:10053 >/dev/null
+        - --cmd=nslookup kubernetes.default.svc.__PILLAR__DNS__DOMAIN__ 127.0.0.1:10053 >/dev/null
         - --url=/healthz-kubedns
         - --port=8080
         - --quiet

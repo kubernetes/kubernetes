@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
-
-# Warning: This is a file generated from the base underscore template file: skydns-svc.yaml.base
+# Warning: This is a file generated from the base underscore template file: kubedns-svc.yaml.base
 
 apiVersion: v1
 kind: Service
