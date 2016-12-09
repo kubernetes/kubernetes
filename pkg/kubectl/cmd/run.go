@@ -326,7 +326,13 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 				ResourceNames(mapping.Resource, name).
 				Flatten().
 				Do()
-			err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, false, mapper, quiet)
+			// Note: we pass in "true" for the "quiet" parameter because
+			// ReadResult will only print one thing based on the "quiet"
+			// flag, and that's the "pod xxx deleted" message. If they
+			// asked for us to remove the pod (via --rm) then telling them
+			// its been deleted is unnecessary since that's what they asked
+			// for. We should only print something if the "rm" fails.
+			err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, false, mapper, true)
 			if err != nil {
 				return err
 			}
