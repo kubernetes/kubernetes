@@ -19,6 +19,7 @@ package transport
 import (
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -152,6 +153,66 @@ func TestImpersonationRoundTripper(t *testing.T) {
 			if !reflect.DeepEqual(expected, v) {
 				t.Errorf("%v expected %v: %v, got %v", tc.name, k, expected, v)
 			}
+		}
+	}
+}
+
+func TestAuthProxyRoundTripper(t *testing.T) {
+	for n, tc := range map[string]struct {
+		username string
+		groups   []string
+		extra    map[string][]string
+	}{
+		"allfields": {
+			username: "user",
+			groups:   []string{"groupA", "groupB"},
+			extra: map[string][]string{
+				"one": {"alpha", "bravo"},
+				"two": {"charlie", "delta"},
+			},
+		},
+	} {
+		rt := &testRoundTripper{}
+		req := &http.Request{}
+		NewAuthProxyRoundTripper(tc.username, tc.groups, tc.extra, rt).RoundTrip(req)
+		if rt.Request == nil {
+			t.Errorf("%s: unexpected nil request: %v", n, rt)
+			continue
+		}
+		if rt.Request == req {
+			t.Errorf("%s: round tripper should have copied request object: %#v", n, rt.Request)
+			continue
+		}
+
+		actualUsernames, ok := rt.Request.Header["X-Remote-User"]
+		if !ok {
+			t.Errorf("%s missing value", n)
+			continue
+		}
+		if e, a := []string{tc.username}, actualUsernames; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s expected %v, got %v", n, e, a)
+			continue
+		}
+		actualGroups, ok := rt.Request.Header["X-Remote-Group"]
+		if !ok {
+			t.Errorf("%s missing value", n)
+			continue
+		}
+		if e, a := tc.groups, actualGroups; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s expected %v, got %v", n, e, a)
+			continue
+		}
+
+		actualExtra := map[string][]string{}
+		for key, values := range rt.Request.Header {
+			if strings.HasPrefix(strings.ToLower(key), strings.ToLower("X-Remote-Extra-")) {
+				extraKey := strings.ToLower(key[len("X-Remote-Extra-"):])
+				actualExtra[extraKey] = append(actualExtra[key], values...)
+			}
+		}
+		if e, a := tc.extra, actualExtra; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s expected %v, got %v", n, e, a)
+			continue
 		}
 	}
 }

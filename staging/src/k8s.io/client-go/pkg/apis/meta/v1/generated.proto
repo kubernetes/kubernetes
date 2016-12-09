@@ -69,6 +69,10 @@ message APIResource {
 
   // kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
   optional string kind = 3;
+
+  // verbs is a list of supported kube verbs (this includes get, list, watch, create,
+  // update, patch, delete, deletecollection, and proxy)
+  optional Verbs verbs = 4;
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
@@ -114,6 +118,15 @@ message ExportOptions {
 
   // Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.
   optional bool exact = 2;
+}
+
+// GetOptions is the standard query options to the standard REST get call.
+message GetOptions {
+  // When specified:
+  // - if unset, then the result is returned from remote storage based on quorum-read flag;
+  // - if it's 0, then we simply return what we currently have in cache, no guarantee;
+  // - if set to non zero, then the result is at least as fresh as given rv.
+  optional string resourceVersion = 1;
 }
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
@@ -230,6 +243,30 @@ message ListMeta {
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency
   // +optional
   optional string resourceVersion = 2;
+}
+
+// OwnerReference contains enough information to let you identify an owning
+// object. Currently, an owning object must be in the same namespace, so there
+// is no namespace field.
+message OwnerReference {
+  // API version of the referent.
+  optional string apiVersion = 5;
+
+  // Kind of the referent.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  optional string kind = 1;
+
+  // Name of the referent.
+  // More info: http://kubernetes.io/docs/user-guide/identifiers#names
+  optional string name = 3;
+
+  // UID of the referent.
+  // More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+  optional string uid = 4;
+
+  // If true, this reference points to the managing controller.
+  // +optional
+  optional bool controller = 6;
 }
 
 // RootPaths lists the paths available at root.
@@ -397,5 +434,15 @@ message TypeMeta {
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
   // +optional
   optional string apiVersion = 2;
+}
+
+// Verbs masks the value so protobuf can generate
+// 
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+message Verbs {
+  // items, if empty, will result in an empty slice
+
+  repeated string items = 1;
 }
 

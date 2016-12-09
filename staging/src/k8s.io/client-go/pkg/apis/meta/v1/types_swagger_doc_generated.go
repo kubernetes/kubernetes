@@ -53,6 +53,7 @@ var map_APIResource = map[string]string{
 	"name":       "name is the name of the resource.",
 	"namespaced": "namespaced indicates if a resource is namespaced or not.",
 	"kind":       "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
+	"verbs":      "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
 }
 
 func (APIResource) SwaggerDoc() map[string]string {
@@ -87,6 +88,15 @@ var map_ExportOptions = map[string]string{
 
 func (ExportOptions) SwaggerDoc() map[string]string {
 	return map_ExportOptions
+}
+
+var map_GetOptions = map[string]string{
+	"":                "GetOptions is the standard query options to the standard REST get call.",
+	"resourceVersion": "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+}
+
+func (GetOptions) SwaggerDoc() map[string]string {
+	return map_GetOptions
 }
 
 var map_GroupVersionForDiscovery = map[string]string{
@@ -128,6 +138,19 @@ var map_ListMeta = map[string]string{
 
 func (ListMeta) SwaggerDoc() map[string]string {
 	return map_ListMeta
+}
+
+var map_OwnerReference = map[string]string{
+	"":           "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+	"apiVersion": "API version of the referent.",
+	"kind":       "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"name":       "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+	"uid":        "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
+	"controller": "If true, this reference points to the managing controller.",
+}
+
+func (OwnerReference) SwaggerDoc() map[string]string {
+	return map_OwnerReference
 }
 
 var map_Patch = map[string]string{

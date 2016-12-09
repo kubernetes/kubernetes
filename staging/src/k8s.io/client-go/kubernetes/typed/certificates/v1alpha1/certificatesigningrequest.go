@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/certificates/v1alpha1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
@@ -37,7 +38,7 @@ type CertificateSigningRequestInterface interface {
 	UpdateStatus(*v1alpha1.CertificateSigningRequest) (*v1alpha1.CertificateSigningRequest, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1alpha1.CertificateSigningRequest, error)
+	Get(name string, options meta_v1.GetOptions) (*v1alpha1.CertificateSigningRequest, error)
 	List(opts v1.ListOptions) (*v1alpha1.CertificateSigningRequestList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.CertificateSigningRequest, err error)
@@ -79,6 +80,9 @@ func (c *certificateSigningRequests) Update(certificateSigningRequest *v1alpha1.
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *certificateSigningRequests) UpdateStatus(certificateSigningRequest *v1alpha1.CertificateSigningRequest) (result *v1alpha1.CertificateSigningRequest, err error) {
 	result = &v1alpha1.CertificateSigningRequest{}
 	err = c.client.Put().
@@ -112,11 +116,12 @@ func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions,
 }
 
 // Get takes name of the certificateSigningRequest, and returns the corresponding certificateSigningRequest object, and an error if there is any.
-func (c *certificateSigningRequests) Get(name string) (result *v1alpha1.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.CertificateSigningRequest, err error) {
 	result = &v1alpha1.CertificateSigningRequest{}
 	err = c.client.Get().
 		Resource("certificatesigningrequests").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

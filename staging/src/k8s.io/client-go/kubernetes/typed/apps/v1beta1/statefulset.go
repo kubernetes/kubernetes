@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
@@ -37,7 +38,7 @@ type StatefulSetInterface interface {
 	UpdateStatus(*v1beta1.StatefulSet) (*v1beta1.StatefulSet, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1beta1.StatefulSet, error)
+	Get(name string, options meta_v1.GetOptions) (*v1beta1.StatefulSet, error)
 	List(opts v1.ListOptions) (*v1beta1.StatefulSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.StatefulSet, err error)
@@ -83,6 +84,9 @@ func (c *statefulSets) Update(statefulSet *v1beta1.StatefulSet) (result *v1beta1
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *statefulSets) UpdateStatus(statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
 	result = &v1beta1.StatefulSet{}
 	err = c.client.Put().
@@ -119,12 +123,13 @@ func (c *statefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v
 }
 
 // Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
-func (c *statefulSets) Get(name string) (result *v1beta1.StatefulSet, err error) {
+func (c *statefulSets) Get(name string, options meta_v1.GetOptions) (result *v1beta1.StatefulSet, err error) {
 	result = &v1beta1.StatefulSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

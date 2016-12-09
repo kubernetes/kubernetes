@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
 	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
@@ -72,7 +73,7 @@ func (c *FakePersistentVolumes) DeleteCollection(options *v1.DeleteOptions, list
 	return err
 }
 
-func (c *FakePersistentVolumes) Get(name string) (result *v1.PersistentVolume, err error) {
+func (c *FakePersistentVolumes) Get(name string, options meta_v1.GetOptions) (result *v1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(persistentvolumesResource, name), &v1.PersistentVolume{})
 	if obj == nil {
