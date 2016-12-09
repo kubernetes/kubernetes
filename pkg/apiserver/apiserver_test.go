@@ -133,7 +133,7 @@ func addGrouplessTypes() {
 	}
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
-		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&v1.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{}, &metav1.ExportOptions{},
 		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
@@ -151,7 +151,7 @@ func addTestTypes() {
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
-		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
+		&v1.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &v1.Pod{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion,
