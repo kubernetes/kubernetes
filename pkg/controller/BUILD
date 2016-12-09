@@ -33,7 +33,6 @@ go_library(
         "//pkg/client/clientset_generated/release_1_5/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/conversion:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",

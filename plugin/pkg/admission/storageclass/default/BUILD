@@ -40,7 +40,6 @@ go_test(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
-        "//pkg/conversion:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )

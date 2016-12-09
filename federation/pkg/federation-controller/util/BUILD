@@ -39,7 +39,6 @@ go_library(
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
-        "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/net:go_default_library",

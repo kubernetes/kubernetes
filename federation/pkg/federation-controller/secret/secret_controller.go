@@ -32,7 +32,6 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/conversion"
 	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -315,7 +314,7 @@ func (secretcontroller *SecretController) reconcileSecret(secret types.Namespace
 
 	// Create a copy before modifying the obj to prevent race condition with
 	// other readers of obj from store.
-	baseSecretObj, err := conversion.NewCloner().DeepCopy(baseSecretObjFromStore)
+	baseSecretObj, err := api.Scheme.DeepCopy(baseSecretObjFromStore)
 	baseSecret, ok := baseSecretObj.(*apiv1.Secret)
 	if err != nil || !ok {
 		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
