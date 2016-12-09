@@ -455,7 +455,7 @@ func (adc *attachDetachController) createVolumeSpec(
 // with the given namespace/name.
 // This method returns an error if the PVC object's phase is not "Bound".
 func (adc *attachDetachController) getPVCFromCacheExtractPV(
-	namespace string, name string) (string, types.UID, error) {
+	namespace, name string) (string, types.UID, error) {
 	key := name
 	if len(namespace) > 0 {
 		key = namespace + "/" + name

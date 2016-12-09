@@ -24,6 +24,7 @@ import (
 	"path"
 	"testing"
 	"text/template"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
