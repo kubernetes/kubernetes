@@ -78,6 +78,9 @@ func (c *nodes) Update(node *v1.Node) (result *v1.Node, err error) {
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *nodes) UpdateStatus(node *v1.Node) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Put().

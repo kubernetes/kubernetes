@@ -50,6 +50,15 @@ func (c *FakeAPIServices) Update(aPIService *apiregistration.APIService) (result
 	return obj.(*apiregistration.APIService), err
 }
 
+func (c *FakeAPIServices) UpdateStatus(aPIService *apiregistration.APIService) (*apiregistration.APIService, error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootUpdateSubresourceAction(apiservicesResource, "status", aPIService), &apiregistration.APIService{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*apiregistration.APIService), err
+}
+
 func (c *FakeAPIServices) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(apiservicesResource, name), &apiregistration.APIService{})

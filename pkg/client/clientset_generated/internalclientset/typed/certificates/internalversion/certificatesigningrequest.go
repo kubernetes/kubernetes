@@ -78,6 +78,9 @@ func (c *certificateSigningRequests) Update(certificateSigningRequest *certifica
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *certificateSigningRequests) UpdateStatus(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
 	err = c.client.Put().

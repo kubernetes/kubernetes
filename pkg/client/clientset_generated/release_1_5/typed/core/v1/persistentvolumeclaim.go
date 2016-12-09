@@ -82,6 +82,9 @@ func (c *persistentVolumeClaims) Update(persistentVolumeClaim *v1.PersistentVolu
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Put().

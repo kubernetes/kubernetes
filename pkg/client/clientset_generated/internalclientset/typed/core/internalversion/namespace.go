@@ -77,6 +77,9 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *namespaces) UpdateStatus(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
 	err = c.client.Put().
