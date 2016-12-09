@@ -71,22 +71,17 @@ func TestModifyContainerConfig(t *testing.T) {
 
 func TestModifyHostConfig(t *testing.T) {
 	priv := true
-	setNetworkHC := &dockercontainer.HostConfig{
-		NetworkMode: "none",
-	}
+	setNetworkHC := &dockercontainer.HostConfig{}
 	setPrivSC := &runtimeapi.LinuxContainerSecurityContext{}
 	setPrivSC.Privileged = &priv
 	setPrivHC := &dockercontainer.HostConfig{
-		Privileged:  true,
-		NetworkMode: "none",
+		Privileged: true,
 	}
 	setCapsHC := &dockercontainer.HostConfig{
-		NetworkMode: "none",
-		CapAdd:      []string{"addCapA", "addCapB"},
-		CapDrop:     []string{"dropCapA", "dropCapB"},
+		CapAdd:  []string{"addCapA", "addCapB"},
+		CapDrop: []string{"dropCapA", "dropCapB"},
 	}
 	setSELinuxHC := &dockercontainer.HostConfig{
-		NetworkMode: "none",
 		SecurityOpt: []string{
 			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser, "user"),
 			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole, "role"),
@@ -133,7 +128,7 @@ func TestModifyHostConfig(t *testing.T) {
 
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.sc, "", dockerCfg)
+		modifyHostConfig(tc.sc, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
@@ -141,7 +136,7 @@ func TestModifyHostConfig(t *testing.T) {
 func TestModifyHostConfigWithGroups(t *testing.T) {
 	supplementalGroupsSC := &runtimeapi.LinuxContainerSecurityContext{}
 	supplementalGroupsSC.SupplementalGroups = []int64{2222}
-	supplementalGroupHC := &dockercontainer.HostConfig{NetworkMode: "none"}
+	supplementalGroupHC := &dockercontainer.HostConfig{}
 	supplementalGroupHC.GroupAdd = []string{"2222"}
 
 	testCases := []struct {
@@ -152,7 +147,7 @@ func TestModifyHostConfigWithGroups(t *testing.T) {
 		{
 			name:            "nil",
 			securityContext: nil,
-			expected:        &dockercontainer.HostConfig{NetworkMode: "none"},
+			expected:        &dockercontainer.HostConfig{},
 		},
 		{
 			name:            "SupplementalGroup",
@@ -163,12 +158,12 @@ func TestModifyHostConfigWithGroups(t *testing.T) {
 
 	for _, tc := range testCases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.securityContext, "", dockerCfg)
+		modifyHostConfig(tc.securityContext, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
 
-func TestModifyHostConfigWithSandboxID(t *testing.T) {
+func TestModifyHostConfigAndNamespaceOptionsForContainer(t *testing.T) {
 	priv := true
 	sandboxID := "sandbox"
 	sandboxNSMode := fmt.Sprintf("container:%v", sandboxID)
@@ -224,7 +219,100 @@ func TestModifyHostConfigWithSandboxID(t *testing.T) {
 
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.sc, sandboxID, dockerCfg)
+		modifyHostConfig(tc.sc, dockerCfg)
+		modifyContainerNamespaceOptions(tc.sc.GetNamespaceOptions(), sandboxID, dockerCfg)
+		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
+	}
+}
+
+func TestModifySandboxNamespaceOptions(t *testing.T) {
+	set := true
+	cases := []struct {
+		name     string
+		nsOpt    *runtimeapi.NamespaceOption
+		expected *dockercontainer.HostConfig
+	}{
+		{
+			name: "NamespaceOption.HostNetwork",
+			nsOpt: &runtimeapi.NamespaceOption{
+				HostNetwork: &set,
+			},
+			expected: &dockercontainer.HostConfig{
+				NetworkMode: namespaceModeHost,
+			},
+		},
+		{
+			name: "NamespaceOption.HostIpc",
+			nsOpt: &runtimeapi.NamespaceOption{
+				HostIpc: &set,
+			},
+			expected: &dockercontainer.HostConfig{
+				IpcMode:     namespaceModeHost,
+				NetworkMode: "default",
+			},
+		},
+		{
+			name: "NamespaceOption.HostPid",
+			nsOpt: &runtimeapi.NamespaceOption{
+				HostPid: &set,
+			},
+			expected: &dockercontainer.HostConfig{
+				PidMode:     namespaceModeHost,
+				NetworkMode: "default",
+			},
+		},
+	}
+	for _, tc := range cases {
+		dockerCfg := &dockercontainer.HostConfig{}
+		modifySandboxNamespaceOptions(tc.nsOpt, dockerCfg, nil)
+		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
+	}
+}
+
+func TestModifyContainerNamespaceOptions(t *testing.T) {
+	set := true
+	sandboxID := "sandbox"
+	sandboxNSMode := fmt.Sprintf("container:%v", sandboxID)
+	cases := []struct {
+		name     string
+		nsOpt    *runtimeapi.NamespaceOption
+		expected *dockercontainer.HostConfig
+	}{
+		{
+			name: "NamespaceOption.HostNetwork",
+			nsOpt: &runtimeapi.NamespaceOption{
+				HostNetwork: &set,
+			},
+			expected: &dockercontainer.HostConfig{
+				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
+				UTSMode:     namespaceModeHost,
+			},
+		},
+		{
+			name: "NamespaceOption.HostIpc",
+			nsOpt: &runtimeapi.NamespaceOption{
+				HostIpc: &set,
+			},
+			expected: &dockercontainer.HostConfig{
+				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
+			},
+		},
+		{
+			name: "NamespaceOption.HostPid",
+			nsOpt: &runtimeapi.NamespaceOption{
+				HostPid: &set,
+			},
+			expected: &dockercontainer.HostConfig{
+				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
+			},
+		},
+	}
+	for _, tc := range cases {
+		dockerCfg := &dockercontainer.HostConfig{}
+		modifyContainerNamespaceOptions(tc.nsOpt, sandboxID, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
@@ -261,10 +349,9 @@ func inputSELinuxOptions() *runtimeapi.SELinuxOption {
 
 func fullValidHostConfig() *dockercontainer.HostConfig {
 	return &dockercontainer.HostConfig{
-		Privileged:  true,
-		NetworkMode: "none",
-		CapAdd:      []string{"addCapA", "addCapB"},
-		CapDrop:     []string{"dropCapA", "dropCapB"},
+		Privileged: true,
+		CapAdd:     []string{"addCapA", "addCapB"},
+		CapDrop:    []string{"dropCapA", "dropCapB"},
 		SecurityOpt: []string{
 			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser, "user"),
 			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole, "role"),
