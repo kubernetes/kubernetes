@@ -3,23 +3,32 @@ kind: Pod
 metadata:
   name: kube-addon-manager
   namespace: kube-system
-  version: v1
+  labels:
+    component: kube-addon-manager
 spec:
   hostNetwork: true
   containers:
   - name: kube-addon-manager
-    image: gcr.io/google-containers/kube-addon-manager:v1
+    image: gcr.io/google-containers/kube-addon-manager:v6.1
+    command:
+    - /bin/bash
+    - -c
+    - /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
     resources:
       requests:
         cpu: 5m
-        # TODO(yifan): Figure out what's the memory usage should be here.
-        # See https://github.com/kubernetes/kubernetes/issues/23641.
-        memory: 100Mi
+        memory: 50Mi
     volumeMounts:
     - mountPath: /etc/kubernetes/
       name: addons
       readOnly: true
+    - mountPath: /var/log
+      name: varlog
+      readOnly: false
   volumes:
   - hostPath:
       path: /etc/kubernetes/
     name: addons
+  - hostPath:
+      path: /var/log
+    name: varlog
