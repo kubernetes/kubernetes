@@ -227,6 +227,8 @@ type VolumeSource struct {
 	// kubelet's host machine and then exposed to the pod.
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty"`
+	// RemoteTar represents a remote tar archive.
+	RemoteTar *RemoteTarVolumeSource `json:"remoteTar,omitempty"`
 	// GitRepo represents a git repository at a particular revision.
 	// +optional
 	GitRepo *GitRepoVolumeSource `json:"gitRepo,omitempty"`
@@ -694,6 +696,20 @@ type AWSElasticBlockStoreVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// Represents a volume that is populated with the contents of a git repository.
+// Git repo volumes do not support ownership management.
+// Git repo volumes support SELinux relabeling.
+type RemoteTarVolumeSource struct {
+	// Remote tar URL
+	Source string `json:"source"`
+	// Decompression target
+	// Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the
+	// git repository.  Otherwise, if specified, the volume will contain the git repository in
+	// the subdirectory with the given name.
+	Directory string `json:"directory"`
+	// TODO: Consider credentials here.
 }
 
 // Represents a volume that is populated with the contents of a git repository.
