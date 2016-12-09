@@ -10,7 +10,7 @@
   "apis": [
    {
     "path": "/api",
-    "description": "get available API versions",
+    "description": "get available API versions.",
     "operations": [
      {
       "type": "v1.APIVersions",
