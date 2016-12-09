@@ -480,7 +480,14 @@ func encodeToJSON(obj *extensions.ThirdPartyResourceData, stream io.Writer) erro
 	if !ok {
 		return fmt.Errorf("unexpected type: %v", objOut)
 	}
-	objMap["metadata"] = obj.ObjectMeta
+
+	// Convert to a serializable type
+	versionedObjectMeta := &v1.ObjectMeta{}
+	if err := v1.Convert_api_ObjectMeta_To_v1_ObjectMeta(&obj.ObjectMeta, versionedObjectMeta, nil); err != nil {
+		return err
+	}
+
+	objMap["metadata"] = versionedObjectMeta
 	encoder := json.NewEncoder(stream)
 	return encoder.Encode(objMap)
 }
