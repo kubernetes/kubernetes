@@ -19,6 +19,8 @@ package util
 import (
 	"sync"
 
+	"github.com/spf13/pflag"
+
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -29,8 +31,30 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
-func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
-	return &ClientCache{
+const (
+	FlagMatchBinaryVersion = "match-server-version"
+)
+
+// ClientCache caches previously loaded clients for reuse, and ensures MatchServerVersion
+// is invoked only once
+type ClientCache interface {
+	// ClientConfigForVersion returns the correct config for a server
+	ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error)
+	// ClientSetForVersion initializes or reuses a clientset for the specified version, or returns an
+	// error if that is not possible
+	ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error)
+	// FederationClientSetForVersion initializes or reuses a federation clientset
+	// for the specified version, or returns an error if that is not possible
+	FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error)
+	// FederationClientSetForVersion initializes or reuses a federation RESTClient
+	// for the specified version, or returns an error if that is not possible
+	FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error)
+	// BindFlags binds flags for the ClientCache to the given FlagSet
+	BindFlags(flags *pflag.FlagSet)
+}
+
+func NewClientCache(loader clientcmd.ClientConfig) ClientCache {
+	return &clientCache{
 		clientsets:    make(map[schema.GroupVersion]*internalclientset.Clientset),
 		configs:       make(map[schema.GroupVersion]*restclient.Config),
 		fedClientSets: make(map[schema.GroupVersion]fedclientset.Interface),
@@ -38,9 +62,8 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 	}
 }
 
-// ClientCache caches previously loaded clients for reuse, and ensures MatchServerVersion
-// is invoked only once
-type ClientCache struct {
+// clientCache implements ClientCache
+type clientCache struct {
 	loader        clientcmd.ClientConfig
 	clientsets    map[schema.GroupVersion]*internalclientset.Clientset
 	fedClientSets map[schema.GroupVersion]fedclientset.Interface
@@ -53,9 +76,11 @@ type ClientCache struct {
 	discoveryClient   discovery.DiscoveryInterface
 }
 
+var _ ClientCache = &clientCache{}
+
 // also looks up the discovery client.  We can't do this during init because the flags won't have been set
 // because this is constructed pre-command execution before the command tree is even set up
-func (c *ClientCache) getDefaultConfig() (restclient.Config, discovery.DiscoveryInterface, error) {
+func (c *clientCache) getDefaultConfig() (restclient.Config, discovery.DiscoveryInterface, error) {
 	c.defaultConfigLock.Lock()
 	defer c.defaultConfigLock.Unlock()
 
@@ -83,7 +108,7 @@ func (c *ClientCache) getDefaultConfig() (restclient.Config, discovery.Discovery
 }
 
 // ClientConfigForVersion returns the correct config for a server
-func (c *ClientCache) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
+func (c *clientCache) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
 	// TODO: have a better config copy method
 	config, discoveryClient, err := c.getDefaultConfig()
 	if err != nil {
@@ -126,7 +151,7 @@ func (c *ClientCache) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 
 // ClientSetForVersion initializes or reuses a clientset for the specified version, or returns an
 // error if that is not possible
-func (c *ClientCache) ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error) {
+func (c *clientCache) ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error) {
 	if requiredVersion != nil {
 		if clientset, ok := c.clientsets[*requiredVersion]; ok {
 			return clientset, nil
@@ -158,7 +183,7 @@ func (c *ClientCache) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 	return clientset, nil
 }
 
-func (c *ClientCache) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
+func (c *clientCache) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
 	if version != nil {
 		if clientSet, found := c.fedClientSets[*version]; found {
 			return clientSet, nil
@@ -188,10 +213,18 @@ func (c *ClientCache) FederationClientSetForVersion(version *schema.GroupVersion
 	return clientSet, nil
 }
 
-func (c *ClientCache) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
+func (c *clientCache) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
 	fedClientSet, err := c.FederationClientSetForVersion(version)
 	if err != nil {
 		return nil, err
 	}
 	return fedClientSet.Federation().RESTClient().(*restclient.RESTClient), nil
+}
+
+func (c *clientCache) BindFlags(flags *pflag.FlagSet) {
+	// Globally persistent flags across all subcommands.
+	// TODO Change flag names to consts to allow safer lookup from subcommands.
+	// TODO Add a verbose flag that turns on glog logging. Probably need a way
+	// to do that automatically for every subcommand.
+	flags.BoolVar(&c.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
 }

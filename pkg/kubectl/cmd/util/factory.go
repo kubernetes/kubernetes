@@ -68,10 +68,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const (
-	FlagMatchBinaryVersion = "match-server-version"
-)
-
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
 // of resources and different API sets.
 // TODO: make the functions interfaces
@@ -94,6 +90,8 @@ type Factory interface {
 	Decoder(toInternal bool) runtime.Decoder
 	// Returns an encoder capable of encoding a provided object into JSON in the default desired version.
 	JSONEncoder() runtime.Encoder
+	// ClientCache returns a cache of clients.
+	ClientCache() ClientCache
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet() (*internalclientset.Clientset, error)
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
@@ -312,7 +310,7 @@ type factory struct {
 	flags        *pflag.FlagSet
 	clientConfig clientcmd.ClientConfig
 
-	clients *ClientCache
+	clients ClientCache
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -355,9 +353,17 @@ func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) 
 	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
-func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+type ClientCacheFactory interface {
+	ClientCache() ClientCache
+}
+
+type DiscoveryClientFactory interface {
+	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+}
+
+func Object(dcf DiscoveryClientFactory, ccf ClientCacheFactory) (meta.RESTMapper, runtime.ObjectTyper) {
 	mapper := registered.RESTMapper()
-	discoveryClient, err := f.DiscoveryClient()
+	discoveryClient, err := dcf.DiscoveryClient()
 	if err == nil {
 		mapper = meta.FirstHitRESTMapper{
 			MultiRESTMapper: meta.MultiRESTMapper{
@@ -371,7 +377,7 @@ func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	mapper = NewShortcutExpander(mapper, discoveryClient)
 
 	// wrap with output preferences
-	cfg, err := f.clients.ClientConfigForVersion(nil)
+	cfg, err := ccf.ClientCache().ClientConfigForVersion(nil)
 	checkErrWithPrefix("failed to get client config: ", err)
 	cmdApiVersion := schema.GroupVersion{}
 	if cfg.GroupVersion != nil {
@@ -381,8 +387,12 @@ func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	return mapper, api.Scheme
 }
 
-func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
-	discoveryClient, err := f.DiscoveryClient()
+func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+	return Object(f, f)
+}
+
+func UnstructuredObject(dcf DiscoveryClientFactory) (meta.RESTMapper, runtime.ObjectTyper, error) {
+	discoveryClient, err := dcf.DiscoveryClient()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -400,12 +410,20 @@ func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, er
 	return NewShortcutExpander(mapper, discoveryClient), typer, nil
 }
 
+func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
+	return UnstructuredObject(f)
+}
+
 func (f *factory) RESTClient() (*restclient.RESTClient, error) {
 	clientConfig, err := f.clients.ClientConfigForVersion(nil)
 	if err != nil {
 		return nil, err
 	}
 	return restclient.RESTClientFor(clientConfig)
+}
+
+func (f *factory) ClientCache() ClientCache {
+	return f.clients
 }
 
 func (f *factory) ClientSet() (*internalclientset.Clientset, error) {
@@ -725,9 +743,9 @@ func (f *factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer,
 	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 }
 
-func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+func Validator(dcf DiscoveryClientFactory, validate bool, cacheDir string) (validation.Schema, error) {
 	if validate {
-		discovery, err := f.DiscoveryClient()
+		discovery, err := dcf.DiscoveryClient()
 		if err != nil {
 			return nil, err
 		}
@@ -752,13 +770,21 @@ func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, 
 	return validation.NullSchema{}, nil
 }
 
-func (f *factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
+func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+	return Validator(f, validate, cacheDir)
+}
+
+func SwaggerSchema(dcf DiscoveryClientFactory, gvk schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
 	version := gvk.GroupVersion()
-	discovery, err := f.DiscoveryClient()
+	discovery, err := dcf.DiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
 	return discovery.SwaggerSchema(version)
+}
+
+func (f *factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
+	return SwaggerSchema(f, gvk)
 }
 
 func (f *factory) DefaultNamespace() (string, bool, error) {
@@ -943,11 +969,8 @@ func (f *factory) BindFlags(flags *pflag.FlagSet) {
 	// Merge factory's flags
 	flags.AddFlagSet(f.flags)
 
-	// Globally persistent flags across all subcommands.
-	// TODO Change flag names to consts to allow safer lookup from subcommands.
-	// TODO Add a verbose flag that turns on glog logging. Probably need a way
-	// to do that automatically for every subcommand.
-	flags.BoolVar(&f.clients.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
+	// Merge client cache's flags
+	f.clients.BindFlags(flags)
 
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
@@ -1233,7 +1256,11 @@ func (f *factory) DefaultResourceFilterFunc() kubectl.Filters {
 	return kubectl.NewResourceFilter()
 }
 
-func (f *factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+type PrinterForMappingFactory interface {
+	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error)
+}
+
+func PrintObject(pmf PrinterForMappingFactory, cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	gvks, _, err := api.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return err
@@ -1244,20 +1271,32 @@ func (f *factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj ru
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, mapping, false)
+	printer, err := pmf.PrinterForMapping(cmd, mapping, false)
 	if err != nil {
 		return err
 	}
 	return printer.PrintObj(obj, out)
 }
 
-func (f *factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+func (f *factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+	return PrintObject(f, cmd, mapper, obj, out)
+}
+
+type ClientConfigFactory interface {
+	ClientConfig() (*restclient.Config, error)
+}
+
+type PrinterFactory interface {
+	Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error)
+}
+
+func PrinterForMapping(ccf ClientConfigFactory, pf PrinterFactory, cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
 	printer, ok, err := PrinterForCommand(cmd)
 	if err != nil {
 		return nil, err
 	}
 	if ok {
-		clientConfig, err := f.ClientConfig()
+		clientConfig, err := ccf.ClientConfig()
 		if err != nil {
 			return nil, err
 		}
@@ -1283,7 +1322,7 @@ func (f *factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			columnLabel = []string{}
 		}
-		printer, err = f.Printer(mapping, kubectl.PrintOptions{
+		printer, err = pf.Printer(mapping, kubectl.PrintOptions{
 			NoHeaders:          GetFlagBool(cmd, "no-headers"),
 			WithNamespace:      withNamespace,
 			Wide:               GetWideFlag(cmd),
@@ -1301,10 +1340,30 @@ func (f *factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 	return printer, nil
 }
 
-func (f *factory) NewBuilder() *resource.Builder {
-	mapper, typer := f.Object()
+func (f *factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+	return PrinterForMapping(f, f, cmd, mapping, withNamespace)
+}
 
-	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+type ObjectFactory interface {
+	Object() (meta.RESTMapper, runtime.ObjectTyper)
+}
+
+type DecoderFactory interface {
+	Decoder(toInternal bool) runtime.Decoder
+}
+
+type ClientForMappingFactory interface {
+	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
+}
+
+func NewBuilder(of ObjectFactory, df DecoderFactory, cfmf ClientForMappingFactory) *resource.Builder {
+	mapper, typer := of.Object()
+
+	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(cfmf.ClientForMapping), df.Decoder(true))
+}
+
+func (f *factory) NewBuilder() *resource.Builder {
+	return NewBuilder(f, f, f)
 }
 
 func (f *factory) SuggestedPodTemplateResources() []schema.GroupResource {
