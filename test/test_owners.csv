@@ -24,6 +24,7 @@ ClusterDns should create pod that uses dns,sttts,0
 ConfigMap should be consumable from pods in volume,alex-mohr,1
 ConfigMap should be consumable from pods in volume as non-root,hurf,1
 ConfigMap should be consumable from pods in volume as non-root with FSGroup,roberthbailey,1
+ConfigMap should be consumable from pods in volume as non-root with defaultMode and fsGroup set,pospispa,0
 ConfigMap should be consumable from pods in volume with defaultMode set,Random-Liu,1
 ConfigMap should be consumable from pods in volume with mappings,karlkfi,1
 ConfigMap should be consumable from pods in volume with mappings and Item mode set,eparis,1
@@ -62,7 +63,7 @@ Density create a batch of pods latency/resource should be within limit when crea
 Density create a batch of pods with higher API QPS latency/resource should be within limit when create * pods with * interval (QPS *),jlowdermilk,1
 Density create a sequence of pods latency/resource should be within limit when create * pods with * background pods,wojtek-t,1
 Density should allow running maximum capacity pods on nodes,smarterclayton,1
-Density should allow starting * pods per node,gmarek,0
+Density should allow starting * pods per node using * with * secrets,pospispa,0
 Deployment RecreateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should scale up and down in the right order,pwittrock,0
@@ -98,6 +99,7 @@ Downward API volume should provide container's memory request,mikedanese,1
 Downward API volume should provide node allocatable (cpu) as default cpu limit if the limit is not set,lavalamp,1
 Downward API volume should provide node allocatable (memory) as default memory limit if the limit is not set,freehan,1
 Downward API volume should provide podname as non-root with fsgroup,karlkfi,1
+Downward API volume should provide podname as non-root with fsgroup and defaultMode,pospispa,0
 Downward API volume should provide podname only,mwielgus,1
 Downward API volume should set DefaultMode on files,davidopp,1
 Downward API volume should set mode on item file,mtaufen,1
@@ -141,7 +143,6 @@ Federated Services DNS non-local federated service missing local service should 
 Federated Services DNS non-local federated service should be able to discover a non-local federated service,jlowdermilk,1
 Federated Services DNS should be able to discover a federated service,derekwaynecarr,1
 Federated Services Service creation should create matching services in underlying clusters,jbeda,1
-Federated Services Service creation should not be deleted from underlying clusters when it is deleted,sttts,0
 Federated Services Service creation should not be deleted from underlying clusters when it is deleted,madhusudancs,0
 Federated Services Service creation should succeed,rmmh,1
 Federated ingresses Federated Ingresses Ingress connectivity and DNS should be able to connect to a federated ingress via its load balancer,rmmh,1
@@ -274,7 +275,7 @@ KubeletManagedEtcHosts should test kubelet managed /etc/hosts file,Random-Liu,1
 Kubernetes Dashboard should check that the kubernetes-dashboard instance is alive,wonderfly,0
 LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied.,cjcullen,1
 Liveness liveness pods should be automatically restarted,andyzheng0831,1
-Load capacity should be able to handle * pods per node,gmarek,0
+Load capacity should be able to handle * pods per node * with * secrets,pospispa,0
 Loadbalancing: L7 GCE shoud create ingress with given static-ip,vulpecula,1
 Loadbalancing: L7 GCE should conform to Ingress spec,andyzheng0831,1
 Loadbalancing: L7 Nginx should conform to Ingress spec,ncdc,1
@@ -424,6 +425,7 @@ Secret should create a pod that reads a secret,luxas,1
 Secrets should be able to mount in a volume regardless of a different secret existing with same name in different namespace,rkouj,0
 Secrets should be consumable from pods in env vars,mml,1
 Secrets should be consumable from pods in volume,ghodss,1
+Secrets should be consumable from pods in volume as non-root with defaultMode and fsGroup set,pospispa,0
 Secrets should be consumable from pods in volume with defaultMode set,derekwaynecarr,1
 Secrets should be consumable from pods in volume with mappings,jbeda,1
 Secrets should be consumable from pods in volume with mappings and Item Mode set,quinton-hoole,1
@@ -447,7 +449,6 @@ Services should be able to create a functioning NodePort service,bprashanth,0
 Services should be able to up and down services,bprashanth,0
 Services should check NodePort out-of-range,bprashanth,0
 Services should create endpoints for unready pods,maisem,0
-Services should only allow access from service loadbalancer source ranges,sttts,0
 Services should only allow access from service loadbalancer source ranges,madhusudancs,0
 Services should preserve source pod IP for traffic thru service cluster IP,Random-Liu,1
 Services should prevent NodePort collisions,bprashanth,0
@@ -503,7 +504,6 @@ Volumes PD should be mountable,caesarxuchao,1
 Volumes iSCSI should be mountable,jsafrane,1
 k8s.io/kubernetes/cmd/genutils,rmmh,1
 k8s.io/kubernetes/cmd/hyperkube,jbeda,0
-k8s.io/kubernetes/cmd/kube-apiserver/app,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-apiserver/app/options,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-discovery/app,pmorie,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
@@ -515,6 +515,7 @@ k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
 k8s.io/kubernetes/cmd/kubelet/app,hurf,1
+k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver,pospispa,0
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1
@@ -525,6 +526,7 @@ k8s.io/kubernetes/federation/apis/federation/validation,nikhiljindal,0
 k8s.io/kubernetes/federation/cmd/federation-controller-manager/app,kzwang,0
 k8s.io/kubernetes/federation/pkg/dnsprovider,sttts,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53,cjcullen,1
+k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns,pospispa,0
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,jsafrane,1
 k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0
 k8s.io/kubernetes/federation/pkg/federation-controller/configmap,mwielgus,0
@@ -556,9 +558,6 @@ k8s.io/kubernetes/pkg/api/service,spxtr,1
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1
 k8s.io/kubernetes/pkg/api/util,ghodss,1
 k8s.io/kubernetes/pkg/api/v1,vulpecula,1
-k8s.io/kubernetes/pkg/api/v1/endpoints,sttts,0
-k8s.io/kubernetes/pkg/api/v1/pod,sttts,0
-k8s.io/kubernetes/pkg/api/v1/service,sttts,0
 k8s.io/kubernetes/pkg/api/v1/endpoints,madhusudancs,0
 k8s.io/kubernetes/pkg/api/v1/pod,madhusudancs,0
 k8s.io/kubernetes/pkg/api/v1/service,madhusudancs,0
@@ -796,7 +795,6 @@ k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd,xiang90,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass,brendandburns,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd,eparis,1
 k8s.io/kubernetes/pkg/runtime,wojtek-t,0
-k8s.io/kubernetes/pkg/runtime/schema,sttts,0
 k8s.io/kubernetes/pkg/runtime/schema,madhusudancs,0
 k8s.io/kubernetes/pkg/runtime/serializer,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/json,wojtek-t,0
@@ -860,13 +858,13 @@ k8s.io/kubernetes/pkg/util/parsers,derekwaynecarr,1
 k8s.io/kubernetes/pkg/util/procfs,roberthbailey,1
 k8s.io/kubernetes/pkg/util/proxy,cjcullen,1
 k8s.io/kubernetes/pkg/util/rand,madhusudancs,1
-k8s.io/kubernetes/pkg/util/ratelimit,justinsb,1
 k8s.io/kubernetes/pkg/util/runtime,davidopp,1
 k8s.io/kubernetes/pkg/util/sets,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/slice,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/strategicpatch,brendandburns,1
 k8s.io/kubernetes/pkg/util/strings,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/system,mwielgus,0
+k8s.io/kubernetes/pkg/util/taints,pospispa,0
 k8s.io/kubernetes/pkg/util/term,davidopp,1
 k8s.io/kubernetes/pkg/util/testing,jlowdermilk,1
 k8s.io/kubernetes/pkg/util/threading,roberthbailey,1
@@ -955,6 +953,7 @@ k8s.io/kubernetes/test/integration/auth,jbeda,1
 k8s.io/kubernetes/test/integration/client,Q-Lee,1
 k8s.io/kubernetes/test/integration/configmap,Q-Lee,1
 k8s.io/kubernetes/test/integration/discoverysummarizer,fabioy,1
+k8s.io/kubernetes/test/integration/evictions,pospispa,0
 k8s.io/kubernetes/test/integration/examples,maisem,1
 k8s.io/kubernetes/test/integration/federation,vulpecula,1
 k8s.io/kubernetes/test/integration/garbagecollector,jlowdermilk,1
@@ -963,7 +962,6 @@ k8s.io/kubernetes/test/integration/master,fabioy,1
 k8s.io/kubernetes/test/integration/metrics,lavalamp,1
 k8s.io/kubernetes/test/integration/objectmeta,janetkuo,1
 k8s.io/kubernetes/test/integration/openshift,kevin-wangzefeng,1
-k8s.io/kubernetes/test/integration/persistentvolumes,cjcullen,1
 k8s.io/kubernetes/test/integration/pods,smarterclayton,1
 k8s.io/kubernetes/test/integration/quota,alex-mohr,1
 k8s.io/kubernetes/test/integration/replicaset,janetkuo,1
@@ -974,6 +972,7 @@ k8s.io/kubernetes/test/integration/secrets,rmmh,1
 k8s.io/kubernetes/test/integration/serviceaccount,deads2k,1
 k8s.io/kubernetes/test/integration/storageclasses,andyzheng0831,1
 k8s.io/kubernetes/test/integration/thirdparty,davidopp,1
+k8s.io/kubernetes/test/integration/volume,pospispa,0
 k8s.io/kubernetes/test/list,maisem,1
 kubelet Clean up pods on node kubelet should be able to delete * pods per node in *.,yujuhong,0
 "when we run containers that should cause * should eventually see *, and then evict all of the correct pods",Random-Liu,0
