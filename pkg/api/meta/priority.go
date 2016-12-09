@@ -167,6 +167,9 @@ func (m PriorityRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string)
 			if err != nil {
 				return nil, err
 			}
+			// this will always have an empty Group (since the original string was just a version),
+			// so fill in the group from the desired group
+			gv.Group = gk.Group
 			priorities = append(priorities, gv.WithKind(AnyKind))
 		}
 		priorities = append(priorities, m.KindPriority...)
