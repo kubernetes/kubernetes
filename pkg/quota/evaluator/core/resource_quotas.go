@@ -17,7 +17,6 @@ limitations under the License.
 package core
 
 import (
-	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -28,17 +27,10 @@ import (
 
 // NewResourceQuotaEvaluator returns an evaluator that can evaluate resource quotas
 func NewResourceQuotaEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourceQuotas}
-	return &generic.GenericEvaluator{
-		Name:              "Evaluator.ResourceQuota",
-		InternalGroupKind: api.Kind("ResourceQuota"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceQuotas),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceQuotas),
+	return &generic.ObjectCountEvaluator{
+		AllowCreateOnUpdate: false,
+		InternalGroupKind:   api.Kind("ResourceQuota"),
+		ResourceName:        api.ResourceQuotas,
 		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ResourceQuotas(namespace).List(options)
 			if err != nil {

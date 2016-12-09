@@ -28,28 +28,21 @@ import (
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+// serviceResources are the set of resources managed by quota associated with services.
+var serviceResources = []api.ResourceName{
+	api.ResourceServices,
+	api.ResourceServicesNodePorts,
+	api.ResourceServicesLoadBalancers,
+}
+
 // NewServiceEvaluator returns an evaluator that can evaluate service quotas
 func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{
-		api.ResourceServices,
-		api.ResourceServicesNodePorts,
-		api.ResourceServicesLoadBalancers,
-	}
-	return &generic.GenericEvaluator{
-		Name:              "Evaluator.Service",
-		InternalGroupKind: api.Kind("Service"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-			admission.Update: allResources,
-		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      ServiceConstraintsFunc,
-		UsageFunc:            ServiceUsageFunc,
-		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+	return &serviceEvaluator{
+		listFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().Services(namespace).List(options)
 			if err != nil {
 				return nil, err
@@ -63,38 +56,103 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	}
 }
 
-// ServiceUsageFunc knows how to measure usage associated with services
-func ServiceUsageFunc(object runtime.Object) api.ResourceList {
-	result := api.ResourceList{}
-	var serviceType api.ServiceType
-	var ports int
+// serviceEvaluator knows how to measure usage for services.
+type serviceEvaluator struct {
+	// knows how to list items by namespace
+	listFuncByNamespace generic.ListFuncByNamespace
+}
 
-	switch t := object.(type) {
-	case *v1.Service:
-		serviceType = api.ServiceType(t.Spec.Type)
-		ports = len(t.Spec.Ports)
-	case *api.Service:
-		serviceType = t.Spec.Type
-		ports = len(t.Spec.Ports)
-	default:
-		panic(fmt.Sprintf("expect *api.Service or *v1.Service, got %v", t))
+// Constraints verifies that all required resources are present on the item
+func (p *serviceEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
+	service, ok := item.(*api.Service)
+	if !ok {
+		return fmt.Errorf("unexpected input object %v", item)
 	}
 
+	requiredSet := quota.ToSet(required)
+	missingSet := sets.NewString()
+	serviceUsage, err := p.Usage(service)
+	if err != nil {
+		return err
+	}
+	serviceSet := quota.ToSet(quota.ResourceNames(serviceUsage))
+	if diff := requiredSet.Difference(serviceSet); len(diff) > 0 {
+		missingSet.Insert(diff.List()...)
+	}
+
+	if len(missingSet) == 0 {
+		return nil
+	}
+	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
+}
+
+// GroupKind that this evaluator tracks
+func (p *serviceEvaluator) GroupKind() schema.GroupKind {
+	return api.Kind("Service")
+}
+
+// Handles returns true of the evalutor should handle the specified operation.
+func (p *serviceEvaluator) Handles(operation admission.Operation) bool {
+	// We handle create and update because a service type can change.
+	return admission.Create == operation || admission.Update == operation
+}
+
+// Matches returns true if the evaluator matches the specified quota with the provided input item
+func (p *serviceEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error) {
+	return generic.Matches(resourceQuota, item, p.MatchingResources, generic.MatchesNoScopeFunc)
+}
+
+// MatchingResources takes the input specified list of resources and returns the set of resources it matches.
+func (p *serviceEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
+	return quota.Intersection(input, serviceResources)
+}
+
+// convert the input object to an internal service object or error.
+func toInternalServiceOrError(obj runtime.Object) (*api.Service, error) {
+	svc := &api.Service{}
+	switch t := obj.(type) {
+	case *v1.Service:
+		if err := v1.Convert_v1_Service_To_api_Service(t, svc, nil); err != nil {
+			return nil, err
+		}
+	case *api.Service:
+		svc = t
+	default:
+		return nil, fmt.Errorf("expect *api.Service or *v1.Service, got %v", t)
+	}
+	return svc, nil
+}
+
+// Usage knows how to measure usage associated with pods
+func (p *serviceEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
+	result := api.ResourceList{}
+	svc, err := toInternalServiceOrError(item)
+	if err != nil {
+		return result, err
+	}
+	ports := len(svc.Spec.Ports)
 	// default service usage
-	result[api.ResourceServices] = resource.MustParse("1")
-	result[api.ResourceServicesLoadBalancers] = resource.MustParse("0")
-	result[api.ResourceServicesNodePorts] = resource.MustParse("0")
-	switch serviceType {
+	result[api.ResourceServices] = *(resource.NewQuantity(1, resource.DecimalSI))
+	result[api.ResourceServicesLoadBalancers] = resource.Quantity{Format: resource.DecimalSI}
+	result[api.ResourceServicesNodePorts] = resource.Quantity{Format: resource.DecimalSI}
+	switch svc.Spec.Type {
 	case api.ServiceTypeNodePort:
 		// node port services need to count node ports
 		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
 		result[api.ResourceServicesNodePorts] = *value
 	case api.ServiceTypeLoadBalancer:
 		// load balancer services need to count load balancers
-		result[api.ResourceServicesLoadBalancers] = resource.MustParse("1")
+		result[api.ResourceServicesLoadBalancers] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
-	return result
+	return result, nil
 }
+
+// UsageStats calculates aggregate usage for the object.
+func (p *serviceEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
+}
+
+var _ quota.Evaluator = &serviceEvaluator{}
 
 // QuotaServiceType returns true if the service type is eligible to track against a quota
 func QuotaServiceType(service *v1.Service) bool {
@@ -114,25 +172,4 @@ func GetQuotaServiceType(service *v1.Service) v1.ServiceType {
 		return v1.ServiceTypeLoadBalancer
 	}
 	return v1.ServiceType("")
-}
-
-// ServiceConstraintsFunc verifies that all required resources are captured in service usage.
-func ServiceConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
-	service, ok := object.(*api.Service)
-	if !ok {
-		return fmt.Errorf("unexpected input object %v", object)
-	}
-
-	requiredSet := quota.ToSet(required)
-	missingSet := sets.NewString()
-	serviceUsage := ServiceUsageFunc(service)
-	serviceSet := quota.ToSet(quota.ResourceNames(serviceUsage))
-	if diff := requiredSet.Difference(serviceSet); len(diff) > 0 {
-		missingSet.Insert(diff.List()...)
-	}
-
-	if len(missingSet) == 0 {
-		return nil
-	}
-	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
 }
