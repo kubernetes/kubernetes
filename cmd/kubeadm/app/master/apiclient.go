@@ -42,17 +42,15 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("<master/apiclient> failed to create API client configuration [%v]", err)
+		return nil, fmt.Errorf("failed to create API client configuration [%v]", err)
 	}
-
-	fmt.Println("<master/apiclient> created API client configuration")
 
 	client, err := clientset.NewForConfig(adminClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("<master/apiclient> failed to create API client [%v]", err)
+		return nil, fmt.Errorf("failed to create API client [%v]", err)
 	}
 
-	fmt.Println("<master/apiclient> created API client, waiting for the control plane to become ready")
+	fmt.Println("[apiclient] Created API client, waiting for the control plane to become ready")
 
 	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
@@ -62,28 +60,28 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		}
 		// TODO(phase2) must revisit this when we implement HA
 		if len(cs.Items) < 3 {
-			fmt.Println("<master/apiclient> not all control plane components are ready yet")
+			fmt.Println("[apiclient] Not all control plane components are ready yet")
 			return false, nil
 		}
 		for _, item := range cs.Items {
 			for _, condition := range item.Conditions {
 				if condition.Type != v1.ComponentHealthy {
-					fmt.Printf("<master/apiclient> control plane component %q is still unhealthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
+					fmt.Printf("[apiclient] Control plane component %q is still unhealthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
 					return false, nil
 				}
 			}
 		}
 
-		fmt.Printf("<master/apiclient> all control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
+		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 
-	fmt.Println("<master/apiclient> waiting for at least one node to register and become ready")
+	fmt.Println("[apiclient] Waiting for at least one node to register and become ready")
 	start = time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		nodeList, err := client.Nodes().List(v1.ListOptions{})
 		if err != nil {
-			fmt.Println("<master/apiclient> temporarily unable to list nodes (will retry)")
+			fmt.Println("[apiclient] Temporarily unable to list nodes (will retry)")
 			return false, nil
 		}
 		if len(nodeList.Items) < 1 {
@@ -91,11 +89,11 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		}
 		n := &nodeList.Items[0]
 		if !v1.IsNodeReady(n) {
-			fmt.Println("<master/apiclient> first node has registered, but is not ready yet")
+			fmt.Println("[apiclient] First node has registered, but is not ready yet")
 			return false, nil
 		}
 
-		fmt.Printf("<master/apiclient> first node is ready after %f seconds\n", time.Since(start).Seconds())
+		fmt.Printf("[apiclient] First node is ready after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 
@@ -180,7 +178,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 
 	if _, err := client.Nodes().Update(n); err != nil {
 		if apierrs.IsConflict(err) {
-			fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
+			fmt.Println("[apiclient] Temporarily unable to update master node metadata due to conflict (will retry)")
 			time.Sleep(apiCallRetryInterval)
 			attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
 		} else {
@@ -195,7 +193,7 @@ func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bo
 	// TODO(phase1+) use iterate instead of recursion
 	err := attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
 	if err != nil {
-		return fmt.Errorf("<master/apiclient> failed to update master node - %v", err)
+		return fmt.Errorf("failed to update master node - [%v]", err)
 	}
 	return nil
 }
@@ -240,7 +238,7 @@ func NativeArchitectureNodeAffinity() v1.NodeSelectorRequirement {
 }
 
 func createDummyDeployment(client *clientset.Clientset) {
-	fmt.Println("<master/apiclient> attempting a test deployment")
+	fmt.Println("[apiclient] Creating a test deployment")
 	dummyDeployment := NewDeployment("dummy", 1, v1.PodSpec{
 		HostNetwork:     true,
 		SecurityContext: &v1.PodSecurityContext{},
@@ -253,7 +251,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		// TODO: we should check the error, as some cases may be fatal
 		if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(dummyDeployment); err != nil {
-			fmt.Printf("<master/apiclient> failed to create test deployment [%v] (will retry)", err)
+			fmt.Printf("[apiclient] Failed to create test deployment [%v] (will retry)\n", err)
 			return false, nil
 		}
 		return true, nil
@@ -262,7 +260,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get("dummy", metav1.GetOptions{})
 		if err != nil {
-			fmt.Printf("<master/apiclient> failed to get test deployment [%v] (will retry)", err)
+			fmt.Printf("[apiclient] Failed to get test deployment [%v] (will retry)\n", err)
 			return false, nil
 		}
 		if d.Status.AvailableReplicas < 1 {
@@ -271,9 +269,10 @@ func createDummyDeployment(client *clientset.Clientset) {
 		return true, nil
 	})
 
-	fmt.Println("<master/apiclient> test deployment succeeded")
+	fmt.Println("[apiclient] Test deployment succeeded")
 
+	// TODO: In the future, make sure the ReplicaSet and Pod are garbage collected
 	if err := client.Extensions().Deployments(api.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
-		fmt.Printf("<master/apiclient> failed to delete test deployment [%v] (will ignore)", err)
+		fmt.Printf("[apiclient] Failed to delete test deployment [%v] (will ignore)\n", err)
 	}
 }
