@@ -149,6 +149,31 @@ func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) ma
 			continue
 		}
 
+		// btrfs fix
+		if mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
+
+			buf := new(syscall.Stat_t)
+			err := syscall.Stat(mount.Source, buf)
+			if err != nil {
+				glog.Warningf("stat failed on %s with error: %s", mount.Source, err)
+			} else {
+				glog.Infof("btrfs mount %#v", mount)
+				if buf.Mode&syscall.S_IFMT == syscall.S_IFBLK {
+					err := syscall.Stat(mount.Mountpoint, buf)
+					if err != nil {
+						glog.Warningf("stat failed on %s with error: %s", mount.Mountpoint, err)
+					} else {
+						glog.Infof("apply fix to btrfs mount")
+						glog.Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
+						glog.Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
+
+						mount.Major = int(major(buf.Dev))
+						mount.Minor = int(minor(buf.Dev))
+					}
+				}
+			}
+		}
+
 		partitions[mount.Source] = partition{
 			fsType:     mount.Fstype,
 			mountpoint: mount.Mountpoint,
