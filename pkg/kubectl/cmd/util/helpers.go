@@ -523,18 +523,24 @@ func RecordChangeCause(obj runtime.Object, changeCause string) error {
 // ChangeResourcePatch creates a strategic merge patch between the origin input resource info
 // and the annotated with change-cause input resource info.
 func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
-	oldData, err := json.Marshal(info.Object)
+	// Get a versioned object
+	obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 	if err != nil {
 		return nil, err
 	}
-	if err := RecordChangeCause(info.Object, changeCause); err != nil {
-		return nil, err
-	}
-	newData, err := json.Marshal(info.Object)
+
+	oldData, err := json.Marshal(obj)
 	if err != nil {
 		return nil, err
 	}
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object)
+	if err := RecordChangeCause(obj, changeCause); err != nil {
+		return nil, err
+	}
+	newData, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 }
 
 // containsChangeCause checks if input resource info contains change-cause annotation.
