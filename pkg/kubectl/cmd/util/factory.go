@@ -68,6 +68,58 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+// ClientCacheFactory provides access to a ClientCache
+type ClientCacheFactory interface {
+	// ClientCache returns a cache of clients.
+	ClientCache() ClientCache
+}
+
+// DiscoveryClientFactory provides access to a CachedDiscoverInterface
+type DiscoveryClientFactory interface {
+	// DiscoveryClient returns a discovery client
+	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+}
+
+// PrinterForMappingFactory provides access to a ResourcePrinter
+type PrinterForMappingFactory interface {
+	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
+	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
+	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error)
+}
+
+// ClientConfigFactory provides access to a restclient Config
+type ClientConfigFactory interface {
+	// ClientConfig returns a client.Config for accessing the Kubernetes server.
+	ClientConfig() (*restclient.Config, error)
+}
+
+// PrinterFactory provides access to a ResourcePrinter
+type PrinterFactory interface {
+	// Printer returns a Printer for formatting objects of the given type or an error.
+	Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error)
+}
+
+// ObjectFactory provides access to a RESTMapper and ObjectTyper
+type ObjectFactory interface {
+	// Object returns interfaces for dealing with arbitrary runtime.Objects.
+	Object() (meta.RESTMapper, runtime.ObjectTyper)
+}
+
+// DecoderFactory provides access to a Decoder
+type DecoderFactory interface {
+	// Decoder returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
+	// into their internal form (if possible). Eventually the internal form will be removed as an option,
+	// and only versioned objects will be returned.
+	Decoder(toInternal bool) runtime.Decoder
+}
+
+// ClientForMappingFactory provides access to a RESTClient
+type ClientForMappingFactory interface {
+	// ClientForMapping returns a RESTClient for working with the specified RESTMapping or an error. This is intended
+	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
+	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
+}
+
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
 // of resources and different API sets.
 // TODO: make the functions interfaces
@@ -351,14 +403,6 @@ func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) 
 	}
 	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
 	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
-}
-
-type ClientCacheFactory interface {
-	ClientCache() ClientCache
-}
-
-type DiscoveryClientFactory interface {
-	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 }
 
 func Object(dcf DiscoveryClientFactory, ccf ClientCacheFactory) (meta.RESTMapper, runtime.ObjectTyper) {
@@ -1256,10 +1300,6 @@ func (f *factory) DefaultResourceFilterFunc() kubectl.Filters {
 	return kubectl.NewResourceFilter()
 }
 
-type PrinterForMappingFactory interface {
-	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error)
-}
-
 func PrintObject(pmf PrinterForMappingFactory, cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	gvks, _, err := api.Scheme.ObjectKinds(obj)
 	if err != nil {
@@ -1280,14 +1320,6 @@ func PrintObject(pmf PrinterForMappingFactory, cmd *cobra.Command, mapper meta.R
 
 func (f *factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	return PrintObject(f, cmd, mapper, obj, out)
-}
-
-type ClientConfigFactory interface {
-	ClientConfig() (*restclient.Config, error)
-}
-
-type PrinterFactory interface {
-	Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error)
 }
 
 func PrinterForMapping(ccf ClientConfigFactory, pf PrinterFactory, cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
@@ -1342,18 +1374,6 @@ func PrinterForMapping(ccf ClientConfigFactory, pf PrinterFactory, cmd *cobra.Co
 
 func (f *factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
 	return PrinterForMapping(f, f, cmd, mapping, withNamespace)
-}
-
-type ObjectFactory interface {
-	Object() (meta.RESTMapper, runtime.ObjectTyper)
-}
-
-type DecoderFactory interface {
-	Decoder(toInternal bool) runtime.Decoder
-}
-
-type ClientForMappingFactory interface {
-	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
 }
 
 func NewBuilder(of ObjectFactory, df DecoderFactory, cfmf ClientForMappingFactory) *resource.Builder {
