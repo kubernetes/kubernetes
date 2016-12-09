@@ -316,9 +316,28 @@ func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOpti
 		return c, nil
 	}
 
+	var err error
+	if o.ClientCert != nil {
+		c, err = c.applyClientCert(o.ClientCert.ClientCA)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
+		}
+	}
+	if o.RequestHeader != nil {
+		c, err = c.applyClientCert(o.RequestHeader.ClientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
+		}
+	}
+
+	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
+	return c, nil
+}
+
+func (c *Config) applyClientCert(clientCAFile string) (*Config, error) {
 	if c.SecureServingInfo != nil {
-		if o.ClientCert != nil && len(o.ClientCert.ClientCA) > 0 {
-			clientCAs, err := certutil.CertsFromFile(o.ClientCert.ClientCA)
+		if len(clientCAFile) > 0 {
+			clientCAs, err := certutil.CertsFromFile(clientCAFile)
 			if err != nil {
 				return nil, fmt.Errorf("unable to load client CA file: %v", err)
 			}
@@ -329,27 +348,24 @@ func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOpti
 				c.SecureServingInfo.ClientCA.AddCert(cert)
 			}
 		}
-		if o.RequestHeader != nil && len(o.RequestHeader.ClientCAFile) > 0 {
-			clientCAs, err := certutil.CertsFromFile(o.RequestHeader.ClientCAFile)
-			if err != nil {
-				return nil, fmt.Errorf("unable to load requestheader client CA file: %v", err)
-			}
-			if c.SecureServingInfo.ClientCA == nil {
-				c.SecureServingInfo.ClientCA = x509.NewCertPool()
-			}
-			for _, cert := range clientCAs {
-				c.SecureServingInfo.ClientCA.AddCert(cert)
-			}
-		}
 	}
 
-	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
 	return c, nil
 }
 
 func (c *Config) ApplyDelegatingAuthenticationOptions(o *options.DelegatingAuthenticationOptions) (*Config, error) {
 	if o == nil {
 		return c, nil
+	}
+
+	var err error
+	c, err = c.applyClientCert(o.ClientCert.ClientCA)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load client CA file: %v", err)
+	}
+	c, err = c.applyClientCert(o.RequestHeader.ClientCAFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load client CA file: %v", err)
 	}
 
 	cfg, err := o.ToAuthenticationConfig()
