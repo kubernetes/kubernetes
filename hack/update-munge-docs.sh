@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: remove this script when we have a standalone TOC generator.
+
 set -o errexit
 set -o nounset
 set -o pipefail
