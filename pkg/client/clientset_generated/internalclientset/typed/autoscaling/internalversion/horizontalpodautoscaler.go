@@ -82,6 +82,9 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *autoscaling.H
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *autoscaling.HorizontalPodAutoscaler) (result *autoscaling.HorizontalPodAutoscaler, err error) {
 	result = &autoscaling.HorizontalPodAutoscaler{}
 	err = c.client.Put().

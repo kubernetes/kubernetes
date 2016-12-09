@@ -77,6 +77,9 @@ func (c *persistentVolumes) Update(persistentVolume *api.PersistentVolume) (resu
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *persistentVolumes) UpdateStatus(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Put().

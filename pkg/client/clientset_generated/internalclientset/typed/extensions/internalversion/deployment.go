@@ -82,6 +82,9 @@ func (c *deployments) Update(deployment *extensions.Deployment) (result *extensi
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
 	err = c.client.Put().

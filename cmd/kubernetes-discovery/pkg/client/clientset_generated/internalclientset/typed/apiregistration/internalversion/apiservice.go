@@ -33,6 +33,7 @@ type APIServicesGetter interface {
 type APIServiceInterface interface {
 	Create(*apiregistration.APIService) (*apiregistration.APIService, error)
 	Update(*apiregistration.APIService) (*apiregistration.APIService, error)
+	UpdateStatus(*apiregistration.APIService) (*apiregistration.APIService, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*apiregistration.APIService, error)
@@ -71,6 +72,21 @@ func (c *aPIServices) Update(aPIService *apiregistration.APIService) (result *ap
 	err = c.client.Put().
 		Resource("apiservices").
 		Name(aPIService.Name).
+		Body(aPIService).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
+func (c *aPIServices) UpdateStatus(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
+	result = &apiregistration.APIService{}
+	err = c.client.Put().
+		Resource("apiservices").
+		Name(aPIService.Name).
+		SubResource("status").
 		Body(aPIService).
 		Do().
 		Into(result)
