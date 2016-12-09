@@ -148,12 +148,18 @@ function test_docker {
     fi
 }
 
+# Test whether cfssl and cfssljson are installed.
+# Sets:
+#  CFSSL_BIN: The path of the installed cfssl binary
+#  CFSSLJSON_BIN: The path of the installed cfssljson binary
 function test_cfssl_installed {
     if ! command -v cfssl &>/dev/null || ! command -v cfssljson &>/dev/null; then
       echo "Failed to successfully run 'cfssl', please verify that cfssl and cfssljson are in \$PATH."
       echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
       exit 1
     fi
+    CFSSL_BIN=$(command -v cfssl)
+    CFSSLJSON_BIN=$(command -v cfssljson)
 }
 
 function test_rkt {
@@ -172,12 +178,16 @@ function test_rkt {
     fi
 }
 
+# Test whether openssl is installed.
+# Sets:
+#  OPENSSL_BIN: The path to the openssl binary to use
 function test_openssl_installed {
     openssl version >& /dev/null
     if [ "$?" != "0" ]; then
       echo "Failed to run openssl. Please ensure openssl is installed"
       exit 1
     fi
+    OPENSSL_BIN=$(command -v openssl)
 }
 
 # Shut down anyway if there's an error.
@@ -372,7 +382,7 @@ function create_client_certkey {
     done
     ${CONTROLPLANE_SUDO} /bin/bash -e <<EOF
     cd ${CERT_DIR}
-    echo '{"CN":"${CN}","names":[${NAMES}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | cfssl gencert -ca=${CA}.crt -ca-key=${CA}.key -config=client-ca-config.json - | cfssljson -bare client-${ID}
+    echo '{"CN":"${CN}","names":[${NAMES}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=${CA}.crt -ca-key=${CA}.key -config=client-ca-config.json - | "${CFSSLJSON_BIN}" -bare client-${ID}
     mv "client-${ID}-key.pem" "client-${ID}.key"
     mv "client-${ID}.pem" "client-${ID}.crt"
     rm -f "client-${ID}.csr"
@@ -421,7 +431,7 @@ function start_apiserver {
     anytoken_arg=""
     if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
       anytoken_arg="--insecure-allow-any-token "
-      KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-"system:admin/system:masters"}
+      KUBECONFIG_TOKEN="${KUBECONFIG_TOKEN:-system:admin/system:masters}"
     fi
     authorizer_arg=""
     if [[ "${ENABLE_RBAC}" = true ]]; then
@@ -446,7 +456,7 @@ function start_apiserver {
     # Create client ca
     ${CONTROLPLANE_SUDO} /bin/bash -e <<EOF
     rm -f "${CERT_DIR}/client-ca.crt" "${CERT_DIR}/client-ca.key"
-    openssl req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/client-ca.key" -out "${CERT_DIR}/client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
+    "${OPENSSL_BIN}" req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/client-ca.key" -out "${CERT_DIR}/client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "${CERT_DIR}/client-ca-config.json"
 EOF
 
@@ -461,7 +471,7 @@ EOF
     # Create auth proxy client ca
     sudo /bin/bash -e <<EOF
     rm -f "${CERT_DIR}/auth-proxy-client-ca.crt" "${CERT_DIR}/auth-proxy-client-ca.key"
-    openssl req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/auth-proxy-client-ca.key" -out "${CERT_DIR}/auth-proxy-client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
+    "${OPENSSL_BIN}" req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/auth-proxy-client-ca.key" -out "${CERT_DIR}/auth-proxy-client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "${CERT_DIR}/auth-proxy-client-ca-config.json"
 EOF
     create_client_certkey auth-proxy-client-ca auth-proxy system:auth-proxy
