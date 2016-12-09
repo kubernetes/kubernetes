@@ -196,12 +196,12 @@ func FormatCert(c *x509.Certificate) string {
 	}
 	altNames := append(ips, c.DNSNames...)
 	res := fmt.Sprintf(
-		"Issuer: CN=%s | Subject: CN=%s | CA: %t\n",
+		"\tIssuer: CN=%s | Subject: CN=%s | CA: %t\n",
 		c.Issuer.CommonName, c.Subject.CommonName, c.IsCA,
 	)
-	res += fmt.Sprintf("Not before: %s Not After: %s", c.NotBefore, c.NotAfter)
+	res += fmt.Sprintf("\tNot before: %s Not After: %s", c.NotBefore, c.NotAfter)
 	if len(altNames) > 0 {
-		res += fmt.Sprintf("\nAlternate Names: %v", altNames)
+		res += fmt.Sprintf("\n\tAlternate Names: %v", altNames)
 	}
 	return res
 }
