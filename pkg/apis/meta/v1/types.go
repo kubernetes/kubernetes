@@ -109,7 +109,7 @@ type GetOptions struct {
 	// - if unset, then the result is returned from remote storage based on quorum-read flag;
 	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
 	// - if set to non zero, then the result is at least as fresh as given rv.
-	ResourceVersion string `json:"resourceVersion,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,1,opt,name=resourceVersion"`
 }
 
 // Status is a return value for calls that don't return other objects.

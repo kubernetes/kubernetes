@@ -34,6 +34,7 @@ go_library(
         "//pkg/labels:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/selection:go_default_library",
+        "//pkg/types:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
