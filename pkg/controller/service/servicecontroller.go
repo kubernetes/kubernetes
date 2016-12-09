@@ -295,14 +295,8 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
 	}
 
-	// Write the state if changed
-	// TODO: Be careful here ... what if there were other changes to the service?
-	if !v1.LoadBalancerStatusEqual(previousState, &service.Status.LoadBalancer) {
-		if err := s.persistUpdate(service); err != nil {
-			return fmt.Errorf("Failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
-		}
-	} else {
-		glog.V(2).Infof("Not persisting unchanged LoadBalancerStatus to registry.")
+	if err := s.persistUpdate(service); err != nil {
+		return fmt.Errorf("Failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
 	}
 
 	return nil, notRetryable
