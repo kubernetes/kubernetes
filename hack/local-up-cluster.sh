@@ -401,6 +401,14 @@ contexts:
     name: local-up-cluster
 current-context: local-up-cluster
 EOF
+
+    # flatten the kubeconfig files to make them self contained
+    username=$(whoami)
+    ${CONTROLPLANE_SUDO} /bin/bash -e <<EOF
+    ${GO_OUT}/kubectl --kubeconfig="${CERT_DIR}/$1.kubeconfig" config view --minify --flatten > "/tmp/$1.kubeconfig"
+    mv -f "/tmp/$1.kubeconfig" "${CERT_DIR}/$1.kubeconfig"
+    chown ${username} "${CERT_DIR}/$1.kubeconfig"
+EOF
 }
 
 function start_apiserver {
@@ -730,7 +738,6 @@ function start_kubeproxy {
 }
 
 function start_kubedns {
-
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
         sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" >| skydns-rc.yaml
@@ -748,18 +755,15 @@ function start_kubedns {
           sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
         fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
-        export KUBERNETES_PROVIDER=local
-        ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-        ${KUBECTL} config set-credentials myself --username=admin --password=admin
-        ${KUBECTL} config set-context local --cluster=local --user=myself
-        ${KUBECTL} config use-context local
-
+        
+        # TODO update to dns role once we have one.
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create skydns rc and service
-        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml
-        ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f skydns-rc.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f skydns-svc.yaml
         echo "Kube-dns rc and service successfully deployed."
+        rm  skydns-rc.yaml skydns-svc.yaml
     fi
-
 }
 
 function print_success {
