@@ -99,7 +99,7 @@ function start_discovery {
 	sleep 1
 
 	# create the "normal" api services for the core API server
-	${kubectl} --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" create -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/core-apiservices" --token="foo/system:masters"
+	${kubectl} --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" create -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/core-apiservices"
 }
 
 kube::util::test_openssl_installed
