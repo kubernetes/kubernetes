@@ -12691,7 +12691,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"ports"},
 			},
 		},
 		Dependencies: []string{
