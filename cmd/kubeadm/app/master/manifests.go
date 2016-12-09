@@ -31,6 +31,8 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+
+	"github.com/blang/semver"
 )
 
 // Static pod definitions in golang form are included below so that `kubeadm init` can get going.
@@ -47,6 +49,11 @@ const (
 	kubeControllerManager = "kube-controller-manager"
 	kubeScheduler         = "kube-scheduler"
 	kubeProxy             = "kube-proxy"
+)
+
+var (
+	// Minimum version of kube-apiserver that supports --kubelet-preferred-address-types
+	preferredAddressMinimumVersion = semver.MustParse("1.5.0-beta.2")
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -190,7 +197,7 @@ func isPkiVolumeMountNeeded() bool {
 
 func pkiVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
-		Name: "k8s",
+		Name: "pki",
 		VolumeSource: api.VolumeSource{
 			// TODO(phase1+) make path configurable
 			HostPath: &api.HostPathVolumeSource{Path: "/etc/pki"},
@@ -289,6 +296,16 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {
 		command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
+	}
+
+	if len(cfg.KubernetesVersion) != 0 {
+		// If the k8s version is v1.5-something, this argument is set and makes `kubectl logs` and `kubectl exec`
+		// work on bare-metal where hostnames aren't usually resolvable
+		// Omit the "v" in the beginning, otherwise semver will fail
+		k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
+		if err == nil && k8sVersion.GTE(preferredAddressMinimumVersion) {
+			command = append(command, "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname")
+		}
 	}
 
 	// Check if the user decided to use an external etcd cluster

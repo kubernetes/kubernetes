@@ -45,7 +45,7 @@ func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, e
 		return nil, fmt.Errorf("failed to format certificate [%v]", err)
 	}
 	fmt.Printf("[csr] Received signed certificate from the API server:\n%s\n", fmtCert)
-	fmt.Println("[csr] Generating kubelet configuration...")
+	fmt.Println("[csr] Generating kubelet configuration")
 
 	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", connection.Endpoint, connection.CACert)
 	finalConfig := kubeadmutil.MakeClientConfigWithCerts(

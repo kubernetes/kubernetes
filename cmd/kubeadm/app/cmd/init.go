@@ -22,7 +22,6 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
-	"os"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -54,8 +53,8 @@ var (
 	initDoneMsgf = dedent.Dedent(`
 		Your Kubernetes master has initialized successfully!
 
-		But you still need to deploy a pod network to the cluster.
-		You should "kubectl apply -f" some pod network yaml file that's listed at:
+		You should now deploy a pod network to the cluster.
+		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 		    http://kubernetes.io/docs/admin/addons/
 
 		You can now join any number of machines by running the following on each node:
@@ -168,7 +167,7 @@ type Init struct {
 
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
 
-	fmt.Println("[kubeadm] Bear in mind that kubeadm is in alpha, do not use it in production clusters.")
+	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
@@ -190,25 +189,23 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 
 	if !skipPreFlight {
-		fmt.Println("[preflight] Running pre-flight checks...")
+		fmt.Println("[preflight] Running pre-flight checks")
 
 		// First, check if we're root separately from the other preflight checks and fail fast
-		if err := preflight.RunChecks([]preflight.PreFlightCheck{preflight.IsRootCheck{}}, os.Stderr); err != nil {
-			return nil, &preflight.PreFlightError{Msg: err.Error()}
+		if err := preflight.RunRootCheckOnly(); err != nil {
+			return nil, err
 		}
 
 		// Then continue with the others...
 		if err := preflight.RunInitMasterChecks(cfg); err != nil {
-			return nil, &preflight.PreFlightError{Msg: err.Error()}
+			return nil, err
 		}
 	} else {
-		fmt.Println("[preflight] Skipping pre-flight checks...")
+		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	if err := preflight.TryStartKubelet(); err != nil {
-		return nil, &preflight.PreFlightError{Msg: err.Error()}
-	}
+	preflight.TryStartKubelet()
 
 	// validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
@@ -220,7 +217,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		}
 	}
 	cfg.KubernetesVersion = ver
-	fmt.Println("Using Kubernetes version:", ver)
+	fmt.Println("[init] Using Kubernetes version:", ver)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {

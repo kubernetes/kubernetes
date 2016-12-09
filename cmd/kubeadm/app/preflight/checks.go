@@ -342,6 +342,14 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	return RunChecks(checks, os.Stderr)
 }
 
+func RunRootCheckOnly() error {
+	checks := []PreFlightCheck{
+		IsRootCheck{},
+	}
+
+	return RunChecks(checks, os.Stderr)
+}
+
 // RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
 func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
@@ -349,7 +357,7 @@ func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 	for _, c := range checks {
 		warnings, errs := c.Check()
 		for _, w := range warnings {
-			io.WriteString(ww, fmt.Sprintf("[preflight] Warning: %s\n", w))
+			io.WriteString(ww, fmt.Sprintf("[preflight] WARNING: %s\n", w))
 		}
 		for _, e := range errs {
 			found = append(found, e)
@@ -360,21 +368,22 @@ func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 		for _, i := range found {
 			errs += "\t" + i.Error() + "\n"
 		}
-		return errors.New(errs)
+		return &PreFlightError{Msg: errors.New(errs).Error()}
 	}
 	return nil
 }
 
-func TryStartKubelet() error {
+func TryStartKubelet() {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		fmt.Println("[preflight] No supported init system detected, won't check if kubelet is running")
-	} else if !initSystem.ServiceIsActive("kubelet") {
-		fmt.Printf("[preflight] Starting the kubelet service by running %q\n", "systemctl start kubelet")
+		fmt.Println("[preflight] No supported init system detected, won't ensure kubelet is running.")
+	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
+
+		fmt.Println("[preflight] Starting the kubelet service")
 		if err := initSystem.ServiceStart("kubelet"); err != nil {
-			return fmt.Errorf("Couldn't start the kubelet service. Please start the kubelet service manually and try again.")
+			fmt.Printf("[preflight] WARNING: Unable to start the kubelet service: [%v]\n", err)
+			fmt.Println("[preflight] WARNING: Please ensure kubelet is running manually.")
 		}
 	}
-	return nil
 }
