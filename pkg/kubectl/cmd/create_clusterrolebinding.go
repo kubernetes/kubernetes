@@ -55,6 +55,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.
 	cmd.Flags().String("clusterrole", "", "ClusterRole this ClusterRoleBinding should reference")
 	cmd.Flags().StringSlice("user", []string{}, "usernames to bind to the role")
 	cmd.Flags().StringSlice("group", []string{}, "groups to bind to the role")
+	cmd.Flags().StringSlice("serviceaccount", []string{}, "service accounts to bind to the role")
 	return cmd
 }
 
@@ -68,10 +69,11 @@ func CreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Co
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ClusterRoleBindingV1GeneratorName:
 		generator = &kubectl.ClusterRoleBindingGeneratorV1{
-			Name:        name,
-			ClusterRole: cmdutil.GetFlagString(cmd, "clusterrole"),
-			Users:       cmdutil.GetFlagStringSlice(cmd, "user"),
-			Groups:      cmdutil.GetFlagStringSlice(cmd, "group"),
+			Name:            name,
+			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
+			Users:           cmdutil.GetFlagStringSlice(cmd, "user"),
+			Groups:          cmdutil.GetFlagStringSlice(cmd, "group"),
+			ServiceAccounts: cmdutil.GetFlagStringSlice(cmd, "serviceaccount"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
