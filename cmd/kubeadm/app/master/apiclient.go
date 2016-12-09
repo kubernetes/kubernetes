@@ -109,6 +109,32 @@ func standardLabels(n string) map[string]string {
 	}
 }
 
+func WaitForAPI(client *clientset.Clientset) {
+	start := time.Now()
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		cs, err := client.ComponentStatuses().List(v1.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		// TODO(phase2) must revisit this when we implement HA
+		if len(cs.Items) < 3 {
+			fmt.Println("<master/apiclient> not all control plane components are ready yet")
+			return false, nil
+		}
+		for _, item := range cs.Items {
+			for _, condition := range item.Conditions {
+				if condition.Type != v1.ComponentHealthy {
+					fmt.Printf("<master/apiclient> control plane component %q is still unhealthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
+					return false, nil
+				}
+			}
+		}
+
+		fmt.Printf("<master/apiclient> all control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
+		return true, nil
+	})
+}
+
 func NewDaemonSet(daemonName string, podSpec v1.PodSpec) *extensions.DaemonSet {
 	l := standardLabels(daemonName)
 	return &extensions.DaemonSet{

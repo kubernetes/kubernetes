@@ -1,11 +1,29 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package master
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	ext "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -37,14 +55,15 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration) ext.DaemonSet {
 		ObjectMeta: v1.ObjectMeta{
 			Name:      kubeAPIServer,
 			Namespace: "kube-system",
-			// TODO: label from bootkube, not sure if necessary
-			Labels: map[string]string{"k8s-app": "kube-apiserver"},
+			//Labels:    map[string]string{"k8s-app": "kube-apiserver"},
 		},
 		Spec: ext.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
-						"k8s-app":   "kube-apiserver", // # TODO: from bootkube, not sure if necessary
+						// TODO: taken from bootkube, appears to be essential, without this
+						// we don't get an apiserver pod...
+						"k8s-app":   "kube-apiserver",
 						"tier":      "control-plane",
 						"component": kubeAPIServer,
 					},
@@ -60,6 +79,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration) ext.DaemonSet {
 							Name:    kubeAPIServer,
 							Image:   images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 							Command: getAPIServerCommand(cfg),
+							// TODO: Is this env var used? (borrowed from bootkube)
 							Env: []v1.EnvVar{
 								v1.EnvVar{
 									Name: "MY_POD_IP",
@@ -84,9 +104,50 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration) ext.DaemonSet {
 
 func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	ds := getAPIServerDS(cfg)
-	fmt.Printf("%+v\n", ds)
 	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(&ds); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q DaemonSet [%v]", kubeAPIServer, err)
 	}
+	return nil
+}
+
+func WaitForSelfHostedControlPlane(client *clientset.Clientset) error {
+	start := time.Now()
+	// TODO: Break this up into multiple wait's so we don't re-do every step:
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		apiDS, err := client.DaemonSets(api.NamespaceSystem).Get(kubeAPIServer)
+		if err != nil {
+			fmt.Println("[debug] error getting apiserver DaemonSet:", err)
+			return false, nil
+		}
+		fmt.Printf("[debug] %s DaemonSet current=%d, desired=%d\n",
+			kubeAPIServer,
+			apiDS.Status.CurrentNumberScheduled,
+			apiDS.Status.DesiredNumberScheduled)
+		if apiDS.Status.CurrentNumberScheduled != apiDS.Status.DesiredNumberScheduled {
+			return false, nil
+		}
+
+		// Check that all API Server pods are running:
+		listOpts := v1.ListOptions{LabelSelector: "k8s-app=kube-apiserver"}
+		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
+		if err != nil {
+			fmt.Println("[debug] error getting apiserver pods:", err)
+			return false, nil
+		}
+		fmt.Printf("[debug] Found %d apiserver pods\n", len(apiPods.Items))
+		if int32(len(apiPods.Items)) != apiDS.Status.DesiredNumberScheduled {
+			return false, nil
+		}
+		for _, pod := range apiPods.Items {
+			fmt.Printf("[debug] Pod %s status: %s\n", pod.Name, pod.Status.Phase)
+			if pod.Status.Phase != "Running" {
+				return false, nil
+			}
+		}
+
+		fmt.Printf("[debug] self-hosted control plane components ready after %f seconds\n", time.Since(start).Seconds())
+		return true, nil
+	})
+	// TODO: Timeout eventually
 	return nil
 }
