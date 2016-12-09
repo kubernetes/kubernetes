@@ -32,6 +32,8 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage"
@@ -953,4 +955,111 @@ func (e *Store) Export(ctx api.Context, name string, opts metav1.ExportOptions) 
 		e.CreateStrategy.PrepareForCreate(ctx, obj)
 	}
 	return obj, nil
+}
+
+// CompleteWithOptions updates the store with the provided options and defaults common fields
+func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
+	if e.QualifiedResource.Empty() {
+		return fmt.Errorf("store %#v must have a non-empty qualified resource", e)
+	}
+	if e.NewFunc == nil {
+		return fmt.Errorf("store for %s must have NewFunc set", e.QualifiedResource.String())
+	}
+	if e.NewListFunc == nil {
+		return fmt.Errorf("store for %s must have NewListFunc set", e.QualifiedResource.String())
+	}
+	if (e.KeyRootFunc == nil) != (e.KeyFunc == nil) {
+		return fmt.Errorf("store for %s must set both KeyRootFunc and KeyFunc or neither", e.QualifiedResource.String())
+	}
+
+	var isNamespaced bool
+	switch {
+	case e.CreateStrategy != nil:
+		isNamespaced = e.CreateStrategy.NamespaceScoped()
+	case e.UpdateStrategy != nil:
+		isNamespaced = e.UpdateStrategy.NamespaceScoped()
+	default:
+		return fmt.Errorf("store for %s must have CreateStrategy or UpdateStrategy set", e.QualifiedResource.String())
+	}
+
+	if options.RESTOptions == nil {
+		return fmt.Errorf("options for %s must have RESTOptions set", e.QualifiedResource.String())
+	}
+	if options.AttrFunc == nil {
+		return fmt.Errorf("options for %s must have AttrFunc set", e.QualifiedResource.String())
+	}
+
+	opts, err := options.RESTOptions.GetRESTOptions(e.QualifiedResource)
+	if err != nil {
+		return err
+	}
+
+	// Resource prefix must come from the underlying factory
+	prefix := opts.ResourcePrefix
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+	if prefix == "/" {
+		return fmt.Errorf("store for %s has an invalid prefix %q", e.QualifiedResource.String(), opts.ResourcePrefix)
+	}
+
+	// Set the default behavior for storage key generation
+	if e.KeyRootFunc == nil && e.KeyFunc == nil {
+		if isNamespaced {
+			e.KeyRootFunc = func(ctx api.Context) string {
+				return NamespaceKeyRootFunc(ctx, prefix)
+			}
+			e.KeyFunc = func(ctx api.Context, name string) (string, error) {
+				return NamespaceKeyFunc(ctx, prefix, name)
+			}
+		} else {
+			e.KeyRootFunc = func(ctx api.Context) string {
+				return prefix
+			}
+			e.KeyFunc = func(ctx api.Context, name string) (string, error) {
+				return NoNamespaceKeyFunc(ctx, prefix, name)
+			}
+		}
+	}
+
+	// We adapt the store's keyFunc so that we can use it with the StorageDecorator
+	// without making any assumptions about where objects are stored in etcd
+	keyFunc := func(obj runtime.Object) (string, error) {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return "", err
+		}
+
+		if isNamespaced {
+			return e.KeyFunc(api.WithNamespace(api.NewContext(), accessor.GetNamespace()), accessor.GetName())
+		}
+
+		return e.KeyFunc(api.NewContext(), accessor.GetName())
+	}
+
+	triggerFunc := options.TriggerFunc
+	if triggerFunc == nil {
+		triggerFunc = storage.NoTriggerPublisher
+	}
+
+	if e.DeleteCollectionWorkers == 0 {
+		e.DeleteCollectionWorkers = opts.DeleteCollectionWorkers
+	}
+
+	e.EnableGarbageCollection = opts.EnableGarbageCollection
+
+	if e.Storage == nil {
+		e.Storage, e.DestroyFunc = opts.Decorator(
+			opts.StorageConfig,
+			cachesize.GetWatchCacheSizeByResource(cachesize.Resource(e.QualifiedResource.Resource)),
+			e.NewFunc(),
+			prefix,
+			keyFunc,
+			e.NewListFunc,
+			options.AttrFunc,
+			triggerFunc,
+		)
+	}
+
+	return nil
 }

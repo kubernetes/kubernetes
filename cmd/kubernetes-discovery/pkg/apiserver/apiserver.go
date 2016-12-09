@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -39,23 +38,17 @@ import (
 	clientset "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers"
 	listers "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion"
-	apiservicestorage "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/registry/apiservice"
+	apiservicestorage "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/registry/apiservice/etcd"
 )
 
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."
 
-// TODO move to genericapiserver or something like that
-// RESTOptionsGetter is used to construct storage for a particular resource
-type RESTOptionsGetter interface {
-	NewFor(resource schema.GroupResource) generic.RESTOptions
-}
-
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
 	// RESTOptionsGetter is used to construct storage for a particular resource
-	RESTOptionsGetter RESTOptionsGetter
+	RESTOptionsGetter generic.RESTOptionsGetter
 }
 
 // APIDiscoveryServer contains state for a Kubernetes cluster master/api server.
@@ -117,7 +110,7 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 	v1alpha1storage := map[string]rest.Storage{}
-	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.RESTOptionsGetter.NewFor(apiregistration.Resource("apiservices")))
+	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.RESTOptionsGetter)
 	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {

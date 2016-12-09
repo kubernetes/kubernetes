@@ -128,8 +128,15 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("Unable to get storage config: %v", err)
 	}
 
+	testTypeOpts := generic.RESTOptions{
+		StorageConfig:           storageConfig,
+		Decorator:               generic.UndecoratedStorage,
+		ResourcePrefix:          "testtypes",
+		DeleteCollectionWorkers: 1,
+	}
+
 	restStorageMap := map[string]rest.Storage{
-		"testtypes": testgroupetcd.NewREST(storageConfig, generic.UndecoratedStorage),
+		"testtypes": testgroupetcd.NewREST(testTypeOpts),
 	}
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *groupMeta,

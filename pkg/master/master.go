@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
-	"k8s.io/kubernetes/pkg/registry"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
@@ -219,7 +218,7 @@ func (c completedConfig) New() (*Master, error) {
 		GenericAPIServer: s,
 	}
 
-	restOptionsFactory := restOptionsFactory{
+	restOptionsFactory := &restOptionsFactory{
 		deleteCollectionWorkers: c.DeleteCollectionWorkers,
 		enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
 		storageFactory:          c.StorageFactory,
@@ -242,7 +241,7 @@ func (c completedConfig) New() (*Master, error) {
 			ServiceNodePortRange: c.ServiceNodePortRange,
 			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,
 		}
-		m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider)
+		m.InstallLegacyAPI(c.Config, restOptionsFactory, legacyRESTStorageProvider)
 	}
 
 	restStorageProviders := []RESTStorageProvider{
@@ -257,7 +256,7 @@ func (c completedConfig) New() (*Master, error) {
 		rbacrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
 	}
-	m.InstallAPIs(c.Config.APIResourceConfigSource, restOptionsFactory.NewFor, restStorageProviders...)
+	m.InstallAPIs(c.Config.APIResourceConfigSource, restOptionsFactory, restStorageProviders...)
 
 	if c.Tunneler != nil {
 		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
@@ -266,7 +265,7 @@ func (c completedConfig) New() (*Master, error) {
 	return m, nil
 }
 
-func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter registry.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
 		glog.Fatalf("Error building core storage: %v", err)
@@ -297,11 +296,11 @@ func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient 
 // RESTStorageProvider is a factory type for REST storage.
 type RESTStorageProvider interface {
 	GroupName() string
-	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
+func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
@@ -344,10 +343,10 @@ type restOptionsFactory struct {
 	storageDecorator        generic.StorageDecorator
 }
 
-func (f restOptionsFactory) NewFor(resource schema.GroupResource) generic.RESTOptions {
+func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	storageConfig, err := f.storageFactory.NewConfig(resource)
 	if err != nil {
-		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
+		return generic.RESTOptions{}, fmt.Errorf("Unable to find storage destination for %v, due to %v", resource, err.Error())
 	}
 
 	return generic.RESTOptions{
@@ -356,7 +355,7 @@ func (f restOptionsFactory) NewFor(resource schema.GroupResource) generic.RESTOp
 		DeleteCollectionWorkers: f.deleteCollectionWorkers,
 		EnableGarbageCollection: f.enableGarbageCollection,
 		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
-	}
+	}, nil
 }
 
 type nodeAddressProvider struct {

@@ -20,9 +20,9 @@ go_library(
         "//pkg/apis/authorization/v1beta1:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/genericapiserver:go_default_library",
-        "//pkg/registry:go_default_library",
         "//pkg/registry/authorization/localsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/selfsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/subjectaccessreview:go_default_library",
+        "//pkg/registry/generic:go_default_library",
     ],
 )
