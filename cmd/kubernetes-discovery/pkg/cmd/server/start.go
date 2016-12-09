@@ -61,9 +61,10 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 		StdOut: out,
 		StdErr: err,
 	}
+	o.Etcd.StorageConfig.Type = storagebackend.StorageTypeETCD3
 	o.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
 	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
-	o.SecureServing.ServingOptions.BindPort = 9090
+	o.SecureServing.ServingOptions.BindPort = 443
 
 	cmd := &cobra.Command{
 		Short: "Launch a discovery summarizer and proxy server",
