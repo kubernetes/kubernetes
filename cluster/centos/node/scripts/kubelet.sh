@@ -35,7 +35,7 @@ NODE_PORT="--port=10250"
 # --hostname-override="": If non-empty, will use this string as identification instead of the actual hostname.
 NODE_HOSTNAME="--hostname-override=${NODE_ADDRESS}"
 
-# --api-servers=[]: List of Kubernetes API servers for publishing events, 
+# --api-servers=[]: List of Kubernetes API servers for publishing events,
 # and reading pods and services. (ip:port), comma separated.
 KUBELET_API_SERVER="--api-servers=${MASTER_ADDRESS}:8080"
 
@@ -73,4 +73,4 @@ EOF
 
 systemctl daemon-reload
 systemctl enable kubelet
-systemctl start kubelet
+systemctl restart kubelet
