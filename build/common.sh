@@ -130,6 +130,8 @@ kube::build::get_docker_wrapped_binaries() {
 
 # Verify that the right utilities and such are installed for building Kube. Set
 # up some dynamic constants.
+# Args:
+#   $1 - boolean of whether to require functioning docker (default true)
 #
 # Vars set:
 #   KUBE_ROOT_HASH
@@ -145,18 +147,21 @@ kube::build::get_docker_wrapped_binaries() {
 #   DOCKER_MOUNT_ARGS
 #   LOCAL_OUTPUT_BUILD_CONTEXT
 function kube::build::verify_prereqs() {
+  local -r require_docker=${1:-true}
   kube::log::status "Verifying Prerequisites...."
   kube::build::ensure_tar || return 1
   kube::build::ensure_rsync || return 1
-  kube::build::ensure_docker_in_path || return 1
-  if kube::build::is_osx; then
-      kube::build::docker_available_on_osx || return 1
-  fi
-  kube::build::ensure_docker_daemon_connectivity || return 1
+  if ${require_docker}; then
+    kube::build::ensure_docker_in_path || return 1
+    if kube::build::is_osx; then
+        kube::build::docker_available_on_osx || return 1
+    fi
+    kube::build::ensure_docker_daemon_connectivity || return 1
 
-  if (( ${KUBE_VERBOSE} > 6 )); then
-    kube::log::status "Docker Version:"
-    "${DOCKER[@]}" version | kube::log::info_from_stdin
+    if (( ${KUBE_VERBOSE} > 6 )); then
+      kube::log::status "Docker Version:"
+      "${DOCKER[@]}" version | kube::log::info_from_stdin
+    fi
   fi
 
   KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}")
