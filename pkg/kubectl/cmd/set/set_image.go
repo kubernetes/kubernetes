@@ -35,21 +35,22 @@ import (
 type ImageOptions struct {
 	resource.FilenameOptions
 
-	Mapper      meta.RESTMapper
-	Typer       runtime.ObjectTyper
-	Infos       []*resource.Info
-	Encoder     runtime.Encoder
-	Selector    string
-	Out         io.Writer
-	Err         io.Writer
-	DryRun      bool
-	ShortOutput bool
-	All         bool
-	Record      bool
-	Output      string
-	ChangeCause string
-	Local       bool
-	Cmd         *cobra.Command
+	Mapper       meta.RESTMapper
+	Typer        runtime.ObjectTyper
+	Infos        []*resource.Info
+	Encoder      runtime.Encoder
+	Selector     string
+	Out          io.Writer
+	Err          io.Writer
+	DryRun       bool
+	ShortOutput  bool
+	All          bool
+	Record       bool
+	Output       string
+	ChangeCause  string
+	Local        bool
+	Cmd          *cobra.Command
+	ResolveImage func(in string) (string, error)
 
 	PrintObject            func(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
@@ -120,6 +121,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.PrintObject = f.PrintObject
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
+	o.ResolveImage = f.ResolveImage
 	o.Cmd = cmd
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -171,12 +173,27 @@ func (o *ImageOptions) Run() error {
 		transformed := false
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			for name, image := range o.ContainerImages {
-				containerFound := false
+				var (
+					containerFound bool
+					err            error
+					resolved       string
+				)
 				// Find the container to update, and update its image
 				for i, c := range spec.Containers {
 					if c.Name == name || name == "*" {
-						spec.Containers[i].Image = image
 						containerFound = true
+						if len(resolved) == 0 {
+							if resolved, err = o.ResolveImage(image); err != nil {
+								allErrs = append(allErrs, fmt.Errorf("error: unable to resolve image %q for container %q: %v", image, name, err))
+								// Do not loop again if the image resolving failed for wildcard case as we
+								// will report the same error again for the next container.
+								if name == "*" {
+									break
+								}
+								continue
+							}
+						}
+						spec.Containers[i].Image = resolved
 						// Perform updates
 						transformed = true
 					}
