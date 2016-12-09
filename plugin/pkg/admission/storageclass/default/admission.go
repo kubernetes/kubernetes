@@ -106,35 +106,35 @@ func (a *claimDefaulterPlugin) Stop() {
 // 1.  Find available StorageClasses.
 // 2.  Figure which is the default
 // 3.  Write to the PVClaim
-func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
+func (c *claimDefaulterPlugin) Admit(a admission.Attributes) (admission.Warning, error) {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
-		return nil
+		return nil, nil
 	}
 
 	if len(a.GetSubresource()) != 0 {
-		return nil
+		return nil, nil
 	}
 
 	pvc, ok := a.GetObject().(*api.PersistentVolumeClaim)
 	// if we can't convert then we don't handle this object so just return
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
 	if storageutil.HasStorageClassAnnotation(pvc.ObjectMeta) {
 		// The user asked for a class.
-		return nil
+		return nil, nil
 	}
 
 	glog.V(4).Infof("no storage class for claim %s (generate: %s)", pvc.Name, pvc.GenerateName)
 
 	def, err := getDefaultClass(c.store)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return nil, admission.NewForbidden(a, err)
 	}
 	if def == nil {
 		// No default class selected, do nothing about the PVC.
-		return nil
+		return nil, nil
 	}
 
 	glog.V(4).Infof("defaulting storage class for claim %s (generate: %s) to %s", pvc.Name, pvc.GenerateName, def.Name)
@@ -142,7 +142,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 		pvc.ObjectMeta.Annotations = map[string]string{}
 	}
 	pvc.Annotations[storageutil.StorageClassAnnotation] = def.Name
-	return nil
+	return nil, nil
 }
 
 // getDefaultClass returns the default StorageClass from the store, or nil.

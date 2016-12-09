@@ -214,7 +214,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		pod.ObjectMeta.Annotations = test.affinity
-		err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		_, err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 
 		if test.errorExpected && err == nil {
 			t.Errorf("Expected error for Anti Affinity %+v but did not get an error", test.affinity)
@@ -282,7 +282,7 @@ func TestOtherResources(t *testing.T) {
 	for _, tc := range tests {
 		handler := &plugin{}
 
-		err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
+		_, err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
 
 		if tc.expectError {
 			if err == nil {

@@ -203,7 +203,7 @@ func TestGCAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, api.NamespaceDefault, "foo", tc.resource, "", operation, user)
 
-		err := gcAdmit.Admit(attributes)
+		_, err := gcAdmit.Admit(attributes)
 		switch {
 		case err != nil && !tc.expectedAllowed:
 		case err != nil && tc.expectedAllowed:

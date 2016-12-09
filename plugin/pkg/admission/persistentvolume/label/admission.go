@@ -59,31 +59,31 @@ func NewPersistentVolumeLabel() *persistentVolumeLabel {
 	}
 }
 
-func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
+func (l *persistentVolumeLabel) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumes") {
-		return nil
+		return nil, nil
 	}
 	obj := a.GetObject()
 	if obj == nil {
-		return nil
+		return nil, nil
 	}
 	volume, ok := obj.(*api.PersistentVolume)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
 	var volumeLabels map[string]string
 	if volume.Spec.AWSElasticBlockStore != nil {
 		labels, err := l.findAWSEBSLabels(volume)
 		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying AWS EBS volume %s: %v", volume.Spec.AWSElasticBlockStore.VolumeID, err))
+			return nil, admission.NewForbidden(a, fmt.Errorf("error querying AWS EBS volume %s: %v", volume.Spec.AWSElasticBlockStore.VolumeID, err))
 		}
 		volumeLabels = labels
 	}
 	if volume.Spec.GCEPersistentDisk != nil {
 		labels, err := l.findGCEPDLabels(volume)
 		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying GCE PD volume %s: %v", volume.Spec.GCEPersistentDisk.PDName, err))
+			return nil, admission.NewForbidden(a, fmt.Errorf("error querying GCE PD volume %s: %v", volume.Spec.GCEPersistentDisk.PDName, err))
 		}
 		volumeLabels = labels
 	}
@@ -100,7 +100,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (map[string]string, error) {

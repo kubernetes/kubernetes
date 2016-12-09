@@ -50,19 +50,19 @@ func NewInterPodAntiAffinity(client clientset.Interface) admission.Interface {
 
 // Admit will deny any pod that defines AntiAffinity topology key other than metav1.LabelHostname i.e. "kubernetes.io/hostname"
 // in  requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution.
-func (p *plugin) Admit(attributes admission.Attributes) (err error) {
+func (p *plugin) Admit(attributes admission.Attributes) (warn admission.Warning, err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
-		return nil
+		return nil, nil
 	}
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
-		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+		return nil, apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
 	if err != nil {
 		glog.V(5).Infof("Invalid Affinity detected, but we will leave handling of this to validation phase")
-		return nil
+		return nil, nil
 	}
 	if affinity != nil && affinity.PodAntiAffinity != nil {
 		var podAntiAffinityTerms []api.PodAffinityTerm
@@ -75,9 +75,9 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		//}
 		for _, v := range podAntiAffinityTerms {
 			if v.TopologyKey != metav1.LabelHostname {
-				return apierrors.NewForbidden(attributes.GetResource().GroupResource(), pod.Name, fmt.Errorf("affinity.PodAntiAffinity.RequiredDuringScheduling has TopologyKey %v but only key %v is allowed", v.TopologyKey, metav1.LabelHostname))
+				return nil, apierrors.NewForbidden(attributes.GetResource().GroupResource(), pod.Name, fmt.Errorf("affinity.PodAntiAffinity.RequiredDuringScheduling has TopologyKey %v but only key %v is allowed", v.TopologyKey, metav1.LabelHostname))
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }

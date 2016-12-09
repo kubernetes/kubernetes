@@ -85,25 +85,25 @@ func readConfig(config io.Reader) *pluginConfig {
 }
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
-func (p *podNodeSelector) Admit(a admission.Attributes) error {
+func (p *podNodeSelector) Admit(a admission.Attributes) (admission.Warning, error) {
 	resource := a.GetResource().GroupResource()
 	if resource != api.Resource("pods") {
-		return nil
+		return nil, nil
 	}
 	if a.GetSubresource() != "" {
 		// only run the checks below on pods proper and not subresources
-		return nil
+		return nil, nil
 	}
 
 	obj := a.GetObject()
 	pod, ok := obj.(*api.Pod)
 	if !ok {
 		glog.Errorf("expected pod but got %s", a.GetKind().Kind)
-		return nil
+		return nil, nil
 	}
 
 	if !p.WaitForReady() {
-		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+		return nil, admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
 	name := pod.Name
@@ -117,7 +117,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 		},
 	})
 	if err != nil {
-		return errors.NewInternalError(err)
+		return nil, errors.NewInternalError(err)
 	}
 	if exists {
 		namespace = namespaceObj.(*api.Namespace)
@@ -125,23 +125,23 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 		namespace, err = p.defaultGetNamespace(nsName)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				return err
+				return nil, err
 			}
-			return errors.NewInternalError(err)
+			return nil, errors.NewInternalError(err)
 		}
 	}
 	namespaceNodeSelector, err := p.getNodeSelectorMap(namespace)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if labels.Conflicts(namespaceNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
-		return errors.NewForbidden(resource, name, fmt.Errorf("pod node label selector conflicts with its namespace node label selector"))
+		return nil, errors.NewForbidden(resource, name, fmt.Errorf("pod node label selector conflicts with its namespace node label selector"))
 	}
 
 	whitelist, err := labels.ConvertSelectorToLabelsMap(p.clusterNodeSelectors[namespace.Name])
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Merge pod node selector = namespace node selector + current pod node selector
@@ -149,12 +149,12 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 
 	// whitelist verification
 	if !labels.AreLabelsInWhiteList(podNodeSelectorLabels, whitelist) {
-		return errors.NewForbidden(resource, name, fmt.Errorf("pod node label selector labels conflict with its namespace whitelist"))
+		return nil, errors.NewForbidden(resource, name, fmt.Errorf("pod node label selector labels conflict with its namespace whitelist"))
 	}
 
 	// Updated pod node selector = namespace node selector + current pod node selector
 	pod.Spec.NodeSelector = map[string]string(podNodeSelectorLabels)
-	return nil
+	return nil, nil
 }
 
 func NewPodNodeSelector(client clientset.Interface, clusterNodeSelectors map[string]string) *podNodeSelector {

@@ -207,7 +207,7 @@ func TestAdmission(t *testing.T) {
 			admission.Create,
 			nil, // userInfo
 		)
-		err = ctrl.Admit(attrs)
+		_, err = ctrl.Admit(attrs)
 		glog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)

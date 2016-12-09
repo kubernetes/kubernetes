@@ -99,19 +99,19 @@ func (a *imagePolicyWebhook) webhookError(attributes admission.Attributes, err e
 	return nil
 }
 
-func (a *imagePolicyWebhook) Admit(attributes admission.Attributes) (err error) {
+func (a *imagePolicyWebhook) Admit(attributes admission.Attributes) (warn admission.Warning, err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	allowedResources := map[schema.GroupResource]bool{
 		api.Resource("pods"): true,
 	}
 
 	if len(attributes.GetSubresource()) != 0 || !allowedResources[attributes.GetResource().GroupResource()] {
-		return nil
+		return nil, nil
 	}
 
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
-		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+		return nil, apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
 	// Build list of ImageReviewContainerSpec
@@ -132,9 +132,9 @@ func (a *imagePolicyWebhook) Admit(attributes admission.Attributes) (err error) 
 		},
 	}
 	if err := a.admitPod(attributes, &imageReview); err != nil {
-		return admission.NewForbidden(attributes, err)
+		return nil, admission.NewForbidden(attributes, err)
 	}
-	return nil
+	return nil, nil
 }
 
 func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v1alpha1.ImageReview) error {

@@ -43,10 +43,10 @@ type gcPermissionsEnforcement struct {
 	authorizer authorizer.Authorizer
 }
 
-func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err error) {
+func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (warn admission.Warning, err error) {
 	// if we aren't changing owner references, then the edit is always allowed
 	if !isChangingOwnerReference(attributes.GetObject(), attributes.GetOldObject()) {
-		return nil
+		return nil, nil
 	}
 
 	deleteAttributes := authorizer.AttributesRecord{
@@ -63,10 +63,10 @@ func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err e
 	}
 	allowed, reason, err := a.authorizer.Authorize(deleteAttributes)
 	if allowed {
-		return nil
+		return nil, nil
 	}
 
-	return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
+	return nil, admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
 }
 
 func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {

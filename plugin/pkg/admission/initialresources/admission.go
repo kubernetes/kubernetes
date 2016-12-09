@@ -73,18 +73,18 @@ func newInitialResources(source dataSource, percentile int64, nsOnly bool) admis
 	}
 }
 
-func (ir initialResources) Admit(a admission.Attributes) (err error) {
+func (ir initialResources) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
-		return nil
+		return nil, nil
 	}
 	pod, ok := a.GetObject().(*api.Pod)
 	if !ok {
-		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+		return nil, apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
 	ir.estimateAndFillResourcesIfNotSet(pod)
-	return nil
+	return nil, nil
 }
 
 // The method veryfies whether resources should be set for the given pod and

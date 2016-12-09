@@ -35,8 +35,8 @@ func init() {
 // It is useful in unit tests to force an operation to be forbidden.
 type alwaysDeny struct{}
 
-func (alwaysDeny) Admit(a admission.Attributes) (err error) {
-	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
+func (alwaysDeny) Admit(a admission.Attributes) (warn admission.Warning, err error) {
+	return nil, admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
 }
 
 func (alwaysDeny) Handles(operation admission.Operation) bool {

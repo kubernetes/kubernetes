@@ -19,6 +19,7 @@ package apiserver
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/evanphx/json-patch"
 
+	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -36,8 +38,57 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
+
+type fakeWriter struct {
+	headers http.Header
+}
+
+func (f *fakeWriter) Write([]byte) (int, error) { return 0, fmt.Errorf("unimplemented") }
+func (f *fakeWriter) Header() http.Header       { return f.headers }
+func (f *fakeWriter) WriteHeader(int)           {}
+
+func TestAddWarnings(t *testing.T) {
+	tests := []struct {
+		name             string
+		warning          admission.Warning
+		expectedWarnings []string
+		source           string
+	}{
+		{
+			name:             "simple",
+			warning:          admission.Warning(fmt.Errorf("test warning")),
+			source:           "PodValidator",
+			expectedWarnings: []string{"199 PodValidator test warning"},
+		},
+		{
+			name: "aggregate",
+			warning: admission.Warning(utilerrors.NewAggregate([]error{
+				fmt.Errorf("test warning"),
+				fmt.Errorf("test warning 2"),
+			})),
+			source: "PodValidator",
+			expectedWarnings: []string{
+				"199 PodValidator test warning",
+				"199 PodValidator test warning 2",
+			},
+		},
+	}
+	for _, test := range tests {
+		res := &restful.Response{}
+		fakeWriter := &fakeWriter{
+			headers: http.Header{},
+		}
+		res.ResponseWriter = fakeWriter
+		addWarningHeaders(test.warning, test.source, res)
+		values := fakeWriter.headers["Warning"]
+		if !reflect.DeepEqual(values, test.expectedWarnings) {
+			t.Errorf("unexpected headers: %v expected: %v", values, test.expectedWarnings)
+		}
+	}
+}
 
 type testPatchType struct {
 	metav1.TypeMeta `json:",inline"`

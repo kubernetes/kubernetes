@@ -141,19 +141,19 @@ func (a *podSecurityPolicyPlugin) Stop() {
 // 3.  Try to generate and validate a PSP with providers.  If we find one then admit the pod
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
-func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
+func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) (admission.Warning, error) {
 	if a.GetResource().GroupResource() != api.Resource("pods") {
-		return nil
+		return nil, nil
 	}
 
 	if len(a.GetSubresource()) != 0 {
-		return nil
+		return nil, nil
 	}
 
 	pod, ok := a.GetObject().(*api.Pod)
 	// if we can't convert then we don't handle this object so just return
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
 	// get all constraints that are usable by the user
@@ -165,20 +165,20 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 
 	matchedPolicies, err := c.pspMatcher(c.store, a.GetUserInfo(), saInfo, c.authz)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return nil, admission.NewForbidden(a, err)
 	}
 
 	// if we have no policies and want to succeed then return.  Otherwise we'll end up with no
 	// providers and fail with "unable to validate against any pod security policy" below.
 	if len(matchedPolicies) == 0 && !c.failOnNoPolicies {
-		return nil
+		return nil, nil
 	}
 
 	providers, errs := c.createProvidersFromPolicies(matchedPolicies, pod.Namespace)
 	logProviders(pod, providers, errs)
 
 	if len(providers) == 0 {
-		return admission.NewForbidden(a, fmt.Errorf("no providers available to validate pod request"))
+		return nil, admission.NewForbidden(a, fmt.Errorf("no providers available to validate pod request"))
 	}
 
 	// all containers in a single pod must validate under a single provider or we will reject the request
@@ -195,12 +195,12 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
 		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = provider.GetPSPName()
-		return nil
+		return nil, nil
 	}
 
 	// we didn't validate against any provider, reject the pod and give the errors for each attempt
 	glog.V(4).Infof("unable to validate pod %s (generate: %s) against any pod security policy: %v", pod.Name, pod.GenerateName, validationErrs)
-	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
+	return nil, admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
 // assignSecurityContext creates a security context for each container in the pod

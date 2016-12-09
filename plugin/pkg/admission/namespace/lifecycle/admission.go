@@ -82,10 +82,10 @@ func makeNamespaceKey(namespace string) *api.Namespace {
 	}
 }
 
-func (l *lifecycle) Admit(a admission.Attributes) error {
+func (l *lifecycle) Admit(a admission.Attributes) (admission.Warning, error) {
 	// prevent deletion of immortal namespaces
 	if a.GetOperation() == admission.Delete && a.GetKind().GroupKind() == api.Kind("Namespace") && l.immortalNamespaces.Has(a.GetName()) {
-		return errors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
+		return nil, errors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
@@ -99,12 +99,12 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		if a.GetOperation() == admission.Delete {
 			l.forceLiveLookupCache.Add(a.GetName(), true, forceLiveLookupTTL)
 		}
-		return nil
+		return nil, nil
 	}
 
 	// we need to wait for our caches to warm
 	if !l.WaitForReady() {
-		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+		return nil, admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
 	var (
@@ -116,7 +116,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 	key := makeNamespaceKey(a.GetNamespace())
 	namespaceObj, exists, err = l.namespaceInformer.GetStore().Get(key)
 	if err != nil {
-		return errors.NewInternalError(err)
+		return nil, errors.NewInternalError(err)
 	}
 
 	if !exists && a.GetOperation() == admission.Create {
@@ -125,7 +125,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		time.Sleep(missingNamespaceWait)
 		namespaceObj, exists, err = l.namespaceInformer.GetStore().Get(key)
 		if err != nil {
-			return errors.NewInternalError(err)
+			return nil, errors.NewInternalError(err)
 		}
 		if exists {
 			glog.V(4).Infof("found %s in cache after waiting", a.GetNamespace())
@@ -145,9 +145,9 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		namespaceObj, err = l.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				return err
+				return nil, err
 			}
-			return errors.NewInternalError(err)
+			return nil, errors.NewInternalError(err)
 		}
 		glog.V(4).Infof("found %s via storage lookup", a.GetNamespace())
 	}
@@ -156,14 +156,14 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 	if a.GetOperation() == admission.Create {
 		namespace := namespaceObj.(*api.Namespace)
 		if namespace.Status.Phase != api.NamespaceTerminating {
-			return nil
+			return nil, nil
 		}
 
 		// TODO: This should probably not be a 403
-		return admission.NewForbidden(a, fmt.Errorf("unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
+		return nil, admission.NewForbidden(a, fmt.Errorf("unable to create new content in namespace %s because it is being terminated", a.GetNamespace()))
 	}
 
-	return nil
+	return nil, nil
 }
 
 // NewLifecycle creates a new namespace lifecycle admission control handler

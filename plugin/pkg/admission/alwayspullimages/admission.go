@@ -46,14 +46,14 @@ type alwaysPullImages struct {
 	*admission.Handler
 }
 
-func (a *alwaysPullImages) Admit(attributes admission.Attributes) (err error) {
+func (a *alwaysPullImages) Admit(attributes admission.Attributes) (warn admission.Warning, err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
-		return nil
+		return nil, nil
 	}
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
-		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+		return nil, apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
 	for i := range pod.Spec.InitContainers {
@@ -64,7 +64,7 @@ func (a *alwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 		pod.Spec.Containers[i].ImagePullPolicy = api.PullAlways
 	}
 
-	return nil
+	return nil, nil
 }
 
 // NewAlwaysPullImages creates a new always pull images admission control handler

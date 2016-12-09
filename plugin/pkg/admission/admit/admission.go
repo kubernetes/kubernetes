@@ -34,8 +34,8 @@ func init() {
 // It is useful in tests and when using kubernetes in an open manner.
 type alwaysAdmit struct{}
 
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
-	return nil
+func (alwaysAdmit) Admit(a admission.Attributes) (warn admission.Warning, err error) {
+	return nil, nil
 }
 
 func (alwaysAdmit) Handles(operation admission.Operation) bool {

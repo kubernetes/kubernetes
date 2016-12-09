@@ -22,6 +22,12 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
+// Warning describes a warning to a user about an activity that they are taking.
+// A warning could be a deprecation message, it could be advice about an object, etc.
+type Warning interface {
+	error
+}
+
 // Attributes is an interface used by AdmissionController to get information about a request
 // that is used to make an admission decision.
 type Attributes interface {
@@ -52,7 +58,7 @@ type Attributes interface {
 // Interface is an abstract, pluggable interface for Admission Control decisions.
 type Interface interface {
 	// Admit makes an admission decision based on the request attributes
-	Admit(a Attributes) (err error)
+	Admit(a Attributes) (warning Warning, err error)
 
 	// Handles returns true if this admission controller can handle the given operation
 	// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT

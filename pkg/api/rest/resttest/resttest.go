@@ -18,6 +18,7 @@ package resttest
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -44,6 +45,8 @@ type Tester struct {
 	generatesName       bool
 	returnDeletedObject bool
 	namer               func(int) string
+	methods             []string
+	handler             http.Handler
 }
 
 func New(t *testing.T, storage rest.Storage) *Tester {
@@ -63,6 +66,18 @@ func defaultNamer(i int) string {
 func (t *Tester) Namer(namer func(int) string) *Tester {
 	t.namer = namer
 	return t
+}
+
+func (t *Tester) Connect(ctx api.Context, id string, options runtime.Object, r rest.Responder) (http.Handler, error) {
+	return t.handler, nil
+}
+
+func (t *Tester) NewConnectOptions() (runtime.Object, bool, string) {
+	return nil, false, ""
+}
+
+func (t *Tester) ConnectMethods() []string {
+	return t.methods
 }
 
 func (t *Tester) ClusterScope() *Tester {
