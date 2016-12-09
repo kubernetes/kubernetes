@@ -17,11 +17,15 @@ limitations under the License.
 package kubectl
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -38,6 +42,8 @@ type ConfigMapGeneratorV1 struct {
 	FileSources []string
 	// LiteralSources to derive the configMap from (optional)
 	LiteralSources []string
+	// EnvFileSource to derive the configMap from (optional)
+	EnvFileSource string
 }
 
 // Ensure it supports the generator pattern that uses parameter injection.
@@ -79,6 +85,15 @@ func (s ConfigMapGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 		}
 		params[key] = strVal
 	}
+	fromEnvFileString, found := genericParams["from-env-file"]
+	if found {
+		fromEnvFile, isString := fromEnvFileString.(string)
+		if !isString {
+			return nil, fmt.Errorf("expected string, found :%v", fromEnvFileString)
+		}
+		delegate.EnvFileSource = fromEnvFile
+		delete(genericParams, "from-env-file")
+	}
 	delegate.Name = params["name"]
 	delegate.Type = params["type"]
 	return delegate.StructuredGenerate()
@@ -91,6 +106,7 @@ func (s ConfigMapGeneratorV1) ParamNames() []GeneratorParam {
 		{"type", false},
 		{"from-file", false},
 		{"from-literal", false},
+		{"from-env-file", false},
 		{"force", false},
 	}
 }
@@ -113,6 +129,11 @@ func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 			return nil, err
 		}
 	}
+	if len(s.EnvFileSource) > 0 {
+		if err := handleConfigMapFromEnvFileSource(configMap, s.EnvFileSource); err != nil {
+			return nil, err
+		}
+	}
 	return configMap, nil
 }
 
@@ -120,6 +141,9 @@ func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 func (s ConfigMapGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
+	}
+	if len(s.EnvFileSource) > 0 && (len(s.FileSources) > 0 || len(s.LiteralSources) > 0) {
+		return fmt.Errorf("from-env-file cannot be combined with from-file or from-literal")
 	}
 	return nil
 }
@@ -186,6 +210,24 @@ func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []stri
 	return nil
 }
 
+// handleConfigMapFromEnvFileSources adds the specified env file source information
+// into the provided configMap
+func handleConfigMapFromEnvFileSource(configMap *api.ConfigMap, envFileSource string) error {
+	info, err := os.Stat(envFileSource)
+	if err != nil {
+		switch err := err.(type) {
+		case *os.PathError:
+			return fmt.Errorf("error reading %s: %v", envFileSource, err.Err)
+		default:
+			return fmt.Errorf("error reading %s: %v", envFileSource, err)
+		}
+	}
+	if info.IsDir() {
+		return fmt.Errorf("must be a file")
+	}
+	return addFromEnvFileToConfigMap(configMap, envFileSource)
+}
+
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToConfigMap(configMap *api.ConfigMap, keyName, filePath string) error {
@@ -207,5 +249,50 @@ func addKeyFromLiteralToConfigMap(configMap *api.ConfigMap, keyName, data string
 		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, configMap.Data)
 	}
 	configMap.Data[keyName] = data
+	return nil
+}
+
+// addFromEnvFileToConfigMap adds an env file to a ConfigMap or returns an error.
+func addFromEnvFileToConfigMap(configMap *api.ConfigMap, filePath string) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	currentLine := 0
+	utf8bom := []byte{0xEF, 0xBB, 0xBF}
+	for scanner.Scan() {
+		scannedBytes := scanner.Bytes()
+		if !utf8.Valid(scannedBytes) {
+			return fmt.Errorf("env file %s contains invalid utf8 bytes at line %d: %v", filePath, currentLine+1, scannedBytes)
+		}
+		// We trim UTF8 BOM
+		if currentLine == 0 {
+			scannedBytes = bytes.TrimPrefix(scannedBytes, utf8bom)
+		}
+		// trim the line from all leading whitespace first
+		line := strings.TrimLeftFunc(string(scannedBytes), unicode.IsSpace)
+		currentLine++
+		// line is not empty, and not starting with '#'
+		if len(line) > 0 && !strings.HasPrefix(line, "#") {
+			data := strings.SplitN(line, "=", 2)
+			key := data[0]
+			if errs := validation.IsCIdentifier(key); len(errs) != 0 {
+				return fmt.Errorf("%q is not a valid key name for a ConfigMap: %s", key, strings.Join(errs, ";"))
+			}
+
+			value := ""
+			if len(data) > 1 {
+				// pass the value through, no trimming
+				value = data[1]
+			} else {
+				// a pass-through variable is given
+				value = os.Getenv(key)
+			}
+			addKeyFromLiteralToConfigMap(configMap, key, value)
+		}
+	}
 	return nil
 }
