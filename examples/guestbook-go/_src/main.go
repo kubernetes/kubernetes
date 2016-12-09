@@ -21,35 +21,40 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/codegangsta/negroni"
+	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
-	"github.com/xyproto/simpleredis"
 )
 
 var (
-	masterPool *simpleredis.ConnectionPool
-	slavePool  *simpleredis.ConnectionPool
+	masterPool *redis.Pool
+	slavePool  *redis.Pool
 )
 
 func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
+	conn := slavePool.Get()
+	defer conn.Close()
 	key := mux.Vars(req)["key"]
-	list := simpleredis.NewList(slavePool, key)
-	members := HandleError(list.GetAll()).([]string)
+	members := HandleError(redis.Strings(conn.Do("LRANGE", key, "0", "-1")))
 	membersJSON := HandleError(json.MarshalIndent(members, "", "  ")).([]byte)
 	rw.Write(membersJSON)
 }
 
 func ListPushHandler(rw http.ResponseWriter, req *http.Request) {
+	conn := masterPool.Get()
+	defer conn.Close()
 	key := mux.Vars(req)["key"]
 	value := mux.Vars(req)["value"]
-	list := simpleredis.NewList(masterPool, key)
-	HandleError(nil, list.Add(value))
+	HandleError(conn.Do("RPUSH", key, value))
 	ListRangeHandler(rw, req)
 }
 
 func InfoHandler(rw http.ResponseWriter, req *http.Request) {
-	info := HandleError(masterPool.Get(0).Do("INFO")).([]byte)
+	conn := masterPool.Get()
+	defer conn.Close()
+	info := HandleError(conn.Do("INFO")).([]byte)
 	rw.Write(info)
 }
 
@@ -73,10 +78,27 @@ func HandleError(result interface{}, err error) (r interface{}) {
 	return result
 }
 
+func newPool(server string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		MaxActive:   10,
+		Wait:        true,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", server)
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
+}
+
 func main() {
-	masterPool = simpleredis.NewConnectionPoolHost("redis-master:6379")
+	masterPool = newPool("redis-master:6379")
 	defer masterPool.Close()
-	slavePool = simpleredis.NewConnectionPoolHost("redis-slave:6379")
+	slavePool = newPool("redis-slave:6379")
 	defer slavePool.Close()
 
 	r := mux.NewRouter()
