@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
 	"k8s.io/kubernetes/pkg/util/limitwriter"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -575,30 +576,27 @@ type requestParams struct {
 	podUID        types.UID
 	containerName string
 	cmd           []string
-	streamOpts    remotecommand.Options
 }
 
 func getRequestParams(req *restful.Request) requestParams {
-	streamOpts, err := remotecommand.NewOptions(req.Request)
-	if err != nil {
-		glog.Warningf("Unable to parse request stream options: %v", err)
-	}
-	if streamOpts == nil {
-		streamOpts = &remotecommand.Options{}
-	}
 	return requestParams{
 		podNamespace:  req.PathParameter("podNamespace"),
 		podName:       req.PathParameter("podID"),
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
 		cmd:           req.Request.URL.Query()[api.ExecCommandParamm],
-		streamOpts:    *streamOpts,
 	}
 }
 
 // getAttach handles requests to attach to a container.
 func (s *Server) getAttach(request *restful.Request, response *restful.Response) {
 	params := getRequestParams(request)
+	streamOpts, err := remotecommand.NewOptions(request.Request)
+	if err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
 	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
@@ -606,7 +604,7 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
-	redirect, err := s.host.GetAttach(podFullName, params.podUID, params.containerName, params.streamOpts)
+	redirect, err := s.host.GetAttach(podFullName, params.podUID, params.containerName, *streamOpts)
 	if err != nil {
 		response.WriteError(streaming.HTTPStatus(err), err)
 		return
@@ -622,6 +620,7 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		podFullName,
 		params.podUID,
 		params.containerName,
+		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
 		remotecommand.DefaultStreamCreationTimeout,
 		remotecommand.SupportedStreamingProtocols)
@@ -630,6 +629,12 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 // getExec handles requests to run a command inside a container.
 func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	params := getRequestParams(request)
+	streamOpts, err := remotecommand.NewOptions(request.Request)
+	if err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
 	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
@@ -637,7 +642,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
-	redirect, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, params.streamOpts)
+	redirect, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
 	if err != nil {
 		response.WriteError(streaming.HTTPStatus(err), err)
 		return
@@ -653,6 +658,8 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		podFullName,
 		params.podUID,
 		params.containerName,
+		params.cmd,
+		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
 		remotecommand.DefaultStreamCreationTimeout,
 		remotecommand.SupportedStreamingProtocols)

@@ -251,6 +251,13 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 		return
 	}
 
+	streamOpts, err := remotecommand.NewOptions(req.Request)
+	if err != nil {
+		resp.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	cmd := req.Request.URL.Query()[api.ExecCommandParamm]
+
 	remotecommand.ServeExec(
 		resp.ResponseWriter,
 		req.Request,
@@ -258,6 +265,8 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 		"", // unused: podName
 		"", // unusued: podUID
 		containerID,
+		cmd,
+		streamOpts,
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout,
 		s.config.SupportedProtocols)
@@ -270,6 +279,12 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		return
 	}
 
+	streamOpts, err := remotecommand.NewOptions(req.Request)
+	if err != nil {
+		resp.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
 	remotecommand.ServeAttach(
 		resp.ResponseWriter,
 		req.Request,
@@ -277,6 +292,7 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		"", // unused: podName
 		"", // unusued: podUID
 		containerID,
+		streamOpts,
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout,
 		s.config.SupportedProtocols)

@@ -1172,7 +1172,7 @@ func testExecAttach(t *testing.T, verb string) {
 		{stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
 		{stdout: true, stderr: true, tty: true, responseStatusCode: http.StatusSwitchingProtocols},
 		{stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
-		{responseStatusCode: http.StatusFound, responseLocation: "http://localhost:12345/" + verb},
+		{stdout: true, responseStatusCode: http.StatusFound, responseLocation: "http://localhost:12345/" + verb},
 	}
 
 	for i, test := range tests {
