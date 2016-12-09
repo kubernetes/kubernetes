@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
@@ -384,7 +385,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	// We don't want to update the cache's copy of the service account
 	// so add the secret to a freshly retrieved copy of the service account
 	serviceAccounts := e.client.Core().ServiceAccounts(serviceAccount.Namespace)
-	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name)
+	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name, metav1.GetOptions{})
 	if err != nil {
 		// Retry for any error other than a NotFound
 		return !apierrors.IsNotFound(err), err
@@ -477,7 +478,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 	// We don't want to update the cache's copy of the secret
 	// so add the token to a freshly retrieved copy of the secret
 	secrets := e.client.Core().Secrets(cachedSecret.Namespace)
-	liveSecret, err := secrets.Get(cachedSecret.Name)
+	liveSecret, err := secrets.Get(cachedSecret.Name, metav1.GetOptions{})
 	if err != nil {
 		// Retry for any error other than a NotFound
 		return !apierrors.IsNotFound(err), err
@@ -541,7 +542,7 @@ func (e *TokensController) removeSecretReference(saNamespace string, saName stri
 	// We don't want to update the cache's copy of the service account
 	// so remove the secret from a freshly retrieved copy of the service account
 	serviceAccounts := e.client.Core().ServiceAccounts(saNamespace)
-	serviceAccount, err := serviceAccounts.Get(saName)
+	serviceAccount, err := serviceAccounts.Get(saName, metav1.GetOptions{})
 	// Ignore NotFound errors when attempting to remove a reference
 	if apierrors.IsNotFound(err) {
 		return nil
@@ -598,7 +599,7 @@ func (e *TokensController) getServiceAccount(ns string, name string, uid types.U
 	}
 
 	// Live lookup
-	sa, err := e.client.Core().ServiceAccounts(ns).Get(name)
+	sa, err := e.client.Core().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}
@@ -634,7 +635,7 @@ func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetc
 	}
 
 	// Live lookup
-	secret, err := e.client.Core().Secrets(ns).Get(name)
+	secret, err := e.client.Core().Secrets(ns).Get(name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}

@@ -107,7 +107,7 @@ func (m *FakeNodeHandler) Create(node *v1.Node) (*v1.Node, error) {
 }
 
 // Get returns a Node from the fake store.
-func (m *FakeNodeHandler) Get(name string) (*v1.Node, error) {
+func (m *FakeNodeHandler) Get(name string, opts metav1.GetOptions) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++

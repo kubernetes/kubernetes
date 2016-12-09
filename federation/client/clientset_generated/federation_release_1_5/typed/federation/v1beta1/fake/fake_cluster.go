@@ -20,6 +20,7 @@ import (
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -73,7 +74,7 @@ func (c *FakeClusters) DeleteCollection(options *v1.DeleteOptions, listOptions v
 	return err
 }
 
-func (c *FakeClusters) Get(name string) (result *v1beta1.Cluster, err error) {
+func (c *FakeClusters) Get(name string, options meta_v1.GetOptions) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootGetAction(clustersResource, name), &v1beta1.Cluster{})
 	if obj == nil {

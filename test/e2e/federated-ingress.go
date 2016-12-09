@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -227,7 +228,7 @@ func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, cluste
 	// ingress should be present in underlying clusters unless orphanDependents is false.
 	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Extensions().Ingresses(nsName).Get(ingressName)
+		_, err := clusterClientset.Extensions().Ingresses(nsName).Get(ingressName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for ingress %s in cluster %s, expected ingress to exist", ingressName, clusterName))
 		} else if !shouldExist && !errors.IsNotFound(err) {
@@ -247,7 +248,7 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	var clusterIngress *v1beta1.Ingress
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name)
+		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace))
 			return true, nil // Success
@@ -293,7 +294,7 @@ func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingres
 func waitForIngressUpdateOrFail(clientset *kubeclientset.Clientset, namespace string, ingress *v1beta1.Ingress, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name)
+		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if err == nil { // We want it present, and the Get succeeded, so we're all good.
 			if equivalentIngress(*clusterIngress, *ingress) {
 				By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is updated", ingress.Name, namespace))
@@ -326,7 +327,7 @@ func deleteIngressOrFail(clientset *fedclientset.Clientset, namespace string, in
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
 	// Wait for the ingress to be deleted.
 	err = wait.Poll(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := clientset.Extensions().Ingresses(namespace).Get(ingressName)
+		_, err := clientset.Extensions().Ingresses(namespace).Get(ingressName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
 		}
@@ -456,7 +457,7 @@ func waitForFederatedIngressAddress(c *fedclientset.Clientset, ns, ingName strin
 // waitForFederatedIngressExists waits for the Ingress object exists.
 func waitForFederatedIngressExists(c *fedclientset.Clientset, ns, ingName string, timeout time.Duration) error {
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		_, err := c.Extensions().Ingresses(ns).Get(ingName)
+		_, err := c.Extensions().Ingresses(ns).Get(ingName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Waiting for Ingress %v, error %v", ingName, err)
 			return false, nil
@@ -468,7 +469,7 @@ func waitForFederatedIngressExists(c *fedclientset.Clientset, ns, ingName string
 
 // getFederatedIngressAddress returns the ips/hostnames associated with the Ingress.
 func getFederatedIngressAddress(client *fedclientset.Clientset, ns, name string) ([]string, error) {
-	ing, err := client.Extensions().Ingresses(ns).Get(name)
+	ing, err := client.Extensions().Ingresses(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

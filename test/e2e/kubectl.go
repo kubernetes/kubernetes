@@ -205,7 +205,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 			framework.RunKubectlOrDie("run", sjName, "--restart=OnFailure", "--generator=scheduledjob/v2alpha1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			By("verifying the ScheduledJob " + sjName + " was created")
-			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(sjName)
+			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(sjName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting ScheduledJob %s: %v", sjName, err)
 			}
@@ -242,7 +242,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			By("verifying the CronJob " + cjName + " was created")
-			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(cjName)
+			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(cjName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting CronJob %s: %v", cjName, err)
 			}
@@ -756,7 +756,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
-					endpoints, err := c.Core().Endpoints(ns).Get(name)
+					endpoints, err := c.Core().Endpoints(ns).Get(name, metav1.GetOptions{})
 					if err != nil {
 						// log the real error
 						framework.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
@@ -787,7 +787,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				service, err := c.Core().Services(ns).Get(name)
+				service, err := c.Core().Services(ns).Get(name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				if len(service.Spec.Ports) != 1 {
@@ -1016,7 +1016,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
-			rc, err := c.Core().ReplicationControllers(ns).Get(rcName)
+			rc, err := c.Core().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting rc %s: %v", rcName, err)
 			}
@@ -1072,7 +1072,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
-			rc, err := c.Core().ReplicationControllers(ns).Get(rcName)
+			rc, err := c.Core().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting rc %s: %v", rcName, err)
 			}
@@ -1118,7 +1118,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", dName, "--image="+nginxImage, "--generator=deployment/v1beta1", nsFlag)
 			By("verifying the deployment " + dName + " was created")
-			d, err := c.Extensions().Deployments(ns).Get(dName)
+			d, err := c.Extensions().Deployments(ns).Get(dName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting deployment %s: %v", dName, err)
 			}
@@ -1160,7 +1160,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", jobName, "--restart=OnFailure", "--generator=job/v1", "--image="+nginxImage, nsFlag)
 			By("verifying the job " + jobName + " was created")
-			job, err := c.Batch().Jobs(ns).Get(jobName)
+			job, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting job %s: %v", jobName, err)
 			}
@@ -1193,7 +1193,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", podName, "--restart=Never", "--generator=run-pod/v1", "--image="+nginxImage, nsFlag)
 			By("verifying the pod " + podName + " was created")
-			pod, err := c.Core().Pods(ns).Get(podName)
+			pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", podName, err)
 			}
@@ -1244,7 +1244,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDieInput(podJson, "replace", "-f", "-", nsFlag)
 
 			By("verifying the pod " + podName + " has the right image " + busyboxImage)
-			pod, err := c.Core().Pods(ns).Get(podName)
+			pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting deployment %s: %v", podName, err)
 			}
@@ -1276,7 +1276,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
 
 			By("verifying the job " + jobName + " was deleted")
-			_, err := c.Batch().Jobs(ns).Get(jobName)
+			_, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
 			Expect(err).To(HaveOccurred())
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
@@ -1425,7 +1425,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDie("create", "quota", quotaName, "--hard=pods=1000000,services=1000000", nsFlag)
 
 			By("verifying that the quota was created")
-			quota, err := c.Core().ResourceQuotas(ns).Get(quotaName)
+			quota, err := c.Core().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting quota %s: %v", quotaName, err)
 			}
@@ -1455,7 +1455,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDie("create", "quota", quotaName, "--hard=pods=1000000", "--scopes=BestEffort,NotTerminating", nsFlag)
 
 			By("verifying that the quota was created")
-			quota, err := c.Core().ResourceQuotas(ns).Get(quotaName)
+			quota, err := c.Core().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting quota %s: %v", quotaName, err)
 			}

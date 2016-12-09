@@ -232,10 +232,10 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
 	}
 	// checks the garbage collect doesn't delete pods it shouldn't delete.
-	if _, err := podClient.Get(independentPodName); err != nil {
+	if _, err := podClient.Get(independentPodName, metav1.GetOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := podClient.Get(oneValidOwnerPodName); err != nil {
+	if _, err := podClient.Get(oneValidOwnerPodName, metav1.GetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 }

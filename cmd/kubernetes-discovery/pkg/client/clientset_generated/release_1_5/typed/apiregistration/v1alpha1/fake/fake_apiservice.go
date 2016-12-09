@@ -20,6 +20,7 @@ import (
 	v1alpha1 "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -73,7 +74,7 @@ func (c *FakeAPIServices) DeleteCollection(options *v1.DeleteOptions, listOption
 	return err
 }
 
-func (c *FakeAPIServices) Get(name string) (result *v1alpha1.APIService, err error) {
+func (c *FakeAPIServices) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.APIService, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootGetAction(apiservicesResource, name), &v1alpha1.APIService{})
 	if obj == nil {

@@ -24,6 +24,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -98,7 +99,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 	})
 
 	It("runs out of disk space", func() {
-		unfilledNode, err := c.Core().Nodes().Get(unfilledNodeName)
+		unfilledNode, err := c.Core().Nodes().Get(unfilledNodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		By(fmt.Sprintf("Calculating CPU availability on node %s", unfilledNode.Name))
@@ -122,7 +123,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 			createOutOfDiskPod(c, ns, name, podCPU)
 
 			framework.ExpectNoError(f.WaitForPodRunning(name))
-			pod, err := podClient.Get(name)
+			pod, err := podClient.Get(name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(pod.Spec.NodeName).To(Equal(unfilledNodeName))
 		}
@@ -161,7 +162,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 
 		By(fmt.Sprintf("Verifying that pod %s schedules on node %s", pendingPodName, recoveredNodeName))
 		framework.ExpectNoError(f.WaitForPodRunning(pendingPodName))
-		pendingPod, err := podClient.Get(pendingPodName)
+		pendingPod, err := podClient.Get(pendingPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(pendingPod.Spec.NodeName).To(Equal(recoveredNodeName))
 	})

@@ -213,7 +213,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		podName := fmt.Sprintf(podNameFormat, i)
-		_, err := clientSet.Core().Pods(ns.Name).Get(podName)
+		_, err := clientSet.Core().Pods(ns.Name).Get(podName, metav1.GetOptions{})
 		if !errors.IsNotFound(err) {
 			t.Errorf("Pod %q is expected to be evicted", podName)
 		}
@@ -243,7 +243,7 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 
 func waitPDBStable(t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-		pdb, err := clientSet.Policy().PodDisruptionBudgets(ns).Get(pdbName)
+		pdb, err := clientSet.Policy().PodDisruptionBudgets(ns).Get(pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

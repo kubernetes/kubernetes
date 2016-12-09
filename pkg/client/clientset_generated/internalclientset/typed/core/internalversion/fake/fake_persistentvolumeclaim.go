@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -76,7 +77,7 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(options *api.DeleteOptions
 	return err
 }
 
-func (c *FakePersistentVolumeClaims) Get(name string) (result *api.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) Get(name string, options v1.GetOptions) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(persistentvolumeclaimsResource, c.ns, name), &api.PersistentVolumeClaim{})
 

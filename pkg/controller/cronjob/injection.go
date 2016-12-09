@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/labels"
@@ -97,7 +98,7 @@ func copyAnnotations(template *batch.JobTemplateSpec) labels.Set {
 }
 
 func (r realJobControl) GetJob(namespace, name string) (*batch.Job, error) {
-	return r.KubeClient.BatchV2alpha1().Jobs(namespace).Get(name)
+	return r.KubeClient.BatchV2alpha1().Jobs(namespace).Get(name, metav1.GetOptions{})
 }
 
 func (r realJobControl) UpdateJob(namespace string, job *batch.Job) (*batch.Job, error) {

@@ -19,6 +19,7 @@ package internalversion
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type CronJobInterface interface {
 	UpdateStatus(*batch.CronJob) (*batch.CronJob, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*batch.CronJob, error)
+	Get(name string, options v1.GetOptions) (*batch.CronJob, error)
 	List(opts api.ListOptions) (*batch.CronJobList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error)
@@ -121,12 +122,13 @@ func (c *cronJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.
 }
 
 // Get takes name of the cronJob, and returns the corresponding cronJob object, and an error if there is any.
-func (c *cronJobs) Get(name string) (result *batch.CronJob, err error) {
+func (c *cronJobs) Get(name string, options v1.GetOptions) (result *batch.CronJob, err error) {
 	result = &batch.CronJob{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

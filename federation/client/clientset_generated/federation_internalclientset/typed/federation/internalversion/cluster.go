@@ -19,6 +19,7 @@ package internalversion
 import (
 	federation "k8s.io/kubernetes/federation/apis/federation"
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type ClusterInterface interface {
 	UpdateStatus(*federation.Cluster) (*federation.Cluster, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*federation.Cluster, error)
+	Get(name string, options v1.GetOptions) (*federation.Cluster, error)
 	List(opts api.ListOptions) (*federation.ClusterList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error)
@@ -114,11 +115,12 @@ func (c *clusters) DeleteCollection(options *api.DeleteOptions, listOptions api.
 }
 
 // Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
-func (c *clusters) Get(name string) (result *federation.Cluster, err error) {
+func (c *clusters) Get(name string, options v1.GetOptions) (result *federation.Cluster, err error) {
 	result = &federation.Cluster{}
 	err = c.client.Get().
 		Resource("clusters").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -34,7 +35,7 @@ type ConfigMapInterface interface {
 	Update(*api.ConfigMap) (*api.ConfigMap, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*api.ConfigMap, error)
+	Get(name string, options v1.GetOptions) (*api.ConfigMap, error)
 	List(opts api.ListOptions) (*api.ConfigMapList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error)
@@ -103,12 +104,13 @@ func (c *configMaps) DeleteCollection(options *api.DeleteOptions, listOptions ap
 }
 
 // Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
-func (c *configMaps) Get(name string) (result *api.ConfigMap, err error) {
+func (c *configMaps) Get(name string, options v1.GetOptions) (result *api.ConfigMap, err error) {
 	result = &api.ConfigMap{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

@@ -19,6 +19,7 @@ package internalversion
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type DaemonSetInterface interface {
 	UpdateStatus(*extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*extensions.DaemonSet, error)
+	Get(name string, options v1.GetOptions) (*extensions.DaemonSet, error)
 	List(opts api.ListOptions) (*extensions.DaemonSetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error)
@@ -121,12 +122,13 @@ func (c *daemonSets) DeleteCollection(options *api.DeleteOptions, listOptions ap
 }
 
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
-func (c *daemonSets) Get(name string) (result *extensions.DaemonSet, err error) {
+func (c *daemonSets) Get(name string, options v1.GetOptions) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

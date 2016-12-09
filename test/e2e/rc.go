@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -165,7 +166,7 @@ func rcConditionCheck(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		quota, err = c.Core().ResourceQuotas(namespace).Get(name)
+		quota, err = c.Core().ResourceQuotas(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -187,7 +188,7 @@ func rcConditionCheck(f *framework.Framework) {
 	generation := rc.Generation
 	conditions := rc.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rc, err = c.Core().ReplicationControllers(namespace).Get(name)
+		rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -216,7 +217,7 @@ func rcConditionCheck(f *framework.Framework) {
 	generation = rc.Generation
 	conditions = rc.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rc, err = c.Core().ReplicationControllers(namespace).Get(name)
+		rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

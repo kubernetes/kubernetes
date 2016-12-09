@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
 
@@ -60,7 +61,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		}
 	}
 
-	pod1, err := tc.Core().Pods("nsA").Get("pod-1")
+	pod1, err := tc.Core().Pods("nsA").Get("pod-1", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Pods.Get: %s", err)
 	}
@@ -71,7 +72,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		t.Fatalf("Expected to find pod nsA/pod-1t, got %s/%s", pod1.Namespace, pod1.Name)
 	}
 
-	wrongPod, err := tc.Core().Pods("nsB").Get("pod-1")
+	wrongPod, err := tc.Core().Pods("nsB").Get("pod-1", metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Pods.Get: expected nsB/pod-1 not to match, but it matched %s/%s", wrongPod.Namespace, wrongPod.Name)
 	}

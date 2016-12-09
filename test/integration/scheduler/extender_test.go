@@ -298,7 +298,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
 
-	if myPod, err := cs.Core().Pods(ns.Name).Get(myPod.Name); err != nil {
+	if myPod, err := cs.Core().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{}); err != nil {
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine3" {
 		t.Fatalf("Failed to schedule using extender, expected machine3, got %v", myPod.Spec.NodeName)

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -79,7 +80,7 @@ func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerF
 			// admission.Update: computeResources,
 		},
 		GetFuncByNamespace: func(namespace, name string) (runtime.Object, error) {
-			return kubeClient.Core().Pods(namespace).Get(name)
+			return kubeClient.Core().Pods(namespace).Get(name, metav1.GetOptions{})
 		},
 		ConstraintsFunc:      PodConstraintsFunc,
 		MatchedResourceNames: allResources,

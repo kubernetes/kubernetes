@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -85,7 +86,7 @@ func createClusterObjectOrFail(f *framework.Framework, context *framework.E2ECon
 }
 
 func clusterIsReadyOrFail(f *framework.Framework, context *framework.E2EContext) {
-	c, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name)
+	c, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("get cluster: %+v", err))
 	if c.ObjectMeta.Name != context.Name {
 		framework.Failf("cluster name does not match input context: actual=%+v, expected=%+v", c, context)
@@ -140,7 +141,7 @@ func createNamespaceInClusters(clusters map[string]*cluster, f *framework.Framew
 	for name, c := range clusters {
 		// The e2e Framework created the required namespace in federation control plane, but we need to create it in all the others, if it doesn't yet exist.
 		// TODO(nikhiljindal): remove this once we have the namespace controller working as expected.
-		if _, err := c.Clientset.Core().Namespaces().Get(nsName); errors.IsNotFound(err) {
+		if _, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{}); errors.IsNotFound(err) {
 			ns := &v1.Namespace{
 				ObjectMeta: v1.ObjectMeta{
 					Name: nsName,
@@ -164,7 +165,7 @@ func unregisterClusters(clusters map[string]*cluster, f *framework.Framework) {
 	nsName := f.FederationNamespace.Name
 	for name, c := range clusters {
 		if c.namespaceCreated {
-			if _, err := c.Clientset.Core().Namespaces().Get(nsName); !errors.IsNotFound(err) {
+			if _, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{}); !errors.IsNotFound(err) {
 				err := c.Clientset.Core().Namespaces().Delete(nsName, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Couldn't delete the namespace %s in cluster %q: %v", nsName, name, err)
 			}
@@ -217,7 +218,7 @@ func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	By(fmt.Sprintf("Fetching a federated service shard of service %q in namespace %q from cluster", service.Name, namespace))
 	var clusterService *v1.Service
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterService, err := clientset.Services(namespace).Get(service.Name)
+		clusterService, err := clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is absent", service.Name, namespace))
 			return true, nil // Success
@@ -297,7 +298,7 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 
 		err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 			var err error
-			cSvc, err = c.Clientset.Services(namespace).Get(service.Name)
+			cSvc, err = c.Clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				// Get failed with an error, try again.
 				framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v. Trying again in %s", service.Name, namespace, name, err, framework.Poll)
@@ -385,7 +386,7 @@ func podExitCodeDetector(f *framework.Framework, name, namespace string, code in
 	}
 
 	return func() error {
-		pod, err := f.ClientSet.Core().Pods(namespace).Get(name)
+		pod, err := f.ClientSet.Core().Pods(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return logerr(err)
 		}

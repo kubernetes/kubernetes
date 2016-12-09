@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -34,7 +35,7 @@ type fakeNodeInterface struct {
 	node api.Node
 }
 
-func (fake *fakeNodeInterface) Get(hostname string) (*api.Node, error) {
+func (fake *fakeNodeInterface) Get(hostname string, options metav1.GetOptions) (*api.Node, error) {
 	return &fake.node, nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -45,7 +46,7 @@ type DeploymentStatusViewer struct {
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done
 func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
-	deployment, err := s.c.Deployments(namespace).Get(name)
+	deployment, err := s.c.Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", false, err
 	}

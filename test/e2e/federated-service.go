@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -129,7 +130,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
 				By(fmt.Sprintf("Verifying that services in underlying clusters are not deleted"))
 				for clusterName, clusterClientset := range clusters {
-					_, err := clusterClientset.Core().Services(service.Namespace).Get(service.Name)
+					_, err := clusterClientset.Core().Services(service.Namespace).Get(service.Name, metav1.GetOptions{})
 					if err != nil {
 						framework.Failf("Unexpected error in fetching service %s in cluster %s, %s", service.Name, clusterName, err)
 					}

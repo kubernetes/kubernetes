@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -169,7 +170,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("Cannot setup configMap volume %v because kube client is not configured", b.volName)
 	}
 
-	configMap, err := kubeClient.Core().ConfigMaps(b.pod.Namespace).Get(b.source.Name)
+	configMap, err := kubeClient.Core().ConfigMaps(b.pod.Namespace).Get(b.source.Name, metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
 		return err

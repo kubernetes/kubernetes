@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -36,7 +37,7 @@ type PodDisruptionBudgetInterface interface {
 	UpdateStatus(*policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*policy.PodDisruptionBudget, error)
+	Get(name string, options v1.GetOptions) (*policy.PodDisruptionBudget, error)
 	List(opts api.ListOptions) (*policy.PodDisruptionBudgetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *policy.PodDisruptionBudget, err error)
@@ -121,12 +122,13 @@ func (c *podDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, list
 }
 
 // Get takes name of the podDisruptionBudget, and returns the corresponding podDisruptionBudget object, and an error if there is any.
-func (c *podDisruptionBudgets) Get(name string) (result *policy.PodDisruptionBudget, err error) {
+func (c *podDisruptionBudgets) Get(name string, options v1.GetOptions) (result *policy.PodDisruptionBudget, err error) {
 	result = &policy.PodDisruptionBudget{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

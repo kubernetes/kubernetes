@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -100,7 +101,7 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 		// may be carried out immediately rather than gracefully.
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 		// save the running pod
-		pod, err = podClient.Get(pod.Name)
+		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter

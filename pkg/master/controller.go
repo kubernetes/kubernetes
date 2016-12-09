@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
@@ -185,7 +186,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 
 // CreateNamespaceIfNeeded will create a namespace if it doesn't already exist
 func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
-	if _, err := c.NamespaceClient.Namespaces().Get(ns); err == nil {
+	if _, err := c.NamespaceClient.Namespaces().Get(ns, metav1.GetOptions{}); err == nil {
 		// the namespace already exists
 		return nil
 	}
@@ -237,7 +238,7 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 // CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
 func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType, reconcile bool) error {
-	if s, err := c.ServiceClient.Services(api.NamespaceDefault).Get(serviceName); err == nil {
+	if s, err := c.ServiceClient.Services(api.NamespaceDefault).Get(serviceName, metav1.GetOptions{}); err == nil {
 		// The service already exists.
 		if reconcile {
 			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
@@ -317,7 +318,7 @@ func NewMasterCountEndpointReconciler(masterCount int, endpointClient coreclient
 //      to be running (c.masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
 func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	e, err := r.endpointClient.Endpoints(api.NamespaceDefault).Get(serviceName)
+	e, err := r.endpointClient.Endpoints(api.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		e = &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{

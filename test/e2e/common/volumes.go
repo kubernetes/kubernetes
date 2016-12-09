@@ -148,7 +148,7 @@ func startVolumeServer(f *framework.Framework, config VolumeTestConfig) *v1.Pod 
 	serverPod = podClient.CreateSync(serverPod)
 
 	By("locating the server pod")
-	pod, err := podClient.Get(serverPod.Name)
+	pod, err := podClient.Get(serverPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the server pod %v: %v", serverPod.Name, err)
 
 	By("sleeping a bit to give the server time to start")

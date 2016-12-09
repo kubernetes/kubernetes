@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -400,7 +401,7 @@ func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
 }
 
 type nodeGetter interface {
-	Get(hostname string) (*api.Node, error)
+	Get(hostname string, options metav1.GetOptions) (*api.Node, error)
 }
 
 func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
@@ -417,7 +418,7 @@ func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver i
 		glog.Errorf("nodeGetter is nil: assuming iptables proxy")
 		return tryIPTablesProxy(iptver, kcompat)
 	}
-	node, err := client.Get(hostname)
+	node, err := client.Get(hostname, metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("Can't get Node %q, assuming iptables proxy, err: %v", hostname, err)
 		return tryIPTablesProxy(iptver, kcompat)
@@ -464,7 +465,7 @@ func (s *ProxyServer) birthCry() {
 
 func getNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
-	node, err := client.Core().Nodes().Get(hostname)
+	node, err := client.Core().Nodes().Get(hostname, metav1.GetOptions{})
 	if err != nil {
 		glog.Warningf("Failed to retrieve node info: %v", err)
 		return nil

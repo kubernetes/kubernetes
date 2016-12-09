@@ -22,6 +22,7 @@ import (
 
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -42,7 +43,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		var secrets []v1.ObjectReference
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
 			By("waiting for a single token reference")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default")
+			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				framework.Logf("default service account was not found")
 				return false, nil
@@ -68,7 +69,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		{
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default")
+			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
@@ -80,7 +81,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		// wait for the referenced secret to be removed, and another one autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("waiting for a new token reference")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default")
+			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("error getting default service account: %v", err)
 				return false, err
@@ -106,7 +107,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		{
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default")
+			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
@@ -114,7 +115,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		// delete the reference from the service account
 		By("deleting the reference to the service account token")
 		{
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default")
+			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			sa.Secrets = nil
 			_, updateErr := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Update(sa)
@@ -124,7 +125,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		// wait for another one to be autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("waiting for a new token to be created and added")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default")
+			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("error getting default service account: %v", err)
 				return false, err
@@ -146,7 +147,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		{
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default")
+			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
@@ -159,7 +160,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		// Standard get, update retry loop
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("getting the auto-created API token")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default")
+			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				framework.Logf("default service account was not found")
 				return false, nil
@@ -173,7 +174,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 				return false, nil
 			}
 			for _, secretRef := range sa.Secrets {
-				secret, err := f.ClientSet.Core().Secrets(f.Namespace.Name).Get(secretRef.Name)
+				secret, err := f.ClientSet.Core().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
 				if err != nil {
 					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
 					continue

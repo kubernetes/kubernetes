@@ -19,6 +19,7 @@ package internalversion
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type CertificateSigningRequestInterface interface {
 	UpdateStatus(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*certificates.CertificateSigningRequest, error)
+	Get(name string, options v1.GetOptions) (*certificates.CertificateSigningRequest, error)
 	List(opts api.ListOptions) (*certificates.CertificateSigningRequestList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *certificates.CertificateSigningRequest, err error)
@@ -114,11 +115,12 @@ func (c *certificateSigningRequests) DeleteCollection(options *api.DeleteOptions
 }
 
 // Get takes name of the certificateSigningRequest, and returns the corresponding certificateSigningRequest object, and an error if there is any.
-func (c *certificateSigningRequests) Get(name string) (result *certificates.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) Get(name string, options v1.GetOptions) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
 	err = c.client.Get().
 		Resource("certificatesigningrequests").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

@@ -19,6 +19,7 @@ package internalversion
 import (
 	apiregistration "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration"
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type APIServiceInterface interface {
 	UpdateStatus(*apiregistration.APIService) (*apiregistration.APIService, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*apiregistration.APIService, error)
+	Get(name string, options v1.GetOptions) (*apiregistration.APIService, error)
 	List(opts api.ListOptions) (*apiregistration.APIServiceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error)
@@ -114,11 +115,12 @@ func (c *aPIServices) DeleteCollection(options *api.DeleteOptions, listOptions a
 }
 
 // Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
-func (c *aPIServices) Get(name string) (result *apiregistration.APIService, err error) {
+func (c *aPIServices) Get(name string, options v1.GetOptions) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
 	err = c.client.Get().
 		Resource("apiservices").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

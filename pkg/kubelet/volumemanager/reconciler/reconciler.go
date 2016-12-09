@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -548,7 +549,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 
 func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) error {
 	// Get the node status to retrieve volume device path information.
-	node, fetchErr := rc.kubeClient.Core().Nodes().Get(string(rc.nodeName))
+	node, fetchErr := rc.kubeClient.Core().Nodes().Get(string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		glog.Errorf("updateStates in reconciler: could not get node status with error %v", fetchErr)
 	} else {

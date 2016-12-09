@@ -76,7 +76,7 @@ func TestUnschedulableNodes(t *testing.T) {
 
 func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.Core().Pods(podNamespace).Get(podName)
+		pod, err := c.Core().Pods(podNamespace).Get(podName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
@@ -268,7 +268,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 		}
 
 		// Apply the schedulable modification to the node, and wait for the reflection
-		schedNode, err := cs.Core().Nodes().Get(unSchedNode.Name)
+		schedNode, err := cs.Core().Nodes().Get(unSchedNode.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get node: %v", err)
 		}
