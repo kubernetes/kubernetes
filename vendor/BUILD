@@ -11810,3 +11810,13 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/selection",
     ],
 )
+
+go_library(
+    name = "github.com/miekg/coredns/middleware/etcd/msg",
+    srcs = [
+        "github.com/miekg/coredns/middleware/etcd/msg/path.go",
+        "github.com/miekg/coredns/middleware/etcd/msg/service.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/miekg/dns"],
+)

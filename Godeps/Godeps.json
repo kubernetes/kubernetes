@@ -1553,6 +1553,11 @@
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
+			"ImportPath": "github.com/miekg/coredns/middleware/etcd/msg",
+			"Comment": "v003",
+			"Rev": "20e25559d5eada5a68a0720816a6e947b94860ce"
+		},
+		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "5d001d020961ae1c184f9f8152fdc73810481677"
 		},
