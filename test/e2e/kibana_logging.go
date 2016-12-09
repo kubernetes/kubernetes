@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -60,7 +61,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		if _, err = s.Get("kibana-logging"); err == nil {
+		if _, err = s.Get("kibana-logging", metav1.GetOptions{}); err == nil {
 			break
 		}
 		framework.Logf("Attempt to check for the existence of the Kibana service failed after %v", time.Since(start))

@@ -97,8 +97,8 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	proxyREST := &noderest.ProxyREST{Store: store, ProxyTransport: proxyTransport}
 
 	// Build a NodeGetter that looks up nodes using the REST handler
-	nodeGetter := client.NodeGetterFunc(func(nodeName string) (*v1.Node, error) {
-		obj, err := nodeREST.Get(api.NewContext(), nodeName, &metav1.GetOptions{})
+	nodeGetter := client.NodeGetterFunc(func(nodeName string, options metav1.GetOptions) (*v1.Node, error) {
+		obj, err := nodeREST.Get(api.NewContext(), nodeName, &options)
 		if err != nil {
 			return nil, err
 		}

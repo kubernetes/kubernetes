@@ -724,7 +724,7 @@ func waitForPDInVolumesInUse(
 		"Waiting for node %s's VolumesInUse Status %s PD %q",
 		nodeName, logStr, diskName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(nodeStatusPollTime) {
-		nodeObj, err := nodeClient.Get(string(nodeName))
+		nodeObj, err := nodeClient.Get(string(nodeName), metav1.GetOptions{})
 		if err != nil || nodeObj == nil {
 			framework.Logf(
 				"Failed to fetch node object %q from API server. err=%v",

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func init() {
@@ -86,7 +87,7 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 	if connectRequest.ResourcePath != "pods/exec" && connectRequest.ResourcePath != "pods/attach" {
 		return nil
 	}
-	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name)
+	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name, metav1.GetOptions{})
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}

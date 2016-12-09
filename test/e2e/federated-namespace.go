@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -132,7 +133,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 				f.FederationClientset_1_5.Core().Namespaces().Delete)
 
 			By(fmt.Sprintf("Verify that event %s was deleted as well", event.Name))
-			latestEvent, err := f.FederationClientset_1_5.Core().Events(nsName).Get(event.Name)
+			latestEvent, err := f.FederationClientset_1_5.Core().Events(nsName).Get(event.Name, metav1.GetOptions{})
 			if !errors.IsNotFound(err) {
 				framework.Failf("Event %s should have been deleted. Found: %v", event.Name, latestEvent)
 			}
@@ -150,7 +151,7 @@ func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface, clusters m
 	By(fmt.Sprintf("Waiting for namespace %s to be created in all underlying clusters", nsName))
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
-			_, err := cluster.Core().Namespaces().Get(nsName)
+			_, err := cluster.Core().Namespaces().Get(nsName, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				return false, err
 			}
@@ -170,7 +171,7 @@ func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface, clusters m
 	// namespace should be present in underlying clusters unless orphanDependents is false.
 	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Core().Namespaces().Get(nsName)
+		_, err := clusterClientset.Core().Namespaces().Get(nsName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for namespace %s in cluster %s, expected namespace to exist", nsName, clusterName))
 		} else if !shouldExist && !errors.IsNotFound(err) {

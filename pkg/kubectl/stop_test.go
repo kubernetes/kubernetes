@@ -527,7 +527,7 @@ type noSuchPod struct {
 	coreclient.PodInterface
 }
 
-func (c *noSuchPod) Get(name string) (*api.Pod, error) {
+func (c *noSuchPod) Get(name string, options metav1.GetOptions) (*api.Pod, error) {
 	return nil, fmt.Errorf("%s does not exist", name)
 }
 

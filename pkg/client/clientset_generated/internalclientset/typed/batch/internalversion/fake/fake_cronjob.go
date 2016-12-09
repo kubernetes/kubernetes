@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -77,7 +78,7 @@ func (c *FakeCronJobs) DeleteCollection(options *api.DeleteOptions, listOptions 
 	return err
 }
 
-func (c *FakeCronJobs) Get(name string) (result *batch.CronJob, err error) {
+func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(cronjobsResource, c.ns, name), &batch.CronJob{})
 

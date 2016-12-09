@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -116,7 +117,7 @@ func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset, cluster
 	By(fmt.Sprintf("Waiting for secret %s to be created in all underlying clusters", secretName))
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
-			_, err := cluster.Core().Secrets(nsName).Get(secretName)
+			_, err := cluster.Core().Secrets(nsName).Get(secretName, metav1.GetOptions{})
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					return false, err
@@ -136,7 +137,7 @@ func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset, cluster
 	// secret should be present in underlying clusters unless orphanDependents is false.
 	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Core().Secrets(nsName).Get(secretName)
+		_, err := clusterClientset.Core().Secrets(nsName).Get(secretName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for secret %s in cluster %s, expected secret to exist", secretName, clusterName))
 		} else if !shouldExist && !errors.IsNotFound(err) {
@@ -173,7 +174,7 @@ func deleteSecretOrFail(clientset *fedclientset.Clientset, nsName string, secret
 
 	// Wait for the secret to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := clientset.Core().Secrets(nsName).Get(secretName)
+		_, err := clientset.Core().Secrets(nsName).Get(secretName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
 		}
@@ -191,7 +192,7 @@ func updateSecretOrFail(clientset *fedclientset.Clientset, nsName string, secret
 
 	var newSecret *v1.Secret
 	for retryCount := 0; retryCount < MaxRetries; retryCount++ {
-		secret, err := clientset.Core().Secrets(nsName).Get(secretName)
+		secret, err := clientset.Core().Secrets(nsName).Get(secretName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get secret %q: %v", secretName, err)
 		}
@@ -223,7 +224,7 @@ func waitForSecretOrFail(clientset *kubeclientset.Clientset, nsName string, secr
 	By(fmt.Sprintf("Fetching a federated secret shard of secret %q in namespace %q from cluster", secret.Name, nsName))
 	var clusterSecret *v1.Secret
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterSecret, err := clientset.Core().Secrets(nsName).Get(secret.Name)
+		clusterSecret, err := clientset.Core().Secrets(nsName).Get(secret.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is absent", secret.Name, nsName))
 			return true, nil // Success
@@ -252,7 +253,7 @@ func waitForSecretShardsUpdatedOrFail(nsName string, secret *v1.Secret, clusters
 func waitForSecretUpdateOrFail(clientset *kubeclientset.Clientset, nsName string, secret *v1.Secret, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated secret shard of secret %q in namespace %q from cluster", secret.Name, nsName))
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterSecret, err := clientset.Core().Secrets(nsName).Get(secret.Name)
+		clusterSecret, err := clientset.Core().Secrets(nsName).Get(secret.Name, metav1.GetOptions{})
 		if err == nil { // We want it present, and the Get succeeded, so we're all good.
 			if util.SecretEquivalent(*clusterSecret, *secret) {
 				By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is updated", secret.Name, nsName))

@@ -19,6 +19,7 @@ package fake
 import (
 	apiregistration "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration"
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	schema "k8s.io/kubernetes/pkg/runtime/schema"
@@ -72,7 +73,7 @@ func (c *FakeAPIServices) DeleteCollection(options *api.DeleteOptions, listOptio
 	return err
 }
 
-func (c *FakeAPIServices) Get(name string) (result *apiregistration.APIService, err error) {
+func (c *FakeAPIServices) Get(name string, options v1.GetOptions) (result *apiregistration.APIService, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootGetAction(apiservicesResource, name), &apiregistration.APIService{})
 	if obj == nil {

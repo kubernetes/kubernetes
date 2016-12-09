@@ -243,7 +243,7 @@ func TestAdoption(t *testing.T) {
 		waitToObservePods(t, podInformer, 1)
 		go rm.Run(5, stopCh)
 		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
-			updatedPod, err := podClient.Get(pod.Name)
+			updatedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -278,7 +278,7 @@ func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.Replic
 func waitRCStable(t *testing.T, clientSet clientset.Interface, rc *v1.ReplicationController, ns string) {
 	rcClient := clientSet.Core().ReplicationControllers(ns)
 	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
-		updatedRC, err := rcClient.Get(rc.Name)
+		updatedRC, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -367,7 +367,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	podClient := clientSet.Core().Pods(ns.Name)
-	pod2, err = podClient.Get(pod2.Name)
+	pod2, err = podClient.Get(pod2.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod2: %v", err)
 	}
@@ -409,7 +409,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	pod2, err = podClient.Get(pod2.Name)
+	pod2, err = podClient.Get(pod2.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod2: %v", err)
 	}

@@ -27,6 +27,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -54,7 +55,7 @@ func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
 	hostIPTimeout := 2 * time.Minute
 	t := time.Now()
 	for {
-		p, err := podClient.Get(pod.Name)
+		p, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "Failed to get pod %q", pod.Name)
 		if p.Status.HostIP != "" {
 			framework.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
@@ -100,7 +101,7 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 	beginTime := time.Now()
 	for time.Since(beginTime) < (2 * maxBackOffTolerance) { // may just miss the 1st MaxContainerBackOff delay
 		time.Sleep(time.Second)
-		pod, err := podClient.Get(podName)
+		pod, err := podClient.Get(podName, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 		status, ok := v1.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
 		if !ok {
@@ -201,7 +202,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		// may be carried out immediately rather than gracefully.
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 		// save the running pod
-		pod, err = podClient.Get(pod.Name)
+		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 		framework.Logf("running pod: %#v", pod)
 

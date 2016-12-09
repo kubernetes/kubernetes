@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -67,7 +68,7 @@ func (c *FakeRoles) DeleteCollection(options *api.DeleteOptions, listOptions api
 	return err
 }
 
-func (c *FakeRoles) Get(name string) (result *rbac.Role, err error) {
+func (c *FakeRoles) Get(name string, options v1.GetOptions) (result *rbac.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(rolesResource, c.ns, name), &rbac.Role{})
 

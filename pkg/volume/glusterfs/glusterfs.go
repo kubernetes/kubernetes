@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/labels"
@@ -123,7 +124,7 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 	ep_name := source.EndpointsName
 	// PVC/POD is in same ns.
 	ns := pod.Namespace
-	ep, err := plugin.host.GetKubeClient().Core().Endpoints(ns).Get(ep_name)
+	ep, err := plugin.host.GetKubeClient().Core().Endpoints(ns).Get(ep_name, metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", ep_name, err)
 		return nil, err

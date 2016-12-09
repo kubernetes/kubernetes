@@ -69,7 +69,7 @@ func pvPvcCleanup(c clientset.Interface, ns string, pvols pvmap, claims pvcmap) 
 
 	if c != nil && len(ns) > 0 {
 		for pvcKey := range claims {
-			_, err := c.Core().PersistentVolumeClaims(pvcKey.Namespace).Get(pvcKey.Name)
+			_, err := c.Core().PersistentVolumeClaims(pvcKey.Namespace).Get(pvcKey.Name, metav1.GetOptions{})
 			if !apierrs.IsNotFound(err) {
 				Expect(err).NotTo(HaveOccurred())
 				framework.Logf("   deleting PVC %v ...", pvcKey)
@@ -81,7 +81,7 @@ func pvPvcCleanup(c clientset.Interface, ns string, pvols pvmap, claims pvcmap) 
 		}
 
 		for name := range pvols {
-			_, err := c.Core().PersistentVolumes().Get(name)
+			_, err := c.Core().PersistentVolumes().Get(name, metav1.GetOptions{})
 			if !apierrs.IsNotFound(err) {
 				Expect(err).NotTo(HaveOccurred())
 				framework.Logf("   deleting PV %v ...", name)
@@ -106,7 +106,7 @@ func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check that the PVC is really deleted.
-	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
+	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
 	// Wait for the PV's phase to return to the expected Phase
@@ -115,7 +115,7 @@ func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 	Expect(err).NotTo(HaveOccurred())
 
 	// examine the pv's ClaimRef and UID and compare to expected values
-	pv, err = c.Core().PersistentVolumes().Get(pv.Name)
+	pv, err = c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	cr := pv.Spec.ClaimRef
 	if expctPVPhase == v1.VolumeAvailable {
@@ -140,7 +140,7 @@ func deletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols pvmap, 
 	var expctPVPhase v1.PersistentVolumePhase
 
 	for pvName := range pvols {
-		pv, err := c.Core().PersistentVolumes().Get(pvName)
+		pv, err := c.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 		Expect(apierrs.IsNotFound(err)).To(BeFalse())
 		cr := pv.Spec.ClaimRef
 		// if pv is bound then delete the pvc it is bound to
@@ -151,7 +151,7 @@ func deletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols pvmap, 
 			pvcKey := makePvcKey(ns, cr.Name)
 			_, found := claims[pvcKey]
 			Expect(found).To(BeTrue())
-			pvc, err := c.Core().PersistentVolumeClaims(ns).Get(cr.Name)
+			pvc, err := c.Core().PersistentVolumeClaims(ns).Get(cr.Name, metav1.GetOptions{})
 			Expect(apierrs.IsNotFound(err)).To(BeFalse())
 
 			// what Phase do we expect the PV that was bound to the claim to
@@ -305,11 +305,11 @@ func waitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, p
 	Expect(err).NotTo(HaveOccurred())
 
 	// Re-get the pv and pvc objects
-	pv, err = c.Core().PersistentVolumes().Get(pv.Name)
+	pv, err = c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Re-get the pvc and
-	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
+	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// The pv and pvc are both bound, but to each other?
@@ -343,7 +343,7 @@ func waitAndVerifyBinds(c clientset.Interface, ns string, pvols pvmap, claims pv
 		}
 		Expect(err).NotTo(HaveOccurred())
 
-		pv, err := c.Core().PersistentVolumes().Get(pvName)
+		pv, err := c.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if cr := pv.Spec.ClaimRef; cr != nil && len(cr.Name) > 0 {
 			// Assert bound pvc is a test resource. Failing assertion could
@@ -435,7 +435,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 	// 1. verify each PV permits write access to a client pod
 	By("Checking pod has write access to PersistentVolumes")
 	for pvcKey := range claims {
-		pvc, err := c.Core().PersistentVolumeClaims(pvcKey.Namespace).Get(pvcKey.Name)
+		pvc, err := c.Core().PersistentVolumeClaims(pvcKey.Namespace).Get(pvcKey.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if len(pvc.Spec.VolumeName) == 0 {
 			continue // claim is not bound
@@ -503,7 +503,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		AfterEach(func() {
 			if c != nil && len(ns) > 0 {
 				if pvc != nil && len(pvc.Name) > 0 {
-					_, err := c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
+					_, err := c.Core().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 					if !apierrs.IsNotFound(err) {
 						Expect(err).NotTo(HaveOccurred())
 						framework.Logf("AfterEach: deleting PVC %v", pvc.Name)
@@ -515,7 +515,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				pvc = nil
 
 				if pv != nil && len(pv.Name) > 0 {
-					_, err := c.Core().PersistentVolumes().Get(pv.Name)
+					_, err := c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 					if !apierrs.IsNotFound(err) {
 						Expect(err).NotTo(HaveOccurred())
 						framework.Logf("AfterEach: deleting PV %v", pv.Name)

@@ -237,7 +237,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 	By("retrieving the pod")
-	pod, err := podClient.Get(pod.Name)
+	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
 	}
@@ -266,7 +266,7 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 	By("retrieving the pod")
-	pod, err := podClient.Get(pod.Name)
+	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
 	}

@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -35,7 +36,7 @@ type PersistentVolumeClaimInterface interface {
 	UpdateStatus(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*api.PersistentVolumeClaim, error)
+	Get(name string, options v1.GetOptions) (*api.PersistentVolumeClaim, error)
 	List(opts api.ListOptions) (*api.PersistentVolumeClaimList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PersistentVolumeClaim, err error)
@@ -120,12 +121,13 @@ func (c *persistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, li
 }
 
 // Get takes name of the persistentVolumeClaim, and returns the corresponding persistentVolumeClaim object, and an error if there is any.
-func (c *persistentVolumeClaims) Get(name string) (result *api.PersistentVolumeClaim, err error) {
+func (c *persistentVolumeClaims) Get(name string, options v1.GetOptions) (result *api.PersistentVolumeClaim, err error) {
 	result = &api.PersistentVolumeClaim{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

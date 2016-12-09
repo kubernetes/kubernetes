@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -645,7 +646,7 @@ func deleteResourceQuota(c clientset.Interface, namespace, name string) error {
 // wait for resource quota status to show the expected used resources value
 func waitForResourceQuota(c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
 	return wait.Poll(framework.Poll, resourceQuotaTimeout, func() (bool, error) {
-		resourceQuota, err := c.Core().ResourceQuotas(ns).Get(quotaName)
+		resourceQuota, err := c.Core().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

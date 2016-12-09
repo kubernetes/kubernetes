@@ -150,6 +150,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "DeleteOptions"})
 		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"})
 	}
+	m["GetOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/apis/meta/v1", Name: "GetOptions"})
 
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 
@@ -239,7 +240,7 @@ func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type
 `
 
 var getTemplate = `
-func (c *Fake$.type|publicPlural$) Get(name string) (result *$.type|raw$, err error) {
+func (c *Fake$.type|publicPlural$) Get(name string, options $.GetOptions|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewGetAction|raw$($.type|allLowercasePlural$Resource, c.ns, name), &$.type|raw${})
 		$else$Invokes($.NewRootGetAction|raw$($.type|allLowercasePlural$Resource, name), &$.type|raw${})$end$

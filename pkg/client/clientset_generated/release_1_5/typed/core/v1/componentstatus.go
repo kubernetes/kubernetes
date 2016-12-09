@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -35,7 +36,7 @@ type ComponentStatusInterface interface {
 	Update(*v1.ComponentStatus) (*v1.ComponentStatus, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.ComponentStatus, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.ComponentStatus, error)
 	List(opts v1.ListOptions) (*v1.ComponentStatusList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ComponentStatus, err error)
@@ -98,11 +99,12 @@ func (c *componentStatuses) DeleteCollection(options *v1.DeleteOptions, listOpti
 }
 
 // Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *componentStatuses) Get(name string) (result *v1.ComponentStatus, err error) {
+func (c *componentStatuses) Get(name string, options meta_v1.GetOptions) (result *v1.ComponentStatus, err error) {
 	result = &v1.ComponentStatus{}
 	err = c.client.Get().
 		Resource("componentstatuses").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

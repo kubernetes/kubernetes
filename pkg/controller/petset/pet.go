@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -183,7 +184,7 @@ type apiServerPetClient struct {
 // Get gets the pet in the pcb from the apiserver.
 func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
 	ns := pet.parent.Namespace
-	pod, err := p.c.Core().Pods(ns).Get(pet.pod.Name)
+	pod, err := p.c.Core().Pods(ns).Get(pet.pod.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil, false, nil
 	}
@@ -228,7 +229,7 @@ func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error
 		if updateErr == nil || i >= updateRetries {
 			return updateErr
 		}
-		getPod, getErr := pc.Get(updatePod.Name)
+		getPod, getErr := pc.Get(updatePod.Name, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		}
@@ -243,7 +244,7 @@ func (p *apiServerPetClient) DeletePVCs(pet *pcb) error {
 }
 
 func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*v1.PersistentVolumeClaim, error) {
-	pvc, err := p.c.Core().PersistentVolumeClaims(pvcNamespace).Get(pvcName)
+	pvc, err := p.c.Core().PersistentVolumeClaims(pvcNamespace).Get(pvcName, metav1.GetOptions{})
 	return pvc, err
 }
 

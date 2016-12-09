@@ -97,6 +97,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "DeleteOptions"})
 		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"})
 	}
+	m["GetOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/apis/meta/v1", Name: "GetOptions"})
 
 	sw.Do(getterComment, m)
 	if namespaced {
@@ -176,7 +177,7 @@ var interfaceUpdateStatusTemplate = `
 var interfaceTemplate3 = `
 	Delete(name string, options *$.DeleteOptions|raw$) error
 	DeleteCollection(options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error
-	Get(name string) (*$.type|raw$, error)
+	Get(name string, options $.GetOptions|raw$) (*$.type|raw$, error)
 	List(opts $.ListOptions|raw$) (*$.type|raw$List, error)
 	Watch(opts $.ListOptions|raw$) ($.watchInterface|raw$, error)
 	Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.type|raw$, err error)`
@@ -237,12 +238,13 @@ func (c *$.type|privatePlural$) List(opts $.ListOptions|raw$) (result *$.type|ra
 `
 var getTemplate = `
 // Get takes name of the $.type|private$, and returns the corresponding $.type|private$ object, and an error if there is any.
-func (c *$.type|privatePlural$) Get(name string) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) Get(name string, options $.GetOptions|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		Name(name).
+		VersionedParams(&options, $.apiParameterCodec|raw$).
 		Do().
 		Into(result)
 	return

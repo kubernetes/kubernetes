@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
@@ -75,7 +76,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	}
 
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-	_, err = e.client.Core().Namespaces().Get(a.GetNamespace())
+	_, err = e.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return err

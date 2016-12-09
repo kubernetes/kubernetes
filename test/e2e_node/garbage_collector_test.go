@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	docker "k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -149,7 +150,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			By("Making sure all containers restart the specified number of times")
 			Eventually(func() error {
 				for _, podSpec := range test.testPods {
-					updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podSpec.podName)
+					updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podSpec.podName, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}

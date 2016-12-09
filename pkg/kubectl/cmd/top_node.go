@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -144,7 +145,7 @@ func (o TopNodeOptions) RunTopNode() error {
 
 	var nodes []api.Node
 	if len(o.ResourceName) > 0 {
-		node, err := o.NodeClient.Nodes().Get(o.ResourceName)
+		node, err := o.NodeClient.Nodes().Get(o.ResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

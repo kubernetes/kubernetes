@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -34,7 +35,7 @@ type EndpointsInterface interface {
 	Update(*api.Endpoints) (*api.Endpoints, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*api.Endpoints, error)
+	Get(name string, options v1.GetOptions) (*api.Endpoints, error)
 	List(opts api.ListOptions) (*api.EndpointsList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Endpoints, err error)
@@ -103,12 +104,13 @@ func (c *endpoints) DeleteCollection(options *api.DeleteOptions, listOptions api
 }
 
 // Get takes name of the endpoints, and returns the corresponding endpoints object, and an error if there is any.
-func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
+func (c *endpoints) Get(name string, options v1.GetOptions) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

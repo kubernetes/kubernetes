@@ -23,6 +23,7 @@ go_library(
         "//federation/client/clientset_generated/federation_release_1_5/typed/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/labels:go_default_library",

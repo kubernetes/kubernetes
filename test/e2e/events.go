@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -79,7 +80,7 @@ var _ = framework.KubeDescribe("Events", func() {
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("retrieving the pod")
-		podWithUid, err := podClient.Get(pod.Name)
+		podWithUid, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}

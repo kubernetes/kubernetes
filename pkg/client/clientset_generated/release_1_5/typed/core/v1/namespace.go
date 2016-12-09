@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type NamespaceInterface interface {
 	UpdateStatus(*v1.Namespace) (*v1.Namespace, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.Namespace, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.Namespace, error)
 	List(opts v1.ListOptions) (*v1.NamespaceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error)
@@ -114,11 +115,12 @@ func (c *namespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
-func (c *namespaces) Get(name string) (result *v1.Namespace, err error) {
+func (c *namespaces) Get(name string, options meta_v1.GetOptions) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
 	err = c.client.Get().
 		Resource("namespaces").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

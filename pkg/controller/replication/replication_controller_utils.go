@@ -63,7 +63,7 @@ func updateReplicationControllerStatus(c v1core.ReplicationControllerInterface, 
 			return updateErr
 		}
 		// Update the controller with the latest resource version for the next poll
-		if rc, getErr = c.Get(rc.Name); getErr != nil {
+		if rc, getErr = c.Get(rc.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			return getErr

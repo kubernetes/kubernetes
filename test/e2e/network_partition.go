@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
@@ -268,7 +269,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
 
-			node, err := c.Core().Nodes().Get(nodeName)
+			node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// This creates a temporary network partition, verifies that 'podNameToDisappear',
@@ -306,7 +307,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			// verify that it is really on the requested node
 			{
-				pod, err := c.Core().Pods(ns).Get(additionalPod)
+				pod, err := c.Core().Pods(ns).Get(additionalPod, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				if pod.Spec.NodeName != node.Name {
 					framework.Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
@@ -333,7 +334,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
 
-			node, err := c.Core().Nodes().Get(nodeName)
+			node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// This creates a temporary network partition, verifies that 'podNameToDisappear',
@@ -411,7 +412,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			pst.waitForRunningAndReady(*ps.Spec.Replicas, ps)
 
 			pod := pst.getPodList(ps).Items[0]
-			node, err := c.Core().Nodes().Get(pod.Spec.NodeName)
+			node, err := c.Core().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
@@ -453,7 +454,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
 
-			node, err := c.Core().Nodes().Get(nodeName)
+			node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// This creates a temporary network partition, verifies that the job has 'parallelism' number of

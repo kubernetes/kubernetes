@@ -24,6 +24,7 @@ import (
 
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -229,7 +230,7 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 	defer r.removeNodeFromProcessing(data.nodeName)
 	for rep := 0; rep < podCIDRUpdateRetry; rep++ {
 		// TODO: change it to using PATCH instead of full Node updates.
-		node, err = r.client.Core().Nodes().Get(data.nodeName)
+		node, err = r.client.Core().Nodes().Get(data.nodeName, metav1.GetOptions{})
 		if err != nil {
 			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", data.nodeName, err)
 			continue

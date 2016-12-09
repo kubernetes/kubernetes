@@ -19,6 +19,7 @@ package internalversion
 import (
 	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type TestTypeInterface interface {
 	UpdateStatus(*testgroup.TestType) (*testgroup.TestType, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*testgroup.TestType, error)
+	Get(name string, options v1.GetOptions) (*testgroup.TestType, error)
 	List(opts api.ListOptions) (*testgroup.TestTypeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error)
@@ -121,12 +122,13 @@ func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api
 }
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *testTypes) Get(name string) (result *testgroup.TestType, err error) {
+func (c *testTypes) Get(name string, options v1.GetOptions) (result *testgroup.TestType, err error) {
 	result = &testgroup.TestType{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

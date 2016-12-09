@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -62,7 +63,7 @@ func createSynthLogger(f *framework.Framework, linesCount int) {
 }
 
 func reportLogsFromFluentdPod(f *framework.Framework) error {
-	synthLoggerPod, err := f.PodClient().Get(synthLoggerPodName)
+	synthLoggerPod, err := f.PodClient().Get(synthLoggerPodName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed to get synth logger pod due to %v", err)
 	}

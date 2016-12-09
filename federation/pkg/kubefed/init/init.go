@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -286,7 +287,7 @@ func waitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service, d
 	}
 
 	err := wait.PollImmediateInfinite(lbAddrRetryInterval, func() (bool, error) {
-		pollSvc, err := clientset.Core().Services(svc.Namespace).Get(svc.Name)
+		pollSvc, err := clientset.Core().Services(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}

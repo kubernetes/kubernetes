@@ -43,6 +43,7 @@ go_library(
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",

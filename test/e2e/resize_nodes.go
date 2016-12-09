@@ -214,7 +214,7 @@ func newRCByName(c clientset.Interface, ns, name string, replicas int32, gracePe
 }
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
-	rc, err := c.Core().ReplicationControllers(ns).Get(name)
+	rc, err := c.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

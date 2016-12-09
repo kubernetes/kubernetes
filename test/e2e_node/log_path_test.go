@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -67,7 +68,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 
 				// get containerID from created Pod
-				createdLogPod, err := podClient.Get(logPodName)
+				createdLogPod, err := podClient.Get(logPodName, metav1.GetOptions{})
 				logConID := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
 				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 

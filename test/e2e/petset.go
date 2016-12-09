@@ -240,7 +240,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			By("Verifying that the 2nd pod wont be removed if it is not running and ready")
 			pst.confirmPetCount(2, ps, 10*time.Second)
 			expectedPodName := ps.Name + "-1"
-			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName)
+			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			watcher, err := f.ClientSet.Core().Pods(ns).Watch(v1.SingleObject(
 				v1.ObjectMeta{
@@ -488,7 +488,7 @@ var _ = framework.KubeDescribe("Stateful Set recreate", func() {
 		By("waiting when pet pod " + petPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
 		// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
 		Eventually(func() error {
-			petPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(petPodName)
+			petPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(petPodName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -812,7 +812,7 @@ type verifyPodFunc func(*v1.Pod)
 
 func (p *statefulSetTester) verifyPodAtIndex(index int, ps *apps.StatefulSet, verify verifyPodFunc) {
 	name := getPodNameAtIndex(index, ps)
-	pod, err := p.c.Core().Pods(ps.Namespace).Get(name)
+	pod, err := p.c.Core().Pods(ps.Namespace).Get(name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get stateful pod %s for StatefulSet %s/%s", name, ps.Namespace, ps.Name))
 	verify(pod)
 }
@@ -861,7 +861,7 @@ func (p *statefulSetTester) restart(ps *apps.StatefulSet) {
 
 func (p *statefulSetTester) update(ns, name string, update func(ps *apps.StatefulSet)) {
 	for i := 0; i < 3; i++ {
-		ps, err := p.c.Apps().StatefulSets(ns).Get(name)
+		ps, err := p.c.Apps().StatefulSets(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get statefulset %q: %v", name, err)
 		}
@@ -979,7 +979,7 @@ func (p *statefulSetTester) waitForStatus(ps *apps.StatefulSet, expectedReplicas
 	ns, name := ps.Namespace, ps.Name
 	pollErr := wait.PollImmediate(statefulsetPoll, statefulsetTimeout,
 		func() (bool, error) {
-			psGet, err := p.c.Apps().StatefulSets(ns).Get(name)
+			psGet, err := p.c.Apps().StatefulSets(ns).Get(name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
