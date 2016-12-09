@@ -198,11 +198,9 @@ spec:
       value: kube-registry.kube-system.svc.cluster.local
     - name: REGISTRY_PORT
       value: "5000"
-    - name: FORWARD_PORT
-      value: "5000"
     ports:
     - name: registry
-      containerPort: 5000
+      containerPort: 80
       hostPort: 5000
 ```
 <!-- END MUNGE: EXAMPLE ../../saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml -->
