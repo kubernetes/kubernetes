@@ -2491,7 +2491,7 @@ type LoadBalancerIngress struct {
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
 	// More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies
-	Ports []ServicePort `json:"ports" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
+	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 
 	// Route service traffic to pods with label keys and values matching this
 	// selector. If empty or not present, the service is assumed to have an
