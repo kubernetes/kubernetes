@@ -307,3 +307,40 @@ func TestPriorityRESTMapperRESTMapping(t *testing.T) {
 		}
 	}
 }
+
+func TestPriorityRESTMapperRESTMappingHonorsUserVersion(t *testing.T) {
+	mappingV2alpha1 := &RESTMapping{
+		GroupVersionKind: schema.GroupVersionKind{Group: "Bar", Kind: "Foo", Version: "v2alpha1"},
+	}
+	mappingV1 := &RESTMapping{
+		GroupVersionKind: schema.GroupVersionKind{Group: "Bar", Kind: "Foo", Version: "v1"},
+	}
+
+	allMappers := MultiRESTMapper{
+		fixedRESTMapper{mappings: []*RESTMapping{mappingV2alpha1}},
+		fixedRESTMapper{mappings: []*RESTMapping{mappingV1}},
+	}
+
+	mapper := PriorityRESTMapper{
+		Delegate:     allMappers,
+		KindPriority: []schema.GroupVersionKind{{Group: "Bar", Version: "v2alpha1", Kind: AnyKind}, {Group: "Bar", Version: AnyVersion, Kind: AnyKind}},
+	}
+
+	outMapping1, err := mapper.RESTMapping(schema.GroupKind{Group: "Bar", Kind: "Foo"}, "v1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if outMapping1 != mappingV1 {
+		t.Errorf("asked for version %v, expected mapping for %v, got mapping for %v", "v1", mappingV1.GroupVersionKind, outMapping1.GroupVersionKind)
+	}
+
+	outMapping2, err := mapper.RESTMapping(schema.GroupKind{Group: "Bar", Kind: "Foo"}, "v2alpha1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if outMapping2 != mappingV2alpha1 {
+		t.Errorf("asked for version %v, expected mapping for %v, got mapping for %v", "v2alpha1", mappingV2alpha1.GroupVersionKind, outMapping2.GroupVersionKind)
+	}
+}
