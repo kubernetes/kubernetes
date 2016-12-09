@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/watch"
@@ -243,7 +243,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	claims := []*v1.PersistentVolumeClaim{}
 	for counter <= maxClaims {
 		counter += 1
-		clone, _ := conversion.NewCloner().DeepCopy(pvc)
+		clone, _ := api.Scheme.DeepCopy(pvc)
 		newPvc, _ := clone.(*v1.PersistentVolumeClaim)
 		newPvc.ObjectMeta = v1.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
 		claim, err := testClient.PersistentVolumeClaims(ns.Name).Create(newPvc)
