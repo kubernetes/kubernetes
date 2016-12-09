@@ -207,7 +207,7 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *v1.Pod) *extensions.Repli
 		// overlap, sort by creation timestamp, subsort by name, then pick
 		// the first.
 		utilruntime.HandleError(fmt.Errorf("user error! more than one ReplicaSet is selecting pods with labels: %+v", pod.Labels))
-		sort.Sort(overlappingReplicaSets(rss))
+		sort.Sort(controller.ReplicaSetsByCreationTimestamp(rss))
 	}
 
 	// update lookup cache

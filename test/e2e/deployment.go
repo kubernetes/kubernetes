@@ -311,7 +311,12 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 
 	rsName := "test-rolling-update-controller"
 	replicas := int32(3)
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage))
+	rsRevision := "3546343826724305832"
+	annotations := make(map[string]string)
+	annotations[deploymentutil.RevisionAnnotation] = rsRevision
+	rs := newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage)
+	rs.Annotations = annotations
+	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
 	err = framework.VerifyPods(c, ns, "sample-pod", false, 3)
@@ -326,8 +331,8 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	deploy, err := c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, redisImageName, redisImage, extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 
-	// Wait for it to be updated to revision 1
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", redisImage)
+	// Wait for it to be updated to revision 3546343826724305833.
+	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", redisImage)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = framework.WaitForDeploymentStatus(c, deploy)
@@ -351,27 +356,27 @@ func testRecreateDeployment(f *framework.Framework) {
 
 	// Create a deployment that brings up redis pods.
 	deploymentName := "test-recreate-deployment"
-	framework.Logf("Creating deployment %q", deploymentName)
+	By(fmt.Sprintf("Creating deployment %q", deploymentName))
 	deployment, err := c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, int32(3), map[string]string{"name": "sample-pod-3"}, redisImageName, redisImage, extensions.RecreateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for it to be updated to revision 1
-	framework.Logf("Waiting deployment %q to be updated to revision 1", deploymentName)
+	By(fmt.Sprintf("Waiting deployment %q to be updated to revision 1", deploymentName))
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", redisImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("Waiting deployment %q to complete", deploymentName)
+	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
 	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
 	// Update deployment to delete redis pods and bring up nginx pods.
-	framework.Logf("Triggering a new rollout for deployment %q", deploymentName)
+	By(fmt.Sprintf("Triggering a new rollout for deployment %q", deploymentName))
 	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *extensions.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = nginxImageName
 		update.Spec.Template.Spec.Containers[0].Image = nginxImage
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("Watching deployment %q to verify that new pods will not run with olds pods", deploymentName)
+	By(fmt.Sprintf("Watching deployment %q to verify that new pods will not run with olds pods", deploymentName))
 	Expect(framework.WatchRecreateDeployment(c, deployment)).NotTo(HaveOccurred())
 }
 

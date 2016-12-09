@@ -17,12 +17,8 @@ limitations under the License.
 package deployment
 
 import (
-	"fmt"
-
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
@@ -45,9 +41,16 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
 
-	// Wait for all old replica set to scale down to zero.
-	if err := dc.waitForInactiveReplicaSets(activeOldRSs); err != nil {
-		return err
+	newStatus := calculateStatus(allRSs, newRS, deployment)
+	// Do not process a deployment when it has old pods running.
+	if newStatus.UpdatedReplicas == 0 {
+		podList, err := dc.listPods(deployment)
+		if err != nil {
+			return err
+		}
+		if len(podList.Items) > 0 {
+			return dc.syncRolloutStatus(allRSs, newRS, deployment)
+		}
 	}
 
 	// If we need to create a new RS, create it now
@@ -95,40 +98,6 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*ext
 		}
 	}
 	return scaled, nil
-}
-
-// waitForInactiveReplicaSets will wait until all passed replica sets are inactive and have been noticed
-// by the replica set controller.
-func (dc *DeploymentController) waitForInactiveReplicaSets(oldRSs []*extensions.ReplicaSet) error {
-	for i := range oldRSs {
-		rs := oldRSs[i]
-		desiredGeneration := rs.Generation
-		observedGeneration := rs.Status.ObservedGeneration
-		specReplicas := *(rs.Spec.Replicas)
-		statusReplicas := rs.Status.Replicas
-
-		if err := wait.ExponentialBackoff(retry.DefaultRetry, func() (bool, error) {
-			replicaSet, err := dc.rsLister.ReplicaSets(rs.Namespace).Get(rs.Name)
-			if err != nil {
-				return false, err
-			}
-
-			specReplicas = *(replicaSet.Spec.Replicas)
-			statusReplicas = replicaSet.Status.Replicas
-			observedGeneration = replicaSet.Status.ObservedGeneration
-
-			// TODO: We also need to wait for terminating replicas to actually terminate.
-			// See https://github.com/kubernetes/kubernetes/issues/32567
-			return observedGeneration >= desiredGeneration && *(replicaSet.Spec.Replicas) == 0 && replicaSet.Status.Replicas == 0, nil
-		}); err != nil {
-			if err == wait.ErrWaitTimeout {
-				err = fmt.Errorf("replica set %q never became inactive: synced=%t, spec.replicas=%d, status.replicas=%d",
-					rs.Name, observedGeneration >= desiredGeneration, specReplicas, statusReplicas)
-			}
-			return err
-		}
-	}
-	return nil
 }
 
 // scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate"

@@ -83,19 +83,6 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs exte
 	}
 }
 
-// overlappingReplicaSets sorts a list of ReplicaSets by creation timestamp, using their names as a tie breaker.
-type overlappingReplicaSets []*extensions.ReplicaSet
-
-func (o overlappingReplicaSets) Len() int      { return len(o) }
-func (o overlappingReplicaSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o overlappingReplicaSets) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-}
-
 func calculateStatus(rs extensions.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) extensions.ReplicaSetStatus {
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
