@@ -271,6 +271,7 @@ forward-services
 framework-name
 framework-store-uri
 framework-weburi
+from-env-file
 from-file
 from-literal
 func-dest
