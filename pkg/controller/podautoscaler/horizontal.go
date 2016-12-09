@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/autoscaling/v1"
@@ -144,7 +144,7 @@ func getLastScaleTime(hpa *autoscaling.HorizontalPodAutoscaler) time.Time {
 	return lastScaleTime.Time
 }
 
-func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling.HorizontalPodAutoscaler, scale *extensions.Scale) (int32, *int32, time.Time, error) {
+func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling.HorizontalPodAutoscaler, scale *extensionsv1beta1.Scale) (int32, *int32, time.Time, error) {
 	targetUtilization := int32(defaultTargetCPUUtilizationPercentage)
 	if hpa.Spec.TargetCPUUtilizationPercentage != nil {
 		targetUtilization = *hpa.Spec.TargetCPUUtilizationPercentage
@@ -190,7 +190,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 // Returns number of replicas, metric which required highest number of replicas,
 // status string (also json-serialized extensions.CustomMetricsCurrentStatusList),
 // last timestamp of the metrics involved in computations or error, if occurred.
-func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.HorizontalPodAutoscaler, scale *extensions.Scale,
+func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.HorizontalPodAutoscaler, scale *extensionsv1beta1.Scale,
 	cmAnnotation string) (replicas int32, metric string, status string, timestamp time.Time, err error) {
 
 	if cmAnnotation == "" {
@@ -199,7 +199,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 
 	currentReplicas := scale.Status.Replicas
 
-	var targetList extensions.CustomMetricTargetList
+	var targetList extensionsv1beta1.CustomMetricTargetList
 	if err := json.Unmarshal([]byte(cmAnnotation), &targetList); err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedParseCustomMetricsAnnotation", err.Error())
 		return 0, "", "", time.Time{}, fmt.Errorf("failed to parse custom metrics annotation: %v", err)
@@ -209,8 +209,8 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 		return 0, "", "", time.Time{}, fmt.Errorf("no custom metrics in annotation")
 	}
 
-	statusList := extensions.CustomMetricCurrentStatusList{
-		Items: make([]extensions.CustomMetricCurrentStatus, 0),
+	statusList := extensionsv1beta1.CustomMetricCurrentStatusList{
+		Items: make([]extensionsv1beta1.CustomMetricCurrentStatus, 0),
 	}
 
 	for _, customMetricTarget := range targetList.Items {
@@ -249,7 +249,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedSetCustomMetrics", err.Error())
 			return 0, "", "", time.Time{}, fmt.Errorf("failed to set custom metric value: %v", err)
 		}
-		statusList.Items = append(statusList.Items, extensions.CustomMetricCurrentStatus{
+		statusList.Items = append(statusList.Items, extensionsv1beta1.CustomMetricCurrentStatus{
 			Name:         customMetricTarget.Name,
 			CurrentValue: quantity,
 		})
