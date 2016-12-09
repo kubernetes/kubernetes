@@ -543,7 +543,7 @@ EOF
     # flatten the kubeconfig files to make them self contained
     username=$(whoami)
     ${sudo} /bin/bash -e <<EOF
-    ${GO_OUT}/kubectl --kubeconfig="${dest_dir}/${client_id}.kubeconfig" config view --minify --flatten > "/tmp/${client_id}.kubeconfig"
+    $(kube::util::find-binary kubectl) --kubeconfig="${dest_dir}/${client_id}.kubeconfig" config view --minify --flatten > "/tmp/${client_id}.kubeconfig"
     mv -f "/tmp/${client_id}.kubeconfig" "${dest_dir}/${client_id}.kubeconfig"
     chown ${username} "${dest_dir}/${client_id}.kubeconfig"
 EOF
