@@ -285,6 +285,25 @@ func DeepCopy_v1_ListMeta(in interface{}, out interface{}, c *conversion.Cloner)
 	}
 }
 
+func DeepCopy_v1_OwnerReference(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*OwnerReference)
+		out := out.(*OwnerReference)
+		out.APIVersion = in.APIVersion
+		out.Kind = in.Kind
+		out.Name = in.Name
+		out.UID = in.UID
+		if in.Controller != nil {
+			in, out := &in.Controller, &out.Controller
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.Controller = nil
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1_Patch(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Patch)

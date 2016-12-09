@@ -16,6 +16,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",

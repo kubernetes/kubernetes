@@ -29,11 +29,11 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-func controllerRef(kind, name, uid string) []v1.OwnerReference {
+func controllerRef(kind, name, uid string) []metav1.OwnerReference {
 	// TODO: When ControllerRef will be implemented uncomment code below.
 	return nil
 	//trueVar := true
-	//return []v1.OwnerReference{
+	//return []metav1.OwnerReference{
 	//	{Kind: kind, Name: name, UID: types.UID(uid), Controller: &trueVar},
 	//}
 }
@@ -300,7 +300,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	}
 }
 
-func buildPod(nodeName string, labels map[string]string, ownerRefs []v1.OwnerReference) *v1.Pod {
+func buildPod(nodeName string, labels map[string]string, ownerRefs []metav1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{Labels: labels, OwnerReferences: ownerRefs},
 		Spec:       v1.PodSpec{NodeName: nodeName},

@@ -261,5 +261,5 @@ func isValidControllerKind(kind string) bool {
 
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
 type EquivalencePod struct {
-	ControllerRef v1.OwnerReference
+	ControllerRef metav1.OwnerReference
 }

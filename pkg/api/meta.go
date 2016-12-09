@@ -117,7 +117,7 @@ func (meta *ObjectMeta) GetOwnerReferences() []metav1.OwnerReference {
 }
 
 func (meta *ObjectMeta) SetOwnerReferences(references []metav1.OwnerReference) {
-	newReferences := make([]OwnerReference, len(references))
+	newReferences := make([]metav1.OwnerReference, len(references))
 	for i := 0; i < len(references); i++ {
 		newReferences[i].Kind = references[i].Kind
 		newReferences[i].Name = references[i].Name

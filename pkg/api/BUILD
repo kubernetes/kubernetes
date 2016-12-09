@@ -32,7 +32,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/meta:go_default_library",
-        "//pkg/api/meta/metatypes:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/auth/user:go_default_library",
@@ -91,7 +90,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/meta:go_default_library",
-        "//pkg/api/meta/metatypes:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/api/v1:go_default_library",
