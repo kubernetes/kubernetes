@@ -1244,11 +1244,13 @@ func (f *factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj ru
 }
 
 func (f *factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
-	printer, ok, err := PrinterForCommand(cmd)
+	printer, generic, err := PrinterForCommand(cmd)
 	if err != nil {
 		return nil, err
 	}
-	if ok {
+
+	// Make sure we output versioned data for generic printers
+	if generic {
 		clientConfig, err := f.ClientConfig()
 		if err != nil {
 			return nil, err
