@@ -2779,6 +2779,8 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 		return c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("Deployment"):
 		return c.Extensions().Deployments(ns).Get(name, metav1.GetOptions{})
+	case extensionsinternal.Kind("DaemonSet"):
+		return c.Extensions().DaemonSets(ns).Get(name, metav1.GetOptions{})
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
 	}
@@ -2804,6 +2806,8 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	case *extensions.ReplicaSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.Deployment:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *extensions.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
@@ -2840,6 +2844,8 @@ func getReaperForKind(internalClientset internalclientset.Interface, kind schema
 		return kubectl.ReaperFor(extensionsinternal.Kind("ReplicaSet"), internalClientset)
 	case extensionsinternal.Kind("Deployment"):
 		return kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClientset)
+	case extensionsinternal.Kind("DaemonSet"):
+		return kubectl.ReaperFor(extensionsinternal.Kind("DaemonSet"), internalClientset)
 	default:
 		return nil, fmt.Errorf("Unsupported kind: %v", kind)
 	}
