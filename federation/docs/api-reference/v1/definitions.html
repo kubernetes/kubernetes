@@ -1988,6 +1988,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">verbs</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -2018,7 +2025,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">ports</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The list of ports that are exposed by this service. More info: <a href="http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies">http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_serviceport">v1.ServicePort</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -2197,7 +2204,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-12-03 22:08:05 UTC
+Last updated 2016-12-08 13:48:31 UTC
 </div>
 </div>
 </body>
