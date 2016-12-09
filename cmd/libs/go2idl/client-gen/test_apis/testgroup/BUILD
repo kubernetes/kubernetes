@@ -15,7 +15,6 @@ go_library(
     srcs = [
         "doc.go",
         "register.go",
-        "types.generated.go",
         "types.go",
     ],
     tags = ["automanaged"],
@@ -24,7 +23,5 @@ go_library(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
-        "//pkg/types:go_default_library",
-        "//vendor:github.com/ugorji/go/codec",
     ],
 )
