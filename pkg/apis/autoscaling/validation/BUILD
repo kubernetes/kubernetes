@@ -18,7 +18,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/api/validation/path:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/controller/podautoscaler:go_default_library",
         "//pkg/util/validation/field:go_default_library",
     ],

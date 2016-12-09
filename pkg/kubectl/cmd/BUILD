@@ -198,6 +198,7 @@ go_test(
         "//pkg/runtime/serializer/streaming:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/intstr:go_default_library",
+        "//pkg/util/strategicpatch:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/util/wait:go_default_library",
