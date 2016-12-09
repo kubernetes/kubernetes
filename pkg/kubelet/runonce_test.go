@@ -96,7 +96,7 @@ func TestRunOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
 	}
-	kb.volumeManager, err = volumemanager.NewVolumeManager(
+	kb.volumeManager = volumemanager.NewVolumeManager(
 		true,
 		kb.nodeName,
 		kb.podManager,

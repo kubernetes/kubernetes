@@ -58,10 +58,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	node, pod, pv, claim := createObjects()
 	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-	manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
-	if err != nil {
-		t.Fatalf("Failed to initialize volume manager: %v", err)
-	}
+	manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
 	stopCh := runVolumeManager(manager)
 	defer close(stopCh)
@@ -147,11 +144,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		}
 		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-		manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
-		if err != nil {
-			t.Errorf("Failed to initialize volume manager: %v", err)
-			continue
-		}
+		manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
 		stopCh := runVolumeManager(manager)
 		defer func() {
@@ -182,13 +175,13 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 func newTestVolumeManager(
 	tmpDir string,
 	podManager pod.Manager,
-	kubeClient clientset.Interface) (VolumeManager, error) {
+	kubeClient clientset.Interface) VolumeManager {
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, volumetest.NewFakeVolumeHost(tmpDir, kubeClient, nil))
 
-	vm, err := NewVolumeManager(
+	vm := NewVolumeManager(
 		true,
 		testHostname,
 		podManager,
@@ -201,7 +194,7 @@ func newTestVolumeManager(
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
 		false /* keepTerminatedPodVolumes */)
 
-	return vm, err
+	return vm
 }
 
 // createObjects returns objects for making a fake clientset. The pv is
