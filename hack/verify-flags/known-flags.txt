@@ -561,6 +561,7 @@ since-time
 skip-generated-rewrite
 skip-munges
 skip-preflight-checks
+skip-unsafe
 sort-by
 source-file
 ssh-env
