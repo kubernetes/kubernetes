@@ -64,13 +64,13 @@ type Reset struct {
 
 func NewReset(skipPreFlight, removeNode bool) (*Reset, error) {
 	if !skipPreFlight {
-		fmt.Println("[preflight] Running pre-flight checks...")
+		fmt.Println("[preflight] Running pre-flight checks")
 
-		if err := preflight.RunResetCheck(); err != nil {
-			return nil, &preflight.PreFlightError{Msg: err.Error()}
+		if err := preflight.RunRootCheckOnly(); err != nil {
+			return nil, err
 		}
 	} else {
-		fmt.Println("[preflight] Skipping pre-flight checks...")
+		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
 
 	return &Reset{
@@ -81,57 +81,62 @@ func NewReset(skipPreFlight, removeNode bool) (*Reset, error) {
 // Run reverts any changes made to this host by "kubeadm init" or "kubeadm join".
 func (r *Reset) Run(out io.Writer) error {
 
-	// Drain and maybe remove the node from the cluster
+	// Try to drain and remove the node from the cluster
 	err := drainAndRemoveNode(r.removeNode)
 	if err != nil {
 		fmt.Printf("[reset] Failed to cleanup node: [%v]\n", err)
 	}
 
-	serviceToStop := "kubelet"
+	// Try to stop the kubelet service
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		fmt.Printf("[reset] Failed to detect init system and stop the kubelet service: %v\n", err)
+		fmt.Println("[reset] WARNING: The kubelet service couldn't be stopped by kubeadm because no supported init system was detected.")
+		fmt.Println("[reset] WARNING: Please ensure kubelet is stopped manually.")
 	} else {
-		fmt.Printf("[reset] Stopping the %s service...\n", serviceToStop)
-		if err := initSystem.ServiceStop(serviceToStop); err != nil {
-			fmt.Printf("[reset] Failed to stop the %s service\n", serviceToStop)
+		fmt.Println("[reset] Stopping the kubelet service")
+		if err := initSystem.ServiceStop("kubelet"); err != nil {
+			fmt.Printf("[reset] WARNING: The kubelet service couldn't be stopped by kubeadm: [%v]\n", err)
+			fmt.Println("[reset] WARNING: Please ensure kubelet is stopped manually.")
 		}
 	}
 
-	fmt.Println("[reset] Unmounting directories in /var/lib/kubelet...")
+	// Try to unmount mounted directories under /var/lib/kubelet in order to be able to remove the /var/lib/kubelet directory later
+	fmt.Printf("[reset] Unmounting mounted directories in %q\n", "/var/lib/kubelet")
 	umountDirsCmd := "cat /proc/mounts | awk '{print $2}' | grep '/var/lib/kubelet' | xargs -r umount"
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
 	if err != nil {
-		fmt.Printf("[reset] Failed to unmount directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
-	}
-
-	// Remove contents from the config and pki directories
-	resetConfigDir(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmapi.GlobalEnvParams.HostPKIPath)
-
-	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d"}
-
-	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
-	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
-	if _, err := os.Stat("/etc/kubernetes/manifests/etcd.json"); os.IsNotExist(err) {
-		dirsToClean = append(dirsToClean, "/var/lib/etcd")
-	} else {
-		fmt.Printf("[reset] No etcd manifest found in %q, assuming external etcd.\n", "/etc/kubernetes/manifests/etcd.json")
-	}
-
-	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", dirsToClean)
-	for _, dir := range dirsToClean {
-		cleanDir(dir)
+		fmt.Printf("[reset] Failed to unmount mounted directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
 	}
 
 	dockerCheck := preflight.ServiceCheck{Service: "docker"}
 	if warnings, errors := dockerCheck.Check(); len(warnings) == 0 && len(errors) == 0 {
-		fmt.Println("[reset] Stopping all running docker containers...")
+		fmt.Println("[reset] Removing kubernetes-managed containers")
 		if err := exec.Command("sh", "-c", "docker ps | grep 'k8s_' | awk '{print $1}' | xargs -r docker rm --force --volumes").Run(); err != nil {
 			fmt.Println("[reset] Failed to stop the running containers")
 		}
 	} else {
 		fmt.Println("[reset] docker doesn't seem to be running, skipping the removal of running kubernetes containers")
 	}
+
+	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d"}
+
+	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
+	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
+	etcdManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests/etcd.json")
+	if _, err := os.Stat(etcdManifestPath); err == nil {
+		dirsToClean = append(dirsToClean, "/var/lib/etcd")
+	} else {
+		fmt.Printf("[reset] No etcd manifest found in %q, assuming external etcd.\n", etcdManifestPath)
+	}
+
+	// Then clean contents from the stateful kubelet, etcd and cni directories
+	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", dirsToClean)
+	for _, dir := range dirsToClean {
+		cleanDir(dir)
+	}
+
+	// Remove contents from the config and pki directories
+	resetConfigDir(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmapi.GlobalEnvParams.HostPKIPath)
 
 	return nil
 }

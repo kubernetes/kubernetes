@@ -25,9 +25,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/api/validation"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -38,7 +40,7 @@ type PreFlightError struct {
 }
 
 func (e *PreFlightError) Error() string {
-	return fmt.Sprintf("preflight check errors:\n%s", e.Msg)
+	return fmt.Sprintf("[preflight] Some fatal errors occurred:\n%s%s", e.Msg, "[preflight] If you know what you are doing, you can skip pre-flight checks with `--skip-preflight-checks`")
 }
 
 // PreFlightCheck validates the state of the system to ensure kubeadm will be
@@ -51,7 +53,8 @@ type PreFlightCheck interface {
 // detect a supported init system however, all checks are skipped and a warning is
 // returned.
 type ServiceCheck struct {
-	Service string
+	Service       string
+	CheckIfActive bool
 }
 
 func (sc ServiceCheck) Check() (warnings, errors []error) {
@@ -73,7 +76,7 @@ func (sc ServiceCheck) Check() (warnings, errors []error) {
 				sc.Service, sc.Service))
 	}
 
-	if !initSystem.ServiceIsActive(sc.Service) {
+	if sc.CheckIfActive && !initSystem.ServiceIsActive(sc.Service) {
 		errors = append(errors,
 			fmt.Errorf("%s service is not active, please run 'systemctl start %s.service'",
 				sc.Service, sc.Service))
@@ -128,9 +131,7 @@ func (poc PortOpenCheck) Check() (warnings, errors []error) {
 }
 
 // IsRootCheck verifies user is root
-type IsRootCheck struct {
-	root bool
-}
+type IsRootCheck struct{}
 
 func (irc IsRootCheck) Check() (warnings, errors []error) {
 	errors = []error{}
@@ -141,8 +142,7 @@ func (irc IsRootCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
-// DirAvailableCheck checks if the given directory either does not exist, or
-// is empty.
+// DirAvailableCheck checks if the given directory either does not exist, or is empty.
 type DirAvailableCheck struct {
 	Path string
 }
@@ -245,13 +245,28 @@ type SystemVerificationCheck struct{}
 
 func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 	// Create a buffered writer and choose a quite large value (1M) and suppose the output from the system verification test won't exceed the limit
-	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
-
 	// Run the system verification check, but write to out buffered writer instead of stdout
-	err := system.Validate(system.DefaultSysSpec, &system.StreamReporter{WriteStream: bufw})
+	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
+	reporter := &system.StreamReporter{WriteStream: bufw}
+
+	var errs []error
+	// All the validators we'd like to run:
+	var validators = []system.Validator{
+		&system.OSValidator{Reporter: reporter},
+		&system.KernelValidator{Reporter: reporter},
+		&system.CgroupsValidator{Reporter: reporter},
+		&system.DockerValidator{Reporter: reporter},
+	}
+
+	// Run all validators
+	for _, v := range validators {
+		errs = append(errs, v.Validate(system.DefaultSysSpec))
+	}
+
+	err := utilerrors.NewAggregate(errs)
 	if err != nil {
 		// Only print the output from the system verification check if the check failed
-		fmt.Println("System verification failed. Printing the output from the verification...")
+		fmt.Println("[preflight] The system verification failed. Printing the output from the verification:")
 		bufw.Flush()
 		return nil, []error{err}
 	}
@@ -261,10 +276,10 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	checks := []PreFlightCheck{
 		SystemVerificationCheck{},
-		IsRootCheck{root: true},
+		IsRootCheck{},
 		HostnameCheck{},
-		ServiceCheck{Service: "kubelet"},
-		ServiceCheck{Service: "docker"},
+		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), int(cfg.Discovery.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
 		PortOpenCheck{port: 8080},
@@ -273,18 +288,18 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
 		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
-		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
-		DirAvailableCheck{Path: "/etc/kubernetes/pki"},
+		DirAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
+		DirAvailableCheck{Path: kubeadmapi.GlobalEnvParams.HostPKIPath},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: "/etc/kubernetes/admin.conf"},
-		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
-		InPathCheck{executable: "ebtables", mandatory: true},
-		InPathCheck{executable: "ethtool", mandatory: true},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf")},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
 		InPathCheck{executable: "nsenter", mandatory: true},
-		InPathCheck{executable: "socat", mandatory: true},
+		InPathCheck{executable: "ebtables", mandatory: false},
+		InPathCheck{executable: "ethtool", mandatory: false},
+		InPathCheck{executable: "socat", mandatory: false},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
 	}
@@ -297,52 +312,52 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		)
 	}
 
-	return runChecks(checks, os.Stderr)
+	return RunChecks(checks, os.Stderr)
 }
 
 func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	checks := []PreFlightCheck{
 		SystemVerificationCheck{},
-		IsRootCheck{root: true},
+		IsRootCheck{},
 		HostnameCheck{},
-		ServiceCheck{Service: "docker"},
-		ServiceCheck{Service: "kubelet"},
+		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
 		HTTPProxyCheck{Proto: "https", Host: cfg.MasterAddresses[0], Port: int(cfg.APIPort)},
 		HTTPProxyCheck{Proto: "http", Host: cfg.MasterAddresses[0], Port: int(cfg.DiscoveryPort)},
-		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
+		DirAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
-		InPathCheck{executable: "ebtables", mandatory: true},
-		InPathCheck{executable: "ethtool", mandatory: true},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
 		InPathCheck{executable: "nsenter", mandatory: true},
-		InPathCheck{executable: "socat", mandatory: true},
+		InPathCheck{executable: "ebtables", mandatory: false},
+		InPathCheck{executable: "ethtool", mandatory: false},
+		InPathCheck{executable: "socat", mandatory: false},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
 	}
 
-	return runChecks(checks, os.Stderr)
+	return RunChecks(checks, os.Stderr)
 }
 
-func RunResetCheck() error {
+func RunRootCheckOnly() error {
 	checks := []PreFlightCheck{
-		IsRootCheck{root: true},
+		IsRootCheck{},
 	}
 
-	return runChecks(checks, os.Stderr)
+	return RunChecks(checks, os.Stderr)
 }
 
-// runChecks runs each check, displays it's warnings/errors, and once all
+// RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func runChecks(checks []PreFlightCheck, ww io.Writer) error {
+func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 	found := []error{}
 	for _, c := range checks {
 		warnings, errs := c.Check()
 		for _, w := range warnings {
-			io.WriteString(ww, fmt.Sprintf("WARNING: %s\n", w))
+			io.WriteString(ww, fmt.Sprintf("[preflight] WARNING: %s\n", w))
 		}
 		for _, e := range errs {
 			found = append(found, e)
@@ -353,7 +368,22 @@ func runChecks(checks []PreFlightCheck, ww io.Writer) error {
 		for _, i := range found {
 			errs += "\t" + i.Error() + "\n"
 		}
-		return errors.New(errs)
+		return &PreFlightError{Msg: errors.New(errs).Error()}
 	}
 	return nil
+}
+
+func TryStartKubelet() {
+	// If we notice that the kubelet service is inactive, try to start it
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		fmt.Println("[preflight] No supported init system detected, won't ensure kubelet is running.")
+	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
+
+		fmt.Println("[preflight] Starting the kubelet service")
+		if err := initSystem.ServiceStart("kubelet"); err != nil {
+			fmt.Printf("[preflight] WARNING: Unable to start the kubelet service: [%v]\n", err)
+			fmt.Println("[preflight] WARNING: Please ensure kubelet is running manually.")
+		}
+	}
 }

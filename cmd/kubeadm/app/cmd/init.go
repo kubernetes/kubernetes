@@ -51,7 +51,11 @@ const (
 
 var (
 	initDoneMsgf = dedent.Dedent(`
-		Kubernetes master initialised successfully!
+		Your Kubernetes master has initialized successfully!
+
+		You should now deploy a pod network to the cluster.
+		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+		    http://kubernetes.io/docs/admin/addons/
 
 		You can now join any number of machines by running the following on each node:
 
@@ -162,6 +166,9 @@ type Init struct {
 }
 
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
+
+	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -174,7 +181,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
-		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
 			return nil, err
@@ -183,14 +189,23 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 
 	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
-		err := preflight.RunInitMasterChecks(cfg)
-		if err != nil {
-			return nil, &preflight.PreFlightError{Msg: err.Error()}
+		fmt.Println("[preflight] Running pre-flight checks")
+
+		// First, check if we're root separately from the other preflight checks and fail fast
+		if err := preflight.RunRootCheckOnly(); err != nil {
+			return nil, err
+		}
+
+		// Then continue with the others...
+		if err := preflight.RunInitMasterChecks(cfg); err != nil {
+			return nil, err
 		}
 	} else {
-		fmt.Println("Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
+
+	// Try to start the kubelet service in case it's inactive
+	preflight.TryStartKubelet()
 
 	// validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
@@ -202,7 +217,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		}
 	}
 	cfg.KubernetesVersion = ver
-	fmt.Println("Using Kubernetes version:", ver)
+	fmt.Println("[init] Using Kubernetes version:", ver)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
@@ -245,7 +260,7 @@ func (i *Init) Run(out io.Writer) error {
 	// write a file that has already been written (the kubelet will be up and
 	// running in that case - they'd need to stop the kubelet, remove the file, and
 	// start it again in that case).
-	// TODO(phase1+) this is no longer the right place to guard agains foo-shooting,
+	// TODO(phase1+) this is no longer the right place to guard against foo-shooting,
 	// we need to decide how to handle existing files (it may be handy to support
 	// importing existing files, may be we could even make our command idempotant,
 	// or at least allow for external PKI and stuff)

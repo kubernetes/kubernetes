@@ -42,6 +42,7 @@ go_library(
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//pkg/util/wait:go_default_library",
+        "//vendor:github.com/blang/semver",
     ],
 )
 

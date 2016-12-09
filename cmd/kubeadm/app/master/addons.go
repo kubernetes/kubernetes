@@ -85,6 +85,7 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 
 	kubeDNSPort := int32(10053)
 	dnsmasqPort := int32(53)
+	dnsMasqMetricsUser := int64(0)
 
 	return v1.PodSpec{
 		Containers: []v1.Container{
@@ -131,6 +132,7 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 					fmt.Sprintf("--domain=%s", cfg.Networking.DNSDomain),
 					fmt.Sprintf("--dns-port=%d", kubeDNSPort),
 					"--config-map=kube-dns",
+					"--v=2",
 				},
 				Env: []v1.EnvVar{
 					{
@@ -214,6 +216,13 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 					SuccessThreshold:    1,
 					FailureThreshold:    5,
 				},
+				// The code below is a workaround for https://github.com/kubernetes/contrib/blob/master/dnsmasq-metrics/Dockerfile.in#L21
+				// This is just the normal mode (to run with user 0), all other containers do it except for this one, which may lead to
+				// that the DNS pod fails if the "nobody" _group_ doesn't exist. I think it's a typo in the Dockerfile manifest and
+				// that it should be "USER nobody:nogroup" instead of "USER nobody:nobody". However, this fixes the problem.
+				SecurityContext: &v1.SecurityContext{
+					RunAsUser: &dnsMasqMetricsUser,
+				},
 				Args: []string{
 					"--v=2",
 					"--logtostderr",
@@ -269,7 +278,7 @@ func createKubeDNSServiceSpec(cfg *kubeadmapi.MasterConfiguration) (*v1.ServiceS
 	}
 	ip, err := ipallocator.GetIndexedIP(n, 10)
 	if err != nil {
-		return nil, fmt.Errorf("unable to allocate IP address for kube-dns addon from the given CIDR (%q) [%v]", cfg.Networking.ServiceSubnet, err)
+		return nil, fmt.Errorf("unable to allocate IP address for kube-dns addon from the given CIDR %q: [%v]", cfg.Networking.ServiceSubnet, err)
 	}
 
 	return &v1.ServiceSpec{
@@ -288,17 +297,17 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	SetNodeAffinity(&kubeProxyDaemonSet.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
 	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%v]", err)
+		return fmt.Errorf("failed creating essential kube-proxy addon [%v]", err)
 	}
 
-	fmt.Println("<master/addons> created essential addon: kube-proxy")
+	fmt.Println("[addons] Created essential addon: kube-proxy")
 
 	kubeDNSDeployment := NewDeployment("kube-dns", 1, createKubeDNSPodSpec(cfg))
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 	SetNodeAffinity(&kubeDNSDeployment.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
+		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
 
 	kubeDNSServiceSpec, err := createKubeDNSServiceSpec(cfg)
@@ -309,10 +318,10 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	kubeDNSService := NewService("kube-dns", *kubeDNSServiceSpec)
 	kubeDNSService.ObjectMeta.Labels["kubernetes.io/name"] = "KubeDNS"
 	if _, err := client.Services(api.NamespaceSystem).Create(kubeDNSService); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
+		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
 
-	fmt.Println("<master/addons> created essential addon: kube-dns")
+	fmt.Println("[addons] Created essential addon: kube-dns")
 
 	return nil
 }

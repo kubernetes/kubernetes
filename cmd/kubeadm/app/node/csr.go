@@ -30,22 +30,22 @@ import (
 func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, error) {
 	csrClient := connection.CertClient.CertificateSigningRequests()
 
-	fmt.Println("<node/csr> created API client to obtain unique certificate for this node, generating keys and certificate signing request")
+	fmt.Println("[csr] Created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
 	key, err := certutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to generating private key [%v]", err)
+		return nil, fmt.Errorf("failed to generating private key [%v]", err)
 	}
 	cert, err := csr.RequestNodeCertificate(csrClient, key, connection.NodeName)
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%v]", err)
+		return nil, fmt.Errorf("failed to request signed certificate from the API server [%v]", err)
 	}
 	fmtCert, err := certutil.FormatBytesCert(cert)
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to format certificate [%v]", err)
+		return nil, fmt.Errorf("failed to format certificate [%v]", err)
 	}
-	fmt.Printf("<node/csr> received signed certificate from the API server:\n%s\n", fmtCert)
-	fmt.Println("<node/csr> generating kubelet configuration")
+	fmt.Printf("[csr] Received signed certificate from the API server:\n%s\n", fmtCert)
+	fmt.Println("[csr] Generating kubelet configuration")
 
 	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", connection.Endpoint, connection.CACert)
 	finalConfig := kubeadmutil.MakeClientConfigWithCerts(

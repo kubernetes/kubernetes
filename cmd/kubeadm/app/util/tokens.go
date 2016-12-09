@@ -64,10 +64,10 @@ func UseGivenTokenIfValid(s *kubeadmapi.Secrets) (bool, error) {
 	if s.GivenToken == "" {
 		return false, nil // not given
 	}
-	fmt.Println("<util/tokens> validating provided token")
+	fmt.Println("[tokens] Validating provided token")
 	givenToken := strings.Split(strings.ToLower(s.GivenToken), ".")
 	// TODO(phase1+) could also print more specific messages in each case
-	invalidErr := "<util/tokens> provided token does not match expected <6 characters>.<16 characters> format - %s"
+	invalidErr := "[tokens] Provided token does not match expected <6 characters>.<16 characters> format - %s"
 	if len(givenToken) != 2 {
 		return false, fmt.Errorf(invalidErr, "not in 2-part dot-separated format")
 	}

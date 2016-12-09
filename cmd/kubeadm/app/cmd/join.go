@@ -94,6 +94,9 @@ type Join struct {
 }
 
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
+
+	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -109,25 +112,34 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	}
 	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
 	if len(cfg.MasterAddresses) > 1 {
-		return nil, fmt.Errorf("Must not specify more than one master address  (see --help)")
+		return nil, fmt.Errorf("must not specify more than one master address (see --help)")
 	}
 
 	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
-		err := preflight.RunJoinNodeChecks(cfg)
-		if err != nil {
-			return nil, &preflight.PreFlightError{Msg: err.Error()}
+		fmt.Println("[preflight] Running pre-flight checks")
+
+		// First, check if we're root separately from the other preflight checks and fail fast
+		if err := preflight.RunRootCheckOnly(); err != nil {
+			return nil, err
+		}
+
+		// Then continue with the others...
+		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
+			return nil, err
 		}
 	} else {
-		fmt.Println("Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
+
+	// Try to start the kubelet service in case it's inactive
+	preflight.TryStartKubelet()
 
 	ok, err := kubeadmutil.UseGivenTokenIfValid(&cfg.Secrets)
 	if !ok {
 		if err != nil {
-			return nil, fmt.Errorf("%v (see --help)\n", err)
+			return nil, fmt.Errorf("%v (see --help)", err)
 		}
-		return nil, fmt.Errorf("Must specify --token (see --help)\n")
+		return nil, fmt.Errorf("Must specify --token (see --help)")
 	}
 
 	return &Join{cfg: cfg}, nil
