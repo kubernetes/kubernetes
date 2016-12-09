@@ -38,8 +38,8 @@ type Attacher interface {
 
 // ServeAttach handles requests to attach to a container. After creating/receiving the required
 // streams, it delegates the actual attaching to attacher.
-func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, podName string, uid types.UID, container string, idleTimeout, streamCreationTimeout time.Duration, supportedProtocols []string) {
-	ctx, ok := createStreams(req, w, supportedProtocols, idleTimeout, streamCreationTimeout)
+func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, podName string, uid types.UID, container string, streamOpts *Options, idleTimeout, streamCreationTimeout time.Duration, supportedProtocols []string) {
+	ctx, ok := createStreams(req, w, streamOpts, supportedProtocols, idleTimeout, streamCreationTimeout)
 	if !ok {
 		// error is handled by createStreams
 		return
