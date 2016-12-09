@@ -31,6 +31,7 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//pkg/controller/replicaset/util:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",

@@ -166,6 +166,7 @@ pkg/cloudprovider/providers
 pkg/cloudprovider/providers/azure
 pkg/cloudprovider/providers/cloudstack
 pkg/controller/framework
+pkg/controller/replicaset/util
 pkg/controller/volume
 pkg/controller/volume/attachdetach/cache
 pkg/controller/volume/attachdetach/populator

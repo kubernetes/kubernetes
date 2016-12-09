@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	"k8s.io/kubernetes/pkg/controller/replicaset/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -207,7 +208,7 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *v1.Pod) *extensions.Repli
 		// overlap, sort by creation timestamp, subsort by name, then pick
 		// the first.
 		utilruntime.HandleError(fmt.Errorf("user error! more than one ReplicaSet is selecting pods with labels: %+v", pod.Labels))
-		sort.Sort(overlappingReplicaSets(rss))
+		sort.Sort(util.OverlappingReplicaSets(rss))
 	}
 
 	// update lookup cache

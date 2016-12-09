@@ -83,19 +83,6 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs exte
 	}
 }
 
-// overlappingReplicaSets sorts a list of ReplicaSets by creation timestamp, using their names as a tie breaker.
-type overlappingReplicaSets []*extensions.ReplicaSet
-
-func (o overlappingReplicaSets) Len() int      { return len(o) }
-func (o overlappingReplicaSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o overlappingReplicaSets) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-}
-
 func calculateStatus(rs extensions.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) extensions.ReplicaSetStatus {
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
@@ -139,6 +126,8 @@ func calculateStatus(rs extensions.ReplicaSet, filteredPods []*v1.Pod, manageRep
 	newStatus.AvailableReplicas = int32(availableReplicasCount)
 	return newStatus
 }
+
+// TODO: Move Condition helpers in pkg/controller/replicaset/util
 
 // NewReplicaSetCondition creates a new replica set condition.
 func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status v1.ConditionStatus, reason, msg string) extensions.ReplicaSetCondition {
