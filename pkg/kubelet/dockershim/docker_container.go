@@ -124,14 +124,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 		Binds: generateMountBindings(config.GetMounts()),
 	}
 
-	// Apply cgroupsParent derived from the sandbox config.
-	if lc := sandboxConfig.GetLinux(); lc != nil {
-		// Apply Cgroup options.
-		// TODO: Check if this works with per-pod cgroups.
-		// TODO: we need to pass the cgroup in syntax expected by cgroup driver but shim does not use docker info yet...
-		hc.CgroupParent = lc.GetCgroupParent()
-	}
-
 	// Apply Linux-specific options if applicable.
 	if lc := config.GetLinux(); lc != nil {
 		// Apply resource options.
@@ -152,6 +144,14 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 
 		// Apply security context.
 		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc)
+	}
+
+	// Apply cgroupsParent derived from the sandbox config.
+	if lc := sandboxConfig.GetLinux(); lc != nil {
+		// Apply Cgroup options.
+		// TODO: Check if this works with per-pod cgroups.
+		// TODO: we need to pass the cgroup in syntax expected by cgroup driver but shim does not use docker info yet...
+		hc.CgroupParent = lc.GetCgroupParent()
 	}
 
 	// Set devices for container.
