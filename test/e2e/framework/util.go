@@ -3301,7 +3301,7 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 	return nil
 }
 
-// WatchRecreateDeployment wathces Recreate deployments and ensures no new pods will run at the same time with
+// WatchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
 // old pods.
 func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) error {
 	if d.Spec.Strategy.Type != extensions.RecreateDeploymentStrategyType {
@@ -3320,7 +3320,7 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 		status = d.Status
 
 		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
-			return false, fmt.Errorf("deployment %q is running new pods alongisde old pods: %#v", d.Name, status)
+			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
 		}
 
 		return *(d.Spec.Replicas) == d.Status.Replicas &&

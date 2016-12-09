@@ -29,7 +29,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/informers:go_default_library",
@@ -49,12 +48,14 @@ go_test(
     name = "go_default_test",
     srcs = [
         "deployment_controller_test.go",
+        "recreate_test.go",
         "rolling_test.go",
         "sync_test.go",
     ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
