@@ -460,7 +460,7 @@ function kube::util::test_cfssl_installed {
 # Test whether openssl is installed.
 # Sets:
 #  OPENSSL_BIN: The path to the openssl binary to use
-function test_openssl_installed {
+function kube::util::test_openssl_installed {
     openssl version >& /dev/null
     if [ "$?" != "0" ]; then
       echo "Failed to run openssl. Please ensure openssl is installed"
@@ -569,7 +569,7 @@ EOF
     # flatten the kubeconfig files to make them self contained
     username=$(whoami)
     ${sudo} /bin/bash -e <<EOF
-    ${GO_OUT}/kubectl --kubeconfig="${dest_dir}/${client_id}.kubeconfig" config view --minify --flatten > "/tmp/${client_id}.kubeconfig"
+    $(kube::util::find-binary kubectl) --kubeconfig="${dest_dir}/${client_id}.kubeconfig" config view --minify --flatten > "/tmp/${client_id}.kubeconfig"
     mv -f "/tmp/${client_id}.kubeconfig" "${dest_dir}/${client_id}.kubeconfig"
     chown ${username} "${dest_dir}/${client_id}.kubeconfig"
 EOF
