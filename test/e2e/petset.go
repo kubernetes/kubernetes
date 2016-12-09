@@ -120,25 +120,25 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			pst.saturate(ps)
 
 			By("Verifying statefulset mounted data directory is usable")
-			ExpectNoError(pst.checkMount(ps, "/data"))
+			framework.ExpectNoError(pst.checkMount(ps, "/data"))
 
 			By("Verifying statefulset provides a stable hostname for each pod")
-			ExpectNoError(pst.checkHostname(ps))
+			framework.ExpectNoError(pst.checkHostname(ps))
 
 			cmd := "echo $(hostname) > /data/hostname; sync;"
 			By("Running " + cmd + " in all pets")
-			ExpectNoError(pst.execInPets(ps, cmd))
+			framework.ExpectNoError(pst.execInPets(ps, cmd))
 
 			By("Restarting statefulset " + ps.Name)
 			pst.restart(ps)
 			pst.saturate(ps)
 
 			By("Verifying statefulset mounted data directory is usable")
-			ExpectNoError(pst.checkMount(ps, "/data"))
+			framework.ExpectNoError(pst.checkMount(ps, "/data"))
 
 			cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
 			By("Running " + cmd + " in all pets")
-			ExpectNoError(pst.execInPets(ps, cmd))
+			framework.ExpectNoError(pst.execInPets(ps, cmd))
 		})
 
 		It("should handle healthy pet restarts during scale", func() {
@@ -855,7 +855,7 @@ func (p *statefulSetTester) updateReplicas(ps *apps.StatefulSet, count int32) {
 
 func (p *statefulSetTester) restart(ps *apps.StatefulSet) {
 	oldReplicas := *(ps.Spec.Replicas)
-	ExpectNoError(p.scale(ps, 0))
+	framework.ExpectNoError(p.scale(ps, 0))
 	p.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { *(ps.Spec.Replicas) = oldReplicas })
 }
 
@@ -879,9 +879,9 @@ func (p *statefulSetTester) update(ns, name string, update func(ps *apps.Statefu
 
 func (p *statefulSetTester) getPodList(ps *apps.StatefulSet) *v1.PodList {
 	selector, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	podList, err := p.c.Core().Pods(ps.Namespace).List(v1.ListOptions{LabelSelector: selector.String()})
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	return podList
 }
 
@@ -967,7 +967,7 @@ func (p *statefulSetTester) setHealthy(ps *apps.StatefulSet) {
 		p, err := framework.UpdatePodWithRetries(p.c, pod.Namespace, pod.Name, func(up *v1.Pod) {
 			up.Annotations[petset.StatefulSetInitAnnotation] = "true"
 		})
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 		framework.Logf("Set annotation %v to %v on pod %v", petset.StatefulSetInitAnnotation, p.Annotations[petset.StatefulSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
 	}
@@ -997,7 +997,7 @@ func (p *statefulSetTester) waitForStatus(ps *apps.StatefulSet, expectedReplicas
 func deleteAllStatefulSets(c clientset.Interface, ns string) {
 	pst := &statefulSetTester{c: c}
 	psList, err := c.Apps().StatefulSets(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 
 	// Scale down each statefulset, then delete it completely.
 	// Deleting a pvc without doing this will leak volumes, #25101.
@@ -1059,12 +1059,8 @@ func deleteAllStatefulSets(c clientset.Interface, ns string) {
 		errList = append(errList, fmt.Sprintf("Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs."))
 	}
 	if len(errList) != 0 {
-		ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")))
+		framework.ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")))
 	}
-}
-
-func ExpectNoError(err error) {
-	Expect(err).NotTo(HaveOccurred())
 }
 
 func pollReadWithTimeout(pet petTester, petNumber int, key, expectedVal string) error {

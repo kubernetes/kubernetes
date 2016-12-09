@@ -287,7 +287,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 					if err != nil {
 						return false, fmt.Errorf("Unable to get list of pods in statefulset %s", label)
 					}
-					ExpectNoError(err)
+					framework.ExpectNoError(err)
 					if len(podList.Items) < numPets {
 						framework.Logf("Found %d pets, waiting for %d", len(podList.Items), numPets)
 						return false, nil
@@ -381,7 +381,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		It("liveness pods should be automatically restarted", func() {
 			mkpath := func(file string) string {
 				path := filepath.Join("test/fixtures/doc-yaml/user-guide/liveness", file)
-				ExpectNoError(createFileForGoBinData(path, path))
+				framework.ExpectNoError(createFileForGoBinData(path, path))
 				return path
 			}
 			execYaml := mkpath("exec-liveness.yaml")
@@ -433,7 +433,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		It("should create a pod that reads a secret", func() {
 			mkpath := func(file string) string {
 				path := filepath.Join("test/fixtures/doc-yaml/user-guide/secrets", file)
-				ExpectNoError(createFileForGoBinData(path, path))
+				framework.ExpectNoError(createFileForGoBinData(path, path))
 				return path
 			}
 			secretYaml := mkpath("secret.yaml")
@@ -458,7 +458,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		It("should create a pod that prints his name and namespace", func() {
 			mkpath := func(file string) string {
 				path := filepath.Join("test/fixtures/doc-yaml/user-guide/downward-api", file)
-				ExpectNoError(createFileForGoBinData(path, path))
+				framework.ExpectNoError(createFileForGoBinData(path, path))
 				return path
 			}
 			podYaml := mkpath("dapi-pod.yaml")

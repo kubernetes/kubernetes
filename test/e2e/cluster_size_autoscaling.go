@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		}
 
 		nodes, err := GetGroupNodes(minMig)
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 		nodesSet := sets.NewString(nodes...)
 		defer removeLabels(nodesSet)
 		By(fmt.Sprintf("Annotating nodes of the smallest MIG(%s): %v", minMig, nodes))
@@ -207,7 +207,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
 		newNodes, err := GetGroupNodes(minMig)
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 		newNodesSet := sets.NewString(newNodes...)
 		newNodesSet.Delete(nodes...)
 		if len(newNodesSet) > 1 {
