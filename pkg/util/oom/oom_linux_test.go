@@ -19,7 +19,10 @@ limitations under the License.
 package oom
 
 import (
+	"math/rand"
 	"os"
+	"path"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -96,6 +99,40 @@ func TestOOMScoreAdjContainer(t *testing.T) {
 		applyOOMScoreAdjContainerTester(pidListSequenceLag, i, nil, true, t)
 	}
 	applyOOMScoreAdjContainerTester(pidListSequenceLag, 4, []int{1, 2, 4}, false, t)
+}
+
+// Test that applyOOMScoreAdjPidNotExist will return the expected error(os.ErrNotExist) when 'pid' not exist
+func TestApplyOOMScoreAdjPidNotExist(t *testing.T) {
+	// For most systems,  default 'pid_max' is 32768
+	pid := 500000
+	oomScoreAdj := 100
+
+	// try to find a pid which not exist if pid:500000 has been exist
+	tryTimes := 0
+	upperLimit := 100000
+	for {
+		toBeCheckedPath := path.Join("/proc", strconv.Itoa(pid))
+		_, searchErr := os.Stat(toBeCheckedPath)
+		if searchErr != nil && os.IsNotExist(searchErr) {
+			break
+		}
+
+		tryTimes++
+		if tryTimes > upperLimit {
+			break
+		}
+
+		// select the next 'pid' within the specified range [500000, 500000+upperLimit)
+		pid = 500000 + rand.Intn(upperLimit)
+	}
+
+	if tryTimes > upperLimit {
+		t.Errorf("Failed to find a not exist pid after try %d times, please retry it after a moment", upperLimit)
+		return
+	}
+
+	err := applyOOMScoreAdj(pid, oomScoreAdj)
+	assert.True(t, os.IsNotExist(err), "expected applyOOMScoreAdj to return not exists error. Got %v", err)
 }
 
 func TestPidListerFailure(t *testing.T) {
