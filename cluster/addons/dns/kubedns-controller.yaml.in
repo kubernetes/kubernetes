@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
 # Should keep target in cluster/addons/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml
 # in sync with this file.
 
-# Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
+# Warning: This is a file generated from the base underscore template file: kubedns-controller.yaml.base
 
 apiVersion: extensions/v1beta1
 kind: Deployment
