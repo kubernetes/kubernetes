@@ -396,7 +396,18 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 	}
 	framework.ExpectNoError(framework.RunRC(controllerRcConfig))
 
-	// Make sure endpoints are propagated.
-	// TODO(piosz): replace sleep with endpoints watch.
-	time.Sleep(10 * time.Second)
+	// Wait for endpoints to propagate for the controller service.
+	for start := time.Now(); time.Since(start) < startServiceTimeout; time.Sleep(startServiceInterval) {
+		eps, err := c.Core().Endpoints(ns).Get(controllerName)
+		if err != nil {
+			fmt.Sprintf("Failed to get endpoints for %s service: %v", controllerName, err)
+			continue
+		}
+		if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
+			fmt.Sprintf("Wrong number of endpoints for %s service", controllerName)
+			continue
+		}
+		return
+	}
+	framework.Failf("Endpoints for %s service did not propagate", controllerName)
 }
