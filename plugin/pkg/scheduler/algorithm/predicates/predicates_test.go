@@ -738,6 +738,65 @@ func TestRBDDiskConflicts(t *testing.T) {
 	}
 }
 
+func TestISCSIDiskConflicts(t *testing.T) {
+	volState := v1.PodSpec{
+		Volumes: []v1.Volume{
+			{
+				VolumeSource: v1.VolumeSource{
+					ISCSI: &v1.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1:3260",
+						IQN:          "iqn.2014-12.server:storage.target01",
+						FSType:       "ext4",
+						Lun:          0,
+					},
+				},
+			},
+		},
+	}
+	volState2 := v1.PodSpec{
+		Volumes: []v1.Volume{
+			{
+				VolumeSource: v1.VolumeSource{
+					ISCSI: &v1.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.2:3260",
+						IQN:          "iqn.2014-12.server:storage.target01",
+						FSType:       "ext4",
+						Lun:          1,
+					},
+				},
+			},
+		},
+	}
+	tests := []struct {
+		pod      *v1.Pod
+		nodeInfo *schedulercache.NodeInfo
+		isOk     bool
+		test     string
+	}{
+		{&v1.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
+		{&v1.Pod{}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
+		{&v1.Pod{Spec: volState}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
+		{&v1.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
+	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
+
+	for _, test := range tests {
+		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		}
+		if test.isOk && !ok {
+			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
+		}
+		if !test.isOk && ok {
+			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
+		}
+	}
+}
+
 func TestPodFitsSelector(t *testing.T) {
 	tests := []struct {
 		pod    *v1.Pod
