@@ -217,7 +217,7 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API}/$(kube::util::sortable_date)"
+  cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"
@@ -245,24 +245,42 @@ runTests() {
   # `go test` does not install the things it builds. `go test -i` installs
   # the build artifacts but doesn't run the tests.  The two together provide
   # a large speedup for tests that do not need to be rebuilt.
-  printf "%s\n" "${@}" | grep -Ev $cover_ignore_dirs | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
-    bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
-        go test -i ${goflags[@]:+${goflags[@]}} \
-          ${KUBE_RACE} \
-          ${KUBE_TIMEOUT} \
-          -cover -covermode=\"${KUBE_COVERMODE}\" \
-          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
-          ${testargs[@]:+${testargs[@]}}
-        go test ${goflags[@]:+${goflags[@]}} \
-          ${KUBE_RACE} \
-          ${KUBE_TIMEOUT} \
-          -cover -covermode=\"${KUBE_COVERMODE}\" \
-          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
-          ${testargs[@]:+${testargs[@]}} \
-        | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
-        | grep \"${go_test_grep_pattern}\"" \
+  #
+  # xargs on BSD (including OS X) supports a maximum parameter length of 255
+  # characters after substitutions. To work around this limitation, we
+  # pass arguments to the shell script instead of inlining them in the command
+  # string. For example, when `bash -c "cmd" a b` is evaluated, $0=a and $1=b.
+  #
+  # Arguments:
+  # $0 = package to test
+  # $1 = go flags
+  # $2 = kubernetes package
+  # $3 = kubernetes test args
+  # $4 = junit file name prefix
+  # $5 = go test grep pattern
+  #
+  # Prepare script
+  COV_SCRIPT="set -o pipefail; \
+  go test -i \$1 \$2/\$0 \$3; \
+  go test \$1 \$2/\$0 \$3 \
+  | tee \${4-\${0//\//_}.stdout} \
+  | grep \"\$5\""
+  # Compile, test, measure coverage for go packages
+  printf "%s\n" "${@}" \
+    | grep -Ev "$cover_ignore_dirs" \
+    | xargs -I{} -n 1 -P${KUBE_COVERPROCS} \
+    bash -c "$COV_SCRIPT" \
+      {} \
+      "${goflags[@]:+${goflags[@]}}
+        ${KUBE_RACE:-}
+        ${KUBE_TIMEOUT:-}
+        -cover
+        -covermode=${KUBE_COVERMODE}
+        -coverprofile=${cover_report_dir}/{}/${cover_profile}" \
+      "$KUBE_GO_PACKAGE" \
+      "${KUBE_TEST_ARGS:+${KUBE_TEST_ARGS}}" \
+      "${junit_filename_prefix:+${junit_filename_prefix}}" \
+      "${go_test_grep_pattern}" \
       && test_result=$? || test_result=$?
 
   produceJUnitXMLReport "${junit_filename_prefix}"
