@@ -188,7 +188,7 @@ metadata:
 spec:
   containers:
   - name: kube-registry-proxy
-    image: gcr.io/google_containers/kube-registry-proxy:0.3
+    image: gcr.io/google_containers/kube-registry-proxy:0.4
     resources:
       limits:
         cpu: 100m
@@ -198,11 +198,9 @@ spec:
       value: kube-registry.kube-system.svc.cluster.local
     - name: REGISTRY_PORT
       value: "5000"
-    - name: FORWARD_PORT
-      value: "5000"
     ports:
     - name: registry
-      containerPort: 5000
+      containerPort: 80
       hostPort: 5000
 ```
 <!-- END MUNGE: EXAMPLE ../../saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml -->

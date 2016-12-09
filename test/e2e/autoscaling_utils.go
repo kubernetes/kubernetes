@@ -299,9 +299,9 @@ func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, timeout t
 
 func (rc *ResourceConsumer) CleanUp() {
 	By(fmt.Sprintf("Removing consuming RC %s", rc.name))
-	rc.stopCPU <- 0
-	rc.stopMem <- 0
-	rc.stopCustomMetric <- 0
+	close(rc.stopCPU)
+	close(rc.stopMem)
+	close(rc.stopCustomMetric)
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
 	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, rc.framework.Namespace.Name, rc.name))

@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, true)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -514,7 +514,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		CreateHostPortPods(f, "host-port", 2, true)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, "host-port")
 		podList, err := cs.Core().Pods(ns).List(v1.ListOptions{})
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))
 		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
 		Expect(nodeNames[0]).ToNot(Equal(nodeNames[1]))

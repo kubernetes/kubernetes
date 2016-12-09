@@ -15,6 +15,7 @@ go_library(
     srcs = [
         "customargs.go",
         "factory.go",
+        "factoryinterface.go",
         "generic.go",
         "groupinterface.go",
         "informer.go",

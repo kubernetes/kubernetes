@@ -70,7 +70,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.SkipUnlessFederated(f.ClientSet)
 
 			fcs, err := invalidAuthFederationClientSet(nil)
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
 			svc, err := createService(fcs, nsName, FederatedServiceName)

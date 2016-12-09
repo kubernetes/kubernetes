@@ -76,8 +76,10 @@ func TestInitFederation(t *testing.T) {
 		dnsZoneName        string
 		lbIP               string
 		image              string
+		etcdPVCapacity     string
 		expectedErr        string
 		dnsProvider        string
+		dryRun             string
 	}{
 		{
 			federation:         "union",
@@ -86,8 +88,10 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "5Gi",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
+			dryRun:             "",
 		},
 		{
 			federation:         "union",
@@ -96,10 +100,26 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "", //test for default value of pvc-size
 			expectedErr:        "",
 			dnsProvider:        "", //test for default value of dns provider
+			dryRun:             "",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "",
+			expectedErr:        "",
+			dnsProvider:        "test-dns-provider",
+			dryRun:             "valid-run",
 		},
 	}
+
+	//TODO: implement a negative case for dry run
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
@@ -111,7 +131,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -127,9 +147,16 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
-		if "" != tc.dnsProvider {
+		if tc.dnsProvider != "" {
 			cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		}
+		if tc.etcdPVCapacity != "" {
+			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
+		}
+		if tc.dryRun == "valid-run" {
+			cmd.Flags().Set("dry-run", "true")
+		}
+
 		cmd.Run(cmd, []string{tc.federation})
 
 		if tc.expectedErr == "" {
@@ -137,6 +164,10 @@ func TestInitFederation(t *testing.T) {
 			// Actual data passed are tested in the fake secret and cluster
 			// REST clients.
 			want := fmt.Sprintf("Federation API server is running at: %s\n", tc.lbIP)
+			if tc.dryRun != "" {
+				want = fmt.Sprintf("Federation control plane runs (dry run)\n")
+			}
+
 			if got := buf.String(); got != want {
 				t.Errorf("[%d] unexpected output: got: %s, want: %s", i, got, want)
 				if cmdErrMsg != "" {
@@ -392,12 +423,17 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
 	cmKubeconfigSecretName := federationName + "-controller-manager-kubeconfig"
-	capacity, err := resource.ParseQuantity("10Gi")
+	pvCap := "10Gi"
+	if etcdPVCapacity != "" {
+		pvCap = etcdPVCapacity
+	}
+
+	capacity, err := resource.ParseQuantity(pvCap)
 	if err != nil {
 		return nil, err
 	}

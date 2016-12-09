@@ -19,27 +19,24 @@ package generators
 import "k8s.io/gengo/types"
 
 var (
-	apiNamespaceAll                    = types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "NamespaceAll"}
-	apiScheme                          = types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "Scheme"}
-	cacheGenericLister                 = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "GenericLister"}
-	cacheIndexers                      = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "Indexers"}
-	cacheListWatch                     = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "ListWatch"}
-	cacheMetaNamespaceIndexFunc        = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "MetaNamespaceIndexFunc"}
-	cacheNamespaceIndex                = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "NamespaceIndex"}
-	cacheNewGenericLister              = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "NewGenericLister"}
-	cacheNewSharedIndexInformer        = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "NewSharedIndexInformer"}
-	cacheSharedIndexInformer           = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "SharedIndexInformer"}
-	interfacesNewInternalInformerFunc  = types.Name{Package: "k8s.io/kubernetes/pkg/client/informers/interfaces", Name: "NewInternalInformerFunc"}
-	interfacesNewVersionedInformerFunc = types.Name{Package: "k8s.io/kubernetes/pkg/client/informers/interfaces", Name: "NewVersionedInformerFunc"}
-	interfacesSharedInformerFactory    = types.Name{Package: "k8s.io/kubernetes/pkg/client/informers/interfaces", Name: "SharedInformerFactory"}
-	listOptions                        = types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}
-	reflectType                        = types.Name{Package: "reflect", Name: "Type"}
-	runtimeObject                      = types.Name{Package: "k8s.io/kubernetes/pkg/runtime", Name: "Object"}
-	schemaGroupResource                = types.Name{Package: "k8s.io/kubernetes/pkg/runtime/schema", Name: "GroupResource"}
-	schemaGroupVersionResource         = types.Name{Package: "k8s.io/kubernetes/pkg/runtime/schema", Name: "GroupVersionResource"}
-	syncMutex                          = types.Name{Package: "sync", Name: "Mutex"}
-	timeDuration                       = types.Name{Package: "time", Name: "Duration"}
-	v1ListOptions                      = types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"}
-	v1NamespaceAll                     = types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "NamespaceAll"}
-	watchInterface                     = types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}
+	apiNamespaceAll             = types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "NamespaceAll"}
+	apiScheme                   = types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "Scheme"}
+	cacheGenericLister          = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "GenericLister"}
+	cacheIndexers               = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "Indexers"}
+	cacheListWatch              = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "ListWatch"}
+	cacheMetaNamespaceIndexFunc = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "MetaNamespaceIndexFunc"}
+	cacheNamespaceIndex         = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "NamespaceIndex"}
+	cacheNewGenericLister       = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "NewGenericLister"}
+	cacheNewSharedIndexInformer = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "NewSharedIndexInformer"}
+	cacheSharedIndexInformer    = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "SharedIndexInformer"}
+	listOptions                 = types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}
+	reflectType                 = types.Name{Package: "reflect", Name: "Type"}
+	runtimeObject               = types.Name{Package: "k8s.io/kubernetes/pkg/runtime", Name: "Object"}
+	schemaGroupResource         = types.Name{Package: "k8s.io/kubernetes/pkg/runtime/schema", Name: "GroupResource"}
+	schemaGroupVersionResource  = types.Name{Package: "k8s.io/kubernetes/pkg/runtime/schema", Name: "GroupVersionResource"}
+	syncMutex                   = types.Name{Package: "sync", Name: "Mutex"}
+	timeDuration                = types.Name{Package: "time", Name: "Duration"}
+	v1ListOptions               = types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"}
+	v1NamespaceAll              = types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "NamespaceAll"}
+	watchInterface              = types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}
 )

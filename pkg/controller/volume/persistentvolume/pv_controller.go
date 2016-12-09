@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
@@ -30,7 +31,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
 
@@ -467,7 +467,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			// This speeds up binding of provisioned volumes - provisioner saves
 			// only the new PV and it expects that next syncClaim will bind the
 			// claim to it.
-			clone, err := conversion.NewCloner().DeepCopy(claim)
+			clone, err := api.Scheme.DeepCopy(claim)
 			if err != nil {
 				return fmt.Errorf("error cloning claim %q: %v", claimToClaimKey(claim), err)
 			}
@@ -547,7 +547,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 
 	dirty := false
 
-	clone, err := conversion.NewCloner().DeepCopy(claim)
+	clone, err := api.Scheme.DeepCopy(claim)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning claim: %v", err)
 	}
@@ -647,7 +647,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *v1.PersistentV
 		return volume, nil
 	}
 
-	clone, err := conversion.NewCloner().DeepCopy(volume)
+	clone, err := api.Scheme.DeepCopy(volume)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning claim: %v", err)
 	}
@@ -712,7 +712,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := conversion.NewCloner().DeepCopy(volume)
+	clone, err := api.Scheme.DeepCopy(volume)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning pv: %v", err)
 	}
@@ -777,7 +777,7 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *v1.PersistentVo
 
 	// The claim from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := conversion.NewCloner().DeepCopy(claim)
+	clone, err := api.Scheme.DeepCopy(claim)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning claim: %v", err)
 	}
@@ -877,7 +877,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 	glog.V(4).Infof("updating PersistentVolume[%s]: rolling back binding from %q", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
 
 	// Save the PV only when any modification is neccessary.
-	clone, err := conversion.NewCloner().DeepCopy(volume)
+	clone, err := api.Scheme.DeepCopy(volume)
 	if err != nil {
 		return fmt.Errorf("Error cloning pv: %v", err)
 	}
@@ -936,8 +936,7 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 		glog.V(4).Infof("reclaimVolume[%s]: policy is Delete", volume.Name)
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
-			ctrl.deleteVolumeOperation(volume)
-			return nil
+			return ctrl.deleteVolumeOperation(volume)
 		})
 
 	default:
@@ -1042,12 +1041,13 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 
 // deleteVolumeOperation deletes a volume. This method is running in standalone
 // goroutine and already has all necessary locks.
-func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) {
+func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) error {
 	volume, ok := arg.(*v1.PersistentVolume)
 	if !ok {
 		glog.Errorf("Cannot convert deleteVolumeOperation argument to volume, got %#v", arg)
-		return
+		return nil
 	}
+
 	glog.V(4).Infof("deleteVolumeOperation [%s] started", volume.Name)
 
 	// This method may have been waiting for a volume lock for some time.
@@ -1056,16 +1056,16 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) {
 	newVolume, err := ctrl.kubeClient.Core().PersistentVolumes().Get(volume.Name)
 	if err != nil {
 		glog.V(3).Infof("error reading peristent volume %q: %v", volume.Name, err)
-		return
+		return nil
 	}
 	needsReclaim, err := ctrl.isVolumeReleased(newVolume)
 	if err != nil {
 		glog.V(3).Infof("error reading claim for volume %q: %v", volume.Name, err)
-		return
+		return nil
 	}
 	if !needsReclaim {
 		glog.V(3).Infof("volume %q no longer needs deletion, skipping", volume.Name)
-		return
+		return nil
 	}
 
 	deleted, err := ctrl.doDeleteVolume(volume)
@@ -1082,17 +1082,17 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) {
 			if _, err = ctrl.updateVolumePhaseWithEvent(volume, v1.VolumeFailed, v1.EventTypeWarning, "VolumeFailedDelete", err.Error()); err != nil {
 				glog.V(4).Infof("deleteVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 				// Save failed, retry on the next deletion attempt
-				return
+				return err
 			}
 		}
 
 		// Despite the volume being Failed, the controller will retry deleting
 		// the volume in every syncVolume() call.
-		return
+		return err
 	}
 	if !deleted {
 		// The volume waits for deletion by an external plugin. Do nothing.
-		return
+		return nil
 	}
 
 	glog.V(4).Infof("deleteVolumeOperation [%s]: success", volume.Name)
@@ -1103,9 +1103,9 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) {
 		// cache of "recently deleted volumes" and avoid unnecessary deletion,
 		// this is left out as future optimization.
 		glog.V(3).Infof("failed to delete volume %q from database: %v", volume.Name, err)
-		return
+		return nil
 	}
-	return
+	return nil
 }
 
 // isVolumeReleased returns true if given volume is released and can be recycled

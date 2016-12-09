@@ -694,9 +694,10 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 		url = req.baseURL.Host
 	}
 
-	// If we have an error (i.e. apiserver down) we report that as a metric label.
+	// Errors can be arbitrary strings. Unbound label cardinality is not suitable for a metric
+	// system so we just report them as `<error>`.
 	if err != nil {
-		metrics.RequestResult.Increment(err.Error(), req.verb, url)
+		metrics.RequestResult.Increment("<error>", req.verb, url)
 	} else {
 		//Metrics for failure codes
 		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, url)

@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/legacy"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -35,13 +34,17 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/wait"
+
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1"
 )
 
 const defaultEtcdPathPrefix = "/registry/kubernetes.io/kubernetes-discovery"
 
 type DiscoveryServerOptions struct {
-	Etcd          *genericoptions.EtcdOptions
-	SecureServing *genericoptions.SecureServingOptions
+	Etcd           *genericoptions.EtcdOptions
+	SecureServing  *genericoptions.SecureServingOptions
+	Authentication *genericoptions.DelegatingAuthenticationOptions
+	Authorization  *genericoptions.DelegatingAuthorizationOptions
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -50,14 +53,16 @@ type DiscoveryServerOptions struct {
 // NewCommandStartMaster provides a CLI handler for 'start master' command
 func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o := &DiscoveryServerOptions{
-		Etcd:          genericoptions.NewEtcdOptions(),
-		SecureServing: genericoptions.NewSecureServingOptions(),
+		Etcd:           genericoptions.NewEtcdOptions(),
+		SecureServing:  genericoptions.NewSecureServingOptions(),
+		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
+		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
 
 		StdOut: out,
 		StdErr: err,
 	}
 	o.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
-	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(registered.EnabledVersionsForGroup(api.GroupName)...)
+	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
 	o.SecureServing.ServingOptions.BindPort = 9090
 
 	cmd := &cobra.Command{
@@ -73,6 +78,8 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	flags := cmd.Flags()
 	o.Etcd.AddFlags(flags)
 	o.SecureServing.AddFlags(flags)
+	o.Authentication.AddFlags(flags)
+	o.Authorization.AddFlags(flags)
 
 	return cmd
 }
@@ -98,6 +105,12 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 
 	genericAPIServerConfig := genericapiserver.NewConfig()
 	if _, err := genericAPIServerConfig.ApplySecureServingOptions(o.SecureServing); err != nil {
+		return err
+	}
+	if _, err := genericAPIServerConfig.ApplyDelegatingAuthenticationOptions(o.Authentication); err != nil {
+		return err
+	}
+	if _, err := genericAPIServerConfig.ApplyDelegatingAuthorizationOptions(o.Authorization); err != nil {
 		return err
 	}
 

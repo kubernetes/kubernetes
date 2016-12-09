@@ -865,8 +865,8 @@
 		},
 		{
 			"ImportPath": "github.com/docker/go-units",
-			"Comment": "v0.1.0-21-g0bbddae",
-			"Rev": "0bbddae09c5a5419a8c6dcdd7ff90da3d450393b"
+			"Comment": "v0.3.1-10-ge30f1e7",
+			"Rev": "e30f1e79f3cd72542f2026ceec18d3bd67ab859c"
 		},
 		{
 			"ImportPath": "github.com/docker/spdystream",
@@ -1485,6 +1485,10 @@
 			"Rev": "a0ff2567cfb70903282db057e799fd826784d41d"
 		},
 		{
+			"ImportPath": "github.com/juju/ratelimit",
+			"Rev": "77ed1c8a01217656d2080ad51981f6e99adaa177"
+		},
+		{
 			"ImportPath": "github.com/kardianos/osext",
 			"Rev": "8fef92e41e22a70e700a96b29f066cda30ea24ef"
 		},
@@ -1547,6 +1551,11 @@
 			"ImportPath": "github.com/mesos/mesos-go/upid",
 			"Comment": "before-0.26-protos-33-g45c8b08",
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
+		},
+		{
+			"ImportPath": "github.com/miekg/coredns/middleware/etcd/msg",
+			"Comment": "v003",
+			"Rev": "20e25559d5eada5a68a0720816a6e947b94860ce"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
@@ -1967,6 +1976,11 @@
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/floatingips",
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
+		},
+		{
+			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers",
 			"Comment": "v1.0.0-1012-ge00690e",
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},

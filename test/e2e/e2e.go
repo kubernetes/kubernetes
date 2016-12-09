@@ -128,7 +128,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
 	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
-	if err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels); err != nil {
+	if err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels, true); err != nil {
 		framework.DumpAllNamespaceInfo(c, api.NamespaceSystem)
 		framework.LogFailedContainers(c, api.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, v1.NamespaceDefault)

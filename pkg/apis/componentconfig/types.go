@@ -321,6 +321,10 @@ type KubeletConfiguration struct {
 	// requests - pull, logs, exec and attach.
 	// +optional
 	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout,omitempty"`
+	// If no pulling progress is made before the deadline imagePullProgressDeadline,
+	// the image pulling will be cancelled. Defaults to 1m0s.
+	// +optional
+	ImagePullProgressDeadline metav1.Duration `json:"imagePullProgressDeadline,omitempty"`
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	// +optional
@@ -430,6 +434,9 @@ type KubeletConfiguration struct {
 	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
 	// +optional
 	EvictionMinimumReclaim string `json:"evictionMinimumReclaim,omitempty"`
+	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
+	// +optional
+	ExperimentalKernelMemcgNotification bool `json:"experimentalKernelMemcgNotification"`
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32 `json:"podsPerCore"`
 	// enableControllerAttachDetach enables the Attach/Detach controller to

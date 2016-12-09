@@ -33967,6 +33967,7 @@ func (x *ServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2588 [10]bool
 			_, _, _ = yysep2588, yyq2588, yy2arr2588
 			const yyr2588 bool = false
+			yyq2588[0] = len(x.Ports) != 0
 			yyq2588[1] = len(x.Selector) != 0
 			yyq2588[2] = x.ClusterIP != ""
 			yyq2588[3] = x.Type != ""
@@ -33980,7 +33981,7 @@ func (x *ServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2588 || yy2arr2588 {
 				r.EncodeArrayStart(10)
 			} else {
-				yynn2588 = 1
+				yynn2588 = 0
 				for _, b := range yyq2588 {
 					if b {
 						yynn2588++
@@ -33991,28 +33992,34 @@ func (x *ServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2588 || yy2arr2588 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.Ports == nil {
-					r.EncodeNil()
-				} else {
-					yym2590 := z.EncBinary()
-					_ = yym2590
-					if false {
+				if yyq2588[0] {
+					if x.Ports == nil {
+						r.EncodeNil()
 					} else {
-						h.encSliceServicePort(([]ServicePort)(x.Ports), e)
+						yym2590 := z.EncBinary()
+						_ = yym2590
+						if false {
+						} else {
+							h.encSliceServicePort(([]ServicePort)(x.Ports), e)
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("ports"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.Ports == nil {
-					r.EncodeNil()
-				} else {
-					yym2591 := z.EncBinary()
-					_ = yym2591
-					if false {
+				if yyq2588[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("ports"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Ports == nil {
+						r.EncodeNil()
 					} else {
-						h.encSliceServicePort(([]ServicePort)(x.Ports), e)
+						yym2591 := z.EncBinary()
+						_ = yym2591
+						if false {
+						} else {
+							h.encSliceServicePort(([]ServicePort)(x.Ports), e)
+						}
 					}
 				}
 			}

@@ -580,12 +580,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		if framework.ProviderIs("gce", "gke") {
 			By("creating a static load balancer IP")
 			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunId)
-			requestedIP, err = createGCEStaticIP(staticIPName)
+			requestedIP, err = framework.CreateGCEStaticIP(staticIPName)
 			Expect(err).NotTo(HaveOccurred())
 			defer func() {
 				if staticIPName != "" {
 					// Release GCE static IP - this is not kube-managed and will not be automatically released.
-					if err := deleteGCEStaticIP(staticIPName); err != nil {
+					if err := framework.DeleteGCEStaticIP(staticIPName); err != nil {
 						framework.Logf("failed to release static IP %s: %v", staticIPName, err)
 					}
 				}
@@ -632,7 +632,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			if staticIPName != "" {
 				// Deleting it after it is attached "demotes" it to an
 				// ephemeral IP, which can be auto-released.
-				if err := deleteGCEStaticIP(staticIPName); err != nil {
+				if err := framework.DeleteGCEStaticIP(staticIPName); err != nil {
 					framework.Failf("failed to release static IP %s: %v", staticIPName, err)
 				}
 				staticIPName = ""
@@ -1076,14 +1076,14 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By(fmt.Sprintf("createing RC %v with selectors %v", rcSpec.Name, rcSpec.Spec.Selector))
 		_, err := t.createRC(rcSpec)
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 
 		By(fmt.Sprintf("creating Service %v with selectors %v", service.Name, service.Spec.Selector))
 		_, err = t.CreateService(service)
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 
 		By("Verifying pods for RC " + t.name)
-		ExpectNoError(framework.VerifyPods(t.Client, t.Namespace, t.name, false, 1))
+		framework.ExpectNoError(framework.VerifyPods(t.Client, t.Namespace, t.name, false, 1))
 
 		svcName := fmt.Sprintf("%v.%v", serviceName, f.Namespace.Name)
 		By("waiting for endpoints of Service with DNS name " + svcName)
@@ -1351,7 +1351,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		execPod, err := f.ClientSet.Core().Pods(namespace).Get(execPodName)
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 
 		framework.Logf("Waiting up to %v wget %v", kubeProxyLagTimeout, path)
 		cmd := fmt.Sprintf(`wget -T 30 -qO- %v`, path)
@@ -2779,7 +2779,7 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 		Expect(err).NotTo(HaveOccurred())
 	}()
 	execPod, err := f.ClientSet.Core().Pods(ns).Get(execPodName)
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 
 	var stdout string
 	timeout := 2 * time.Minute
@@ -2799,7 +2799,7 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 		break
 	}
 
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 
 	// The stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed.
 	// Desired stdout in this format: client_address=x.x.x.x

@@ -4241,6 +4241,15 @@ go_binary(
 )
 
 go_library(
+    name = "github.com/juju/ratelimit",
+    srcs = [
+        "github.com/juju/ratelimit/ratelimit.go",
+        "github.com/juju/ratelimit/reader.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/kardianos/osext",
     srcs = [
         "github.com/kardianos/osext/osext.go",
@@ -11757,6 +11766,21 @@ go_library(
 )
 
 go_library(
+    name = "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers",
+    srcs = [
+        "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers/requests.go",
+        "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers/results.go",
+        "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/mitchellh/mapstructure",
+        "//vendor:github.com/rackspace/gophercloud",
+        "//vendor:github.com/rackspace/gophercloud/pagination",
+    ],
+)
+
+go_library(
     name = "k8s.io/client-go/pkg/apis/meta/v1",
     srcs = [
         "k8s.io/client-go/pkg/apis/meta/v1/doc.go",
@@ -11785,4 +11809,14 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/runtime/schema",
         "//vendor:k8s.io/client-go/pkg/selection",
     ],
+)
+
+go_library(
+    name = "github.com/miekg/coredns/middleware/etcd/msg",
+    srcs = [
+        "github.com/miekg/coredns/middleware/etcd/msg/path.go",
+        "github.com/miekg/coredns/middleware/etcd/msg/service.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/miekg/dns"],
 )

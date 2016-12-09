@@ -4,6 +4,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:attachdetach-controller
   rules:
   - apiGroups:
@@ -53,6 +55,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:cronjob-controller
   rules:
   - apiGroups:
@@ -96,6 +100,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:daemon-set-controller
   rules:
   - apiGroups:
@@ -152,6 +158,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:deployment-controller
   rules:
   - apiGroups:
@@ -206,6 +214,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:disruption-controller
   rules:
   - apiGroups:
@@ -252,6 +262,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:endpoint-controller
   rules:
   - apiGroups:
@@ -295,6 +307,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:horizontal-pod-autoscaler
   rules:
   - apiGroups:
@@ -361,6 +375,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:job-controller
   rules:
   - apiGroups:
@@ -405,6 +421,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:namespace-controller
   rules:
   - apiGroups:
@@ -439,6 +457,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:persistent-volume-binder
   rules:
   - apiGroups:
@@ -527,6 +547,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:pod-garbage-controller
   rules:
   - apiGroups:
@@ -542,6 +564,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:replicaset-controller
   rules:
   - apiGroups:
@@ -584,6 +608,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:replication-controller
   rules:
   - apiGroups:
@@ -626,6 +652,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:service-controller
   rules:
   - apiGroups:
@@ -665,6 +693,8 @@ items:
   kind: ClusterRole
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:statefulset-controller
   rules:
   - apiGroups:

@@ -70,7 +70,6 @@ go_test(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/conversion:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/securitycontext:go_default_library",

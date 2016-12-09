@@ -241,7 +241,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	It("should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs", func() {
 		var enabled bool
 		groupList, err := f.ClientSet.Discovery().ServerGroups()
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 		for _, group := range groupList.Groups {
 			if group.Name == v2alpha1.GroupName {
 				for _, version := range group.Versions {

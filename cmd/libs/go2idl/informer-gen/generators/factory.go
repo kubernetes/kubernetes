@@ -36,6 +36,7 @@ type factoryGenerator struct {
 	groupVersions             map[string]clientgentypes.GroupVersions
 	internalClientSetPackage  string
 	versionedClientSetPackage string
+	internalInterfacesPackage string
 	filtered                  bool
 }
 
@@ -76,9 +77,9 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"groupVersions":                      g.groupVersions,
 		"gvInterfaces":                       gvInterfaces,
 		"gvNewFuncs":                         gvNewFuncs,
-		"interfacesNewInternalInformerFunc":  c.Universe.Type(interfacesNewInternalInformerFunc),
-		"interfacesNewVersionedInformerFunc": c.Universe.Type(interfacesNewVersionedInformerFunc),
-		"interfacesSharedInformerFactory":    c.Universe.Type(interfacesSharedInformerFactory),
+		"interfacesNewInternalInformerFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInternalInformerFunc"}),
+		"interfacesNewVersionedInformerFunc": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewVersionedInformerFunc"}),
+		"informerFactoryInterface":           c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"internalClientSetInterface":         c.Universe.Type(types.Name{Package: g.internalClientSetPackage, Name: "Interface"}),
 		"reflectType":                        c.Universe.Type(reflectType),
 		"runtimeObject":                      c.Universe.Type(runtimeObject),
@@ -107,7 +108,7 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(internalClient {{.internalClientSetInterface|raw}}, versionedClient {{.versionedClientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}) {{.interfacesSharedInformerFactory|raw}} {
+func NewSharedInformerFactory(internalClient {{.internalClientSetInterface|raw}}, versionedClient {{.versionedClientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}) SharedInformerFactory {
   return &sharedInformerFactory{
 		internalClient: internalClient,
 		versionedClient: versionedClient,
@@ -169,7 +170,7 @@ var sharedInformerFactoryInterface = `
 // SharedInformerFactory provides shared informers for resources in all known
 // API group versions.
 type SharedInformerFactory interface {
-  {{.interfacesSharedInformerFactory|raw}}
+	{{.informerFactoryInterface|raw}}
 
 	{{$gvInterfaces := .gvInterfaces}}
 	{{range $groupName, $group := .groupVersions}}{{$groupName}}() {{index $gvInterfaces $groupName|raw}}

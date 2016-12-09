@@ -4,6 +4,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:attachdetach-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -17,6 +19,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:cronjob-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -30,6 +34,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:daemon-set-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -43,6 +49,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:deployment-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -56,6 +64,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:disruption-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -69,6 +79,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:endpoint-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -82,6 +94,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:horizontal-pod-autoscaler
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -95,6 +109,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:job-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -108,6 +124,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:namespace-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -121,6 +139,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:persistent-volume-binder
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -134,6 +154,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:pod-garbage-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -147,6 +169,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:replicaset-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -160,6 +184,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:replication-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -173,6 +199,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:service-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -186,6 +214,8 @@ items:
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:statefulset-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io

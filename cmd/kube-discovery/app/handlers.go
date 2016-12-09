@@ -141,13 +141,13 @@ func (cih *ClusterInfoHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 
 	// TODO probably should not leak server-side errors to the client
 	caPEM, err := cih.caLoader.LoadPEM()
-	log.Printf("Loaded CA: %s", caPEM)
 	if err != nil {
 		err = fmt.Errorf("Error loading root CA certificate data: %s", err)
 		log.Println(err)
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Loaded CA: %s", caPEM)
 
 	endpoints, err := cih.endpointsLoader.LoadList()
 	if err != nil {

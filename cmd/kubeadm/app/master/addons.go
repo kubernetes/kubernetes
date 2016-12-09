@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -83,25 +83,8 @@ func createKubeProxyPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 
 func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 
-	dnsPodResources := v1.ResourceList{
-		v1.ResourceName(v1.ResourceCPU):    resource.MustParse("100m"),
-		v1.ResourceName(v1.ResourceMemory): resource.MustParse("170Mi"),
-	}
-
-	healthzPodResources := v1.ResourceList{
-		v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10m"),
-		v1.ResourceName(v1.ResourceMemory): resource.MustParse("50Mi"),
-	}
-
 	kubeDNSPort := int32(10053)
 	dnsmasqPort := int32(53)
-
-	nslookup := fmt.Sprintf("nslookup kubernetes.default.svc.%s 127.0.0.1", cfg.Networking.DNSDomain)
-
-	nslookup = fmt.Sprintf("-cmd=%s:%d >/dev/null && %s:%d >/dev/null",
-		nslookup, dnsmasqPort,
-		nslookup, kubeDNSPort,
-	)
 
 	return v1.PodSpec{
 		Containers: []v1.Container{
@@ -110,18 +93,18 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 				Name:  "kube-dns",
 				Image: images.GetAddonImage(images.KubeDNSImage),
 				Resources: v1.ResourceRequirements{
-					Limits:   dnsPodResources,
-					Requests: dnsPodResources,
-				},
-				Args: []string{
-					fmt.Sprintf("--domain=%s", cfg.Networking.DNSDomain),
-					fmt.Sprintf("--dns-port=%d", kubeDNSPort),
-					// TODO __PILLAR__FEDERATIONS__DOMAIN__MAP__
+					Limits: v1.ResourceList{
+						v1.ResourceName(v1.ResourceMemory): resource.MustParse("170Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceName(v1.ResourceCPU):    resource.MustParse("100m"),
+						v1.ResourceName(v1.ResourceMemory): resource.MustParse("70Mi"),
+					},
 				},
 				LivenessProbe: &v1.Probe{
 					Handler: v1.Handler{
 						HTTPGet: &v1.HTTPGetAction{
-							Path:   "/healthz",
+							Path:   "/healthz-kubedns",
 							Port:   intstr.FromInt(8080),
 							Scheme: v1.URISchemeHTTP,
 						},
@@ -129,7 +112,7 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 					InitialDelaySeconds: 60,
 					TimeoutSeconds:      5,
 					SuccessThreshold:    1,
-					FailureThreshold:    1,
+					FailureThreshold:    5,
 				},
 				// # we poll on pod startup for the Kubernetes master service and
 				// # only setup the /readiness HTTP server once that's available.
@@ -141,8 +124,19 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 							Scheme: v1.URISchemeHTTP,
 						},
 					},
-					InitialDelaySeconds: 30,
+					InitialDelaySeconds: 3,
 					TimeoutSeconds:      5,
+				},
+				Args: []string{
+					fmt.Sprintf("--domain=%s", cfg.Networking.DNSDomain),
+					fmt.Sprintf("--dns-port=%d", kubeDNSPort),
+					"--config-map=kube-dns",
+				},
+				Env: []v1.EnvVar{
+					{
+						Name:  "PROMETHEUS_PORT",
+						Value: "10055",
+					},
 				},
 				Ports: []v1.ContainerPort{
 					{
@@ -155,20 +149,35 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 						Name:          "dns-tcp-local",
 						Protocol:      v1.ProtocolTCP,
 					},
+					{
+						ContainerPort: 10055,
+						Name:          "metrics",
+						Protocol:      v1.ProtocolTCP,
+					},
 				},
 			},
 			// dnsmasq
 			{
 				Name:  "dnsmasq",
 				Image: images.GetAddonImage(images.KubeDNSmasqImage),
-				Resources: v1.ResourceRequirements{
-					Limits:   dnsPodResources,
-					Requests: dnsPodResources,
+				LivenessProbe: &v1.Probe{
+					Handler: v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
+							Path:   "/healthz-dnsmasq",
+							Port:   intstr.FromInt(8080),
+							Scheme: v1.URISchemeHTTP,
+						},
+					},
+					InitialDelaySeconds: 60,
+					TimeoutSeconds:      5,
+					SuccessThreshold:    1,
+					FailureThreshold:    5,
 				},
 				Args: []string{
 					"--cache-size=1000",
 					"--no-resolv",
 					fmt.Sprintf("--server=127.0.0.1#%d", kubeDNSPort),
+					"--log-facility=-",
 				},
 				Ports: []v1.ContainerPort{
 					{
@@ -182,19 +191,66 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 						Protocol:      v1.ProtocolTCP,
 					},
 				},
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceName(v1.ResourceCPU):    resource.MustParse("150m"),
+						v1.ResourceName(v1.ResourceMemory): resource.MustParse("10Mi"),
+					},
+				},
+			},
+			{
+				Name:  "dnsmasq-metrics",
+				Image: images.GetAddonImage(images.KubeDNSmasqMetricsImage),
+				LivenessProbe: &v1.Probe{
+					Handler: v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
+							Path:   "/metrics",
+							Port:   intstr.FromInt(10054),
+							Scheme: v1.URISchemeHTTP,
+						},
+					},
+					InitialDelaySeconds: 60,
+					TimeoutSeconds:      5,
+					SuccessThreshold:    1,
+					FailureThreshold:    5,
+				},
+				Args: []string{
+					"--v=2",
+					"--logtostderr",
+				},
+				Ports: []v1.ContainerPort{
+					{
+						ContainerPort: 10054,
+						Name:          "metrics",
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceName(v1.ResourceMemory): resource.MustParse("10Mi"),
+					},
+				},
 			},
 			// healthz
 			{
 				Name:  "healthz",
 				Image: images.GetAddonImage(images.KubeExechealthzImage),
 				Resources: v1.ResourceRequirements{
-					Limits:   healthzPodResources,
-					Requests: healthzPodResources,
+					Limits: v1.ResourceList{
+						v1.ResourceName(v1.ResourceMemory): resource.MustParse("50Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10m"),
+						v1.ResourceName(v1.ResourceMemory): resource.MustParse("50Mi"),
+					},
 				},
 				Args: []string{
-					nslookup,
-					"-port=8080",
-					"-quiet",
+					fmt.Sprintf("--cmd=nslookup kubernetes.default.svc.%s 127.0.0.1 >/dev/null", cfg.Networking.DNSDomain),
+					"--url=/healthz-dnsmasq",
+					fmt.Sprintf("--cmd=nslookup kubernetes.default.svc.%s 127.0.0.1:%d >/dev/null", cfg.Networking.DNSDomain, kubeDNSPort),
+					"--url=/healthz-kubedns",
+					"--port=8080",
+					"--quiet",
 				},
 				Ports: []v1.ContainerPort{{
 					ContainerPort: 8080,
@@ -204,7 +260,6 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 		},
 		DNSPolicy: v1.DNSDefault,
 	}
-
 }
 
 func createKubeDNSServiceSpec(cfg *kubeadmapi.MasterConfiguration) (*v1.ServiceSpec, error) {
@@ -217,16 +272,14 @@ func createKubeDNSServiceSpec(cfg *kubeadmapi.MasterConfiguration) (*v1.ServiceS
 		return nil, fmt.Errorf("unable to allocate IP address for kube-dns addon from the given CIDR (%q) [%v]", cfg.Networking.ServiceSubnet, err)
 	}
 
-	svc := &v1.ServiceSpec{
+	return &v1.ServiceSpec{
 		Selector: map[string]string{"name": "kube-dns"},
 		Ports: []v1.ServicePort{
 			{Name: "dns", Port: 53, Protocol: v1.ProtocolUDP},
 			{Name: "dns-tcp", Port: 53, Protocol: v1.ProtocolTCP},
 		},
 		ClusterIP: ip.String(),
-	}
-
-	return svc, nil
+	}, nil
 }
 
 func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
@@ -250,10 +303,11 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 
 	kubeDNSServiceSpec, err := createKubeDNSServiceSpec(cfg)
 	if err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon - %v", err)
+		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
 
 	kubeDNSService := NewService("kube-dns", *kubeDNSServiceSpec)
+	kubeDNSService.ObjectMeta.Labels["kubernetes.io/name"] = "KubeDNS"
 	if _, err := client.Services(api.NamespaceSystem).Create(kubeDNSService); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
 	}

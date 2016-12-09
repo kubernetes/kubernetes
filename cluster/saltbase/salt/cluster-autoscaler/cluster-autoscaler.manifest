@@ -46,6 +46,11 @@
                         "mountPath": "/etc/ssl/certs"
                     },
                     {
+                        "name": "usrsharecacerts",
+                        "readOnly": true,
+                        "mountPath": "/usr/share/ca-certificates"
+                    },
+                    {
                         "name": "logfile",
                         "mountPath": "/var/log/cluster-autoscaler.log",
                         "readOnly": false
@@ -61,6 +66,12 @@
                 "name": "ssl-certs",
                 "hostPath": {
                     "path": "/etc/ssl/certs"
+                }
+            },
+            {
+                "name": "usrsharecacerts",
+                "hostPath": {
+                    "path": "/usr/share/ca-certificates"
                 }
             },
             {

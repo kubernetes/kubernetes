@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -172,7 +172,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
 				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
-				obj, err := conversion.NewCloner().DeepCopy(service)
+				obj, err := api.Scheme.DeepCopy(service)
 				// Cloning shouldn't fail. On the off-chance it does, we
 				// should shallow copy service to serviceShard before
 				// failing. If we don't do this we will never really
@@ -217,8 +217,8 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				}
 
 				if serviceShard != nil {
-					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", service.Name, nsName))
-					cleanupServiceShardsAndProviderResources(nsName, service, clusters)
+					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", serviceShard.Name, nsName))
+					cleanupServiceShardsAndProviderResources(nsName, serviceShard, clusters)
 					serviceShard = nil
 				} else {
 					By("No service shards to delete. `serviceShard` is nil")

@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: selenium-node-firefox
-        image: selenium/node-firefox-debug:2.47.1
+        image: selenium/node-firefox-debug:2.53.0
         ports:
           - containerPort: 5900 
         env:

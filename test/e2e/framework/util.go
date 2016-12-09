@@ -41,6 +41,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"google.golang.org/api/googleapi"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -294,7 +295,7 @@ func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 }
 
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
-	if TestContext.CloudConfig.NumNodes <= maxNodeCount {
+	if TestContext.CloudConfig.NumNodes > maxNodeCount {
 		Skipf("Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
 	}
 }
@@ -515,8 +516,8 @@ var ReadyReplicaVersion = version.MustParse("v1.4.0")
 // even if there are minPods pods, some of which are in Running/Ready
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
-func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
-
+// If skipSucceeded is true, any pods that are Succeeded are not counted.
+func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string, skipSucceeded bool) error {
 	// This can be removed when we no longer have 1.3 servers running with upgrade tests.
 	hasReadyReplicas, err := ServerVersionGTE(ReadyReplicaVersion, c.Discovery())
 	if err != nil {
@@ -580,13 +581,22 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 				Logf("%v in state %v, ignoring", pod.Name, pod.Status.Phase)
 				continue
 			}
-			if res, err := testutils.PodRunningReady(&pod); res && err == nil {
+			res, err := testutils.PodRunningReady(&pod)
+			switch {
+			case res && err == nil:
 				nOk++
-			} else {
-				if pod.Status.Phase != v1.PodFailed {
-					Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
-					badPods = append(badPods, pod)
-				} else if _, ok := pod.Annotations[v1.CreatedByAnnotation]; !ok {
+			case pod.Status.Phase == v1.PodSucceeded && skipSucceeded:
+				continue
+			case pod.Status.Phase == v1.PodSucceeded:
+				Logf("The status of Pod %s is Succeeded which is unexpected", pod.ObjectMeta.Name)
+				badPods = append(badPods, pod)
+				// it doesn't make sense to wait for this pod
+				return false, errors.New("unexpected Succeeded pod state")
+			case pod.Status.Phase != v1.PodFailed:
+				Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
+				badPods = append(badPods, pod)
+			default:
+				if _, ok := pod.Annotations[v1.CreatedByAnnotation]; !ok {
 					Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
@@ -5000,17 +5010,49 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 	return encounteredError
 }
 
-func CleanupGCEResources(loadBalancerName string) (err error) {
+// CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
+// the given name. The name is usually the UUID of the Service prefixed with an
+// alpha-numeric character ('a') to work around cloudprovider rules.
+func CleanupGCEResources(loadBalancerName string) (retErr error) {
 	gceCloud, ok := TestContext.CloudConfig.Provider.(*gcecloud.GCECloud)
 	if !ok {
 		return fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", TestContext.CloudConfig.Provider)
 	}
-	gceCloud.DeleteFirewall(loadBalancerName)
-	gceCloud.DeleteForwardingRule(loadBalancerName)
-	gceCloud.DeleteGlobalStaticIP(loadBalancerName)
-	hc, _ := gceCloud.GetHttpHealthCheck(loadBalancerName)
-	gceCloud.DeleteTargetPool(loadBalancerName, hc)
-	return nil
+	if err := gceCloud.DeleteFirewall(loadBalancerName); err != nil &&
+		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
+		retErr = err
+	}
+	if err := gceCloud.DeleteForwardingRule(loadBalancerName); err != nil &&
+		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
+		retErr = fmt.Errorf("%v\n%v", retErr, err)
+
+	}
+	if err := gceCloud.DeleteGlobalStaticIP(loadBalancerName); err != nil &&
+		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
+		retErr = fmt.Errorf("%v\n%v", retErr, err)
+	}
+	// This function shells out to gcloud, so we can't compare for NotFound errors.
+	// TODO: Invoke cloudprovider method directly instead.
+	if err := DeleteGCEStaticIP(loadBalancerName); err != nil {
+		Logf("%v", err)
+	}
+	hc, getErr := gceCloud.GetHttpHealthCheck(loadBalancerName)
+	if getErr != nil && !IsGoogleAPIHTTPErrorCode(getErr, http.StatusNotFound) {
+		retErr = fmt.Errorf("%v\n%v", retErr, getErr)
+		return
+	}
+	if err := gceCloud.DeleteTargetPool(loadBalancerName, hc); err != nil &&
+		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
+		retErr = fmt.Errorf("%v\n%v", retErr, err)
+	}
+	return
+}
+
+// IsHTTPErrorCode returns true if the error is a google api
+// error matching the corresponding HTTP error code.
+func IsGoogleAPIHTTPErrorCode(err error, code int) bool {
+	apiErr, ok := err.(*googleapi.Error)
+	return ok && apiErr.Code == code
 }
 
 // getMaster populates the externalIP, internalIP and hostname fields of the master.

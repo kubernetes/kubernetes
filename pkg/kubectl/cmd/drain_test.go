@@ -41,7 +41,6 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	"k8s.io/kubernetes/pkg/conversion"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -70,7 +69,7 @@ func TestMain(m *testing.M) {
 		},
 		Status: api.NodeStatus{},
 	}
-	clone, _ := conversion.NewCloner().DeepCopy(node)
+	clone, _ := api.Scheme.DeepCopy(node)
 
 	// A copy of the same node, but cordoned.
 	cordoned_node = clone.(*api.Node)

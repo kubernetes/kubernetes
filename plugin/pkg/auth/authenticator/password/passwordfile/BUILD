@@ -14,7 +14,10 @@ go_library(
     name = "go_default_library",
     srcs = ["passwordfile.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/auth/user:go_default_library"],
+    deps = [
+        "//pkg/auth/user:go_default_library",
+        "//vendor:github.com/golang/glog",
+    ],
 )
 
 go_test(

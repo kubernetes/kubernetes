@@ -28,6 +28,8 @@ import (
 	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/install"
 	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/validation"
 	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers/apiregistration/internalversion"
+	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers/apiregistration/v1alpha1"
 	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion"
 	_ "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/v1alpha1"
 )

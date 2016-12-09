@@ -28,10 +28,10 @@ import (
 	certificates "k8s.io/kubernetes/pkg/client/informers/informers_generated/certificates"
 	core "k8s.io/kubernetes/pkg/client/informers/informers_generated/core"
 	extensions "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions"
+	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	policy "k8s.io/kubernetes/pkg/client/informers/informers_generated/policy"
 	rbac "k8s.io/kubernetes/pkg/client/informers/informers_generated/rbac"
 	storage "k8s.io/kubernetes/pkg/client/informers/informers_generated/storage"
-	interfaces "k8s.io/kubernetes/pkg/client/informers/interfaces"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 	sync "sync"
@@ -51,7 +51,7 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(internalClient internalclientset.Interface, versionedClient release_1_5.Interface, defaultResync time.Duration) interfaces.SharedInformerFactory {
+func NewSharedInformerFactory(internalClient internalclientset.Interface, versionedClient release_1_5.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
 		internalClient:   internalClient,
 		versionedClient:  versionedClient,
@@ -76,7 +76,7 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
-func (f *sharedInformerFactory) InternalInformerFor(obj runtime.Object, newFunc interfaces.NewInternalInformerFunc) cache.SharedIndexInformer {
+func (f *sharedInformerFactory) InternalInformerFor(obj runtime.Object, newFunc internalinterfaces.NewInternalInformerFunc) cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -93,7 +93,7 @@ func (f *sharedInformerFactory) InternalInformerFor(obj runtime.Object, newFunc 
 
 // VersionedInformerFor returns the SharedIndexInformer for obj using a
 // versioned client.
-func (f *sharedInformerFactory) VersionedInformerFor(obj runtime.Object, newFunc interfaces.NewVersionedInformerFunc) cache.SharedIndexInformer {
+func (f *sharedInformerFactory) VersionedInformerFor(obj runtime.Object, newFunc internalinterfaces.NewVersionedInformerFunc) cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -111,7 +111,7 @@ func (f *sharedInformerFactory) VersionedInformerFor(obj runtime.Object, newFunc
 // SharedInformerFactory provides shared informers for resources in all known
 // API group versions.
 type SharedInformerFactory interface {
-	interfaces.SharedInformerFactory
+	internalinterfaces.SharedInformerFactory
 
 	Apps() apps.Interface
 	Autoscaling() autoscaling.Interface
