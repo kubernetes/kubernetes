@@ -2694,6 +2694,7 @@ type NamespaceSpec struct {
 	Finalizers []FinalizerName
 }
 
+// FinalizerName is the name identifying a finalizer during namespace lifecycle.
 type FinalizerName string
 
 // These are internal finalizer values to Kubernetes, must be qualified name unless defined here

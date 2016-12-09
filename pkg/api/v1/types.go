@@ -3103,6 +3103,7 @@ type NodeList struct {
 	Items []Node `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// FinalizerName is the name identifying a finalizer during namespace lifecycle.
 type FinalizerName string
 
 // These are internal finalizer values to Kubernetes, must be qualified name unless defined here
