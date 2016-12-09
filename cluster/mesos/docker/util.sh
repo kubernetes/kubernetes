@@ -192,8 +192,8 @@ function detect-master {
 }
 
 # Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
-# These Mesos slaves MAY host Kublets,
-# but might not have a Kublet running unless a kubernetes task has been scheduled on them.
+# These Mesos slaves MAY host Kubelets,
+# but might not have a Kubelet running unless a kubernetes task has been scheduled on them.
 function detect-nodes {
   local docker_ids=$(docker ps --filter="name=docker_mesosslave" --quiet)
   if [ -z "${docker_ids}" ]; then
