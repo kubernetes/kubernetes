@@ -295,7 +295,7 @@ kubectl run process-matrix --image=my/matrix \
    --per-completion-env=EC="15 15 31 31" \
    --restart=OnFailure  \
    -- \
-   /usr/local/bin/process_matrix_block -start_row $SR -end_row $ER -start_col $ER --end_col $EC 
+   /usr/local/bin/process_matrix_block -start_row $SR -end_row $ER -start_col $ER --end_col $EC
 ```
 
 ### Composition With Workflows and ScheduledJob
@@ -522,7 +522,7 @@ The JobStatus is also not changed. The user can gauge the progress of the job by
 the `.status.succeeded` count.
 
 
-#### Job Spec Compatilibity
+#### Job Spec Compatibility
 
 A job spec written before this change will work exactly the same as before with
 the new controller. The Pods it creates will have the same environment as
@@ -535,7 +535,7 @@ This is okay for a Beta resource.
 
 #### Job Controller Changes
 
-The Job controller will maintain for each Job a data structed which
+The Job controller will maintain for each Job a data structured which
 indicates the status of each completion index. We call this the
 *scoreboard* for short. It is an array of length `.spec.completions`.
 Elements of the array are `enum` type with possible values including
@@ -601,7 +601,7 @@ kubectl run say-number --image=busybox \
    --completions=3 \
    --completion-index-var-name=I \
    -- \
-   sh -c 'echo "My index is $I" && sleep 5' 
+   sh -c 'echo "My index is $I" && sleep 5'
 ```
 
 will run 3 pods to completion, each printing one of the following lines:
@@ -624,7 +624,7 @@ kubectl run say-fruit --image=busybox \
    --per-completion-env=FRUIT="apple banana cherry" \
    --per-completion-env=COLOR="green yellow red" \
    -- \
-   sh -c 'echo "Have a nice $COLOR $FRUIT" && sleep 5' 
+   sh -c 'echo "Have a nice $COLOR $FRUIT" && sleep 5'
 ```
 
 or equivalently:
@@ -637,7 +637,7 @@ kubectl run say-fruit --image=busybox \
    --per-completion-env=FRUIT="$(cat fruits.txt)" \
    --per-completion-env=COLOR="$(cat fruits.txt)" \
    -- \
-   sh -c 'echo "Have a nice $COLOR $FRUIT" && sleep 5' 
+   sh -c 'echo "Have a nice $COLOR $FRUIT" && sleep 5'
 ```
 
 or similarly:
@@ -647,7 +647,7 @@ kubectl run say-fruit --image=busybox \
    --per-completion-env=FRUIT=@fruits.txt \
    --per-completion-env=COLOR=@fruits.txt \
    -- \
-   sh -c 'echo "Have a nice $COLOR $FRUIT" && sleep 5' 
+   sh -c 'echo "Have a nice $COLOR $FRUIT" && sleep 5'
 ```
 
 will all run 3 pods in parallel. Index 0 pod will log:
@@ -691,7 +691,7 @@ kubectl run say-fruit --image=busybox \
    --per-completion-env=FRUIT="apple banana cherry" \
    --per-completion-env=COLOR="green yellow red" \
    -- \
-   sh -c 'echo "Have a nice $COLOR $FRUIT" && sleep 5' 
+   sh -c 'echo "Have a nice $COLOR $FRUIT" && sleep 5'
 ```
 
 First, kubectl generates the PodSpec as it normally does for `kubectl run`.
@@ -768,7 +768,7 @@ spec:
             - '/etc/job-params.sh; echo "this is the rest of the command"'
           volumeMounts:
             - name: annotations
-              mountPath: /etc 
+              mountPath: /etc
             - name: script
               mountPath: /etc
       volumes:
@@ -799,7 +799,7 @@ spec:
     ...
     spec:
       containers:
-      - name: foo 
+      - name: foo
         ...
         env:        
  # following block added:

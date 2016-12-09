@@ -110,13 +110,13 @@ well-bounded time period.
    to machine failure to a small number of minutes per failure
    (i.e. typically around "3 nines" availability), provided that:
     1. cluster persistent state (i.e. etcd disks) is either:
-        1. truely persistent (i.e. remote persistent disks), or
+        1. truly persistent (i.e. remote persistent disks), or
         1. reconstructible (e.g. using etcd [dynamic member
            addition](https://github.com/coreos/etcd/blob/master/Documentation/runtime-configuration.md#add-a-new-member)
            or [backup and
            recovery](https://github.com/coreos/etcd/blob/master/Documentation/admin_guide.md#disaster-recovery)).
     1. and boot disks are either:
-        1. truely persistent (i.e. remote persistent disks), or
+        1. truly persistent (i.e. remote persistent disks), or
         1. reconstructible (e.g. using boot-from-snapshot,
            boot-from-pre-configured-image or
            boot-from-auto-initializing image).
@@ -210,7 +210,7 @@ recoverable even if all other replicas are down.
 There are also significant performance differences between local disks and remote
 persistent disks. For example, the
 <A HREF="https://cloud.google.com/compute/docs/disks/#comparison_of_disk_types">
-sustained throughput local disks in GCE is approximatley 20x that of remote
+sustained throughput local disks in GCE is approximately 20x that of remote
 disks</A>.
 
 Hence we suggest that self-healing be provided by remotely mounted persistent

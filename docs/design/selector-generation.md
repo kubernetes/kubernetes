@@ -161,7 +161,7 @@ preserved (would have been nice to do so, but requires more complicated
 solution).
 3. Users who only created v1beta1 examples or v1 examples, will not ever see the
 existence of either field.
-4. Since v1beta1 are convertable to/from v1, the storage location (path in etcd)
+4. Since v1beta1 are convertible to/from v1, the storage location (path in etcd)
 does not need to change, allowing scriptable rollforward/rollback.
 
 # Future Work

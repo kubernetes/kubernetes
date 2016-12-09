@@ -121,7 +121,7 @@ engine to decide how to spit workloads among clusters. It creates a
 Kubernetes Replication Controller on one ore more underlying cluster,
 and post them back to `etcd` storage.
 
-One sublety worth noting here is that the scheduling decision is arrived at by
+One subtlety worth noting here is that the scheduling decision is arrived at by
 combining the application-specific request from the user (which might
 include, for example, placement constraints), and the global policy specified
 by the federation administrator (for example, "prefer on-premise
@@ -306,7 +306,7 @@ cases it may be complex. For example:
 
 Below is a sample of the YAML to create such a replication controller.
 
-``` 
+```
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -325,7 +325,7 @@ spec:
         image: nginx
         ports:
         - containerPort: 80
-      clusterSelector: 
+      clusterSelector:
       name in (Foo, Bar)
 ```
 
