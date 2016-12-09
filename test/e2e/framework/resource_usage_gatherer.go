@@ -28,7 +28,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -295,7 +294,7 @@ func (g *containerResourceGatherer) startGatheringData() {
 	g.getKubeSystemContainersResourceUsage(g.client)
 }
 
-func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) *ResourceUsageSummary {
+func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) (*ResourceUsageSummary, error) {
 	close(g.stopCh)
 	Logf("Closed stop channel. Waiting for %v workers", len(g.workers))
 	finished := make(chan struct{})
@@ -318,7 +317,7 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 
 	if len(percentiles) == 0 {
 		Logf("Warning! Empty percentile list for stopAndPrintData.")
-		return &ResourceUsageSummary{}
+		return &ResourceUsageSummary{}, nil
 	}
 	data := make(map[int]ResourceUsagePerContainer)
 	for i := range g.workers {
@@ -373,6 +372,8 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 			}
 		}
 	}
-	Expect(violatedConstraints).To(BeEmpty())
-	return &summary
+	if len(violatedConstraints) > 0 {
+		return &summary, fmt.Errorf(strings.Join(violatedConstraints, "\n"))
+	}
+	return &summary, nil
 }
