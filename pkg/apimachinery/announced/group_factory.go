@@ -156,6 +156,15 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager) erro
 	prioritizedVersions = append(prioritizedVersions, unprioritizedVersions...)
 	m.RegisterVersions(prioritizedVersions)
 	gmf.prioritizedVersionList = prioritizedVersions
+
+	// Register empty group. Will be filled with proper values in Enable()
+	groupMeta := &apimachinery.GroupMeta{
+		GroupVersion:  gmf.prioritizedVersionList[0],
+	}
+	if err := m.RegisterGroup(*groupMeta); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -205,12 +214,13 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 
 	preferredExternalVersion := externalVersions[0]
 	accessor := meta.NewAccessor()
-
-	groupMeta := &apimachinery.GroupMeta{
-		GroupVersion:  preferredExternalVersion,
-		GroupVersions: externalVersions,
-		SelfLinker:    runtime.SelfLinker(accessor),
+	groupMeta, err := m.Group(gmf.GroupArgs.GroupName)
+	if err != nil {
+		return err
 	}
+	groupMeta.GroupVersion = preferredExternalVersion // this might change the value set in Register()
+	groupMeta.GroupVersions = externalVersions
+	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
 	for _, v := range externalVersions {
 		gvf := gmf.VersionArgs[v.Version]
 		if err := groupMeta.AddVersionInterfaces(
@@ -226,9 +236,6 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 	groupMeta.InterfacesFor = groupMeta.DefaultInterfacesFor
 	groupMeta.RESTMapper = gmf.newRESTMapper(scheme, externalVersions, groupMeta)
 
-	if err := m.RegisterGroup(*groupMeta); err != nil {
-		return err
-	}
 	return nil
 }
 
