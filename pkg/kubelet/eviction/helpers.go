@@ -533,12 +533,18 @@ func memory(stats statsFunc) cmpFunc {
 
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Memory := p1Usage[v1.ResourceMemory]
-		p1Spec := core.PodUsageFunc(p1)
+		p1Spec, err := core.PodUsageFunc(p1)
+		if err != nil {
+			return -1
+		}
 		p1Request := p1Spec[api.ResourceRequestsMemory]
 		p1Memory.Sub(p1Request)
 
 		p2Memory := p2Usage[v1.ResourceMemory]
-		p2Spec := core.PodUsageFunc(p2)
+		p2Spec, err := core.PodUsageFunc(p2)
+		if err != nil {
+			return 1
+		}
 		p2Request := p2Spec[api.ResourceRequestsMemory]
 		p2Memory.Sub(p2Request)
 

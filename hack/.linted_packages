@@ -197,6 +197,7 @@ pkg/kubelet/volumemanager/populator
 pkg/kubelet/volumemanager/reconciler
 pkg/proxy/config
 pkg/proxy/healthcheck
+pkg/quota
 pkg/quota/install
 pkg/registry
 pkg/registry/authorization/util

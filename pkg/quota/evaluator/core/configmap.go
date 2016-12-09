@@ -17,7 +17,6 @@ limitations under the License.
 package core
 
 import (
-	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -28,17 +27,10 @@ import (
 
 // NewConfigMapEvaluator returns an evaluator that can evaluate configMaps
 func NewConfigMapEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourceConfigMaps}
-	return &generic.GenericEvaluator{
-		Name:              "Evaluator.ConfigMap",
-		InternalGroupKind: api.Kind("ConfigMap"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceConfigMaps),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceConfigMaps),
+	return &generic.ObjectCountEvaluator{
+		AllowCreateOnUpdate: false,
+		InternalGroupKind:   api.Kind("ConfigMap"),
+		ResourceName:        api.ResourceConfigMaps,
 		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ConfigMaps(namespace).List(options)
 			if err != nil {
