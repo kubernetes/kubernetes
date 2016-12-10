@@ -317,7 +317,11 @@ func getTestArtifacts(host, testDir string) error {
 // in the runner. This is used to collect serial console log.
 // TODO(random-liu): Use the log-dump script in cluster e2e.
 func WriteLog(host, filename, content string) error {
-	f, err := os.Create(filepath.Join(*resultsDir, host, filename))
+	logPath := filepath.Join(*resultsDir, host)
+	if err := os.MkdirAll(logPath, 0755); err != nil {
+		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
+	}
+	f, err := os.Create(filepath.Join(logPath, filename))
 	if err != nil {
 		return err
 	}
