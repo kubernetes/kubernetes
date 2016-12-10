@@ -568,15 +568,13 @@ func patchResource(
 			// 2. save the originalJS and patchedJS to detect whether there were conflicting changes on retries
 			if js, err := runtime.Encode(codec, currentObject); err != nil {
 				return nil, err
-			} else {
-				originalObjJS = js
 			}
+			originalObjJS = js
 
 			if js, err := getPatchedJS(patchType, originalObjJS, patchJS, versionedObj); err != nil {
 				return nil, err
-			} else {
-				originalPatchedObjJS = js
 			}
+			originalPatchedObjJS = js
 
 			objToUpdate := patcher.New()
 			if err := runtime.DecodeInto(codec, originalPatchedObjJS, objToUpdate); err != nil {
