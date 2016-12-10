@@ -106,7 +106,7 @@ func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput stri
 			var err error
 			// decode runtime.Unknown to runtime.Unstructured for sorting.
 			// we don't actually want the internal versions of known types.
-			if objs[ix], _, err = decoder.Decode(u.Raw, nil, &runtime.Unstructured{}); err != nil {
+			if objs[ix], _, err = decoder.Decode(u.Raw, nil, &unstructured.Unstructured{}); err != nil {
 				return nil, err
 			}
 		}
