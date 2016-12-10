@@ -1,4 +1,6 @@
-This file has moved to: http://kubernetes.github.io/docs/getting-started-guides/ubuntu/
+This file has moved to:
+http://kubernetes.io/docs/getting-started-guides/ubuntu/automated/
+http://kubernetes.io/docs/getting-started-guides/ubuntu/manual/
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
