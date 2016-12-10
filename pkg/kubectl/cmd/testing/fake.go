@@ -221,6 +221,10 @@ func (f *FakeFactory) RESTClient() (*restclient.RESTClient, error) {
 	return nil, nil
 }
 
+func (f *FakeFactory) ClientCache() cmdutil.ClientCache {
+	return nil
+}
+
 func (f *FakeFactory) ClientSet() (*internalclientset.Clientset, error) {
 	return nil, nil
 }
