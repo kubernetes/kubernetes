@@ -236,8 +236,6 @@ kube::golang::set_platform_envs() {
     # Dynamic CGO linking for other server architectures than linux/amd64 goes here
     # If you want to include support for more server platforms than these, add arch-specific gcc names here
     case "${platform}" in
-      "linux/amd64")
-        ;;
       "linux/arm")
         export CGO_ENABLED=1
         export CC=arm-linux-gnueabi-gcc
@@ -255,10 +253,6 @@ kube::golang::set_platform_envs() {
       "linux/s390x")
         export CGO_ENABLED=1
         export CC=s390x-linux-gnu-gcc
-        ;;
-      *)
-        echo "Unsupported architecture to cross-compile from linux/amd64." >&2
-        exit 1
         ;;
     esac
   fi
