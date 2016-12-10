@@ -2277,37 +2277,6 @@ func (gce *GCECloud) InstanceType(nodeName types.NodeName) (string, error) {
 	return instance.Type, nil
 }
 
-// List is an implementation of Instances.List.
-func (gce *GCECloud) List(filter string) ([]types.NodeName, error) {
-	var instances []types.NodeName
-	// TODO: Parallelize, although O(zones) so not too bad (N <= 3 typically)
-	for _, zone := range gce.managedZones {
-		pageToken := ""
-		page := 0
-		for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
-			listCall := gce.service.Instances.List(gce.projectID, zone)
-			if len(filter) > 0 {
-				listCall = listCall.Filter("name eq " + filter)
-			}
-			if pageToken != "" {
-				listCall = listCall.PageToken(pageToken)
-			}
-			res, err := listCall.Do()
-			if err != nil {
-				return nil, err
-			}
-			pageToken = res.NextPageToken
-			for _, instance := range res.Items {
-				instances = append(instances, mapInstanceToNodeName(instance))
-			}
-		}
-		if page >= maxPages {
-			glog.Errorf("List exceeded maxPages=%d for Instances.List: truncating.", maxPages)
-		}
-	}
-	return instances, nil
-}
-
 // GetAllZones returns all the zones in which nodes are running
 func (gce *GCECloud) GetAllZones() (sets.String, error) {
 	// Fast-path for non-multizone

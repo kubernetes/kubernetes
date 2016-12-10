@@ -287,19 +287,6 @@ func (m *OVirtInstanceMap) ListSortedNames() []string {
 	return names
 }
 
-// List enumerates the set of nodes instances known by the cloud provider
-func (v *OVirtCloud) List(filter string) ([]types.NodeName, error) {
-	instances, err := v.fetchAllInstances()
-	if err != nil {
-		return nil, err
-	}
-	var nodeNames []types.NodeName
-	for _, s := range instances.ListSortedNames() {
-		nodeNames = append(nodeNames, types.NodeName(s))
-	}
-	return nodeNames, nil
-}
-
 // Implementation of Instances.CurrentNodeName
 func (v *OVirtCloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
