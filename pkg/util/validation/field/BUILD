@@ -17,7 +17,10 @@ go_library(
         "path.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/util/errors:go_default_library"],
+    deps = [
+        "//pkg/util/errors:go_default_library",
+        "//pkg/util/sets:go_default_library",
+    ],
 )
 
 go_test(
