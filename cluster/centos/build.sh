@@ -65,8 +65,8 @@ function unpack-releases() {
   # flannel
   if [[ -f ${RELEASES_DIR}/flannel.tar.gz ]] ; then
     tar xzf ${RELEASES_DIR}/flannel.tar.gz -C ${RELEASES_DIR}
-    cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/master/bin
-    cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/node/bin
+    cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/master/bin
+    cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/node/bin
   fi
 
   # ectd
@@ -95,8 +95,8 @@ function unpack-releases() {
   fi
 
   # docker
-  if [[ -f ${RELEASES_DIR}/docker.tar.gz ]]; then
-    tar xzf ${RELEASES_DIR}/docker.tar.gz -C ${RELEASES_DIR}
+  if [[ -f ${RELEASES_DIR}/docker.tgz ]]; then
+    tar xzf ${RELEASES_DIR}/docker.tgz -C ${RELEASES_DIR}
 
     cp ${RELEASES_DIR}/docker/docker* ${BINARY_DIR}/node/bin
   fi
