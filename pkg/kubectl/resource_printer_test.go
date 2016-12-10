@@ -118,23 +118,27 @@ func TestPrinter(t *testing.T) {
 		Format         string
 		FormatArgument string
 		Input          runtime.Object
+		OutputVersions []schema.GroupVersion
 		Expect         string
 	}{
-		{"test json", "json", "", simpleTest, "{\n    \"Data\": \"foo\"\n}\n"},
-		{"test yaml", "yaml", "", simpleTest, "Data: foo\n"},
+		{"test json", "json", "", simpleTest, nil, "{\n    \"Data\": \"foo\"\n}\n"},
+		{"test yaml", "yaml", "", simpleTest, nil, "Data: foo\n"},
 		{"test template", "template", "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}",
-			podTest, "foo"},
-		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "foo"},
-		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, "foo bar"},
-		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, ""},
-		{"test name", "name", "", podTest, "pod/foo\n"},
-		{"emits versioned objects", "template", "{{.kind}}", testapi, "Pod"},
+			podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
+		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
+		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo bar"},
+		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, ""},
+		{"test name", "name", "", podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "pod/foo\n"},
+		{"emits versioned objects", "template", "{{.kind}}", testapi, []schema.GroupVersion{v1.SchemeGroupVersion}, "Pod"},
 	}
 	for _, test := range printerTests {
 		buf := bytes.NewBuffer([]byte{})
-		printer, found, err := GetPrinter(test.Format, test.FormatArgument, false)
-		if err != nil || !found {
+		printer, generic, err := GetPrinter(test.Format, test.FormatArgument, false)
+		if err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
+		}
+		if generic && len(test.OutputVersions) > 0 {
+			printer = NewVersionedPrinter(printer, api.Scheme, test.OutputVersions...)
 		}
 		if err := printer.PrintObj(test.Input, buf); err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
@@ -496,18 +500,32 @@ func TestTemplateStrings(t *testing.T) {
 
 func TestPrinters(t *testing.T) {
 	om := func(name string) api.ObjectMeta { return api.ObjectMeta{Name: name} }
-	templatePrinter, err := NewTemplatePrinter([]byte("{{.name}}"))
+
+	var (
+		err              error
+		templatePrinter  ResourcePrinter
+		templatePrinter2 ResourcePrinter
+		jsonpathPrinter  ResourcePrinter
+	)
+
+	templatePrinter, err = NewTemplatePrinter([]byte("{{.name}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatePrinter2, err := NewTemplatePrinter([]byte("{{len .items}}"))
+	templatePrinter = NewVersionedPrinter(templatePrinter, api.Scheme, v1.SchemeGroupVersion)
+
+	templatePrinter2, err = NewTemplatePrinter([]byte("{{len .items}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	jsonpathPrinter, err := NewJSONPathPrinter("{.metadata.name}")
+	templatePrinter2 = NewVersionedPrinter(templatePrinter2, api.Scheme, v1.SchemeGroupVersion)
+
+	jsonpathPrinter, err = NewJSONPathPrinter("{.metadata.name}")
 	if err != nil {
 		t.Fatal(err)
 	}
+	jsonpathPrinter = NewVersionedPrinter(jsonpathPrinter, api.Scheme, v1.SchemeGroupVersion)
+
 	printers := map[string]ResourcePrinter{
 		"humanReadable": NewHumanReadablePrinter(PrintOptions{
 			NoHeaders:    true,
