@@ -1,6 +1,6 @@
 ## Kubernetes "Github and Build-cop" Rotation
 
-### Preqrequisites
+### Prerequisites
 
 * Ensure you have [write access to http://github.com/kubernetes/kubernetes](https://github.com/orgs/kubernetes/teams/kubernetes-maintainers)
   * Test your admin access by e.g. adding a label to an issue.

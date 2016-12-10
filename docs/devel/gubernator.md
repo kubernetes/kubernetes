@@ -22,7 +22,7 @@ test results.
 Gubernator simplifies the debugging proccess and makes it easier to track down failures by automating many
 steps commonly taken in searching through logs, and by offering tools to filter through logs to find relevant lines.
 Gubernator automates the steps of finding the failed tests, displaying relevant logs, and determining the
-failed pods and the corresponing pod UID, namespace, and container ID.
+failed pods and the corresponding pod UID, namespace, and container ID.
 It also allows for filtering of the log files to display relevant lines based on selected keywords, and
 allows for multiple logs to be woven together by timestamp.
 

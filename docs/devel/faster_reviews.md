@@ -108,7 +108,7 @@ inadequate or even entirely absent. Very few PRs can touch code and NOT touch
 tests. If you don't know how to test Feature-X - ask!  We'll be happy to help
 you design things for easy testing or to suggest appropriate test cases.
 
-## 6. Look for opportunities to generify
+## 6. Look for opportunities to gentrify
 
 If you find yourself writing something that touches a lot of modules, think hard
 about the dependencies you are introducing between packages. Can some of what
