@@ -26,7 +26,6 @@ go_library(
         "register.go",
         "requestcontext.go",
         "resource_helpers.go",
-        "types.generated.go",
         "types.go",
         "zz_generated.deepcopy.go",
     ],
@@ -53,7 +52,6 @@ go_library(
         "//pkg/util/validation/field:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/ugorji/go/codec",
         "//vendor:golang.org/x/net/context",
     ],
 )

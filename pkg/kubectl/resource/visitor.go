@@ -81,9 +81,9 @@ type Info struct {
 	// Optional, this is the provided object in a versioned type before defaulting
 	// and conversions into its corresponding internal type. This is useful for
 	// reflecting on user intent which may be lost after defaulting and conversions.
-	VersionedObject interface{}
+	VersionedObject runtime.Object
 	// Optional, this is the most recent value returned by the server if available
-	runtime.Object
+	Object runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
 	// this type of resource. It may not match the resource version of the object,
 	// but if set it should be equal to or newer than the resource version of the

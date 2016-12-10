@@ -85,6 +85,6 @@ type NodeConfiguration struct {
 type ClusterInfo struct {
 	metav1.TypeMeta
 	// TODO(phase1+) this may become simply `api.Config`
-	CertificateAuthorities []string `json:"certificateAuthorities"`
-	Endpoints              []string `json:"endpoints"`
+	CertificateAuthorities []string
+	Endpoints              []string
 }
