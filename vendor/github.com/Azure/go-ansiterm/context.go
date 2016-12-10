@@ -1,6 +1,6 @@
 package ansiterm
 
-type AnsiContext struct {
+type ansiContext struct {
 	currentChar byte
 	paramBuffer []byte
 	interBuffer []byte

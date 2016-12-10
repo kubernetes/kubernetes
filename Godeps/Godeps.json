@@ -30,51 +30,61 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/compute",
-			"Comment": "v3.1.0-beta-24-g8316b90",
-			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
+			"Comment": "v7.0.1-beta",
+			"Rev": "0984e0641ae43b89283223034574d6465be93bf4"
+		},
+		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/containerregistry",
+			"Comment": "v7.0.1-beta",
+			"Rev": "0984e0641ae43b89283223034574d6465be93bf4"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
-			"Comment": "v3.1.0-beta-24-g8316b90",
-			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
+			"Comment": "v7.0.1-beta",
+			"Rev": "0984e0641ae43b89283223034574d6465be93bf4"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/storage",
-			"Comment": "v3.1.0-beta-24-g8316b90",
-			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
+			"Comment": "v7.0.1-beta",
+			"Rev": "0984e0641ae43b89283223034574d6465be93bf4"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/storage",
-			"Comment": "v3.1.0-beta-24-g8316b90",
-			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
+			"Comment": "v7.0.1-beta",
+			"Rev": "0984e0641ae43b89283223034574d6465be93bf4"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
-			"Rev": "70b2c90b260171e829f1ebd7c17f600c11858dbe"
+			"Rev": "fa152c58bc15761d0200cb75fe958b89a9d4888e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm/winterm",
-			"Rev": "70b2c90b260171e829f1ebd7c17f600c11858dbe"
+			"Rev": "fa152c58bc15761d0200cb75fe958b89a9d4888e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v7.0.6-4-g2492d97",
-			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
+			"Comment": "v7.2.2-8-ge0c77ec",
+			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v7.0.6-4-g2492d97",
-			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
+			"Comment": "v7.2.2-8-ge0c77ec",
+			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v7.0.6-4-g2492d97",
-			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
+			"Comment": "v7.2.2-8-ge0c77ec",
+			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v7.0.6-4-g2492d97",
-			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
+			"Comment": "v7.2.2-8-ge0c77ec",
+			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest/validation",
+			"Comment": "v7.2.2-8-ge0c77ec",
+			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
 		},
 		{
 			"ImportPath": "github.com/MakeNowJust/heredoc",
@@ -2304,12 +2314,12 @@
 		},
 		{
 			"ImportPath": "github.com/vmware/photon-controller-go-sdk/photon",
-			"Comment": "PROMOTED-336",
+			"Comment": "PROMOTED-339",
 			"Rev": "dd6be2029ef341cae37b2557ddd302f68176f832"
 		},
 		{
 			"ImportPath": "github.com/vmware/photon-controller-go-sdk/photon/lightwave",
-			"Comment": "PROMOTED-336",
+			"Comment": "PROMOTED-339",
 			"Rev": "dd6be2029ef341cae37b2557ddd302f68176f832"
 		},
 		{
