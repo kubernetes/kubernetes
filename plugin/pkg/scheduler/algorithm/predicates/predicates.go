@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -668,6 +669,66 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta interface{},
 		}
 	}
 	return true, nil, nil
+}
+
+type NodeConditionChecker struct {
+	conditionType string
+	statuses      sets.String
+	presence      bool
+}
+
+func NewNodeConditionPredicate(conditionType string, statuses []string, presence bool) algorithm.FitPredicate {
+	labelChecker := &NodeConditionChecker{
+		conditionType: conditionType,
+		statuses:      sets.NewString(statuses...),
+		presence:      presence,
+	}
+	return labelChecker.CheckNodeConditionPresence
+}
+
+// CheckNodeConditionPresence checks whether the specified condition exists with one of the specified values.
+// If "presence" is true, and "statuses" is empty, returns true if the condition exists at all.
+// If "presence" is true, and "statuses" is non-empty, returns true if the condition exists with one of the specified statuses.
+// If "presence" is false, and "statuses" is empty, returns false if the condition exists at all.
+// If "presence" is false, and "statuses" is non-empty, returns false if the condition exists with one of the specified statuses.
+func (n *NodeConditionChecker) CheckNodeConditionPresence(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
+	var (
+		exists bool
+		value  string
+	)
+	for _, condition := range node.Status.Conditions {
+		if string(condition.Type) == n.conditionType {
+			exists = true
+			value = string(condition.Status)
+			break
+		}
+	}
+
+	switch {
+	case n.presence && len(n.statuses) == 0:
+		if exists {
+			return true, nil, nil
+		}
+	case n.presence:
+		if exists && n.statuses.Has(value) {
+			return true, nil, nil
+		}
+	case !n.presence && len(n.statuses) == 0:
+		if !exists {
+			return true, nil, nil
+		}
+	case !n.presence:
+		if !(exists && n.statuses.Has(value)) {
+			return true, nil, nil
+		}
+	}
+
+	return false, []algorithm.PredicateFailureReason{ErrNodeConditionPresenceViolated}, nil
 }
 
 type ServiceAffinity struct {

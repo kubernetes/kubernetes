@@ -140,6 +140,22 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 					policy.Argument.LabelsPresence.Presence,
 				)
 			}
+		} else if policy.Argument.RequireCondition != nil {
+			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewNodeConditionPredicate(
+					policy.Argument.RequireCondition.ConditionType,
+					policy.Argument.RequireCondition.ConditionStatuses,
+					true,
+				)
+			}
+		} else if policy.Argument.ForbidCondition != nil {
+			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewNodeConditionPredicate(
+					policy.Argument.ForbidCondition.ConditionType,
+					policy.Argument.ForbidCondition.ConditionStatuses,
+					false,
+				)
+			}
 		}
 	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {
 		// checking to see if a pre-defined predicate is requested
@@ -375,6 +391,12 @@ func validatePredicateOrDie(predicate schedulerapi.PredicatePolicy) {
 			numArgs++
 		}
 		if predicate.Argument.LabelsPresence != nil {
+			numArgs++
+		}
+		if predicate.Argument.RequireCondition != nil {
+			numArgs++
+		}
+		if predicate.Argument.ForbidCondition != nil {
 			numArgs++
 		}
 		if numArgs != 1 {
