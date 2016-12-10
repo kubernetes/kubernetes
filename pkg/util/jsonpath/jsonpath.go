@@ -18,6 +18,7 @@ package jsonpath
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -117,18 +118,25 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 }
 
 // PrintResults write the results into writer
-func (j *JSONPath) PrintResults(wr io.Writer, results []reflect.Value) error {
-	for i, r := range results {
-		text, err := j.evalToText(r)
-		if err != nil {
-			return err
+func (j *JSONPath) PrintResults(w io.Writer, results []reflect.Value) error {
+	items := make([]interface{}, len(results))
+	for i, obj := range results {
+		obj, ok := template.PrintableValue(obj)
+		if !ok {
+			return fmt.Errorf("can't print object %#v", obj)
 		}
-		if i != len(results)-1 {
-			text = append(text, ' ')
-		}
-		if _, err = wr.Write(text); err != nil {
-			return err
-		}
+		items[i] = obj
+	}
+	data, err := json.Marshal(items)
+	if err != nil {
+		return err
+	}
+	dst := bytes.Buffer{}
+	err = json.Indent(&dst, data, "", "    ")
+	dst.WriteByte('\n')
+	_, err = w.Write(dst.Bytes())
+	if err != nil {
+		return err
 	}
 	return nil
 }

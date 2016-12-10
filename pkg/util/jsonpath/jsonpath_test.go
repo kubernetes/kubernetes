@@ -48,7 +48,7 @@ func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 		}
 		out := buf.String()
 		if out != test.expect {
-			t.Errorf(`in %s, expect to get "%s", got "%s"`, test.name, test.expect, out)
+			t.Errorf(`in %s, expect to get "%q", got "%q"`, test.name, test.expect, out)
 		}
 	}
 }
@@ -73,7 +73,7 @@ func testJSONPathSortOutput(tests []jsonpathTest, t *testing.T) {
 		sortedExpect := strings.Fields(test.expect)
 		sort.Strings(sortedExpect)
 		if !reflect.DeepEqual(sortedOut, sortedExpect) {
-			t.Errorf(`in %s, expect to get "%s", got "%s"`, test.name, test.expect, out)
+			t.Errorf(`in %s, expect to get "%q", got "%q"`, test.name, test.expect, out)
 		}
 	}
 }
@@ -147,30 +147,30 @@ func TestStructInput(t *testing.T) {
 	}
 
 	storeTests := []jsonpathTest{
-		{"plain", "hello jsonpath", nil, "hello jsonpath"},
-		{"recursive", "{..}", []int{1, 2, 3}, "[1 2 3]"},
-		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3"},
-		{"quote", `{"{"}`, nil, "{"},
-		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4"},
-		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},
-		{"variable", "hello {.Name}", storeData, "hello jsonpath"},
-		{"dict/", "{$.Labels.web/html}", storeData, "15"},
-		{"dict/", "{$.Employees.jason}", storeData, "manager"},
-		{"dict/", "{$.Employees.dan}", storeData, "clerk"},
-		{"dict-", "{.Labels.k8s-app}", storeData, "20"},
-		{"nest", "{.Bicycle.Color}", storeData, "red"},
-		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville"},
-		{"allfileds", "{.Bicycle.*}", storeData, "red 19.95"},
-		{"recurfileds", "{..Price}", storeData, "8.95 12.99 8.99 19.95"},
+		{"plain", "hello jsonpath", nil, "[\n    \"hello jsonpath\"\n]\n"},
+		{"recursive", "{..}", []int{1, 2, 3}, "[\n    [\n        1,\n        2,\n        3\n    ]\n]\n"},
+		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "[\n    2,\n    3\n]\n"},
+		{"quote", `{"{"}`, nil, "[\n    \"{\"\n]\n"},
+		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "[\n    1,\n    3,\n    4\n]\n"},
+		{"array", "{[0:2]}", []string{"Monday", "Tuesday"}, "[\n    \"Monday\",\n    \"Tuesday\"\n]\n"},
+		{"variable", "hello {.Name}", storeData, "[\n    \"hello \"\n]\n[\n    \"jsonpath\"\n]\n"},
+		{"dict/", "{$.Labels.web/html}", storeData, "[\n    15\n]\n"},
+		{"dict/", "{$.Employees.jason}", storeData, "[\n    \"manager\"\n]\n"},
+		{"dict/", "{$.Employees.dan}", storeData, "[\n    \"clerk\"\n]\n"},
+		{"dict-", "{.Labels.k8s-app}", storeData, "[\n    20\n]\n"},
+		{"nest", "{.Bicycle.Color}", storeData, "[\n    \"red\"\n]\n"},
+		{"allarray", "{.Book[*].Author}", storeData, "[\n    \"Nigel Rees\",\n    \"Evelyn Waugh\",\n    \"Herman Melville\"\n]\n"},
+		{"allfileds", "{.Bicycle.*}", storeData, "[\n    \"red\",\n    19.95\n]\n"},
+		{"recurfileds", "{..Price}", storeData, "[\n    8.95,\n    12.99,\n    8.99,\n    19.95\n]\n"},
 		{"lastarray", "{.Book[-1:]}", storeData,
-			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
+			"[\n    {\n        \"Category\": \"fiction\",\n        \"Author\": \"Herman Melville\",\n        \"Title\": \"Moby Dick\",\n        \"Price\": 8.99\n    }\n]\n"},
 		{"recurarray", "{..Book[2]}", storeData,
-			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
+			"[\n    {\n        \"Category\": \"fiction\",\n        \"Author\": \"Herman Melville\",\n        \"Title\": \"Moby Dick\",\n        \"Price\": 8.99\n    }\n]\n"},
 	}
 	testJSONPath(storeTests, false, t)
 
 	missingKeyTests := []jsonpathTest{
-		{"nonexistent field", "{.hello}", storeData, ""},
+		{"nonexistent field", "{.hello}", storeData, "[]\n"},
 	}
 	testJSONPath(missingKeyTests, true, t)
 
@@ -199,8 +199,8 @@ func TestJSONInput(t *testing.T) {
 		t.Error(err)
 	}
 	pointsTests := []jsonpathTest{
-		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5"},
-		{"bracket key", "{[0]['id']}", pointsData, "i1"},
+		{"exists filter", "{[?(@.z)].id}", pointsData, "[\n    \"i2\",\n    \"i5\"\n]\n"},
+		{"bracket key", "{[0]['id']}", pointsData, "[\n    \"i1\"\n]\n"},
 	}
 	testJSONPath(pointsTests, false, t)
 }
@@ -258,25 +258,25 @@ func TestKubernetes(t *testing.T) {
 	}
 
 	nodesTests := []jsonpathTest{
-		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "127.0.0.1, 127.0.0.2, List"},
-		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "127.0.0.1\t127.0.0.2\t"},
+		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "[\n    \"127.0.0.1\"\n]\n[\n    \", \"\n]\n[\n    \"127.0.0.2\"\n]\n[\n    \", \"\n]\n[]\n[\n    \"List\"\n]\n"},
+		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "[\n    \"127.0.0.1\"\n]\n[\n    \"\\t\"\n]\n[\n    \"127.0.0.2\"\n]\n[\n    \"\\t\"\n]\n[]\n"},
 		{"range addresss", `{.items[*].status.addresses[*].address}`, nodesData,
-			"127.0.0.1 127.0.0.2 127.0.0.3"},
+			"[\n    \"127.0.0.1\",\n    \"127.0.0.2\",\n    \"127.0.0.3\"\n]\n"},
 		{"double range", `{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}`, nodesData,
-			"127.0.0.1, 127.0.0.2, 127.0.0.3, "},
-		{"item name", `{.items[*].metadata.name}`, nodesData, "127.0.0.1 127.0.0.2"},
+			"[\n    \"127.0.0.1\"\n]\n[\n    \", \"\n]\n[\n    \"127.0.0.2\"\n]\n[\n    \", \"\n]\n[\n    \"127.0.0.3\"\n]\n[\n    \", \"\n]\n[]\n[]\n"},
+		{"item name", `{.items[*].metadata.name}`, nodesData, "[\n    \"127.0.0.1\",\n    \"127.0.0.2\"\n]\n"},
 		{"union nodes capacity", `{.items[*]['metadata.name', 'status.capacity']}`, nodesData,
-			"127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]"},
+			"[\n    \"127.0.0.1\",\n    \"127.0.0.2\",\n    {\n        \"cpu\": \"4\"\n    },\n    {\n        \"cpu\": \"8\"\n    }\n]\n"},
 		{"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
-			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] "},
-		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
-		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1"},
-		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None"},
+			"[\n    \"[\"\n]\n[\n    \"127.0.0.1\"\n]\n[\n    \", \"\n]\n[\n    {\n        \"cpu\": \"4\"\n    }\n]\n[\n    \"] \"\n]\n[\n    \"[\"\n]\n[\n    \"127.0.0.2\"\n]\n[\n    \", \"\n]\n[\n    {\n        \"cpu\": \"8\"\n    }\n]\n[\n    \"] \"\n]\n[]\n"},
+		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "[\n    \"secret\"\n]\n"},
+		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "[\n    \"127.0.0.1\"\n]\n"},
+		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "[\n    \"None\"\n]\n"},
 	}
 	testJSONPath(nodesTests, false, t)
 
 	randomPrintOrderTests := []jsonpathTest{
-		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},
+		{"recursive name", "{..name}", nodesData, "[\n    \"127.0.0.1\",\n    \"127.0.0.2\",\n    \"myself\",\n    \"e2e\"\n]\n"},
 	}
 	testJSONPathSortOutput(randomPrintOrderTests, t)
 }
