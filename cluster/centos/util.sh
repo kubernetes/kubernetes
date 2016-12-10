@@ -225,12 +225,15 @@ function provision-master() {
   # scp -r ${SSH_OPTS} master config-default.sh copy-files.sh util.sh "${MASTER}:${KUBE_TEMP}"
   kube-scp ${MASTER} "${ROOT}/../saltbase/salt/generate-cert/make-ca-cert.sh ${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}"
   kube-ssh "${MASTER}" " \
+    rm -rf /opt/kubernetes/bin; \
     sudo cp -r ${KUBE_TEMP}/master/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
+    sudo ln -s /opt/kubernetes/bin/* /usr/local/bin/; \
     sudo bash ${KUBE_TEMP}/make-ca-cert.sh ${master_ip} IP:${master_ip},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
     sudo bash ${KUBE_TEMP}/master/scripts/etcd.sh; \
     sudo bash ${KUBE_TEMP}/master/scripts/apiserver.sh ${master_ip} ${ETCD_SERVERS} ${SERVICE_CLUSTER_IP_RANGE} ${ADMISSION_CONTROL}; \
     sudo bash ${KUBE_TEMP}/master/scripts/controller-manager.sh ${master_ip}; \
+    sudo bash ${KUBE_TEMP}/master/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/master/scripts/scheduler.sh ${master_ip}"
 }
 
@@ -249,15 +252,19 @@ function provision-node() {
   local master_ip=${MASTER#*@}
   local node=$1
   local node_ip=${node#*@}
+  local dns_ip=${DNS_SERVER_IP#*@}
+  local dns_domain=${DNS_DOMAIN#*@}
   ensure-setup-dir ${node}
 
   kube-scp ${node} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
   kube-ssh "${node}" " \
+    rm -rf /opt/kubernetes/bin; \
     sudo cp -r ${KUBE_TEMP}/node/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
+    sudo ln -s /opt/kubernetes/bin/* /usr/local/bin/; \
     sudo bash ${KUBE_TEMP}/node/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/node/scripts/docker.sh \"${DOCKER_OPTS}\"; \
-    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${node_ip}; \
+    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${node_ip} ${dns_ip} ${dns_domain}; \
     sudo bash ${KUBE_TEMP}/node/scripts/proxy.sh ${master_ip}"
 }
 
