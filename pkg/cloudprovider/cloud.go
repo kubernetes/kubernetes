@@ -119,8 +119,6 @@ type Instances interface {
 	InstanceID(nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
 	InstanceType(name types.NodeName) (string, error)
-	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-	List(filter string) ([]types.NodeName, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error

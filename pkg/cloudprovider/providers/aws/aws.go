@@ -1030,12 +1030,6 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
 	return matchingInstances, nil
 }
 
-// List is an implementation of Instances.List.
-func (c *Cloud) List(filter string) ([]types.NodeName, error) {
-	// TODO: Should really use tag query. No need to go regexp.
-	return c.getInstancesByRegex(filter)
-}
-
 // getAllZones retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
 func (c *Cloud) getAllZones() (sets.String, error) {

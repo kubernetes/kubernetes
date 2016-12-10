@@ -231,35 +231,6 @@ func (os *Rackspace) Instances() (cloudprovider.Instances, bool) {
 	return &Instances{compute}, true
 }
 
-func (i *Instances) List(name_filter string) ([]types.NodeName, error) {
-	glog.V(2).Infof("rackspace List(%v) called", name_filter)
-
-	opts := osservers.ListOpts{
-		Name:   name_filter,
-		Status: "ACTIVE",
-	}
-	pager := servers.List(i.compute, opts)
-
-	ret := make([]types.NodeName, 0)
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		sList, err := servers.ExtractServers(page)
-		if err != nil {
-			return false, err
-		}
-		for i := range sList {
-			ret = append(ret, mapServerToNodeName(&sList[i]))
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	glog.V(2).Infof("Found %v entries: %v", len(ret), ret)
-
-	return ret, nil
-}
-
 func serverHasAddress(srv osservers.Server, ip string) bool {
 	if ip == firstAddr(srv.Addresses["private"]) {
 		return true
