@@ -21,6 +21,7 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
@@ -221,6 +222,10 @@ func (c *hostPathUnmounter) TearDown() error {
 
 // TearDownAt does not make sense for host paths - probably programmer error.
 func (c *hostPathUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }
 

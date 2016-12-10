@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"os"
 )
 
 // ProbeVolumePlugin is the entry point for plugin detection in a package.
@@ -294,6 +295,10 @@ func (c *secretVolumeUnmounter) TearDown() error {
 }
 
 func (c *secretVolumeUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.

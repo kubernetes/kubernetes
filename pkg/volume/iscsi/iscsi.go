@@ -29,6 +29,7 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
+	"os"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -230,6 +231,10 @@ func (c *iscsiDiskUnmounter) TearDown() error {
 }
 
 func (c *iscsiDiskUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
 

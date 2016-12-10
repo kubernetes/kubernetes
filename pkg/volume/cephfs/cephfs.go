@@ -245,6 +245,10 @@ func (cephfsVolume *cephfsUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	return cephfsVolume.cleanup(dir)
 }
 

@@ -299,6 +299,10 @@ func (ed *emptyDir) TearDown() error {
 
 // TearDownAt simply discards everything in the directory.
 func (ed *emptyDir) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	// Figure out the medium.
 	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
 	if err != nil {

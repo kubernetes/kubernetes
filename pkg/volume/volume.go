@@ -131,6 +131,8 @@ type Unmounter interface {
 	TearDown() error
 	// TearDown unmounts the volume from the specified directory and
 	// removes traces of the SetUp procedure.
+	// NOTE: If the dir doesn't exist, this function should just log
+	// and exit as it may have been unmounted by another operation
 	TearDownAt(dir string) error
 }
 

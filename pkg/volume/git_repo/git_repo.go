@@ -22,12 +22,14 @@ import (
 	"path"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"os"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -254,6 +256,10 @@ func (c *gitRepoVolumeUnmounter) TearDown() error {
 
 // TearDownAt simply deletes everything in the directory.
 func (c *gitRepoVolumeUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 
 	// Wrap EmptyDir, let it do the teardown.
 	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec(), c.podUID)

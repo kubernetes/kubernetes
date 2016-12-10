@@ -371,6 +371,10 @@ func (f *flexVolumeUnmounter) TearDown() error {
 
 // TearDownAt simply deletes everything in the directory.
 func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 
 	notmnt, err := f.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {

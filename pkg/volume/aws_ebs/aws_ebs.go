@@ -393,6 +393,10 @@ func (c *awsElasticBlockStoreUnmounter) TearDown() error {
 
 // Unmounts the bind mount
 func (c *awsElasticBlockStoreUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
 		glog.V(2).Info("Error checking if mountpoint ", dir, ": ", err)

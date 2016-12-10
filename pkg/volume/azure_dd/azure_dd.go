@@ -316,6 +316,10 @@ func (c *azureDiskUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *azureDiskUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
 		glog.Errorf("Error checking if mountpoint %s: %v", dir, err)

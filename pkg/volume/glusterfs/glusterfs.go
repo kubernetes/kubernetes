@@ -278,6 +278,10 @@ func (c *glusterfsUnmounter) TearDown() error {
 }
 
 func (c *glusterfsUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	return c.cleanup(dir)
 }
 

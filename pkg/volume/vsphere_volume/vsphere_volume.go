@@ -262,6 +262,10 @@ func (v *vsphereVolumeUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	glog.V(5).Infof("vSphere Volume TearDown of %s", dir)
 	notMnt, err := v.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {

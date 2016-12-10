@@ -240,6 +240,10 @@ func (c *azureFileUnmounter) TearDown() error {
 }
 
 func (c *azureFileUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
 		glog.Errorf("Error checking IsLikelyNotMountPoint: %v", err)

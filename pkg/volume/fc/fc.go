@@ -18,6 +18,7 @@ package fc
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -222,6 +223,10 @@ func (c *fcDiskUnmounter) TearDown() error {
 }
 
 func (c *fcDiskUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
 

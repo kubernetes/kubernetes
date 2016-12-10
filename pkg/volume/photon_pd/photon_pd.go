@@ -264,6 +264,10 @@ func (c *photonPersistentDiskUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.Infof("The dir %v doesn't exist as it might have been unmounted by a previous unmount operation", dir)
+		return nil
+	}
 	glog.V(4).Infof("Photon Controller Volume TearDown of %s", dir)
 	notmnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
