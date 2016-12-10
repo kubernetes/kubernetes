@@ -132,6 +132,10 @@ type HorizontalPodAutoscalerSpec struct {
 	// if not specified it defaults to the target CPU utilization at 80% of the requested resources.
 	// +optional
 	CPUUtilization *CPUTargetUtilization `json:"cpuUtilization,omitempty" protobuf:"bytes,4,opt,name=cpuUtilization"`
+	// downscale forbidden window seconds, defaults to 300 seconds.
+	DownscaleForbiddenWindowSeconds *int64 `json:"downScaleForbiddenWindowSeconds,omiteempty" protobuf:"varint,5,opt,name=downScaleForbiddenWindowSeconds"`
+	// upscale forbidden window seconds, defaults to 180 seconds.
+	UpscaleForbiddenWindowSeconds *int64 `json:"upScaleForbiddenWindowSeconds,omiteempty" protobuf:"varint,6,opt,name=upScaleForbiddenWindowSeconds"`
 }
 
 // current status of a horizontal pod autoscaler

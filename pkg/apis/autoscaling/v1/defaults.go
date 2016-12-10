@@ -32,4 +32,12 @@ func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
 		minReplicas := int32(1)
 		obj.Spec.MinReplicas = &minReplicas
 	}
+	if obj.Spec.DownscaleForbiddenWindowSeconds == nil {
+		downScaleForbiddenWindow := int64(300)
+		obj.Spec.DownscaleForbiddenWindowSeconds = &downScaleForbiddenWindow
+	}
+	if obj.Spec.UpscaleForbiddenWindowSeconds == nil {
+		upScaleForbiddenWindow := int64(180)
+		obj.Spec.UpscaleForbiddenWindowSeconds = &upScaleForbiddenWindow
+	}
 }

@@ -133,6 +133,14 @@ func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
 	if obj.Spec.CPUUtilization == nil {
 		obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
 	}
+	if obj.Spec.DownscaleForbiddenWindowSeconds == nil {
+		downScaleForbiddenWindow := int64(300)
+		obj.Spec.DownscaleForbiddenWindowSeconds = &downScaleForbiddenWindow
+	}
+	if obj.Spec.UpscaleForbiddenWindowSeconds == nil {
+		upScaleForbiddenWindow := int64(180)
+		obj.Spec.UpscaleForbiddenWindowSeconds = &upScaleForbiddenWindow
+	}
 }
 
 func SetDefaults_ReplicaSet(obj *ReplicaSet) {

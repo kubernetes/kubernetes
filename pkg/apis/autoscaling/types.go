@@ -82,6 +82,10 @@ type HorizontalPodAutoscalerSpec struct {
 	// if not specified the default autoscaling policy will be used.
 	// +optional
 	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
+	// downscale forbidden window seconds, defaults to 300 seconds.
+	DownscaleForbiddenWindowSeconds *int64 `json:"downScaleForbiddenWindowSeconds,omiteempty"`
+	// upscale forbidden window seconds, defaults to 180 seconds.
+	UpscaleForbiddenWindowSeconds *int64 `json:"upScaleForbiddenWindowSeconds,omiteempty"`
 }
 
 // current status of a horizontal pod autoscaler
