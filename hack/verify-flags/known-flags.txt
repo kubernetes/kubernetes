@@ -43,6 +43,7 @@ authorization-rbac-super-user
 authorization-webhook-cache-authorized-ttl
 authorization-webhook-cache-unauthorized-ttl
 authorization-webhook-config-file
+azure-container-registry-config
 babysit-daemons
 basic-auth-file
 bench-pods

@@ -21,6 +21,7 @@ package compute
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -52,6 +53,13 @@ func NewVirtualMachineExtensionsClientWithBaseURI(baseURI string, subscriptionID
 // extensionParameters is parameters supplied to the Create Virtual Machine
 // Extension operation.
 func (client VirtualMachineExtensionsClient) CreateOrUpdate(resourceGroupName string, vmName string, vmExtensionName string, extensionParameters VirtualMachineExtension, cancel <-chan struct{}) (result autorest.Response, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: extensionParameters,
+			Constraints: []validation.Constraint{{Target: "extensionParameters.VirtualMachineExtensionProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{{Target: "extensionParameters.VirtualMachineExtensionProperties.ProvisioningState", Name: validation.ReadOnly, Rule: true, Chain: nil}}}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "compute.VirtualMachineExtensionsClient", "CreateOrUpdate")
+	}
+
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, vmName, vmExtensionName, extensionParameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "compute.VirtualMachineExtensionsClient", "CreateOrUpdate", nil, "Failure preparing request")

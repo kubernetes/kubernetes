@@ -39,7 +39,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 	} else if !exists {
 		return cloudprovider.InstanceNotFound
 	}
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	disks = append(disks,
 		compute.DataDisk{
 			Name: &diskName,
@@ -53,7 +53,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 
 	newVM := compute.VirtualMachine{
 		Location: vm.Location,
-		Properties: &compute.VirtualMachineProperties{
+		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			StorageProfile: &compute.StorageProfile{
 				DataDisks: &disks,
 			},
@@ -91,7 +91,7 @@ func (az *Cloud) DisksAreAttached(diskNames []string, nodeName types.NodeName) (
 		return attached, err
 	}
 
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	for _, disk := range disks {
 		for _, diskName := range diskNames {
 			if disk.Name != nil && diskName != "" && *disk.Name == diskName {
@@ -113,7 +113,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeN
 		return nil
 	}
 
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	for i, disk := range disks {
 		if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) {
 			// found the disk
@@ -124,7 +124,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeN
 	}
 	newVM := compute.VirtualMachine{
 		Location: vm.Location,
-		Properties: &compute.VirtualMachineProperties{
+		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			StorageProfile: &compute.StorageProfile{
 				DataDisks: &disks,
 			},
@@ -148,7 +148,7 @@ func (az *Cloud) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (
 	} else if !exists {
 		return -1, cloudprovider.InstanceNotFound
 	}
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	for _, disk := range disks {
 		if disk.Lun != nil && (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) {
 			// found the disk
@@ -169,7 +169,7 @@ func (az *Cloud) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
 		return -1, cloudprovider.InstanceNotFound
 	}
 	used := make([]bool, maxLUN)
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	for _, disk := range disks {
 		if disk.Lun != nil {
 			used[*disk.Lun] = true
