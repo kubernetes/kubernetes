@@ -31,7 +31,7 @@ func parseParams(bytes []byte) ([]string, error) {
 	return params, nil
 }
 
-func parseCmd(context ansiContext) (string, error) {
+func parseCmd(context AnsiContext) (string, error) {
 	return string(context.currentChar), nil
 }
 
