@@ -345,18 +345,6 @@ func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
 
 func TestNamedHeadlessServiceEndpointAdd(t *testing.T) {
 	kd := newKubeDNS()
-	kd.kubeClient = fake.NewSimpleClientset(
-		&v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "foo",
-				Namespace: testNamespace,
-			},
-			Spec: v1.PodSpec{
-				Hostname:  "foo",
-				Subdomain: testService,
-			},
-		},
-	)
 
 	service := newHeadlessService()
 	// add service to store
@@ -371,6 +359,7 @@ func TestNamedHeadlessServiceEndpointAdd(t *testing.T) {
 					Name:      "foo",
 					Namespace: testNamespace,
 				},
+				Hostname: "foo",
 			},
 		},
 		Ports: []v1.EndpointPort{},
@@ -392,18 +381,6 @@ func TestNamedHeadlessServiceEndpointAdd(t *testing.T) {
 
 func TestNamedHeadlessServiceEndpointUpdate(t *testing.T) {
 	kd := newKubeDNS()
-	kd.kubeClient = fake.NewSimpleClientset(
-		&v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "foo",
-				Namespace: testNamespace,
-			},
-			Spec: v1.PodSpec{
-				Hostname:  "foo",
-				Subdomain: testService,
-			},
-		},
-	)
 
 	service := newHeadlessService()
 	// add service to store
@@ -418,6 +395,7 @@ func TestNamedHeadlessServiceEndpointUpdate(t *testing.T) {
 					Name:      "foo",
 					Namespace: testNamespace,
 				},
+				Hostname: "foo",
 			},
 		},
 		Ports: []v1.EndpointPort{},
@@ -437,6 +415,7 @@ func TestNamedHeadlessServiceEndpointUpdate(t *testing.T) {
 					Name:      "foo",
 					Namespace: testNamespace,
 				},
+				Hostname: "foo",
 			},
 		},
 		Ports: []v1.EndpointPort{},
@@ -457,18 +436,6 @@ func TestNamedHeadlessServiceEndpointUpdate(t *testing.T) {
 
 func TestNamedHeadlessServiceEndpointDelete(t *testing.T) {
 	kd := newKubeDNS()
-	kd.kubeClient = fake.NewSimpleClientset(
-		&v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "foo",
-				Namespace: testNamespace,
-			},
-			Spec: v1.PodSpec{
-				Hostname:  "foo",
-				Subdomain: testService,
-			},
-		},
-	)
 
 	service := newHeadlessService()
 	// add service to store
@@ -483,6 +450,7 @@ func TestNamedHeadlessServiceEndpointDelete(t *testing.T) {
 					Name:      "foo",
 					Namespace: testNamespace,
 				},
+				Hostname: "foo",
 			},
 		},
 		Ports: []v1.EndpointPort{},
