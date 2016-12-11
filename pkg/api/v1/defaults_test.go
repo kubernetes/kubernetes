@@ -17,6 +17,7 @@ limitations under the License.
 package v1_test
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -226,6 +227,72 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 			t.Errorf("unexpected nil Replicas")
 		} else if test.expectReplicas != *rc2.Spec.Replicas {
 			t.Errorf("expected: %d replicas, got: %d", test.expectReplicas, *rc2.Spec.Replicas)
+		}
+	}
+}
+
+func TestSetDefaultReplicationControllerImagePullPolicy(t *testing.T) {
+	containersWithoutPullPolicy, _ := json.Marshal([]map[string]interface{}{
+		{
+			"name":  "install",
+			"image": "busybox:latest",
+		},
+	})
+
+	containersWithPullPolicy, _ := json.Marshal([]map[string]interface{}{
+		{
+			"name":            "install",
+			"imagePullPolicy": "IfNotPresent",
+		},
+	})
+
+	tests := []struct {
+		rc               versioned.ReplicationController
+		expectPullPolicy versioned.PullPolicy
+	}{
+		{
+			rc: versioned.ReplicationController{
+				Spec: versioned.ReplicationControllerSpec{
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Annotations: map[string]string{
+								"pod.beta.kubernetes.io/init-containers": string(containersWithoutPullPolicy),
+							},
+						},
+					},
+				},
+			},
+			expectPullPolicy: versioned.PullAlways,
+		},
+		{
+			rc: versioned.ReplicationController{
+				Spec: versioned.ReplicationControllerSpec{
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Annotations: map[string]string{
+								"pod.beta.kubernetes.io/init-containers": string(containersWithPullPolicy),
+							},
+						},
+					},
+				},
+			},
+			expectPullPolicy: versioned.PullIfNotPresent,
+		},
+	}
+
+	for _, test := range tests {
+		rc := &test.rc
+		obj2 := roundTrip(t, runtime.Object(rc))
+		rc2, ok := obj2.(*versioned.ReplicationController)
+		if !ok {
+			t.Errorf("unexpected object: %v", rc2)
+			t.FailNow()
+		}
+		if test.expectPullPolicy != rc2.Spec.Template.Spec.InitContainers[0].ImagePullPolicy {
+			t.Errorf("expected ImagePullPolicy: %s, got: %s",
+				test.expectPullPolicy,
+				rc2.Spec.Template.Spec.InitContainers[0].ImagePullPolicy,
+			)
 		}
 	}
 }
