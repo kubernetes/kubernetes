@@ -169,7 +169,7 @@ app containers are started at once.
 The name of each app and init container in a pod must be unique - it is a
 validation error for any container to share a name.
 
-While pod containers are in alpha state, they will be serialized as an annotation
+While init containers are in alpha state, they will be serialized as an annotation
 on the pod with the name `pod.alpha.kubernetes.io/init-containers` and the status
 of the containers will be stored as `pod.alpha.kubernetes.io/init-container-statuses`.
 Mutation of these annotations is prohibited on existing pods.
