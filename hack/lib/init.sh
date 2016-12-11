@@ -25,6 +25,10 @@ KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
 KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
 
+# This controls rsync compression. Set to a value > 0 to enable rsync
+# compression for build container
+KUBE_RSYNC_COMPRESS="${KUBE_RSYNC_COMPRESS:-0}"
+
 # Set no_proxy for localhost if behind a proxy, otherwise, 
 # the connections to localhost in scripts will time out
 export no_proxy=127.0.0.1,localhost
