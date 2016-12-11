@@ -110,7 +110,7 @@ being initialized is in the `Pending` phase but should have a distinct
 condition. Each app container and all future init containers should have
 the reason `PodInitializing`. The pod should have a condition `Initializing`
 set to `false` until all init containers have succeeded, and `true` thereafter.
-If the pod is restarted, the `Initializing` condition should be set to `false.
+If the pod is restarted, the `Initializing` condition should be set to `false`.
 
 If the pod is "restarted" all containers stopped and started due to
 a node restart, change to the pod definition, or admin interaction, all
