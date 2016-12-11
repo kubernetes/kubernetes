@@ -9,7 +9,10 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-addon-manager
-    # When updating version also bump it in cluster/images/hyperkube/static-pods/addon-manager.json
+    # When updating version also bump it in:
+    # - cluster/images/hyperkube/static-pods/addon-manager-singlenode.json
+    # - cluster/images/hyperkube/static-pods/addon-manager-multinode.json
+    # - cluster/gce/coreos/kube-manifests/kube-addon-manager.yaml
     image: gcr.io/google-containers/kube-addon-manager:v6.1
     command:
     - /bin/bash
