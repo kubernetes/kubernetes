@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package watch
+package watch_test
 
 import (
 	"io"
@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/runtime"
+	. "k8s.io/kubernetes/pkg/watch"
 )
 
 type fakeDecoder struct {

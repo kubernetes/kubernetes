@@ -156,6 +156,7 @@ pkg/client/listers/storage/internalversion
 pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
+pkg/client/restclient/watch
 pkg/client/testing/core
 pkg/client/typed/discovery
 pkg/client/unversioned
@@ -281,6 +282,7 @@ pkg/volume/util/nestedpendingoperations
 pkg/volume/util/operationexecutor
 pkg/volume/util/types
 pkg/volume/util/volumehelper
+pkg/watch
 pkg/watch/json
 pkg/watch/versioned
 plugin/cmd/kube-scheduler

@@ -67,6 +67,7 @@ go_test(
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
+        "//pkg/client/restclient/watch:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/serializer/streaming:go_default_library",
