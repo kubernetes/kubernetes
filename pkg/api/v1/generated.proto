@@ -1752,7 +1752,7 @@ message ObjectMeta {
   // then an entry in this list will point to this controller, with the controller field set to true.
   // There cannot be more than one managing controller.
   // +optional
-  repeated OwnerReference ownerReferences = 13;
+  repeated k8s.io.kubernetes.pkg.apis.meta.v1.OwnerReference ownerReferences = 13;
 
   // Must be empty before the object is deleted from the registry. Each entry
   // is an identifier for the responsible component that will remove the entry
@@ -1809,30 +1809,6 @@ message ObjectReference {
   // TODO: this design is not final and this field is subject to change in the future.
   // +optional
   optional string fieldPath = 7;
-}
-
-// OwnerReference contains enough information to let you identify an owning
-// object. Currently, an owning object must be in the same namespace, so there
-// is no namespace field.
-message OwnerReference {
-  // API version of the referent.
-  optional string apiVersion = 5;
-
-  // Kind of the referent.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-  optional string kind = 1;
-
-  // Name of the referent.
-  // More info: http://kubernetes.io/docs/user-guide/identifiers#names
-  optional string name = 3;
-
-  // UID of the referent.
-  // More info: http://kubernetes.io/docs/user-guide/identifiers#uids
-  optional string uid = 4;
-
-  // If true, this reference points to the managing controller.
-  // +optional
-  optional bool controller = 6;
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
@@ -2432,7 +2408,7 @@ message PodSecurityContext {
 message PodSignature {
   // Reference to controller whose pods should avoid this node.
   // +optional
-  optional OwnerReference podController = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.OwnerReference podController = 1;
 }
 
 // PodSpec is a description of a pod.

@@ -81,6 +81,13 @@ func DeepCopy_v1_APIResource(in interface{}, out interface{}, c *conversion.Clon
 		out.Name = in.Name
 		out.Namespaced = in.Namespaced
 		out.Kind = in.Kind
+		if in.Verbs != nil {
+			in, out := &in.Verbs, &out.Verbs
+			*out = make(Verbs, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Verbs = nil
+		}
 		return nil
 	}
 }
@@ -95,7 +102,9 @@ func DeepCopy_v1_APIResourceList(in interface{}, out interface{}, c *conversion.
 			in, out := &in.APIResources, &out.APIResources
 			*out = make([]APIResource, len(*in))
 			for i := range *in {
-				(*out)[i] = (*in)[i]
+				if err := DeepCopy_v1_APIResource(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		} else {
 			out.APIResources = nil
@@ -145,6 +154,16 @@ func DeepCopy_v1_ExportOptions(in interface{}, out interface{}, c *conversion.Cl
 		out.TypeMeta = in.TypeMeta
 		out.Export = in.Export
 		out.Exact = in.Exact
+		return nil
+	}
+}
+
+func DeepCopy_v1_GetOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*GetOptions)
+		out := out.(*GetOptions)
+		out.TypeMeta = in.TypeMeta
+		out.ResourceVersion = in.ResourceVersion
 		return nil
 	}
 }
@@ -262,6 +281,25 @@ func DeepCopy_v1_ListMeta(in interface{}, out interface{}, c *conversion.Cloner)
 		out := out.(*ListMeta)
 		out.SelfLink = in.SelfLink
 		out.ResourceVersion = in.ResourceVersion
+		return nil
+	}
+}
+
+func DeepCopy_v1_OwnerReference(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*OwnerReference)
+		out := out.(*OwnerReference)
+		out.APIVersion = in.APIVersion
+		out.Kind = in.Kind
+		out.Name = in.Name
+		out.UID = in.UID
+		if in.Controller != nil {
+			in, out := &in.Controller, &out.Controller
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.Controller = nil
+		}
 		return nil
 	}
 }

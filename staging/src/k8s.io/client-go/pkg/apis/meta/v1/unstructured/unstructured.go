@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package unstructured
 
 import (
 	"bytes"
@@ -26,12 +26,58 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/json"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/client-go/pkg/types"
+	"k8s.io/client-go/pkg/util/json"
 )
+
+// Unstructured allows objects that do not have Golang structs registered to be manipulated
+// generically. This can be used to deal with the API objects from a plug-in. Unstructured
+// objects still have functioning TypeMeta features-- kind, version, etc.
+//
+// WARNING: This object has accessors for the v1 standard metadata. You *MUST NOT* use this
+// type if you are dealing with objects that are not in the server meta v1 schema.
+//
+// TODO: make the serialization part of this type distinct from the field accessors.
+type Unstructured struct {
+	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or
+	// map[string]interface{}
+	// children.
+	Object map[string]interface{}
+}
+
+var _ runtime.Unstructured = &Unstructured{}
+var _ runtime.Unstructured = &UnstructuredList{}
+
+func (obj *Unstructured) GetObjectKind() schema.ObjectKind     { return obj }
+func (obj *UnstructuredList) GetObjectKind() schema.ObjectKind { return obj }
+
+func (obj *Unstructured) IsUnstructuredObject()     {}
+func (obj *UnstructuredList) IsUnstructuredObject() {}
+
+func (obj *Unstructured) IsList() bool {
+	if obj.Object != nil {
+		_, ok := obj.Object["items"]
+		return ok
+	}
+	return false
+}
+func (obj *UnstructuredList) IsList() bool { return true }
+
+func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
+	if obj.Object == nil {
+		obj.Object = make(map[string]interface{})
+	}
+	return obj.Object
+}
+func (obj *UnstructuredList) UnstructuredContent() map[string]interface{} {
+	if obj.Object == nil {
+		obj.Object = make(map[string]interface{})
+	}
+	return obj.Object
+}
 
 // MarshalJSON ensures that the unstructured object produces proper
 // JSON when passed to Go's standard JSON library.
@@ -142,7 +188,7 @@ func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
 	setNestedMap(u.Object, value, fields...)
 }
 
-func extractOwnerReference(src interface{}) metatypes.OwnerReference {
+func extractOwnerReference(src interface{}) metav1.OwnerReference {
 	v := src.(map[string]interface{})
 	controllerPtr, ok := (getNestedField(v, "controller")).(*bool)
 	if !ok {
@@ -153,7 +199,7 @@ func extractOwnerReference(src interface{}) metatypes.OwnerReference {
 			controllerPtr = &controller
 		}
 	}
-	return metatypes.OwnerReference{
+	return metav1.OwnerReference{
 		Kind:       getNestedString(v, "kind"),
 		Name:       getNestedString(v, "name"),
 		APIVersion: getNestedString(v, "apiVersion"),
@@ -162,7 +208,7 @@ func extractOwnerReference(src interface{}) metatypes.OwnerReference {
 	}
 }
 
-func setOwnerReference(src metatypes.OwnerReference) map[string]interface{} {
+func setOwnerReference(src metav1.OwnerReference) map[string]interface{} {
 	ret := make(map[string]interface{})
 	controllerPtr := src.Controller
 	if controllerPtr != nil {
@@ -202,20 +248,20 @@ func getOwnerReferences(object map[string]interface{}) ([]map[string]interface{}
 	return ownerReferences, nil
 }
 
-func (u *Unstructured) GetOwnerReferences() []metatypes.OwnerReference {
+func (u *Unstructured) GetOwnerReferences() []metav1.OwnerReference {
 	original, err := getOwnerReferences(u.Object)
 	if err != nil {
 		glog.V(6).Info(err)
 		return nil
 	}
-	ret := make([]metatypes.OwnerReference, 0, len(original))
+	ret := make([]metav1.OwnerReference, 0, len(original))
 	for i := 0; i < len(original); i++ {
 		ret = append(ret, extractOwnerReference(original[i]))
 	}
 	return ret
 }
 
-func (u *Unstructured) SetOwnerReferences(references []metatypes.OwnerReference) {
+func (u *Unstructured) SetOwnerReferences(references []metav1.OwnerReference) {
 	var newReferences = make([]map[string]interface{}, 0, len(references))
 	for i := 0; i < len(references); i++ {
 		newReferences = append(newReferences, setOwnerReference(references[i]))
@@ -439,11 +485,11 @@ func (u *UnstructuredList) GroupVersionKind() schema.GroupVersionKind {
 // UnstructuredJSONScheme is capable of converting JSON data into the Unstructured
 // type, which can be used for generic access to objects without a predefined scheme.
 // TODO: move into serializer/json.
-var UnstructuredJSONScheme Codec = unstructuredJSONScheme{}
+var UnstructuredJSONScheme runtime.Codec = unstructuredJSONScheme{}
 
 type unstructuredJSONScheme struct{}
 
-func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, obj Object) (Object, *schema.GroupVersionKind, error) {
+func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, obj runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	var err error
 	if obj != nil {
 		err = s.decodeInto(data, obj)
@@ -457,13 +503,13 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, 
 
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	if len(gvk.Kind) == 0 {
-		return nil, &gvk, NewMissingKindErr(string(data))
+		return nil, &gvk, runtime.NewMissingKindErr(string(data))
 	}
 
 	return obj, &gvk, nil
 }
 
-func (unstructuredJSONScheme) Encode(obj Object, w io.Writer) error {
+func (unstructuredJSONScheme) Encode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case *Unstructured:
 		return json.NewEncoder(w).Encode(t.Object)
@@ -475,7 +521,7 @@ func (unstructuredJSONScheme) Encode(obj Object, w io.Writer) error {
 		t.Object["items"] = items
 		defer func() { delete(t.Object, "items") }()
 		return json.NewEncoder(w).Encode(t.Object)
-	case *Unknown:
+	case *runtime.Unknown:
 		// TODO: Unstructured needs to deal with ContentType.
 		_, err := w.Write(t.Raw)
 		return err
@@ -484,7 +530,7 @@ func (unstructuredJSONScheme) Encode(obj Object, w io.Writer) error {
 	}
 }
 
-func (s unstructuredJSONScheme) decode(data []byte) (Object, error) {
+func (s unstructuredJSONScheme) decode(data []byte) (runtime.Object, error) {
 	type detector struct {
 		Items gojson.RawMessage
 	}
@@ -505,16 +551,16 @@ func (s unstructuredJSONScheme) decode(data []byte) (Object, error) {
 	return unstruct, err
 }
 
-func (s unstructuredJSONScheme) decodeInto(data []byte, obj Object) error {
+func (s unstructuredJSONScheme) decodeInto(data []byte, obj runtime.Object) error {
 	switch x := obj.(type) {
 	case *Unstructured:
 		return s.decodeToUnstructured(data, x)
 	case *UnstructuredList:
 		return s.decodeToList(data, x)
-	case *VersionedObjects:
+	case *runtime.VersionedObjects:
 		o, err := s.decode(data)
 		if err == nil {
-			x.Objects = []Object{o}
+			x.Objects = []runtime.Object{o}
 		}
 		return err
 	default:
@@ -596,7 +642,7 @@ func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 	return nil
 }
 
-func (UnstructuredObjectConverter) ConvertToVersion(in Object, target GroupVersioner) (Object, error) {
+func (UnstructuredObjectConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
 	if kind := in.GetObjectKind().GroupVersionKind(); !kind.Empty() {
 		gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
 		if !ok {

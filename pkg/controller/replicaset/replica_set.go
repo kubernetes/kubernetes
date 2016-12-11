@@ -485,7 +485,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 
 				if rsc.garbageCollectorEnabled {
 					var trueVar = true
-					controllerRef := &v1.OwnerReference{
+					controllerRef := &metav1.OwnerReference{
 						APIVersion: getRSKind().GroupVersion().String(),
 						Kind:       getRSKind().Kind,
 						Name:       rs.Name,

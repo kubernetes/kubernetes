@@ -50,10 +50,10 @@ func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *Unstructur
 }
 
 // ObjectKind returns the group,version,kind of the provided object, or an error
-// if the object in not *runtime.Unstructured or has no group,version,kind
+// if the object in not runtime.Unstructured or has no group,version,kind
 // information.
 func (d *UnstructuredObjectTyper) ObjectKind(obj runtime.Object) (schema.GroupVersionKind, error) {
-	if _, ok := obj.(*runtime.Unstructured); !ok {
+	if _, ok := obj.(runtime.Unstructured); !ok {
 		return schema.GroupVersionKind{}, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
 	}
 
@@ -61,7 +61,7 @@ func (d *UnstructuredObjectTyper) ObjectKind(obj runtime.Object) (schema.GroupVe
 }
 
 // ObjectKinds returns a slice of one element with the group,version,kind of the
-// provided object, or an error if the object is not *runtime.Unstructured or
+// provided object, or an error if the object is not runtime.Unstructured or
 // has no group,version,kind information. unversionedType will always be false
 // because runtime.Unstructured object should always have group,version,kind
 // information set.
@@ -80,7 +80,7 @@ func (d *UnstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
 	return d.registered[gvk]
 }
 
-// IsUnversioned returns false always because *runtime.Unstructured objects
+// IsUnversioned returns false always because runtime.Unstructured objects
 // should always have group,version,kind information set. ok will be true if the
 // object's group,version,kind is registered.
 func (d *UnstructuredObjectTyper) IsUnversioned(obj runtime.Object) (unversioned bool, ok bool) {

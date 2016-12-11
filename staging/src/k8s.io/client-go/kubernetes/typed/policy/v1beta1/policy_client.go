@@ -27,12 +27,17 @@ import (
 
 type PolicyV1beta1Interface interface {
 	RESTClient() rest.Interface
+	EvictionsGetter
 	PodDisruptionBudgetsGetter
 }
 
 // PolicyV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
 type PolicyV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *PolicyV1beta1Client) Evictions(namespace string) EvictionInterface {
+	return newEvictions(c, namespace)
 }
 
 func (c *PolicyV1beta1Client) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {

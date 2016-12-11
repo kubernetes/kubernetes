@@ -61,7 +61,7 @@ func (f Filters) Filter(obj runtime.Object, opts *PrintOptions) (bool, error) {
 	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand
 	// before apply filter func.
 	switch obj.(type) {
-	case *runtime.UnstructuredList, *runtime.Unstructured, *runtime.Unknown:
+	case runtime.Unstructured, *runtime.Unknown:
 		if objBytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj); err == nil {
 			if decodedObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), objBytes); err == nil {
 				obj = decodedObj

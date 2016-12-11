@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
@@ -52,7 +52,7 @@ type monitor struct {
 }
 
 type objectReference struct {
-	metatypes.OwnerReference
+	metav1.OwnerReference
 	// This is needed by the dynamic client
 	Namespace string
 }
@@ -72,7 +72,7 @@ type node struct {
 	dependents     map[*node]struct{}
 	// When processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
-	owners []metatypes.OwnerReference
+	owners []metav1.OwnerReference
 }
 
 func (ownerNode *node) addDependent(dependent *node) {
@@ -138,7 +138,7 @@ type Propagator struct {
 // exist in the p.uidToNode yet, a "virtual" node will be created to represent
 // the owner. The "virtual" node will be enqueued to the dirtyQueue, so that
 // processItem() will verify if the owner exists according to the API server.
-func (p *Propagator) addDependentToOwners(n *node, owners []metatypes.OwnerReference) {
+func (p *Propagator) addDependentToOwners(n *node, owners []metav1.OwnerReference) {
 	for _, owner := range owners {
 		ownerNode, ok := p.uidToNode.Read(owner.UID)
 		if !ok {
@@ -170,7 +170,7 @@ func (p *Propagator) insertNode(n *node) {
 }
 
 // removeDependentFromOwners remove n from owners' dependents list.
-func (p *Propagator) removeDependentFromOwners(n *node, owners []metatypes.OwnerReference) {
+func (p *Propagator) removeDependentFromOwners(n *node, owners []metav1.OwnerReference) {
 	for _, owner := range owners {
 		ownerNode, ok := p.uidToNode.Read(owner.UID)
 		if !ok {
@@ -189,13 +189,13 @@ func (p *Propagator) removeNode(n *node) {
 
 // TODO: profile this function to see if a naive N^2 algorithm performs better
 // when the number of references is small.
-func referencesDiffs(old []metatypes.OwnerReference, new []metatypes.OwnerReference) (added []metatypes.OwnerReference, removed []metatypes.OwnerReference) {
-	oldUIDToRef := make(map[string]metatypes.OwnerReference)
+func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (added []metav1.OwnerReference, removed []metav1.OwnerReference) {
+	oldUIDToRef := make(map[string]metav1.OwnerReference)
 	for i := 0; i < len(old); i++ {
 		oldUIDToRef[string(old[i].UID)] = old[i]
 	}
 	oldUIDSet := sets.StringKeySet(oldUIDToRef)
-	newUIDToRef := make(map[string]metatypes.OwnerReference)
+	newUIDToRef := make(map[string]metav1.OwnerReference)
 	for i := 0; i < len(new); i++ {
 		newUIDToRef[string(new[i].UID)] = new[i]
 	}
@@ -372,7 +372,7 @@ func (p *Propagator) processEvent() {
 	case (event.eventType == addEvent || event.eventType == updateEvent) && !found:
 		newNode := &node{
 			identity: objectReference{
-				OwnerReference: metatypes.OwnerReference{
+				OwnerReference: metav1.OwnerReference{
 					APIVersion: typeAccessor.GetAPIVersion(),
 					Kind:       typeAccessor.GetKind(),
 					UID:        accessor.GetUID(),
@@ -622,7 +622,7 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
 }
 
-func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
+func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
@@ -633,7 +633,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructur
 	return client.Resource(resource, item.Namespace).Get(item.Name)
 }
 
-func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unstructured) (*runtime.Unstructured, error) {
+func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
@@ -644,7 +644,7 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unst
 	return client.Resource(resource, item.Namespace).Update(obj)
 }
 
-func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*runtime.Unstructured, error) {
+func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
@@ -655,8 +655,8 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*ru
 	return client.Resource(resource, item.Namespace).Patch(item.Name, api.StrategicMergePatchType, patch)
 }
 
-func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
-	ret := &runtime.Unstructured{}
+func objectReferenceToUnstructured(ref objectReference) *unstructured.Unstructured {
+	ret := &unstructured.Unstructured{}
 	ret.SetKind(ref.Kind)
 	ret.SetAPIVersion(ref.APIVersion)
 	ret.SetUID(ref.UID)

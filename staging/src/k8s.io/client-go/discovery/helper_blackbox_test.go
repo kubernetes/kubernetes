@@ -30,9 +30,11 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/testapi"
 	"k8s.io/client-go/pkg/apimachinery/registered"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	uapi "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/client-go/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 )
@@ -154,4 +156,75 @@ func TestNegotiateVersion(t *testing.T) {
 			t.Errorf("%s: expected version %s, got %s.", test.name, test.expectedVersion, response)
 		}
 	}
+}
+
+func TestFilteredBy(t *testing.T) {
+	all := discovery.ResourcePredicateFunc(func(gv string, r *metav1.APIResource) bool {
+		return true
+	})
+	none := discovery.ResourcePredicateFunc(func(gv string, r *metav1.APIResource) bool {
+		return false
+	})
+	onlyV2 := discovery.ResourcePredicateFunc(func(gv string, r *metav1.APIResource) bool {
+		return strings.HasSuffix(gv, "/v2") || gv == "v2"
+	})
+	onlyBar := discovery.ResourcePredicateFunc(func(gv string, r *metav1.APIResource) bool {
+		return r.Kind == "Bar"
+	})
+
+	foo := []*metav1.APIResourceList{
+		{
+			GroupVersion: "foo/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "bar", Kind: "Bar"},
+				{Name: "test", Kind: "Test"},
+			},
+		},
+		{
+			GroupVersion: "foo/v2",
+			APIResources: []metav1.APIResource{
+				{Name: "bar", Kind: "Bar"},
+				{Name: "test", Kind: "Test"},
+			},
+		},
+		{
+			GroupVersion: "foo/v3",
+			APIResources: []metav1.APIResource{},
+		},
+	}
+
+	tests := []struct {
+		input             []*metav1.APIResourceList
+		pred              discovery.ResourcePredicate
+		expectedResources []string
+	}{
+		{nil, all, []string{}},
+		{[]*metav1.APIResourceList{
+			{GroupVersion: "foo/v1"},
+		}, all, []string{}},
+		{foo, all, []string{"foo/v1.bar", "foo/v1.test", "foo/v2.bar", "foo/v2.test"}},
+		{foo, onlyV2, []string{"foo/v2.bar", "foo/v2.test"}},
+		{foo, onlyBar, []string{"foo/v1.bar", "foo/v2.bar"}},
+		{foo, none, []string{}},
+	}
+	for i, test := range tests {
+		filtered := discovery.FilteredBy(test.pred, test.input)
+
+		if expected, got := sets.NewString(test.expectedResources...), sets.NewString(stringify(filtered)...); !expected.Equal(got) {
+			t.Errorf("[%d] unexpected group versions: expected=%v, got=%v", i, test.expectedResources, stringify(filtered))
+		}
+	}
+}
+
+func stringify(rls []*metav1.APIResourceList) []string {
+	result := []string{}
+	for _, rl := range rls {
+		for _, r := range rl.APIResources {
+			result = append(result, rl.GroupVersion+"."+r.Name)
+		}
+		if len(rl.APIResources) == 0 {
+			result = append(result, rl.GroupVersion)
+		}
+	}
+	return result
 }

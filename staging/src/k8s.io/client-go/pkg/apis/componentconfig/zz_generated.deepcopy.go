@@ -21,6 +21,7 @@ limitations under the License.
 package componentconfig
 
 import (
+	api "k8s.io/client-go/pkg/api"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
 	config "k8s.io/client-go/pkg/util/config"
@@ -318,6 +319,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 		out.RemoteImageEndpoint = in.RemoteImageEndpoint
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+		out.ImagePullProgressDeadline = in.ImagePullProgressDeadline
 		out.RktPath = in.RktPath
 		out.ExperimentalMounterPath = in.ExperimentalMounterPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
@@ -336,6 +338,15 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.MaxOpenFiles = in.MaxOpenFiles
 		out.ReconcileCIDR = in.ReconcileCIDR
 		out.RegisterSchedulable = in.RegisterSchedulable
+		if in.RegisterWithTaints != nil {
+			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
+			*out = make([]api.Taint, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
+		} else {
+			out.RegisterWithTaints = nil
+		}
 		out.ContentType = in.ContentType
 		out.KubeAPIQPS = in.KubeAPIQPS
 		out.KubeAPIBurst = in.KubeAPIBurst
@@ -359,6 +370,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 		out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 		out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
+		out.ExperimentalKernelMemcgNotification = in.ExperimentalKernelMemcgNotification
 		out.PodsPerCore = in.PodsPerCore
 		out.EnableControllerAttachDetach = in.EnableControllerAttachDetach
 		if in.SystemReserved != nil {

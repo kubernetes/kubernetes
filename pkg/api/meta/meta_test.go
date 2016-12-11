@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -143,19 +142,19 @@ func TestAPIObjectMeta(t *testing.T) {
 
 func TestGenericTypeMeta(t *testing.T) {
 	type TypeMeta struct {
-		Kind              string               `json:"kind,omitempty"`
-		Namespace         string               `json:"namespace,omitempty"`
-		Name              string               `json:"name,omitempty"`
-		GenerateName      string               `json:"generateName,omitempty"`
-		UID               string               `json:"uid,omitempty"`
-		CreationTimestamp metav1.Time          `json:"creationTimestamp,omitempty"`
-		SelfLink          string               `json:"selfLink,omitempty"`
-		ResourceVersion   string               `json:"resourceVersion,omitempty"`
-		APIVersion        string               `json:"apiVersion,omitempty"`
-		Labels            map[string]string    `json:"labels,omitempty"`
-		Annotations       map[string]string    `json:"annotations,omitempty"`
-		OwnerReferences   []api.OwnerReference `json:"ownerReferences,omitempty"`
-		Finalizers        []string             `json:"finalizers,omitempty"`
+		Kind              string                  `json:"kind,omitempty"`
+		Namespace         string                  `json:"namespace,omitempty"`
+		Name              string                  `json:"name,omitempty"`
+		GenerateName      string                  `json:"generateName,omitempty"`
+		UID               string                  `json:"uid,omitempty"`
+		CreationTimestamp metav1.Time             `json:"creationTimestamp,omitempty"`
+		SelfLink          string                  `json:"selfLink,omitempty"`
+		ResourceVersion   string                  `json:"resourceVersion,omitempty"`
+		APIVersion        string                  `json:"apiVersion,omitempty"`
+		Labels            map[string]string       `json:"labels,omitempty"`
+		Annotations       map[string]string       `json:"annotations,omitempty"`
+		OwnerReferences   []metav1.OwnerReference `json:"ownerReferences,omitempty"`
+		Finalizers        []string                `json:"finalizers,omitempty"`
 	}
 
 	j := struct{ TypeMeta }{TypeMeta{APIVersion: "a", Kind: "b"}}
@@ -193,19 +192,19 @@ func TestGenericTypeMeta(t *testing.T) {
 }
 
 type InternalTypeMeta struct {
-	Kind              string               `json:"kind,omitempty"`
-	Namespace         string               `json:"namespace,omitempty"`
-	Name              string               `json:"name,omitempty"`
-	GenerateName      string               `json:"generateName,omitempty"`
-	UID               string               `json:"uid,omitempty"`
-	CreationTimestamp metav1.Time          `json:"creationTimestamp,omitempty"`
-	SelfLink          string               `json:"selfLink,omitempty"`
-	ResourceVersion   string               `json:"resourceVersion,omitempty"`
-	APIVersion        string               `json:"apiVersion,omitempty"`
-	Labels            map[string]string    `json:"labels,omitempty"`
-	Annotations       map[string]string    `json:"annotations,omitempty"`
-	Finalizers        []string             `json:"finalizers,omitempty"`
-	OwnerReferences   []api.OwnerReference `json:"ownerReferences,omitempty"`
+	Kind              string                  `json:"kind,omitempty"`
+	Namespace         string                  `json:"namespace,omitempty"`
+	Name              string                  `json:"name,omitempty"`
+	GenerateName      string                  `json:"generateName,omitempty"`
+	UID               string                  `json:"uid,omitempty"`
+	CreationTimestamp metav1.Time             `json:"creationTimestamp,omitempty"`
+	SelfLink          string                  `json:"selfLink,omitempty"`
+	ResourceVersion   string                  `json:"resourceVersion,omitempty"`
+	APIVersion        string                  `json:"apiVersion,omitempty"`
+	Labels            map[string]string       `json:"labels,omitempty"`
+	Annotations       map[string]string       `json:"annotations,omitempty"`
+	Finalizers        []string                `json:"finalizers,omitempty"`
+	OwnerReferences   []metav1.OwnerReference `json:"ownerReferences,omitempty"`
 }
 
 func (m *InternalTypeMeta) GetResourceVersion() string   { return m.ResourceVersion }
@@ -337,14 +336,14 @@ type MyAPIObject2 struct {
 	v1.ObjectMeta
 }
 
-func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metatypes.OwnerReference) {
+func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metav1.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&myAPIObject2)
 	references := myAPIObject2.ObjectMeta.OwnerReferences
 	// This is necessary for the test to pass because the getter will return a
 	// non-nil slice.
-	metaOwnerReferences = make([]metatypes.OwnerReference, 0)
+	metaOwnerReferences = make([]metav1.OwnerReference, 0)
 	for i := 0; i < len(references); i++ {
-		metaOwnerReferences = append(metaOwnerReferences, metatypes.OwnerReference{
+		metaOwnerReferences = append(metaOwnerReferences, metav1.OwnerReference{
 			Kind:       references[i].Kind,
 			Name:       references[i].Name,
 			UID:        references[i].UID,
@@ -355,7 +354,7 @@ func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerRef
 	if len(references) == 0 {
 		// This is necessary for the test to pass because the setter will make a
 		// non-nil slice.
-		myAPIObject2.ObjectMeta.OwnerReferences = make([]v1.OwnerReference, 0)
+		myAPIObject2.ObjectMeta.OwnerReferences = make([]metav1.OwnerReference, 0)
 	}
 	return myAPIObject2, metaOwnerReferences
 }

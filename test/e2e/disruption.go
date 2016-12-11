@@ -61,7 +61,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
 		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo")
+			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}

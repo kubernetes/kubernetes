@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime_test
+package unstructured_test
 
 import (
 	"fmt"
@@ -24,11 +24,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -49,7 +49,7 @@ func TestDecodeUnstructured(t *testing.T) {
 				Raw:         []byte(rawJson),
 				ContentType: runtime.ContentTypeJSON,
 			},
-			&runtime.Unstructured{
+			&unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"kind":       "Foo",
 					"apiVersion": "Bar",
@@ -58,13 +58,13 @@ func TestDecodeUnstructured(t *testing.T) {
 			},
 		},
 	}
-	if errs := runtime.DecodeList(pl.Items, runtime.UnstructuredJSONScheme); len(errs) == 1 {
+	if errs := runtime.DecodeList(pl.Items, unstructured.UnstructuredJSONScheme); len(errs) == 1 {
 		t.Fatalf("unexpected error %v", errs)
 	}
-	if pod, ok := pl.Items[1].(*runtime.Unstructured); !ok || pod.Object["kind"] != "Pod" || pod.Object["metadata"].(map[string]interface{})["name"] != "test" {
+	if pod, ok := pl.Items[1].(*unstructured.Unstructured); !ok || pod.Object["kind"] != "Pod" || pod.Object["metadata"].(map[string]interface{})["name"] != "test" {
 		t.Errorf("object not converted: %#v", pl.Items[1])
 	}
-	if pod, ok := pl.Items[2].(*runtime.Unstructured); !ok || pod.Object["kind"] != "Pod" || pod.Object["metadata"].(map[string]interface{})["name"] != "test" {
+	if pod, ok := pl.Items[2].(*unstructured.Unstructured); !ok || pod.Object["kind"] != "Pod" || pod.Object["metadata"].(map[string]interface{})["name"] != "test" {
 		t.Errorf("object not converted: %#v", pl.Items[2])
 	}
 }
@@ -76,21 +76,21 @@ func TestDecode(t *testing.T) {
 	}{
 		{
 			json: []byte(`{"apiVersion": "test", "kind": "test_kind"}`),
-			want: &runtime.Unstructured{
+			want: &unstructured.Unstructured{
 				Object: map[string]interface{}{"apiVersion": "test", "kind": "test_kind"},
 			},
 		},
 		{
 			json: []byte(`{"apiVersion": "test", "kind": "test_list", "items": []}`),
-			want: &runtime.UnstructuredList{
+			want: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{"apiVersion": "test", "kind": "test_list"},
 			},
 		},
 		{
 			json: []byte(`{"items": [{"metadata": {"name": "object1"}, "apiVersion": "test", "kind": "test_kind"}, {"metadata": {"name": "object2"}, "apiVersion": "test", "kind": "test_kind"}], "apiVersion": "test", "kind": "test_list"}`),
-			want: &runtime.UnstructuredList{
+			want: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{"apiVersion": "test", "kind": "test_list"},
-				Items: []*runtime.Unstructured{
+				Items: []*unstructured.Unstructured{
 					{
 						Object: map[string]interface{}{
 							"metadata":   map[string]interface{}{"name": "object1"},
@@ -111,7 +111,7 @@ func TestDecode(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		got, _, err := runtime.UnstructuredJSONScheme.Decode(tc.json, nil, nil)
+		got, _, err := unstructured.UnstructuredJSONScheme.Decode(tc.json, nil, nil)
 		if err != nil {
 			t.Errorf("Unexpected error for %q: %v", string(tc.json), err)
 			continue
@@ -124,7 +124,7 @@ func TestDecode(t *testing.T) {
 }
 
 func TestUnstructuredGetters(t *testing.T) {
-	unstruct := runtime.Unstructured{
+	unstruct := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "test_kind",
 			"apiVersion": "test_version",
@@ -214,7 +214,7 @@ func TestUnstructuredGetters(t *testing.T) {
 		t.Errorf("GetAnnotations() = %s, want %s", got, want)
 	}
 	refs := unstruct.GetOwnerReferences()
-	expectedOwnerReferences := []metatypes.OwnerReference{
+	expectedOwnerReferences := []metav1.OwnerReference{
 		{
 			Kind:       "Pod",
 			Name:       "poda",
@@ -240,10 +240,10 @@ func TestUnstructuredGetters(t *testing.T) {
 }
 
 func TestUnstructuredSetters(t *testing.T) {
-	unstruct := runtime.Unstructured{}
+	unstruct := unstructured.Unstructured{}
 	trueVar := true
 
-	want := runtime.Unstructured{
+	want := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "test_kind",
 			"apiVersion": "test_version",
@@ -300,7 +300,7 @@ func TestUnstructuredSetters(t *testing.T) {
 	unstruct.SetDeletionTimestamp(&date)
 	unstruct.SetLabels(map[string]string{"test_label": "test_value"})
 	unstruct.SetAnnotations(map[string]string{"test_annotation": "test_value"})
-	newOwnerReferences := []metatypes.OwnerReference{
+	newOwnerReferences := []metav1.OwnerReference{
 		{
 			Kind:       "Pod",
 			Name:       "poda",
@@ -325,7 +325,7 @@ func TestUnstructuredSetters(t *testing.T) {
 }
 
 func TestUnstructuredListGetters(t *testing.T) {
-	unstruct := runtime.UnstructuredList{
+	unstruct := unstructured.UnstructuredList{
 		Object: map[string]interface{}{
 			"kind":       "test_kind",
 			"apiVersion": "test_version",
@@ -354,9 +354,9 @@ func TestUnstructuredListGetters(t *testing.T) {
 }
 
 func TestUnstructuredListSetters(t *testing.T) {
-	unstruct := runtime.UnstructuredList{}
+	unstruct := unstructured.UnstructuredList{}
 
-	want := runtime.UnstructuredList{
+	want := unstructured.UnstructuredList{
 		Object: map[string]interface{}{
 			"kind":       "test_kind",
 			"apiVersion": "test_version",
@@ -407,11 +407,11 @@ func TestDecodeNumbers(t *testing.T) {
 	}
 
 	// Round-trip with unstructured codec
-	unstructuredObj, err := runtime.Decode(runtime.UnstructuredJSONScheme, originalJSON)
+	unstructuredObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalJSON)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	roundtripJSON, err := runtime.Encode(runtime.UnstructuredJSONScheme, unstructuredObj)
+	roundtripJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, unstructuredObj)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

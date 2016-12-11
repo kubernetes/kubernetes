@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/pkg/conversion/queryparams"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
@@ -124,8 +125,8 @@ func (rc *ResourceClient) List(opts runtime.Object) (runtime.Object, error) {
 }
 
 // Get gets the resource with the specified name.
-func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
-	result := new(runtime.Unstructured)
+func (rc *ResourceClient) Get(name string) (*unstructured.Unstructured, error) {
+	result := new(unstructured.Unstructured)
 	err := rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -162,8 +163,8 @@ func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, list
 }
 
 // Create creates the provided resource.
-func (rc *ResourceClient) Create(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
-	result := new(runtime.Unstructured)
+func (rc *ResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	result := new(unstructured.Unstructured)
 	err := rc.cl.Post().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -174,8 +175,8 @@ func (rc *ResourceClient) Create(obj *runtime.Unstructured) (*runtime.Unstructur
 }
 
 // Update updates the provided resource.
-func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
-	result := new(runtime.Unstructured)
+func (rc *ResourceClient) Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	result := new(unstructured.Unstructured)
 	if len(obj.GetName()) == 0 {
 		return result, errors.New("object missing name")
 	}
@@ -203,8 +204,8 @@ func (rc *ResourceClient) Watch(opts runtime.Object) (watch.Interface, error) {
 		Watch()
 }
 
-func (rc *ResourceClient) Patch(name string, pt api.PatchType, data []byte) (*runtime.Unstructured, error) {
-	result := new(runtime.Unstructured)
+func (rc *ResourceClient) Patch(name string, pt api.PatchType, data []byte) (*unstructured.Unstructured, error) {
+	result := new(unstructured.Unstructured)
 	err := rc.cl.Patch(pt).
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -220,7 +221,7 @@ func (rc *ResourceClient) Patch(name string, pt api.PatchType, data []byte) (*ru
 type dynamicCodec struct{}
 
 func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	obj, gvk, err := runtime.UnstructuredJSONScheme.Decode(data, gvk, obj)
+	obj, gvk, err := unstructured.UnstructuredJSONScheme.Decode(data, gvk, obj)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -237,7 +238,7 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 }
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
-	return runtime.UnstructuredJSONScheme.Encode(obj, w)
+	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
 }
 
 // ContentConfig returns a rest.ContentConfig for dynamic types.
