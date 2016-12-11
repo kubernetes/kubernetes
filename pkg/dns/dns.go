@@ -321,9 +321,52 @@ func (kd *KubeDNS) handleEndpointAdd(obj interface{}) {
 }
 
 func (kd *KubeDNS) handleEndpointUpdate(oldObj, newObj interface{}) {
-	kd.handleEndpointDelete(oldObj)
-	// TODO: Avoid unwanted updates.
-	kd.handleEndpointAdd(newObj)
+	if o, ok := oldObj.(*v1.Endpoints); ok {
+		if n, ok := newObj.(*v1.Endpoints); ok {
+			oldAddressMap := map[string]bool{}
+
+			// svc is same for both old and new endpoints
+			svc, err := kd.getServiceFromEndpoints(o)
+			if svc != nil && err == nil {
+				if !v1.IsServiceIPSet(svc) {
+					for idx := range o.Subsets {
+						for subIdx := range o.Subsets[idx].Addresses {
+							address := o.Subsets[idx].Addresses[subIdx]
+							endpointIP := address.IP
+							if isHeadlessServiceNamed(o.Subsets[idx].Addresses[subIdx]) {
+								oldAddressMap[endpointIP] = true
+							}
+						}
+					}
+
+					for idx := range n.Subsets {
+						for subIdx := range n.Subsets[idx].Addresses {
+							address := n.Subsets[idx].Addresses[subIdx]
+							endpointIP := address.IP
+							if _, ok := oldAddressMap[endpointIP]; ok {
+								// Entries are both in old and new endpoint. Remove from the `oldAddressMap`
+								// if the address is still named to the service.
+								if isHeadlessServiceNamed(n.Subsets[idx].Addresses[subIdx]) {
+									// The service is still named in the Pod
+									delete(oldAddressMap, endpointIP)
+								}
+							}
+						}
+					}
+
+					// Remove all old PTR records for the endpoint that are not
+					// in new endpoint, or
+					// the addresses that are no longer named.
+					for k := range oldAddressMap {
+						delete(kd.reverseRecordMap, k)
+					}
+				}
+			}
+
+			// TODO: Avoid unwanted updates.
+			kd.handleEndpointAdd(newObj)
+		}
+	}
 }
 
 func (kd *KubeDNS) handleEndpointDelete(obj interface{}) {
