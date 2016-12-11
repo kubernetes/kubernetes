@@ -166,10 +166,10 @@ def launch_dns():
         # Create the kube-system namespace that is used by the kubedns files.
         check_call(split('kubectl create namespace kube-system'))
     # Check for the kubedns replication controller.
-    return_code = call(split('kubectl get -f files/manifests/kubedns-rc.yaml'))
+    return_code = call(split('kubectl get -f files/manifests/kubedns-controller.yaml'))
     if return_code != 0:
         # Create the kubedns replication controller from the rendered file.
-        check_call(split('kubectl create -f files/manifests/kubedns-rc.yaml'))
+        check_call(split('kubectl create -f files/manifests/kubedns-controller.yaml'))
     # Check for the kubedns service.
     return_code = call(split('kubectl get -f files/manifests/kubedns-svc.yaml'))
     if return_code != 0:
@@ -330,7 +330,7 @@ def gather_sdn_data():
     else:
         # There is no SDN cider fall back to the kubernetes config cidr option.
         pillar['dns_server'] = get_dns_ip(hookenv.config().get('cidr'))
-    # The pillar['dns_domain'] value is used in the kubedns-rc.yaml
+    # The pillar['dns_domain'] value is used in the kubedns-controller.yaml
     pillar['dns_domain'] = hookenv.config().get('dns_domain')
     # Use a 'pillar' dictionary so we can reuse the upstream kubedns templates.
     sdn_data['pillar'] = pillar
@@ -453,14 +453,14 @@ def render_files(reldata=None):
         # Render the files/manifests/master.json that contains parameters for
         # the apiserver, controller, and controller-manager
         render('master.json', target, context)
-        # Source: ...cluster/addons/dns/skydns-svc.yaml.in
+        # Source: ...cluster/addons/dns/kubedns-svc.yaml.in
         target = os.path.join(rendered_manifest_dir, 'kubedns-svc.yaml')
         # Render files/kubernetes/kubedns-svc.yaml for the DNS service.
         render('kubedns-svc.yaml', target, context)
-        # Source: ...cluster/addons/dns/skydns-rc.yaml.in
-        target = os.path.join(rendered_manifest_dir, 'kubedns-rc.yaml')
-        # Render files/kubernetes/kubedns-rc.yaml for the DNS pod.
-        render('kubedns-rc.yaml', target, context)
+        # Source: ...cluster/addons/dns/kubedns-controller.yaml.in
+        target = os.path.join(rendered_manifest_dir, 'kubedns-controller.yaml')
+        # Render files/kubernetes/kubedns-controller.yaml for the DNS pod.
+        render('kubedns-controller.yaml', target, context)
 
 
 def status_set(level, message):

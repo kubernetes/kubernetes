@@ -28,8 +28,8 @@ kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 workspace=$(pwd)
 
 # Process salt pillar templates manually
-sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" > "${workspace}/skydns-rc.yaml"
-sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" > "${workspace}/skydns-svc.yaml"
+sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" > "${workspace}/kubedns-controller.yaml"
+sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" > "${workspace}/kubedns-svc.yaml"
 
 # Federation specific values.
 if [[ "${FEDERATION:-}" == "true" ]]; then
@@ -38,14 +38,14 @@ if [[ "${FEDERATION:-}" == "true" ]]; then
     FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
   fi
   if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-    sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" "${workspace}/skydns-rc.yaml"
+    sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" "${workspace}/kubedns-controller.yaml"
   else
-    sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" "${workspace}/skydns-rc.yaml"
+    sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" "${workspace}/kubedns-controller.yaml"
   fi
 else
-  sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" "${workspace}/skydns-rc.yaml"
+  sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" "${workspace}/kubedns-controller.yaml"
 fi
 
 # Use kubectl to create kube-dns controller and service
-"${kubectl}" create -f "${workspace}/skydns-rc.yaml"
-"${kubectl}" create -f "${workspace}/skydns-svc.yaml"
+"${kubectl}" create -f "${workspace}/kubedns-controller.yaml"
+"${kubectl}" create -f "${workspace}/kubedns-svc.yaml"

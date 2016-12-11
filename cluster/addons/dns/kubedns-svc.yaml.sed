@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
-
-# __MACHINE_GENERATED_WARNING__
+# Warning: This is a file generated from the base underscore template file: kubedns-svc.yaml.base
 
 apiVersion: v1
 kind: Service
@@ -28,7 +26,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: __PILLAR__DNS__SERVER__
+  clusterIP: $DNS_SERVER_IP
   ports:
   - name: dns
     port: 53

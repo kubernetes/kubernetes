@@ -18,4 +18,4 @@ options:
     default: cluster.local
     description: |
       The domain name to use for the Kubernetes cluster by the
-      skydns service.
+      kubedns service.
