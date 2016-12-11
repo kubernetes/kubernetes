@@ -40,7 +40,7 @@ func newTestInterface() (dnsprovider.Interface, error) {
 func newFakeInterface() (dnsprovider.Interface, error) {
 	var service route53testing.Route53API
 	service = route53testing.NewRoute53APIStub()
-	iface := newInterfaceWithStub(service)
+	iface := New(service)
 	// Add a fake zone to test against.
 	params := &route53.CreateHostedZoneInput{
 		CallerReference: aws.String("Nonce"),       // Required

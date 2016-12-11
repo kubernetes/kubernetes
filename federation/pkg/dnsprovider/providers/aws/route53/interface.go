@@ -28,9 +28,9 @@ type Interface struct {
 	service stubs.Route53API
 }
 
-// newInterfaceWithStub facilitates stubbing out the underlying AWS Route53
-// library for testing purposes.  It returns an provider-independent interface.
-func newInterfaceWithStub(service stubs.Route53API) *Interface {
+// New builds an Interface, with a specified Route53API implementation.
+// This is useful for testing purposes, but also if we want an instance with with custom AWS options.
+func New(service stubs.Route53API) *Interface {
 	return &Interface{service}
 }
 
