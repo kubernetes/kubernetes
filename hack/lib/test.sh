@@ -23,7 +23,12 @@ readonly   red=$(tput setaf 1)
 readonly green=$(tput setaf 2)
 
 kube::test::clear_all() {
-  kubectl delete "${kube_flags[@]}" rc,pods --all --grace-period=0 --force
+  if kube::test::if_supports_resource "rc" ; then
+    kubectl delete "${kube_flags[@]}" rc --all --grace-period=0 --force
+  fi
+  if kube::test::if_supports_resource "pods" ; then
+    kubectl delete "${kube_flags[@]}" pods --all --grace-period=0 --force
+  fi
 }
 
 # Force exact match of a returned result for a object query.  Wrap this with || to support multiple
@@ -222,4 +227,22 @@ kube::test::if_has_string() {
     caller
     return 1
   fi
+}
+
+# Returns true if the required resource is part of supported resources.
+# Expects env vars:
+#   SUPPORTED_RESOURCES: Array of all resources supported by the apiserver. "*"
+#   means it supports all resources. For ex: ("*") or ("rc" "*") both mean that
+#   all resources are supported.
+#   $1: Name of the resource to be tested.
+kube::test::if_supports_resource() {
+  SUPPORTED_RESOURCES=${SUPPORTED_RESOURCES:-""}
+  REQUIRED_RESOURCE=${1:-""}
+
+  for r in "${SUPPORTED_RESOURCES[@]}"; do
+    if [[ "${r}" == "*" || "${r}" == "${REQUIRED_RESOURCE}" ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
