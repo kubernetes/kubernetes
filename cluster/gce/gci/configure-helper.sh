@@ -1064,12 +1064,12 @@ function start-kube-addons {
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
-    local -r dns_rc_file="${dst_dir}/dns/skydns-rc.yaml"
-    local -r dns_svc_file="${dst_dir}/dns/skydns-svc.yaml"
-    mv "${dst_dir}/dns/skydns-rc.yaml.in" "${dns_rc_file}"
-    mv "${dst_dir}/dns/skydns-svc.yaml.in" "${dns_svc_file}"
+    local -r dns_controller_file="${dst_dir}/dns/kubedns-controller.yaml"
+    local -r dns_svc_file="${dst_dir}/dns/kubedns-svc.yaml"
+    mv "${dst_dir}/dns/kubedns-controller.yaml.in" "${dns_controller_file}"
+    mv "${dst_dir}/dns/kubedns-svc.yaml.in" "${dns_svc_file}"
     # Replace the salt configurations with variable values.
-    sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
+    sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_controller_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
 
     if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
@@ -1082,12 +1082,12 @@ function start-kube-addons {
         federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
       fi
       if [[ -n "${federations_domain_map}" ]]; then
-        sed -i -e "s@{{ *pillar\['federations_domain_map'\] *}}@- --federations=${federations_domain_map}@g" "${dns_rc_file}"
+        sed -i -e "s@{{ *pillar\['federations_domain_map'\] *}}@- --federations=${federations_domain_map}@g" "${dns_controller_file}"
       else
-        sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_rc_file}"
+        sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_controller_file}"
       fi
     else
-      sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_rc_file}"
+      sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_controller_file}"
     fi
   fi
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then

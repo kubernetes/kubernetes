@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file should be kept in sync with cluster/images/hyperkube/dns-svc.yaml
+# This file should be kept in sync with cluster/addons/dns/kubedns-svc.yaml.base
 
-# Warning: This is a file generated from the base underscore template file: skydns-svc.yaml.base
+# Warning: This is a file generated from the base underscore template file: kubedns-svc.yaml.base
 
 apiVersion: v1
 kind: Service
