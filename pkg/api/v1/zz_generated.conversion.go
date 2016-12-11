@@ -207,8 +207,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_ObjectMeta_To_v1_ObjectMeta,
 		Convert_v1_ObjectReference_To_api_ObjectReference,
 		Convert_api_ObjectReference_To_v1_ObjectReference,
-		Convert_v1_OwnerReference_To_api_OwnerReference,
-		Convert_api_OwnerReference_To_v1_OwnerReference,
 		Convert_v1_PersistentVolume_To_api_PersistentVolume,
 		Convert_api_PersistentVolume_To_v1_PersistentVolume,
 		Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim,
@@ -2347,7 +2345,7 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 	out.DeletionGracePeriodSeconds = (*int64)(unsafe.Pointer(in.DeletionGracePeriodSeconds))
 	out.Labels = *(*map[string]string)(unsafe.Pointer(&in.Labels))
 	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
-	out.OwnerReferences = *(*[]api.OwnerReference)(unsafe.Pointer(&in.OwnerReferences))
+	out.OwnerReferences = *(*[]meta_v1.OwnerReference)(unsafe.Pointer(&in.OwnerReferences))
 	out.Finalizers = *(*[]string)(unsafe.Pointer(&in.Finalizers))
 	out.ClusterName = in.ClusterName
 	return nil
@@ -2370,7 +2368,7 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 	out.DeletionGracePeriodSeconds = (*int64)(unsafe.Pointer(in.DeletionGracePeriodSeconds))
 	out.Labels = *(*map[string]string)(unsafe.Pointer(&in.Labels))
 	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
-	out.OwnerReferences = *(*[]OwnerReference)(unsafe.Pointer(&in.OwnerReferences))
+	out.OwnerReferences = *(*[]meta_v1.OwnerReference)(unsafe.Pointer(&in.OwnerReferences))
 	out.Finalizers = *(*[]string)(unsafe.Pointer(&in.Finalizers))
 	out.ClusterName = in.ClusterName
 	return nil
@@ -2408,32 +2406,6 @@ func autoConvert_api_ObjectReference_To_v1_ObjectReference(in *api.ObjectReferen
 
 func Convert_api_ObjectReference_To_v1_ObjectReference(in *api.ObjectReference, out *ObjectReference, s conversion.Scope) error {
 	return autoConvert_api_ObjectReference_To_v1_ObjectReference(in, out, s)
-}
-
-func autoConvert_v1_OwnerReference_To_api_OwnerReference(in *OwnerReference, out *api.OwnerReference, s conversion.Scope) error {
-	out.APIVersion = in.APIVersion
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.UID = types.UID(in.UID)
-	out.Controller = (*bool)(unsafe.Pointer(in.Controller))
-	return nil
-}
-
-func Convert_v1_OwnerReference_To_api_OwnerReference(in *OwnerReference, out *api.OwnerReference, s conversion.Scope) error {
-	return autoConvert_v1_OwnerReference_To_api_OwnerReference(in, out, s)
-}
-
-func autoConvert_api_OwnerReference_To_v1_OwnerReference(in *api.OwnerReference, out *OwnerReference, s conversion.Scope) error {
-	out.APIVersion = in.APIVersion
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.UID = types.UID(in.UID)
-	out.Controller = (*bool)(unsafe.Pointer(in.Controller))
-	return nil
-}
-
-func Convert_api_OwnerReference_To_v1_OwnerReference(in *api.OwnerReference, out *OwnerReference, s conversion.Scope) error {
-	return autoConvert_api_OwnerReference_To_v1_OwnerReference(in, out, s)
 }
 
 func autoConvert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *api.PersistentVolume, s conversion.Scope) error {
@@ -3038,7 +3010,7 @@ func autoConvert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecu
 }
 
 func autoConvert_v1_PodSignature_To_api_PodSignature(in *PodSignature, out *api.PodSignature, s conversion.Scope) error {
-	out.PodController = (*api.OwnerReference)(unsafe.Pointer(in.PodController))
+	out.PodController = (*meta_v1.OwnerReference)(unsafe.Pointer(in.PodController))
 	return nil
 }
 
@@ -3047,7 +3019,7 @@ func Convert_v1_PodSignature_To_api_PodSignature(in *PodSignature, out *api.PodS
 }
 
 func autoConvert_api_PodSignature_To_v1_PodSignature(in *api.PodSignature, out *PodSignature, s conversion.Scope) error {
-	out.PodController = (*OwnerReference)(unsafe.Pointer(in.PodController))
+	out.PodController = (*meta_v1.OwnerReference)(unsafe.Pointer(in.PodController))
 	return nil
 }
 

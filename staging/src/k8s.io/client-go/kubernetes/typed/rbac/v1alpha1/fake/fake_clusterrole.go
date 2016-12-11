@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	labels "k8s.io/client-go/pkg/labels"
 	schema "k8s.io/client-go/pkg/runtime/schema"
@@ -64,7 +65,7 @@ func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptio
 	return err
 }
 
-func (c *FakeClusterRoles) Get(name string) (result *v1alpha1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &v1alpha1.ClusterRole{})
 	if obj == nil {

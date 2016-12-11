@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
 	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
@@ -67,7 +68,7 @@ func (c *FakePodTemplates) DeleteCollection(options *v1.DeleteOptions, listOptio
 	return err
 }
 
-func (c *FakePodTemplates) Get(name string) (result *v1.PodTemplate, err error) {
+func (c *FakePodTemplates) Get(name string, options meta_v1.GetOptions) (result *v1.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podtemplatesResource, c.ns, name), &v1.PodTemplate{})
 

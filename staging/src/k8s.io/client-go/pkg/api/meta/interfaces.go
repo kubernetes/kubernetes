@@ -17,8 +17,8 @@ limitations under the License.
 package meta
 
 import (
-	"k8s.io/client-go/pkg/api/meta/metatypes"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/types"
@@ -61,13 +61,14 @@ type Object interface {
 	SetAnnotations(annotations map[string]string)
 	GetFinalizers() []string
 	SetFinalizers(finalizers []string)
-	GetOwnerReferences() []metatypes.OwnerReference
-	SetOwnerReferences([]metatypes.OwnerReference)
+	GetOwnerReferences() []metav1.OwnerReference
+	SetOwnerReferences([]metav1.OwnerReference)
 	GetClusterName() string
 	SetClusterName(clusterName string)
 }
 
-var _ Object = &runtime.Unstructured{}
+// TODO: move me to pkg/apis/meta/v1/unstructured once Object is moved to pkg/apis/meta/v1
+var _ Object = &unstructured.Unstructured{}
 
 type ListMetaAccessor interface {
 	GetListMeta() List
@@ -177,8 +178,10 @@ type RESTMapper interface {
 
 	// RESTMapping identifies a preferred resource mapping for the provided group kind.
 	RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error)
-	// RESTMappings returns all resource mappings for the provided group kind.
-	RESTMappings(gk schema.GroupKind) ([]*RESTMapping, error)
+	// RESTMappings returns all resource mappings for the provided group kind if no
+	// version search is provided. Otherwise identifies a preferred resource mapping for
+	// the provided version(s).
+	RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error)
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)

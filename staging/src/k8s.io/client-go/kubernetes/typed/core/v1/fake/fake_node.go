@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
 	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
@@ -72,7 +73,7 @@ func (c *FakeNodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 	return err
 }
 
-func (c *FakeNodes) Get(name string) (result *v1.Node, err error) {
+func (c *FakeNodes) Get(name string, options meta_v1.GetOptions) (result *v1.Node, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(nodesResource, name), &v1.Node{})
 	if obj == nil {

@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
 	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
@@ -67,7 +68,7 @@ func (c *FakeConfigMaps) DeleteCollection(options *v1.DeleteOptions, listOptions
 	return err
 }
 
-func (c *FakeConfigMaps) Get(name string) (result *v1.ConfigMap, err error) {
+func (c *FakeConfigMaps) Get(name string, options meta_v1.GetOptions) (result *v1.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(configmapsResource, c.ns, name), &v1.ConfigMap{})
 

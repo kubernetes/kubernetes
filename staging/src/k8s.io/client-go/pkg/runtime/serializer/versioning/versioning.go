@@ -181,7 +181,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	switch obj.(type) {
-	case *runtime.Unknown, *runtime.Unstructured, *runtime.UnstructuredList:
+	case *runtime.Unknown, runtime.Unstructured:
 		return c.encoder.Encode(obj, w)
 	}
 
@@ -227,6 +227,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 
 // DirectEncoder serializes an object and ensures the GVK is set.
 type DirectEncoder struct {
+	Version runtime.GroupVersioner
 	runtime.Encoder
 	runtime.ObjectTyper
 }
@@ -242,7 +243,14 @@ func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
 	}
 	kind := obj.GetObjectKind()
 	oldGVK := kind.GroupVersionKind()
-	kind.SetGroupVersionKind(gvks[0])
+	gvk := gvks[0]
+	if e.Version != nil {
+		preferredGVK, ok := e.Version.KindForGroupVersionKinds(gvks)
+		if ok {
+			gvk = preferredGVK
+		}
+	}
+	kind.SetGroupVersionKind(gvk)
 	err = e.Encoder.Encode(obj, stream)
 	kind.SetGroupVersionKind(oldGVK)
 	return err

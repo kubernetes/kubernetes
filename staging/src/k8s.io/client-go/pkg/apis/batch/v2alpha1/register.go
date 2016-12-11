@@ -18,6 +18,7 @@ package v2alpha1
 
 import (
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 	versionedwatch "k8s.io/client-go/pkg/watch/versioned"
@@ -49,6 +50,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CronJobList{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
+		&metav1.ExportOptions{},
+		&metav1.GetOptions{},
 	)
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJob"), &CronJob{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJobList"), &CronJobList{})

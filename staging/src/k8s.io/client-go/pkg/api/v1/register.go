@@ -77,6 +77,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
 		&metav1.ExportOptions{},
+		&metav1.GetOptions{},
 		&ListOptions{},
 		&PodAttachOptions{},
 		&PodLogOptions{},

@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
@@ -37,7 +38,7 @@ type JobInterface interface {
 	UpdateStatus(*v1beta1.Job) (*v1beta1.Job, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1beta1.Job, error)
+	Get(name string, options meta_v1.GetOptions) (*v1beta1.Job, error)
 	List(opts v1.ListOptions) (*v1beta1.JobList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Job, err error)
@@ -83,6 +84,9 @@ func (c *jobs) Update(job *v1beta1.Job) (result *v1beta1.Job, err error) {
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *jobs) UpdateStatus(job *v1beta1.Job) (result *v1beta1.Job, err error) {
 	result = &v1beta1.Job{}
 	err = c.client.Put().
@@ -119,12 +123,13 @@ func (c *jobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOp
 }
 
 // Get takes name of the job, and returns the corresponding job object, and an error if there is any.
-func (c *jobs) Get(name string) (result *v1beta1.Job, err error) {
+func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1beta1.Job, err error) {
 	result = &v1beta1.Job{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

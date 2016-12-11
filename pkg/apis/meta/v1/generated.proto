@@ -245,6 +245,30 @@ message ListMeta {
   optional string resourceVersion = 2;
 }
 
+// OwnerReference contains enough information to let you identify an owning
+// object. Currently, an owning object must be in the same namespace, so there
+// is no namespace field.
+message OwnerReference {
+  // API version of the referent.
+  optional string apiVersion = 5;
+
+  // Kind of the referent.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  optional string kind = 1;
+
+  // Name of the referent.
+  // More info: http://kubernetes.io/docs/user-guide/identifiers#names
+  optional string name = 3;
+
+  // UID of the referent.
+  // More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+  optional string uid = 4;
+
+  // If true, this reference points to the managing controller.
+  // +optional
+  optional bool controller = 6;
+}
+
 // RootPaths lists the paths available at root.
 // For example: "/healthz", "/apis".
 message RootPaths {

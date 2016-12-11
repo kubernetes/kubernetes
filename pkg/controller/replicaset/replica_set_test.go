@@ -161,11 +161,11 @@ func newPod(name string, rs *extensions.ReplicaSet, status v1.PodPhase, lastTran
 func newPodList(store cache.Store, count int, status v1.PodPhase, labelMap map[string]string, rs *extensions.ReplicaSet, name string) *v1.PodList {
 	pods := []v1.Pod{}
 	var trueVar = true
-	controllerReference := v1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
+	controllerReference := metav1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
 	for i := 0; i < count; i++ {
 		pod := newPod(fmt.Sprintf("%s%d", name, i), rs, status, nil)
 		pod.ObjectMeta.Labels = labelMap
-		pod.OwnerReferences = []v1.OwnerReference{controllerReference}
+		pod.OwnerReferences = []metav1.OwnerReference{controllerReference}
 		if store != nil {
 			store.Add(pod)
 		}
@@ -1143,10 +1143,10 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 	manager, fakePodControl := setupManagerWithGCEnabled(stopCh, rs)
 	manager.rsLister.Indexer.Add(rs)
 	var trueVar = true
-	otherControllerReference := v1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1beta1", Kind: "ReplicaSet", Name: "AnotherRS", Controller: &trueVar}
+	otherControllerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1beta1", Kind: "ReplicaSet", Name: "AnotherRS", Controller: &trueVar}
 	// add to podLister a matching Pod controlled by another controller. Expect no patch.
 	pod := newPod("pod", rs, v1.PodRunning, nil)
-	pod.OwnerReferences = []v1.OwnerReference{otherControllerReference}
+	pod.OwnerReferences = []metav1.OwnerReference{otherControllerReference}
 	manager.podLister.Indexer.Add(pod)
 	err := manager.syncReplicaSet(getKey(rs, t))
 	if err != nil {
@@ -1166,9 +1166,9 @@ func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 	// add to podLister one more matching pod that doesn't have a controller
 	// ref, but has an owner ref pointing to other object. Expect a patch to
 	// take control of it.
-	unrelatedOwnerReference := v1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "batch/v1", Kind: "Job", Name: "Job"}
+	unrelatedOwnerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "batch/v1", Kind: "Job", Name: "Job"}
 	pod := newPod("pod", rs, v1.PodRunning, nil)
-	pod.OwnerReferences = []v1.OwnerReference{unrelatedOwnerReference}
+	pod.OwnerReferences = []metav1.OwnerReference{unrelatedOwnerReference}
 	manager.podLister.Indexer.Add(pod)
 
 	err := manager.syncReplicaSet(getKey(rs, t))
@@ -1188,9 +1188,9 @@ func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
 	manager.rsLister.Indexer.Add(rs)
 	// add to podLister a matching pod that has an ownerRef pointing to the rs,
 	// but ownerRef.Controller is false. Expect a patch to take control it.
-	rsOwnerReference := v1.OwnerReference{UID: rs.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rs.Name}
+	rsOwnerReference := metav1.OwnerReference{UID: rs.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rs.Name}
 	pod := newPod("pod", rs, v1.PodRunning, nil)
-	pod.OwnerReferences = []v1.OwnerReference{rsOwnerReference}
+	pod.OwnerReferences = []metav1.OwnerReference{rsOwnerReference}
 	manager.podLister.Indexer.Add(pod)
 
 	err := manager.syncReplicaSet(getKey(rs, t))
@@ -1254,8 +1254,8 @@ func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
 	pod := newPod("pod", rs, v1.PodRunning, nil)
 	pod.ResourceVersion = "1"
 	var trueVar = true
-	rsOwnerReference := v1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
-	pod.OwnerReferences = []v1.OwnerReference{rsOwnerReference}
+	rsOwnerReference := metav1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
+	pod.OwnerReferences = []metav1.OwnerReference{rsOwnerReference}
 	updatedPod := *pod
 	// reset the labels
 	updatedPod.Labels = make(map[string]string)

@@ -19999,7 +19999,8 @@
       "type": "array",
       "items": {
        "type": "string"
-      }
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
      }
     }
    }

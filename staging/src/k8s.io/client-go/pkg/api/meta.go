@@ -18,7 +18,6 @@ package api
 
 import (
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/meta/metatypes"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/conversion"
 	"k8s.io/client-go/pkg/runtime"
@@ -102,8 +101,8 @@ func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Ann
 func (meta *ObjectMeta) GetFinalizers() []string                      { return meta.Finalizers }
 func (meta *ObjectMeta) SetFinalizers(finalizers []string)            { meta.Finalizers = finalizers }
 
-func (meta *ObjectMeta) GetOwnerReferences() []metatypes.OwnerReference {
-	ret := make([]metatypes.OwnerReference, len(meta.OwnerReferences))
+func (meta *ObjectMeta) GetOwnerReferences() []metav1.OwnerReference {
+	ret := make([]metav1.OwnerReference, len(meta.OwnerReferences))
 	for i := 0; i < len(meta.OwnerReferences); i++ {
 		ret[i].Kind = meta.OwnerReferences[i].Kind
 		ret[i].Name = meta.OwnerReferences[i].Name
@@ -117,8 +116,8 @@ func (meta *ObjectMeta) GetOwnerReferences() []metatypes.OwnerReference {
 	return ret
 }
 
-func (meta *ObjectMeta) SetOwnerReferences(references []metatypes.OwnerReference) {
-	newReferences := make([]OwnerReference, len(references))
+func (meta *ObjectMeta) SetOwnerReferences(references []metav1.OwnerReference) {
+	newReferences := make([]metav1.OwnerReference, len(references))
 	for i := 0; i < len(references); i++ {
 		newReferences[i].Kind = references[i].Kind
 		newReferences[i].Name = references[i].Name

@@ -27,7 +27,6 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/api/install"
 
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -121,7 +120,7 @@ func setupGC(t *testing.T, config *restclient.Config) *GarbageCollector {
 	return gc
 }
 
-func getPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
+func getPod(podName string, ownerReferences []metav1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -145,7 +144,7 @@ func serilizeOrDie(t *testing.T, object interface{}) []byte {
 
 // test the processItem function making the expected actions.
 func TestProcessItem(t *testing.T) {
-	pod := getPod("ToBeDeletedPod", []v1.OwnerReference{
+	pod := getPod("ToBeDeletedPod", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "owner1",
@@ -170,7 +169,7 @@ func TestProcessItem(t *testing.T) {
 	gc := setupGC(t, clientConfig)
 	item := &node{
 		identity: objectReference{
-			OwnerReference: metatypes.OwnerReference{
+			OwnerReference: metav1.OwnerReference{
 				Kind:       pod.Kind,
 				APIVersion: pod.APIVersion,
 				Name:       pod.Name,
@@ -231,9 +230,9 @@ func verifyGraphInvariants(scenario string, uidToNode map[types.UID]*node, t *te
 }
 
 func createEvent(eventType eventType, selfUID string, owners []string) event {
-	var ownerReferences []v1.OwnerReference
+	var ownerReferences []metav1.OwnerReference
 	for i := 0; i < len(owners); i++ {
-		ownerReferences = append(ownerReferences, v1.OwnerReference{UID: types.UID(owners[i])})
+		ownerReferences = append(ownerReferences, metav1.OwnerReference{UID: types.UID(owners[i])})
 	}
 	return event{
 		eventType: eventType,
@@ -326,8 +325,8 @@ func TestDependentsRace(t *testing.T) {
 	go func() {
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
-			gc.propagator.addDependentToOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
-			gc.propagator.removeDependentFromOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
+			gc.propagator.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.propagator.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
 		}
 	}()
 	go func() {
@@ -366,7 +365,7 @@ func TestGCListWatcher(t *testing.T) {
 func podToGCNode(pod *v1.Pod) *node {
 	return &node{
 		identity: objectReference{
-			OwnerReference: metatypes.OwnerReference{
+			OwnerReference: metav1.OwnerReference{
 				Kind:       pod.Kind,
 				APIVersion: pod.APIVersion,
 				Name:       pod.Name,
@@ -380,7 +379,7 @@ func podToGCNode(pod *v1.Pod) *node {
 }
 
 func TestAbsentUIDCache(t *testing.T) {
-	rc1Pod1 := getPod("rc1Pod1", []v1.OwnerReference{
+	rc1Pod1 := getPod("rc1Pod1", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "rc1",
@@ -388,7 +387,7 @@ func TestAbsentUIDCache(t *testing.T) {
 			APIVersion: "v1",
 		},
 	})
-	rc1Pod2 := getPod("rc1Pod2", []v1.OwnerReference{
+	rc1Pod2 := getPod("rc1Pod2", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "rc1",
@@ -396,7 +395,7 @@ func TestAbsentUIDCache(t *testing.T) {
 			APIVersion: "v1",
 		},
 	})
-	rc2Pod1 := getPod("rc2Pod1", []v1.OwnerReference{
+	rc2Pod1 := getPod("rc2Pod1", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "rc2",
@@ -404,7 +403,7 @@ func TestAbsentUIDCache(t *testing.T) {
 			APIVersion: "v1",
 		},
 	})
-	rc3Pod1 := getPod("rc3Pod1", []v1.OwnerReference{
+	rc3Pod1 := getPod("rc3Pod1", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "rc3",

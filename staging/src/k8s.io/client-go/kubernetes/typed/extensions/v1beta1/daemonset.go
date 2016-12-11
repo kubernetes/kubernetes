@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
@@ -37,7 +38,7 @@ type DaemonSetInterface interface {
 	UpdateStatus(*v1beta1.DaemonSet) (*v1beta1.DaemonSet, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1beta1.DaemonSet, error)
+	Get(name string, options meta_v1.GetOptions) (*v1beta1.DaemonSet, error)
 	List(opts v1.ListOptions) (*v1beta1.DaemonSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.DaemonSet, err error)
@@ -83,6 +84,9 @@ func (c *daemonSets) Update(daemonSet *v1beta1.DaemonSet) (result *v1beta1.Daemo
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *daemonSets) UpdateStatus(daemonSet *v1beta1.DaemonSet) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
 	err = c.client.Put().
@@ -119,12 +123,13 @@ func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
-func (c *daemonSets) Get(name string) (result *v1beta1.DaemonSet, err error) {
+func (c *daemonSets) Get(name string, options meta_v1.GetOptions) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

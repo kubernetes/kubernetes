@@ -212,8 +212,8 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 
 		var values [][]reflect.Value
 		var err error
-		if unstructured, ok := obj.(*runtime.Unstructured); ok {
-			values, err = parser.FindResults(unstructured.Object)
+		if unstructured, ok := obj.(runtime.Unstructured); ok {
+			values, err = parser.FindResults(unstructured.UnstructuredContent())
 		} else {
 			values, err = parser.FindResults(reflect.ValueOf(obj).Elem().Interface())
 		}

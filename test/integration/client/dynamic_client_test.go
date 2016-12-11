@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -93,9 +94,9 @@ func TestDynamicClient(t *testing.T) {
 
 	// check dynamic list
 	obj, err := dynamicClient.Resource(&resource, ns.Name).List(&v1.ListOptions{})
-	unstructuredList, ok := obj.(*runtime.UnstructuredList)
+	unstructuredList, ok := obj.(*unstructured.UnstructuredList)
 	if !ok {
-		t.Fatalf("expected *runtime.UnstructuredList, got %#v", obj)
+		t.Fatalf("expected *unstructured.UnstructuredList, got %#v", obj)
 	}
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
@@ -145,8 +146,8 @@ func TestDynamicClient(t *testing.T) {
 	}
 }
 
-func unstructuredToPod(obj *runtime.Unstructured) (*v1.Pod, error) {
-	json, err := runtime.Encode(runtime.UnstructuredJSONScheme, obj)
+func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
+	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}

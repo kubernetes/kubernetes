@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/client-go/pkg/api/meta"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 )
@@ -29,7 +30,7 @@ import (
 // accessor appropriate for use with unstructured objects.
 func VersionInterfaces(schema.GroupVersion) (*meta.VersionInterfaces, error) {
 	return &meta.VersionInterfaces{
-		ObjectConvertor:  &runtime.UnstructuredObjectConverter{},
+		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
 		MetadataAccessor: meta.NewAccessor(),
 	}, nil
 }
@@ -56,7 +57,7 @@ func NewDiscoveryRESTMapper(resources []*metav1.APIResourceList, versionFunc met
 }
 
 // ObjectTyper provides an ObjectTyper implementation for
-// runtime.Unstructured object based on discovery information.
+// unstructured.Unstructured object based on discovery information.
 type ObjectTyper struct {
 	registered map[schema.GroupVersionKind]bool
 }
@@ -79,10 +80,10 @@ func NewObjectTyper(resources []*metav1.APIResourceList) (runtime.ObjectTyper, e
 
 // ObjectKinds returns a slice of one element with the
 // group,version,kind of the provided object, or an error if the
-// object is not *runtime.Unstructured or has no group,version,kind
+// object is not *unstructured.Unstructured or has no group,version,kind
 // information.
 func (ot *ObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, bool, error) {
-	if _, ok := obj.(*runtime.Unstructured); !ok {
+	if _, ok := obj.(*unstructured.Unstructured); !ok {
 		return nil, false, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
 	}
 	return []schema.GroupVersionKind{obj.GetObjectKind().GroupVersionKind()}, false, nil

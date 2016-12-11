@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -89,7 +90,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicationController", Name: "foo", UID: "abcdef123456", Controller: &trueVar},
 					},
 				},
@@ -102,7 +103,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "RandomController", Name: "foo", UID: "abcdef123456", Controller: &trueVar},
 					},
 				},
@@ -115,7 +116,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicationController", Name: "foo", UID: "abcdef123456"},
 					},
 				},
@@ -128,7 +129,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: v1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicaSet", Name: "foo", UID: "qwert12345", Controller: &trueVar},
 					},
 				},

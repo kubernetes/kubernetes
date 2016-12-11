@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,17 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// The types defined in this package are used by the meta package to represent
-// the in-memory version of objects. We cannot reuse the __internal version of
-// API objects because it causes import cycle.
-package metatypes
-
-import "k8s.io/kubernetes/pkg/types"
-
-type OwnerReference struct {
-	APIVersion string
-	Kind       string
-	UID        types.UID
-	Name       string
-	Controller *bool
-}
+// Package metatypes has been deprecated and removed.
+package meta // import "k8s.io/kubernetes/pkg/api/meta/metatypes"
