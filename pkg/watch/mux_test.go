@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package watch
+package watch_test
 
 import (
 	"reflect"
@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/wait"
+	. "k8s.io/kubernetes/pkg/watch"
 )
 
 type myType struct {

@@ -26,7 +26,7 @@ import (
 // Event represents a single event to a watched resource.
 //
 // +protobuf=true
-// +k8s:openapi-gen=true
+// +k8s:openapi-gen=false
 type Event struct {
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 
@@ -74,6 +74,7 @@ func Convert_versioned_Event_to_versioned_InternalEvent(in *Event, out *Internal
 }
 
 // InternalEvent makes watch.Event versioned
+// +protobuf=false
 type InternalEvent watch.Event
 
 func (e *InternalEvent) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }

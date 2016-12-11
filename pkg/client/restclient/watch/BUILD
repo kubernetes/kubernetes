@@ -34,6 +34,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/client/restclient/watch:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/serializer/streaming:go_default_library",
         "//pkg/util/wait:go_default_library",
