@@ -400,6 +400,7 @@ type provisioningConfig struct {
 	clusterId       string
 	gidMin          int
 	gidMax          int
+	volumeType      gapi.VolumeDurabilityInfo
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -422,6 +423,19 @@ func convertGid(gidString string) (int, error) {
 	// for 32 bit, we can cast to int without loss:
 	gid := int(gid64)
 	return gid, nil
+}
+
+func convertVolumeParam(volumeString string) (int, error) {
+
+	count, err := strconv.Atoi(volumeString)
+	if err != nil {
+		return 0, fmt.Errorf("glusterfs: failed to parse volumeString %v ", volumeString)
+	}
+
+	if count < 0 {
+		return 0, fmt.Errorf("glusterfs: negative values are not allowed: %v", volumeString)
+	}
+	return count, nil
 }
 
 func (plugin *glusterfsPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -859,6 +873,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	cfg.gidMax = defaultGidMax
 
 	authEnabled := true
+	parseVolumeType := ""
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
 		case "resturl":
@@ -901,6 +916,9 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 				return nil, fmt.Errorf("glusterfs: gidMax must be <= %v", absoluteGidMax)
 			}
 			cfg.gidMax = parseGidMax
+		case "volumetype":
+			parseVolumeType = v
+
 		default:
 			return nil, fmt.Errorf("glusterfs: invalid option %q for volume plugin %s", k, glusterfsPluginName)
 		}
@@ -910,6 +928,33 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'resturl' parameter", glusterfsPluginName)
 	}
 
+	if len(parseVolumeType) == 0 {
+		cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityReplicate, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}
+	} else {
+		parseVolumeTypeInfo := dstrings.Split(parseVolumeType, ":")
+		switch parseVolumeTypeInfo[0] {
+		case "replicate":
+			replicaCount, err := convertVolumeParam(parseVolumeTypeInfo[1])
+			if err != nil {
+				return nil, fmt.Errorf("glusterfs: invalid value %q for option %s volume plugin %s ", parseVolumeTypeInfo[1], "volumetype", glusterfsPluginName)
+			}
+			cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityReplicate, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}
+		case "disperse":
+			disperseData, err := convertVolumeParam(parseVolumeTypeInfo[1])
+			if err != nil {
+				return nil, fmt.Errorf("glusterfs: invalid value %q for option %s volume plugin %s ", parseVolumeTypeInfo[1], "volumetype", glusterfsPluginName)
+			}
+			disperseRedundancy, err := convertVolumeParam(parseVolumeTypeInfo[2])
+			if err != nil {
+				return nil, fmt.Errorf("glusterfs: invalid value %q for option %s volume plugin %s ", parseVolumeTypeInfo[2], "volumetype", glusterfsPluginName)
+			}
+			cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityEC, Disperse: gapi.DisperseDurability{Data: disperseData, Redundancy: disperseRedundancy}}
+		case "none":
+			cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityDistributeOnly}
+		default:
+			return nil, fmt.Errorf("glusterfs: invalid value for option 'volumetype' for volume plugin %s", glusterfsPluginName)
+		}
+	}
 	if !authEnabled {
 		cfg.user = ""
 		cfg.secretName = ""
