@@ -73,6 +73,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).Dial,
+		ResponseHeaderTimeout: 10 * time.Second,
 	})
 	return c.transports[key], nil
 }
