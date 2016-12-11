@@ -124,32 +124,32 @@ func getByteRange(start byte, end byte) []byte {
 	return bytes
 }
 
-var toGroundBytes = getToGroundBytes()
-var executors = getExecuteBytes()
+var ToGroundBytes = getToGroundBytes()
+var Executors = getExecuteBytes()
 
 // SPACE		  20+A0 hex  Always and everywhere a blank space
 // Intermediate	  20-2F hex   !"#$%&'()*+,-./
-var intermeds = getByteRange(0x20, 0x2F)
+var Intermeds = getByteRange(0x20, 0x2F)
 
 // Parameters	  30-3F hex  0123456789:;<=>?
 // CSI Parameters 30-39, 3B hex 0123456789;
-var csiParams = getByteRange(0x30, 0x3F)
+var CsiParams = getByteRange(0x30, 0x3F)
 
-var csiCollectables = append(getByteRange(0x30, 0x39), getByteRange(0x3B, 0x3F)...)
+var CsiCollectables = append(getByteRange(0x30, 0x39), getByteRange(0x3B, 0x3F)...)
 
 // Uppercase	  40-5F hex  @ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-var upperCase = getByteRange(0x40, 0x5F)
+var UpperCase = getByteRange(0x40, 0x5F)
 
 // Lowercase	  60-7E hex  `abcdefghijlkmnopqrstuvwxyz{|}~
-var lowerCase = getByteRange(0x60, 0x7E)
+var LowerCase = getByteRange(0x60, 0x7E)
 
 // Alphabetics	  40-7E hex  (all of upper and lower case)
-var alphabetics = append(upperCase, lowerCase...)
+var Alphabetics = append(UpperCase, LowerCase...)
 
-var printables = getByteRange(0x20, 0x7F)
+var Printables = getByteRange(0x20, 0x7F)
 
-var escapeIntermediateToGroundBytes = getByteRange(0x30, 0x7E)
-var escapeToGroundBytes = getEscapeToGroundBytes()
+var EscapeIntermediateToGroundBytes = getByteRange(0x30, 0x7E)
+var EscapeToGroundBytes = getEscapeToGroundBytes()
 
 // See http://www.vt100.net/emu/vt500_parser.png for description of the complex
 // byte ranges below
