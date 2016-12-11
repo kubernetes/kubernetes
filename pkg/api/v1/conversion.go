@@ -493,6 +493,12 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 		// taking responsibility to ensure mutation of in is not exposed
 		// back to the caller.
 		in.Spec.InitContainers = values
+
+		// Call defaulters explicitly until annotations are removed
+		for i := range in.Spec.InitContainers {
+			c := &in.Spec.InitContainers[i]
+			SetDefaults_Container(c)
+		}
 	}
 
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
