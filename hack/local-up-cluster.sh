@@ -149,7 +149,7 @@ function test_docker {
 }
 
 function test_cfssl_installed {
-    if ! command -v cfssl &>/dev/null || ! command -v cfssljson &>/dev/null; then
+    if ! ${CONTROLPLANE_SUDO} /bin/bash -c "which cfssl" &>/dev/null || ! ${CONTROLPLANE_SUDO} /bin/bash -c "which cfssljson" &>/dev/null; then
       echo "Failed to successfully run 'cfssl', please verify that cfssl and cfssljson are in \$PATH."
       echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
       exit 1
@@ -676,11 +676,11 @@ function start_kubelet {
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
       # Quick check that kubelet is running.
-      if ps -p $KUBELET_PID > /dev/null ; then 
+      if ps -p $KUBELET_PID > /dev/null ; then
 	echo "kubelet ( $KUBELET_PID ) is running."
       else
 	cat ${KUBELET_LOG} ; exit 1
-      fi	
+      fi
     else
       # Docker won't run a container with a cidfile (container id file)
       # unless that file does not already exist; clean up an existing
@@ -755,7 +755,7 @@ function start_kubedns {
           sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
         fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
-        
+
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create skydns rc and service
