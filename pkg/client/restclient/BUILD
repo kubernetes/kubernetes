@@ -65,6 +65,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/client/restclient/watch:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",

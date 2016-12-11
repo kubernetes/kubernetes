@@ -23,10 +23,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	restclientwatch "k8s.io/kubernetes/pkg/client/restclient/watch"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {
@@ -55,14 +55,14 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		buf := &bytes.Buffer{}
 
 		codec := testCase.Codec
-		encoder := versioned.NewEncoder(streaming.NewEncoder(buf, codec), codec)
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(buf, codec), codec)
 		if err := encoder.Encode(&watch.Event{Type: testCase.Type, Object: testCase.Object}); err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
 
 		rc := ioutil.NopCloser(buf)
-		decoder := versioned.NewDecoder(streaming.NewDecoder(rc, codec), codec)
+		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(rc, codec), codec)
 		event, obj, err := decoder.Decode()
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
