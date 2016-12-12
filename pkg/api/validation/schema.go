@@ -285,7 +285,16 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 		}
 	}
 	for key, value := range fields {
-		details, ok := properties.At(key)
+		details, okProperty := properties.At(key)
+		if !okProperty {
+			msg := "["
+			for _, p := range properties.List {
+				msg = msg + p.Name + ","
+			}
+			msg = msg + "]"
+			allErrs = append(allErrs, fmt.Errorf("found invalid field %s for %s --- valid fields are %v", key, typeName, msg))
+			continue
+		}
 
 		// Special case for runtime.RawExtension and runtime.Objects because they always fail to validate
 		// This is because the actual values will be of some sub-type (e.g. Deployment) not the expected
@@ -295,10 +304,6 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 			if len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			}
-			continue
-		}
-		if !ok {
-			allErrs = append(allErrs, fmt.Errorf("found invalid field %s for %s", key, typeName))
 			continue
 		}
 		if details.Type == nil && details.Ref == nil {

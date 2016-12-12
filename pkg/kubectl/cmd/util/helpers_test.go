@@ -43,6 +43,8 @@ import (
 
 func TestMerge(t *testing.T) {
 	grace := int64(30)
+	podSpec := apitesting.DeepEqualSafePodSpec()
+
 	tests := []struct {
 		obj       runtime.Object
 		fragment  string
@@ -56,13 +58,14 @@ func TestMerge(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
+				Spec: podSpec,
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: apitesting.DeepEqualSafePodSpec(),
+				Spec: podSpec,
 			},
 		},
 		/* TODO: uncomment this test once Merge is updated to use
@@ -111,6 +114,7 @@ func TestMerge(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
+				Spec: podSpec,
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
@@ -128,11 +132,12 @@ func TestMerge(t *testing.T) {
 							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 						},
 					},
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-					SecurityContext:               &api.PodSecurityContext{},
-					Affinity:                      &api.Affinity{},
+					Affinity:                             &api.Affinity{},
+					RestartPolicy:                        api.RestartPolicyAlways,
+					DNSPolicy:                            api.DNSClusterFirst,
+					TerminationGracePeriodSeconds:        &grace,
+					SecurityContext:                      podSpec.SecurityContext,
+					SchedulingMismatchedPredicateResults: podSpec.SchedulingMismatchedPredicateResults,
 				},
 			},
 		},
@@ -332,6 +337,10 @@ func TestDumpReaderToFile(t *testing.T) {
 }
 
 func TestMaybeConvert(t *testing.T) {
+	podSpecApi := api.PodSpec{}
+	podSpecV1 := v1.PodSpec{}
+	v1.Convert_api_PodSpec_To_v1_PodSpec(&podSpecApi, &podSpecV1, nil)
+
 	tests := []struct {
 		input    runtime.Object
 		gv       schema.GroupVersion
@@ -342,6 +351,7 @@ func TestMaybeConvert(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
+				Spec: podSpecApi,
 			},
 			gv: schema.GroupVersion{Group: "", Version: "v1"},
 			expected: &v1.Pod{
@@ -352,6 +362,7 @@ func TestMaybeConvert(t *testing.T) {
 				ObjectMeta: v1.ObjectMeta{
 					Name: "foo",
 				},
+				Spec: podSpecV1,
 			},
 		},
 		{

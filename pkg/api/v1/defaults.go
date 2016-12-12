@@ -178,6 +178,9 @@ func SetDefaults_PodSpec(obj *PodSpec) {
 	if obj.Affinity == nil {
 		obj.Affinity = &Affinity{}
 	}
+	if obj.SchedulingMismatchedPredicateResults == nil {
+		obj.SchedulingMismatchedPredicateResults = make(map[string]int32)
+	}
 }
 func SetDefaults_Probe(obj *Probe) {
 	if obj.TimeoutSeconds == 0 {

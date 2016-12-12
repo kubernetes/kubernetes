@@ -333,6 +333,7 @@ func TestEncode_Ptr(t *testing.T) {
 
 			SecurityContext: &api.PodSecurityContext{},
 			Affinity:        &api.Affinity{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 	obj := runtime.Object(pod)

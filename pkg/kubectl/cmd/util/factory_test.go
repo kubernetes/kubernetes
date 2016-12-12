@@ -610,6 +610,9 @@ func TestGetFirstPod(t *testing.T) {
 
 		pod, numPods, err := GetFirstPod(fake.Core(), api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
 		pod.Spec.SecurityContext = nil
+		test.expected.Spec.SecurityContext = nil
+		pod.Spec.SchedulingMismatchedPredicateResults = nil
+		test.expected.Spec.SchedulingMismatchedPredicateResults = nil
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue

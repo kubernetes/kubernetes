@@ -1827,6 +1827,8 @@ type PodSpec struct {
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity
+	// When populated, summary of false podFitsOnNode predicates for investigating unscheduled pods.
+	SchedulingMismatchedPredicateResults map[string]int32 `json:"schedulingMismatchedPredicateResults,omitempty" protobuf:"bytes,19,rep,name=schedulingMismatchedPredicateResults"`
 }
 
 // Sysctl defines a kernel parameter to be set

@@ -133,6 +133,9 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			if s.Affinity == nil {
 				s.Affinity = new(api.Affinity)
 			}
+			if s.SchedulingMismatchedPredicateResults == nil {
+				s.SchedulingMismatchedPredicateResults = make(map[string]int32)
+			}
 		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
@@ -554,6 +557,9 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			s.PodDisruptionsAllowed = int32(c.Rand.Intn(2))
+		},
+		func(s *api.Affinity, c fuzz.Continue) {
+			c.FuzzNoCustom(s)
 		},
 	)
 	return f

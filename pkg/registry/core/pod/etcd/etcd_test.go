@@ -71,8 +71,9 @@ func validNewPod() *api.Pod {
 					SecurityContext:        securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 				},
 			},
-			SecurityContext: &api.PodSecurityContext{},
-			Affinity:        &api.Affinity{},
+			Affinity:                             &api.Affinity{},
+			SecurityContext:                      &api.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 }
@@ -660,6 +661,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			},
 			SecurityContext: &api.PodSecurityContext{},
 			Affinity:        &api.Affinity{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}, nil, 1)
 	if err != nil {
@@ -683,12 +685,12 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 				TerminationMessagePath: api.TerminationMessagePathDefault,
 				SecurityContext:        securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 			}},
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-
-			TerminationGracePeriodSeconds: &grace,
-			SecurityContext:               &api.PodSecurityContext{},
-			Affinity:                      &api.Affinity{},
+			RestartPolicy:                        api.RestartPolicyAlways,
+			DNSPolicy:                            api.DNSClusterFirst,
+			Affinity:                             &api.Affinity{},
+			TerminationGracePeriodSeconds:        &grace,
+			SecurityContext:                      &api.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn, api.Scheme))
@@ -730,6 +732,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 			},
 			SecurityContext: &api.PodSecurityContext{},
 			Affinity:        &api.Affinity{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 	err := storage.Storage.Create(ctx, key, &podStart, nil, 0)
@@ -753,8 +756,9 @@ func TestEtcdUpdateStatus(t *testing.T) {
 					TerminationMessagePath: api.TerminationMessagePathDefault,
 				},
 			},
-			SecurityContext: &api.PodSecurityContext{},
-			Affinity:        &api.Affinity{},
+			Affinity:                             &api.Affinity{},
+			SecurityContext:                      &api.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 		Status: api.PodStatus{
 			Phase:   api.PodRunning,

@@ -138,6 +138,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
+
 	handler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), testPod),
@@ -171,7 +172,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		}
 		handler.ValidateRequest(t, testapi.Default.ResourcePath("pods", "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
+			t.Errorf("EXPECTED\n%vGOT\n%v", e, a)
 		}
 		break
 	}

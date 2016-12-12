@@ -41,6 +41,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			Affinity:                      &v1.Affinity{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Labels: defaultLabels,
@@ -53,6 +54,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			Affinity:                      &v1.Affinity{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 	tests := []struct {
@@ -158,6 +160,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			Affinity:                      &v1.Affinity{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 	tests := []struct {

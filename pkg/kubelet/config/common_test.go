@@ -53,8 +53,9 @@ func TestDecodeSinglePod(t *testing.T) {
 				TerminationMessagePath: "/dev/termination-log",
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
-			SecurityContext: &v1.PodSecurityContext{},
-			Affinity:        &v1.Affinity{},
+			Affinity:                             &v1.Affinity{},
+			SecurityContext:                      &v1.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 	json, err := runtime.Encode(testapi.Default.Codec(), pod)
@@ -114,8 +115,9 @@ func TestDecodePodList(t *testing.T) {
 				TerminationMessagePath: "/dev/termination-log",
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
-			SecurityContext: &v1.PodSecurityContext{},
-			Affinity:        &v1.Affinity{},
+			Affinity:                             &v1.Affinity{},
+			SecurityContext:                      &v1.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 	podList := &v1.PodList{
