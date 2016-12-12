@@ -208,8 +208,9 @@ function create-master-auth {
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
   if [[ ! -e "${known_tokens_csv}" ]]; then
     echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
+    echo "kube-controller-manager-token,system:kube-controller-manager,system:masters" > "${known_tokens_csv}"
+    echo "${KUBELET_TOKEN},kubelet,\"kubelet,system:nodes\"" >> "${known_tokens_csv}"
+    echo "${KUBE_PROXY_TOKEN},kube_proxy,\"kube_proxy,system:nodes\"" >> "${known_tokens_csv}"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -370,6 +371,30 @@ contexts:
 - context:
     cluster: local
     user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
+function create-kubecontrollermanager-kubeconfig {
+  echo "Creating kube-controller-manager kubeconfig file"
+  mdkir -p /var/lib/kube-controller-manager
+  cat <<EOF >/var/lib/kube-controller-manager/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-controller-manager
+  user:
+    token: kube-controller-manager-token
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://127.0.0.1:443
+contexts:
+- context:
+    cluster: local
+    user: kube-controller-manager
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -835,7 +860,7 @@ function start-kube-apiserver {
     webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
   fi
 
-  params+=" --authorization-mode=ABAC"
+  params+=" --authorization-mode=RBAC,ABAC"
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
@@ -894,11 +919,13 @@ function start-kube-apiserver {
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
+  create-kubecontrollermanager-kubeconfig
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
+  params+=" --use-service-account-credentials"
   params+=" --cloud-provider=gce"
-  params+=" --master=127.0.0.1:8080"
+  params+=" --kubeconfig=/var/lib/kube-controller-manager/kubeconfig"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
