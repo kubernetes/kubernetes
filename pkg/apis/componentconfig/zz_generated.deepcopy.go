@@ -133,6 +133,8 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
 		out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 		out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
+		out.EnableBootstrapSigner = in.EnableBootstrapSigner
+		out.EnableTokenCleaner = in.EnableTokenCleaner
 		return nil
 	}
 }
