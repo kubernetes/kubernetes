@@ -562,6 +562,23 @@ function create-dhcp-option-set () {
   echo "Using DHCP option set ${DHCP_OPTION_SET_ID}"
 }
 
+function delete-dhcp-option-sets () {
+  if [[ -n "${DHCP_OPTION_SET_ID:-}" ]]; then
+    return
+  fi
+
+  dhcp_option_ids=$($AWS_CMD describe-dhcp-options \
+                             --output text \
+                             --filters Name=tag:Name,Values=kubernetes-dhcp-option-set \
+                                       Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                             --query DhcpOptions[].DhcpOptionsId \
+                    | tr "\t" "\n")
+  for dhcp_option_id in ${dhcp_option_ids}; do
+    echo "Deleting DHCP option set: ${dhcp_option_id}"
+    $AWS_CMD delete-dhcp-options --dhcp-options-id $dhcp_option_id > $LOG
+  done
+}
+
 # Verify prereqs
 function verify-prereqs {
   if [[ "$(which aws)" == "" ]]; then
@@ -1488,6 +1505,8 @@ function kube-down {
     echo "Note: You may be seeing this message may be because the cluster was already deleted, or" >&2
     echo "has a name other than '${CLUSTER_ID}'." >&2
   fi
+
+  delete-dhcp-option-sets
 
   echo "Deleting IAM Instance profiles"
   delete-iam-profiles
