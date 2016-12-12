@@ -97,7 +97,7 @@ import (
 
 const (
 	// Max amount of time to wait for the container runtime to come up.
-	maxWaitForContainerRuntime = 5 * time.Minute
+	maxWaitForContainerRuntime = 30 * time.Second
 
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
