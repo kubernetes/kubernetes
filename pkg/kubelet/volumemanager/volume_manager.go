@@ -296,8 +296,10 @@ func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
 
 	for _, volume := range desiredVolumes {
 		if volume.PluginIsAttachable {
-			desiredVolumesMap[volume.VolumeName] = true
-			volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
+			if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
+				desiredVolumesMap[volume.VolumeName] = true
+				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
+			}
 		}
 	}
 
