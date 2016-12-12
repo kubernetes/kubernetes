@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -164,7 +165,26 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 		return rs, nil
 	}
-	hash := deploymentutil.GetReplicaSetHash(rs)
+	// The hash here is used for setting the unique label for the replica set. If the admin chooses to
+	// migrate to the new hashing algorithm, we will need to determine if this replica set was created
+	// using the old or the new algorithm.
+	var hash string
+	switch dc.hashingAlgorithm {
+	case "adler":
+		hash = deploymentutil.GetReplicaSetHash(rs)
+	case "fnv":
+		hash = deploymentutil.GetReplicaSetHashFnv(rs)
+	case "migrate-to-fnv":
+		// TODO: Should we look for the migrated-from annotation?
+		// We can look at the name suffix of the replica set, if it's the same as
+		// the old hash, then use the old hash, otherwise use the new algorithm.
+		if !strings.HasSuffix(rs.Name, hash) {
+			hash = deploymentutil.GetReplicaSetHashFnv(rs)
+		} else {
+			hash = deploymentutil.GetReplicaSetHash(rs)
+		}
+	}
+
 	// 1. Add hash template label to the rs. This ensures that any newly created pods will have the new label.
 	updatedRS, err := deploymentutil.UpdateRSWithRetries(dc.client.Extensions().ReplicaSets(rs.Namespace), dc.rsLister, rs.Namespace, rs.Name,
 		func(updated *extensions.ReplicaSet) error {
@@ -315,10 +335,30 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 
 	// new ReplicaSet does not exist, create one.
 	namespace := deployment.Namespace
-	podTemplateSpecHash := fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template))
+	var podTemplateSpecHash string
+	var usesNewHashingAlgorithm bool
+	switch dc.hashingAlgorithm {
+	case "adler":
+		podTemplateSpecHash = fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template))
+
+	case "fnv":
+		podTemplateSpecHash = fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHashFnv(deployment.Spec.Template))
+
+	case "migrate-to-fnv":
+		// See if we can use a new hash.
+		podTemplateSpecHash = fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHashFnv(deployment.Spec.Template))
+		_, err := dc.rsLister.ReplicaSets(namespace).Get(deployment.Name + "-" + podTemplateSpecHash)
+		if !errors.IsNotFound(err) {
+			// Fallback to the old hash.
+			podTemplateSpecHash = fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template))
+		} else {
+			usesNewHashingAlgorithm = true
+		}
+	}
+
 	newRSTemplate := deploymentutil.GetNewReplicaSetTemplate(deployment)
+	// Add podTemplateHash label to the pod template and selector of the new replica set.
 	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(deployment.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
-	// Add podTemplateHash label to selector.
 	newRSSelector := labelsutil.CloneSelectorAndAddLabel(deployment.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 
 	// Create new ReplicaSet
@@ -353,6 +393,9 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	*(newRS.Spec.Replicas) = newReplicasCount
 	// Set new replica set's annotation
 	deploymentutil.SetNewReplicaSetAnnotations(deployment, &newRS, newRevision, false)
+	if usesNewHashingAlgorithm {
+		newRS.Annotations[deploymentutil.MigratedFromAnnotation] = ""
+	}
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	switch {
 	// We may end up hitting this due to a slow cache or a fast resync of the deployment.

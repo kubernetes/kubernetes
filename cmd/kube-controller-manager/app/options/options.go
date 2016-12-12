@@ -94,16 +94,17 @@ func NewCMServer() *CMServer {
 				},
 				FlexVolumePluginDir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 			},
-			ContentType:              "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:               20.0,
-			KubeAPIBurst:             30,
-			LeaderElection:           leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval:  metav1.Duration{Duration: 0 * time.Second},
-			EnableGarbageCollector:   true,
-			ConcurrentGCSyncs:        20,
-			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
-			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 5 * time.Second},
+			ContentType:                "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:                 20.0,
+			KubeAPIBurst:               30,
+			LeaderElection:             leaderelection.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval:    metav1.Duration{Duration: 0 * time.Second},
+			EnableGarbageCollector:     true,
+			ConcurrentGCSyncs:          20,
+			ClusterSigningCertFile:     "/etc/kubernetes/ca/ca.pem",
+			ClusterSigningKeyFile:      "/etc/kubernetes/ca/ca.key",
+			ReconcilerSyncLoopPeriod:   metav1.Duration{Duration: 5 * time.Second},
+			DeploymentHashingAlgorithm: "adler",
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -196,6 +197,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.Float32Var(&s.UnhealthyZoneThreshold, "unhealthy-zone-threshold", 0.55, "Fraction of Nodes in a zone which needs to be not Ready (minimum 3) for zone to be treated as unhealthy. ")
 	fs.BoolVar(&s.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile-sync", false, "Disable volume attach detach reconciler sync. Disabling this may cause volumes to be mismatched with pods. Use wisely.")
 	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
+	fs.StringVar(&s.DeploymentHashingAlgorithm, "deployment-hashing-algorithm", s.DeploymentHashingAlgorithm, "The hashing algorithm used to hash pod templates for Deployments. 'adler' is used by default, 'migrate-to-fnv' needs to run as a migration step, and 'fnv' is the new hashing option.")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 

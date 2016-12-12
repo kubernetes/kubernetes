@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "deployment_controller.go",
+        "migrate.go",
         "progress.go",
         "recreate.go",
         "rollback.go",
@@ -21,6 +22,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/cache:go_default_library",
@@ -31,6 +33,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//pkg/util/errors:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/workqueue:go_default_library",

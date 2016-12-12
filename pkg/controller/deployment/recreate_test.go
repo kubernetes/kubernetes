@@ -68,7 +68,7 @@ func TestScaleDownOldReplicaSets(t *testing.T) {
 
 		kc := fake.NewSimpleClientset(expected...)
 		informers := informers.NewSharedInformerFactory(kc, nil, controller.NoResyncPeriodFunc())
-		c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), kc)
+		c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), kc, "fnv")
 
 		c.scaleDownOldReplicaSetsForRecreate(oldRSs, test.d)
 		for j := range oldRSs {

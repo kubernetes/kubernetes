@@ -50,6 +50,7 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.ReplicaSets(),
 		ctx.InformerFactory.Pods(),
 		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
+		ctx.Options.DeploymentHashingAlgorithm,
 	).Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
 }

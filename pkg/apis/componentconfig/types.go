@@ -789,6 +789,10 @@ type KubeControllerManagerConfiguration struct {
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+	// deploymentHashingAlgorithm is the hasing algorithm used for hashing pod templates for Deployments.
+	// adler is used by default, migrate-to-fnv needs to run as a migration step, and fnv is the new
+	// hashing algorithm that should be used (adler breaks quite fast when brute-forced).
+	DeploymentHashingAlgorithm string
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

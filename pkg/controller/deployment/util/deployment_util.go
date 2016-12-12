@@ -72,6 +72,11 @@ const (
 	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
 	// See https://github.com/kubernetes/kubernetes/issues/2210
 	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
+	// MigratedFromAnnotation is added in a replica set that was created by the deployment controller
+	// by using the new hashing algorithm (fnv). This annotation will be added and is useful only
+	// during the migration step that should be performed by admins.
+	// TODO: Once added this annotation should never be removed?
+	MigratedFromAnnotation = "deployment.kubernetes.io/migrated-from"
 
 	// Reasons for deployment conditions
 	//
