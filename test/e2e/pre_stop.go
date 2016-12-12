@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -122,9 +123,14 @@ func testPreStop(c clientset.Interface, ns string) {
 		if err != nil {
 			return false, err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		var body []byte
 		if subResourceProxyAvailable {
 			body, err = c.Core().RESTClient().Get().
+				Context(ctx).
 				Namespace(ns).
 				Resource("pods").
 				SubResource("proxy").
@@ -133,6 +139,7 @@ func testPreStop(c clientset.Interface, ns string) {
 				DoRaw()
 		} else {
 			body, err = c.Core().RESTClient().Get().
+				Context(ctx).
 				Prefix("proxy").
 				Namespace(ns).
 				Resource("pods").
@@ -141,6 +148,10 @@ func testPreStop(c clientset.Interface, ns string) {
 				DoRaw()
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("Error validating prestop: %v", err)
+				return true, err
+			}
 			By(fmt.Sprintf("Error validating prestop: %v", err))
 		} else {
 			framework.Logf("Saw: %s", string(body))
