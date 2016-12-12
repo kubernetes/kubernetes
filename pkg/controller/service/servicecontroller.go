@@ -302,7 +302,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 			return fmt.Errorf("Failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
 		}
 	} else {
-		glog.V(2).Infof("Not persisting unchanged LoadBalancerStatus to registry.")
+		glog.V(2).Infof("Not persisting unchanged LoadBalancerStatus for service %s to registry.", key)
 	}
 
 	return nil, notRetryable
@@ -327,7 +327,7 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 		// balancer status. For now, just rely on the fact that we'll
 		// also process the update that caused the resource version to change.
 		if errors.IsConflict(err) {
-			glog.V(4).Infof("Not persisting update to service '%s/%s' that has been changed since we received it: %v",
+			glog.Warningf("Not persisting update to service '%s/%s' that has been changed since we received it: %v",
 				service.Namespace, service.Name, err)
 			return nil
 		}
