@@ -167,6 +167,22 @@ func TestBootstrapClusterRoles(t *testing.T) {
 	testObjects(t, list, "cluster-roles.yaml")
 }
 
+func TestBootstrapClusterRoleBindings(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roleBindings := map[string]runtime.Object{}
+	bootstrapRoleBindings := bootstrappolicy.ClusterRoleBindings()
+	for i := range bootstrapRoleBindings {
+		role := bootstrapRoleBindings[i]
+		names.Insert(role.Name)
+		roleBindings[role.Name] = &role
+	}
+	for _, name := range names.List() {
+		list.Items = append(list.Items, roleBindings[name])
+	}
+	testObjects(t, list, "cluster-role-bindings.yaml")
+}
+
 func TestBootstrapControllerRoles(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()
