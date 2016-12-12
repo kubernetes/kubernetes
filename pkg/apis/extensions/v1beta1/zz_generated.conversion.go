@@ -741,7 +741,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPo
 	// WARNING: in.ScaleTargetRef requires manual conversion: does not exist in peer-type
 	out.MinReplicas = (*int32)(unsafe.Pointer(in.MinReplicas))
 	out.MaxReplicas = in.MaxReplicas
-	// WARNING: in.TargetCPUUtilizationPercentage requires manual conversion: does not exist in peer-type
+	// WARNING: in.Metrics requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -750,12 +750,8 @@ func autoConvert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_Horizontal
 	out.LastScaleTime = (*v1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
+	// WARNING: in.CurrentCPUUtilizationPercentage requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	return autoConvert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in, out, s)
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
@@ -763,12 +759,8 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1beta1_Horizontal
 	out.LastScaleTime = (*v1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
+	// WARNING: in.CurrentMetrics requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	return autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in, out, s)
 }
 
 func autoConvert_v1beta1_HostPortRange_To_extensions_HostPortRange(in *HostPortRange, out *extensions.HostPortRange, s conversion.Scope) error {

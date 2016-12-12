@@ -47,6 +47,7 @@ filegroup(
         "//pkg/client/listers/authorization/v1beta1:all-srcs",
         "//pkg/client/listers/autoscaling/internalversion:all-srcs",
         "//pkg/client/listers/autoscaling/v1:all-srcs",
+        "//pkg/client/listers/autoscaling/v2alpha1:all-srcs",
         "//pkg/client/listers/batch/internalversion:all-srcs",
         "//pkg/client/listers/batch/v1:all-srcs",
         "//pkg/client/listers/batch/v2alpha1:all-srcs",

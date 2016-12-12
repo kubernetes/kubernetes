@@ -32,6 +32,8 @@ import (
 	fakev1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1/fake"
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
 	fakev1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1/fake"
+	v2alpha1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v2alpha1"
+	fakev2alpha1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v2alpha1/fake"
 	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1"
 	fakev1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1/fake"
 	v2alpha1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v2alpha1"
@@ -133,6 +135,11 @@ func (c *Clientset) AutoscalingV1() v1autoscaling.AutoscalingV1Interface {
 // Autoscaling retrieves the AutoscalingV1Client
 func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
 	return &fakev1autoscaling.FakeAutoscalingV1{Fake: &c.Fake}
+}
+
+// AutoscalingV2alpha1 retrieves the AutoscalingV2alpha1Client
+func (c *Clientset) AutoscalingV2alpha1() v2alpha1autoscaling.AutoscalingV2alpha1Interface {
+	return &fakev2alpha1autoscaling.FakeAutoscalingV2alpha1{Fake: &c.Fake}
 }
 
 // BatchV1 retrieves the BatchV1Client

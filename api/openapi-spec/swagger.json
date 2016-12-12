@@ -16797,6 +16797,904 @@
      }
     ]
    },
+   "/apis/autoscaling/v2alpha1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "getAutoscalingV2alpha1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/autoscaling/v2alpha1/horizontalpodautoscalers": {
+    "get": {
+     "description": "list or watch objects of kind HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "listAutoscalingV2alpha1HorizontalPodAutoscalerForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscalerList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers": {
+    "get": {
+     "description": "list or watch objects of kind HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "listAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscalerList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "createAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "deleteAutoscalingV2alpha1CollectionNamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
+    "get": {
+     "description": "read the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "readAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "replaceAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "deleteAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "patchAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the HorizontalPodAutoscaler",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status": {
+    "get": {
+     "description": "read status of the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "readAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace status of the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "replaceAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "patchAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the HorizontalPodAutoscaler",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/watch/horizontalpodautoscalers": {
+    "get": {
+     "description": "watch individual changes to a list of HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "watchAutoscalingV2alpha1HorizontalPodAutoscalerListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/watch/namespaces/{namespace}/horizontalpodautoscalers": {
+    "get": {
+     "description": "watch individual changes to a list of HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "watchAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/watch/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "watchAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the HorizontalPodAutoscaler",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/batch/": {
     "get": {
      "description": "get information of a group",
@@ -41523,6 +42421,145 @@
      }
     }
    },
+   "v2alpha1.CrossVersionObjectReference": {
+    "description": "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+    "required": [
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "API version of the referent",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\"",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
+     }
+    }
+   },
+   "v2alpha1.HorizontalPodAutoscaler": {
+    "description": "configuration of a horizontal pod autoscaler.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+      "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscalerSpec"
+     },
+     "status": {
+      "description": "current information about the autoscaler.",
+      "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscalerStatus"
+     }
+    }
+   },
+   "v2alpha1.HorizontalPodAutoscalerList": {
+    "description": "list of horizontal pod autoscaler objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "list of horizontal pod autoscaler objects.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v2alpha1.HorizontalPodAutoscaler"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata.",
+      "$ref": "#/definitions/v1.ListMeta"
+     }
+    }
+   },
+   "v2alpha1.HorizontalPodAutoscalerSpec": {
+    "description": "specification of a horizontal pod autoscaler.",
+    "required": [
+     "scaleTargetRef",
+     "maxReplicas"
+    ],
+    "properties": {
+     "maxReplicas": {
+      "description": "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "metrics": {
+      "description": "the metrics to use to calculate the desired replica count (the maximum replica count across all metrics will be used).\tThe desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v2alpha1.MetricSpec"
+      }
+     },
+     "minReplicas": {
+      "description": "lower limit for the number of pods that can be set by the autoscaler, default 1.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "scaleTargetRef": {
+      "description": "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource.",
+      "$ref": "#/definitions/v2alpha1.CrossVersionObjectReference"
+     }
+    }
+   },
+   "v2alpha1.HorizontalPodAutoscalerStatus": {
+    "description": "current status of a horizontal pod autoscaler",
+    "required": [
+     "currentReplicas",
+     "desiredReplicas",
+     "currentMetrics"
+    ],
+    "properties": {
+     "currentMetrics": {
+      "description": "the last read state of the metrics used by this autoscaler",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v2alpha1.MetricStatus"
+      }
+     },
+     "currentReplicas": {
+      "description": "current number of replicas of pods managed by this autoscaler.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "desiredReplicas": {
+      "description": "desired number of replicas of pods managed by this autoscaler.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "lastScaleTime": {
+      "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
+      "$ref": "#/definitions/v1.Time"
+     },
+     "observedGeneration": {
+      "description": "most recent generation observed by this autoscaler.",
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
    "v2alpha1.Job": {
     "description": "Job represents the configuration of a single job.",
     "properties": {
@@ -41688,6 +42725,175 @@
      "spec": {
       "description": "Specification of the desired behavior of the job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/v2alpha1.JobSpec"
+     }
+    }
+   },
+   "v2alpha1.MetricSpec": {
+    "description": "a specification for how to scale based on a single metric (only `type` and one other matching field should be set at once)",
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "object": {
+      "description": "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+      "$ref": "#/definitions/v2alpha1.ObjectMetricSource"
+     },
+     "pods": {
+      "description": "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+      "$ref": "#/definitions/v2alpha1.PodsMetricSource"
+     },
+     "resource": {
+      "description": "a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+      "$ref": "#/definitions/v2alpha1.ResourceMetricSource"
+     },
+     "type": {
+      "description": "the type of metric source (should match one of the fields below)",
+      "type": "string"
+     }
+    }
+   },
+   "v2alpha1.MetricStatus": {
+    "description": "the status of a single metric",
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "object": {
+      "description": "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+      "$ref": "#/definitions/v2alpha1.ObjectMetricStatus"
+     },
+     "pods": {
+      "description": "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+      "$ref": "#/definitions/v2alpha1.PodsMetricStatus"
+     },
+     "resource": {
+      "description": "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+      "$ref": "#/definitions/v2alpha1.ResourceMetricStatus"
+     },
+     "type": {
+      "description": "the type of metric source",
+      "type": "string"
+     }
+    }
+   },
+   "v2alpha1.ObjectMetricSource": {
+    "description": "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+    "required": [
+     "target",
+     "metricName",
+     "targetValue"
+    ],
+    "properties": {
+     "metricName": {
+      "description": "the name of the metric in question",
+      "type": "string"
+     },
+     "target": {
+      "description": "the described Kubernetes object",
+      "$ref": "#/definitions/v2alpha1.CrossVersionObjectReference"
+     },
+     "targetValue": {
+      "description": "the target value of the metric (as a quantity)",
+      "$ref": "#/definitions/resource.Quantity"
+     }
+    }
+   },
+   "v2alpha1.ObjectMetricStatus": {
+    "description": "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+    "required": [
+     "target",
+     "metricName",
+     "currentValue"
+    ],
+    "properties": {
+     "currentValue": {
+      "description": "the current value of the metric (as a quantity)",
+      "$ref": "#/definitions/resource.Quantity"
+     },
+     "metricName": {
+      "description": "the name of the metric in question",
+      "type": "string"
+     },
+     "target": {
+      "description": "the described Kubernetes object",
+      "$ref": "#/definitions/v2alpha1.CrossVersionObjectReference"
+     }
+    }
+   },
+   "v2alpha1.PodsMetricSource": {
+    "description": "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+    "required": [
+     "metricName",
+     "targetAverageValue"
+    ],
+    "properties": {
+     "metricName": {
+      "description": "the name of the metric in question",
+      "type": "string"
+     },
+     "targetAverageValue": {
+      "description": "the target value of the metric (as a quantity)",
+      "$ref": "#/definitions/resource.Quantity"
+     }
+    }
+   },
+   "v2alpha1.PodsMetricStatus": {
+    "description": "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+    "required": [
+     "metricName",
+     "currentAverageValue"
+    ],
+    "properties": {
+     "currentAverageValue": {
+      "description": "the current value of the metric (as a quantity)",
+      "$ref": "#/definitions/resource.Quantity"
+     },
+     "metricName": {
+      "description": "the name of the metric in question",
+      "type": "string"
+     }
+    }
+   },
+   "v2alpha1.ResourceMetricSource": {
+    "description": "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Only one \"target\" type should be set.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "description": "the name of the resource in question",
+      "type": "string"
+     },
+     "targetAverageUtilization": {
+      "description": "the target value of the resource metric, represented as a percentage of the requested value of the resource on the pods.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "targetAverageValue": {
+      "description": "the target value of the resource metric as a raw value, similarly to the \"pods\" metric source type.",
+      "$ref": "#/definitions/resource.Quantity"
+     }
+    }
+   },
+   "v2alpha1.ResourceMetricStatus": {
+    "description": "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Only one \"target\" type should be set.  Note that the current raw value is always displayed (even when the current values as request utilization is also displayed).",
+    "required": [
+     "name",
+     "currentAverageValue"
+    ],
+    "properties": {
+     "currentAverageUtilization": {
+      "description": "the target value of the resource metric, represented as a percentage of the requested value of the resource on the pods (only populated if the corresponding request target was set)",
+      "type": "integer",
+      "format": "int32"
+     },
+     "currentAverageValue": {
+      "description": "the current value of the resource metric as a raw value",
+      "$ref": "#/definitions/resource.Quantity"
+     },
+     "name": {
+      "description": "the name of the resource in question",
+      "type": "string"
      }
     }
    },

@@ -3808,6 +3808,80 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		},
 		Dependencies: []string{},
 	},
+	"v1.MetricSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a specification for how to scale based on a single metric (only `type` and one other matching field should be set at once)",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the type of metric source (should match one of the fields below)",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMetricSource"),
+						},
+					},
+					"pods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+							Ref:         spec.MustCreateRef("#/definitions/v1.PodsMetricSource"),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ResourceMetricSource"),
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMetricSource", "v1.PodsMetricSource", "v1.ResourceMetricSource"},
+	},
+	"v1.MetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "the status of a single metric",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the type of metric source",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMetricStatus"),
+						},
+					},
+					"pods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+							Ref:         spec.MustCreateRef("#/definitions/v1.PodsMetricStatus"),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ResourceMetricStatus"),
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMetricStatus", "v1.PodsMetricStatus", "v1.ResourceMetricStatus"},
+	},
 	"v1.NFSVolumeSource": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4732,6 +4806,68 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		},
 		Dependencies: []string{
 			"v1.OwnerReference", "v1.Time"},
+	},
+	"v1.ObjectMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the described Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/v1.CrossVersionObjectReference"),
+						},
+					},
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"target", "metricName", "targetValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity", "v1.CrossVersionObjectReference"},
+	},
+	"v1.ObjectMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the described Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/v1.CrossVersionObjectReference"),
+						},
+					},
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"target", "metricName", "currentValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity", "v1.CrossVersionObjectReference"},
 	},
 	"v1.ObjectReference": {
 		Schema: spec.Schema{
@@ -6458,6 +6594,56 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.PodSpec"},
 	},
+	"v1.PodsMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+				Properties: map[string]spec.Schema{
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"metricName", "targetAverageValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v1.PodsMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+				Properties: map[string]spec.Schema{
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"metricName", "currentAverageValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
 	"v1.Preconditions": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7034,6 +7220,70 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 					},
 				},
 				Required: []string{"resource"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v1.ResourceMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Only one \"target\" type should be set.",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the resource in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetAverageUtilization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric, represented as a percentage of the requested value of the resource on the pods.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"targetAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a raw value, similarly to the \"pods\" metric source type.",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v1.ResourceMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Only one \"target\" type should be set.  Note that the current raw value is always displayed (even when the current values as request utilization is also displayed).",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the resource in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentAverageUtilization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric, represented as a percentage of the requested value of the resource on the pods (only populated if the corresponding request target was set)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"currentAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the resource metric as a raw value",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"name", "currentAverageValue"},
 			},
 		},
 		Dependencies: []string{
@@ -15526,6 +15776,223 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		Dependencies: []string{
 			"v1.ObjectReference", "v1.Time"},
 	},
+	"v2alpha1.CrossVersionObjectReference": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "API version of the referent",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"kind", "name"},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v2alpha1.HorizontalPodAutoscaler": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "configuration of a horizontal pod autoscaler.",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.HorizontalPodAutoscalerSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current information about the autoscaler.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.HorizontalPodAutoscalerStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v2alpha1.HorizontalPodAutoscalerSpec", "v2alpha1.HorizontalPodAutoscalerStatus"},
+	},
+	"v2alpha1.HorizontalPodAutoscalerList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "list of horizontal pod autoscaler objects.",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "list of horizontal pod autoscaler objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v2alpha1.HorizontalPodAutoscaler"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"v1.ListMeta", "v2alpha1.HorizontalPodAutoscaler"},
+	},
+	"v2alpha1.HorizontalPodAutoscalerSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "specification of a horizontal pod autoscaler.",
+				Properties: map[string]spec.Schema{
+					"scaleTargetRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CrossVersionObjectReference"),
+						},
+					},
+					"minReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "lower limit for the number of pods that can be set by the autoscaler, default 1.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"maxReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"metrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the metrics to use to calculate the desired replica count (the maximum replica count across all metrics will be used).\tThe desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v2alpha1.MetricSpec"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"scaleTargetRef", "maxReplicas"},
+			},
+		},
+		Dependencies: []string{
+			"v2alpha1.CrossVersionObjectReference", "v2alpha1.MetricSpec"},
+	},
+	"v2alpha1.HorizontalPodAutoscalerStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "current status of a horizontal pod autoscaler",
+				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "most recent generation observed by this autoscaler.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"lastScaleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.Time"),
+						},
+					},
+					"currentReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current number of replicas of pods managed by this autoscaler.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"desiredReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "desired number of replicas of pods managed by this autoscaler.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"currentMetrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the last read state of the metrics used by this autoscaler",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v2alpha1.MetricStatus"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"currentReplicas", "desiredReplicas", "currentMetrics"},
+			},
+		},
+		Dependencies: []string{
+			"v1.Time", "v2alpha1.MetricStatus"},
+	},
 	"v2alpha1.Job": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15834,6 +16301,256 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		},
 		Dependencies: []string{
 			"v1.ObjectMeta", "v2alpha1.JobSpec"},
+	},
+	"v2alpha1.MetricSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a specification for how to scale based on a single metric (only `type` and one other matching field should be set at once)",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the type of metric source (should match one of the fields below)",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ObjectMetricSource"),
+						},
+					},
+					"pods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.PodsMetricSource"),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ResourceMetricSource"),
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+		},
+		Dependencies: []string{
+			"v2alpha1.ObjectMetricSource", "v2alpha1.PodsMetricSource", "v2alpha1.ResourceMetricSource"},
+	},
+	"v2alpha1.MetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "the status of a single metric",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the type of metric source",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ObjectMetricStatus"),
+						},
+					},
+					"pods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.PodsMetricStatus"),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ResourceMetricStatus"),
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+		},
+		Dependencies: []string{
+			"v2alpha1.ObjectMetricStatus", "v2alpha1.PodsMetricStatus", "v2alpha1.ResourceMetricStatus"},
+	},
+	"v2alpha1.ObjectMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the described Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CrossVersionObjectReference"),
+						},
+					},
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"target", "metricName", "targetValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity", "v2alpha1.CrossVersionObjectReference"},
+	},
+	"v2alpha1.ObjectMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)",
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the described Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CrossVersionObjectReference"),
+						},
+					},
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"target", "metricName", "currentValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity", "v2alpha1.CrossVersionObjectReference"},
+	},
+	"v2alpha1.PodsMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+				Properties: map[string]spec.Schema{
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"metricName", "targetAverageValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v2alpha1.PodsMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value",
+				Properties: map[string]spec.Schema{
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"metricName", "currentAverageValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v2alpha1.ResourceMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Only one \"target\" type should be set.",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the resource in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetAverageUtilization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric, represented as a percentage of the requested value of the resource on the pods.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"targetAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a raw value, similarly to the \"pods\" metric source type.",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v2alpha1.ResourceMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Only one \"target\" type should be set.  Note that the current raw value is always displayed (even when the current values as request utilization is also displayed).",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the resource in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentAverageUtilization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric, represented as a percentage of the requested value of the resource on the pods (only populated if the corresponding request target was set)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"currentAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the resource metric as a raw value",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"name", "currentAverageValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
 	},
 	"version.Info": {
 		Schema: spec.Schema{
