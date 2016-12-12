@@ -9458,6 +9458,14 @@
       "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy",
       "type": "string"
      },
+     "schedulingMismatchedPredicateResults": {
+      "description": "SchedulingMismatchedPredicateResults Summary of false podFitsOnNode predicates for investigating unscheduled pods.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "integer",
+       "format": "int32"
+      }
+     },
      "securityContext": {
       "description": "SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field.",
       "$ref": "#/definitions/v1.PodSecurityContext"

@@ -2517,6 +2517,9 @@ message PodSpec {
   // If not specified, the pod will not have a domainname at all.
   // +optional
   optional string subdomain = 17;
+
+  // SchedulingMismatchedPredicateResults Summary of false podFitsOnNode predicates for investigating unscheduled pods.
+  map<string, int32> schedulingMismatchedPredicateResults = 18;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
