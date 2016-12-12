@@ -106,7 +106,7 @@ var userResources = []schema.GroupResource{
 	{Group: "", Resource: "services"},
 	{Group: "apps", Resource: "statefulsets"},
 	{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
-	{Group: "extensions", Resource: "jobs"},
+	{Group: "batch", Resource: "jobs"},
 	{Group: "extensions", Resource: "deployments"},
 	{Group: "extensions", Resource: "replicasets"},
 }

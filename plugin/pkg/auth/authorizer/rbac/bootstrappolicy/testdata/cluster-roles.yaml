@@ -133,7 +133,6 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
-    - jobs
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -321,7 +320,6 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
-    - jobs
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -689,7 +687,6 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
-    - jobs
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale

@@ -23,7 +23,6 @@ package app
 import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
-	"k8s.io/kubernetes/pkg/controller/job"
 	replicaset "k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
@@ -39,18 +38,6 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
 		int(ctx.Options.LookupCacheSizeForDaemonSet),
 	).Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
-	return true, nil
-}
-
-func startJobController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "jobs"}] {
-		return false, nil
-	}
-	go job.NewJobController(
-		ctx.InformerFactory.Pods().Informer(),
-		ctx.InformerFactory.Jobs(),
-		ctx.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
 	return true, nil
 }
 
