@@ -33,6 +33,21 @@ func (prop *ModelProperty) setMaximum(field reflect.StructField) {
 
 func (prop *ModelProperty) setType(field reflect.StructField) {
 	if tag := field.Tag.Get("type"); tag != "" {
+		// Check if the first two characters of the type tag are
+		// intended to emulate slice/array behaviour.
+		//
+		// If type is intended to be a slice/array then add the
+		// overriden type to the array item instead of the main property
+		if len(tag) > 2 && tag[0:2] == "[]" {
+			pType := "array"
+			prop.Type = &pType
+			prop.Items = new(Item)
+
+			iType := tag[2:]
+			prop.Items.Type = &iType
+			return
+		}
+
 		prop.Type = &tag
 	}
 }
