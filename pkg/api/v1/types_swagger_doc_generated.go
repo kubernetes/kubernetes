@@ -1275,6 +1275,7 @@ var map_PodSpec = map[string]string{
 	"hostname":                      "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
 	"subdomain":                     "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
 	"affinity":                      "If specified, the pod's scheduling constraints",
+	"predicateResults":              "When populated, summary of false podFitsOnNode predicates for investigating unscheduled pods.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1345,6 +1346,14 @@ var map_Preconditions = map[string]string{
 
 func (Preconditions) SwaggerDoc() map[string]string {
 	return map_Preconditions
+}
+
+var map_PredicateResult = map[string]string{
+	"": "PredicateResult is metadata that aggregates at the pod level.",
+}
+
+func (PredicateResult) SwaggerDoc() map[string]string {
+	return map_PredicateResult
 }
 
 var map_PreferAvoidPodsEntry = map[string]string{

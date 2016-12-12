@@ -30,6 +30,7 @@ func DeepEqualSafePodSpec() api.PodSpec {
 		TerminationGracePeriodSeconds: &grace,
 		SecurityContext:               &api.PodSecurityContext{},
 		Affinity:                      &api.Affinity{},
+		PredicateResults:              []api.PredicateResult{},
 	}
 }
 
@@ -40,6 +41,9 @@ func V1DeepEqualSafePodSpec() v1.PodSpec {
 		RestartPolicy:                 v1.RestartPolicyAlways,
 		DNSPolicy:                     v1.DNSClusterFirst,
 		TerminationGracePeriodSeconds: &grace,
-		SecurityContext:               &v1.PodSecurityContext{},
+		// Non nil data needed for test semantics.
+		SecurityContext: &v1.PodSecurityContext{},
+		// keep deep equals post-serialization consistent.
+		PredicateResults: []v1.PredicateResult{},
 	}
 }

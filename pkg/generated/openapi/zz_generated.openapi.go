@@ -5379,12 +5379,25 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/v1.Affinity"),
 						},
 					},
+					"predicateResults": {
+						SchemaProps: spec.SchemaProps{
+							Description: "When populated, summary of false podFitsOnNode predicates for investigating unscheduled pods.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.PredicateResult"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
 		},
 		Dependencies: []string{
-			"v1.Affinity", "v1.Container", "v1.LocalObjectReference", "v1.PodSecurityContext", "v1.Volume"},
+			"v1.Affinity", "v1.Container", "v1.LocalObjectReference", "v1.PodSecurityContext", "v1.PredicateResult", "v1.Volume"},
 	},
 	"v1.PodStatus": {
 		Schema: spec.Schema{
@@ -5584,6 +5597,29 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v1.PredicateResult": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PredicateResult is metadata that aggregates at the pod level.",
+				Properties: map[string]spec.Schema{
+					"Description": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"Count": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+				Required: []string{"Description", "Count"},
 			},
 		},
 		Dependencies: []string{},
