@@ -42,7 +42,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
-			SelfLink:  "/apis/extensions/v1beta1/namespaces/snazzycats/jobs/mycronjob",
+			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/mycronjob",
 		},
 		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
@@ -90,7 +90,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 	if !ok {
 		t.Errorf("Missing created-by annotation")
 	}
-	expectedCreatedBy := `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"CronJob","namespace":"snazzycats","name":"mycronjob","uid":"1a2b3c","apiVersion":"extensions"}}
+	expectedCreatedBy := `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"CronJob","namespace":"snazzycats","name":"mycronjob","uid":"1a2b3c","apiVersion":"batch"}}
 `
 	if len(v) != len(expectedCreatedBy) {
 		t.Errorf("Wrong length for created-by annotation, expected %v got %v", len(expectedCreatedBy), len(v))

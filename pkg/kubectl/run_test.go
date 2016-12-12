@@ -758,10 +758,6 @@ func TestGenerateJob(t *testing.T) {
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: batch.JobSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"foo": "bar", "baz": "blah"},
-					},
-					ManualSelector: newBool(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -810,7 +806,7 @@ func TestGenerateJob(t *testing.T) {
 		},
 	}
 
-	generator := JobV1Beta1{}
+	generator := JobV1{}
 	for _, test := range tests {
 		obj, err := generator.Generate(test.params)
 		if !test.expectErr && err != nil {
