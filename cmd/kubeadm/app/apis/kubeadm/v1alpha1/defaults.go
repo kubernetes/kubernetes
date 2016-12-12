@@ -24,7 +24,7 @@ const (
 	DefaultServiceDNSDomain          = "cluster.local"
 	DefaultServicesSubnet            = "10.96.0.0/12"
 	DefaultKubernetesVersion         = "stable"
-	DefaultKubernetesFallbackVersion = "v1.4.6"
+	DefaultKubernetesFallbackVersion = "v1.5.0"
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
 )
