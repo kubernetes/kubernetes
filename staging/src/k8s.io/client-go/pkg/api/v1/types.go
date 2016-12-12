@@ -2107,6 +2107,9 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,17,opt,name=subdomain"`
+
+	// SchedulingMismatchedPredicateResults Summary of false podFitsOnNode predicates for investigating unscheduled pods.
+	SchedulingMismatchedPredicateResults map[string]int32 `json:"schedulingMismatchedPredicateResults,omitempty" protobuf:"bytes,18,rep,name=schedulingMismatchedPredicateResults"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.

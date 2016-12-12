@@ -527,6 +527,9 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 		out.HostNetwork = in.SecurityContext.HostNetwork
 		out.HostIPC = in.SecurityContext.HostIPC
 	}
+	if in.SchedulingMismatchedPredicateResults == nil {
+		out.SchedulingMismatchedPredicateResults = make(map[string]int32)
+	}
 
 	return nil
 }
@@ -547,6 +550,10 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 	if out.SecurityContext == nil {
 		out.SecurityContext = new(api.PodSecurityContext)
 	}
+	if out.SchedulingMismatchedPredicateResults == nil {
+		out.SchedulingMismatchedPredicateResults = make(map[string]int32)
+	}
+
 	out.SecurityContext.HostNetwork = in.HostNetwork
 	out.SecurityContext.HostPID = in.HostPID
 	out.SecurityContext.HostIPC = in.HostIPC

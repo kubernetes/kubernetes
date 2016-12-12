@@ -175,6 +175,9 @@ func SetDefaults_PodSpec(obj *PodSpec) {
 		period := int64(DefaultTerminationGracePeriodSeconds)
 		obj.TerminationGracePeriodSeconds = &period
 	}
+	if obj.SchedulingMismatchedPredicateResults == nil {
+		obj.SchedulingMismatchedPredicateResults = make(map[string]int32)
+	}
 }
 func SetDefaults_Probe(obj *Probe) {
 	if obj.TimeoutSeconds == 0 {

@@ -28,7 +28,10 @@ func DeepEqualSafePodSpec() api.PodSpec {
 		RestartPolicy:                 api.RestartPolicyAlways,
 		DNSPolicy:                     api.DNSClusterFirst,
 		TerminationGracePeriodSeconds: &grace,
-		SecurityContext:               &api.PodSecurityContext{},
+
+		// Non nil data needed for test semantics.
+		SecurityContext:                      &api.PodSecurityContext{},
+		SchedulingMismatchedPredicateResults: make(map[string]int32),
 	}
 }
 
@@ -39,6 +42,9 @@ func V1DeepEqualSafePodSpec() v1.PodSpec {
 		RestartPolicy:                 v1.RestartPolicyAlways,
 		DNSPolicy:                     v1.DNSClusterFirst,
 		TerminationGracePeriodSeconds: &grace,
-		SecurityContext:               &v1.PodSecurityContext{},
+
+		// Non nil data needed for test semantics.
+		SecurityContext:                      &v1.PodSecurityContext{},
+		SchedulingMismatchedPredicateResults: make(map[string]int32),
 	}
 }

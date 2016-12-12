@@ -1824,6 +1824,9 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string `json:"subdomain,omitempty"`
+
+	// SchedulingMismatchedPredicateResults Summary of false podFitsOnNode predicates for investigating unscheduled pods.
+	SchedulingMismatchedPredicateResults map[string]int32 `json:"schedulingMismatchedPredicateResults,omitempty" protobuf:"bytes,18,rep,name=schedulingMismatchedPredicateResults"`
 }
 
 // Sysctl defines a kernel parameter to be set

@@ -331,7 +331,8 @@ func TestEncode_Ptr(t *testing.T) {
 
 			TerminationGracePeriodSeconds: &grace,
 
-			SecurityContext: &api.PodSecurityContext{},
+			SecurityContext:                      &api.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
 		},
 	}
 	obj := runtime.Object(pod)

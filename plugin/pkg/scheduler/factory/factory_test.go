@@ -171,7 +171,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		}
 		handler.ValidateRequest(t, testapi.Default.ResourcePath("pods", "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
+			t.Errorf("EXPECTED\n%vGOT\n%v", e, a)
 		}
 		break
 	}

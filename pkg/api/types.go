@@ -1823,7 +1823,10 @@ type PodSpec struct {
 	// If specified, the fully qualified Pod hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
-	Subdomain string
+	Subdomain string `json:"subdomain,omitempty"`
+
+	// SchedulingMismatchedPredicateResults Summary of false podFitsOnNode predicates for investigating unscheduled pods.
+	SchedulingMismatchedPredicateResults map[string]int32 `json:"schedulingMismatchedPredicateResults,omitempty" protobuf:"bytes,18,rep,name=schedulingMismatchedPredicateResults"`
 }
 
 // Sysctl defines a kernel parameter to be set

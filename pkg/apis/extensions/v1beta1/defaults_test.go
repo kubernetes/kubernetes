@@ -36,10 +36,11 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
-			DNSPolicy:                     v1.DNSClusterFirst,
-			RestartPolicy:                 v1.RestartPolicyAlways,
-			SecurityContext:               &v1.PodSecurityContext{},
-			TerminationGracePeriodSeconds: &period,
+			DNSPolicy:                            v1.DNSClusterFirst,
+			RestartPolicy:                        v1.RestartPolicyAlways,
+			SecurityContext:                      &v1.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
+			TerminationGracePeriodSeconds:        &period,
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Labels: defaultLabels,
@@ -47,10 +48,11 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 	}
 	templateNoLabel := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
-			DNSPolicy:                     v1.DNSClusterFirst,
-			RestartPolicy:                 v1.RestartPolicyAlways,
-			SecurityContext:               &v1.PodSecurityContext{},
-			TerminationGracePeriodSeconds: &period,
+			DNSPolicy:                            v1.DNSClusterFirst,
+			RestartPolicy:                        v1.RestartPolicyAlways,
+			SecurityContext:                      &v1.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
+			TerminationGracePeriodSeconds:        &period,
 		},
 	}
 	tests := []struct {
@@ -151,10 +153,11 @@ func TestSetDefaultDeployment(t *testing.T) {
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
-			DNSPolicy:                     v1.DNSClusterFirst,
-			RestartPolicy:                 v1.RestartPolicyAlways,
-			SecurityContext:               &v1.PodSecurityContext{},
-			TerminationGracePeriodSeconds: &period,
+			DNSPolicy:                            v1.DNSClusterFirst,
+			RestartPolicy:                        v1.RestartPolicyAlways,
+			SecurityContext:                      &v1.PodSecurityContext{},
+			SchedulingMismatchedPredicateResults: make(map[string]int32),
+			TerminationGracePeriodSeconds:        &period,
 		},
 	}
 	tests := []struct {
