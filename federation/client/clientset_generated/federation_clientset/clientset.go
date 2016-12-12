@@ -133,54 +133,54 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var clientset Clientset
+	var cs Clientset
 	var err error
-	clientset.CoreV1Client, err = v1core.NewForConfig(&configShallowCopy)
+	cs.CoreV1Client, err = v1core.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
+	cs.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsV1beta1Client, err = v1beta1extensions.NewForConfig(&configShallowCopy)
+	cs.ExtensionsV1beta1Client, err = v1beta1extensions.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.FederationV1beta1Client, err = v1beta1federation.NewForConfig(&configShallowCopy)
+	cs.FederationV1beta1Client, err = v1beta1federation.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
+	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 		return nil, err
 	}
-	return &clientset, nil
+	return &cs, nil
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
-	var clientset Clientset
-	clientset.CoreV1Client = v1core.NewForConfigOrDie(c)
-	clientset.BatchV1Client = v1batch.NewForConfigOrDie(c)
-	clientset.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
-	clientset.FederationV1beta1Client = v1beta1federation.NewForConfigOrDie(c)
+	var cs Clientset
+	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
+	cs.BatchV1Client = v1batch.NewForConfigOrDie(c)
+	cs.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
+	cs.FederationV1beta1Client = v1beta1federation.NewForConfigOrDie(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
+	return &cs
 }
 
 // New creates a new Clientset for the given RESTClient.
 func New(c restclient.Interface) *Clientset {
-	var clientset Clientset
-	clientset.CoreV1Client = v1core.New(c)
-	clientset.BatchV1Client = v1batch.New(c)
-	clientset.ExtensionsV1beta1Client = v1beta1extensions.New(c)
-	clientset.FederationV1beta1Client = v1beta1federation.New(c)
+	var cs Clientset
+	cs.CoreV1Client = v1core.New(c)
+	cs.BatchV1Client = v1batch.New(c)
+	cs.ExtensionsV1beta1Client = v1beta1extensions.New(c)
+	cs.FederationV1beta1Client = v1beta1federation.New(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
+	return &cs
 }

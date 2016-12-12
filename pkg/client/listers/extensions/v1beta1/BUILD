@@ -14,7 +14,6 @@ go_library(
         "deployment.go",
         "expansion_generated.go",
         "ingress.go",
-        "job.go",
         "podsecuritypolicy.go",
         "replicaset.go",
         "scale.go",
