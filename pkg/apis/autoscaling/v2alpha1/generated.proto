@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.autoscaling.v1;
+package k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1;
 
 import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
@@ -28,9 +28,10 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/autoscaling/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "v2alpha1";
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
@@ -45,71 +46,82 @@ message CrossVersionObjectReference {
   optional string apiVersion = 3;
 }
 
-// configuration of a horizontal pod autoscaler.
+// HorizontalPodAutoscaler is the configuration for a horizontal pod
+// autoscaler, which automatically manages the replica count of any resource
+// implementing the scale subresource based on the metrics specified.
 message HorizontalPodAutoscaler {
-  // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // metadata is the standard object metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+  // spec is the specification for the behaviour of the autoscaler.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
   // +optional
   optional HorizontalPodAutoscalerSpec spec = 2;
 
-  // current information about the autoscaler.
+  // status is the current information about the autoscaler.
   // +optional
   optional HorizontalPodAutoscalerStatus status = 3;
 }
 
-// list of horizontal pod autoscaler objects.
+// HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.
 message HorizontalPodAutoscalerList {
-  // Standard list metadata.
+  // metadata is the standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // list of horizontal pod autoscaler objects.
+  // items is the list of horizontal pod autoscaler objects.
   repeated HorizontalPodAutoscaler items = 2;
 }
 
-// specification of a horizontal pod autoscaler.
+// HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.
 message HorizontalPodAutoscalerSpec {
-  // reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption
-  // and will set the desired number of pods by using its Scale subresource.
+  // scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
+  // should be collected, as well as to actually change the replica count.
   optional CrossVersionObjectReference scaleTargetRef = 1;
 
-  // lower limit for the number of pods that can be set by the autoscaler, default 1.
+  // minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.
+  // It defaults to 1 pod.
   // +optional
   optional int32 minReplicas = 2;
 
-  // upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
+  // maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
+  // It cannot be less that minReplicas.
   optional int32 maxReplicas = 3;
 
-  // target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
-  // if not specified the default autoscaling policy will be used.
+  // metrics contains the specifications for which to use to calculate the
+  // desired replica count (the maximum replica count across all metrics will
+  // be used).  The desired replica count is calculated multiplying the
+  // ratio between the target value and the current value by the current
+  // number of pods.  Ergo, metrics used must decrease as the pod count is
+  // increased, and vice-versa.  See the individual metric source types for
+  // more information about how each type of metric must respond.
   // +optional
-  optional int32 targetCPUUtilizationPercentage = 4;
+  repeated MetricSpec metrics = 4;
 }
 
-// current status of a horizontal pod autoscaler
+// HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
 message HorizontalPodAutoscalerStatus {
-  // most recent generation observed by this autoscaler.
+  // observedGeneration is the most recent generation observed by this autoscaler.
   // +optional
   optional int64 observedGeneration = 1;
 
-  // last time the HorizontalPodAutoscaler scaled the number of pods;
+  // lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods,
   // used by the autoscaler to control how often the number of pods is changed.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastScaleTime = 2;
 
-  // current number of replicas of pods managed by this autoscaler.
+  // currentReplicas is current number of replicas of pods managed by this autoscaler,
+  // as last seen by the autoscaler.
   optional int32 currentReplicas = 3;
 
-  // desired number of replicas of pods managed by this autoscaler.
+  // desiredReplicas is the desired number of replicas of pods managed by this autoscaler,
+  // as last calculated by the autoscaler.
   optional int32 desiredReplicas = 4;
 
-  // current average CPU utilization over all pods, represented as a percentage of requested CPU,
-  // e.g. 70 means that an average pod is using now 70% of its requested CPU.
-  // +optional
-  optional int32 currentCPUUtilizationPercentage = 5;
+  // currentMetrics is the last read state of the metrics used by this autoscaler.
+  repeated MetricStatus currentMetrics = 5;
 }
 
 // MetricSpec specifies how to scale based on a single metric
@@ -259,40 +271,5 @@ message ResourceMetricStatus {
   // a percentage of the request), similar to the "pods" metric source type.
   // It will always be set, regardless of the corresponding metric specification.
   optional k8s.io.apimachinery.pkg.api.resource.Quantity currentAverageValue = 3;
-}
-
-// Scale represents a scaling request for a resource.
-message Scale {
-  // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
-  // +optional
-  optional ScaleSpec spec = 2;
-
-  // current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
-  // +optional
-  optional ScaleStatus status = 3;
-}
-
-// ScaleSpec describes the attributes of a scale subresource.
-message ScaleSpec {
-  // desired number of instances for the scaled object.
-  // +optional
-  optional int32 replicas = 1;
-}
-
-// ScaleStatus represents the current status of a scale subresource.
-message ScaleStatus {
-  // actual number of observed instances of the scaled object.
-  optional int32 replicas = 1;
-
-  // label query over pods that should match the replicas count. This is same
-  // as the label selector but in the string format to avoid introspection
-  // by clients. The string will be in the same format as the query-param syntax.
-  // More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
-  // +optional
-  optional string selector = 2;
 }
 
