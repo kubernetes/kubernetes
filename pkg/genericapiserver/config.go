@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -162,6 +163,9 @@ type Config struct {
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
+
+	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
+	HealthzChecks []healthz.HealthzChecker
 }
 
 type ServingInfo struct {
@@ -198,6 +202,7 @@ func NewConfig() *Config {
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
+		HealthzChecks:          []healthz.HealthzChecker{healthz.PingHealthz},
 
 		EnableIndex:          true,
 		EnableSwaggerSupport: true,
@@ -523,6 +528,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		openAPIConfig:        c.OpenAPIConfig,
 
 		postStartHooks: map[string]postStartHookEntry{},
+		healthzChecks:  c.HealthzChecks,
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
