@@ -267,7 +267,10 @@ func KnownControllers() []string {
 	return sets.StringKeySet(newControllerInitializers()).List()
 }
 
-var ControllersDisabledByDefault = sets.NewString()
+var ControllersDisabledByDefault = sets.NewString(
+	"bootstrapsigner",
+	"tokencleaner",
+)
 
 func newControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
@@ -287,6 +290,8 @@ func newControllerInitializers() map[string]InitFunc {
 	controllers["statefuleset"] = startStatefulSetController
 	controllers["cronjob"] = startCronJobController
 	controllers["certificatesigningrequests"] = startCSRController
+	controllers["bootstrapsigner"] = startBootstrapSignerController
+	controllers["tokencleaner"] = startTokenCleanerController
 
 	return controllers
 }
