@@ -57,7 +57,7 @@ nssm set kubelet AppRotateFiles 1
 nssm set kubelet AppRotateOnline 1
 # Rotate Logs Every 24 hours or 1 gb 
 nssm set kubelet AppRotateSeconds 86400
-nssm set kubelet AppRotateBytes 1048576
+nssm set kubelet AppRotateBytes 1073741824
 nssm set kubelet AppEnvironmentExtra CONTAINER_NETWORK=$ContainerNetwork
 
 
@@ -81,7 +81,7 @@ nssm set kube-proxy AppRotateFiles 1
 nssm set kube-proxy AppRotateOnline 1
 # Rotate Logs Every 24 hours or 1 gb 
 nssm set kube-proxy AppRotateSeconds 86400
-nssm set kube-proxy AppRotateBytes 1048576
+nssm set kube-proxy AppRotateBytes 1073741824
 nssm set kube-proxy AppEnvironmentExtra INTERFACE_TO_ADD_SERVICE_IP=$InterfaceForServiceIP
 
 # Start kubelet and kube-proxy Services
