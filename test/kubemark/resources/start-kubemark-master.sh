@@ -24,6 +24,7 @@ function write_supervisor_conf() {
 command=${exec_command}
 stderr_logfile=/var/log/${name}.log
 stdout_logfile=/var/log/${name}.log
+logfile_maxbytes=500MB
 autorestart=true
 startretries=1000000
 EOF
