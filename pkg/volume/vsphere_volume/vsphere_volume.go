@@ -242,6 +242,7 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		os.Remove(dir)
 		return err
 	}
+	volume.SetVolumeOwnership(b, fsGroup)
 	glog.V(3).Infof("vSphere volume %s mounted to %s", b.volPath, dir)
 
 	return nil
