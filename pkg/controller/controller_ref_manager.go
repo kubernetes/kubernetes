@@ -92,7 +92,7 @@ func (m *PodControllerRefManager) Classify(pods []*v1.Pod) (
 
 // GetControllerOf returns the controllerRef if controllee has a controller,
 // otherwise returns nil.
-func GetControllerOf(controllee v1.ObjectMeta) *v1.OwnerReference {
+func GetControllerOf(controllee v1.ObjectMeta) *metav1.OwnerReference {
 	for _, owner := range controllee.OwnerReferences {
 		// controlled by other controller
 		if owner.Controller != nil && *owner.Controller == true {

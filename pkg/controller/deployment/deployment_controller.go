@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -343,7 +342,7 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 		return err
 	}
 
-	deploymentSelector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	deploymentSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
 	}
@@ -421,11 +420,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	if d.DeletionTimestamp != nil {
 		return dc.syncStatusOnly(d)
-	}
-
-	if err = dc.handleOverlap(d); err != nil {
-		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectorOverlap", err.Error())
-		return nil
 	}
 
 	err = dc.classifyReplicaSets(deployment)

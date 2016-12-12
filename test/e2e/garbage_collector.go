@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -53,7 +52,7 @@ func newOwnerDeployment(f *framework.Framework, deploymentName string) *v1beta1.
 		},
 		Spec: v1beta1.DeploymentSpec{
 			Replicas: &replicas,
-			Selector: &unversioned.LabelSelector{MatchLabels: deploymentLabels},
+			Selector: &metav1.LabelSelector{MatchLabels: deploymentLabels},
 			Strategy: v1beta1.DeploymentStrategy{
 				Type: v1beta1.RollingUpdateDeploymentStrategyType,
 			},
