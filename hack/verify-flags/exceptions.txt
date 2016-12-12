@@ -1,7 +1,5 @@
 Vagrantfile:      node_ip = $node_ips[n]
 cluster/addons/addon-manager/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
-cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
-cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
 cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to the full EC2 private dns name
 cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
@@ -88,6 +86,7 @@ federation/deploy/config.json.sample:      "num_nodes": 3,
 hack/e2e.go:.phase1.cloud_provider="gce"
 hack/e2e.go:.phase1.cluster_name="{{.Cluster}}"
 hack/e2e.go:.phase1.num_nodes=4
+hack/lib/util.sh:    local api_port=$5
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST_IP}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    advertise_address=""
