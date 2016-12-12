@@ -173,10 +173,6 @@ const (
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
-
-	// Default time to wait for nodes to become schedulable.
-	// Set so high for scale tests.
-	NodeSchedulableTimeout = 4 * time.Hour
 )
 
 var (
