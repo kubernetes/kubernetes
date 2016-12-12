@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -42,6 +43,7 @@ type StreamOptions struct {
 	Stderr             io.Writer
 	Tty                bool
 	TerminalSizeQueue  term.TerminalSizeQueue
+	StreamTimeout      time.Duration
 }
 
 // Executor is an interface for transporting shell-style streams.
@@ -175,5 +177,24 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 		streamer = newStreamProtocolV1(options)
 	}
 
-	return streamer.stream(conn)
+	streamChan := make(chan error)
+	go func() {
+		streamChan <- streamer.stream(conn)
+	}()
+
+	if options.StreamTimeout == 0 {
+		select {
+		case err, _ := <-streamChan:
+			return err
+		}
+	} else {
+		select {
+		case err, _ := <-streamChan:
+			return err
+		case <-time.After(options.StreamTimeout):
+			return fmt.Errorf("Timeout exceeded for this operation.")
+		}
+	}
+
+	return nil
 }
