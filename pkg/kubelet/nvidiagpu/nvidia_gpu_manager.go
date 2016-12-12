@@ -122,7 +122,7 @@ func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
 		}
 
 		for _, device := range devices {
-			if Valid(device.PathOnHost) {
+			if Valid(device.PathOnHost) && path == device.PathOnhost {
 				return false
 			}
 		}
