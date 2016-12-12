@@ -1,4 +1,9 @@
-This file has moved to: http://kubernetes.github.io/docs/getting-started-guides/ubuntu/
+The content of this file has been replaced by: https://github.com/kubernetes/kubernetes.github.io/tree/master/docs/getting-started-guides/ubuntu. You may want to consult either
+
+- http://kubernetes.io/docs/getting-started-guides/ubuntu/manual/
+- http://kubernetes.io/docs/getting-started-guides/ubuntu/automated/
+
+however, this list may be incomplete.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
