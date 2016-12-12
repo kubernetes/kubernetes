@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -121,14 +122,23 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		// Query against the root URL for Elasticsearch.
 		response := proxyRequest.Namespace(api.NamespaceSystem).
+			Context(ctx).
 			Name("elasticsearch-logging").
 			Do()
 		err = response.Error()
 		response.StatusCode(&statusCode)
 
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
+				continue
+			}
 			framework.Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
 			continue
 		}
@@ -153,12 +163,20 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		body, err = proxyRequest.Namespace(api.NamespaceSystem).
+			Context(ctx).
 			Name("elasticsearch-logging").
 			Suffix("_cluster/health").
 			Param("level", "indices").
 			DoRaw()
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("Failed to get cluster health from elasticsearch: %v", err)
+			}
 			continue
 		}
 		health := make(map[string]interface{})
@@ -195,9 +213,13 @@ func getMissingLinesCountElasticsearch(f *framework.Framework, expectedCount int
 		return 0, fmt.Errorf("Failed to get services proxy request: %v", errProxy)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	// Ask Elasticsearch to return all the log lines that were tagged with the
 	// pod name. Ask for ten times as many log lines because duplication is possible.
 	body, err := proxyRequest.Namespace(api.NamespaceSystem).
+		Context(ctx).
 		Name("elasticsearch-logging").
 		Suffix("_search").
 		// TODO: Change filter to only match records from current test run
@@ -207,6 +229,9 @@ func getMissingLinesCountElasticsearch(f *framework.Framework, expectedCount int
 		Param("size", strconv.Itoa(expectedCount*10)).
 		DoRaw()
 	if err != nil {
+		if ctx.Err() != nil {
+			framework.Failf("Failed to make proxy call to elasticsearch-logging: %v", err)
+		}
 		return 0, fmt.Errorf("Failed to make proxy call to elasticsearch-logging: %v", err)
 	}
 

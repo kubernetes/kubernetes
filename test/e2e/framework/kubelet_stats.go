@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -288,9 +289,13 @@ func getContainerInfo(c clientset.Interface, nodeName string, req *kubeletstats.
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+	defer cancel()
+
 	var data []byte
 	if subResourceProxyAvailable {
 		data, err = c.Core().RESTClient().Post().
+			Context(ctx).
 			Resource("nodes").
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
@@ -301,6 +306,7 @@ func getContainerInfo(c clientset.Interface, nodeName string, req *kubeletstats.
 
 	} else {
 		data, err = c.Core().RESTClient().Post().
+			Context(ctx).
 			Prefix("proxy").
 			Resource("nodes").
 			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
