@@ -775,6 +775,14 @@ type KubeControllerManagerConfiguration struct {
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
 	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
+	// enables the BootstrapSigner controller. This controller will use tokens
+	// stored in secrets in the kube-system namespace to attach signatures to a
+	// ConfigMap for Cluster Info in the kube-public namespace.
+	EnableBootstrapSigner bool
+	// enables the TokenCleaner controller.  This controller will remove bootstrap
+	// tokens that have expired.  These are stored as secrets in the kube-system
+	// namespace.
+	EnableTokenCleaner bool
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

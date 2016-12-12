@@ -157,6 +157,7 @@ dump-logs-on-failure
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+enable-bootstrap-signer
 enable-controller-attach-detach
 enable-cri
 enable-custom-metrics
@@ -168,6 +169,7 @@ enable-garbage-collector
 enable-hostpath-provisioner
 enable-server
 enable-swagger-ui
+enable-token-cleaner
 etcd-address
 etcd-cafile
 etcd-certfile
