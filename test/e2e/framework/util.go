@@ -171,6 +171,9 @@ const (
 	// GC issues 2 requestes for single delete.
 	gcThroughput = 10
 
+	// Minimal number of nodes for the cluster to be considered large.
+	largeClusterThreshold = 100
+
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
 
@@ -2435,7 +2438,9 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notSchedulable []*v1.Node
+	attempt := 0
 	return wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
+		attempt++
 		notSchedulable = nil
 		opts := v1.ListOptions{
 			ResourceVersion: "0",
@@ -2461,12 +2466,16 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		//
 		// However, we only allow non-ready nodes with some specific reasons.
 		if len(notSchedulable) > 0 {
-			Logf("Unschedulable nodes:")
-			for i := range notSchedulable {
-				Logf("-> %s Ready=%t Network=%t",
-					notSchedulable[i].Name,
-					IsNodeConditionSetAsExpected(notSchedulable[i], v1.NodeReady, true),
-					IsNodeConditionSetAsExpected(notSchedulable[i], v1.NodeNetworkUnavailable, false))
+			// In large clusters, log them only every 10th pass.
+			if len(nodes.Items) >= largeClusterThreshold && attempt%10 == 0 {
+				Logf("Unschedulable nodes:")
+				for i := range notSchedulable {
+					Logf("-> %s Ready=%t Network=%t",
+						notSchedulable[i].Name,
+						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
+						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false))
+				}
+				Logf("================================")
 			}
 		}
 		if len(notSchedulable) > TestContext.AllowedNotReadyNodes {
