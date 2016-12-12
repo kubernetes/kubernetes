@@ -2517,6 +2517,10 @@ message PodSpec {
   // If not specified, the pod will not have a domainname at all.
   // +optional
   optional string subdomain = 17;
+
+  // If specified, the pod's scheduling constraints
+  // +optional
+  optional Affinity affinity = 18;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -2560,6 +2564,12 @@ message PodStatus {
   // More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
   // +optional
   repeated ContainerStatus containerStatuses = 8;
+
+  // The Quality of Service (QOS) classification assigned to the pod based on resource requirements
+  // See PodQOSClass type for available QOS classes
+  // More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
+  // +optional
+  optional string qosClass = 9;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
