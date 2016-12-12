@@ -19,7 +19,6 @@ package extensions
 import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/apis/autoscaling"
-	"k8s.io/client-go/pkg/apis/batch"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
@@ -55,9 +54,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&DeploymentRollback{},
 		&autoscaling.HorizontalPodAutoscaler{},
 		&autoscaling.HorizontalPodAutoscalerList{},
-		&batch.Job{},
-		&batch.JobList{},
-		&batch.JobTemplate{},
 		&ReplicationControllerDummy{},
 		&Scale{},
 		&ThirdPartyResource{},

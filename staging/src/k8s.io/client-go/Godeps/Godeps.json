@@ -26,11 +26,6 @@
 			"Rev": "5bd2802263f21d8788851d5305584c82a5c75d7e"
 		},
 		{
-			"ImportPath": "github.com/blang/semver",
-			"Comment": "v3.0.1",
-			"Rev": "31b736133b98f26d5e078ec9eb591666edfd091f"
-		},
-		{
 			"ImportPath": "github.com/coreos/go-oidc/http",
 			"Rev": "5644a2f50e2d2d5ba0b474bc5bc55fea1925936d"
 		},
@@ -89,18 +84,18 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.2-79-g89ef8af",
-			"Rev": "89ef8af493ab468a45a42bb0d89a06fccdd2fb22"
+			"Comment": "v1.2-96-g09691a3",
+			"Rev": "09691a3b6378b740595c1002f40c34dd5f218a22"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/log",
-			"Comment": "v1.2-79-g89ef8af",
-			"Rev": "89ef8af493ab468a45a42bb0d89a06fccdd2fb22"
+			"Comment": "v1.2-96-g09691a3",
+			"Rev": "09691a3b6378b740595c1002f40c34dd5f218a22"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/swagger",
-			"Comment": "v1.2-79-g89ef8af",
-			"Rev": "89ef8af493ab468a45a42bb0d89a06fccdd2fb22"
+			"Comment": "v1.2-96-g09691a3",
+			"Rev": "09691a3b6378b740595c1002f40c34dd5f218a22"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
@@ -146,7 +141,7 @@
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
-			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
+			"Rev": "44d81051d367757e1c7c6a5a86423ece9afcf63c"
 		},
 		{
 			"ImportPath": "github.com/howeyc/gopass",

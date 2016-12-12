@@ -2699,6 +2699,15 @@ func DeepCopy_api_PodSpec(in interface{}, out interface{}, c *conversion.Cloner)
 		}
 		out.Hostname = in.Hostname
 		out.Subdomain = in.Subdomain
+		if in.Affinity != nil {
+			in, out := &in.Affinity, &out.Affinity
+			*out = new(Affinity)
+			if err := DeepCopy_api_Affinity(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.Affinity = nil
+		}
 		return nil
 	}
 }
@@ -2730,6 +2739,7 @@ func DeepCopy_api_PodStatus(in interface{}, out interface{}, c *conversion.Clone
 		} else {
 			out.StartTime = nil
 		}
+		out.QOSClass = in.QOSClass
 		if in.InitContainerStatuses != nil {
 			in, out := &in.InitContainerStatuses, &out.InitContainerStatuses
 			*out = make([]ContainerStatus, len(*in))
