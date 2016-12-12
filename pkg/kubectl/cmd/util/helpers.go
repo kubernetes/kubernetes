@@ -416,6 +416,10 @@ func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	AddDryRunFlag(cmd)
 }
 
+func AddRemoteStreamFlags(cmd *cobra.Command) {
+	cmd.Flags().Duration("stream-timeout", 0, "Maximum amount of time to keep remote shell open. If 0, shell will remain open until an EOF is received. Defaults to 0.")
+}
+
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
