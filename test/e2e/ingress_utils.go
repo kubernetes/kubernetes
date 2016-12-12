@@ -811,7 +811,12 @@ func (j *testJig) deleteIngress() {
 	framework.ExpectNoError(j.client.Extensions().Ingresses(j.ing.Namespace).Delete(j.ing.Name, nil))
 }
 
-func (j *testJig) waitForIngress() {
+// waitForIngress waits till the ingress acquires an IP, then waits for its
+// hosts/urls to respond to a protocol check (either http or https). If
+// waitForNodePort is true, the NodePort of the Service is verified before
+// verifying the Ingress. NodePort is currently a requirement for cloudprovider
+// Ingress.
+func (j *testJig) waitForIngress(waitForNodePort bool) {
 	// Wait for the loadbalancer IP.
 	address, err := framework.WaitForIngressAddress(j.client, j.ing.Namespace, j.ing.Name, lbPollTimeout)
 	if err != nil {
@@ -833,7 +838,9 @@ func (j *testJig) waitForIngress() {
 			}
 		}
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
-			j.curlServiceNodePort(j.ing.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
+			if waitForNodePort {
+				j.curlServiceNodePort(j.ing.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
+			}
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
 			framework.ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, j.pollInterval, timeoutClient, false))
