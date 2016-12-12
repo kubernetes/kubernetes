@@ -120,7 +120,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	ctrl.Run(stopCh)
+	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and recycled.
@@ -174,7 +174,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	ctrl.Run(stopCh)
+	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and deleted.
@@ -233,7 +233,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	ctrl.Run(stopCh)
+	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
 	pv := createPV("fake-pv-race", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
@@ -304,7 +304,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	controller.Run(stopCh)
+	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	var (
@@ -384,7 +384,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	controller.Run(stopCh)
+	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	var (
@@ -483,7 +483,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	controller.Run(stopCh)
+	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	maxPVs := getObjectCount()
@@ -572,7 +572,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	controllerStopCh := make(chan struct{})
-	binder.Run(controllerStopCh)
+	go binder.Run(controllerStopCh)
 	defer close(controllerStopCh)
 
 	objCount := getObjectCount()
@@ -785,7 +785,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 
 	// Start the controller when all PVs and PVCs are already saved in etcd
 	stopCh := make(chan struct{})
-	binder.Run(stopCh)
+	go binder.Run(stopCh)
 	defer close(stopCh)
 
 	// wait for at least two sync periods for changes. No volume should be
@@ -872,7 +872,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	testClient.Storage().StorageClasses().Create(&storageClass)
 
 	stopCh := make(chan struct{})
-	binder.Run(stopCh)
+	go binder.Run(stopCh)
 	defer close(stopCh)
 
 	objCount := getObjectCount()
@@ -957,7 +957,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	controller.Run(stopCh)
+	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and deleted
