@@ -18270,7 +18270,8 @@
       "description": "If specified, the fully qualified Pod hostname will be \"\u003chostname\u003e.\u003csubdomain\u003e.\u003cpod namespace\u003e.svc.\u003ccluster domain\u003e\". If not specified, the pod will not have a domainname at all."
      },
      "schedulingMismatchedPredicateResults": {
-      "type": "object"
+      "type": "object",
+      "description": "SchedulingMismatchedPredicateResults Summary of false podFitsOnNode predicates for investigating unscheduled pods."
      }
     }
    },

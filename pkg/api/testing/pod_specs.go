@@ -30,8 +30,9 @@ func DeepEqualSafePodSpec() api.PodSpec {
 		TerminationGracePeriodSeconds: &grace,
 
 		// Non nil data needed for test semantics.
-		SecurityContext:                      &api.PodSecurityContext{},
-		SchedulingMismatchedPredicateResults: make(map[string]int32),
+		SecurityContext: &api.PodSecurityContext{},
+		// keep deep equals post-serialization consistent.
+		SchedulingMismatchedPredicateResults: map[string]int32{"apredicate": 1},
 	}
 }
 
@@ -44,7 +45,8 @@ func V1DeepEqualSafePodSpec() v1.PodSpec {
 		TerminationGracePeriodSeconds: &grace,
 
 		// Non nil data needed for test semantics.
-		SecurityContext:                      &v1.PodSecurityContext{},
-		SchedulingMismatchedPredicateResults: make(map[string]int32),
+		SecurityContext: &v1.PodSecurityContext{},
+		// keep deep equals post-serialization consistent.
+		SchedulingMismatchedPredicateResults: map[string]int32{"apredicate": 1},
 	}
 }

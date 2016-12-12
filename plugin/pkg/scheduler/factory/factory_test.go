@@ -138,6 +138,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
+
 	handler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), testPod),
@@ -149,6 +150,9 @@ func TestDefaultErrorFunc(t *testing.T) {
 	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
+
+	// hmm if non empty will it fix things?
+
 	factory := NewConfigFactory(clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}}), v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{

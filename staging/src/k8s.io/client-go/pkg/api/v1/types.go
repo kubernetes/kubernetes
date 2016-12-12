@@ -2109,6 +2109,7 @@ type PodSpec struct {
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,17,opt,name=subdomain"`
 
 	// SchedulingMismatchedPredicateResults Summary of false podFitsOnNode predicates for investigating unscheduled pods.
+	// +optional
 	SchedulingMismatchedPredicateResults map[string]int32 `json:"schedulingMismatchedPredicateResults,omitempty" protobuf:"bytes,18,rep,name=schedulingMismatchedPredicateResults"`
 }
 

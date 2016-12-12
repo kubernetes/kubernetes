@@ -146,6 +146,7 @@ func (f *FIFO) AddIfNotPresent(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.addIfNotPresent(id, obj)
+
 	return nil
 }
 

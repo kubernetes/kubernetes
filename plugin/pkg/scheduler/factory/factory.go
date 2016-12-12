@@ -588,6 +588,9 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
+			if pod.Spec.SchedulingMismatchedPredicateResults == nil {
+				panic("SchedulingMismatchedPredicateResults shouldnt be nil")
+			}
 			defer runtime.HandleCrash()
 			podID := types.NamespacedName{
 				Namespace: pod.Namespace,
