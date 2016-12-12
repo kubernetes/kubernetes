@@ -14,6 +14,7 @@ go_library(
         "apps.go",
         "autoscaling.go",
         "batch.go",
+        "bootstrap.go",
         "certificates.go",
         "controllermanager.go",
         "core.go",
