@@ -653,8 +653,8 @@ function create-network() {
     gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --range "10.240.0.0/16"
   fi
 
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal-master" &>/dev/null; then
-    gcloud compute firewall-rules create "${NETWORK}-default-internal-master" \
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-${CLUSTER_NAME}-default-internal-master" &>/dev/null; then
+    gcloud compute firewall-rules create "${NETWORK}-${CLUSTER_NAME}-default-internal-master" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
@@ -662,8 +662,8 @@ function create-network() {
       --target-tags "${MASTER_TAG}"&
   fi
 
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal-node" &>/dev/null; then
-    gcloud compute firewall-rules create "${NETWORK}-default-internal-node" \
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-${CLUSTER_NAME}-default-internal-node" &>/dev/null; then
+    gcloud compute firewall-rules create "${NETWORK}-${CLUSTER_NAME}-default-internal-node" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
