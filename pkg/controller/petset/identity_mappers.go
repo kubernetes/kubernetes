@@ -84,7 +84,7 @@ type VolumeIdentityMapper struct {
 	ps *apps.StatefulSet
 }
 
-// SetIdentity sets storge identity on the pet.
+// SetIdentity sets storage identity on the pet.
 func (v *VolumeIdentityMapper) SetIdentity(id string, pet *v1.Pod) {
 	petVolumes := []v1.Volume{}
 	petClaims := v.GetClaims(id)
