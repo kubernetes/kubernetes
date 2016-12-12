@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -31,12 +32,9 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 )
 
-// Sources from bootkube templates.go
-func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration) ext.DaemonSet {
-
+func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	volumes := []v1.Volume{k8sVolume(cfg)}
 	volumeMounts := []v1.VolumeMount{k8sVolumeMount()}
-
 	if isCertsVolumeMountNeeded() {
 		volumes = append(volumes, certsVolume(cfg))
 		volumeMounts = append(volumeMounts, certsVolumeMount())
@@ -47,66 +45,16 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration) ext.DaemonSet {
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
 
-	ds := ext.DaemonSet{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "extensions/v1beta1",
-			Kind:       "DaemonSet",
-		},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      kubeAPIServer,
-			Namespace: "kube-system",
-			//Labels:    map[string]string{"k8s-app": "kube-apiserver"},
-		},
-		Spec: ext.DaemonSetSpec{
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
-					Labels: map[string]string{
-						// TODO: taken from bootkube, appears to be essential, without this
-						// we don't get an apiserver pod...
-						"k8s-app":   "kube-apiserver",
-						"tier":      "control-plane",
-						"component": kubeAPIServer,
-					},
-				},
-				Spec: v1.PodSpec{
-					// TODO: Make sure masters get this label
-					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
-					HostNetwork:  true,
-					Volumes:      volumes,
-
-					Containers: []v1.Container{
-						v1.Container{
-							Name:    kubeAPIServer,
-							Image:   images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command: getAPIServerCommand(cfg),
-							// TODO: Is this env var used? (borrowed from bootkube)
-							Env: []v1.EnvVar{
-								v1.EnvVar{
-									Name: "MY_POD_IP",
-									ValueFrom: &v1.EnvVarSource{
-										FieldRef: &v1.ObjectFieldSelector{
-											FieldPath: "status.podIP",
-										},
-									},
-								},
-							},
-							VolumeMounts:  volumeMounts,
-							LivenessProbe: componentProbe(8080, "/healthz"),
-							Resources:     componentResources("250m"),
-						},
-					},
-				},
-			},
-		},
+	apiServer := getAPIServerDS(cfg, volumes, volumeMounts)
+	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(&apiServer); err != nil {
+		return fmt.Errorf("failed to create self-hosted %q daemon set [%v]", kubeAPIServer, err)
 	}
-	return ds
-}
 
-func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
-	ds := getAPIServerDS(cfg)
-	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(&ds); err != nil {
-		return fmt.Errorf("failed to create self-hosted %q DaemonSet [%v]", kubeAPIServer, err)
+	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts)
+	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&ctrlMgr); err != nil {
+		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
 	}
+
 	return nil
 }
 
@@ -153,4 +101,110 @@ func WaitForSelfHostedControlPlane(client *clientset.Clientset) error {
 	})
 	// TODO: Timeout eventually
 	return nil
+}
+
+// Sources from bootkube templates.go
+func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration,
+	volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.DaemonSet {
+
+	ds := ext.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "extensions/v1beta1",
+			Kind:       "DaemonSet",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      kubeAPIServer,
+			Namespace: "kube-system",
+			//Labels:    map[string]string{"k8s-app": "kube-apiserver"},
+		},
+		Spec: ext.DaemonSetSpec{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{
+						// TODO: taken from bootkube, appears to be essential, without this
+						// we don't get an apiserver pod...
+						"k8s-app":   kubeAPIServer,
+						"component": kubeAPIServer,
+						"tier":      "control-plane",
+					},
+				},
+				Spec: v1.PodSpec{
+					// TODO: Make sure masters get this label
+					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
+					HostNetwork:  true,
+					Volumes:      volumes,
+					Containers: []v1.Container{
+						v1.Container{
+							Name:          kubeAPIServer,
+							Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+							Command:       getAPIServerCommand(cfg),
+							Env:           getProxyEnvVars(),
+							VolumeMounts:  volumeMounts,
+							LivenessProbe: componentProbe(8080, "/healthz"),
+							Resources:     componentResources("250m"),
+						},
+					},
+				},
+			},
+		},
+	}
+	return ds
+}
+
+func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration,
+	volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.Deployment {
+
+	// Tolerate the master taint we add to our master nodes, as this can and should
+	// run there.
+	masterToleration, _ := json.Marshal([]v1.Toleration{v1.Toleration{
+		Key:      "dedicated",
+		Value:    "master",
+		Operator: v1.TolerationOpEqual,
+		Effect:   v1.TaintEffectNoSchedule,
+	}})
+
+	cmDep := ext.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "extensions/v1beta1",
+			Kind:       "Deployment",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      kubeControllerManager,
+			Namespace: "kube-system",
+		},
+		Spec: ext.DeploymentSpec{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{
+						// TODO: taken from bootkube, appears to be essential
+						"k8s-app":   kubeControllerManager,
+						"component": kubeControllerManager,
+						"tier":      "control-plane",
+					},
+					Annotations: map[string]string{
+						v1.TolerationsAnnotationKey: string(masterToleration),
+					},
+				},
+				Spec: v1.PodSpec{
+					// TODO: Make sure masters get this label
+					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
+					HostNetwork:  true,
+					Volumes:      volumes,
+
+					Containers: []v1.Container{
+						v1.Container{
+							Name:          kubeAPIServer,
+							Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+							Command:       getControllerManagerCommand(cfg),
+							VolumeMounts:  volumeMounts,
+							LivenessProbe: componentProbe(10252, "/healthz"),
+							Resources:     componentResources("200m"),
+							Env:           getProxyEnvVars(),
+						},
+					},
+				},
+			},
+		},
+	}
+	return cmDep
 }

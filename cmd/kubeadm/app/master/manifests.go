@@ -154,6 +154,12 @@ func DeleteStaticManifests() error {
 	if err := os.Remove(apiServerStaticManifestPath); err != nil {
 		return fmt.Errorf("unable to delete temporary API server manifest [%v]", err)
 	}
+
+	ctrlMgrStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
+		"manifests", kubeControllerManager+".json")
+	if err := os.Remove(ctrlMgrStaticManifestPath); err != nil {
+		return fmt.Errorf("unable to delete temporary controller manager manifest [%v]", err)
+	}
 	return nil
 }
 
