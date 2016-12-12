@@ -18,6 +18,8 @@ limitations under the License.
 package rbac
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -41,6 +43,8 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	if RulesAllow(requestAttributes, rules...) {
 		return true, "", nil
 	}
+	fmt.Printf("RBAC DENY: user %q cannot %q on \"%v.%v/%v\"\n", requestAttributes.GetUser().GetName(),
+		requestAttributes.GetVerb(), requestAttributes.GetResource(), requestAttributes.GetAPIGroup(), requestAttributes.GetSubresource())
 
 	return false, "", ruleResolutionError
 }
