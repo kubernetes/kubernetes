@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -124,6 +125,8 @@ type Config struct {
 	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses DiscoveryAddresses
+	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
+	HealthzChecks []healthz.HealthzChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup.  New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -198,6 +201,7 @@ func NewConfig() *Config {
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
+		HealthzChecks:          []healthz.HealthzChecker{healthz.PingHealthz},
 
 		EnableIndex:          true,
 		EnableSwaggerSupport: true,
@@ -523,6 +527,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		openAPIConfig:        c.OpenAPIConfig,
 
 		postStartHooks: map[string]postStartHookEntry{},
+		healthzChecks:  c.HealthzChecks,
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
