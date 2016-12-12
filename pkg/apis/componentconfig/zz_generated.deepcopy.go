@@ -241,7 +241,13 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.FileCheckFrequency = in.FileCheckFrequency
 		out.HTTPCheckFrequency = in.HTTPCheckFrequency
 		out.ManifestURL = in.ManifestURL
-		out.ManifestURLHeader = in.ManifestURLHeader
+		if in.ManifestURLHeader != nil {
+			in, out := &in.ManifestURLHeader, &out.ManifestURLHeader
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.ManifestURLHeader = nil
+		}
 		out.EnableServer = in.EnableServer
 		out.Address = in.Address
 		out.Port = in.Port
