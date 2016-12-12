@@ -10,29 +10,21 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "defaults.go",
+        "autoscaling_client.go",
         "doc.go",
-        "generated.pb.go",
-        "register.go",
-        "types.generated.go",
-        "types.go",
-        "types_swagger_doc_generated.go",
-        "zz_generated.conversion.go",
-        "zz_generated.deepcopy.go",
+        "generated_expansion.go",
+        "horizontalpodautoscaler.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
-        "//vendor:github.com/gogo/protobuf/proto",
-        "//vendor:github.com/ugorji/go/codec",
-        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//pkg/apis/autoscaling/v2alpha1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -45,6 +37,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/autoscaling/v2alpha1/fake:all-srcs",
+    ],
     tags = ["automanaged"],
 )
