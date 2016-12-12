@@ -184,7 +184,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				// TODO: restrict to creating a node with the same name they announce
 				rbac.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 				// TODO: restrict to the bound node once supported
-				rbac.NewRule("update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+				rbac.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 
 				// TODO: restrict to the bound node as creator once supported
 				rbac.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
