@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -58,6 +60,15 @@ const (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = extensions.SchemeGroupVersion.WithKind("Deployment")
 
+// The total number of replica sets that need to be migrated to the new hashing algorithm exposed as a metric.
+var unmigratedReplicaSetsNumber = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Subsystem: "deployment_controller",
+		Name:      "unmigrated_replica_sets",
+		Help:      "The total number of replica sets that need to be migrated to the new hashing algorithm.",
+	},
+)
+
 // DeploymentController is responsible for synchronizing Deployment objects stored
 // in the system with actual running replica sets and pods.
 type DeploymentController struct {
@@ -88,12 +99,26 @@ type DeploymentController struct {
 	// Added as a member to the struct to allow injection for testing.
 	podListerSynced cache.InformerSynced
 
+	// hashingAlgorithm is the hashing algorithm used by the controller to hash pod templates
+	// for deployments. adler32 is used by default but since it breaks fast when brute-forced[1]
+	// we need to migrate to a more stable algorithm. fnv is the new hashing algorithm that will
+	// be supported as it's still fast and more stable than adler32.
+	//
+	// [1] https://github.com/kubernetes/kubernetes/issues/29735
+	hashingAlgorithm string
+
 	// Deployments that need to be synced
 	queue workqueue.RateLimitingInterface
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) *DeploymentController {
+func NewDeploymentController(
+	dInformer extensionsinformers.DeploymentInformer,
+	rsInformer extensionsinformers.ReplicaSetInformer,
+	podInformer coreinformers.PodInformer,
+	client clientset.Interface,
+	hashingAlgorithm string,
+) *DeploymentController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -102,10 +127,15 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.Core().RESTClient().GetRateLimiter())
 	}
+	if hashingAlgorithm == "migrate-to-fnv" {
+		prometheus.MustRegister(unmigratedReplicaSetsNumber)
+	}
+
 	dc := &DeploymentController{
-		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "deployment-controller"}),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		client:           client,
+		hashingAlgorithm: hashingAlgorithm,
+		eventRecorder:    eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "deployment-controller"}),
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 	dc.rsControl = controller.RealRSControl{
 		KubeClient: client,
@@ -640,6 +670,33 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		// succesfully completed deploying a replica set. Decouple it from the strategies and have it
 		// run almost unconditionally - cleanupDeployment is safe by default.
 		dc.cleanupDeployment(oldRSs, d)
+	}
+
+	// Migrate old replica sets for a deployment before it is synced. We inline the migration
+	// here instead of a separate worker because the migration of the replica sets will cause
+	// the deployment to be synced many times. By having a worker hold the key during the migration
+	// all the events caused by replica set creations and deletions should be compressed the next
+	// time this deployment is going to be resynced. It may also be racy to have a separate thread
+	// fiddle with old replica sets with respect to rolling back to an old revision.
+	if dc.hashingAlgorithm == "migrate-to-fnv" {
+		if err := dc.estimateUnmigratedReplicaSets(); err != nil {
+			return err
+		}
+
+		migratedRSs, err := dc.migrateDeployment(d, rsList, podMap)
+		// Errors are going to resync this deployment. We may want to handle this more gracefully,
+		// ie. if a deployment is resynced for more than 5 times because of a migration error, we
+		// shouldn't probably drop it but instead continue processing by using the old hash (maybe
+		// the new replica set can be migrated to a new hash if a new rollout needs to start).
+		if err != nil {
+			return err
+		}
+		// If we just migrated any replica set then the replica set creation should resync
+		// this deployment. By forcing the controller to migrate all old replica sets before
+		// continuing to process this deployment, we ensure that our cache is updated.
+		if len(migratedRSs) > 0 {
+			return nil
+		}
 	}
 
 	// Update deployment conditions with an Unknown condition when pausing/resuming
