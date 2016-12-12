@@ -109,16 +109,14 @@ echo "${ETCD_VERSION}/${STORAGE_BACKEND_ETCD2}" > "${ETCD_DIR}/version.txt"
 
 # source_file,resource,namespace,name,old_version,new_version
 tests=(
-test/fixtures/doc-yaml/user-guide/job.yaml,jobs,default,pi,extensions/v1beta1,batch/v1
 test/fixtures/doc-yaml/user-guide/horizontal-pod-autoscaling/hpa-php-apache.yaml,horizontalpodautoscalers,default,php-apache,extensions/v1beta1,autoscaling/v1
 )
 
-# need to include extensions/v1beta1 in new api version because its internal types are used by jobs
-# and hpas
+# need to include extensions/v1beta1 in new api version because its internal types are used by hpas
 KUBE_OLD_API_VERSION="v1,extensions/v1beta1"
-KUBE_NEW_API_VERSION="v1,extensions/v1beta1,batch/v1,autoscaling/v1"
-KUBE_OLD_STORAGE_VERSIONS="batch=extensions/v1beta1,autoscaling=extensions/v1beta1"
-KUBE_NEW_STORAGE_VERSIONS="batch/v1,autoscaling/v1"
+KUBE_NEW_API_VERSION="v1,extensions/v1beta1,autoscaling/v1"
+KUBE_OLD_STORAGE_VERSIONS="autoscaling=extensions/v1beta1"
+KUBE_NEW_STORAGE_VERSIONS="autoscaling/v1"
 
 ### END TEST DEFINITION CUSTOMIZATION ###
 

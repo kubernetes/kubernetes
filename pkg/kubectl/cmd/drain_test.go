@@ -282,7 +282,7 @@ func TestDrain(t *testing.T) {
 			Name:              "job",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/jobs/job",
+			SelfLink:          "/apis/batch/v1/namespaces/default/jobs/job",
 		},
 		Spec: batch.JobSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
@@ -525,7 +525,7 @@ func TestDrain(t *testing.T) {
 					case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
 					case m.isFor("GET", "/namespaces/default/jobs/job"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &job)}, nil
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Batch.Codec(), &job)}, nil
 					case m.isFor("GET", "/namespaces/default/replicasets/rs"):
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
 					case m.isFor("GET", "/namespaces/default/pods/bar"):
