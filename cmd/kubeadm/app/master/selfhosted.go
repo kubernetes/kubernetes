@@ -114,7 +114,9 @@ func WaitForSelfHostedControlPlane(client *clientset.Clientset) error {
 	start := time.Now()
 	// TODO: Break this up into multiple wait's so we don't re-do every step:
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		apiDS, err := client.DaemonSets(api.NamespaceSystem).Get(kubeAPIServer)
+		// TODO: This might be pointless, checking the pods is probably enough.
+		apiDS, err := client.DaemonSets(api.NamespaceSystem).Get(kubeAPIServer,
+			metav1.GetOptions{})
 		if err != nil {
 			fmt.Println("[debug] error getting apiserver DaemonSet:", err)
 			return false, nil
@@ -128,6 +130,7 @@ func WaitForSelfHostedControlPlane(client *clientset.Clientset) error {
 		}
 
 		// Check that all API Server pods are running:
+		// TODO: Do we need a stronger label link than this?
 		listOpts := v1.ListOptions{LabelSelector: "k8s-app=kube-apiserver"}
 		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
 		if err != nil {

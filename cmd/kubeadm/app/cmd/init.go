@@ -380,26 +380,18 @@ func (i *SelfHostedInit) Run(out io.Writer) error {
 		return err
 	}
 
-	// Query pods in kube-system namespace with label selector k8s-app: kube-apiserver
-	// Ensure status.phase == Running
-	// Ensure count == status.desiredNumberScheduled
-
-	//// TODO: Make sure the self hosted apiserver is up before we proceed here:
-	//time.Sleep(20 * time.Second)
-
 	// At this point the API server is running but cannot get the port it wants
-	// because of our temporary API server.
+	// because of our temporary API server. Remove the static pod manifests and wait
+	// for the self-hosted components to take over.
 
-	//// Now we can remove the static pod manifests written earlier and let the
-	//// self-hosted components take over:
 	//fmt.Println("[init] Removing static pod manifests to transition to self-hosted control plane...")
-	//if err := kubemaster.DeleteStaticManifests(); err != nil {
-	//return err
-	//}
+	if err := kubemaster.DeleteStaticManifests(); err != nil {
+		return err
+	}
 
 	// Wait again until all API components are healthy. The self-hosted apiserver was polling
 	// waiting for it's port to be available, and may take a few seconds to come back up.
-	//time.Sleep(20 * time.Second)
+	kubemaster.WaitForAPI(client)
 
 	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
 		return err
