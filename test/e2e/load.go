@@ -163,7 +163,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 				defer func(services []*v1.Service) {
 					framework.Logf("Starting to delete services...")
 					for _, service := range services {
-						err := clientset.Core().Services(ns).Delete(service.Name, nil)
+						err := clientset.Core().Services(service.Namespace).Delete(service.Name, nil)
 						framework.ExpectNoError(err)
 					}
 					framework.Logf("Services deleted")
