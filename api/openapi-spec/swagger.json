@@ -34450,6 +34450,10 @@
       "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
       "type": "string"
      },
+     "qosClass": {
+      "description": "QOS class of the Pod",
+      "type": "string"
+     },
      "reason": {
       "description": "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'",
       "type": "string"

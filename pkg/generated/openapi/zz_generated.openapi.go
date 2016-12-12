@@ -5452,6 +5452,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"qosClass": {
+						SchemaProps: spec.SchemaProps{
+							Description: "QOS class of the Pod",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
