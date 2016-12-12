@@ -26,8 +26,8 @@ kube::etcd::start() {
     exit 1
   }
 
-  if pgrep etcd >/dev/null 2>&1; then
-    kube::log::usage "etcd appears to already be running on this machine (`pgrep -l etcd`) (or its a zombie and you need to kill its parent)."
+  if netstat -tnlp | grep $(pgrep etcd) >/dev/null 2>&1; then
+    kube::log::usage "etcd appears to already be running on this machine without network isolation (`pgrep -l etcd`, `netstat -tnlp | grep $(pgrep etcd)`) (or its a zombie and you need to kill its parent)."
     kube::log::usage "retry after you resolve this etcd error."
     exit 1
   fi
