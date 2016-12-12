@@ -336,7 +336,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 		},
 	}
 	var trueVar = true
-	controllerRef := &v1.OwnerReference{
+	controllerRef := &metav1.OwnerReference{
 		APIVersion: getDeploymentKind().GroupVersion().String(),
 		Kind:       getDeploymentKind().Kind,
 		Name:       deployment.Name,
