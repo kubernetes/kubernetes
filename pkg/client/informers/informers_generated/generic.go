@@ -28,9 +28,10 @@ import (
 	v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	v2alpha1 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	batch_v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
 	certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
@@ -86,6 +87,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case v1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V1().HorizontalPodAutoscalers().Informer()}, nil
 
+		// Group=Autoscaling, Version=V2alpha1
+	case v2alpha1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2alpha1().HorizontalPodAutoscalers().Informer()}, nil
+
 		// Group=Batch, Version=InternalVersion
 	case batch.SchemeGroupVersion.WithResource("cronjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().InternalVersion().CronJobs().Informer()}, nil
@@ -97,9 +102,9 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1().Jobs().Informer()}, nil
 
 		// Group=Batch, Version=V2alpha1
-	case v2alpha1.SchemeGroupVersion.WithResource("cronjobs"):
+	case batch_v2alpha1.SchemeGroupVersion.WithResource("cronjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V2alpha1().CronJobs().Informer()}, nil
-	case v2alpha1.SchemeGroupVersion.WithResource("jobs"):
+	case batch_v2alpha1.SchemeGroupVersion.WithResource("jobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V2alpha1().Jobs().Informer()}, nil
 
 		// Group=Certificates, Version=InternalVersion
