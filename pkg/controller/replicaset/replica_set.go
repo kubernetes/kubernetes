@@ -567,26 +567,17 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}()
 
 	obj, exists, err := rsc.rsLister.Indexer.GetByKey(key)
+	if err != nil {
+		return err
+	}
 	if !exists {
 		glog.V(4).Infof("ReplicaSet has been deleted %v", key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
 	}
-	if err != nil {
-		return err
-	}
+
 	rs := *obj.(*extensions.ReplicaSet)
 
-	// Check the expectations of the ReplicaSet before counting active pods, otherwise a new pod can sneak
-	// in and update the expectations after we've retrieved active pods from the store. If a new pod enters
-	// the store after we've checked the expectation, the ReplicaSet sync is just deferred till the next
-	// relist.
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err))
-		// Explicitly return nil to avoid re-enqueue bad key
-		return nil
-	}
-	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error converting pod selector to selector: %v", err))
@@ -606,16 +597,19 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		}
 		cm := controller.NewPodControllerRefManager(rsc.podControl, rs.ObjectMeta, selector, getRSKind())
 		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
-		for _, pod := range matchesNeedsController {
-			err := cm.AdoptPod(pod)
-			// continue to next pod if adoption fails.
-			if err != nil {
-				// If the pod no longer exists, don't even log the error.
-				if !errors.IsNotFound(err) {
-					utilruntime.HandleError(err)
+		// Adopt pods only if this replica set is not going to be deleted.
+		if rs.DeletionTimestamp == nil {
+			for _, pod := range matchesNeedsController {
+				err := cm.AdoptPod(pod)
+				// continue to next pod if adoption fails.
+				if err != nil {
+					// If the pod no longer exists, don't even log the error.
+					if !errors.IsNotFound(err) {
+						utilruntime.HandleError(err)
+					}
+				} else {
+					matchesAndControlled = append(matchesAndControlled, pod)
 				}
-			} else {
-				matchesAndControlled = append(matchesAndControlled, pod)
 			}
 		}
 		filteredPods = matchesAndControlled
@@ -643,6 +637,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 
 	var manageReplicasErr error
+	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(filteredPods, &rs)
 	}

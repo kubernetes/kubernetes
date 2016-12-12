@@ -656,26 +656,17 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 
 	obj, exists, err := rm.rcStore.Indexer.GetByKey(key)
+	if err != nil {
+		return err
+	}
 	if !exists {
 		glog.Infof("Replication Controller has been deleted %v", key)
 		rm.expectations.DeleteExpectations(key)
 		return nil
 	}
-	if err != nil {
-		return err
-	}
 	rc := *obj.(*v1.ReplicationController)
 
-	// Check the expectations of the rc before counting active pods, otherwise a new pod can sneak in
-	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
-	// the store after we've checked the expectation, the rc sync is just deferred till the next relist.
-	rcKey, err := controller.KeyFunc(&rc)
-	if err != nil {
-		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
-		return err
-	}
 	trace.Step("ReplicationController restored")
-	rcNeedsSync := rm.expectations.SatisfiedExpectations(rcKey)
 	trace.Step("Expectations restored")
 
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
@@ -693,16 +684,19 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		}
 		cm := controller.NewPodControllerRefManager(rm.podControl, rc.ObjectMeta, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), getRCKind())
 		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
-		for _, pod := range matchesNeedsController {
-			err := cm.AdoptPod(pod)
-			// continue to next pod if adoption fails.
-			if err != nil {
-				// If the pod no longer exists, don't even log the error.
-				if !errors.IsNotFound(err) {
-					utilruntime.HandleError(err)
+		// Adopt pods only if this replication controller is not going to be deleted.
+		if rc.DeletionTimestamp == nil {
+			for _, pod := range matchesNeedsController {
+				err := cm.AdoptPod(pod)
+				// continue to next pod if adoption fails.
+				if err != nil {
+					// If the pod no longer exists, don't even log the error.
+					if !errors.IsNotFound(err) {
+						utilruntime.HandleError(err)
+					}
+				} else {
+					matchesAndControlled = append(matchesAndControlled, pod)
 				}
-			} else {
-				matchesAndControlled = append(matchesAndControlled, pod)
 			}
 		}
 		filteredPods = matchesAndControlled
@@ -733,6 +727,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 
 	var manageReplicasErr error
+	rcNeedsSync := rm.expectations.SatisfiedExpectations(key)
 	if rcNeedsSync && rc.DeletionTimestamp == nil {
 		manageReplicasErr = rm.manageReplicas(filteredPods, &rc)
 	}
