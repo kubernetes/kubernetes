@@ -90,12 +90,7 @@ type genericScheduler struct {
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.
 func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
-	var trace *util.Trace
-	if pod != nil {
-		trace = util.NewTrace(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
-	} else {
-		trace = util.NewTrace("Scheduling <nil> pod")
-	}
+	trace := util.NewTrace(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
 
 	nodes, err := nodeLister.List()

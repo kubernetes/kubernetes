@@ -164,8 +164,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		extenderPredicates   []fitPredicate
 		extenderPrioritizers []priorityConfig
 		nodes                []string
-		pod                  *v1.Pod
-		pods                 []*v1.Pod
 		expectedHost         string
 		expectsErr           bool
 	}{
@@ -284,15 +282,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			extenders = append(extenders, &test.extenders[ii])
 		}
 		cache := schedulercache.New(time.Duration(0), wait.NeverStop)
-		for _, pod := range test.pods {
-			cache.AddPod(pod)
-		}
 		for _, name := range test.nodes {
 			cache.AddNode(&v1.Node{ObjectMeta: v1.ObjectMeta{Name: name}})
 		}
 		scheduler := NewGenericScheduler(
 			cache, test.predicates, algorithm.EmptyMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, extenders)
-		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
+		podIgnored := &v1.Pod{}
+		machine, err := scheduler.Schedule(podIgnored, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
 				t.Errorf("Unexpected non-error for %s, machine %s", test.name, machine)
@@ -300,6 +296,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		} else {
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
+				continue
 			}
 			if test.expectedHost != machine {
 				t.Errorf("Failed : %s, Expected: %s, Saw: %s", test.name, test.expectedHost, machine)
