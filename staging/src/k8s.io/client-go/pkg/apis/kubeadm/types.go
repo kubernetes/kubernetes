@@ -21,14 +21,13 @@ import (
 )
 
 type EnvParams struct {
-	KubernetesDir     string
-	HostPKIPath       string
-	HostEtcdPath      string
-	HyperkubeImage    string
-	RepositoryPrefix  string
-	DiscoveryImage    string
-	EtcdImage         string
-	ComponentLoglevel string
+	KubernetesDir    string
+	HostPKIPath      string
+	HostEtcdPath     string
+	HyperkubeImage   string
+	RepositoryPrefix string
+	DiscoveryImage   string
+	EtcdImage        string
 }
 
 type MasterConfiguration struct {
@@ -86,6 +85,6 @@ type NodeConfiguration struct {
 type ClusterInfo struct {
 	metav1.TypeMeta
 	// TODO(phase1+) this may become simply `api.Config`
-	CertificateAuthorities []string `json:"certificateAuthorities"`
-	Endpoints              []string `json:"endpoints"`
+	CertificateAuthorities []string
+	Endpoints              []string
 }
