@@ -3429,14 +3429,16 @@ func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string
 }
 
 func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) {
-	Logf("Deployment: %+v. Selector = %+v", *deployment, deployment.Spec.Selector)
-	for i := range allOldRSs {
-		Logf("All old ReplicaSets (%d/%d) of deployment %s: %+v. Selector = %+v", i+1, len(allOldRSs), deployment.Name, *allOldRSs[i], allOldRSs[i].Spec.Selector)
-	}
 	if newRS != nil {
-		Logf("New ReplicaSet of deployment %s: %+v. Selector = %+v", deployment.Name, *newRS, newRS.Spec.Selector)
+		Logf("New ReplicaSet of Deployment %s:\n%+v", deployment.Name, *newRS)
 	} else {
-		Logf("New ReplicaSet of deployment %s is nil.", deployment.Name)
+		Logf("New ReplicaSet of Deployment %s is nil.", deployment.Name)
+	}
+	if len(allOldRSs) > 0 {
+		Logf("All old ReplicaSets of Deployment %s:", deployment.Name)
+	}
+	for i := range allOldRSs {
+		Logf("%+v", *allOldRSs[i])
 	}
 }
 
@@ -3470,17 +3472,15 @@ func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 			return c.Core().Pods(namespace).List(options)
 		})
 	if err != nil {
-		Logf("Failed to list pods of deployment %s: %v", deployment.Name, err)
+		Logf("Failed to list Pods of Deployment %s: %v", deployment.Name, err)
 		return
 	}
-	if err == nil {
-		for _, pod := range podList.Items {
-			availability := "not available"
-			if deploymentutil.IsPodAvailable(&pod, minReadySeconds, time.Now()) {
-				availability = "available"
-			}
-			Logf("Pod %s is %s: %+v", pod.Name, availability, pod)
+	for _, pod := range podList.Items {
+		availability := "not available"
+		if deploymentutil.IsPodAvailable(&pod, minReadySeconds, time.Now()) {
+			availability = "available"
 		}
+		Logf("Pod %s is %s:\n%+v", pod.Name, availability, pod)
 	}
 }
 
