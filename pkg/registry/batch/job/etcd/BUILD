@@ -32,7 +32,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
