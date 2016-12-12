@@ -66,6 +66,9 @@ AUTH_ARGS=${AUTH_ARGS:-""}
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+# start kubernetes-discovery
+START_DISCOVERY=${START_DISCOVERY:-false}
+
 # START_MODE can be 'all', 'kubeletonly', 'nokubelet', or a comma separated list of
 # services to start. Valid values for service names:
 # etcd, kube-apiserver, kube-ctrlmgr, kube-scheduler, kubelet, kube-proxy, kube-dns
@@ -92,9 +95,12 @@ set -e
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-function is_dns_disabled {
+function check_dns_discovery_disabled {
     if [[ "${ENABLE_CLUSTER_DNS}" == "false" ]]; then
         [[ "$services" =~ "kube-dns" ]] && return 1
+    fi
+    if [[ "${START_DISCOVERY}" == "false" ]]; then
+        [[ "$services" =~ "kube-discovery" ]] && return 1
     fi
     return 0
 }
@@ -103,14 +109,14 @@ function is_service_enabled {
     local services=$@
     local enabled_services=$START_MODE
     if [[ "$enabled_services" == "all" ]]; then
-        # everything is enabled, just check DNS
-        return ! is_dns_disabled
+        # everything is enabled, just check DNS and discovery
+        return check_dns_discovery_disabled
     elif [[ "$enabled_services" == "nokubelet" ]]; then
         # anything but kubelet is good
         for service in ${services}; do
             [[ 'kubelet' == ${service} ]] && return 1
         done
-        return ! is_dns_disabled
+        return check_dns_discovery_disabled
     elif [[ "$enabled_services" == "kubeletonly" ]]; then
         enabled_services='kubelet'
     fi
@@ -118,6 +124,10 @@ function is_service_enabled {
     if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
         # It is possible that kube-dns will get repeated but it won't harm
         enabled_services=${enabled_services}",kube-dns"
+    fi
+    if [[ "${START_DISCOVERY}" == "true" ]]; then
+        # It is possible that kube-discovery will get repeated as well
+        enabled_services=${enabled_services}",kube-discovery"
     fi
     local service
     for service in ${services}; do
@@ -776,6 +786,9 @@ if is_service_enabled kube-proxy; then
 fi
 if is_service_enabled kube-dns; then
     start_kubedns
+fi
+if is_service_enabled kube-discovery; then
+  start_discovery
 fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
