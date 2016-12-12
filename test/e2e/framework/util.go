@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1568,9 +1569,14 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 		if err != nil {
 			return false, err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+		defer cancel()
+
 		var body []byte
 		if subResourceProxyAvailable {
 			body, err = r.c.Core().RESTClient().Get().
+				Context(ctx).
 				Namespace(r.ns).
 				Resource("pods").
 				SubResource("proxy").
@@ -1579,6 +1585,7 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 				Raw()
 		} else {
 			body, err = r.c.Core().RESTClient().Get().
+				Context(ctx).
 				Prefix("proxy").
 				Namespace(r.ns).
 				Resource("pods").
@@ -1587,6 +1594,10 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 				Raw()
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				Failf("Controller %s: Failed to Get from replica %d [%s]: %v\n pod status: %#v", r.controllerName, i+1, pod.Name, ctx.Err(), pod.Status)
+				return false, ctx.Err()
+			}
 			Logf("Controller %s: Failed to GET from replica %d [%s]: %v\npod status: %#v", r.controllerName, i+1, pod.Name, err, pod.Status)
 			continue
 		}
@@ -1756,11 +1767,20 @@ func ServiceResponding(c clientset.Interface, ns, name string) error {
 			Logf("Failed to get services proxy request: %v:", errProxy)
 			return false, nil
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+		defer cancel()
+
 		body, err := proxyRequest.Namespace(ns).
+			Context(ctx).
 			Name(name).
 			Do().
 			Raw()
 		if err != nil {
+			if ctx.Err() != nil {
+				Failf("Failed to GET from service %s: %v", name, ctx.Err())
+				return true, ctx.Err()
+			}
 			Logf("Failed to GET from service %s: %v:", name, err)
 			return false, nil
 		}
