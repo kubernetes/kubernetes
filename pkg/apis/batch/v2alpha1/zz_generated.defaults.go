@@ -68,8 +68,8 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Spec.JobTemplate.Spec.Template.Spec.InitContainers {
-		a := &in.Spec.JobTemplate.Spec.Template.Spec.InitContainers[i]
+	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Containers {
+		a := &in.Spec.JobTemplate.Spec.Template.Spec.Containers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -110,8 +110,8 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 			}
 		}
 	}
-	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Containers {
-		a := &in.Spec.JobTemplate.Spec.Template.Spec.Containers[i]
+	for i := range in.Spec.JobTemplate.Spec.Template.Spec.InitContainers {
+		a := &in.Spec.JobTemplate.Spec.Template.Spec.InitContainers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -192,8 +192,8 @@ func SetObjectDefaults_Job(in *Job) {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Spec.Template.Spec.InitContainers {
-		a := &in.Spec.Template.Spec.InitContainers[i]
+	for i := range in.Spec.Template.Spec.Containers {
+		a := &in.Spec.Template.Spec.Containers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -234,8 +234,8 @@ func SetObjectDefaults_Job(in *Job) {
 			}
 		}
 	}
-	for i := range in.Spec.Template.Spec.Containers {
-		a := &in.Spec.Template.Spec.Containers[i]
+	for i := range in.Spec.Template.Spec.InitContainers {
+		a := &in.Spec.Template.Spec.InitContainers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -315,8 +315,8 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Template.Spec.Template.Spec.InitContainers {
-		a := &in.Template.Spec.Template.Spec.InitContainers[i]
+	for i := range in.Template.Spec.Template.Spec.Containers {
+		a := &in.Template.Spec.Template.Spec.Containers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -357,8 +357,8 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 			}
 		}
 	}
-	for i := range in.Template.Spec.Template.Spec.Containers {
-		a := &in.Template.Spec.Template.Spec.Containers[i]
+	for i := range in.Template.Spec.Template.Spec.InitContainers {
+		a := &in.Template.Spec.Template.Spec.InitContainers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]

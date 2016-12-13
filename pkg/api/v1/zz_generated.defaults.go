@@ -191,8 +191,8 @@ func SetObjectDefaults_Pod(in *Pod) {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Spec.InitContainers {
-		a := &in.Spec.InitContainers[i]
+	for i := range in.Spec.Containers {
+		a := &in.Spec.Containers[i]
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -233,8 +233,8 @@ func SetObjectDefaults_Pod(in *Pod) {
 			}
 		}
 	}
-	for i := range in.Spec.Containers {
-		a := &in.Spec.Containers[i]
+	for i := range in.Spec.InitContainers {
+		a := &in.Spec.InitContainers[i]
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -322,8 +322,8 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Template.Spec.InitContainers {
-		a := &in.Template.Spec.InitContainers[i]
+	for i := range in.Template.Spec.Containers {
+		a := &in.Template.Spec.Containers[i]
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -364,8 +364,8 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 			}
 		}
 	}
-	for i := range in.Template.Spec.Containers {
-		a := &in.Template.Spec.Containers[i]
+	for i := range in.Template.Spec.InitContainers {
+		a := &in.Template.Spec.InitContainers[i]
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -447,8 +447,8 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 				SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 			}
 		}
-		for i := range in.Spec.Template.Spec.InitContainers {
-			a := &in.Spec.Template.Spec.InitContainers[i]
+		for i := range in.Spec.Template.Spec.Containers {
+			a := &in.Spec.Template.Spec.Containers[i]
 			SetDefaults_Container(a)
 			for j := range a.Ports {
 				b := &a.Ports[j]
@@ -489,8 +489,8 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 				}
 			}
 		}
-		for i := range in.Spec.Template.Spec.Containers {
-			a := &in.Spec.Template.Spec.Containers[i]
+		for i := range in.Spec.Template.Spec.InitContainers {
+			a := &in.Spec.Template.Spec.InitContainers[i]
 			SetDefaults_Container(a)
 			for j := range a.Ports {
 				b := &a.Ports[j]

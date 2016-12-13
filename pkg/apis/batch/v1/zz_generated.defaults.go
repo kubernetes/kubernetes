@@ -65,8 +65,8 @@ func SetObjectDefaults_Job(in *Job) {
 			api_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Spec.Template.Spec.InitContainers {
-		a := &in.Spec.Template.Spec.InitContainers[i]
+	for i := range in.Spec.Template.Spec.Containers {
+		a := &in.Spec.Template.Spec.Containers[i]
 		api_v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -107,8 +107,8 @@ func SetObjectDefaults_Job(in *Job) {
 			}
 		}
 	}
-	for i := range in.Spec.Template.Spec.Containers {
-		a := &in.Spec.Template.Spec.Containers[i]
+	for i := range in.Spec.Template.Spec.InitContainers {
+		a := &in.Spec.Template.Spec.InitContainers[i]
 		api_v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]

@@ -77,8 +77,8 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Spec.Template.Spec.InitContainers {
-		a := &in.Spec.Template.Spec.InitContainers[i]
+	for i := range in.Spec.Template.Spec.Containers {
+		a := &in.Spec.Template.Spec.Containers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -119,8 +119,8 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 			}
 		}
 	}
-	for i := range in.Spec.Template.Spec.Containers {
-		a := &in.Spec.Template.Spec.Containers[i]
+	for i := range in.Spec.Template.Spec.InitContainers {
+		a := &in.Spec.Template.Spec.InitContainers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -201,8 +201,8 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Spec.Template.Spec.InitContainers {
-		a := &in.Spec.Template.Spec.InitContainers[i]
+	for i := range in.Spec.Template.Spec.Containers {
+		a := &in.Spec.Template.Spec.Containers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -243,8 +243,8 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 			}
 		}
 	}
-	for i := range in.Spec.Template.Spec.Containers {
-		a := &in.Spec.Template.Spec.Containers[i]
+	for i := range in.Spec.Template.Spec.InitContainers {
+		a := &in.Spec.Template.Spec.InitContainers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -336,8 +336,8 @@ func SetObjectDefaults_Job(in *Job) {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Spec.Template.Spec.InitContainers {
-		a := &in.Spec.Template.Spec.InitContainers[i]
+	for i := range in.Spec.Template.Spec.Containers {
+		a := &in.Spec.Template.Spec.Containers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -378,8 +378,8 @@ func SetObjectDefaults_Job(in *Job) {
 			}
 		}
 	}
-	for i := range in.Spec.Template.Spec.Containers {
-		a := &in.Spec.Template.Spec.Containers[i]
+	for i := range in.Spec.Template.Spec.InitContainers {
+		a := &in.Spec.Template.Spec.InitContainers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -471,8 +471,8 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 	}
-	for i := range in.Spec.Template.Spec.InitContainers {
-		a := &in.Spec.Template.Spec.InitContainers[i]
+	for i := range in.Spec.Template.Spec.Containers {
+		a := &in.Spec.Template.Spec.Containers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -513,8 +513,8 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 			}
 		}
 	}
-	for i := range in.Spec.Template.Spec.Containers {
-		a := &in.Spec.Template.Spec.Containers[i]
+	for i := range in.Spec.Template.Spec.InitContainers {
+		a := &in.Spec.Template.Spec.InitContainers[i]
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]

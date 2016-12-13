@@ -3039,7 +3039,6 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	} else {
 		out.Volumes = nil
 	}
-	out.InitContainers = *(*[]api.Container)(unsafe.Pointer(&in.InitContainers))
 	out.Containers = *(*[]api.Container)(unsafe.Pointer(&in.Containers))
 	out.RestartPolicy = api.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
@@ -3064,6 +3063,7 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.ImagePullSecrets = *(*[]api.LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
+	out.InitContainers = *(*[]api.Container)(unsafe.Pointer(&in.InitContainers))
 	return nil
 }
 
@@ -3079,7 +3079,6 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	} else {
 		out.Volumes = nil
 	}
-	out.InitContainers = *(*[]Container)(unsafe.Pointer(&in.InitContainers))
 	out.Containers = *(*[]Container)(unsafe.Pointer(&in.Containers))
 	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
@@ -3100,6 +3099,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.ImagePullSecrets = *(*[]LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
+	out.InitContainers = *(*[]Container)(unsafe.Pointer(&in.InitContainers))
 	return nil
 }
 
@@ -3111,8 +3111,8 @@ func autoConvert_v1_PodStatus_To_api_PodStatus(in *PodStatus, out *api.PodStatus
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
 	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
-	out.InitContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
+	out.InitContainerStatuses = *(*[]api.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	return nil
 }
 
@@ -3128,8 +3128,8 @@ func autoConvert_api_PodStatus_To_v1_PodStatus(in *api.PodStatus, out *PodStatus
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
 	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
-	out.InitContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
+	out.InitContainerStatuses = *(*[]ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	return nil
 }
 

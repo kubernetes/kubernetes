@@ -1274,6 +1274,7 @@ var map_PodSpec = map[string]string{
 	"imagePullSecrets":              "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod",
 	"hostname":                      "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
 	"subdomain":                     "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
+	"initContainers":                "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1281,15 +1282,16 @@ func (PodSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PodStatus = map[string]string{
-	"":                  "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
-	"phase":             "Current condition of the pod. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-phase",
-	"conditions":        "Current service state of pod. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions",
-	"message":           "A human readable message indicating details about why the pod is in this condition.",
-	"reason":            "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'",
-	"hostIP":            "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
-	"podIP":             "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
-	"startTime":         "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
-	"containerStatuses": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
+	"":                      "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
+	"phase":                 "Current condition of the pod. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-phase",
+	"conditions":            "Current service state of pod. More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions",
+	"message":               "A human readable message indicating details about why the pod is in this condition.",
+	"reason":                "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'",
+	"hostIP":                "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
+	"podIP":                 "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+	"startTime":             "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
+	"containerStatuses":     "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
+	"initContainerStatuses": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. Init containers are in alpha state and may change without notice. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {
