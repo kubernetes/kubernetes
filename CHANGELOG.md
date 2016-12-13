@@ -1420,7 +1420,6 @@ binary | sha256 hash
 * Added new kubelet flags `--cni-bin-dir` and `--cni-conf-dir` to specify where CNI files are located. ([#32151](https://github.com/kubernetes/kubernetes/pull/32151), [@bboreham](https://github.com/bboreham))
     * Fixed CNI configuration on GCI platform when using CNI.
 * Move push-ci-build.sh to kubernetes/release repo ([#32444](https://github.com/kubernetes/kubernetes/pull/32444), [@david-mcmahon](https://github.com/david-mcmahon))
-* Generate separate OpenAPI spec for each API GroupVersion on /<Group>/<Version>/swagger.json ([#31468](https://github.com/kubernetes/kubernetes/pull/31468), [@mbohlool](https://github.com/mbohlool))
 * vendor: update github.com/coreos/go-oidc client package ([#31564](https://github.com/kubernetes/kubernetes/pull/31564), [@ericchiang](https://github.com/ericchiang))
 * Fixed an issue that caused a credential error when deploying federation control plane onto a GKE cluster. ([#31747](https://github.com/kubernetes/kubernetes/pull/31747), [@madhusudancs](https://github.com/madhusudancs))
 * NONE ([#32229](https://github.com/kubernetes/kubernetes/pull/32229), [@errordeveloper](https://github.com/errordeveloper))
