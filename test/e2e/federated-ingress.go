@@ -43,9 +43,10 @@ import (
 
 const (
 	MaxRetriesOnFederatedApiserver = 3
-	FederatedIngressTimeout        = 120 * time.Second
+	FederatedIngressTimeout        = 10 * time.Minute
 	FederatedIngressName           = "federated-ingress"
 	FederatedIngressServiceName    = "federated-ingress-service"
+	FederatedIngressTLSSecretName  = "federated-ingress-tls-secret"
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
 	FederatedIngressFirewallPrefix = "f8n-ing-fw-e2e"
 	FederatedIngressFirewallDesc   = "Federated Ingress e2e GCE L7 firewall rule"
@@ -55,6 +56,10 @@ const (
 	// https://cloud.google.com/compute/docs/load-balancing/http/
 	// for details.
 	FederatedIngressGCLBSrcRange = "130.211.0.0/22"
+
+	// TLS Certificate and Key for the ingress resource
+	FederatedIngressTLSCrt = `LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURNekNDQWh1Z0F3SUJBZ0lKQUkrTEVWOFZtU2F5TUEwR0NTcUdTSWIzRFFFQkN3VUFNQzh4Q3pBSkJnTlYKQkFZVEFsVlRNUk13RVFZRFZRUUlEQXBUYjIxbExWTjBZWFJsTVFzd0NRWURWUVFLREFKT1FUQWdGdzB4TmpFeQpNVFV5TWpRd01UZGFHQTh5TURnMU1ERXdNakl5TkRBeE4xb3dMekVMTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WCkJBZ01DbE52YldVdFUzUmhkR1V4Q3pBSkJnTlZCQW9NQWs1Qk1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0MKQVE4QU1JSUJDZ0tDQVFFQTBReXlBcmp0a2ZmUEt4RGNYa1FMdnBkak1JN0FkTGQ1M2QzSmhVV0Q2SThISi9SOApoa2tVK2ZaUWtVUEdnZ1hOY05YTklCVlZIMHJsekNxUi9ia2xBNGlHYkJ1VXdhV3FCaHBJQW1hT0xYYm41b1NjCi9sTW50aklnd3NzR1F5UnR4ZHpEOXpLM25MOVYzd25OVzJBVWdHQ00xa0VHMnN1eG44czBndjVQZlc3RnBCNnQKd0ViMFp2cmJzaHpSYjc3YkVEWDlhUEQ3RkRZSWtJK1p0R01hcG90SWNwOE1JMWVsUmw0Yms1eHlWK0hPei95eQozV0pINGxaS01qYnRSdEcrQnRmTGQyVm9VRTBneTdTdDdXWFZUNERPdkFEeG9hdXFybk40VDJyalVkMDZQbzQ2CjZ0dWZnVERhQS84d1NtSi9lTkpCdVJHTVZJb0VBeStkMVZIbjJ3SURBUUFCbzFBd1RqQWRCZ05WSFE0RUZnUVUKaHllWjluVEFLZlFXNUl5dGs5VmE2WnpWYWxJd0h3WURWUjBqQkJnd0ZvQVVoeWVaOW5UQUtmUVc1SXl0azlWYQo2WnpWYWxJd0RBWURWUjBUQkFVd0F3RUIvekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBaWRxY1k2aVh2SVpmCkNseFNkUmtzd0xJTlo0NkRDcXl5YW1qSlBMUzNjRjBuUG84OXlneCsyVzZyems3YjZnazhmdEpxT1R0aG04cmUKRE1BcWlheWE0eEcyRmdpZTc3eC9UWEFMclFLblE4NHlSWlFGeTlQZ21DR2ZuS2xnUzBSaHgvb1NXUFRPZ2JHNwpWbE1EOHdaNjhIWlVZZDhhdkVCb2Rad0JGa2x5OGMyWTlqNHJyS2J5WWhxUjRhTno2MjJhVnppYlNyeWVKWFJ6Cm9SQ0VtUnhpMlhmZVJORi9aMlE4WEkxOG55V1NEc1llUGJROTZMVW9DV3VQQTdyS3BTSENnZFJlRzRNUEpOREIKVUNsUTc1eTJ6U0lDaEoyaWp4eUJoTjJSaHR3TmxPTEh5Tk5PYXcrUWEvcHlNL3NmMkd0dmhVTjE0MlRWRzhHdwpKa1JmYjBvOHN3PT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=`
+	FederatedIngressTLSKey = `LS0tLS1CRUdJTiBFTkNSWVBURUQgUFJJVkFURSBLRVktLS0tLQpNSUlGRGpCQUJna3Foa2lHOXcwQkJRMHdNekFiQmdrcWhraUc5dzBCQlF3d0RnUUlxQjFIRXpocDREOENBZ2dBCk1CUUdDQ3FHU0liM0RRTUhCQWlKREszNkNoOUpmd1NDQk1naXM1UkJ1ZTZXekU0elN5TlVNQ25yeFJsOW9GbHoKWHlLNXJXMkc0R1VTeG8rcFhvYWxoSEd6YVlHaElsUXZZWW42U0ZSTmcrRWpFanBxM2MyY25iZURLN1lvakkrTgpkdW1neEludkJoSUZlM1d6VVBCUFo1bVZ5L1FkRzRpUlQ3Rm9FZHIwUjVKcGdHMnd2M0hSblhQUFNoOTc1Y0lZCm5QcTBiSGRmT2R4ZVJnYWliVHZyeWJ5WGxiZFRFdEhSWWpLYnFnL1RvWkRuQXRib04yaWJLa1NkQityN2lFcWEKV3Q5VnpEalNuM0hhOER2UW0wNVQ2VThuYWtiTTFnbTlwUnNyMThveE4yTktKcVZPdnMvY1JSYzFEWTQxWDBjZwpoTEh6Um9QNytvY21PMlQ4dE5mKzdRMXEwUTBpNUM4enpHWndtdFNkc2kvcHluN2NkUmJIeDdqNXErTy9nNWkyClBRSUN1cHRtY04rZjJvOVBBSzdkUXpnY2VNK3BTUUdpQlBXWXhvSEtXM0ZhbnVVWlcxMS9jVjVDMGUwTGFzcFYKa2NaeFZKdlpqQ0E3QUdaN0dIOXB2UVNDRkdjQml6MDI4eTE0bFkwWEQ0VjZENDZabk40L3lvdmJNZEsrZ1l6WApmY201aVUwRlhBMytCd08rK2tJczBuNkpScFlMTlA1Z2NTRXhpelhXVDkyYTVyQzlVaXJGRmMrQzRiSXI1L0czCnFmK3ZsVmp0bWZLTDBJd29GY2hLWWFaTHlrNnZ2WTlMOE43T21KQVhoVXE2dWFnODV3Y1cvRTc3NlpZd1J4MGgKMFRSNHhDcFo2WThDdi9EdWZlUEZnWUc0eXkxckdkd2ZNOVJBQzFVNkliZFczVnFEcWNRdVZBcjRzeVhMc0FESAppUXFaQjNvRStzQzZKRTYvek1EWGxoNXpOZWhpNjNuZUhORmYxQjE1YjdDcWJmL1ZVUUdnaHdkSnI1NWNiK0pFCjBmQUtXcFhtYmVYcEVlamhmdmpwU2tuS1RPajU5aHlqVnVuaGxxb2NxMm0zR1hXc3lOUTFiRGtIVFhjcGVhSGkKNU5TNFZ4TnJjVDc5UGRXQlkrUjhPUXFBN1FXZURnaWNtd0VnbkpPdHVlN25pYzd6b1VtKzlTZ3hSUC9HZ2dUVAplaGkrR2wyNzgrUUJnV2E4eTFPWTdraVNJSjBPZFl6KzlzRjYyTzBlMWVuSFBacHYycFF0S0VtSGlaNjA1OHFpCmhXQ2RZb2hPeEdmMXJOSEhlSWM5bGJDOUwxbTFSY3F0aU9JZ01zR3FhT2VpV2k5VFR2aVVlV2ZLK0FVUEs4eDEKeUNscUpiK1U2T1hMZE9lNHM2MlcvQ1pJcTViWGhrYzFwTndQT2NJTFBoMG13U3pwWDljdDBEQ01TTzVsRGQwWApJcUVxL3o1WnBvajJNQjMwaUJIak9YRGY3N1EwaGtCVDRhZ3V2Rjl0VEFWMWwyd1djZU5CVEQvcVdqWm54TDQ4CkxGWlhMbkxISC9UY0tYRjV0ZVdlbjJzY3dXYWF2bmJPQXNLYzV4QzVMU0NHU3hXd2I2alVmeGlmSGJJbzlWdzcKeTVILzR2L2ZlOHB1VExtSVFQZWx6c1BrcnVQQTJSNVMySTl3WDFPb1BoK3FPVndoUzliRk5ZUm5xYWt0WDBWOQpka1FMSG9JOENNT2Z0Nkxqam1Uc1N4NFB2NXpGR2srUkdQOFdHR25KbDdXemdZbDBYYjdydVRTclkzcE1TUFQxCmJSOUsxcFpmQ0J1ajdrckdUTGc2b2xIVWU4N215QTRKaXNHSzI5bVExbkV4ZGJnbCtpVithUjVJQjIzTkFxOC8KUHA0TjJyUlRlYUE4bEM1dTk2bnBiblF2ZEdYMXJickFQeDRpTk13bE94K3Vaa1lrVDFRZmRUekpINUtBNkRsRApNUWJjNnFlVjVPRjNyNUQ2VzBiLzZ1TUFWekE2dURkZm53b3ZFRkQzYUU5SnRnOTA4MW1Xa2RmVXI3L081aXIxClplSUVvUktvcngzYzhvKytvTFpEZ09kemo2WUFSUld4UDZweDlTeHpTM0NHK09XcnBwZWxkREVxV3ZkVlVEd3EKTHdHMDJ2Rms0VHhWVG5MWVhLVkl6R0oraHlGcjgxbXR3ZXBsanFzcEJZSDFhQUQyVk12bWhaUktXYzEzY0xCbQowaTA9Ci0tLS0tRU5EIEVOQ1JZUFRFRCBQUklWQVRFIEtFWS0tLS0tCg==`
 )
 
 var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func() {
@@ -73,7 +78,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			framework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			nsName := f.FederationNamespace.Name
-			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName)
+			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName, FederatedIngressServiceName, FederatedIngressTLSSecretName)
 			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
 			// Cleanup
 			err := f.FederationClientset_1_5.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
@@ -111,7 +116,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should create and update matching ingresses in underlying clusters", func() {
-			ingress := createIngressOrFail(f.FederationClientset_1_5, ns)
+			ingress := createIngressOrFail(f.FederationClientset_1_5, ns, FederatedIngressServiceName, FederatedIngressTLSSecretName)
 			// wait for ingress shards being created
 			waitForIngressShardsOrFail(ns, ingress, clusters)
 			ingress = updateIngressOrFail(f.FederationClientset_1_5, ns)
@@ -145,6 +150,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 			var (
 				service *v1.Service
+				secret  *v1.Secret
 				fwNames map[string]string
 			)
 
@@ -162,9 +168,10 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create backend service
 				service = createServiceOrFail(f.FederationClientset_1_5, ns, FederatedIngressServiceName)
+				secret = createTLSSecretOrFail(f.FederationClientset_1_5, ns, FederatedIngressTLSSecretName)
 
 				// create ingress object
-				jig.ing = createIngressOrFail(f.FederationClientset_1_5, ns)
+				jig.ing = createIngressOrFail(f.FederationClientset_1_5, ns, service.Name, FederatedIngressTLSSecretName)
 				// Manually create a firewall rule for the backend pods as
 				// a temporary workaround. See
 				// https://github.com/kubernetes/kubernetes/issues/36327#issuecomment-262354506
@@ -175,6 +182,8 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				fwNames = createFederatedIngressFirewallRulesOrFail(ns, jig.ing.Name, clusters, service)
 				// wait for services objects sync
 				waitForServiceShardsOrFail(ns, service, clusters)
+				// wait for secrets objects to sync
+				waitForSecretShardsOrFail(ns, secret, clusters)
 				// wait for ingress objects sync
 				waitForIngressShardsOrFail(ns, jig.ing, clusters)
 			})
@@ -196,6 +205,13 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 					jig.ing = nil
 				} else {
 					By("No ingress to delete. Ingress is nil")
+				}
+				if secret != nil {
+					orphanDependents := false
+					deleteSecretOrFail(f.FederationClientset_1_5, ns, secret.Name, &orphanDependents)
+					secret = nil
+				} else {
+					By("No secret to delete. Secret is nil")
 				}
 				deleteFederatedIngressFirewallRulesOrFail(fwNames)
 			})
@@ -243,7 +259,7 @@ func equivalentIngress(federatedIngress, clusterIngress v1beta1.Ingress) bool {
 // underlying clusters when orphan dependents is false and they are not deleted
 // when orphan dependents is true.
 func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
-	ingress := createIngressOrFail(clientset, nsName)
+	ingress := createIngressOrFail(clientset, nsName, FederatedIngressServiceName, FederatedIngressTLSSecretName)
 	ingressName := ingress.Name
 	// Check subclusters if the ingress was created there.
 	By(fmt.Sprintf("Waiting for ingress %s to be created in all underlying clusters", ingressName))
@@ -279,7 +295,7 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
-			By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace))
+			framework.Logf("shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace)
 			return true, nil // Success
 		}
 		if present && err == nil { // We want it present, and the Get succeeded, so we're all good.
@@ -376,7 +392,7 @@ func deleteClusterIngressOrFail(clusterName string, clientset *kubeclientset.Cli
 	framework.ExpectNoError(err, "Error deleting cluster ingress %q/%q from cluster %q", namespace, ingressName, clusterName)
 }
 
-func createIngressOrFail(clientset *fedclientset.Clientset, namespace string) *v1beta1.Ingress {
+func createIngressOrFail(clientset *fedclientset.Clientset, namespace, serviceName, secretName string) *v1beta1.Ingress {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createIngressOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
@@ -388,8 +404,13 @@ func createIngressOrFail(clientset *fedclientset.Clientset, namespace string) *v
 		},
 		Spec: v1beta1.IngressSpec{
 			Backend: &v1beta1.IngressBackend{
-				ServiceName: "testingress-service",
+				ServiceName: serviceName,
 				ServicePort: intstr.FromInt(80),
+			},
+			TLS: []v1beta1.IngressTLS{
+				{
+					SecretName: secretName,
+				},
 			},
 		},
 	}
@@ -454,6 +475,29 @@ func (j *federationTestJig) waitForFederatedIngress() {
 			framework.ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, lbPollInterval, timeoutClient, false))
 		}
 	}
+}
+
+func createTLSSecretOrFail(clientset *fedclientset.Clientset, namespace, secretName string) *v1.Secret {
+	if clientset == nil || len(namespace) == 0 {
+		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createTLSSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
+	}
+	By(fmt.Sprintf("Creating federated secret %q in namespace %q", secretName, namespace))
+
+	secret := &v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name: secretName,
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"tls.crt": []byte(FederatedIngressTLSCrt),
+			"tls.key": []byte(FederatedIngressTLSKey),
+		},
+	}
+
+	By(fmt.Sprintf("Creating federated secret %q in namespace %q", secretName, namespace))
+	newSecret, err := clientset.Core().Secrets(namespace).Create(secret)
+	framework.ExpectNoError(err, "creating secret %q in namespace %q", secret.Name, namespace)
+	return newSecret
 }
 
 type federationTestJig struct {
@@ -617,15 +661,23 @@ func deleteFederatedIngressFirewallRules(fwNames map[string]string) error {
 		if !ok {
 			return fmt.Errorf("no cloud provider for zone %q", zone)
 		}
-		gce := provider.(*gceprovider.GCECloud)
+		gce, ok := provider.(*gceprovider.GCECloud)
+		if !ok {
+			return fmt.Errorf("want GCE cloud provider, got: %T", provider)
+		}
 		err := gce.DeleteFirewall(fwName)
-		// Collect the erro and continue
-		errs = append(errs, err.Error())
+		// Collect the error and continue
+		if err != nil {
+			errs = append(errs, err.Error())
+		}
 	}
-	return fmt.Errorf(strings.Join(errs, ", "))
+	if len(errs) > 0 {
+		return fmt.Errorf(strings.Join(errs, ", "))
+	}
+	return nil
 }
 
 func deleteFederatedIngressFirewallRulesOrFail(fwNames map[string]string) {
 	err := deleteFederatedIngressFirewallRules(fwNames)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error deleting firewall rules %q", fwNames))
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error deleting firewall rules %q: %v", fwNames, err))
 }
