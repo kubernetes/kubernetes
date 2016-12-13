@@ -23,12 +23,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/coreos/go-semver/semver"
 	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 type RulePosition string
@@ -40,7 +40,7 @@ const (
 
 // An injectable interface for running iptables commands.  Implementations must be goroutine-safe.
 type Interface interface {
-	// GetVersion returns the "X.Y.Z" semver string for iptables.
+	// GetVersion returns the "X.Y.Z" version string for iptables.
 	GetVersion() (string, error)
 	// EnsureChain checks if the specified chain exists and, if not, creates it.  If the chain existed, return true.
 	EnsureChain(table Table, chain Chain) (bool, error)
@@ -462,45 +462,42 @@ func makeFullArgs(table Table, chain Chain, args ...string) []string {
 
 // Checks if iptables has the "-C" flag
 func getIPTablesHasCheckCommand(vstring string) bool {
-	minVersion, err := semver.NewVersion(MinCheckVersion)
+	minVersion, err := utilversion.ParseGeneric(MinCheckVersion)
 	if err != nil {
 		glog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinCheckVersion, err)
 		return true
 	}
-	version, err := semver.NewVersion(vstring)
+	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
 		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
 		return true
 	}
-	if version.LessThan(*minVersion) {
-		return false
-	}
-	return true
+	return version.AtLeast(minVersion)
 }
 
 // Checks if iptables version has a "wait" flag
 func getIPTablesWaitFlag(vstring string) []string {
-	version, err := semver.NewVersion(vstring)
+	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
 		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
 		return nil
 	}
 
-	minVersion, err := semver.NewVersion(MinWaitVersion)
+	minVersion, err := utilversion.ParseGeneric(MinWaitVersion)
 	if err != nil {
 		glog.Errorf("MinWaitVersion (%s) is not a valid version string: %v", MinWaitVersion, err)
 		return nil
 	}
-	if version.LessThan(*minVersion) {
+	if version.LessThan(minVersion) {
 		return nil
 	}
 
-	minVersion, err = semver.NewVersion(MinWait2Version)
+	minVersion, err = utilversion.ParseGeneric(MinWait2Version)
 	if err != nil {
 		glog.Errorf("MinWait2Version (%s) is not a valid version string: %v", MinWait2Version, err)
 		return nil
 	}
-	if version.LessThan(*minVersion) {
+	if version.LessThan(minVersion) {
 		return []string{"-w"}
 	} else {
 		return []string{"-w2"}
@@ -515,7 +512,7 @@ func getIPTablesVersionString(exec utilexec.Interface) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	versionMatcher := regexp.MustCompile("v([0-9]+\\.[0-9]+\\.[0-9]+)")
+	versionMatcher := regexp.MustCompile("v([0-9]+(\\.[0-9]+)+)")
 	match := versionMatcher.FindStringSubmatch(string(bytes))
 	if match == nil {
 		return "", fmt.Errorf("no iptables version found in string: %s", bytes)

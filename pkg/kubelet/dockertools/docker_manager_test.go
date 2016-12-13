@@ -2117,12 +2117,14 @@ func TestDockerVersionComparison(t *testing.T) {
 		{version: "1.10.4-rc1", compare: -1},
 		{version: "1.11.1", compare: -1},
 		{version: "1.11.1-rc4", compare: -1},
-		{version: "invalid", compare: -1, err: true},
+		{version: "invalid", err: true},
 	} {
 		testCase := fmt.Sprintf("test case #%d test version %q", i, test.version)
 		res, err := v.Compare(test.version)
-		assert.Equal(t, test.compare, res, testCase)
 		assert.Equal(t, test.err, err != nil, testCase)
+		if !test.err {
+			assert.Equal(t, test.compare, res, testCase)
+		}
 	}
 }
 
