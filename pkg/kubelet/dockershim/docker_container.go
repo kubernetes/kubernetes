@@ -217,7 +217,7 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
 	}
-	if path != "" {
+	if path != "" && realPath != "" {
 		// Only create the symlink when container log path is specified.
 		if err = ds.os.Symlink(realPath, path); err != nil {
 			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
