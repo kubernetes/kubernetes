@@ -66,7 +66,7 @@ func (ls Set) AsSelector() Selector {
 // assumes that labels are already validated and thus don't
 // preform any validation.
 // According to our measurements this is significantly faster
-// in codepaths that matter at high sccale.
+// in codepaths that matter at high scale.
 func (ls Set) AsSelectorPreValidated() Selector {
 	return SelectorFromValidatedSet(ls)
 }

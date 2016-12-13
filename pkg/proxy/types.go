@@ -38,7 +38,7 @@ type ProxyProvider interface {
 }
 
 // ServicePortName carries a namespace + name + portname.  This is the unique
-// identfier for a load-balanced service.
+// identifier for a load-balanced service.
 type ServicePortName struct {
 	types.NamespacedName
 	Port string

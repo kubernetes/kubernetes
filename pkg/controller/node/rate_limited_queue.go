@@ -227,7 +227,7 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	}
 }
 
-// Adds value to the queue to be processed. Won't add the same value(comparsion by value) a second time
+// Adds value to the queue to be processed. Won't add the same value(comparison by value) a second time
 // if it was already added and not removed.
 func (q *RateLimitedTimedQueue) Add(value string, uid interface{}) bool {
 	now := now()

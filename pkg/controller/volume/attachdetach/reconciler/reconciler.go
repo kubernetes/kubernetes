@@ -92,7 +92,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 	return func() {
 		rc.reconcile()
 		// reconciler periodically checks whether the attached volumes from actual state
-		// are still attached to the node and udpate the status if they are not.
+		// are still attached to the node and update the status if they are not.
 		if time.Since(rc.timeOfLastSync) > rc.syncDuration {
 			rc.sync()
 		}
@@ -157,7 +157,7 @@ func (rc *reconciler) reconcile() {
 				continue
 			}
 
-			// Trigger detach volume which requires verifing safe to detach step
+			// Trigger detach volume which requires verifying safe to detach step
 			// If timeout is true, skip verifySafeToDetach check
 			glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 			verifySafeToDetach := !timeout

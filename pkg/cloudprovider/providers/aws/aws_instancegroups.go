@@ -27,7 +27,7 @@ import (
 // AWSCloud implements InstanceGroups
 var _ InstanceGroups = &Cloud{}
 
-// ResizeInstanceGroup sets the size of the specificed instancegroup Exported
+// ResizeInstanceGroup sets the size of the specified instancegroup Exported
 // so it can be used by the e2e tests, which don't want to instantiate a full
 // cloudprovider.
 func ResizeInstanceGroup(asg ASG, instanceGroupName string, size int) error {

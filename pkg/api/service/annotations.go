@@ -33,9 +33,9 @@ const (
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
 
-	// AnnotationValueExternalTrafficLocal Value of annotation to specify local endpoints behaviour
+	// AnnotationValueExternalTrafficLocal Value of annotation to specify local endpoints behavior
 	AnnotationValueExternalTrafficLocal = "OnlyLocal"
-	// AnnotationValueExternalTrafficGlobal Value of annotation to specify global (legacy) behaviour
+	// AnnotationValueExternalTrafficGlobal Value of annotation to specify global (legacy) behavior
 	AnnotationValueExternalTrafficGlobal = "Global"
 
 	// TODO: The alpha annotations have been deprecated, remove them when we move this feature to GA.

@@ -87,7 +87,7 @@ func (s *defaultCapabilities) Validate(pod *api.Pod, container *api.Container) f
 	}
 
 	if container.SecurityContext.Capabilities == nil {
-		// if container.SC.Caps is nil then nothing was defaulted by the strat or requested by the pod author
+		// if container.SC.Caps is nil then nothing was defaulted by the start or requested by the pod author
 		// if there are no required caps on the strategy and nothing is requested on the pod
 		// then we can safely return here without further validation.
 		if len(s.defaultAddCapabilities) == 0 && len(s.requiredDropCapabilities) == 0 {

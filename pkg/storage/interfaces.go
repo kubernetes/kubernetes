@@ -138,7 +138,7 @@ type Interface interface {
 	// be have at least 'resourceVersion'.
 	GetToList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
 
-	// List unmarshalls jsons found at directory defined by key and opaque them
+	// List unmarshals jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// be have at least 'resourceVersion'.
@@ -163,7 +163,7 @@ type Interface interface {
 	// err := s.GuaranteedUpdate(
 	//     "myKey", &MyType{}, true,
 	//     func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
-	//       // Before each incovation of the user defined function, "input" is reset to
+	//       // Before each invocation of the user defined function, "input" is reset to
 	//       // current contents for "myKey" in database.
 	//       curr := input.(*MyType)  // Guaranteed to succeed.
 	//
@@ -177,5 +177,5 @@ type Interface interface {
 	// })
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
+		preconditions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
 }

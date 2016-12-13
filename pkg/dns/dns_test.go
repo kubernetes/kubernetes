@@ -209,7 +209,7 @@ func TestSkyPodHostnameSRVLookup(t *testing.T) {
 	endpointIPs := []string{"10.0.0.1", "10.0.0.2"}
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, endpointIPs...))
 
-	// The format of thes annotations is:
+	// The format of the annotations is:
 	// endpoints.beta.kubernetes.io/hostnames-map: '{"ep-ip":{"HostName":"pod request hostname"}}'
 	epRecords := map[string]endpointsapi.HostRecord{}
 	for i, ep := range endpointIPs {

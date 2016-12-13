@@ -73,7 +73,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
 	if !ok {
 		// If we're not deleting gracefully there's no point in updating Generation, as we won't update
-		// the obcject before deleting it.
+		// the object before deleting it.
 		return false, false, nil
 	}
 	// if the object is already being deleted, no need to update generation.

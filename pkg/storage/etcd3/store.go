@@ -149,16 +149,16 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 }
 
 // Delete implements storage.Interface.Delete.
-func (s *store) Delete(ctx context.Context, key string, out runtime.Object, precondtions *storage.Preconditions) error {
+func (s *store) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions) error {
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		panic("unable to convert output object to pointer")
 	}
 	key = path.Join(s.pathPrefix, key)
-	if precondtions == nil {
+	if preconditions == nil {
 		return s.unconditionalDelete(ctx, key, out)
 	}
-	return s.conditionalDelete(ctx, key, out, v, precondtions)
+	return s.conditionalDelete(ctx, key, out, v, preconditions)
 }
 
 func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime.Object) error {
@@ -180,7 +180,7 @@ func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime
 	return decode(s.codec, s.versioner, kv.Value, out, kv.ModRevision)
 }
 
-func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, precondtions *storage.Preconditions) error {
+func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions) error {
 	getResp, err := s.client.KV.Get(ctx, key)
 	if err != nil {
 		return err
@@ -190,7 +190,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		if err != nil {
 			return err
 		}
-		if err := checkPreconditions(key, precondtions, origState.obj); err != nil {
+		if err := checkPreconditions(key, preconditions, origState.obj); err != nil {
 			return err
 		}
 		txnResp, err := s.client.KV.Txn(ctx).If(
@@ -215,7 +215,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
-	precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
 	trace := util.NewTrace(fmt.Sprintf("GuaranteedUpdate etcd3: %s", reflect.TypeOf(out).String()))
 	defer trace.LogIfLong(500 * time.Millisecond)
 
@@ -244,7 +244,7 @@ func (s *store) GuaranteedUpdate(
 	trace.Step("initial value restored")
 
 	for {
-		if err := checkPreconditions(key, precondtions, origState.obj); err != nil {
+		if err := checkPreconditions(key, preconditions, origState.obj); err != nil {
 			return err
 		}
 

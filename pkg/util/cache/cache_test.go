@@ -67,7 +67,7 @@ func TestOverwrite(t *testing.T) {
 	ExpectEntry(t, cache, 1, "yyy")
 }
 
-// TestEvict this test will fail sporatically depending on what add()
+// TestEvict this test will fail sporadically depending on what add()
 // selects for the randomKey to be evicted.  Ensure that randomKey
 // is never the key we most recently added.  Since the chance of failure
 // on each evict is 50%, if we do it 7 times, it should catch the problem

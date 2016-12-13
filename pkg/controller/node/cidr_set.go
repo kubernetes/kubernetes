@@ -78,7 +78,7 @@ func (s *cidrSet) allocateNext() (*net.IPNet, error) {
 	}, nil
 }
 
-func (s *cidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
+func (s *cidrSet) getBeginningAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
 	begin, end = 0, s.maxCIDRs
 	cidrMask := cidr.Mask
 	maskSize, _ := cidrMask.Size()
@@ -112,7 +112,7 @@ func (s *cidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 }
 
 func (s *cidrSet) release(cidr *net.IPNet) error {
-	begin, end, err := s.getBeginingAndEndIndices(cidr)
+	begin, end, err := s.getBeginningAndEndIndices(cidr)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (s *cidrSet) release(cidr *net.IPNet) error {
 }
 
 func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
-	begin, end, err := s.getBeginingAndEndIndices(cidr)
+	begin, end, err := s.getBeginningAndEndIndices(cidr)
 	if err != nil {
 		return err
 	}
