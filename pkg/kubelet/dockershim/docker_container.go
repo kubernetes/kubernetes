@@ -149,7 +149,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	// Apply cgroupsParent derived from the sandbox config.
 	if lc := sandboxConfig.GetLinux(); lc != nil {
 		// Apply Cgroup options.
-		cgroupParent, err := ds.GenereateExpectedCgroupParent(lc.GetCgroupParent())
+		cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.GetCgroupParent())
 		if err != nil {
 			return "", fmt.Errorf("failed to generate cgroup parent in expected syntax for container %q: %v", config.Metadata.GetName(), err)
 		}

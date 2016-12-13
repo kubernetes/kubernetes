@@ -291,7 +291,7 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 // applySandboxLinuxOptions applies LinuxPodSandboxConfig to dockercontainer.HostConfig and dockercontainer.ContainerCreateConfig.
 func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig, lc *runtimeapi.LinuxPodSandboxConfig, createConfig *dockertypes.ContainerCreateConfig, image string) error {
 	// Apply Cgroup options.
-	cgroupParent, err := ds.GenereateExpectedCgroupParent(lc.GetCgroupParent())
+	cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.GetCgroupParent())
 	if err != nil {
 		return err
 	}

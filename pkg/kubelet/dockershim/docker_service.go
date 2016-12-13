@@ -101,7 +101,8 @@ type NetworkPluginSettings struct {
 var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings, cgroupsName string) (DockerService, error) {
+func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
@@ -137,13 +138,16 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	ds.networkPlugin = plug
 	glog.Infof("Docker cri networking managed by %v", plug.Name())
 
+	// NOTE: cgroup driver is only detectable in docker 1.11+
 	var cgroupDriver string
 	dockerInfo, err := ds.client.Info()
 	if err != nil {
-		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
-		glog.Warningf("Using fallback default of cgroupfs for pod level cgroup")
+		return nil, fmt.Errorf("Failed to execute Info() call to the Docker client: %v", err)
 	} else {
 		cgroupDriver = dockerInfo.CgroupDriver
+		if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
+			return nil, fmt.Errorf("Misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
+		}
 		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
 	ds.cgroupDriver = cgroupDriver
@@ -270,8 +274,8 @@ func (ds *dockerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GenereateExpectedCgroupParent returns cgroup parent in syntax expected by cgroup driver
-func (ds *dockerService) GenereateExpectedCgroupParent(cgroupParent string) (string, error) {
+// GenerateExpectedCgroupParent returns cgroup parent in syntax expected by cgroup driver
+func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (string, error) {
 	if len(cgroupParent) > 0 {
 		// if docker uses the systemd cgroup driver, it expects *.slice style names for cgroup parent.
 		// if we configured kubelet to use --cgroup-driver=cgroupfs, and docker is configured to use systemd driver
@@ -285,6 +289,6 @@ func (ds *dockerService) GenereateExpectedCgroupParent(cgroupParent string) (str
 			cgroupParent = systemdCgroupParent
 		}
 	}
-	glog.V(3).Infof("Detected cgroup driver is: %q, setting cgroup parent to: %q", ds.cgroupDriver, cgroupParent)
+	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
 	return cgroupParent, nil
 }
