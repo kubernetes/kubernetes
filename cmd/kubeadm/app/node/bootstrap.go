@@ -126,7 +126,7 @@ func createClients(caCert []byte, endpoint, token string, nodeName types.NodeNam
 	return clientSet, nil
 }
 
-// check to see if there are other nodes in the cluster with identical node names.
+// CheckForNodeNameDuplicates checks whether there are other nodes in the cluster with identical node names.
 func CheckForNodeNameDuplicates(connection *ConnectionDetails) error {
 	hostName, err := os.Hostname()
 	if err != nil {
