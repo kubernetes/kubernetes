@@ -316,6 +316,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	annotations[deploymentutil.RevisionAnnotation] = rsRevision
 	rs := newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage)
 	rs.Annotations = annotations
+	By(fmt.Sprintf("Creating replica set %q (going to be adopted)", rs.Name))
 	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
@@ -327,18 +328,21 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-rolling-update-deployment"
-	framework.Logf("Creating deployment %s", deploymentName)
+	By(fmt.Sprintf("Creating deployment %q", deploymentName))
 	deploy, err := c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, redisImageName, redisImage, extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for it to be updated to revision 3546343826724305833.
+	By(fmt.Sprintf("Ensuring deployment %q gets the next revision from the one the adopted replica set %q has", deploy.Name, rs.Name))
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", redisImage)
 	Expect(err).NotTo(HaveOccurred())
 
+	By(fmt.Sprintf("Ensuring status for deployment %q is the expected", deploy.Name))
 	err = framework.WaitForDeploymentStatus(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	// There should be 1 old RS (nginx-controller, which is adopted)
+	By(fmt.Sprintf("Ensuring deployment %q has one old replica set (the one it adopted)", deploy.Name))
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c)
