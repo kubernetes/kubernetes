@@ -346,6 +346,90 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 		})
+
+		It("Should recreate evicted statefulset", func() {
+			podName := "test-pod"
+			petPodName := psName + "-0"
+			By("Looking for a node to schedule stateful set and pod")
+			nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+			node := nodes.Items[0]
+
+			By("Creating pod with conflicting port in namespace " + f.Namespace.Name)
+			conflictingPort := v1.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
+			pod := &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "nginx",
+							Image: "gcr.io/google_containers/nginx-slim:0.7",
+							Ports: []v1.ContainerPort{conflictingPort},
+						},
+					},
+					NodeName: node.Name,
+				},
+			}
+			pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			framework.ExpectNoError(err)
+
+			By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
+			ps := newStatefulSet(psName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+			petContainer := &ps.Spec.Template.Spec.Containers[0]
+			petContainer.Ports = append(petContainer.Ports, conflictingPort)
+			ps.Spec.Template.Spec.NodeName = node.Name
+			_, err = f.ClientSet.Apps().StatefulSets(f.Namespace.Name).Create(ps)
+			framework.ExpectNoError(err)
+
+			By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
+			if err := f.WaitForPodRunning(podName); err != nil {
+				framework.Failf("Pod %v did not start running: %v", podName, err)
+			}
+
+			var initialPetPodUID types.UID
+			By("Waiting until stateful pod " + petPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
+			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(v1.SingleObject(v1.ObjectMeta{Name: petPodName}))
+			framework.ExpectNoError(err)
+			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
+			_, err = watch.Until(petPodTimeout, w, func(event watch.Event) (bool, error) {
+				pod := event.Object.(*v1.Pod)
+				switch event.Type {
+				case watch.Deleted:
+					framework.Logf("Observed delete event for stateful pod %v in namespace %v", pod.Name, pod.Namespace)
+					if initialPetPodUID == "" {
+						return false, nil
+					}
+					return true, nil
+				}
+				framework.Logf("Observed stateful pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for statefulset controller to delete.",
+					pod.Namespace, pod.Name, pod.UID, pod.Status.Phase)
+				initialPetPodUID = pod.UID
+				return false, nil
+			})
+			if err != nil {
+				framework.Failf("Pod %v expected to be re-created at least once", petPodName)
+			}
+
+			By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
+			err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0))
+			framework.ExpectNoError(err)
+
+			By("Waiting when stateful pod " + petPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
+			// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
+			Eventually(func() error {
+				petPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(petPodName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if petPod.Status.Phase != v1.PodRunning {
+					return fmt.Errorf("Pod %v is not in running phase: %v", petPod.Name, petPod.Status.Phase)
+				} else if petPod.UID == initialPetPodUID {
+					return fmt.Errorf("Pod %v wasn't recreated: %v == %v", petPod.Name, petPod.UID, initialPetPodUID)
+				}
+				return nil
+			}, petPodTimeout, 2*time.Second).Should(BeNil())
+		})
 	})
 
 	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
@@ -384,121 +468,6 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			appTester.pet = &cockroachDBTester{tester: pst}
 			appTester.run()
 		})
-	})
-})
-
-var _ = framework.KubeDescribe("Stateful Set recreate", func() {
-	f := framework.NewDefaultFramework("pet-set-recreate")
-	var c clientset.Interface
-	var ns string
-
-	labels := map[string]string{
-		"foo": "bar",
-		"baz": "blah",
-	}
-	headlessSvcName := "test"
-	podName := "test-pod"
-	statefulSetName := "web"
-	petPodName := "web-0"
-
-	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke", "vagrant")
-		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
-		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
-		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
-		framework.ExpectNoError(err)
-		c = f.ClientSet
-		ns = f.Namespace.Name
-	})
-
-	AfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
-			dumpDebugInfo(c, ns)
-		}
-		By("Deleting all statefulset in ns " + ns)
-		deleteAllStatefulSets(c, ns)
-	})
-
-	It("should recreate evicted statefulset", func() {
-		By("looking for a node to schedule stateful set and pod")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		node := nodes.Items[0]
-
-		By("creating pod with conflicting port in namespace " + f.Namespace.Name)
-		conflictingPort := v1.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
-		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
-				Name: podName,
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
-						Ports: []v1.ContainerPort{conflictingPort},
-					},
-				},
-				NodeName: node.Name,
-			},
-		}
-		pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
-		framework.ExpectNoError(err)
-
-		By("creating statefulset with conflicting port in namespace " + f.Namespace.Name)
-		ps := newStatefulSet(statefulSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
-		petContainer := &ps.Spec.Template.Spec.Containers[0]
-		petContainer.Ports = append(petContainer.Ports, conflictingPort)
-		ps.Spec.Template.Spec.NodeName = node.Name
-		_, err = f.ClientSet.Apps().StatefulSets(f.Namespace.Name).Create(ps)
-		framework.ExpectNoError(err)
-
-		By("waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
-		if err := f.WaitForPodRunning(podName); err != nil {
-			framework.Failf("Pod %v did not start running: %v", podName, err)
-		}
-
-		var initialPetPodUID types.UID
-		By("waiting until stateful pod " + petPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-		w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(v1.SingleObject(v1.ObjectMeta{Name: petPodName}))
-		framework.ExpectNoError(err)
-		// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
-		_, err = watch.Until(petPodTimeout, w, func(event watch.Event) (bool, error) {
-			pod := event.Object.(*v1.Pod)
-			switch event.Type {
-			case watch.Deleted:
-				framework.Logf("Observed delete event for stateful pod %v in namespace %v", pod.Name, pod.Namespace)
-				if initialPetPodUID == "" {
-					return false, nil
-				}
-				return true, nil
-			}
-			framework.Logf("Observed stateful pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for statefulset controller to delete.",
-				pod.Namespace, pod.Name, pod.UID, pod.Status.Phase)
-			initialPetPodUID = pod.UID
-			return false, nil
-		})
-		if err != nil {
-			framework.Failf("Pod %v expected to be re-created at least once", petPodName)
-		}
-
-		By("removing pod with conflicting port in namespace " + f.Namespace.Name)
-		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0))
-		framework.ExpectNoError(err)
-
-		By("waiting when stateful pod " + petPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
-		// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
-		Eventually(func() error {
-			petPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(petPodName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if petPod.Status.Phase != v1.PodRunning {
-				return fmt.Errorf("Pod %v is not in running phase: %v", petPod.Name, petPod.Status.Phase)
-			} else if petPod.UID == initialPetPodUID {
-				return fmt.Errorf("Pod %v wasn't recreated: %v == %v", petPod.Name, petPod.UID, initialPetPodUID)
-			}
-			return nil
-		}, petPodTimeout, 2*time.Second).Should(BeNil())
 	})
 })
 
