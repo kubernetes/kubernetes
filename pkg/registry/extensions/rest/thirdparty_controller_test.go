@@ -17,128 +17,174 @@ limitations under the License.
 package rest
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type FakeAPIInterface struct {
 	removed   []string
 	installed []*expapi.ThirdPartyResource
-	apis      []string
 	t         *testing.T
+	gvrs      []metav1.GroupVersionResource
 }
 
-func (f *FakeAPIInterface) RemoveThirdPartyResource(path string) error {
+func (f *FakeAPIInterface) RemoveThirdPartyResource(gvr metav1.GroupVersionResource) error {
+	path := MakeThirdPartyPath(gvr.Group) + "/" + gvr.Version
 	f.removed = append(f.removed, path)
 	return nil
 }
 
 func (f *FakeAPIInterface) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) error {
 	f.installed = append(f.installed, rsrc)
-	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	f.apis = append(f.apis, MakeThirdPartyPath(group))
+	kind, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	for _, version := range rsrc.Versions {
+		plural, _ := meta.KindToResource(schema.GroupVersionKind{
+			Group:   group,
+			Version: version.Name,
+			Kind:    kind,
+		})
+		gvr := metav1.GroupVersionResource{
+			Group:    group,
+			Version:  version.Name,
+			Resource: plural.Resource,
+		}
+
+		found := false
+		for _, installedGvr := range f.gvrs {
+			if reflect.DeepEqual(installedGvr, gvr) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			f.gvrs = append(f.gvrs, gvr)
+		}
+	}
 	return nil
 }
 
 func (f *FakeAPIInterface) HasThirdPartyResource(rsrc *expapi.ThirdPartyResource) (bool, error) {
-	if f.apis == nil {
+	if f.gvrs == nil {
 		return false, nil
 	}
-	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	path := MakeThirdPartyPath(group)
-	for _, api := range f.apis {
-		if api == path {
-			return true, nil
+	kind, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	for _, version := range rsrc.Versions {
+		plural, _ := meta.KindToResource(schema.GroupVersionKind{
+			Group:   group,
+			Version: version.Name,
+			Kind:    kind,
+		})
+		gvr := metav1.GroupVersionResource{
+			Group:    group,
+			Version:  version.Name,
+			Resource: plural.Resource,
+		}
+
+		for _, installedGvr := range f.gvrs {
+			if !reflect.DeepEqual(installedGvr, gvr) {
+				return false, nil
+			}
 		}
 	}
-	return false, nil
+	return true, nil
 }
 
-func (f *FakeAPIInterface) ListThirdPartyResources() []string {
-	return f.apis
+func (f *FakeAPIInterface) ListThirdPartyResources() []metav1.GroupVersionResource {
+	return f.gvrs
 }
 
 func TestSyncAPIs(t *testing.T) {
-	resourcesNamed := func(names ...string) []expapi.ThirdPartyResource {
-		result := []expapi.ThirdPartyResource{}
-		for _, name := range names {
-			result = append(result, expapi.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: name}})
+	resourceNamed := func(name string, versions ...string) expapi.ThirdPartyResource {
+		apiVersions := []expapi.APIVersion{}
+		for _, version := range versions {
+			apiVersions = append(apiVersions, expapi.APIVersion{
+				Name: version,
+			})
 		}
-		return result
+		return expapi.ThirdPartyResource{
+			ObjectMeta: api.ObjectMeta{Name: name},
+			Versions:   apiVersions,
+		}
 	}
 
 	tests := []struct {
 		list              *expapi.ThirdPartyResourceList
-		apis              []string
+		gvrs              []metav1.GroupVersionResource
 		expectedInstalled []string
 		expectedRemoved   []string
 		name              string
 	}{
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+				},
 			},
 			expectedInstalled: []string{"foo.example.com"},
 			name:              "simple add",
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+				},
 			},
-			apis: []string{
-				"/apis/example.com",
-				"/apis/example.com/v1",
+			gvrs: []metav1.GroupVersionResource{
+				{Group: "example.com", Version: "v1", Resource: "foos"},
 			},
 			name: "does nothing",
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1", "v2"),
+				},
 			},
-			apis: []string{
-				"/apis/example.com",
-				"/apis/example.com/v1",
-				"/apis/example.co",
-				"/apis/example.co/v1",
+			gvrs: []metav1.GroupVersionResource{
+				{Group: "example.com", Version: "v1", Resource: "foos"},
 			},
-			name: "deletes substring API",
-			expectedRemoved: []string{
-				"/apis/example.co",
-				"/apis/example.co/v1",
-			},
+			name:              "add new version",
+			expectedInstalled: []string{"foo.example.com"},
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com", "foo.company.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+					resourceNamed("bar.example.com", "v2"),
+				},
 			},
-			apis: []string{
-				"/apis/company.com",
-				"/apis/company.com/v1",
+			gvrs: []metav1.GroupVersionResource{
+				{Group: "example.com", Version: "v1", Resource: "foos"},
 			},
-			expectedInstalled: []string{"foo.example.com"},
-			name:              "adds with existing",
+			expectedInstalled: []string{"bar.example.com"},
+			name:              "adds new kind with existing group",
 		},
 		{
 			list: &expapi.ThirdPartyResourceList{
-				Items: resourcesNamed("foo.example.com"),
+				Items: []expapi.ThirdPartyResource{
+					resourceNamed("foo.example.com", "v1"),
+				},
 			},
-			apis: []string{
-				"/apis/company.com",
-				"/apis/company.com/v1",
+			gvrs: []metav1.GroupVersionResource{
+				{Group: "company.com", Version: "v1", Resource: "foos"},
 			},
 			expectedInstalled: []string{"foo.example.com"},
-			expectedRemoved:   []string{"/apis/company.com", "/apis/company.com/v1"},
+			expectedRemoved:   []string{"/apis/company.com/v1"},
 			name:              "removes with existing",
 		},
 	}
 
 	for _, test := range tests {
 		fake := FakeAPIInterface{
-			apis: test.apis,
+			gvrs: test.gvrs,
 			t:    t,
 		}
 
