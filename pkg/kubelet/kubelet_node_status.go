@@ -33,7 +33,6 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -341,25 +340,14 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// apiserver cache (the data might be slightly delayed but it doesn't
 	// seem to cause more confilict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
-	// TODO: Currently apiserver doesn't support serving GET operations
-	// from its cache. Thus we are hacking it by issuing LIST with
-	// field selector for the name of the node (field selectors with
-	// specified name are handled efficiently by apiserver). Once
-	// apiserver supports GET from cache, change it here.
-	opts := v1.ListOptions{
-		FieldSelector: fields.Set{"metadata.name": string(kl.nodeName)}.AsSelector().String(),
-	}
+	opts := metav1.GetOptions{}
 	if tryNumber == 0 {
 		opts.ResourceVersion = "0"
 	}
-	nodes, err := kl.kubeClient.Core().Nodes().List(opts)
+	node, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
-	if len(nodes.Items) != 1 {
-		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
-	}
-	node := &nodes.Items[0]
 
 	clonedNode, err := conversion.NewCloner().DeepCopy(node)
 	if err != nil {
