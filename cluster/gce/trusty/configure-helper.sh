@@ -152,9 +152,7 @@ assemble_kubelet_flags() {
   fi
   if [ "${KUBERNETES_MASTER:-}" = "true" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-debugging-handlers=false --hairpin-mode=none"
-    if [ ! -z "${KUBELET_APISERVER:-}" ] && \
-       [ ! -z "${KUBELET_CERT:-}" ] && \
-       [ ! -z "${KUBELET_KEY:-}" ]; then
+    if [ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]; then
       KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --api-servers=https://${KUBELET_APISERVER} --register-schedulable=false"
     else
       KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=${MASTER_IP_RANGE}"
@@ -420,10 +418,13 @@ EOF
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
 # to generate a kubeconfig file for the kubelet to securely connect to the apiserver.
+# Set REGISTER_MASTER_KUBELET to true if kubelet on the master node
+# should register to the apiserver.
 create_master_kubelet_auth() {
   # Only configure the kubelet on the master if the required variables are
   # set in the environment.
   if [ -n "${KUBELET_APISERVER:-}" ] && [ -n "${KUBELET_CERT:-}" ] && [ -n "${KUBELET_KEY:-}" ]; then
+    REGISTER_MASTER_KUBELET="true"
     create_kubelet_kubeconfig
   fi
 }
@@ -806,14 +807,13 @@ start-rescheduler() {
   fi
 }
 
-# Starts a fluentd static pod for logging.
-start_fluentd() {
-  if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
-    if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
-      cp /home/kubernetes/kube-manifests/kubernetes/fluentd-gcp.yaml /etc/kubernetes/manifests/
-    elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
-      cp /home/kubernetes/kube-manifests/kubernetes/fluentd-es.yaml /etc/kubernetes/manifests/
-    fi
+# Starts a fluentd static pod for logging for gcp in case master is not registered.
+start_fluentd_static_pod() {
+  if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
+     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]] && \
+     [[ "${KUBERNETES_MASTER:-}" == "true" ]] && \
+     [[ "${REGISTER_MASTER_KUBELET:-false}" == "false" ]]; then
+    cp /home/kubernetes/kube-manifests/kubernetes/fluentd-gcp.yaml /etc/kubernetes/manifests/
   fi
 }
 
@@ -933,6 +933,10 @@ start_kube_addons() {
      [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ] && \
      [ "${ENABLE_CLUSTER_LOGGING:-}" = "true" ]; then
     setup_addon_manifests "addons" "fluentd-elasticsearch"
+  fi
+  if [ "${ENABLE_NODE_LOGGING:-}" = "true" ] && \
+     [ "${LOGGING_DESTINATION:-}" = "gcp" ] ; then
+    setup_addon_manifests "addons" "fluentd-gcp"
   fi
   if [ "${ENABLE_CLUSTER_UI:-}" = "true" ]; then
     setup_addon_manifests "addons" "dashboard"
