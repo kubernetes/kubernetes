@@ -143,19 +143,19 @@ func IsDNS1035Label(value string) []string {
 // examples:
 // - valid: *.bar.com, *.foo.bar.com
 // - invalid: *.*.bar.com, *.foo.*.com, *bar.com, f*.bar.com, *
-const wildcardDNF1123SubdomainFmt = "\\*\\." + dns1123SubdomainFmt
+const wildcardDNS1123SubdomainFmt = "\\*\\." + dns1123SubdomainFmt
 
 // IsWildcardDNS1123Subdomain tests for a string that conforms to the definition of a
 // wildcard subdomain in DNS (RFC 1034 section 4.3.3).
 func IsWildcardDNS1123Subdomain(value string) []string {
-	wildcardDNS1123SubdomainRegexp := regexp.MustCompile("^\\*\\." + dns1123SubdomainFmt + "$")
+	wildcardDNS1123SubdomainRegexp := regexp.MustCompile("^" + wildcardDNS1123SubdomainFmt + "$")
 
 	var errs []string
 	if len(value) > DNS1123SubdomainMaxLength {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !wildcardDNS1123SubdomainRegexp.MatchString(value) {
-		errs = append(errs, RegexError(wildcardDNF1123SubdomainFmt, "*.example.com"))
+		errs = append(errs, RegexError(wildcardDNS1123SubdomainFmt, "*.example.com"))
 	}
 	return errs
 }
