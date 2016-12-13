@@ -163,8 +163,8 @@ type Runtime struct {
 	execer              utilexec.Interface
 	os                  kubecontainer.OSInterface
 
-	// Network plugin.
-	networkPlugin network.NetworkPlugin
+	// Network plugin manager.
+	network *network.PluginManager
 
 	// If true, the "hairpin mode" flag is set on container interfaces.
 	// A false value means the kubelet just backs off from setting it,
@@ -266,7 +266,7 @@ func New(
 		runtimeHelper:       runtimeHelper,
 		recorder:            recorder,
 		livenessManager:     livenessManager,
-		networkPlugin:       networkPlugin,
+		network:             network.NewPluginManager(networkPlugin),
 		execer:              execer,
 		touchPath:           touchPath,
 		nsenterPath:         nsenterPath,
@@ -946,7 +946,7 @@ func serviceFilePath(serviceName string) string {
 // The pod does not run in host network. And
 // The pod runs inside a netns created outside of rkt.
 func (r *Runtime) shouldCreateNetns(pod *v1.Pod) bool {
-	return !kubecontainer.IsHostNetworkPod(pod) && r.networkPlugin.Name() != network.DefaultPluginName
+	return !kubecontainer.IsHostNetworkPod(pod) && r.network.PluginName() != network.DefaultPluginName
 }
 
 // usesRktHostNetwork returns true if:
@@ -1047,18 +1047,17 @@ func (r *Runtime) generateRunCommand(pod *v1.Pod, uuid, netnsName string) (strin
 }
 
 func (r *Runtime) cleanupPodNetwork(pod *v1.Pod) error {
-	glog.V(3).Infof("Calling network plugin %s to tear down pod for %s", r.networkPlugin.Name(), format.Pod(pod))
+	glog.V(3).Infof("Calling network plugin %s to tear down pod for %s", r.network.PluginName(), format.Pod(pod))
 
 	// No-op if the pod is not running in a created netns.
 	if !r.shouldCreateNetns(pod) {
 		return nil
 	}
 
-	var teardownErr error
 	containerID := kubecontainer.ContainerID{ID: string(pod.UID)}
-	if err := r.networkPlugin.TearDownPod(pod.Namespace, pod.Name, containerID); err != nil {
-		teardownErr = fmt.Errorf("rkt: failed to tear down network for pod %s: %v", format.Pod(pod), err)
-		glog.Errorf("%v", teardownErr)
+	teardownErr := r.network.TearDownPod(pod.Namespace, pod.Name, containerID)
+	if teardownErr != nil {
+		glog.Error(teardownErr)
 	}
 
 	if _, err := r.execer.Command("ip", "netns", "del", makePodNetnsName(pod.UID)).Output(); err != nil {
@@ -1265,7 +1264,7 @@ func netnsPathFromName(netnsName string) string {
 //
 // If the pod is running in host network or is running using the no-op plugin, then nothing will be done.
 func (r *Runtime) setupPodNetwork(pod *v1.Pod) (string, string, error) {
-	glog.V(3).Infof("Calling network plugin %s to set up pod for %s", r.networkPlugin.Name(), format.Pod(pod))
+	glog.V(3).Infof("Calling network plugin %s to set up pod for %s", r.network.PluginName(), format.Pod(pod))
 
 	// No-op if the pod is not running in a created netns.
 	if !r.shouldCreateNetns(pod) {
@@ -1282,15 +1281,14 @@ func (r *Runtime) setupPodNetwork(pod *v1.Pod) (string, string, error) {
 	}
 
 	// Set up networking with the network plugin
-	glog.V(3).Infof("Calling network plugin %s to setup pod for %s", r.networkPlugin.Name(), format.Pod(pod))
 	containerID := kubecontainer.ContainerID{ID: string(pod.UID)}
-	err = r.networkPlugin.SetUpPod(pod.Namespace, pod.Name, containerID)
+	err = r.network.SetUpPod(pod.Namespace, pod.Name, containerID)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to set up pod network: %v", err)
+		return "", "", err
 	}
-	status, err := r.networkPlugin.GetPodNetworkStatus(pod.Namespace, pod.Name, containerID)
+	status, err := r.network.GetPodNetworkStatus(pod.Namespace, pod.Name, containerID)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get status of pod network: %v", err)
+		return "", "", err
 	}
 
 	if r.configureHairpinMode {
@@ -2329,7 +2327,7 @@ func (r *Runtime) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kube
 	}
 
 	// If we are running no-op network plugin, then get the pod IP from the rkt pod status.
-	if r.networkPlugin.Name() == network.DefaultPluginName {
+	if r.network.PluginName() == network.DefaultPluginName {
 		if latestPod != nil {
 			for _, n := range latestPod.Networks {
 				if n.Name == defaultNetworkName {
@@ -2340,9 +2338,9 @@ func (r *Runtime) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kube
 		}
 	} else {
 		containerID := kubecontainer.ContainerID{ID: string(uid)}
-		status, err := r.networkPlugin.GetPodNetworkStatus(namespace, name, containerID)
+		status, err := r.network.GetPodNetworkStatus(namespace, name, containerID)
 		if err != nil {
-			glog.Warningf("rkt: Failed to get pod network status for pod (UID %q, name %q, namespace %q): %v", uid, name, namespace, err)
+			glog.Warningf("rkt: %v", err)
 		} else if status != nil {
 			// status can be nil when the pod is running on the host network, in which case the pod IP
 			// will be populated by the upper layer.
