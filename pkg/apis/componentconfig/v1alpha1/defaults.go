@@ -378,7 +378,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}
 	if obj.ExperimentalKernelMemcgNotification == nil {
-		obj.ExperimentalKernelMemcgNotification = boolVar(false)
+		obj.ExperimentalKernelMemcgNotification = boolVar(true)
 	}
 	if obj.SystemReserved == nil {
 		obj.SystemReserved = make(map[string]string)

@@ -1,0 +1,15 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+        name: containervm-deployment
+spec:
+        replicas: 11
+        template:
+                metadata:
+                        labels:
+                                app: busythebox
+                spec:
+                        containers:
+                        - name: busythebox
+                          image: gcr.io/google_containers/stress:v1
+                          args: ["-mem-alloc-size", "100Mi", "-mem-alloc-sleep", "1s", "-mem-total", "500Mi"]
