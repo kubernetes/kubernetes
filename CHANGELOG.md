@@ -434,7 +434,7 @@ release [38537](https://github.com/kubernetes/kubernetes/issues/38537)
 * Allow anonymous API server access, decorate authenticated users with system:authenticated group ([[#32386](https://github.com/kubernetes/kubernetes/pull/32386)](https://github.com/kubernetes/kubernetes/pull/32386), [[@liggitt](https://github.com/liggitt)](https://github.com/liggitt))
   * kube-apiserver learned the '--anonymous-auth' flag, which defaults to true. When enabled, requests to the secure port that are not rejected by other configured authentication methods are treated as anonymous requests, and given a username of 'system:anonymous' and a group of 'system:unauthenticated'.
   * Authenticated users are decorated with a 'system:authenticated' group.
-  * NOTE: anonymous access is enabled by default. If you rely on authentication alone to authorize access, change to use an authorization mode other than AlwaysAllow, or or set '--anonymous-auth=false'.
+  * **IMPORTANT**: See Action Required for important actions related to this change.
 
 * kubectl get -o jsonpath=... will now throw an error if the path is to a field not present in the json, even if the path is for a field valid for the type.  This is a change from the pre-1.5 behavior, which would return the default value for some fields even if they were not present in the json. ([[#37991](https://github.com/kubernetes/kubernetes/pull/37991)](https://github.com/kubernetes/kubernetes/issues/37991), [[@pwittrock](https://github.com/pwittrock)](http://github.com/pwittrock))
 
@@ -448,6 +448,12 @@ release [38537](https://github.com/kubernetes/kubernetes/issues/38537)
 
 ## Action Required Before Upgrading
 
+* **Important Security-related changes before upgrading
+  * You *MUST* set `--anonymous-auth=false` flag on your kube-apiserver unless you are a developer testing this feature and understand it.
+  If you do not, you risk allowing unauthorized users to access your apiserver.
+  * You *MUST* set `--anonymous-auth=false` flag on your federation apiserver unless you are a developer testing this feature and understand it.
+    If you do not, you risk allowing unauthorized users to access your federation apiserver.
+  * You do not need to adjust this flag on Kubelet:  there was no authorization for the Kubelet APIs in 1.4.
 * batch/v2alpha1.ScheduledJob has been renamed, use batch/v2alpha1.CronJob instead ([[#36021](https://github.com/kubernetes/kubernetes/pull/36021)](https://github.com/kubernetes/kubernetes/pull/36021), [[@soltysh](https://github.com/soltysh)](https://github.com/soltysh))
 * PetSet has been renamed to StatefulSet.
   If you have existing PetSets, **you must perform extra migration steps** both
