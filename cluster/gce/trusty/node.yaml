@@ -242,8 +242,6 @@ script
 
 	. /etc/kube-configure-helper.sh
 	. /etc/kube-env
-	# Fluentd
-	start_fluentd
 	# Kube-registry-proxy
 	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
 		cp /home/kubernetes/kube-manifests/kubernetes/kube-registry-proxy.yaml /etc/kubernetes/manifests/
