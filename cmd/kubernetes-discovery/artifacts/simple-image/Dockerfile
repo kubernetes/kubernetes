@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# Copyright 2014 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
-
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-
-make test \
-    WHAT="$*" \
-    KUBE_COVER="" \
-    KUBE_RACE=" " \
-    KUBE_TEST_ARGS="-- -test.run='^X' -benchtime=1s -bench=. -benchmem" \
+FROM fedora
+MAINTAINER David Eads <deads@redhat.com>
+ADD kubernetes-discovery /
+ENTRYPOINT ["/kubernetes-discovery"]

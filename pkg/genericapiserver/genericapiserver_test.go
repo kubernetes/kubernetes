@@ -287,6 +287,14 @@ func TestPrepareRun(t *testing.T) {
 	resp, err = http.Get(server.URL + "/swaggerapi/")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	// healthz checks are installed in PrepareRun
+	resp, err = http.Get(server.URL + "/healthz")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
+	resp, err = http.Get(server.URL + "/healthz/ping")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.

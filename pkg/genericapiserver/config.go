@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -124,6 +125,8 @@ type Config struct {
 	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses DiscoveryAddresses
+	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
+	HealthzChecks []healthz.HealthzChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup.  New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -198,6 +201,7 @@ func NewConfig() *Config {
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
+		HealthzChecks:          []healthz.HealthzChecker{healthz.PingHealthz},
 
 		EnableIndex:          true,
 		EnableSwaggerSupport: true,
@@ -312,9 +316,28 @@ func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOpti
 		return c, nil
 	}
 
+	var err error
+	if o.ClientCert != nil {
+		c, err = c.applyClientCert(o.ClientCert.ClientCA)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
+		}
+	}
+	if o.RequestHeader != nil {
+		c, err = c.applyClientCert(o.RequestHeader.ClientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
+		}
+	}
+
+	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
+	return c, nil
+}
+
+func (c *Config) applyClientCert(clientCAFile string) (*Config, error) {
 	if c.SecureServingInfo != nil {
-		if o.ClientCert != nil && len(o.ClientCert.ClientCA) > 0 {
-			clientCAs, err := certutil.CertsFromFile(o.ClientCert.ClientCA)
+		if len(clientCAFile) > 0 {
+			clientCAs, err := certutil.CertsFromFile(clientCAFile)
 			if err != nil {
 				return nil, fmt.Errorf("unable to load client CA file: %v", err)
 			}
@@ -325,27 +348,24 @@ func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOpti
 				c.SecureServingInfo.ClientCA.AddCert(cert)
 			}
 		}
-		if o.RequestHeader != nil && len(o.RequestHeader.ClientCAFile) > 0 {
-			clientCAs, err := certutil.CertsFromFile(o.RequestHeader.ClientCAFile)
-			if err != nil {
-				return nil, fmt.Errorf("unable to load requestheader client CA file: %v", err)
-			}
-			if c.SecureServingInfo.ClientCA == nil {
-				c.SecureServingInfo.ClientCA = x509.NewCertPool()
-			}
-			for _, cert := range clientCAs {
-				c.SecureServingInfo.ClientCA.AddCert(cert)
-			}
-		}
 	}
 
-	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
 	return c, nil
 }
 
 func (c *Config) ApplyDelegatingAuthenticationOptions(o *options.DelegatingAuthenticationOptions) (*Config, error) {
 	if o == nil {
 		return c, nil
+	}
+
+	var err error
+	c, err = c.applyClientCert(o.ClientCert.ClientCA)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load client CA file: %v", err)
+	}
+	c, err = c.applyClientCert(o.RequestHeader.ClientCAFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load client CA file: %v", err)
 	}
 
 	cfg, err := o.ToAuthenticationConfig()
@@ -523,6 +543,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		openAPIConfig:        c.OpenAPIConfig,
 
 		postStartHooks: map[string]postStartHookEntry{},
+		healthzChecks:  c.HealthzChecks,
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)

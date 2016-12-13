@@ -1,34 +1,34 @@
 package ansiterm
 
-type escapeIntermediateState struct {
-	baseState
+type EscapeIntermediateState struct {
+	BaseState
 }
 
-func (escState escapeIntermediateState) Handle(b byte) (s state, e error) {
-	logger.Infof("escapeIntermediateState::Handle %#x", b)
-	nextState, err := escState.baseState.Handle(b)
+func (escState EscapeIntermediateState) Handle(b byte) (s State, e error) {
+	logger.Infof("EscapeIntermediateState::Handle %#x", b)
+	nextState, err := escState.BaseState.Handle(b)
 	if nextState != nil || err != nil {
 		return nextState, err
 	}
 
 	switch {
-	case sliceContains(intermeds, b):
+	case sliceContains(Intermeds, b):
 		return escState, escState.parser.collectInter()
-	case sliceContains(executors, b):
+	case sliceContains(Executors, b):
 		return escState, escState.parser.execute()
-	case sliceContains(escapeIntermediateToGroundBytes, b):
-		return escState.parser.ground, nil
+	case sliceContains(EscapeIntermediateToGroundBytes, b):
+		return escState.parser.Ground, nil
 	}
 
 	return escState, nil
 }
 
-func (escState escapeIntermediateState) Transition(s state) error {
-	logger.Infof("escapeIntermediateState::Transition %s --> %s", escState.Name(), s.Name())
-	escState.baseState.Transition(s)
+func (escState EscapeIntermediateState) Transition(s State) error {
+	logger.Infof("EscapeIntermediateState::Transition %s --> %s", escState.Name(), s.Name())
+	escState.BaseState.Transition(s)
 
 	switch s {
-	case escState.parser.ground:
+	case escState.parser.Ground:
 		return escState.parser.escDispatch()
 	}
 

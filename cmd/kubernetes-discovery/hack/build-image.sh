@@ -14,14 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
-make test \
-    WHAT="$*" \
-    KUBE_COVER="" \
-    KUBE_RACE=" " \
-    KUBE_TEST_ARGS="-- -test.run='^X' -benchtime=1s -bench=. -benchmem" \
+# Register function to be called on EXIT to remove generated binary.
+function cleanup {
+  rm "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/simple-image/kubernetes-discovery"
+}
+trap cleanup EXIT
+
+cp -v ${KUBE_ROOT}/_output/local/bin/linux/amd64/kubernetes-discovery "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/simple-image/kubernetes-discovery"
+docker build -t kubernetes-discovery:latest ${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/simple-image
