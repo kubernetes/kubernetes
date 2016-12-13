@@ -27,6 +27,11 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # NOTE: Using "${array[*]}" here is correct.  [@] becomes distinct words (in
 # bash parlance).
 
+if [[ -n "${WHAT-}" ]]; then
+    make all WHAT=${WHAT} ${KUBE_BUILD_PLATFORMS}
+    exit $?
+fi
+
 make all WHAT="${KUBE_SERVER_TARGETS[*]}" KUBE_BUILD_PLATFORMS="${KUBE_SERVER_PLATFORMS[*]}"
 
 make all WHAT="${KUBE_NODE_TARGETS[*]}" KUBE_BUILD_PLATFORMS="${KUBE_NODE_PLATFORMS[*]}"
