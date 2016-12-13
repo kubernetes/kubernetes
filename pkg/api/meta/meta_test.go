@@ -344,11 +344,12 @@ func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerRef
 	metaOwnerReferences = make([]metav1.OwnerReference, 0)
 	for i := 0; i < len(references); i++ {
 		metaOwnerReferences = append(metaOwnerReferences, metav1.OwnerReference{
-			Kind:       references[i].Kind,
-			Name:       references[i].Name,
-			UID:        references[i].UID,
-			APIVersion: references[i].APIVersion,
-			Controller: references[i].Controller,
+			Kind:               references[i].Kind,
+			Name:               references[i].Name,
+			UID:                references[i].UID,
+			APIVersion:         references[i].APIVersion,
+			Controller:         references[i].Controller,
+			BlockOwnerDeletion: references[i].BlockOwnerDeletion,
 		})
 	}
 	if len(references) == 0 {
