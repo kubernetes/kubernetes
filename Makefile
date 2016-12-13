@@ -194,6 +194,20 @@ test-e2e: ginkgo generated_files
 	go run hack/e2e.go -v --build --up --test --down
 endif
 
+# Run e2e conformance test against minikube
+#
+# Args:
+#   GINKGO_FLAGS: Test arguments passed to ginkgo
+#
+# Example:
+#   make test-e2e-minikube
+#   make test-e2e-minikube GINKGO_FLAGS="-ginkgo.focus=foo -ginkgo.skip=bar"
+.PHONY: test-e2e-minikube
+test-e2e-minikube: ginkgo generated_files
+	WHAT=cmd/localkube hack/make-rules/docker-cross.sh
+	hack/make-rules/minikube-e2e-start.sh
+	KUBERNETES_CONFORMANCE_TEST=y hack/ginkgo-e2e.sh ${GINKGO_FLAGS}
+
 define TEST_E2E_NODE_HELP_INFO
 # Build and run node end-to-end tests.
 #
@@ -361,7 +375,26 @@ release-skip-tests quick-release:
 	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 endif
 
+<<<<<<< HEAD
 define CROSS_HELP_INFO
+=======
+# Cross-compile for specific or all platforms using docker
+#
+# Args:
+#   WHAT: Directory names to build.  If any of these directories has a 'main'
+#     package, the build will produce executable files under $(OUT_DIR)/go/bin.
+#     If not specified, "everything" will be built.
+#   KUBE_BUILD_PLATFORMS - Targets to build for. If unset then (linux/amd64) is built.
+#
+# Example:
+#   make docker-cross
+#   make docker-cross WHAT=cmd/kubelet
+#   make docker-cross KUBE_BUILD_PLATFORMS=(linux/arm64)
+.PHONY: docker-cross
+docker-cross:
+	hack/make-rules/docker-cross.sh $(WHAT) $(KUBE_BUILD_PLATFORMS)
+
+>>>>>>> fef7b20db1... adding make rules for cross builds using docker and e2e against minikube
 # Cross-compile for all platforms
 #
 # Example:
