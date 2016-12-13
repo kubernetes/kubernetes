@@ -32,6 +32,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emicklei/go-restful/swagger"
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
@@ -55,7 +56,7 @@ import (
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	openapicommon "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
@@ -94,15 +95,13 @@ type Config struct {
 	AdmissionControl      admission.Interface
 	CorsAllowedOriginList []string
 
-	EnableSwaggerSupport bool
-	EnableSwaggerUI      bool
-	EnableIndex          bool
-	EnableProfiling      bool
+	EnableSwaggerUI bool
+	EnableIndex     bool
+	EnableProfiling bool
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableGarbageCollection   bool
 	EnableMetrics             bool
-	EnableOpenAPISupport      bool
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
@@ -136,8 +135,11 @@ type Config struct {
 	// Serializer is required and provides the interface for serializing and converting objects to and from the wire
 	// The default (api.Codecs) usually works fine.
 	Serializer runtime.NegotiatedSerializer
-	// OpenAPIConfig will be used in generating OpenAPI spec.  This has "working" defaults.
-	OpenAPIConfig *common.Config
+	// OpenAPIConfig will be used in generating OpenAPI spec. This is nil by default. Use DefaultOpenAPIConfig for "working" defaults.
+	OpenAPIConfig *openapicommon.Config
+	// SwaggerConfig will be used in generating Swagger spec. This is nil by default. Use DefaultSwaggerConfig for "working" defaults.
+	SwaggerConfig *swagger.Config
+
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.
 	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
@@ -202,25 +204,7 @@ func NewConfig() *Config {
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
 		HealthzChecks:          []healthz.HealthzChecker{healthz.PingHealthz},
-
-		EnableIndex:          true,
-		EnableSwaggerSupport: true,
-		OpenAPIConfig: &common.Config{
-			ProtocolList:   []string{"https"},
-			IgnorePrefixes: []string{"/swaggerapi"},
-			Info: &spec.Info{
-				InfoProps: spec.InfoProps{
-					Title:   "Generic API Server",
-					Version: "unversioned",
-				},
-			},
-			DefaultResponse: &spec.Response{
-				ResponseProps: spec.ResponseProps{
-					Description: "Default Response.",
-				},
-			},
-			GetOperationIDAndTags: apiserveropenapi.GetOperationIDAndTags,
-		},
+		EnableIndex:            true,
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
@@ -233,6 +217,43 @@ func NewConfig() *Config {
 	// TODO we probably want to run the defaults the other way.  A default here drives it in the CLI flags
 	defaultOptions.AuditLogPath = ""
 	return config.ApplyOptions(defaultOptions)
+}
+
+func DefaultOpenAPIConfig(definitions *openapicommon.OpenAPIDefinitions) *openapicommon.Config {
+	return &openapicommon.Config{
+		ProtocolList:   []string{"https"},
+		IgnorePrefixes: []string{"/swaggerapi"},
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Generic API Server",
+				Version: "unversioned",
+			},
+		},
+		DefaultResponse: &spec.Response{
+			ResponseProps: spec.ResponseProps{
+				Description: "Default Response.",
+			},
+		},
+		GetOperationIDAndTags: apiserveropenapi.GetOperationIDAndTags,
+		Definitions:           definitions,
+	}
+}
+
+// DefaultSwaggerConfig returns a default configuration without WebServiceURL and
+// WebServices set.
+func DefaultSwaggerConfig() *swagger.Config {
+	return &swagger.Config{
+		ApiPath:         "/swaggerapi/",
+		SwaggerPath:     "/swaggerui/",
+		SwaggerFilePath: "/swagger-ui/",
+		SchemaFormatHandler: func(typeName string) string {
+			switch typeName {
+			case "metav1.Time", "*metav1.Time":
+				return "date-time"
+			}
+			return ""
+		},
+	}
 }
 
 func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions) (*Config, error) {
@@ -442,8 +463,8 @@ func (c *Config) Complete() completedConfig {
 		}
 		c.ExternalAddress = hostAndPort
 	}
-	// All APIs will have the same authentication for now.
 	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
+		// Setup OpenAPI security: all APIs will have the same authentication for now.
 		c.OpenAPIConfig.DefaultSecurity = []map[string][]string{}
 		keys := []string{}
 		for k := range *c.OpenAPIConfig.SecurityDefinitions {
@@ -462,6 +483,13 @@ func (c *Config) Complete() completedConfig {
 					Description: "Unauthorized",
 				},
 			}
+		}
+	}
+	if c.SwaggerConfig != nil && len(c.SwaggerConfig.WebServicesUrl) == 0 {
+		if c.SecureServingInfo != nil {
+			c.SwaggerConfig.WebServicesUrl = "https://" + c.ExternalAddress
+		} else {
+			c.SwaggerConfig.WebServicesUrl = "http://" + c.ExternalAddress
 		}
 	}
 	if c.DiscoveryAddresses == nil {
@@ -530,8 +558,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		requestContextMapper:   c.RequestContextMapper,
 		Serializer:             c.Serializer,
 
-		minRequestTimeout:    time.Duration(c.MinRequestTimeout) * time.Second,
-		enableSwaggerSupport: c.EnableSwaggerSupport,
+		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
 		SecureServingInfo:   c.SecureServingInfo,
 		InsecureServingInfo: c.InsecureServingInfo,
@@ -539,8 +566,8 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 
 		apiGroupsForDiscovery: map[string]metav1.APIGroup{},
 
-		enableOpenAPISupport: c.EnableOpenAPISupport,
-		openAPIConfig:        c.OpenAPIConfig,
+		swaggerConfig: c.SwaggerConfig,
+		openAPIConfig: c.OpenAPIConfig,
 
 		postStartHooks: map[string]postStartHookEntry{},
 		healthzChecks:  c.HealthzChecks,
@@ -583,7 +610,7 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableIndex {
 		routes.Index{}.Install(s.HandlerContainer)
 	}
-	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
+	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
 		routes.SwaggerUI{}.Install(s.HandlerContainer)
 	}
 	if c.EnableProfiling {

@@ -111,6 +111,8 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	}
 
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
+	config.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+
 	s, err := config.Complete().New()
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)

@@ -184,8 +184,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
 		masterConfig.GenericConfig.EnableMetrics = true
-		masterConfig.GenericConfig.EnableSwaggerSupport = true
-		masterConfig.GenericConfig.EnableOpenAPISupport = true
+		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.OpenAPIDefinitions)
 		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes",
@@ -198,6 +197,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 			},
 		}
 		masterConfig.GenericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
+		masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	}
 
 	// set the loopback client config
