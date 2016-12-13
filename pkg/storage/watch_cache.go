@@ -35,9 +35,11 @@ import (
 )
 
 const (
-	// MaximumListWait determines how long we're willing to wait for a
-	// list if a client specified a resource version in the future.
-	MaximumListWait = 60 * time.Second
+	// blockTimeout determines how long we're willing to block the request
+	// to wait for a given resource version to be propagated to cache,
+	// before terminating request and returning Timeout error with retry
+	// after suggestion.
+	blockTimeout = 3 * time.Second
 )
 
 // watchCacheEvent is a single "watch event" that is send to users of
@@ -206,7 +208,8 @@ func parseResourceVersion(resourceVersion string) (uint64, error) {
 	if resourceVersion == "" {
 		return 0, nil
 	}
-	return strconv.ParseUint(resourceVersion, 10, 64)
+	// Use bitsize being the size of int on the machine.
+	return strconv.ParseUint(resourceVersion, 10, 0)
 }
 
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
@@ -288,7 +291,7 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *util.
 		// it will wake up the loop below sometime after the broadcast,
 		// we don't need to worry about waking it up before the time
 		// has expired accidentally.
-		<-w.clock.After(MaximumListWait)
+		<-w.clock.After(blockTimeout)
 		w.cond.Broadcast()
 	}()
 
@@ -297,8 +300,9 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *util.
 		trace.Step("watchCache locked acquired")
 	}
 	for w.resourceVersion < resourceVersion {
-		if w.clock.Since(startTime) >= MaximumListWait {
-			return fmt.Errorf("time limit exceeded while waiting for resource version %v (current value: %v)", resourceVersion, w.resourceVersion)
+		if w.clock.Since(startTime) >= blockTimeout {
+			// Timeout with retry after 1 second.
+			return errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %v, current: %v", resourceVersion, w.resourceVersion), 1)
 		}
 		w.cond.Wait()
 	}
