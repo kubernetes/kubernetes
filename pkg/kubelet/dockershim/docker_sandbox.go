@@ -103,7 +103,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 	// on the host as well, to satisfy parts of the pod spec that aren't
 	// recognized by the CNI standard yet.
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
-	err = ds.networkPlugin.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID)
+	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID)
 	// TODO: Do we need to teardown on failure or can we rely on a StopPodSandbox call with the given ID?
 	return createResp.ID, err
 }
@@ -162,8 +162,8 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 	errList := []error{}
 	if needNetworkTearDown {
 		cID := kubecontainer.BuildContainerID(runtimeName, podSandboxID)
-		if err := ds.networkPlugin.TearDownPod(namespace, name, cID); err != nil {
-			errList = append(errList, fmt.Errorf("failed to teardown sandbox %q for pod %s/%s: %v", podSandboxID, namespace, name, err))
+		if err := ds.network.TearDownPod(namespace, name, cID); err != nil {
+			errList = append(errList, err)
 		}
 	}
 	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil {
@@ -199,12 +199,12 @@ func (ds *dockerService) getIPFromPlugin(sandbox *dockertypes.ContainerJSON) (st
 	}
 	msg := fmt.Sprintf("Couldn't find network status for %s/%s through plugin", metadata.Namespace, metadata.Name)
 	cID := kubecontainer.BuildContainerID(runtimeName, sandbox.ID)
-	networkStatus, err := ds.networkPlugin.GetPodNetworkStatus(metadata.Namespace, metadata.Name, cID)
+	networkStatus, err := ds.network.GetPodNetworkStatus(metadata.Namespace, metadata.Name, cID)
 	if err != nil {
 		// This might be a sandbox that somehow ended up without a default
 		// interface (eth0). We can't distinguish this from a more serious
 		// error, so callers should probably treat it as non-fatal.
-		return "", fmt.Errorf("%v: %v", msg, err)
+		return "", err
 	}
 	if networkStatus == nil {
 		return "", fmt.Errorf("%v: invalid network status for", msg)
@@ -408,7 +408,7 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 	}
 	hc.CgroupParent = cgroupParent
 	// Apply security context.
-	applySandboxSecurityContext(lc, createConfig.Config, hc, ds.networkPlugin, separator)
+	applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator)
 
 	return nil
 }
