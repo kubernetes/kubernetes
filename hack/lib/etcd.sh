@@ -81,7 +81,7 @@ kube::etcd::clean_etcd_dir() {
 
 kube::etcd::cleanup() {
   kube::etcd::stop
-  kube::etcd::clean_etcd_dir
+  # kube::etcd::clean_etcd_dir
 }
 
 kube::etcd::install() {

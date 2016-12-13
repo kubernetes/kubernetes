@@ -188,6 +188,7 @@ ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # cur
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
+HASHING_ALGORITHM=${HASHING_ALGORITHM:-"adler"}
 
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
@@ -313,7 +314,7 @@ cleanup()
 
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
-  [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+  # [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
 
   exit 0
 }
@@ -461,6 +462,7 @@ function start_controller_manager {
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
+      --deployment-hashing-algorithm="${HASHING_ALGORITHM}" \
       --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
