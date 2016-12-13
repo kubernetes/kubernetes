@@ -2479,7 +2479,12 @@ func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeG
 		return err
 	}
 
-	return gce.waitForZoneOp(createOp, zone)
+	err = gce.waitForZoneOp(createOp, zone)
+	if isGCEError(err, "alreadyExists") {
+		glog.V(2).Infof("GCE PD %q already exists, reuising", name)
+		return nil
+	}
+	return err
 }
 
 func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
