@@ -481,33 +481,33 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }
 
-func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
-	genericvalidation.ValidateRunOptions(options)
+func DefaultAndValidateRunOptions(cliOptions *options.ServerRunOptions) {
+	genericvalidation.ValidateRunOptions(cliOptions)
 
 	// If advertise-address is not specified, use bind-address. If bind-address
 	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
 	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
-	if options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified() {
-		hostIP, err := utilnet.ChooseBindAddress(options.BindAddress)
+	if cliOptions.AdvertiseAddress == nil || cliOptions.AdvertiseAddress.IsUnspecified() {
+		hostIP, err := utilnet.ChooseBindAddress(cliOptions.BindAddress)
 		if err != nil {
 			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
 				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
 		}
-		options.AdvertiseAddress = hostIP
+		cliOptions.AdvertiseAddress = hostIP
 	}
-	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
+	glog.Infof("Will report %v as public IP address.", cliOptions.AdvertiseAddress)
 
 	// Set default value for ExternalAddress if not specified.
-	if len(options.ExternalHost) == 0 {
+	if len(cliOptions.ExternalHost) == 0 {
 		// TODO: extend for other providers
-		if options.CloudProvider == "gce" || options.CloudProvider == "aws" {
-			cloud, err := cloudprovider.InitCloudProvider(options.CloudProvider, options.CloudConfigFile)
+		if cliOptions.CloudProvider == "gce" || cliOptions.CloudProvider == "aws" {
+			cloud, err := cloudprovider.InitCloudProvider(cliOptions.CloudProvider, cliOptions.CloudConfigFile)
 			if err != nil {
 				glog.Fatalf("Cloud provider could not be initialized: %v", err)
 			}
 			instances, supported := cloud.Instances()
 			if !supported {
-				glog.Fatalf("%q cloud provider has no instances.  this shouldn't happen. exiting.", options.CloudProvider)
+				glog.Fatalf("%q cloud provider has no instances.  this shouldn't happen. exiting.", cliOptions.CloudProvider)
 			}
 			hostname, err := os.Hostname()
 			if err != nil {
@@ -523,10 +523,26 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 			} else {
 				for _, addr := range addrs {
 					if addr.Type == api.NodeExternalIP {
-						options.ExternalHost = addr.Address
+						cliOptions.ExternalHost = addr.Address
 					}
 				}
 			}
+		}
+	}
+
+	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
+	// in such a case the AnonymousAuth is stomped to false and you get a message
+	if cliOptions.AnonymousAuth {
+		found := false
+		for _, mode := range strings.Split(cliOptions.AuthorizationMode, ",") {
+			if mode == options.ModeAlwaysAllow {
+				found = true
+				break
+			}
+		}
+		if found {
+			glog.Warningf("AnonymousAuth is not allowed with the AllowAll authorizer.  Resetting AnonymousAuth to false. You should use a different authorizer")
+			cliOptions.AnonymousAuth = false
 		}
 	}
 }

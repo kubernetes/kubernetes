@@ -410,7 +410,9 @@ EOF
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+    # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
+    # this matches what happened with the combination in 1.4.
+    kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
 }
 
 function start_controller_manager {
