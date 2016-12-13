@@ -2400,7 +2400,12 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 		Description:     k8sNodeRouteTag,
 	}).Do()
 	if err != nil {
-		return err
+		if !isHTTPErrorCode(err, http.StatusConflict) {
+			return err
+		} else {
+			glog.Info("Route %v already exists.")
+			return nil
+		}
 	}
 	return gce.waitForGlobalOp(insertOp)
 }
