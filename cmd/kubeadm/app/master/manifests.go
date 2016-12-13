@@ -53,7 +53,10 @@ const (
 
 var (
 	// Minimum version of kube-apiserver that supports --kubelet-preferred-address-types
-	preferredAddressMinimumVersion = semver.MustParse("1.5.0-beta.2")
+	preferredAddressAPIServerMinVersion = semver.MustParse("1.5.0")
+
+	// Minimum version of kube-apiserver that has to have --anonymous-auth=false set
+	anonAuthDisableAPIServerMinVersion = semver.MustParse("1.5.0")
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -303,8 +306,15 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		// work on bare-metal where hostnames aren't usually resolvable
 		// Omit the "v" in the beginning, otherwise semver will fail
 		k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
-		if err == nil && k8sVersion.GTE(preferredAddressMinimumVersion) {
+
+		// If the k8s version is greater than this version, it supports telling it which way it should contact kubelets
+		if err == nil && k8sVersion.GTE(preferredAddressAPIServerMinVersion) {
 			command = append(command, "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname")
+		}
+
+		// This is a critical "bugfix". Any version above this is vulnarable unless a RBAC/ABAC-authorizer is provided (which kubeadm doesn't for the time being)
+		if err == nil && k8sVersion.GTE(anonAuthDisableAPIServerMinVersion) {
+			command = append(command, "--anonymous-auth=false")
 		}
 	}
 
