@@ -62,7 +62,7 @@ type nothingSelector struct{}
 
 func (n nothingSelector) Matches(_ Labels) bool              { return false }
 func (n nothingSelector) Empty() bool                        { return false }
-func (n nothingSelector) String() string                     { return "<null>" }
+func (n nothingSelector) String() string                     { return "0 != 0" }
 func (n nothingSelector) Add(_ ...Requirement) Selector      { return n }
 func (n nothingSelector) Requirements() (Requirements, bool) { return nil, false }
 
