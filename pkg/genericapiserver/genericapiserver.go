@@ -27,6 +27,7 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/admission"
@@ -38,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	openapicommon "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -86,12 +87,6 @@ type GenericAPIServer struct {
 	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
 	minRequestTimeout time.Duration
 
-	// enableSwaggerSupport indicates that swagger should be served.  This is currently separate because
-	// the API group routes are created *after* initialization and you can't generate the swagger routes until
-	// after those are available.
-	// TODO eventually we should be able to factor this out to take place during initialization.
-	enableSwaggerSupport bool
-
 	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup
 	legacyAPIGroupPrefixes sets.String
@@ -131,10 +126,9 @@ type GenericAPIServer struct {
 	apiGroupsForDiscoveryLock sync.RWMutex
 	apiGroupsForDiscovery     map[string]metav1.APIGroup
 
-	// See Config.$name for documentation of these flags
-
-	enableOpenAPISupport bool
-	openAPIConfig        *common.Config
+	// Enable swagger and/or OpenAPI if these configs are non-nil.
+	swaggerConfig *swagger.Config
+	openAPIConfig *openapicommon.Config
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
@@ -174,10 +168,10 @@ type preparedGenericAPIServer struct {
 
 // PrepareRun does post API installation setup steps.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
-	if s.enableSwaggerSupport {
-		routes.Swagger{ExternalAddress: s.ExternalAddress}.Install(s.HandlerContainer)
+	if s.swaggerConfig != nil {
+		routes.Swagger{Config: s.swaggerConfig}.Install(s.HandlerContainer)
 	}
-	if s.enableOpenAPISupport {
+	if s.openAPIConfig != nil {
 		routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.Install(s.HandlerContainer)
