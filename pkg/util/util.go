@@ -40,7 +40,7 @@ func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 // Please note that simply reading /proc/1/cmdline can be misleading because
 // some installation of various init programs can automatically make /sbin/init
 // a symlink or even a renamed version of their main program.
-// TODO(dchen1107): realiably detects the init system using on the system:
+// TODO(dchen1107): reliably detects the init system using on the system:
 // systemd, upstart, initd, etc.
 func UsingSystemdInitSystem() bool {
 	if _, err := os.Stat("/run/systemd/system"); err == nil {

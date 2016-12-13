@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package taints implements uitilites for working with taints
+// package taints implements utilities for working with taints
 package taints
 
 import (

@@ -38,7 +38,7 @@ var DefaultMetaFactory = SimpleMetaFactory{}
 
 // SimpleMetaFactory provides default methods for retrieving the type and version of objects
 // that are identified with an "apiVersion" and "kind" fields in their JSON
-// serialization. It may be parameterized with the names of the fields in memory, or an
+// serialization. It may be parametersized with the names of the fields in memory, or an
 // optional list of base structs to search for those fields in memory.
 type SimpleMetaFactory struct {
 }

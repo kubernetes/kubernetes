@@ -35,7 +35,7 @@ import (
 )
 
 // pvcResources are the set of static resources managed by quota associated with pvcs.
-// for each resouce in this list, it may be refined dynamically based on storage class.
+// for each resource in this list, it may be refined dynamically based on storage class.
 var pvcResources = []api.ResourceName{
 	api.ResourcePersistentVolumeClaims,
 	api.ResourceRequestsStorage,
@@ -138,7 +138,7 @@ func (p *pvcEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("PersistentVolumeClaim")
 }
 
-// Handles returns true if the evalutor should handle the specified operation.
+// Handles returns true if the evaluator should handle the specified operation.
 func (p *pvcEvaluator) Handles(operation admission.Operation) bool {
 	return admission.Create == operation
 }

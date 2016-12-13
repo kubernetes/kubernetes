@@ -109,7 +109,7 @@ func (p *podEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 
 	// TODO: fix this when we have pod level resource requirements
 	// since we do not yet pod level requests/limits, we need to ensure each
-	// container makes an explict request or limit for a quota tracked resource
+	// container makes an explicit request or limit for a quota tracked resource
 	requiredSet := quota.ToSet(required)
 	missingSet := sets.NewString()
 	for i := range pod.Spec.Containers {
@@ -129,7 +129,7 @@ func (p *podEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("Pod")
 }
 
-// Handles returns true of the evalutor should handle the specified operation.
+// Handles returns true of the evaluator should handle the specified operation.
 func (p *podEvaluator) Handles(operation admission.Operation) bool {
 	// TODO: update this if/when pods support resizing resource requirements.
 	return admission.Create == operation
