@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -30,9 +31,28 @@ func badGatewayError(w http.ResponseWriter, req *http.Request) {
 }
 
 // forbidden renders a simple forbidden error
-func forbidden(w http.ResponseWriter, req *http.Request) {
+func forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string) {
+	msg := forbiddenMessage(attributes)
 	w.WriteHeader(http.StatusForbidden)
-	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
+	fmt.Fprintf(w, "%s: %q", msg, reason)
+}
+
+func forbiddenMessage(attributes authorizer.Attributes) string {
+	username := ""
+	if attributes.GetUser() != nil {
+		username = attributes.GetUser().GetName()
+	}
+
+	resource := attributes.GetResource()
+	if len(attributes.GetAPIGroup()) > 0 {
+		resource = resource + "." + attributes.GetAPIGroup()
+	}
+
+	if ns := attributes.GetNamespace(); len(ns) > 0 {
+		return fmt.Sprintf("User %q cannot %s %s in the namespace %q.", username, attributes.GetVerb(), resource, ns)
+	}
+
+	return fmt.Sprintf("User %q cannot %s %s at the cluster scope.", username, attributes.GetVerb(), resource)
 }
 
 // internalError renders a simple internal error
