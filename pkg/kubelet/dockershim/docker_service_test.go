@@ -32,14 +32,14 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 )
 
 // newTestNetworkPlugin returns a mock plugin that implements network.NetworkPlugin
-func newTestNetworkPlugin(t *testing.T) *mock_network.MockNetworkPlugin {
+func newTestNetworkPlugin(t *testing.T) *nettest.MockNetworkPlugin {
 	ctrl := gomock.NewController(t)
-	return mock_network.NewMockNetworkPlugin(ctrl)
+	return nettest.NewMockNetworkPlugin(ctrl)
 }
 
 func newTestDockerService() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
