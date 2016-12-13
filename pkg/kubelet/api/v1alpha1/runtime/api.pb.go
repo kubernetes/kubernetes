@@ -3675,7 +3675,8 @@ type ImageServiceClient interface {
 	// ListImages lists existing images.
 	ListImages(ctx context.Context, in *ListImagesRequest, opts ...grpc.CallOption) (*ListImagesResponse, error)
 	// ImageStatus returns the status of the image. If the image is not
-	// present, returns nil.
+	// present, returns a response with ImageStatusResponse.Image set to
+	// nil.
 	ImageStatus(ctx context.Context, in *ImageStatusRequest, opts ...grpc.CallOption) (*ImageStatusResponse, error)
 	// PullImage pulls an image with authentication config.
 	PullImage(ctx context.Context, in *PullImageRequest, opts ...grpc.CallOption) (*PullImageResponse, error)
@@ -3735,7 +3736,8 @@ type ImageServiceServer interface {
 	// ListImages lists existing images.
 	ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error)
 	// ImageStatus returns the status of the image. If the image is not
-	// present, returns nil.
+	// present, returns a response with ImageStatusResponse.Image set to
+	// nil.
 	ImageStatus(context.Context, *ImageStatusRequest) (*ImageStatusResponse, error)
 	// PullImage pulls an image with authentication config.
 	PullImage(context.Context, *PullImageRequest) (*PullImageResponse, error)

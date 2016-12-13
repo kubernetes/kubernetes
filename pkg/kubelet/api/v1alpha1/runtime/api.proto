@@ -71,7 +71,8 @@ service ImageService {
     // ListImages lists existing images.
     rpc ListImages(ListImagesRequest) returns (ListImagesResponse) {}
     // ImageStatus returns the status of the image. If the image is not
-    // present, returns nil.
+    // present, returns a response with ImageStatusResponse.Image set to
+    // nil.
     rpc ImageStatus(ImageStatusRequest) returns (ImageStatusResponse) {}
     // PullImage pulls an image with authentication config.
     rpc PullImage(PullImageRequest) returns (PullImageResponse) {}
