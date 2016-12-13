@@ -433,6 +433,7 @@ node-name
 node-os-distro
 node-path-override
 node-port
+node-schedulable-timeout
 node-startup-grace-period
 node-status-update-frequency
 node-sync-period
