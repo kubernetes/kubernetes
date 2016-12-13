@@ -45,6 +45,9 @@ type event struct {
 	oldObj interface{}
 }
 
+// Propagator: based on the events supplied by the informers, Propagator updates
+// uidToNode, a graph that caches the dependencies as we know, and enqueues
+// items to the dirtyQueue and orphanQueue.
 type Propagator struct {
 	eventQueue *workqueue.TimedWorkQueue
 	// uidToNode doesn't require a lock to protect, because only the
