@@ -35,6 +35,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
+        "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/extensions:go_default_library",
