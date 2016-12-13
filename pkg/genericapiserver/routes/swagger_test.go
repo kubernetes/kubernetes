@@ -32,7 +32,9 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	// Install swagger and test
 	c := genericmux.NewAPIContainer(http.NewServeMux(), nil)
-	Swagger{ExternalAddress: "1.2.3.4"}.Install(c)
+	config := DefaultSwaggerConfig()
+	config.WebServicesUrl = "https://1.2.3.4"
+	Swagger{Config: config}.Install(c)
 	ws := c.RegisteredWebServices()
 	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
 		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
@@ -40,7 +42,9 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	// Empty externalHost verification
 	c = genericmux.NewAPIContainer(http.NewServeMux(), nil)
-	Swagger{ExternalAddress: ""}.Install(c)
+	config = DefaultSwaggerConfig()
+	config.WebServicesUrl = "https://"
+	Swagger{Config: config}.Install(c)
 	ws = c.RegisteredWebServices()
 	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
 		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())

@@ -27,14 +27,19 @@ import (
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 type Swagger struct {
-	ExternalAddress string
+	Config *swagger.Config
 }
 
 // Install adds the SwaggerUI webservice to the given mux.
 func (s Swagger) Install(c *mux.APIContainer) {
-	swagger.RegisterSwaggerService(swagger.Config{
-		WebServicesUrl:  "https://" + s.ExternalAddress,
-		WebServices:     c.RegisteredWebServices(),
+	s.Config.WebServices = c.RegisteredWebServices()
+	swagger.RegisterSwaggerService(*s.Config, c.Container)
+}
+
+// DefaultSwaggerConfig returns a default configuration without WebServiceURL and
+// WebServices set.
+func DefaultSwaggerConfig() *swagger.Config {
+	return &swagger.Config{
 		ApiPath:         "/swaggerapi/",
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
@@ -45,5 +50,5 @@ func (s Swagger) Install(c *mux.APIContainer) {
 			}
 			return ""
 		},
-	}, c.Container)
+	}
 }
