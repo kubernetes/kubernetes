@@ -245,25 +245,28 @@ runTests() {
   # `go test` does not install the things it builds. `go test -i` installs
   # the build artifacts but doesn't run the tests.  The two together provide
   # a large speedup for tests that do not need to be rebuilt.
-  printf "%s\n" "${@}" | grep -Ev $cover_ignore_dirs | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
-    bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
-        go test -i ${goflags[@]:+${goflags[@]}} \
-          ${KUBE_RACE} \
-          ${KUBE_TIMEOUT} \
-          -cover -covermode=\"${KUBE_COVERMODE}\" \
-          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
-          ${testargs[@]:+${testargs[@]}}
-        go test ${goflags[@]:+${goflags[@]}} \
-          ${KUBE_RACE} \
-          ${KUBE_TIMEOUT} \
-          -cover -covermode=\"${KUBE_COVERMODE}\" \
-          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
-          ${testargs[@]:+${testargs[@]}} \
-        | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
-        | grep \"${go_test_grep_pattern}\"" \
-      && test_result=$? || test_result=$?
+  printf "%s\n" "${@}" \
+    | grep -Ev $cover_ignore_dirs \
+    | xargs -I{} -n 1 -P ${KUBE_COVERPROCS} \
+    bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
+      go test -i ${goflags[@]:+${goflags[@]}} \
+        ${KUBE_RACE} \
+        ${KUBE_TIMEOUT} \
+        -cover -covermode=\"${KUBE_COVERMODE}\" \
+        -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
+        \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
+        ${testargs[@]:+${testargs[@]}}
+      go test ${goflags[@]:+${goflags[@]}} \
+        ${KUBE_RACE} \
+        ${KUBE_TIMEOUT} \
+        -cover -covermode=\"${KUBE_COVERMODE}\" \
+        -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
+        \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
+        ${testargs[@]:+${testargs[@]}} \
+      | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
+      | grep \"${go_test_grep_pattern}\"" \
+    {} \
+    && test_result=$? || test_result=$?
 
   produceJUnitXMLReport "${junit_filename_prefix}"
 
