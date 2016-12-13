@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -292,4 +293,124 @@ type NoopPortMappingGetter struct{}
 
 func (*NoopPortMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error) {
 	return nil, nil
+}
+
+// The PluginManager wraps a kubelet network plugin and provides synchronization
+// for a given pod's network operations.  Each pod's setup/teardown/status operations
+// are synchronized against each other, but network operations of other pods can
+// proceed in parallel.
+type PluginManager struct {
+	// Network plugin being wrapped
+	plugin NetworkPlugin
+
+	// Pod list and lock
+	podsLock sync.Mutex
+	pods     map[string]*podLock
+}
+
+func NewPluginManager(plugin NetworkPlugin) *PluginManager {
+	return &PluginManager{
+		plugin: plugin,
+		pods:   make(map[string]*podLock),
+	}
+}
+
+func (pm *PluginManager) PluginName() string {
+	return pm.plugin.Name()
+}
+
+func (pm *PluginManager) Event(name string, details map[string]interface{}) {
+	pm.plugin.Event(name, details)
+}
+
+func (pm *PluginManager) Status() error {
+	return pm.plugin.Status()
+}
+
+type podLock struct {
+	// Count of in-flight operations for this pod; when this reaches zero
+	// the lock can be removed from the pod map
+	refcount uint
+
+	// Lock to synchronize operations for this specific pod
+	mu sync.Mutex
+}
+
+// Lock network operations for a specific pod.  If that pod is not yet in
+// the pod map, it will be added.  The reference count for the pod will
+// be increased.
+func (pm *PluginManager) podLock(fullPodName string) *sync.Mutex {
+	pm.podsLock.Lock()
+	defer pm.podsLock.Unlock()
+
+	lock, ok := pm.pods[fullPodName]
+	if !ok {
+		lock = &podLock{}
+		pm.pods[fullPodName] = lock
+	}
+	lock.refcount++
+	return &lock.mu
+}
+
+// Unlock network operations for a specific pod.  The reference count for the
+// pod will be decreased.  If the reference count reaches zero, the pod will be
+// removed from the pod map.
+func (pm *PluginManager) podUnlock(fullPodName string) {
+	pm.podsLock.Lock()
+	defer pm.podsLock.Unlock()
+
+	lock, ok := pm.pods[fullPodName]
+	if !ok {
+		glog.Warningf("Unbalanced pod lock unref for %s", fullPodName)
+		return
+	} else if lock.refcount == 0 {
+		// This should never ever happen, but handle it anyway
+		delete(pm.pods, fullPodName)
+		glog.Warningf("Pod lock for %s still in map with zero refcount", fullPodName)
+		return
+	}
+	lock.refcount--
+	lock.mu.Unlock()
+	if lock.refcount == 0 {
+		delete(pm.pods, fullPodName)
+	}
+}
+
+func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
+	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pm.podLock(fullPodName).Lock()
+	defer pm.podUnlock(fullPodName)
+
+	netStatus, err := pm.plugin.GetPodNetworkStatus(podNamespace, podName, id)
+	if err != nil {
+		return nil, fmt.Errorf("NetworkPlugin %s failed on the status hook for pod %q: %v", pm.plugin.Name(), fullPodName, err)
+	}
+
+	return netStatus, nil
+}
+
+func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer.ContainerID) error {
+	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pm.podLock(fullPodName).Lock()
+	defer pm.podUnlock(fullPodName)
+
+	glog.V(3).Infof("Calling network plugin %s to set up pod %q", pm.plugin.Name(), fullPodName)
+	if err := pm.plugin.SetUpPod(podNamespace, podName, id); err != nil {
+		return fmt.Errorf("NetworkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
+	}
+
+	return nil
+}
+
+func (pm *PluginManager) TearDownPod(podNamespace, podName string, id kubecontainer.ContainerID) error {
+	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pm.podLock(fullPodName).Lock()
+	defer pm.podUnlock(fullPodName)
+
+	glog.V(3).Infof("Calling network plugin %s to tear down pod %q", pm.plugin.Name(), fullPodName)
+	if err := pm.plugin.TearDownPod(podNamespace, podName, id); err != nil {
+		return fmt.Errorf("NetworkPlugin %s failed to teardown pod %q network: %v", pm.plugin.Name(), fullPodName, err)
+	}
+
+	return nil
 }
