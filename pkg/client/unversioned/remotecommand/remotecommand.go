@@ -177,24 +177,5 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 		streamer = newStreamProtocolV1(options)
 	}
 
-	streamChan := make(chan error)
-	go func() {
-		streamChan <- streamer.stream(conn)
-	}()
-
-	if options.StreamTimeout == 0 {
-		select {
-		case err, _ := <-streamChan:
-			return err
-		}
-	} else {
-		select {
-		case err, _ := <-streamChan:
-			return err
-		case <-time.After(options.StreamTimeout):
-			return fmt.Errorf("Timeout exceeded for this operation.")
-		}
-	}
-
-	return nil
+	return streamer.stream(conn)
 }
