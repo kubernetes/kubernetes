@@ -4,10 +4,9 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
+    "cgo_genrule",
     "go_library",
     "go_test",
-    "cgo_library",
 )
 
 go_library(
@@ -18,6 +17,7 @@ go_library(
         "helpers.go",
         "types.go",
     ],
+    library = "cgo_codegen",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -59,4 +59,16 @@ go_test(
         "//pkg/types:go_default_library",
         "//pkg/util/clock:go_default_library",
     ],
+)
+
+cgo_genrule(
+    name = "cgo_codegen",
+    srcs = ["threshold_notifier_linux.go"],
+    clinkopts = [
+        "-lz",
+        "-lm",
+        "-lpthread",
+        "-ldl",
+    ],
+    tags = ["automanaged"],
 )

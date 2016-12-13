@@ -29,7 +29,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -40,6 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -124,7 +125,7 @@ func main() {
 		} else {
 			// wait until the namespace disappears
 			for i := 0; i < int(namespaceDeleteTimeout/time.Second); i++ {
-				if _, err := client.Namespaces().Get(ns); err != nil {
+				if _, err := client.Namespaces().Get(ns, metav1.GetOptions{}); err != nil {
 					if errors.IsNotFound(err) {
 						return
 					}
@@ -239,7 +240,7 @@ func main() {
 	for _, podName := range podNames {
 		var pod *v1.Pod
 		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-			pod, err = client.Pods(ns).Get(podName)
+			pod, err = client.Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				glog.Warningf("Get pod %s/%s failed, ignoring for %v: %v", ns, podName, err, podStartTimeout)
 				continue
