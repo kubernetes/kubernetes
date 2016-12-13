@@ -95,6 +95,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 function usage {
             echo "This script starts a local kube cluster. "
+            echo "Example 0: hack/local-up-cluster.sh -h  (this 'help' usage description)"
             echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
             echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
             echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
@@ -112,7 +113,7 @@ function guess_built_binary_path {
 
 ### Allow user to supply the source directory.
 GO_OUT=${GO_OUT:-}
-while getopts "o:O" OPTION
+while getopts "ho:O" OPTION
 do
     case $OPTION in
         o)
@@ -127,6 +128,10 @@ do
                 exit 1
             fi
             ;;
+        h)
+            usage
+            exit
+            ;;
         ?)
             usage
             exit
@@ -140,10 +145,40 @@ else
     echo "skipped the build."
 fi
 
+
+function test_etcd {
+  etcd_path=$(which etcd)
+  if [ -z "$etcd_path" ]
+  then
+     echo
+     echo "Failed to find 'etcd' in your PATH, please fix and retry."
+     exit 1
+  fi
+}
+
 function test_docker {
     ${DOCKER[@]} ps 2> /dev/null 1> /dev/null
     if [ "$?" != "0" ]; then
-      echo "Failed to successfully run 'docker ps', please verify that docker is installed and \$DOCKER_HOST is set correctly."
+      echo
+      cat <<'EOF' >&2
+Failed to successfully run 'docker ps', please verify that docker is installed and \$DOCKER_HOST is set correctly. 
+Can't connect to 'docker' daemon. Please fix and retry.
+
+Possible causes:
+  - Docker Daemon not started
+    - Linux: confirm via your init system
+    - macOS w/ docker-machine: run `docker-machine ls` and `docker-machine start <name>`
+    - macOS w/ Docker for Mac: Check the menu bar and start the Docker application
+  - DOCKER_HOST hasn't been set or is set incorrectly
+    - Linux: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
+    - macOS w/ docker-machine: run `eval "$(docker-machine env <name>)"`
+    - macOS w/ Docker for Mac: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
+  - Other things to check:
+    - Linux: User isn't in 'docker' group.  Add and Re-Login.
+      - Something like 'sudo usermod -a -G docker ${USER}'
+      - https://github.com/docker/docker/issues/17645
+      - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8
+EOF
       exit 1
     fi
 }
@@ -680,6 +715,9 @@ Logs:
 EOF
 fi
 }
+
+# let's check that etcd is in path before moving on
+test_etcd
 
 if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
   test_docker
