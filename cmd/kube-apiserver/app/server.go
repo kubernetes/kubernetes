@@ -97,6 +97,8 @@ func Run(s *options.ServerRunOptions) error {
 		return fmt.Errorf("error setting the external host value: %v", err)
 	}
 
+	s.Authentication.ApplyAuthorization(s.Authorization)
+
 	// validate options
 	if errs := s.Validate(); len(errs) != 0 {
 		return utilerrors.NewAggregate(errs)
