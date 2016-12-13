@@ -34450,6 +34450,10 @@
       "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
       "type": "string"
      },
+     "qosClass": {
+      "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md",
+      "type": "string"
+     },
      "reason": {
       "description": "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'",
       "type": "string"

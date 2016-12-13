@@ -19103,6 +19103,10 @@
        "$ref": "v1.ContainerStatus"
       },
       "description": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses"
+     },
+     "qosClass": {
+      "type": "string",
+      "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md"
      }
     }
    },
