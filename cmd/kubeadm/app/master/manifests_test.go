@@ -447,6 +447,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--allow-privileged",
 				"--advertise-address=foo",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+				"--anonymous-auth=false",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
 		},
