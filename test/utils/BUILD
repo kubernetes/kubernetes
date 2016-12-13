@@ -22,6 +22,8 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
