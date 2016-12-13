@@ -40,7 +40,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/blang/semver"
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
@@ -87,8 +86,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/uuid"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -234,8 +233,8 @@ func GetPauseImageNameForHostArch() string {
 //
 // TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively
 // in v1.3).
-var SubResourcePodProxyVersion = version.MustParse("v1.1.0")
-var subResourceServiceAndNodeProxyVersion = version.MustParse("v1.2.0")
+var SubResourcePodProxyVersion = utilversion.MustParseSemantic("v1.1.0")
+var subResourceServiceAndNodeProxyVersion = utilversion.MustParseSemantic("v1.2.0")
 
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
 	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c.Discovery())
@@ -350,7 +349,7 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	return false
 }
 
-func SkipUnlessServerVersionGTE(v semver.Version, c discovery.ServerVersionInterface) {
+func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) {
 	gte, err := ServerVersionGTE(v, c)
 	if err != nil {
 		Failf("Failed to get server version: %v", err)
@@ -501,7 +500,7 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 	return nil
 }
 
-var ReadyReplicaVersion = version.MustParse("v1.4.0")
+var ReadyReplicaVersion = utilversion.MustParseSemantic("v1.4.0")
 
 // WaitForPodsRunningReady waits up to timeout to ensure that all pods in
 // namespace ns are either running and ready, or failed but controlled by a
@@ -1624,19 +1623,19 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 // version.
 //
 // TODO(18726): This should be incorporated into client.VersionInterface.
-func ServerVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (bool, error) {
+func ServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
 	serverVersion, err := c.ServerVersion()
 	if err != nil {
 		return false, fmt.Errorf("Unable to get server version: %v", err)
 	}
-	sv, err := version.Parse(serverVersion.GitVersion)
+	sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
 	if err != nil {
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
-	return sv.GTE(v), nil
+	return sv.AtLeast(v), nil
 }
 
-func SkipUnlessKubectlVersionGTE(v semver.Version) {
+func SkipUnlessKubectlVersionGTE(v *utilversion.Version) {
 	gte, err := KubectlVersionGTE(v)
 	if err != nil {
 		Failf("Failed to get kubectl version: %v", err)
@@ -1648,25 +1647,25 @@ func SkipUnlessKubectlVersionGTE(v semver.Version) {
 
 // KubectlVersionGTE returns true if the kubectl version is greater than or
 // equal to v.
-func KubectlVersionGTE(v semver.Version) (bool, error) {
+func KubectlVersionGTE(v *utilversion.Version) (bool, error) {
 	kv, err := KubectlVersion()
 	if err != nil {
 		return false, err
 	}
-	return kv.GTE(v), nil
+	return kv.AtLeast(v), nil
 }
 
 // KubectlVersion gets the version of kubectl that's currently being used (see
 // --kubectl-path in e2e.go to use an alternate kubectl).
-func KubectlVersion() (semver.Version, error) {
+func KubectlVersion() (*utilversion.Version, error) {
 	output := RunKubectlOrDie("version", "--client")
 	matches := gitVersionRegexp.FindStringSubmatch(output)
 	if len(matches) != 2 {
-		return semver.Version{}, fmt.Errorf("Could not find kubectl version in output %v", output)
+		return nil, fmt.Errorf("Could not find kubectl version in output %v", output)
 	}
 	// Don't use the full match, as it contains "GitVersion:\"" and a
 	// trailing "\"".  Just use the submatch.
-	return version.Parse(matches[1])
+	return utilversion.ParseSemantic(matches[1])
 }
 
 func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods *v1.PodList) error {

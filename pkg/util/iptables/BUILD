@@ -20,7 +20,7 @@ go_library(
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/coreos/go-semver/semver",
+        "//pkg/util/version:go_default_library",
         "//vendor:github.com/godbus/dbus",
         "//vendor:github.com/golang/glog",
     ],

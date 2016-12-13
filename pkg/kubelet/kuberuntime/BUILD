@@ -53,7 +53,7 @@ go_library(
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/coreos/go-semver/semver",
+        "//pkg/util/version:go_default_library",
         "//vendor:github.com/docker/docker/pkg/jsonlog",
         "//vendor:github.com/fsnotify/fsnotify",
         "//vendor:github.com/golang/glog",
