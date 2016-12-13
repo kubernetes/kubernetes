@@ -229,3 +229,27 @@ func TestLabelSelectorParse(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatLabels(t *testing.T) {
+	tests := []struct {
+		expected string
+		labels   map[string]string
+	}{
+		{
+			labels:   map[string]string{"a": "a"},
+			expected: "a=a",
+		},
+
+		{
+			labels:   map[string]string{},
+			expected: "0 != 0",
+		},
+	}
+
+	for _, test := range tests {
+		result := FormatLabels(test.labels)
+		if result != test.expected {
+			t.Errorf("result: %s, expected: %s did not match", result, test.expected)
+		}
+	}
+}
