@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -56,7 +57,7 @@ type RESTUpdateStrategy interface {
 }
 
 // TODO: add other common fields that require global validation.
-func validateCommonFields(obj, old runtime.Object) (field.ErrorList, error) {
+func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) (field.ErrorList, error) {
 	allErrs := field.ErrorList{}
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
@@ -66,6 +67,7 @@ func validateCommonFields(obj, old runtime.Object) (field.ErrorList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get old object metadata: %v", err)
 	}
+	allErrs = append(allErrs, validation.ValidateObjectMeta(objectMeta, strategy.NamespaceScoped(), path.ValidatePathSegmentName, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(objectMeta, oldObjectMeta, field.NewPath("metadata"))...)
 
 	return allErrs, nil
@@ -99,7 +101,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 	objectMeta.ClusterName = ""
 
 	// Ensure some common fields, like UID, are validated for all resources.
-	errs, err := validateCommonFields(obj, old)
+	errs, err := validateCommonFields(obj, old, strategy)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}

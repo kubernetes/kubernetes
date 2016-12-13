@@ -288,6 +288,28 @@ func TestValidateFinalizersUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateFinalizersPreventConflictingFinalizers(t *testing.T) {
+	testcases := map[string]struct {
+		ObjectMeta  api.ObjectMeta
+		ExpectedErr string
+	}{
+		"conflicting finalizers": {
+			ObjectMeta:  api.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{api.FinalizerOrphanDependents, api.FinalizerDeleteDependents}},
+			ExpectedErr: "cannot be both set",
+		},
+	}
+	for name, tc := range testcases {
+		errs := ValidateObjectMeta(&tc.ObjectMeta, false, NameIsDNSSubdomain, field.NewPath("field"))
+		if len(errs) == 0 {
+			if len(tc.ExpectedErr) != 0 {
+				t.Errorf("case: %q, expected error to contain %q", name, tc.ExpectedErr)
+			}
+		} else if e, a := tc.ExpectedErr, errs.ToAggregate().Error(); !strings.Contains(a, e) {
+			t.Errorf("case: %q, expected error to contain %q, got error %q", name, e, a)
+		}
+	}
+}
+
 func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 	now := metav1.NewTime(time.Unix(1000, 0).UTC())
 	later := metav1.NewTime(time.Unix(2000, 0).UTC())
@@ -8812,5 +8834,19 @@ func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 	errList := ValidateEndpoints(endpoint)
 	if len(errList) != 0 {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
+	}
+}
+
+// TODO: need an e2e test as well
+func TestInvalidDeleteOptions(t *testing.T) {
+	policy := api.DeletePropagationDefault
+	trueVar := true
+	deleteOptions := &api.DeleteOptions{
+		OrphanDependents:  &trueVar,
+		PropagationPolicy: &policy,
+	}
+	errList := ValidateDeleteOptions(deleteOptions)
+	if len(errList) == 0 || !strings.Contains(errList.ToAggregate().Error(), "cannot be both set") {
+		t.Errorf("unexpected error message: %q", errList.ToAggregate().Error())
 	}
 }

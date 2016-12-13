@@ -406,9 +406,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.OwnerReferences, fldPath.Child("ownerReferences"))...)
-	for _, finalizer := range meta.Finalizers {
-		allErrs = append(allErrs, validateFinalizerName(finalizer, fldPath.Child("finalizers"))...)
-	}
+	allErrs = append(allErrs, ValidateFinalizers(meta.Finalizers, fldPath.Child("finalizers"))...)
 	return allErrs
 }
 
@@ -3471,6 +3469,29 @@ func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorL
 	return field.ErrorList{}
 }
 
+// ValidateFinalizers tests if the finalizers name are valid, and if there are conflicting finalizers.
+func ValidateFinalizers(finalizers []string, fldPath *field.Path) field.ErrorList {
+	if fldPath == nil {
+		fldPath = field.NewPath("metadata", "finalizers")
+	}
+	allErrs := field.ErrorList{}
+	hasFinalizerOrphanDependents := false
+	hasFinalizerDeleteDependents := false
+	for _, finalizer := range finalizers {
+		allErrs = append(allErrs, validateFinalizerName(finalizer, fldPath)...)
+		if finalizer == api.FinalizerOrphanDependents {
+			hasFinalizerOrphanDependents = true
+		}
+		if finalizer == api.FinalizerDeleteDependents {
+			hasFinalizerDeleteDependents = true
+		}
+	}
+	if hasFinalizerDeleteDependents && hasFinalizerOrphanDependents {
+		allErrs = append(allErrs, field.Invalid(fldPath, finalizers, fmt.Sprintf("finalizer %s and %s cannot be both set", api.FinalizerOrphanDependents, api.FinalizerDeleteDependents)))
+	}
+	return allErrs
+}
+
 // ValidateNamespaceUpdate tests to make sure a namespace update can be applied.
 // newNamespace is updated with fields that cannot be changed
 func ValidateNamespaceUpdate(newNamespace *api.Namespace, oldNamespace *api.Namespace) field.ErrorList {
@@ -3751,4 +3772,12 @@ func sysctlIntersection(a []api.Sysctl, b []api.Sysctl) []string {
 		}
 	}
 	return result
+}
+
+func ValidateDeleteOptions(options *api.DeleteOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if options.OrphanDependents != nil && options.PropagationPolicy != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath(""), options, "OrphanDependents and DeletePropagationPolicy cannot be both set"))
+	}
+	return allErrs
 }
