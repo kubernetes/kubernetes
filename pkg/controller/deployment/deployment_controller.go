@@ -22,6 +22,10 @@ package deployment
 
 import (
 	"fmt"
+	"reflect"
+	"sort"
+	"time"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -42,9 +46,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"reflect"
-	"sort"
-	"time"
 )
 
 const (
@@ -348,16 +349,19 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 	}
 	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment.ObjectMeta, deploymentSelector, getDeploymentKind())
 	matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(rsList)
-	for _, replicaSet := range matchesNeedsController {
-		err := cm.AdoptReplicaSet(replicaSet)
-		// continue to next RS if adoption fails.
-		if err != nil {
-			// If the RS no longer exists, don't even log the error.
-			if !errors.IsNotFound(err) {
-				utilruntime.HandleError(err)
+	// Adopt replica sets only if this deployment is not going to be deleted.
+	if deployment.DeletionTimestamp == nil {
+		for _, replicaSet := range matchesNeedsController {
+			err := cm.AdoptReplicaSet(replicaSet)
+			// continue to next RS if adoption fails.
+			if err != nil {
+				// If the RS no longer exists, don't even log the error.
+				if !errors.IsNotFound(err) {
+					utilruntime.HandleError(err)
+				}
+			} else {
+				matchesAndControlled = append(matchesAndControlled, replicaSet)
 			}
-		} else {
-			matchesAndControlled = append(matchesAndControlled, replicaSet)
 		}
 	}
 	// remove the controllerRef for the RS that no longer have matching labels

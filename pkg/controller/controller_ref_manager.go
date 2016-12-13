@@ -18,6 +18,8 @@ package controller
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -25,7 +27,6 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime/schema"
-	"strings"
 )
 
 type PodControllerRefManager struct {
