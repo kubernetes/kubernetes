@@ -40,12 +40,12 @@ func WithAuthorization(handler http.Handler, requestContextMapper api.RequestCon
 			return
 		}
 
-		attrs, err := GetAuthorizerAttributes(ctx)
+		attributes, err := GetAuthorizerAttributes(ctx)
 		if err != nil {
 			internalError(w, req, err)
 			return
 		}
-		authorized, reason, err := a.Authorize(attrs)
+		authorized, reason, err := a.Authorize(attributes)
 		if authorized {
 			handler.ServeHTTP(w, req)
 			return
@@ -55,8 +55,8 @@ func WithAuthorization(handler http.Handler, requestContextMapper api.RequestCon
 			return
 		}
 
-		glog.V(4).Infof("Forbidden: %#v, Reason: %s", req.RequestURI, reason)
-		forbidden(w, req)
+		glog.V(4).Infof("Forbidden: %#v, Reason: %q", req.RequestURI, reason)
+		forbidden(attributes, w, req, reason)
 	})
 }
 
