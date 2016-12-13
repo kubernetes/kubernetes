@@ -210,6 +210,7 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
   fi
 fi
 
+HASHING_ALGORITHM=${HASHING_ALGORITHM:-"adler"}
 
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
@@ -335,7 +336,7 @@ cleanup()
 
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
-  [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+  # [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
 
   exit 0
 }
@@ -518,6 +519,7 @@ function start_controller_manager {
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
+      --deployment-hashing-algorithm="${HASHING_ALGORITHM}" \
       --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --use-service-account-credentials \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
