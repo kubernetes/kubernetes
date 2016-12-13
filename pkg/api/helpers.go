@@ -250,7 +250,8 @@ func IsServiceIPRequested(service *Service) bool {
 
 var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
-	FinalizerOrphan,
+	FinalizerOrphanDependents,
+	FinalizerDeleteDependents,
 )
 
 // HasAnnotation returns a bool if passed in annotation exists

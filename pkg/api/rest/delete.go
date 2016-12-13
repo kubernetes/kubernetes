@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/validation"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -65,6 +66,9 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return false, false, kerr
+	}
+	if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
+		return false, false, errors.NewInvalid(schema.GroupKind{}, "", errs)
 	}
 	// Checking the Preconditions here to fail early. They'll be enforced later on when we actually do the deletion, too.
 	if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.UID {

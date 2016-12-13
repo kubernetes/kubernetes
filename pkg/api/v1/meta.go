@@ -64,6 +64,10 @@ func (meta *ObjectMeta) GetOwnerReferences() []metav1.OwnerReference {
 			value := *meta.OwnerReferences[i].Controller
 			ret[i].Controller = &value
 		}
+		if meta.OwnerReferences[i].BlockOwnerDeletion != nil {
+			value := *meta.OwnerReferences[i].BlockOwnerDeletion
+			ret[i].BlockOwnerDeletion = &value
+		}
 	}
 	return ret
 }
@@ -78,6 +82,10 @@ func (meta *ObjectMeta) SetOwnerReferences(references []metav1.OwnerReference) {
 		if references[i].Controller != nil {
 			value := *references[i].Controller
 			newReferences[i].Controller = &value
+		}
+		if references[i].BlockOwnerDeletion != nil {
+			value := *references[i].BlockOwnerDeletion
+			newReferences[i].BlockOwnerDeletion = &value
 		}
 	}
 	meta.OwnerReferences = newReferences

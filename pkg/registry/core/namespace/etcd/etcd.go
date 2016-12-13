@@ -139,7 +139,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 					newFinalizers := []string{}
 					for i := range existingNamespace.ObjectMeta.Finalizers {
 						finalizer := existingNamespace.ObjectMeta.Finalizers[i]
-						if string(finalizer) != api.FinalizerOrphan {
+						if string(finalizer) != api.FinalizerOrphanDependents {
 							newFinalizers = append(newFinalizers, finalizer)
 						}
 					}

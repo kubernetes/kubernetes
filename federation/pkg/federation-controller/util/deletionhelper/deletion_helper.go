@@ -37,7 +37,7 @@ const (
 	// Add this finalizer to a federation resource if the resource should be
 	// deleted from all underlying clusters before being deleted from
 	// federation control plane.
-	// This is ignored if FinalizerOrphan is also present on the resource.
+	// This is ignored if FinalizerOrphanDependents is also present on the resource.
 	// In that case, both finalizers are removed from the resource and the
 	// resource is deleted from federation control plane without affecting
 	// the underlying clusters.
@@ -79,7 +79,7 @@ func NewDeletionHelper(
 }
 
 // Ensures that the given object has both FinalizerDeleteFromUnderlyingClusters
-// and FinalizerOrphan finalizers.
+// and FinalizerOrphanDependents finalizers.
 // We do this so that the controller is always notified when a federation resource is deleted.
 // If user deletes the resource with nil DeleteOptions or
 // DeletionOptions.OrphanDependents = true then the apiserver removes the orphan finalizer
@@ -96,9 +96,9 @@ func (dh *DeletionHelper) EnsureFinalizers(obj runtime.Object) (
 			return obj, err
 		}
 	}
-	if !dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphan) {
-		glog.V(2).Infof("Adding finalizer %s to %s", api_v1.FinalizerOrphan, dh.objNameFunc(obj))
-		obj, err := dh.addFinalizerFunc(obj, api_v1.FinalizerOrphan)
+	if !dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphanDependents) {
+		glog.V(2).Infof("Adding finalizer %s to %s", api_v1.FinalizerOrphanDependents, dh.objNameFunc(obj))
+		obj, err := dh.addFinalizerFunc(obj, api_v1.FinalizerOrphanDependents)
 		if err != nil {
 			return obj, err
 		}
@@ -107,8 +107,8 @@ func (dh *DeletionHelper) EnsureFinalizers(obj runtime.Object) (
 }
 
 // Deletes the resources corresponding to the given federated resource from
-// all underlying clusters, unless it has the FinalizerOrphan finalizer.
-// Removes FinalizerOrphan and FinalizerDeleteFromUnderlyingClusters finalizers
+// all underlying clusters, unless it has the FinalizerOrphanDependents finalizer.
+// Removes FinalizerOrphanDependents and FinalizerDeleteFromUnderlyingClusters finalizers
 // when done.
 // Callers are expected to keep calling this (with appropriate backoff) until
 // it succeeds.
@@ -120,13 +120,13 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		glog.V(2).Infof("obj does not have %s finalizer. Nothing to do", FinalizerDeleteFromUnderlyingClusters)
 		return obj, nil
 	}
-	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphan)
+	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphanDependents)
 	if hasOrphanFinalizer {
 		glog.V(2).Infof("Found finalizer orphan. Nothing to do, just remove the finalizer")
-		// If the obj has FinalizerOrphan finalizer, then we need to orphan the
+		// If the obj has FinalizerOrphanDependents finalizer, then we need to orphan the
 		// corresponding objects in underlying clusters.
 		// Just remove both the finalizers in that case.
-		obj, err := dh.removeFinalizerFunc(obj, api_v1.FinalizerOrphan)
+		obj, err := dh.removeFinalizerFunc(obj, api_v1.FinalizerOrphanDependents)
 		if err != nil {
 			return obj, err
 		}

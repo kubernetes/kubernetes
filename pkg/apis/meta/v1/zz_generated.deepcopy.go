@@ -300,6 +300,13 @@ func DeepCopy_v1_OwnerReference(in interface{}, out interface{}, c *conversion.C
 		} else {
 			out.Controller = nil
 		}
+		if in.BlockOwnerDeletion != nil {
+			in, out := &in.BlockOwnerDeletion, &out.BlockOwnerDeletion
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.BlockOwnerDeletion = nil
+		}
 		return nil
 	}
 }

@@ -91,6 +91,14 @@ type OwnerReference struct {
 	// If true, this reference points to the managing controller.
 	// +optional
 	Controller *bool `json:"controller,omitempty" protobuf:"varint,6,opt,name=controller"`
+	// If true, AND if the owner has the "DeletingDependents" finalizer, then
+	// the owner cannot be deleted from the key-value store until this
+	// reference is removed.
+	// Defaults to false.
+	// To set this field, a user needs "delete" permission of the owner,
+	// otherwise 422 (Unprocessable Entity) will be returned.
+	// +optional
+	BlockOwnerDeletion *bool `json:"blockOwnerDeletion,omitempty" protobuf:"varint,7,opt,name=blockOwnerDeletion"`
 }
 
 // ExportOptions is the query options to the standard REST get call.

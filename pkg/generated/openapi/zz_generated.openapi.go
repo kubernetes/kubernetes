@@ -1390,6 +1390,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"PropagationPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Whether and how garbage collection will be performed. Defaults to DeletePropagationDefault. Either this field or OrphanDependents may be set, but not both.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -4270,6 +4277,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"controller": {
 						SchemaProps: spec.SchemaProps{
 							Description: "If true, this reference points to the managing controller.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"blockOwnerDeletion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If true, AND if the owner has the \"DeletingDependents\" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed. Defaults to false. To set this field, a user needs \"delete\" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
