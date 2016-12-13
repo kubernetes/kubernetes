@@ -197,20 +197,22 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
+	defer gc.dirtyQueue.ShutDown()
+	defer gc.orphanQueue.ShutDown()
+	defer gc.propagator.eventQueue.ShutDown()
+
 	glog.Infof("Garbage Collector: Initializing")
 	for _, monitor := range gc.monitors {
 		go monitor.controller.Run(stopCh)
 	}
 
-	wait.PollInfinite(10*time.Second, func() (bool, error) {
-		for _, monitor := range gc.monitors {
-			if !monitor.controller.HasSynced() {
-				glog.Infof("Garbage Collector: Waiting for resource monitors to be synced...")
-				return false, nil
-			}
-		}
-		return true, nil
-	})
+	var syncs []cache.InformerSynced
+	for _, monitor := range gc.monitors {
+		syncs = syncs.append(monitor.controller.HasSynced())
+	}
+	if !cache.WaitForCacheSync(stopCh, syncs...) {
+		return
+	}
 	glog.Infof("Garbage Collector: All monitored resources synced. Proceeding to collect garbage")
 
 	// worker
@@ -223,9 +225,6 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	Register()
 	<-stopCh
 	glog.Infof("Garbage Collector: Shutting down")
-	gc.dirtyQueue.ShutDown()
-	gc.orphanQueue.ShutDown()
-	gc.propagator.eventQueue.ShutDown()
 }
 
 func (gc *GarbageCollector) worker() {
@@ -262,14 +261,10 @@ func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.Metadata
 // solid: the owner exists, and is not "waiting"
 // dangling: the owner does not exist
 // waiting: the owner exists, its deletionTimestamp is non-nil, and it has
-// FianlizerDeletingDependents
+// FinalizerDeletingDependents
 // This function communicates with the server.
 func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []metav1.OwnerReference) (
-	solid []metav1.OwnerReference,
-	dangling []metav1.OwnerReference,
-	waiting []metav1.OwnerReference,
-	err error,
-) {
+	solid, dangling, waiting []metav1.OwnerReference, err error) {
 	for _, reference := range latestReferences {
 		if gc.absentOwnerCache.Has(reference.UID) {
 			glog.V(6).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
@@ -293,13 +288,12 @@ func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []me
 		}
 		owner, err := client.Resource(resource, item.identity.Namespace).Get(reference.Name)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				gc.absentOwnerCache.Add(reference.UID)
-				glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
-				dangling = append(dangling, reference)
-			} else {
+			if !errors.IsNotFound(err) {
 				return solid, dangling, waiting, err
 			}
+			gc.absentOwnerCache.Add(reference.UID)
+			glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			dangling = append(dangling, reference)
 		}
 
 		if owner.GetUID() != reference.UID {
@@ -458,7 +452,7 @@ func (gc *GarbageCollector) orhpanDependents(owner objectReference, dependents [
 // orphanFinalizer dequeues a node from the orphanQueue, then finds its dependents
 // based on the graph maintained by the GC, then removes it from the
 // OwnerReferences of its dependents, and finally updates the owner to remove
-// the "Orphan" finalizer. The node is add back into the orphanQueue if any of
+// the "Orphan" finalizer. The node is added back into the orphanQueue if any of
 // these steps fail.
 func (gc *GarbageCollector) orphanFinalizer() {
 	timedItem, quit := gc.orphanQueue.Get()
