@@ -2713,6 +2713,7 @@ func DeepCopy_v1_PodStatus(in interface{}, out interface{}, c *conversion.Cloner
 		} else {
 			out.ContainerStatuses = nil
 		}
+		out.QOSClass = in.QOSClass
 		return nil
 	}
 }
