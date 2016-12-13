@@ -54,7 +54,6 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -1878,7 +1877,7 @@ func TestSyncPodGetsPodIPFromNetworkPlugin(t *testing.T) {
 	dm.podInfraContainerImage = "pod_infra_image"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	fnp := mock_network.NewMockNetworkPlugin(ctrl)
+	fnp := nettest.NewMockNetworkPlugin(ctrl)
 	dm.networkPlugin = fnp
 
 	pod := makePod("foo", &v1.PodSpec{
