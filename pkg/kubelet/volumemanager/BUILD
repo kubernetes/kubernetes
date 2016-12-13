@@ -50,6 +50,7 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",
+        "//pkg/kubelet/secret:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
