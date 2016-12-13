@@ -1,3 +1,4 @@
+{% if grains['roles'][0] == 'kubernetes-master' and grains.kubelet_api_servers is not defined -%}
 /etc/kubernetes/manifests/fluentd-gcp.yaml:
   file.managed:
     - source: salt://fluentd-gcp/fluentd-gcp.yaml
@@ -6,3 +7,4 @@
     - mode: 644
     - makedirs: true
     - dir_mode: 755
+{% endif %}
