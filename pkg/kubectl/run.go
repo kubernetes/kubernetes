@@ -368,6 +368,9 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 			Schedule:          params["schedule"],
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: labels,
+				},
 				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
