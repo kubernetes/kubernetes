@@ -133,7 +133,7 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	if err != nil {
 		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
 	}
-	ds.networkPlugin = plug
+	ds.network = network.NewPluginManager(plug)
 	glog.Infof("Docker cri networking managed by %v", plug.Name())
 	return ds, nil
 }
@@ -155,7 +155,7 @@ type dockerService struct {
 	podSandboxImage    string
 	streamingRuntime   *streamingRuntime
 	streamingServer    streaming.Server
-	networkPlugin      network.NetworkPlugin
+	network            *network.PluginManager
 	containerManager   cm.ContainerManager
 }
 
@@ -184,10 +184,10 @@ func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeCo
 		return
 	}
 	glog.Infof("docker cri received runtime config %+v", runtimeConfig)
-	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != nil {
+	if ds.network != nil && runtimeConfig.NetworkConfig.PodCidr != nil {
 		event := make(map[string]interface{})
 		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = *runtimeConfig.NetworkConfig.PodCidr
-		ds.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
+		ds.network.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
 	}
 	return
 }
@@ -239,7 +239,7 @@ func (ds *dockerService) Status() (*runtimeapi.RuntimeStatus, error) {
 		runtimeReady.Reason = proto.String("DockerDaemonNotReady")
 		runtimeReady.Message = proto.String(fmt.Sprintf("docker: failed to get docker version: %v", err))
 	}
-	if err := ds.networkPlugin.Status(); err != nil {
+	if err := ds.network.Status(); err != nil {
 		networkReady.Status = proto.Bool(false)
 		networkReady.Reason = proto.String("NetworkPluginNotReady")
 		networkReady.Message = proto.String(fmt.Sprintf("docker: network plugin is not ready: %v", err))

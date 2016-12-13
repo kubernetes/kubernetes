@@ -41,7 +41,8 @@ func newTestNetworkPlugin(t *testing.T) *nettest.MockNetworkPlugin {
 func newTestDockerService() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
 	fakeClock := clock.NewFakeClock(time.Time{})
 	c := dockertools.NewFakeDockerClientWithClock(fakeClock)
-	return &dockerService{client: c, os: &containertest.FakeOS{}, networkPlugin: &network.NoopNetworkPlugin{}}, c, fakeClock
+	pm := network.NewPluginManager(&network.NoopNetworkPlugin{})
+	return &dockerService{client: c, os: &containertest.FakeOS{}, network: pm}, c, fakeClock
 }
 
 // TestStatus tests the runtime status logic.
@@ -79,7 +80,7 @@ func TestStatus(t *testing.T) {
 
 	// Should not report ready status is network plugin returns error.
 	mockPlugin := newTestNetworkPlugin(t)
-	ds.networkPlugin = mockPlugin
+	ds.network = network.NewPluginManager(mockPlugin)
 	defer mockPlugin.Finish()
 	mockPlugin.EXPECT().Status().Return(errors.New("network error"))
 	status, err = ds.Status()
