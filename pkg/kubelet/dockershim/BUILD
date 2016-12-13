@@ -73,7 +73,7 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/network:go_default_library",
-        "//pkg/kubelet/network/mock_network:go_default_library",
+        "//pkg/kubelet/network/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/securitycontext:go_default_library",
