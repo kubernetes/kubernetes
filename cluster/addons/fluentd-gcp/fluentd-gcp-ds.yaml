@@ -42,6 +42,8 @@ spec:
           readOnly: true
         - name: libsystemddir
           mountPath: /host/lib
+      nodeSelector:
+        alpha.kubernetes.io/fluentd-ds-ready: "true"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
