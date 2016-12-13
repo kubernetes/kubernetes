@@ -335,6 +335,23 @@ func cleanupGCE(gceController *GCEIngressController) {
 		}
 		return true, nil
 	})
+
+	// Static-IP allocated on behalf of the test, never deleted by the
+	// controller. Delete this IP only after the controller has had a chance
+	// to cleanup or it might interfere with the controller, causing it to
+	// throw out confusing events.
+	if ipErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+		if err := gceController.deleteStaticIPs(); err != nil {
+			framework.Logf("Failed to delete static-ip: %v\n", err)
+			return false, nil
+		}
+		return true, nil
+	}); ipErr != nil {
+		// If this is a persistent error, the suite will fail when we run out
+		// of quota anyway.
+		By(fmt.Sprintf("WARNING: possibly leaked static IP: %v\n", ipErr))
+	}
+
 	// Always try to cleanup even if pollErr == nil, because the cleanup
 	// routine also purges old leaked resources based on creation timestamp.
 	if cleanupErr := gceController.Cleanup(true); cleanupErr != nil {
@@ -342,6 +359,8 @@ func cleanupGCE(gceController *GCEIngressController) {
 	} else {
 		By("No resources leaked.")
 	}
+
+	// Fail if the controller didn't cleanup
 	if pollErr != nil {
 		framework.Failf("L7 controller failed to delete all cloud resources on time. %v", pollErr)
 	}
@@ -383,20 +402,6 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 				gcloudDelete("addresses", ip.Name, cont.cloud.ProjectID, "--global")
 			}
 		}
-	}
-	// If the test allocated a static ip, delete that regardless
-	if cont.staticIPName != "" {
-		if err := gcloudDelete("addresses", cont.staticIPName, cont.cloud.ProjectID, "--global"); err == nil {
-			cont.staticIPName = ""
-		}
-	} else {
-		e2eIPs := []compute.Address{}
-		gcloudList("addresses", "e2e-.*", cont.cloud.ProjectID, &e2eIPs)
-		ips := []string{}
-		for _, ip := range e2eIPs {
-			ips = append(ips, ip.Name)
-		}
-		framework.Logf("None of the remaining %d static-ips were created by this e2e: %v", len(ips), strings.Join(ips, ", "))
 	}
 	return msg
 }
@@ -664,9 +669,10 @@ func (cont *GCEIngressController) init() {
 	}
 }
 
-// staticIP allocates a random static ip with the given name. Returns a string
-// representation of the ip. Caller is expected to manage cleanup of the ip.
-func (cont *GCEIngressController) staticIP(name string) string {
+// createStaticIP allocates a random static ip with the given name. Returns a string
+// representation of the ip. Caller is expected to manage cleanup of the ip by
+// invoking deleteStaticIPs.
+func (cont *GCEIngressController) createStaticIP(name string) string {
 	gceCloud := cont.cloud.Provider.(*gcecloud.GCECloud)
 	ip, err := gceCloud.ReserveGlobalStaticIP(name, "")
 	if err != nil {
@@ -682,6 +688,27 @@ func (cont *GCEIngressController) staticIP(name string) string {
 	cont.staticIPName = ip.Name
 	framework.Logf("Reserved static ip %v: %v", cont.staticIPName, ip.Address)
 	return ip.Address
+}
+
+// deleteStaticIPs delets all static-ips allocated through calls to
+// createStaticIP.
+func (cont *GCEIngressController) deleteStaticIPs() error {
+	if cont.staticIPName != "" {
+		if err := gcloudDelete("addresses", cont.staticIPName, cont.cloud.ProjectID, "--global"); err == nil {
+			cont.staticIPName = ""
+		} else {
+			return err
+		}
+	} else {
+		e2eIPs := []compute.Address{}
+		gcloudList("addresses", "e2e-.*", cont.cloud.ProjectID, &e2eIPs)
+		ips := []string{}
+		for _, ip := range e2eIPs {
+			ips = append(ips, ip.Name)
+		}
+		framework.Logf("None of the remaining %d static-ips were created by this e2e: %v", len(ips), strings.Join(ips, ", "))
+	}
+	return nil
 }
 
 // gcloudList unmarshals json output of gcloud into given out interface.

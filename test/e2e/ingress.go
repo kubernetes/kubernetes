@@ -120,7 +120,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 		It("shoud create ingress with given static-ip ", func() {
 			// ip released when the rest of lb resources are deleted in cleanupGCE
-			ip := gceController.staticIP(ns)
+			ip := gceController.createStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
 
 			jig.createIngress(filepath.Join(ingressManifestPath, "static-ip"), ns, map[string]string{

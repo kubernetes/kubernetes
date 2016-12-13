@@ -12,7 +12,7 @@ spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  - image: gcr.io/google_containers/glbc:0.8.0
+  - image: gcr.io/google_containers/glbc:0.9.0
     livenessProbe:
       httpGet:
         path: /healthz
@@ -43,7 +43,7 @@ spec:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
     - sh
     - -c
-    - '/glbc --default-backend-service=kube-system/default-http-backend --sync-period=60s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
+    - '/glbc --verbose=true --default-backend-service=kube-system/default-http-backend --sync-period=60s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
   volumes:
   - hostPath:
       path: /etc/gce.conf
