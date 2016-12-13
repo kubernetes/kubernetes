@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
 
@@ -36,5 +37,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	app.Run(s)
+	if err := app.Run(s); err != nil {
+		glog.Fatalf("scheduler app failed to run: %v", err)
+	}
 }
