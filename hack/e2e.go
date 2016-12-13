@@ -68,6 +68,7 @@ var (
 	kopsZones       = flag.String("kops-zones", "us-west-2a", "(kops AWS only) AWS zones for kops deployment, comma delimited.")
 	kopsNodes       = flag.Int("kops-nodes", 2, "(kops only) Number of nodes to create.")
 	kopsUpTimeout   = flag.Duration("kops-up-timeout", 20*time.Minute, "(kops only) Time limit between 'kops config / kops update' and a response from the Kubernetes API.")
+	kopsAdminAccess = flag.String("kops-admin-access", "", "(kops only) If set, restrict apiserver access to this CIDR range.")
 
 	// kubernetes-anywhere specific flags.
 	kubernetesAnywherePath           = flag.String("kubernetes-anywhere-path", "", "(kubernetes-anywhere only) Path to the kubernetes-anywhere directory. Must be set for kubernetes-anywhere.")
@@ -511,6 +512,7 @@ type kops struct {
 	sshKey      string
 	zones       []string
 	nodes       int
+	adminAccess string
 	cluster     string
 	kubecfg     string
 }
@@ -573,6 +575,7 @@ func NewKops() (*kops, error) {
 		sshKey:      sshKey + ".pub", // kops only needs the public key, e2es need the private key.
 		zones:       zones,
 		nodes:       *kopsNodes,
+		adminAccess: *kopsAdminAccess,
 		cluster:     *kopsCluster,
 		kubecfg:     kubecfg,
 	}, nil
@@ -588,6 +591,9 @@ func (k kops) Up() error {
 	}
 	if k.kubeVersion != "" {
 		createArgs = append(createArgs, "--kubernetes-version", k.kubeVersion)
+	}
+	if k.adminAccess != "" {
+		createArgs = append(createArgs, "--admin-access", k.adminAccess)
 	}
 	if err := finishRunning(exec.Command(k.path, createArgs...)); err != nil {
 		return fmt.Errorf("kops configuration failed: %v", err)

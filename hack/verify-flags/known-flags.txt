@@ -308,6 +308,7 @@ k8s-bin-dir
 k8s-build-output
 keep-gogoproto
 km-path
+kops-admin-access
 kops-cluster
 kops-kubernetes-version
 kops-nodes
