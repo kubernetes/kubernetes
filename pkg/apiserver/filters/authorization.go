@@ -18,6 +18,7 @@ package filters
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/golang/glog"
@@ -40,12 +41,12 @@ func WithAuthorization(handler http.Handler, requestContextMapper api.RequestCon
 			return
 		}
 
-		attrs, err := GetAuthorizerAttributes(ctx)
+		attributes, err := GetAuthorizerAttributes(ctx)
 		if err != nil {
 			internalError(w, req, err)
 			return
 		}
-		authorized, reason, err := a.Authorize(attrs)
+		authorized, reason, err := a.Authorize(attributes)
 		if authorized {
 			handler.ServeHTTP(w, req)
 			return
@@ -55,8 +56,8 @@ func WithAuthorization(handler http.Handler, requestContextMapper api.RequestCon
 			return
 		}
 
-		glog.V(4).Infof("Forbidden: %#v, Reason: %s", req.RequestURI, reason)
-		forbidden(w, req)
+		glog.V(4).Infof("Forbidden: %#v, Reason: %q", req.RequestURI, reason)
+		forbidden(attributes, w, req, reason)
 	})
 }
 
@@ -86,4 +87,22 @@ func GetAuthorizerAttributes(ctx api.Context) (authorizer.Attributes, error) {
 	attribs.Name = requestInfo.Name
 
 	return &attribs, nil
+}
+
+func createForbiddenMessage(attributes authorizer.Attributes) string {
+	username := ""
+	if attributes.GetUser() != nil {
+		username = attributes.GetUser().GetName()
+	}
+
+	resource := attributes.GetResource()
+	if len(attributes.GetAPIGroup()) > 0 {
+		resource = resource + "." + attributes.GetAPIGroup()
+	}
+
+	if len(attributes.GetNamespace()) > 0 {
+		return fmt.Sprintf("User %q cannot %s %s in the namespace %q.", username, attributes.GetVerb(), resource, attributes.GetNamespace())
+	}
+
+	return fmt.Sprintf("User %q cannot %s %s at the cluster scope.", username, attributes.GetVerb(), resource)
 }

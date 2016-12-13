@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -30,9 +31,10 @@ func badGatewayError(w http.ResponseWriter, req *http.Request) {
 }
 
 // forbidden renders a simple forbidden error
-func forbidden(w http.ResponseWriter, req *http.Request) {
+func forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string) {
+	msg := createForbiddenMessage(attributes)
 	w.WriteHeader(http.StatusForbidden)
-	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
+	fmt.Fprintf(w, "%s %q", msg, reason)
 }
 
 // internalError renders a simple internal error
