@@ -26,6 +26,7 @@ import (
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -146,7 +147,7 @@ func TestSandboxStatus(t *testing.T) {
 func TestNetworkPluginInvocation(t *testing.T) {
 	ds, _, _ := newTestDockerService()
 	mockPlugin := newTestNetworkPlugin(t)
-	ds.networkPlugin = mockPlugin
+	ds.network = network.NewPluginManager(mockPlugin)
 	defer mockPlugin.Finish()
 
 	name := "foo0"
@@ -158,6 +159,7 @@ func TestNetworkPluginInvocation(t *testing.T) {
 	)
 	cID := kubecontainer.ContainerID{Type: runtimeName, ID: fmt.Sprintf("/%v", makeSandboxName(c))}
 
+	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
 	setup := mockPlugin.EXPECT().SetUpPod(ns, name, cID)
 	// StopPodSandbox performs a lookup on status to figure out if the sandbox
 	// is running with hostnetworking, as all its given is the ID.
@@ -175,7 +177,7 @@ func TestNetworkPluginInvocation(t *testing.T) {
 func TestHostNetworkPluginInvocation(t *testing.T) {
 	ds, _, _ := newTestDockerService()
 	mockPlugin := newTestNetworkPlugin(t)
-	ds.networkPlugin = mockPlugin
+	ds.network = network.NewPluginManager(mockPlugin)
 	defer mockPlugin.Finish()
 
 	name := "foo0"

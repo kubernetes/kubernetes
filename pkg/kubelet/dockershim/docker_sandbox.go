@@ -93,7 +93,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 	// on the host as well, to satisfy parts of the pod spec that aren't
 	// recognized by the CNI standard yet.
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
-	err = ds.networkPlugin.SetUpPod(config.GetMetadata().GetNamespace(), config.GetMetadata().GetName(), cID)
+	err = ds.network.SetUpPod(config.GetMetadata().GetNamespace(), config.GetMetadata().GetName(), cID)
 	// TODO: Do we need to teardown on failure or can we rely on a StopPodSandbox call with the given ID?
 	return createResp.ID, err
 }
@@ -111,13 +111,13 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 	if !status.GetLinux().GetNamespaces().GetOptions().GetHostNetwork() {
 		m := status.GetMetadata()
 		cID := kubecontainer.BuildContainerID(runtimeName, podSandboxID)
-		if err := ds.networkPlugin.TearDownPod(m.GetNamespace(), m.GetName(), cID); err != nil {
+		if err := ds.network.TearDownPod(m.GetNamespace(), m.GetName(), cID); err != nil {
 			// TODO: Figure out a way to retry this error. We can't
 			// right now because the plugin throws errors when it doesn't find
 			// eth0, which might not exist for various reasons (setup failed,
 			// conf changed etc). In theory, it should teardown everything else
 			// so there's no need to retry.
-			glog.Errorf("Failed to teardown sandbox %v for pod %v/%v: %v", m.GetNamespace(), m.GetName(), podSandboxID, err)
+			glog.Error(err)
 		}
 	}
 	return ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod)
@@ -142,12 +142,12 @@ func (ds *dockerService) getIPFromPlugin(sandbox *dockertypes.ContainerJSON) (st
 		return "", fmt.Errorf("%v: not responsible for host-network sandboxes", msg)
 	}
 	cID := kubecontainer.BuildContainerID(runtimeName, sandbox.ID)
-	networkStatus, err := ds.networkPlugin.GetPodNetworkStatus(*metadata.Namespace, *metadata.Name, cID)
+	networkStatus, err := ds.network.GetPodNetworkStatus(*metadata.Namespace, *metadata.Name, cID)
 	if err != nil {
 		// This might be a sandbox that somehow ended up without a default
 		// interface (eth0). We can't distinguish this from a more serious
 		// error, so callers should probably treat it as non-fatal.
-		return "", fmt.Errorf("%v: %v", msg, err)
+		return "", err
 	}
 	if networkStatus == nil {
 		return "", fmt.Errorf("%v: invalid network status for", msg)
