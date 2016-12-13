@@ -574,9 +574,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 					return nil, err
 				}
 			}
-			// Use DockerLegacyService directly to work around unimplemented
-			// functions in CRI.
-			// TODO: Remove this hack after CRI is fully implemented.
 			// TODO: Move the instrumented interface wrapping into kuberuntime.
 			runtimeService = kuberuntime.NewInstrumentedRuntimeService(rs)
 			imageService = is
