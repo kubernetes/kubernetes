@@ -17,7 +17,6 @@ limitations under the License.
 package framework
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"math"
@@ -140,14 +139,20 @@ type resourceGatherWorker struct {
 }
 
 func (w *resourceGatherWorker) singleProbe() {
-	var data ResourceUsagePerContainer
+	data := make(ResourceUsagePerContainer)
 	if w.inKubemark {
-		data = getKubemarkMasterComponentsResourceUsage()
+		kubemarkData := GetKubemarkMasterComponentsResourceUsage()
 		if data == nil {
 			return
 		}
+		for k, v := range kubemarkData {
+			data[k] = &ContainerResourceUsage{
+				Name: v.Name,
+				MemoryWorkingSetInBytes: v.MemoryWorkingSetInBytes,
+				CPUUsageInCores:         v.CPUUsageInCores,
+			}
+		}
 	} else {
-		data = make(ResourceUsagePerContainer)
 		nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, probeDuration, func() []string { return w.containerIDs }, true)
 		if err != nil {
 			Logf("Error while reading data from %v: %v", w.nodeName, err)
@@ -179,28 +184,6 @@ func (w *resourceGatherWorker) gather(initialSleep time.Duration) {
 	case <-w.stopCh:
 		return
 	}
-}
-
-func getKubemarkMasterComponentsResourceUsage() ResourceUsagePerContainer {
-	result := make(ResourceUsagePerContainer)
-	sshResult, err := SSH("ps ax -o %cpu,rss,command | tail -n +2 | grep kube", GetMasterHost()+":22", TestContext.Provider)
-	if err != nil {
-		Logf("Error when trying to SSH to master machine. Skipping probe")
-		return nil
-	}
-	scanner := bufio.NewScanner(strings.NewReader(sshResult.Stdout))
-	for scanner.Scan() {
-		var cpu float64
-		var mem uint64
-		var name string
-		fmt.Sscanf(strings.TrimSpace(scanner.Text()), "%f %d kubernetes/server/bin/%s", &cpu, &mem, &name)
-		if name != "" {
-			// Gatherer expects pod_name/container_name format
-			fullName := name + "/" + name
-			result[fullName] = &ContainerResourceUsage{Name: fullName, MemoryWorkingSetInBytes: mem * 1024, CPUUsageInCores: cpu / 100}
-		}
-	}
-	return result
 }
 
 func (g *containerResourceGatherer) getKubeSystemContainersResourceUsage(c clientset.Interface) {
@@ -317,7 +300,7 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 
 	if len(percentiles) == 0 {
 		Logf("Warning! Empty percentile list for stopAndPrintData.")
-		return &ResourceUsageSummary{}, nil
+		return &ResourceUsageSummary{}, fmt.Errorf("Failed to get any resource usage data")
 	}
 	data := make(map[int]ResourceUsagePerContainer)
 	for i := range g.workers {
