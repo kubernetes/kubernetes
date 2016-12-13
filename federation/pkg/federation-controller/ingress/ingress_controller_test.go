@@ -143,7 +143,7 @@ func TestIngressController(t *testing.T) {
 	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
 	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
 	updatedIngress = GetIngressFromChan(t, fedIngressUpdateChan)
-	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, apiv1.FinalizerOrphan), fmt.Sprintf("ingress does not have the orphan finalizer: %v", updatedIngress))
+	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, apiv1.FinalizerOrphanDependents), fmt.Sprintf("ingress does not have the orphan finalizer: %v", updatedIngress))
 	fedIngress = *updatedIngress
 
 	t.Log("Checking that Ingress was correctly created in cluster 1")
@@ -304,7 +304,7 @@ func WaitForFinalizersInFederationStore(ingressController *IngressController, st
 			return false, err
 		}
 		ingress := obj.(*extensionsv1beta1.Ingress)
-		if ingressController.hasFinalizerFunc(ingress, apiv1.FinalizerOrphan) &&
+		if ingressController.hasFinalizerFunc(ingress, apiv1.FinalizerOrphanDependents) &&
 			ingressController.hasFinalizerFunc(ingress, deletionhelper.FinalizerDeleteFromUnderlyingClusters) {
 			return true, nil
 		}
