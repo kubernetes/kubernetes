@@ -51,6 +51,15 @@ ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-0}"
 CLUSTER_READY_ADDITIONAL_TIME_SECONDS="${CLUSTER_READY_ADDITIONAL_TIME_SECONDS:-30}"
 
 EXPECTED_NUM_NODES="${NUM_NODES}"
+
+if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
+  # In multizone mode we need to add instances for all nodes in the region.
+  if [[ "${MULTIZONE:-}" == "true" ]]; then
+    EXPECTED_NUM_NODES=$(gcloud compute instances list --format=[no-heading] --regexp="${NODE_INSTANCE_PREFIX}.*" \
+      --zones=$(gcloud compute zones list --filter=region=europe-west1 --format=[no-heading]\(name\) | tr "\n" "," | sed  "s/,$//") | wc -l)
+  fi
+fi
+
 if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
     NUM_MASTERS=$(get-master-replicas-count)
@@ -59,6 +68,7 @@ if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   fi
   EXPECTED_NUM_NODES=$((EXPECTED_NUM_NODES+NUM_MASTERS))
 fi
+
 REQUIRED_NUM_NODES=$((EXPECTED_NUM_NODES - ALLOWED_NOTREADY_NODES))
 # Make several attempts to deal with slow cluster birth.
 return_value=0
