@@ -376,7 +376,7 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(getRV, key, nil)
 	if err != nil {
-		return fmt.Errorf("failed to wait for fresh get: %v", err)
+		return err
 	}
 
 	if exists {
@@ -429,7 +429,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
 	if err != nil {
-		return fmt.Errorf("failed to wait for fresh get: %v", err)
+		return err
 	}
 	trace.Step("Got from cache")
 
@@ -485,7 +485,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 
 	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, trace)
 	if err != nil {
-		return fmt.Errorf("failed to wait for fresh list: %v", err)
+		return err
 	}
 	trace.Step(fmt.Sprintf("Listed %d items from cache", len(objs)))
 	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {

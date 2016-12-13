@@ -208,6 +208,29 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestInfiniteList(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	podFoo := makeTestPod("foo")
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+
+	// Set up List at fooCreated.ResourceVersion + 10
+	rv, err := storage.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	listRV := strconv.Itoa(int(rv + 10))
+
+	result := &api.PodList{}
+	err = cacher.List(context.TODO(), "pods/ns", listRV, storage.Everything, result)
+	if !errors.IsTimeout(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
 func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType, eventObject runtime.Object) {
 	_, _, line, _ := goruntime.Caller(1)
 	select {
