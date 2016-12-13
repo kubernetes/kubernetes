@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
@@ -1007,4 +1007,37 @@ if missing:
   exit(1)
     ' """${version}"""
   fi
+}
+
+# Check whether required client and server binaries exist, prompting to download
+# if missing.
+# If KUBERNETES_SKIP_CONFIRM is set to y, we'll automatically download binaries
+# without prompting.
+function verify-kube-binaries() {
+  local missing_binaries=false
+  if ! "${KUBE_ROOT}/cluster/kubectl.sh" version --client >&/dev/null; then
+    echo "!!! kubectl appears to be broken or missing"
+    missing_binaries=true
+  fi
+  if ! $(find-release-tars); then
+    missing_binaries=true
+  fi
+
+  if ! "${missing_binaries}"; then
+    return
+  fi
+
+  get_binaries_script="${KUBE_ROOT}/cluster/get-kube-binaries.sh"
+  local resp="y"
+  if [[ ! "${KUBERNETES_SKIP_CONFIRM:-n}" =~ ^[yY]$ ]]; then
+    echo "Required binaries appear to be missing. Do you wish to download them? [Y/n]"
+    read resp
+  fi
+  if [[ "${resp}" =~ ^[nN]$ ]]; then
+    echo "You must download binaries to continue. You can use "
+    echo "  ${get_binaries_script}"
+    echo "to do this for your automatically."
+    exit 1
+  fi
+  "${get_binaries_script}"
 }
