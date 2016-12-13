@@ -2006,21 +2006,6 @@ type PodSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/volumes
 	// +optional
 	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
-	// List of initialization containers belonging to the pod.
-	// Init containers are executed in order prior to containers being started. If any
-	// init container fails, the pod is considered to have failed and is handled according
-	// to its restartPolicy. The name for an init container or normal container must be
-	// unique among all containers.
-	// Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes.
-	// The resourceRequirements of an init container are taken into account during scheduling
-	// by finding the highest request/limit for each resource type, and then using the max of
-	// of that value or the sum of the normal containers. Limits are applied to init containers
-	// in a similar fashion.
-	// Init containers cannot currently be added or removed.
-	// Init containers are in alpha state and may change without notice.
-	// Cannot be updated.
-	// More info: http://kubernetes.io/docs/user-guide/containers
-	InitContainers []Container `json:"-"  patchStrategy:"merge" patchMergeKey:"name"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
 	// There must be at least one container in a Pod.
@@ -2107,6 +2092,20 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,17,opt,name=subdomain"`
+	// List of initialization containers belonging to the pod.
+	// Init containers are executed in order prior to containers being started. If any
+	// init container fails, the pod is considered to have failed and is handled according
+	// to its restartPolicy. The name for an init container or normal container must be
+	// unique among all containers.
+	// Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes.
+	// The resourceRequirements of an init container are taken into account during scheduling
+	// by finding the highest request/limit for each resource type, and then using the max of
+	// of that value or the sum of the normal containers. Limits are applied to init containers
+	// in a similar fashion.
+	// Init containers cannot currently be added or removed.
+	// Cannot be updated.
+	// More info: http://kubernetes.io/docs/user-guide/containers
+	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,18,rep,name=initContainers"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -2185,17 +2184,17 @@ type PodStatus struct {
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,7,opt,name=startTime"`
 
-	// The list has one entry per init container in the manifest. The most recent successful
-	// init container will have ready = true, the most recently started container will have
-	// startTime set.
-	// Init containers are in alpha state and may change without notice.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
-	InitContainerStatuses []ContainerStatus `json:"-"`
 	// The list has one entry per container in the manifest. Each entry is currently the output
 	// of `docker inspect`.
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
 	// +optional
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
+	// The list has one entry per init container in the manifest. The most recent successful
+	// init container will have ready = true, the most recently started container will have
+	// startTime set.
+	// Init containers are in alpha state and may change without notice.
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
+	InitContainerStatuses []ContainerStatus `json:"initContainerStatuses,omitempty" protobuf:"bytes,9,rep,name=initContainerStatuses"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

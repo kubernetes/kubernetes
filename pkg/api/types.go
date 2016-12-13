@@ -1773,8 +1773,6 @@ const (
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes []Volume
-	// List of initialization containers belonging to the pod.
-	InitContainers []Container
 	// List of containers belonging to the pod.
 	Containers []Container
 	// +optional
@@ -1824,6 +1822,8 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string
+	// List of initialization containers belonging to the pod.
+	InitContainers []Container
 }
 
 // Sysctl defines a kernel parameter to be set
@@ -1918,11 +1918,6 @@ type PodStatus struct {
 	// +optional
 	StartTime *metav1.Time
 
-	// The list has one entry per init container in the manifest. The most recent successful
-	// init container will have ready = true, the most recently started container will have
-	// startTime set.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
-	InitContainerStatuses []ContainerStatus
 	// The list has one entry per container in the manifest. Each entry is
 	// currently the output of `docker inspect`. This output format is *not*
 	// final and should not be relied upon.
@@ -1930,6 +1925,11 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus
+	// The list has one entry per init container in the manifest. The most recent successful
+	// init container will have ready = true, the most recently started container will have
+	// startTime set.
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
+	InitContainerStatuses []ContainerStatus
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
