@@ -198,7 +198,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	scaleStatefulSet(t, ps, psc, fc, 3)
 
 	// Create 4th pet, then before flipping it to healthy, kill the first pet.
-	// There should only be 1 not-healty pet at a time.
+	// There should only be 1 not-healthy pet at a time.
 	pl := fc.getPodList()
 	if _, err := psc.syncStatefulSet(ps, pl); err != nil {
 		t.Errorf("Error syncing StatefulSet: %v", err)
