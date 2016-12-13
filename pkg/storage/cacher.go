@@ -750,6 +750,7 @@ type cacheWatcher struct {
 	sync.Mutex
 	input   chan watchCacheEvent
 	result  chan watch.Event
+	done    chan struct{}
 	filter  watchFilterFunc
 	stopped bool
 	forget  func(bool)
@@ -759,6 +760,7 @@ func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []watchCac
 	watcher := &cacheWatcher{
 		input:   make(chan watchCacheEvent, chanSize),
 		result:  make(chan watch.Event, chanSize),
+		done:    make(chan struct{}),
 		filter:  filter,
 		stopped: false,
 		forget:  forget,
@@ -783,6 +785,7 @@ func (c *cacheWatcher) stop() {
 	defer c.Unlock()
 	if !c.stopped {
 		c.stopped = true
+		close(c.done)
 		close(c.input)
 	}
 }
@@ -847,13 +850,19 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 		glog.Errorf("unexpected copy error: %v", err)
 		return
 	}
+	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		c.result <- watch.Event{Type: watch.Added, Object: object}
+		watchEvent = watch.Event{Type: watch.Added, Object: object}
 	case curObjPasses && oldObjPasses:
-		c.result <- watch.Event{Type: watch.Modified, Object: object}
+		watchEvent = watch.Event{Type: watch.Modified, Object: object}
 	case !curObjPasses && oldObjPasses:
-		c.result <- watch.Event{Type: watch.Deleted, Object: object}
+		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
+	}
+	select {
+	case c.result <- watchEvent:
+	// don't block on c.result if c.done is closed
+	case <-c.done:
 	}
 }
 
