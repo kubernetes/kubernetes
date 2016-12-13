@@ -799,6 +799,13 @@ func DeepCopy_api_DeleteOptions(in interface{}, out interface{}, c *conversion.C
 		} else {
 			out.OrphanDependents = nil
 		}
+		if in.PropagationPolicy != nil {
+			in, out := &in.PropagationPolicy, &out.PropagationPolicy
+			*out = new(DeletePropagationPolicy)
+			**out = **in
+		} else {
+			out.PropagationPolicy = nil
+		}
 		return nil
 	}
 }
