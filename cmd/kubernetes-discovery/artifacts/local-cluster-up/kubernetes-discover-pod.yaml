@@ -18,6 +18,8 @@ spec:
         image: kubernetes-discovery:latest
         imagePullPolicy: Never
         args:
+        - "--proxy-client-cert-file=/var/run/auth-proxy-client/tls.crt"
+        - "--proxy-client-key-file=/var/run/auth-proxy-client/tls.key"
         - "--tls-cert-file=/var/run/serving-cert/tls.crt"
         - "--tls-private-key-file=/var/run/serving-cert/tls.key"
         - "--tls-ca-file=/var/run/serving-ca/ca.crt"
