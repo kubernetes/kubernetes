@@ -56,6 +56,7 @@ import (
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -166,7 +167,8 @@ func newTestKubeletWithImageList(
 	kubelet.cadvisor = mockCadvisor
 
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
+	fakeSecretManager := secret.NewFakeManager()
+	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, fakeSecretManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
