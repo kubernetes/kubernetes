@@ -1,5 +1,13 @@
-assignees:
-  - mikedanese
-  - errordeveloper
-  - luxas
-  - jbeda
+approvers:
+- errordeveloper
+- jbeda
+- luxas
+- mikedanese
+reviewers:
+- mikedanese
+- luxas
+- justinsb
+- errordeveloper
+- pires
+- lukemarsden
+- dgoodwin
