@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -51,7 +52,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
 
 	node, pod, pv, claim := createObjects()
 	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
@@ -96,7 +97,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
 
 	node, pod, _, claim := createObjects()
 
