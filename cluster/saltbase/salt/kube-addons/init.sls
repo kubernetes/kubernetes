@@ -138,11 +138,11 @@ addon-dir-create:
 {% endif %}
 
 {% if pillar.get('enable_node_logging', '').lower() == 'true'
-   and pillar.get('logging_destination', '').lower() == 'elasticsearch'
+   and 'logging_destination' in pillar
    and pillar.get('enable_cluster_logging', '').lower() == 'true' %}
-/etc/kubernetes/addons/fluentd-elasticsearch:
+/etc/kubernetes/addons/fluentd-{{ pillar.get('logging_destination') }}:
   file.recurse:
-    - source: salt://kube-addons/fluentd-elasticsearch
+    - source: salt://kube-addons/fluentd-{{ pillar.get('logging_destination') }}
     - include_pat: E@^.+\.yaml$
     - user: root
     - group: root
