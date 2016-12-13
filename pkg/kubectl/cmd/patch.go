@@ -17,11 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -167,8 +169,9 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		}
 
 		if !options.Local {
+			dataChangedMsg := "not patched"
 			helper := resource.NewHelper(client, mapping)
-			_, err := helper.Patch(namespace, name, patchType, patchBytes)
+			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
 			if err != nil {
 				return err
 			}
@@ -184,8 +187,20 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 			count++
 
+			oldData, err := json.Marshal(info.Object)
+			if err != nil {
+				return err
+			}
+			newData, err := json.Marshal(patchedObj)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(oldData, newData) {
+				dataChangedMsg = "patched"
+			}
+
 			if options.OutputFormat == "name" || len(options.OutputFormat) == 0 {
-				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, "", name, false, "patched")
+				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, "", name, false, dataChangedMsg)
 			}
 			return nil
 		}
