@@ -32,8 +32,8 @@ KUBE_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 DEPLOY_ROOT="${KUBE_ROOT}/federation/deploy"
 CUR_ROOT="$(pwd)"
 
-source "${KUBE_ROOT}/build-tools/common.sh"
-source "${KUBE_ROOT}/build-tools/util.sh"
+source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/util.sh"
 # Provides the detect-project function
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 # Provides logging facilities
