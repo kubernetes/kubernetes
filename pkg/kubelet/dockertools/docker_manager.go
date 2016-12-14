@@ -729,7 +729,7 @@ func (dm *DockerManager) runContainer(
 		}
 	}
 
-	// If current api version is newer than docker 1.10 requested, set OomScoreAdj to HostConfig
+	// If current api version is equal to or newer than docker 1.10 requested, set OomScoreAdj to HostConfig
 	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
 	if err != nil {
 		glog.Errorf("Failed to check docker api version: %v", err)
