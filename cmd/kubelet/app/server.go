@@ -21,6 +21,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/golang/glog"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -28,13 +31,10 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/golang/glog"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"k8s.io/apiserver/pkg/healthz"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -457,7 +457,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	if kubeDeps.CAdvisorInterface == nil {
 		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime, s.RootDirectory)
-		if err != nil {
+		if err != nil && goruntime.GOOS != "darwin" {
 			return err
 		}
 	}

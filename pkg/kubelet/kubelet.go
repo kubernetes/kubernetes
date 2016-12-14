@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -488,7 +489,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 
 	machineInfo, err := klet.GetCachedMachineInfo()
-	if err != nil {
+	if runtime.GOOS != "darwin" && err != nil {
 		return nil, err
 	}
 
@@ -1204,7 +1205,7 @@ func (kl *Kubelet) initializeModules() error {
 
 // initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
-	if err := kl.cadvisor.Start(); err != nil {
+	if err := kl.cadvisor.Start(); runtime.GOOS != "darwin" && err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		// TODO(random-liu): Add backoff logic in the babysitter
 		glog.Fatalf("Failed to start cAdvisor %v", err)
