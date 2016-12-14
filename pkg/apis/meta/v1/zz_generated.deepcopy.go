@@ -88,6 +88,7 @@ func DeepCopy_v1_APIResource(in interface{}, out interface{}, c *conversion.Clon
 		} else {
 			out.Verbs = nil
 		}
+		out.ShortName = in.ShortName
 		return nil
 	}
 }
