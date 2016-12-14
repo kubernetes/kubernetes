@@ -163,6 +163,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		Convert_v1_LocalDisk_To_api_LocalDisk,
 		Convert_api_LocalDisk_To_v1_LocalDisk,
+		Convert_v1_LocalDiskSource_To_api_LocalDiskSource,
+		Convert_api_LocalDiskSource_To_v1_LocalDiskSource,
 		Convert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		Convert_api_LocalObjectReference_To_v1_LocalObjectReference,
 		Convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
@@ -1862,6 +1864,26 @@ func autoConvert_api_LocalDisk_To_v1_LocalDisk(in *api.LocalDisk, out *LocalDisk
 
 func Convert_api_LocalDisk_To_v1_LocalDisk(in *api.LocalDisk, out *LocalDisk, s conversion.Scope) error {
 	return autoConvert_api_LocalDisk_To_v1_LocalDisk(in, out, s)
+}
+
+func autoConvert_v1_LocalDiskSource_To_api_LocalDiskSource(in *LocalDiskSource, out *api.LocalDiskSource, s conversion.Scope) error {
+	out.DiskSize = in.DiskSize
+	out.LocalPath = in.LocalPath
+	return nil
+}
+
+func Convert_v1_LocalDiskSource_To_api_LocalDiskSource(in *LocalDiskSource, out *api.LocalDiskSource, s conversion.Scope) error {
+	return autoConvert_v1_LocalDiskSource_To_api_LocalDiskSource(in, out, s)
+}
+
+func autoConvert_api_LocalDiskSource_To_v1_LocalDiskSource(in *api.LocalDiskSource, out *LocalDiskSource, s conversion.Scope) error {
+	out.DiskSize = in.DiskSize
+	out.LocalPath = in.LocalPath
+	return nil
+}
+
+func Convert_api_LocalDiskSource_To_v1_LocalDiskSource(in *api.LocalDiskSource, out *LocalDiskSource, s conversion.Scope) error {
+	return autoConvert_api_LocalDiskSource_To_v1_LocalDiskSource(in, out, s)
 }
 
 func autoConvert_v1_LocalObjectReference_To_api_LocalObjectReference(in *LocalObjectReference, out *api.LocalObjectReference, s conversion.Scope) error {
@@ -4311,6 +4333,7 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.LocalDisk = (*api.LocalDiskSource)(unsafe.Pointer(in.LocalDisk))
 	return nil
 }
 
@@ -4342,6 +4365,7 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.LocalDisk = (*LocalDiskSource)(unsafe.Pointer(in.LocalDisk))
 	return nil
 }
 

@@ -1293,6 +1293,17 @@ message LocalDisk {
   optional uint32 allocatable = 3;
 }
 
+// Represents local disk claim for a pod
+message LocalDiskSource {
+  // Requested local disk size, the unit is Gi
+  optional uint32 diskSize = 1;
+
+  // LocalPath represents the local disk path that pod will use. It will be
+  // backfilled by scheduler when scheduler find a fit local path on a
+  // kubelet node. If user specifies it, it might not be satisfied.
+  optional string localPath = 2;
+}
+
 // LocalObjectReference contains enough information to let you locate the
 // referenced object inside the same namespace.
 message LocalObjectReference {
@@ -3564,6 +3575,10 @@ message VolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
+
+  // LocalDisk represents a local disk request for a pod.
+  // +optional
+  optional LocalDiskSource localDisk = 24;
 }
 
 // Represents a vSphere volume resource.

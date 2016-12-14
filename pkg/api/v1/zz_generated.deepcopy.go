@@ -99,6 +99,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerIngress, InType: reflect.TypeOf(&LoadBalancerIngress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerStatus, InType: reflect.TypeOf(&LoadBalancerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalDisk, InType: reflect.TypeOf(&LocalDisk{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalDiskSource, InType: reflect.TypeOf(&LocalDiskSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalObjectReference, InType: reflect.TypeOf(&LocalObjectReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NFSVolumeSource, InType: reflect.TypeOf(&NFSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Namespace, InType: reflect.TypeOf(&Namespace{})},
@@ -1495,6 +1496,16 @@ func DeepCopy_v1_LocalDisk(in interface{}, out interface{}, c *conversion.Cloner
 		out.LocalDir = in.LocalDir
 		out.Capacity = in.Capacity
 		out.Allocatable = in.Allocatable
+		return nil
+	}
+}
+
+func DeepCopy_v1_LocalDiskSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LocalDiskSource)
+		out := out.(*LocalDiskSource)
+		out.DiskSize = in.DiskSize
+		out.LocalPath = in.LocalPath
 		return nil
 	}
 }
@@ -3749,6 +3760,13 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			**out = **in
 		} else {
 			out.PhotonPersistentDisk = nil
+		}
+		if in.LocalDisk != nil {
+			in, out := &in.LocalDisk, &out.LocalDisk
+			*out = new(LocalDiskSource)
+			**out = **in
+		} else {
+			out.LocalDisk = nil
 		}
 		return nil
 	}
