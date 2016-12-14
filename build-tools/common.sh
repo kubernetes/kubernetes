@@ -62,7 +62,8 @@ readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD
 #                    is really remote, this is the stuff that has to be copied
 #                    back.
 # OUT_DIR can come in from the Makefile, so honor it.
-readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/${OUT_DIR:-_output}"
+readonly OUT_DIR="${OUT_DIR:-_output}"
+readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/${OUT_DIR}"
 readonly LOCAL_OUTPUT_SUBPATH="${LOCAL_OUTPUT_ROOT}/dockerized"
 readonly LOCAL_OUTPUT_BINPATH="${LOCAL_OUTPUT_SUBPATH}/bin"
 readonly LOCAL_OUTPUT_GOPATH="${LOCAL_OUTPUT_SUBPATH}/go"
@@ -72,7 +73,7 @@ readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 readonly THIS_PLATFORM_BIN="${LOCAL_OUTPUT_ROOT}/bin"
 
 readonly REMOTE_ROOT="/go/src/${KUBE_GO_PACKAGE}"
-readonly REMOTE_OUTPUT_ROOT="${REMOTE_ROOT}/_output"
+readonly REMOTE_OUTPUT_ROOT="${REMOTE_ROOT}/${OUT_DIR}"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
@@ -171,7 +172,7 @@ function kube::build::verify_prereqs() {
     fi
   fi
 
-  KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}")
+  KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}:${OUT_DIR}")
   KUBE_BUILD_IMAGE_TAG_BASE="build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_IMAGE_TAG="${KUBE_BUILD_IMAGE_TAG_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
   KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
@@ -569,10 +570,11 @@ function kube::build::run_build_command_ex() {
   done
 
   docker_run_opts+=(
+    --env "OUT_DIR"
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
-    --env "KUBE_BUILD_PPC64LE=${KUBE_BUILD_PPC64LE}"  # TODO(IBM): remove
-    --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
+    --env "KUBE_BUILD_PPC64LE"  # TODO(IBM): remove
+    --env "KUBE_VERBOSE"
   )
 
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
@@ -691,7 +693,7 @@ function kube::build::sync_to_container() {
     --filter='- /.git/' \
     --filter='- /.make/' \
     --filter='- /_tmp/' \
-    --filter='- /_output/' \
+    --filter="- /${OUT_DIR}/" \
     --filter='- /' \
     --filter='- zz_generated.*' \
     --filter='- generated.proto' \
@@ -722,7 +724,7 @@ function kube::build::copy_output() {
   kube::build::rsync \
     --filter='- /vendor/' \
     --filter='- /_temp/' \
-    --filter='+ /_output/dockerized/bin/**' \
+    --filter="+ /${OUT_DIR}/dockerized/bin/"'**' \
     --filter='+ zz_generated.*' \
     --filter='+ generated.proto' \
     --filter='+ *.pb.go' \
