@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -50,7 +49,7 @@ type KubeletClientConfig struct {
 	HTTPTimeout time.Duration
 
 	// Dial is a custom dialer used for the client
-	Dial func(net, addr string) (net.Conn, error)
+	Dial utilnet.DialFunc
 }
 
 // ConnectionInfo provides the information needed to connect to a kubelet
