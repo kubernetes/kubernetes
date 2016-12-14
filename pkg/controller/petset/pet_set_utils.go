@@ -24,7 +24,7 @@ import (
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1"
+	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"

@@ -37,7 +37,7 @@ import (
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
+	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/healthz"

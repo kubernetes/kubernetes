@@ -18,7 +18,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/labels:go_default_library",
@@ -38,7 +38,7 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5/fake:go_default_library",
+        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/controller/node/testutil:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/util/sets:go_default_library",

@@ -30,7 +30,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubeletstats "k8s.io/kubernetes/pkg/kubelet/server/stats"

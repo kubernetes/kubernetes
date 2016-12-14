@@ -28,7 +28,7 @@ import (
 
 func main() {
 	customArgs := &generators.CustomArgs{
-		VersionedClientSetPackage: "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5",
+		VersionedClientSetPackage: "k8s.io/kubernetes/pkg/client/clientset_generated/clientset",
 		InternalClientSetPackage:  "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset",
 		ListersPackage:            "k8s.io/kubernetes/pkg/client/listers",
 	}

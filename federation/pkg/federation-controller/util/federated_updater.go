@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 )
 

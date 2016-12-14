@@ -12,7 +12,7 @@ go_library(
     srcs = ["registry.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/clientset_generated/release_1_5:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",

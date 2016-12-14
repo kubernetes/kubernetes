@@ -32,7 +32,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/runtime:go_default_library",
