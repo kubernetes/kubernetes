@@ -147,6 +147,15 @@ const (
 	volumeAttachmentStatusInitialDelay = 10 * time.Second
 	volumeAttachmentStatusFactor       = 1.2
 	volumeAttachmentStatusSteps        = 21
+
+	// createTag* is configuration of exponential backoff for CreateTag call. We
+	// retry mainly because if we create an object, we cannot tag it until it is
+	// "fully created" (eventual consistency). Starting with 1 second, doubling
+	// it every step and taking 9 steps results in 255 second total waiting
+	// time.
+	createTagInitialDelay = 1 * time.Second
+	createTagFactor       = 2.0
+	createTagSteps        = 9
 )
 
 // Maps from backend protocol to ELB protocol
@@ -2241,30 +2250,33 @@ func (c *Cloud) createTags(resourceID string, tags map[string]string) error {
 		awsTags = append(awsTags, tag)
 	}
 
+	backoff := wait.Backoff{
+		Duration: createTagInitialDelay,
+		Factor:   createTagFactor,
+		Steps:    createTagSteps,
+	}
 	request := &ec2.CreateTagsInput{}
 	request.Resources = []*string{&resourceID}
 	request.Tags = awsTags
 
-	// TODO: We really should do exponential backoff here
-	attempt := 0
-	maxAttempts := 60
-
-	for {
+	var lastErr error
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		_, err := c.ec2.CreateTags(request)
 		if err == nil {
-			return nil
+			return true, nil
 		}
 
 		// We could check that the error is retryable, but the error code changes based on what we are tagging
 		// SecurityGroup: InvalidGroup.NotFound
-		attempt++
-		if attempt > maxAttempts {
-			glog.Warningf("Failed to create tags (too many attempts): %v", err)
-			return err
-		}
 		glog.V(2).Infof("Failed to create tags; will retry.  Error was %v", err)
-		time.Sleep(1 * time.Second)
+		lastErr = err
+		return false, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		// return real CreateTags error instead of timeout
+		err = lastErr
 	}
+	return err
 }
 
 // Finds the value for a given tag.
