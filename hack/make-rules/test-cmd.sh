@@ -331,6 +331,7 @@ runTests() {
   second_port_field="(index .spec.ports 1).port"
   second_port_name="(index .spec.ports 1).name"
   image_field="(index .spec.containers 0).image"
+  container_name_field="(index .spec.template.spec.containers 0).name"
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
@@ -1218,6 +1219,13 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
+
+  # Test kubectl create deployment
+  kubectl create deployment test-nginx --image=gcr.io/google-containers/nginx:test-cmd
+  # Post-Condition: Deployment has 2 replicas defined in its spec.
+  kube::test::get_object_assert 'deploy test-nginx' "{{$container_name_field}}" 'nginx'
+  # Clean up
+  kubectl delete deployment test-nginx "${kube_flags[@]}"
 
   ###############
   # Kubectl get #
