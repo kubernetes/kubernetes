@@ -104,9 +104,13 @@ func WithAudit(handler http.Handler, requestContextMapper api.RequestContextMapp
 			return
 		}
 
+		username := "<none>"
 		groups := "<none>"
-		if userGroups := attribs.GetUser().GetGroups(); len(userGroups) > 0 {
-			groups = auditStringSlice(userGroups)
+		if attribs.GetUser() != nil {
+			username = attribs.GetUser().GetName()
+			if userGroups := attribs.GetUser().GetGroups(); len(userGroups) > 0 {
+				groups = auditStringSlice(userGroups)
+			}
 		}
 		asuser := req.Header.Get(authenticationapi.ImpersonateUserHeader)
 		if len(asuser) == 0 {
@@ -124,7 +128,7 @@ func WithAudit(handler http.Handler, requestContextMapper api.RequestContextMapp
 		id := uuid.NewRandom().String()
 
 		line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q groups=%q as=%q asgroups=%q namespace=%q uri=%q\n",
-			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, attribs.GetUser().GetName(), groups, asuser, asgroups, namespace, req.URL)
+			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, username, groups, asuser, asgroups, namespace, req.URL)
 		if _, err := fmt.Fprint(out, line); err != nil {
 			glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
 		}
