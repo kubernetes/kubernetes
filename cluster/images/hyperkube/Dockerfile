@@ -28,6 +28,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     util-linux \
     socat \
     git \
+    jq \
     nfs-common \
     glusterfs-client \
     cifs-utils \
