@@ -44,7 +44,7 @@ func TestDialURL(t *testing.T) {
 
 	testcases := map[string]struct {
 		TLSConfig   *tls.Config
-		Dial        func(network, addr string) (net.Conn, error)
+		Dial        utilnet.DialFunc
 		ExpectError string
 	}{
 		"insecure": {

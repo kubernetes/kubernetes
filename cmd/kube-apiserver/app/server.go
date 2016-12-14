@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -126,7 +125,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	// Setup tunneler if needed
 	var tunneler genericapiserver.Tunneler
-	var proxyDialerFn apiserver.ProxyDialerFunc
+	var proxyDialerFn utilnet.DialFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSH genericapiserver.InstallSSHKey
