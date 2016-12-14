@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"

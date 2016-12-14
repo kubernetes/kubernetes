@@ -49,7 +49,7 @@ import (
 	. "github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -813,7 +813,7 @@ func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace st
 
 // WaitForFederationApiserverReady waits for the federation apiserver to be ready.
 // It tests the readiness by sending a GET request and expecting a non error response.
-func WaitForFederationApiserverReady(c *federation_release_1_5.Clientset) error {
+func WaitForFederationApiserverReady(c *federation_clientset.Clientset) error {
 	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
 		_, err := c.Federation().Clusters().List(v1.ListOptions{})
 		if err != nil {
@@ -1820,13 +1820,13 @@ func LoadFederatedConfig(overrides *clientcmd.ConfigOverrides) (*restclient.Conf
 	return cfg, nil
 }
 
-func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
+func LoadFederationClientset_1_5() (*federation_clientset.Clientset, error) {
 	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
 	if err != nil {
 		return nil, err
 	}
 
-	c, err := federation_release_1_5.NewForConfig(config)
+	c, err := federation_clientset.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
 	}
