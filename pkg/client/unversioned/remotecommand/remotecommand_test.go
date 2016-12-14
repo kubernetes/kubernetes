@@ -29,6 +29,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -118,10 +120,13 @@ func fakeServer(t *testing.T, testName string, exec bool, stdinData, stdoutData,
 			exec:         exec,
 		}
 
+		opts, err := remotecommand.NewOptions(req)
+		require.NoError(t, err)
 		if exec {
-			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", 0, 10*time.Second, serverProtocols)
+			cmd := req.URL.Query()[api.ExecCommandParamm]
+			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", cmd, opts, 0, 10*time.Second, serverProtocols)
 		} else {
-			remotecommand.ServeAttach(w, req, executor, "pod", "uid", "container", 0, 10*time.Second, serverProtocols)
+			remotecommand.ServeAttach(w, req, executor, "pod", "uid", "container", opts, 0, 10*time.Second, serverProtocols)
 		}
 
 		if e, a := strings.Repeat(stdinData, messageCount), executor.stdinReceived.String(); e != a {
