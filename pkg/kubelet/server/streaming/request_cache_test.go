@@ -33,18 +33,21 @@ func TestInsert(t *testing.T) {
 	// Insert normal
 	oldestTok, err := c.Insert(nextRequest())
 	require.NoError(t, err)
+	assert.Len(t, oldestTok, TokenLen)
 	assertCacheSize(t, c, 1)
 
 	// Insert until full
 	for i := 0; i < CacheMaxSize-2; i++ {
-		_, err := c.Insert(nextRequest())
+		tok, err := c.Insert(nextRequest())
 		require.NoError(t, err)
+		assert.Len(t, tok, TokenLen)
 	}
 	assertCacheSize(t, c, CacheMaxSize-1)
 
 	newestReq := nextRequest()
 	newestTok, err := c.Insert(newestReq)
 	require.NoError(t, err)
+	assert.Len(t, newestTok, TokenLen)
 	assertCacheSize(t, c, CacheMaxSize)
 	require.Contains(t, c.tokens, oldestTok, "oldest request should still be cached")
 
@@ -55,13 +58,15 @@ func TestInsert(t *testing.T) {
 	require.Contains(t, c.tokens, oldestTok, "oldest request should still be cached")
 
 	// Insert again (still full)
-	_, err = c.Insert(nextRequest())
+	tok, err := c.Insert(nextRequest())
 	require.NoError(t, err)
+	assert.Len(t, tok, TokenLen)
 	assertCacheSize(t, c, CacheMaxSize)
 
 	// Insert again (should evict)
-	_, err = c.Insert(nextRequest())
+	tok, err = c.Insert(nextRequest())
 	require.NoError(t, err)
+	assert.Len(t, tok, TokenLen)
 	assertCacheSize(t, c, CacheMaxSize)
 	assert.NotContains(t, c.tokens, oldestTok, "oldest request should be evicted")
 	_, ok = c.Consume(oldestTok)
