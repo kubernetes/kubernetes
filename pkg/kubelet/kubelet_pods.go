@@ -592,11 +592,6 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	return nil
 }
 
-// returns whether the pod uses the host network namespace.
-func podUsesHostNetwork(pod *v1.Pod) bool {
-	return pod.Spec.HostNetwork
-}
-
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
 // TODO: duplicate secrets are being retrieved multiple times and there
@@ -1066,7 +1061,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			glog.V(4).Infof("Cannot get host IP: %v", err)
 		} else {
 			s.HostIP = hostIP.String()
-			if podUsesHostNetwork(pod) && s.PodIP == "" {
+			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
 				s.PodIP = hostIP.String()
 			}
 		}
