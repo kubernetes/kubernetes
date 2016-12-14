@@ -351,6 +351,7 @@ function push-federation-images {
 }
 
 function cleanup-federation-api-objects {
+  echo "Cleaning Federation control plane objects"
   # Delete all resources with the federated-cluster label.
   $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
   # Delete all resources in FEDERATION_NAMESPACE.
