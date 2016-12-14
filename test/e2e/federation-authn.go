@@ -19,7 +19,7 @@ package e2e
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	})
 })
 
-func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_release_1_5.Clientset, error) {
+func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_clientset.Clientset, error) {
 	overrides := &clientcmd.ConfigOverrides{}
 	if user != nil {
 		overrides = &clientcmd.ConfigOverrides{
@@ -105,7 +105,7 @@ func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_relea
 		config.Username = ""
 	}
 
-	c, err := federation_release_1_5.NewForConfig(config)
+	c, err := federation_clientset.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err)
 	}

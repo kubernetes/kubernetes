@@ -22,7 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -123,7 +123,7 @@ func newService(name, namespace string) *v1.Service {
 }
 
 // Verify that the cluster is marked ready.
-func isReady(clusterName string, clientset *federation_release_1_5.Clientset) error {
+func isReady(clusterName string, clientset *federation_clientset.Clientset) error {
 	return wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
 		c, err := clientset.Federation().Clusters().Get(clusterName, metav1.GetOptions{})
 		if err != nil {

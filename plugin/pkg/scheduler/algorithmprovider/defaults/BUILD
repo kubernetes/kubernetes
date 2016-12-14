@@ -34,7 +34,7 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/sets:go_default_library",

@@ -61,10 +61,10 @@ GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@"
-${clientgen} --clientset-name="release_1_5" --input="${GV_DIRS_CSV}" "$@"
+${clientgen} --clientset-name="clientset" --input="${GV_DIRS_CSV}" "$@"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event"   "$@"
-${clientgen} --clientset-name=federation_release_1_5 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,api/v1/ConfigMap,api/v1/Event"   "$@"
+${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,api/v1/ConfigMap,api/v1/Event"   "$@"
 ${setgen} "$@"
 
 LISTERGEN_APIS=(
@@ -95,7 +95,7 @@ INFORMERGEN_APIS=(${INFORMERGEN_APIS[@]/#/k8s.io/kubernetes/})
 INFORMERGEN_APIS=$(IFS=,; echo "${INFORMERGEN_APIS[*]}")
 ${informergen} \
   --input-dirs "${INFORMERGEN_APIS}" \
-  --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5 \
+  --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/clientset \
   --internal-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset \
   --listers-package k8s.io/kubernetes/pkg/client/listers \
   "$@"

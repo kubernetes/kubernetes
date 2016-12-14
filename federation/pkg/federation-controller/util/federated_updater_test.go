@@ -23,8 +23,8 @@ import (
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"

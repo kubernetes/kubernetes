@@ -29,14 +29,14 @@ import (
 	staging "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/util/sets"
 	clientreporestclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/fields"
@@ -94,7 +94,7 @@ type Framework struct {
 	federated bool
 
 	// Federation specific params. These are set only if federated = true.
-	FederationClientset_1_5 *federation_release_1_5.Clientset
+	FederationClientset_1_5 *federation_clientset.Clientset
 	FederationNamespace     *v1.Namespace
 }
 
