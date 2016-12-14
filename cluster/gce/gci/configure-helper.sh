@@ -208,9 +208,9 @@ function create-master-auth {
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
   if [[ ! -e "${known_tokens_csv}" ]]; then
     echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
-    echo "kube-controller-manager-token,system:kube-controller-manager,system:masters" > "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},kubelet,\"kubelet,system:nodes\"" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},kube_proxy,\"kube_proxy,system:nodes\"" >> "${known_tokens_csv}"
+    echo "kube-controller-manager-token,system:kube-controller-manager,uid:system:kube-controller-manager" >> "${known_tokens_csv}"
+    echo "${KUBELET_TOKEN},kubelet,uid:kubelet,system:nodes" >> "${known_tokens_csv}"
+    echo "${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy" >> "${known_tokens_csv}"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -378,8 +378,8 @@ EOF
 
 function create-kubecontrollermanager-kubeconfig {
   echo "Creating kube-controller-manager kubeconfig file"
-  mdkir -p /var/lib/kube-controller-manager
-  cat <<EOF >/var/lib/kube-controller-manager/kubeconfig
+  mkdir -p /etc/srv/kubernetes/kube-controller-manager
+  cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
 apiVersion: v1
 kind: Config
 users:
@@ -925,7 +925,7 @@ function start-kube-controller-manager {
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --use-service-account-credentials"
   params+=" --cloud-provider=gce"
-  params+=" --kubeconfig=/var/lib/kube-controller-manager/kubeconfig"
+  params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
