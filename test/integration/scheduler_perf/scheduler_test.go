@@ -184,7 +184,7 @@ func defaultSchedulerBenchmarkConfig(numNodes, numPods int) *testConfig {
 // This is used to learn the scheduling throughput on various
 // sizes of cluster and changes as more and more pods are scheduled.
 // It won't stop until all pods are scheduled.
-// It retruns the minimum of throughput over whole run.
+// It returns the minimum of throughput over whole run.
 func schedulePods(config *testConfig) int32 {
 	defer config.destroyFunc()
 	if err := config.nodePreparer.PrepareNodes(); err != nil {

@@ -174,7 +174,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
 					// An unschedulable node should still be present in the store
 					// Nodes that are unschedulable or that are not ready or
-					// have their disk full (Node.Spec.Conditions) are exluded
+					// have their disk full (Node.Spec.Conditions) are excluded
 					// based on NodeConditionPredicate, a separate check
 					return node != nil && node.(*v1.Node).Spec.Unschedulable == true
 				})
@@ -319,7 +319,7 @@ func TestMultiScheduler(t *testing.T) {
 		8. create 2 pods: testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2
 			- note: these two pods belong to default scheduler which no longer exists
 		9. **check point-3**:
-			- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 shoule NOT be scheduled
+			- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 should NOT be scheduled
 	*/
 	// 1. create and start default-scheduler
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
@@ -453,7 +453,7 @@ func TestMultiScheduler(t *testing.T) {
 		}
 
 		//	9. **check point-3**:
-		//		- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 shoule NOT be scheduled
+		//		- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 should NOT be scheduled
 		err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPodNoAnnotation2.Namespace, testPodNoAnnotation2.Name))
 		if err == nil {
 			t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodNoAnnotation2.Name, err)
@@ -587,7 +587,7 @@ func TestAllocatable(t *testing.T) {
 	// 7. Test: this test pod should not be scheduled since it request more than Allocatable
 	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testAllocPod2.Namespace, testAllocPod2.Name))
 	if err == nil {
-		t.Errorf("Test allocatable awareness: %s Pod got scheduled unexpectly, %v", testAllocPod2.Name, err)
+		t.Errorf("Test allocatable awareness: %s Pod got scheduled unexpectedly, %v", testAllocPod2.Name, err)
 	} else {
 		t.Logf("Test allocatable awareness: %s Pod not scheduled as expected", testAllocPod2.Name)
 	}

@@ -91,7 +91,7 @@ function start_discovery {
 	${kubectl} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" --certificate-authority="${CERT_DIR}/discovery-ca.crt" --embed-certs --server="https://${API_HOST_IP}:${DISCOVERY_SECURE_PORT}"
 
 	# Wait for kubernetes-discovery to come up before launching the rest of the components.
-	# this should work since we're creating a node port service
+	# This should work since we're creating a node port service.
 	echo "Waiting for kubernetes-discovery to come up: https://${API_HOST_IP}:${DISCOVERY_SECURE_PORT}/version"
 	kube::util::wait_for_url "https://${API_HOST_IP}:${DISCOVERY_SECURE_PORT}/version" "kubernetes-discovery: " 1 60 || exit 1
 
