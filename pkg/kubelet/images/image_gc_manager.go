@@ -89,6 +89,31 @@ type realImageGCManager struct {
 
 	// Track initialization
 	initialized bool
+
+	// imageCache is the cache of latest image list.
+	imageCache imageCache
+}
+
+// imageCache caches latest result of ListImages.
+type imageCache struct {
+	// sync.RWMutex is the mutex protects the image cache.
+	sync.RWMutex
+	// images is the image cache.
+	images []kubecontainer.Image
+}
+
+// set updates image cache.
+func (i *imageCache) set(images []kubecontainer.Image) {
+	i.Lock()
+	defer i.Unlock()
+	i.images = images
+}
+
+// get gets image list from image cache.
+func (i *imageCache) get() []kubecontainer.Image {
+	i.RLock()
+	defer i.RUnlock()
+	return i.images
 }
 
 // Information about the images we track.
@@ -142,16 +167,23 @@ func (im *realImageGCManager) Start() error {
 		}
 	}, 5*time.Minute, wait.NeverStop)
 
+	// Start a goroutine periodically updates image cache.
+	// TODO(random-liu): Merge this with the previous loop.
+	go wait.Until(func() {
+		images, err := im.runtime.ListImages()
+		if err != nil {
+			glog.Warningf("[imageGCManager] Failed to update image list: %v", err)
+		} else {
+			im.imageCache.set(images)
+		}
+	}, 30*time.Second, wait.NeverStop)
+
 	return nil
 }
 
 // Get a list of images on this node
 func (im *realImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
-	images, err := im.runtime.ListImages()
-	if err != nil {
-		return nil, err
-	}
-	return images, nil
+	return im.imageCache.get(), nil
 }
 
 func (im *realImageGCManager) detectImages(detectTime time.Time) error {
