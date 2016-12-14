@@ -10,8 +10,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "node_conformance.go",
+        "node_e2e.go",
         "remote.go",
         "ssh.go",
+        "types.go",
+        "utils.go",
     ],
     tags = ["automanaged"],
     deps = [

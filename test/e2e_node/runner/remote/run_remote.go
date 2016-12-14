@@ -66,6 +66,7 @@ const (
 var (
 	computeService *compute.Service
 	arc            Archive
+	suite          remote.TestSuite
 )
 
 type Archive struct {
@@ -125,12 +126,32 @@ type internalGCEImage struct {
 	tests    []string
 }
 
+// parseFlags parse subcommands and flags
+func parseFlags() {
+	if len(os.Args) <= 1 {
+		glog.Fatalf("Too few flags specified: %v", os.Args)
+	}
+	// Parse subcommand.
+	subcommand := os.Args[1]
+	switch subcommand {
+	case "conformance":
+		suite = remote.InitConformanceRemote()
+	// TODO: Add subcommand for node soaking, node conformance, cri validation.
+	default:
+		// Use node e2e suite by default if no subcommand is specified.
+		suite = remote.InitNodeE2ERemote()
+	}
+	// Parse test flags.
+	flag.CommandLine.Parse(os.Args[2:])
+}
+
 func main() {
-	flag.Parse()
+	parseFlags()
+
 	rand.Seed(time.Now().UTC().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		remote.CreateTestArchive()
+		remote.CreateTestArchive(suite)
 		return
 	}
 
@@ -301,7 +322,7 @@ func callGubernator(gubernator bool) {
 }
 
 func (a *Archive) getArchive() (string, error) {
-	a.Do(func() { a.path, a.err = remote.CreateTestArchive() })
+	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite) })
 	return a.path, a.err
 }
 
@@ -363,7 +384,7 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, ginkgoFlags
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(path, host, deleteFiles, junitFilePrefix, *testArgs, ginkgoFlagsStr)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, junitFilePrefix, *testArgs, ginkgoFlagsStr)
 	return &TestResult{
 		output: output,
 		err:    err,
