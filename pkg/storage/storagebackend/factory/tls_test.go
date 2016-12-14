@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -35,6 +36,7 @@ import (
 
 func TestTLSConnection(t *testing.T) {
 	certFile, keyFile, caFile := configureTLSCerts(t)
+	defer os.RemoveAll(filepath.Dir(certFile))
 
 	tlsInfo := &transport.TLSInfo{
 		CertFile: certFile,
