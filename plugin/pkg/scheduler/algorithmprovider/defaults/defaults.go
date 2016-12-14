@@ -52,7 +52,7 @@ func init() {
 			return priorities.PriorityMetadata
 		})
 
-	// Retisters algorithm providers. By default we use 'DefaultProvider', but user can specify one to be used
+	// Registers algorithm providers. By default we use 'DefaultProvider', but user can specify one to be used
 	// by specifying flag.
 	factory.RegisterAlgorithmProvider(factory.DefaultProvider, defaultPredicates(), defaultPriorities())
 	// Cluster autoscaler friendly scheduling algorithm.
