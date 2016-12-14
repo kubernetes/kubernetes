@@ -49,7 +49,7 @@ func TestDeploymentGenerate(t *testing.T) {
 							Labels: map[string]string{"app": "foo"},
 						},
 						Spec: api.PodSpec{
-							Containers: []api.Container{{Name: "app:v4", Image: "abc/app:v4"}},
+							Containers: []api.Container{{Name: "app", Image: "abc/app:v4"}},
 						},
 					},
 				},
@@ -74,7 +74,7 @@ func TestDeploymentGenerate(t *testing.T) {
 							Labels: map[string]string{"app": "foo"},
 						},
 						Spec: api.PodSpec{
-							Containers: []api.Container{{Name: "app:v4", Image: "abc/app:v4"},
+							Containers: []api.Container{{Name: "app", Image: "abc/app:v4"},
 								{Name: "ape", Image: "zyx/ape"}},
 						},
 					},
@@ -114,21 +114,22 @@ func TestDeploymentGenerate(t *testing.T) {
 	}
 	generator := DeploymentBasicGeneratorV1{}
 	for index, test := range tests {
+		t.Logf("running scenario %d", index)
 		obj, err := generator.Generate(test.params)
 		switch {
 		case test.expectErr && err != nil:
 			continue // loop, since there's no output to check
 		case test.expectErr && err == nil:
-			t.Errorf("%v: expected error and didn't get one", index)
+			t.Errorf("expected error and didn't get one")
 			continue // loop, no expected output object
 		case !test.expectErr && err != nil:
-			t.Errorf("%v: unexpected error %v", index, err)
+			t.Errorf("unexpected error %v", err)
 			continue // loop, no output object
 		case !test.expectErr && err == nil:
 			// do nothing and drop through
 		}
 		if !reflect.DeepEqual(obj.(*extensions.Deployment), test.expected) {
-			t.Errorf("%v\nexpected:\n%#v\nsaw:\n%#v", index, test.expected, obj.(*extensions.Deployment))
+			t.Errorf("expected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensions.Deployment))
 		}
 	}
 }
