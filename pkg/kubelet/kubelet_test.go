@@ -106,6 +106,12 @@ type TestKubelet struct {
 	volumePlugin     *volumetest.FakeVolumePlugin
 }
 
+func (tk *TestKubelet) Cleanup() {
+	if tk.kubelet != nil {
+		os.RemoveAll(tk.kubelet.rootDirectory)
+	}
+}
+
 // newTestKubelet returns test kubelet with two images.
 func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
 	imageList := []kubecontainer.Image{
@@ -289,6 +295,7 @@ var emptyPodUIDs map[types.UID]kubetypes.SyncPodType
 
 func TestSyncLoopTimeUpdate(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 
@@ -314,6 +321,7 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 
 func TestSyncLoopAbort(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 	kubelet.runtimeState.setRuntimeSync(time.Now())
@@ -334,6 +342,7 @@ func TestSyncLoopAbort(t *testing.T) {
 
 func TestSyncPodsStartPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -356,6 +365,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	ready := false
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -410,6 +420,7 @@ func (ls testNodeLister) List() (v1.NodeList, error) {
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
 func TestHandlePortConflicts(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -464,6 +475,7 @@ func TestHandlePortConflicts(t *testing.T) {
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
 func TestHandleHostNameConflicts(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -515,6 +527,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
 func TestHandleNodeSelector(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	nodes := []v1.Node{
 		{
@@ -555,6 +568,7 @@ func TestHandleNodeSelector(t *testing.T) {
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
 func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	nodes := []v1.Node{
 		{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
@@ -603,6 +617,7 @@ func TestHandleMemExceeded(t *testing.T) {
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -634,6 +649,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 
 func TestValidateContainerLogStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	containerName := "x"
 	testCases := []struct {
@@ -760,6 +776,7 @@ func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, ro
 func TestCreateMirrorPod(t *testing.T) {
 	for _, updateType := range []kubetypes.SyncPodType{kubetypes.SyncPodCreate, kubetypes.SyncPodUpdate} {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKubelet.Cleanup()
 		testKubelet.fakeCadvisor.On("Start").Return(nil)
 		testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 		testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
@@ -786,6 +803,7 @@ func TestCreateMirrorPod(t *testing.T) {
 
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
@@ -828,6 +846,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -919,6 +938,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	}
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -949,6 +969,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 
 func TestHostNetworkAllowed(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
@@ -981,6 +1002,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 
 func TestHostNetworkDisallowed(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
@@ -1012,6 +1034,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 
 func TestPrivilegeContainerAllowed(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
@@ -1041,6 +1064,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 
 func TestPrivilegedContainerDisallowed(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -1067,6 +1091,7 @@ func TestPrivilegedContainerDisallowed(t *testing.T) {
 
 func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -1108,6 +1133,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 
 func TestFilterOutTerminatedPods(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
 	pods[0].Status.Phase = v1.PodFailed
@@ -1174,6 +1200,7 @@ func TestMakePortMappings(t *testing.T) {
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
@@ -1221,6 +1248,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
@@ -1290,6 +1318,7 @@ func podWithUidNameNsSpec(uid types.UID, name, namespace string, spec v1.PodSpec
 
 func TestDeletePodDirsForDeletedPods(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
@@ -1329,6 +1358,7 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 
 func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
@@ -1351,6 +1381,7 @@ func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 
 func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
@@ -1383,6 +1414,7 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 
 func TestGetPodsToSync(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	clock := testKubelet.fakeClock
 	pods := newTestPods(5)
@@ -1413,6 +1445,7 @@ func TestGetPodsToSync(t *testing.T) {
 
 func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -1475,6 +1508,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 	testErrorReason := fmt.Errorf("test-error")
 	emptyContainerID := (&kubecontainer.ContainerID{}).String()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -1664,6 +1698,7 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 	testErrorReason := fmt.Errorf("test-error")
 	emptyContainerID := (&kubecontainer.ContainerID{}).String()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -1830,6 +1865,7 @@ func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecyc
 // Test verifies that the kubelet invokes an admission handler during HandlePodAdditions.
 func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	kl.nodeLister = testNodeLister{nodes: []v1.Node{
 		{
@@ -1909,6 +1945,7 @@ func (a *testPodSyncLoopHandler) ShouldSync(pod *v1.Pod) bool {
 // TestGetPodsToSyncInvokesPodSyncLoopHandlers ensures that the get pods to sync routine invokes the handler.
 func TestGetPodsToSyncInvokesPodSyncLoopHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
 	expected := []*v1.Pod{pods[0]}
@@ -1944,6 +1981,7 @@ func (a *testPodSyncHandler) ShouldEvict(pod *v1.Pod) lifecycle.ShouldEvictRespo
 // TestGenerateAPIPodStatusInvokesPodSyncHandlers invokes the handlers and reports the proper status
 func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pod := newTestPods(1)[0]
 	podsToEvict := []*v1.Pod{pod}
@@ -1961,6 +1999,7 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 
 func TestSyncPodKillPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	pod := &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{
