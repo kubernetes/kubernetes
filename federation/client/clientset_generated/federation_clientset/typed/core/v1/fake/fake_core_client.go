@@ -17,7 +17,7 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/core/v1"
+	v1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
