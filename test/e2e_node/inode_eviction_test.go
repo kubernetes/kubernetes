@@ -32,13 +32,13 @@ import (
 
 const (
 	postTestConditionMonitoringPeriod = 2 * time.Minute
-	evictionPollInterval              = 5 * time.Second
+	evictionPollInterval              = 2 * time.Second
 	// pressure conditions often surface after evictions because of delay in propegation of metrics to pressure
 	// we wait this period after evictions to make sure that we wait out this delay
 	pressureDelay = 20 * time.Second
 )
 
-var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
 	f := framework.NewDefaultFramework("inode-eviction-test")
 
 	podTestSpecs := []podTestSpec{
@@ -109,7 +109,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 			},
 		},
 	}
-	evictionTestTimeout := 10 * time.Minute
+	evictionTestTimeout := 60 * time.Minute
 	testCondition := "Disk Pressure due to Inodes"
 
 	runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasInodePressure)
