@@ -29,15 +29,15 @@ func TestInstallHandler(t *testing.T) {
 	InstallHandler(mux)
 	req, err := http.NewRequest("GET", "http://example.com/healthz", nil)
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
-		t.Errorf("Expected %v, got %v", http.StatusOK, w.Code)
+		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
 	}
 	if w.Body.String() != "ok" {
-		t.Errorf("Expected %v, got %v", "ok", w.Body.String())
+		t.Errorf("expected %v, got %v", "ok", w.Body.String())
 	}
 }
 
@@ -53,7 +53,7 @@ func TestMulitipleChecks(t *testing.T) {
 		{"/healthz", "ok", http.StatusOK, false},
 		{"/healthz?verbose", "[+]ping ok\n[-]bad failed: this will fail\nhealthz check failed\n", http.StatusInternalServerError, true},
 		{"/healthz/ping", "ok", http.StatusOK, true},
-		{"/healthz/bad", "Internal server error: this will fail\n", http.StatusInternalServerError, true},
+		{"/healthz/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
 		{"/healthz", "[+]ping ok\n[-]bad failed: this will fail\nhealthz check failed\n", http.StatusInternalServerError, true},
 	}
 
