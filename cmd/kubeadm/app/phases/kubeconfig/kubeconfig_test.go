@@ -142,7 +142,7 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
-	defer os.Remove(tmpdir)
+	defer os.RemoveAll(tmpdir)
 
 	// set up tmp GlobalEnvParams values for testing
 	oldEnv := kubeadmapi.GlobalEnvParams
