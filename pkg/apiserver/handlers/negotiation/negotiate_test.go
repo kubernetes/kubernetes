@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package negotiation
 
 import (
 	"net/http"
@@ -24,6 +24,11 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
+
+// statusError is an object that can be converted into an metav1.Status
+type statusError interface {
+	Status() metav1.Status
+}
 
 type fakeNegotiater struct {
 	serializer, streamSerializer runtime.Serializer
@@ -207,7 +212,7 @@ func TestNegotiate(t *testing.T) {
 			req = &http.Request{Header: http.Header{}}
 			req.Header.Set("Accept", test.accept)
 		}
-		s, err := negotiateOutputSerializer(req, test.ns)
+		s, err := NegotiateOutputSerializer(req, test.ns)
 		switch {
 		case err == nil && test.errFn != nil:
 			t.Errorf("%d: failed: expected error", i)

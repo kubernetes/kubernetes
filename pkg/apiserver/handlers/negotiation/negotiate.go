@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package negotiation
 
 import (
 	"mime"
@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
-// mediaTypesForSerializer returns a list of media and stream media types for the server.
-func mediaTypesForSerializer(ns runtime.NegotiatedSerializer) (mediaTypes, streamMediaTypes []string) {
+// MediaTypesForSerializer returns a list of media and stream media types for the server.
+func MediaTypesForSerializer(ns runtime.NegotiatedSerializer) (mediaTypes, streamMediaTypes []string) {
 	for _, info := range ns.SupportedMediaTypes() {
 		mediaTypes = append(mediaTypes, info.MediaType)
 		if info.StreamSerializer != nil {
@@ -40,10 +40,10 @@ func mediaTypesForSerializer(ns runtime.NegotiatedSerializer) (mediaTypes, strea
 	return mediaTypes, streamMediaTypes
 }
 
-func negotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
+func NegotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaType, ok := negotiateMediaTypeOptions(req.Header.Get("Accept"), acceptedMediaTypesForEndpoint(ns), defaultEndpointRestrictions)
 	if !ok {
-		supported, _ := mediaTypesForSerializer(ns)
+		supported, _ := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, errNotAcceptable{supported}
 	}
 	// TODO: move into resthandler
@@ -54,16 +54,16 @@ func negotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerialize
 	return info, nil
 }
 
-func negotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
+func NegotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaType, ok := negotiateMediaTypeOptions(req.Header.Get("Accept"), acceptedMediaTypesForEndpoint(ns), defaultEndpointRestrictions)
 	if !ok || mediaType.accepted.Serializer.StreamSerializer == nil {
-		_, supported := mediaTypesForSerializer(ns)
+		_, supported := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, errNotAcceptable{supported}
 	}
 	return mediaType.accepted.Serializer, nil
 }
 
-func negotiateInputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
+func NegotiateInputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaTypes := ns.SupportedMediaTypes()
 	mediaType := req.Header.Get("Content-Type")
 	if len(mediaType) == 0 {
@@ -71,7 +71,7 @@ func negotiateInputSerializer(req *http.Request, ns runtime.NegotiatedSerializer
 	}
 	mediaType, _, err := mime.ParseMediaType(mediaType)
 	if err != nil {
-		_, supported := mediaTypesForSerializer(ns)
+		_, supported := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, errUnsupportedMediaType{supported}
 	}
 
@@ -82,7 +82,7 @@ func negotiateInputSerializer(req *http.Request, ns runtime.NegotiatedSerializer
 		return info, nil
 	}
 
-	_, supported := mediaTypesForSerializer(ns)
+	_, supported := MediaTypesForSerializer(ns)
 	return runtime.SerializerInfo{}, errUnsupportedMediaType{supported}
 }
 

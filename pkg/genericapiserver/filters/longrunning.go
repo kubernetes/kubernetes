@@ -19,16 +19,16 @@ package filters
 import (
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // LongRunningRequestCheck is a predicate which is true for long-running http requests.
-type LongRunningRequestCheck func(r *http.Request, requestInfo *request.RequestInfo) bool
+type LongRunningRequestCheck func(r *http.Request, requestInfo *apiserverrequest.RequestInfo) bool
 
 // BasicLongRunningRequestCheck returns true if the given request has one of the specified verbs or one of the specified subresources
 func BasicLongRunningRequestCheck(longRunningVerbs, longRunningSubresources sets.String) LongRunningRequestCheck {
-	return func(r *http.Request, requestInfo *request.RequestInfo) bool {
+	return func(r *http.Request, requestInfo *apiserverrequest.RequestInfo) bool {
 		if longRunningVerbs.Has(requestInfo.Verb) {
 			return true
 		}

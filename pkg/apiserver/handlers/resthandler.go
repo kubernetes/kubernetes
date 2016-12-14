@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package handlers
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -32,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/negotiation"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -86,7 +89,7 @@ type RequestScope struct {
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
-	errorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -118,7 +121,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 	}
 }
 
@@ -228,7 +231,7 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	write(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.res.ResponseWriter, r.req.Request)
+	responsewriters.WriteObject(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.res.ResponseWriter, r.req.Request)
 }
 
 func (r *responder) Error(err error) {
@@ -330,7 +333,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 		trace.Step("Self-linking done")
-		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -364,7 +367,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		ctx = api.WithNamespace(ctx, namespace)
 
 		gv := scope.Kind.GroupVersion()
-		s, err := negotiateInputSerializer(req.Request, scope.Serializer)
+		s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -423,7 +426,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Self-link added")
 
-		write(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 	}
 }
 
@@ -516,7 +519,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return
 		}
 
-		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 	}
 
 }
@@ -682,7 +685,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		s, err := negotiateInputSerializer(req.Request, scope.Serializer)
+		s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -739,7 +742,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		write(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 	}
 }
 
@@ -771,7 +774,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiateInputSerializer(req.Request, scope.Serializer)
+				s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
 				if err != nil {
 					scope.err(err, res.ResponseWriter, req.Request)
 					return
@@ -836,7 +839,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 			}
 		}
-		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 	}
 }
 
@@ -895,7 +898,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiateInputSerializer(req.Request, scope.Serializer)
+				s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
 				if err != nil {
 					scope.err(err, res.ResponseWriter, req.Request)
 					return
@@ -940,7 +943,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				}
 			}
 		}
-		writeNegotiated(scope.Serializer, scope.Kind.GroupVersion(), w, req.Request, http.StatusOK, result)
+		responsewriters.WriteObjectNegotiated(scope.Serializer, scope.Kind.GroupVersion(), w, req.Request, http.StatusOK, result)
 	}
 }
 
@@ -1100,4 +1103,20 @@ func summarizeData(data []byte, maxLength int) string {
 		}
 		return hex.EncodeToString(data)
 	}
+}
+
+func readBody(req *http.Request) ([]byte, error) {
+	defer req.Body.Close()
+	return ioutil.ReadAll(req.Body)
+}
+
+func parseTimeout(str string) time.Duration {
+	if str != "" {
+		timeout, err := time.ParseDuration(str)
+		if err == nil {
+			return timeout
+		}
+		glog.Errorf("Failed to parse %q: %v", str, err)
+	}
+	return 30 * time.Second
 }
