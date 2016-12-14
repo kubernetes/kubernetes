@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -37,7 +38,7 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 		impersonationRequests, err := buildImpersonationRequests(req.Header)
 		if err != nil {
 			glog.V(4).Infof("%v", err)
-			forbidden(w, req)
+			internalError(w, req, err)
 			return
 		}
 		if len(impersonationRequests) == 0 {
@@ -47,12 +48,12 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 
 		ctx, exists := requestContextMapper.Get(req)
 		if !exists {
-			forbidden(w, req)
+			internalError(w, req, errors.New("no context found for request"))
 			return
 		}
 		requestor, exists := api.UserFrom(ctx)
 		if !exists {
-			forbidden(w, req)
+			internalError(w, req, errors.New("no user found for request"))
 			return
 		}
 
@@ -100,15 +101,15 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
 
 			default:
-				glog.V(4).Infof("unknown impersonation request type: %v\n", impersonationRequest)
-				forbidden(w, req)
+				glog.V(4).Infof("unknown impersonation request type: %v", impersonationRequest)
+				forbidden(actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest))
 				return
 			}
 
 			allowed, reason, err := a.Authorize(actingAsAttributes)
 			if err != nil || !allowed {
 				glog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
-				forbidden(w, req)
+				forbidden(actingAsAttributes, w, req, reason)
 				return
 			}
 		}
