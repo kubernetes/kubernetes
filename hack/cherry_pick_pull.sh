@@ -150,6 +150,9 @@ for pull in "${PULLS[@]}"; do
   echo "  $ git am -3 /tmp/${pull}.patch"
   echo
   git am -3 "/tmp/${pull}.patch" || {
+    # remove the patch file from /tmp, we no longer need it
+    rm -f "/tmp/${pull}.patch"
+
     conflicts=false
     while unmerged=$(git status --porcelain | grep ^U) && [[ -n ${unmerged} ]] \
       || [[ -e "${REBASEMAGIC}" ]]; do
@@ -173,6 +176,10 @@ for pull in "${PULLS[@]}"; do
       exit 1
     fi
   }
+
+  # remove the patch file from /tmp
+  rm -f "/tmp/${pull}.patch"
+
   # set the subject
   subject=$(grep -m 1 "^Subject" "/tmp/${pull}.patch" | sed -e 's/Subject: \[PATCH//g' | sed 's/.*] //')
   SUBJECTS+=("#${pull}: ${subject}")
