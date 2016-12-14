@@ -43,7 +43,8 @@ const (
 	cloudResourcePollTimeout = 5 * time.Minute
 
 	// Time required by the loadbalancer to cleanup, proportional to numApps/Ing.
-	lbCleanupTimeout = 5 * time.Minute
+	// Bring the cleanup timeout back down to 5m once b/33588344 is resolved.
+	lbCleanupTimeout = 15 * time.Minute
 	lbPollInterval   = 30 * time.Second
 
 	// Name of the config-map and key the ingress controller stores its uid in.
