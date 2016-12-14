@@ -31,13 +31,17 @@ import (
 
 // NewSelfClientConfig returns a clientconfig which can be used to talk to this apiserver.
 func NewSelfClientConfig(secureServingInfo *SecureServingInfo, insecureServingInfo *ServingInfo, token string) (*restclient.Config, error) {
-	if cfg, err := secureServingInfo.NewSelfClientConfig(token); err != nil || cfg != nil {
+	cfg, err := secureServingInfo.NewSelfClientConfig(token)
+	if cfg != nil && err == nil {
+		return cfg, nil
+	}
+	if err != nil {
 		if insecureServingInfo == nil {
 			// be fatal if insecure port is not available
-			return cfg, err
-		} else {
-			glog.Warningf("Failed to create secure local client, falling back to insecure local connection: %v", err)
+			return nil, err
 		}
+
+		glog.Warningf("Failed to create secure local client, falling back to insecure local connection: %v", err)
 	}
 	if cfg, err := insecureServingInfo.NewSelfClientConfig(token); err != nil || cfg != nil {
 		return cfg, err
