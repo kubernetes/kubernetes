@@ -24,11 +24,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // applySandboxSecurityContext updates docker sandbox options according to security context.
-func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
+func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig, networkPlugin network.NetworkPlugin) {
 	if lc == nil {
 		return
 	}
@@ -45,7 +46,9 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 	}
 
 	modifyContainerConfig(sc, config)
-	modifyHostConfig(sc, "", hc)
+	modifyHostConfig(sc, hc)
+	modifySandboxNamespaceOptions(sc.GetNamespaceOptions(), hc, networkPlugin)
+
 }
 
 // applyContainerSecurityContext updates docker container options according to security context.
@@ -55,7 +58,8 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxI
 	}
 
 	modifyContainerConfig(lc.SecurityContext, config)
-	modifyHostConfig(lc.SecurityContext, sandboxID, hc)
+	modifyHostConfig(lc.SecurityContext, hc)
+	modifyContainerNamespaceOptions(lc.SecurityContext.GetNamespaceOptions(), sandboxID, hc)
 	return
 }
 
@@ -73,10 +77,7 @@ func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config 
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
-func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, sandboxID string, hostConfig *dockercontainer.HostConfig) {
-	// Apply namespace options.
-	modifyNamespaceOptions(sc.GetNamespaceOptions(), sandboxID, hostConfig)
-
+func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *dockercontainer.HostConfig) {
 	if sc == nil {
 		return
 	}
@@ -110,13 +111,21 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, sandboxID st
 	}
 }
 
-// modifyNamespaceOptions applies namespaceoptions to dockercontainer.HostConfig.
-func modifyNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandboxID string, hostConfig *dockercontainer.HostConfig) {
-	hostNetwork := false
+// modifySandboxNamespaceOptions apply namespace options for sandbox
+func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, networkPlugin network.NetworkPlugin) {
+	modifyCommonNamespaceOptions(nsOpts, hostConfig)
+	modifyHostNetworkOptionForSandbox(nsOpts.GetHostNetwork(), networkPlugin, hostConfig)
+}
+
+// modifyContainerNamespaceOptions apply namespace options for container
+func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandboxID string, hostConfig *dockercontainer.HostConfig) {
+	modifyCommonNamespaceOptions(nsOpts, hostConfig)
+	modifyHostNetworkOptionForContainer(nsOpts.GetHostNetwork(), sandboxID, hostConfig)
+}
+
+// modifyCommonNamespaceOptions apply common namespace options for sandbox and container
+func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig) {
 	if nsOpts != nil {
-		if nsOpts.HostNetwork != nil {
-			hostNetwork = nsOpts.GetHostNetwork()
-		}
 		if nsOpts.GetHostPid() {
 			hostConfig.PidMode = namespaceModeHost
 		}
@@ -124,24 +133,27 @@ func modifyNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandboxID string
 			hostConfig.IpcMode = namespaceModeHost
 		}
 	}
-
-	// Set for sandbox if sandboxID is not provided.
-	if sandboxID == "" {
-		modifyHostNetworkOptionForSandbox(hostNetwork, hostConfig)
-	} else {
-		// Set for container if sandboxID is provided.
-		modifyHostNetworkOptionForContainer(hostNetwork, sandboxID, hostConfig)
-	}
 }
 
 // modifyHostNetworkOptionForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForSandbox(hostNetwork bool, hc *dockercontainer.HostConfig) {
+func modifyHostNetworkOptionForSandbox(hostNetwork bool, networkPlugin network.NetworkPlugin, hc *dockercontainer.HostConfig) {
 	if hostNetwork {
 		hc.NetworkMode = namespaceModeHost
-	} else {
-		// Assume kubelet uses either the cni or the kubenet plugin.
-		// TODO: support docker networking.
+		return
+	}
+
+	if networkPlugin == nil {
+		hc.NetworkMode = "default"
+		return
+	}
+
+	switch networkPlugin.Name() {
+	case "cni":
+		fallthrough
+	case "kubenet":
 		hc.NetworkMode = "none"
+	default:
+		hc.NetworkMode = "default"
 	}
 }
 
