@@ -300,12 +300,21 @@ func (lsel internalSelector) Add(reqs ...Requirement) Selector {
 // its Requirements match the input Labels. If any
 // Requirement does not match, false is returned.
 func (lsel internalSelector) Matches(l Labels) bool {
+	if match, hit := cache.Get(l, lsel); hit {
+		return match
+	}
+
+	result := true
 	for ix := range lsel {
 		if matches := lsel[ix].Matches(l); !matches {
-			return false
+			result = false
+			break
 		}
 	}
-	return true
+
+	cache.Add(l, lsel, result)
+
+	return result
 }
 
 func (lsel internalSelector) Requirements() (Requirements, bool) { return Requirements(lsel), true }
