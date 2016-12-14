@@ -30,7 +30,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 prepare-e2e
 
 if [[ "${FEDERATION:-}" == "true" ]];then
-    FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation}
+    FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
     #TODO(colhom): the last cluster that was created in the loop above is the current context.
     # Hence, it will be the cluster that hosts the federated components.
     # In the future, we will want to loop through the all the federated contexts,
