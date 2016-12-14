@@ -273,7 +273,7 @@ clean:
 	@echo "$$CLEAN_HELP_INFO"
 else
 clean: clean_meta
-	build-tools/make-clean.sh
+	build/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
 endif
@@ -342,7 +342,7 @@ release:
 	@echo "$$RELEASE_HELP_INFO"
 else
 release:
-	build-tools/release.sh
+	build/release.sh
 endif
 
 define RELEASE_SKIP_TESTS_HELP_INFO
@@ -357,7 +357,7 @@ release-skip-tests quick-release:
 	@echo "$$RELEASE_SKIP_TESTS_HELP_INFO"
 else
 release-skip-tests quick-release:
-	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build-tools/release.sh
+	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 endif
 
 define CROSS_HELP_INFO
