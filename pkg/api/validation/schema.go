@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -215,29 +216,86 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	if !ok {
 		return fmt.Errorf("error in unmarshaling data %s", string(data))
 	}
-	groupVersion := fields["apiVersion"]
-	if groupVersion == nil {
+	groupVersionName := fields["apiVersion"]
+	if groupVersionName == nil {
 		return fmt.Errorf("apiVersion not set")
 	}
-	if _, ok := groupVersion.(string); !ok {
+	if _, ok := groupVersionName.(string); !ok {
 		return fmt.Errorf("apiVersion isn't string type")
 	}
-	kind := fields["kind"]
-	if kind == nil {
+	groupVersion := groupVersionName.(string)
+	kindName := fields["kind"]
+	if kindName == nil {
 		return fmt.Errorf("kind not set")
 	}
-	if _, ok := kind.(string); !ok {
+	if _, ok := kindName.(string); !ok {
 		return fmt.Errorf("kind isn't string type")
 	}
-	if strings.HasSuffix(kind.(string), "List") {
+	kind := kindName.(string)
+	if strings.HasSuffix(kind, "List") {
 		return utilerrors.NewAggregate(s.validateList(fields))
 	}
-	version := apiutil.GetVersion(groupVersion.(string))
-	allErrs := s.ValidateObject(obj, "", version+"."+kind.(string))
-	if len(allErrs) == 1 {
-		return allErrs[0]
+
+	// find exact match using the new schema
+	candidate := groupTypeName(groupVersion, kind)
+	if _, ok := s.api.Models.At(candidate); ok {
+		return utilerrors.Reduce(utilerrors.NewAggregate(s.ValidateObject(obj, "", candidate)))
 	}
-	return utilerrors.NewAggregate(allErrs)
+
+	// use the exact legacy name (v1beta1.Deployment -> extensions.v1beta1.Deployment)
+	candidate = legacyGroupTypeName(groupVersion, kind)
+	if _, ok := s.api.Models.At(candidate); ok {
+		return utilerrors.Reduce(utilerrors.NewAggregate(s.ValidateObject(obj, "", candidate)))
+	}
+
+	// find the shortest model name that has legacy name as the suffix
+	// (version.Info -> io.k8s.kubernetes.pkg.version.Info)
+	var matches []string
+	for _, model := range s.api.Models.List {
+		if strings.HasSuffix(model.Name, "."+candidate) {
+			matches = append(matches, model.Name)
+		}
+	}
+	if len(matches) == 0 {
+		return TypeNotFoundError(candidate)
+	}
+	sort.Sort(shortestStringSlice(matches))
+	return utilerrors.Reduce(utilerrors.NewAggregate(s.ValidateObject(obj, "", matches[0])))
+}
+
+type shortestStringSlice []string
+
+func (s shortestStringSlice) Len() int { return len(s) }
+func (s shortestStringSlice) Less(i, j int) bool {
+	if len(s[i]) < len(s[j]) {
+		return true
+	}
+	if len(s[i]) > len(s[j]) {
+		return false
+	}
+	return s[i] < s[j]
+}
+func (s shortestStringSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func groupTypeName(groupVersion, kind string) string {
+	if len(groupVersion) == 0 {
+		return kind
+	}
+	parts := strings.Split(groupVersion, ".")
+	for i := 0; i < len(parts)/2; i++ {
+		end := len(parts) - 1 - i
+		parts[i], parts[end] = parts[end], parts[i]
+	}
+	parts = append(parts, kind)
+	return strings.Join(parts, ".")
+}
+
+func legacyGroupTypeName(groupVersion, kind string) string {
+	if len(groupVersion) == 0 {
+		return kind
+	}
+	version := apiutil.GetVersion(groupVersion)
+	return version + "." + kind
 }
 
 func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName string) []error {
@@ -375,7 +433,7 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 	// the type. We need to fix go-restful to embed the group name in the type
 	// name, otherwise we couldn't handle identically named types in different
 	// groups correctly.
-	if versionRegexp.MatchString(fieldType) {
+	if _, ok := s.api.Models.At(fieldType); ok || versionRegexp.MatchString(fieldType) {
 		// if strings.HasPrefix(fieldType, apiVersion) {
 		return s.ValidateObject(value, fieldName, fieldType)
 	}
