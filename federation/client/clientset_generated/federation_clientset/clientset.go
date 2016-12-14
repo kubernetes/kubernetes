@@ -102,6 +102,9 @@ func (c *Clientset) Federation() v1beta1federation.FederationV1beta1Interface {
 
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+	if c == nil {
+		return nil
+	}
 	return c.DiscoveryClient
 }
 
