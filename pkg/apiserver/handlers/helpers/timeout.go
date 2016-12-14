@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package helpers
 
 import (
-	"k8s.io/kubernetes/pkg/apiserver/metrics"
+	"time"
+
+	"github.com/golang/glog"
 )
 
-func init() {
-	metrics.Register()
+func ParseTimeout(str string) time.Duration {
+	if str != "" {
+		timeout, err := time.ParseDuration(str)
+		if err == nil {
+			return timeout
+		}
+		glog.Errorf("Failed to parse %q: %v", str, err)
+	}
+	return 30 * time.Second
 }

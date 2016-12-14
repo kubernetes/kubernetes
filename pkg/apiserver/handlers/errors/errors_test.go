@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package errors
 
 import (
 	stderrs "errors"
@@ -65,7 +65,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 		},
 	}
 	for k, v := range cases {
-		actual := errToAPIStatus(k)
+		actual := ErrToAPIStatus(k)
 		if !reflect.DeepEqual(actual, &v) {
 			t.Errorf("%s: Expected %#v, Got %#v", k, v, actual)
 		}
