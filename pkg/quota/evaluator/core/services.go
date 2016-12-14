@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/quota"
@@ -69,13 +70,13 @@ func (p *serviceEvaluator) Constraints(required []api.ResourceName, item runtime
 		return fmt.Errorf("unexpected input object %v", item)
 	}
 
-	requiredSet := quota.ToSet(required)
+	requiredSet := resources.ToSet(required)
 	missingSet := sets.NewString()
 	serviceUsage, err := p.Usage(service)
 	if err != nil {
 		return err
 	}
-	serviceSet := quota.ToSet(quota.ResourceNames(serviceUsage))
+	serviceSet := resources.ToSet(resources.ResourceNames(serviceUsage))
 	if diff := requiredSet.Difference(serviceSet); len(diff) > 0 {
 		missingSet.Insert(diff.List()...)
 	}
@@ -104,7 +105,7 @@ func (p *serviceEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtim
 
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (p *serviceEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
-	return quota.Intersection(input, serviceResources)
+	return resources.Intersection(input, serviceResources)
 }
 
 // convert the input object to an internal service object or error.

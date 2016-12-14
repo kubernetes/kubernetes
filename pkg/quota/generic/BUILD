@@ -18,6 +18,7 @@ go_library(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
+        "//pkg/api/util/resources:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/labels:go_default_library",

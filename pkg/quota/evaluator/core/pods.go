@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -110,7 +111,7 @@ func (p *podEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 	// TODO: fix this when we have pod level resource requirements
 	// since we do not yet pod level requests/limits, we need to ensure each
 	// container makes an explict request or limit for a quota tracked resource
-	requiredSet := quota.ToSet(required)
+	requiredSet := resources.ToSet(required)
 	missingSet := sets.NewString()
 	for i := range pod.Spec.Containers {
 		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSet)
@@ -142,7 +143,7 @@ func (p *podEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (p *podEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
-	return quota.Intersection(input, podResources)
+	return resources.Intersection(input, podResources)
 }
 
 // Usage knows how to measure usage associated with pods
@@ -164,7 +165,7 @@ func enforcePodContainerConstraints(container *api.Container, requiredSet, missi
 	requests := container.Resources.Requests
 	limits := container.Resources.Limits
 	containerUsage := podUsageHelper(requests, limits)
-	containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
+	containerSet := resources.ToSet(resources.ResourceNames(containerUsage))
 	if !containerSet.Equal(requiredSet) {
 		difference := requiredSet.Difference(containerSet)
 		missingSet.Insert(difference.List()...)
@@ -241,15 +242,15 @@ func PodUsageFunc(obj runtime.Object) (api.ResourceList, error) {
 	// TODO: fix this when we have pod level cgroups
 	// when we have pod level cgroups, we can just read pod level requests/limits
 	for i := range pod.Spec.Containers {
-		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
-		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
+		requests = resources.Add(requests, pod.Spec.Containers[i].Resources.Requests)
+		limits = resources.Add(limits, pod.Spec.Containers[i].Resources.Limits)
 	}
 	// InitContainers are run sequentially before other containers start, so the highest
 	// init container resource is compared against the sum of app containers to determine
 	// the effective usage for both requests and limits.
 	for i := range pod.Spec.InitContainers {
-		requests = quota.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
-		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
+		requests = resources.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
+		limits = resources.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
 	return podUsageHelper(requests, limits), nil

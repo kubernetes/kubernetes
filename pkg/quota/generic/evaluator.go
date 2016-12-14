@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
@@ -68,7 +69,7 @@ func Matches(resourceQuota *api.ResourceQuota, item runtime.Object, matchFunc Ma
 		return false, fmt.Errorf("expected non-nil quota")
 	}
 	// verify the quota matches on at least one resource
-	matchResource := len(matchFunc(quota.ResourceNames(resourceQuota.Status.Hard))) > 0
+	matchResource := len(matchFunc(resources.ResourceNames(resourceQuota.Status.Hard))) > 0
 	// by default, no scopes matches all
 	matchScope := true
 	for _, scope := range resourceQuota.Spec.Scopes {
@@ -115,7 +116,7 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 			if err != nil {
 				return result, err
 			}
-			result.Used = quota.Add(result.Used, usage)
+			result.Used = resources.Add(result.Used, usage)
 		}
 	}
 	return result, nil
@@ -139,7 +140,7 @@ type ObjectCountEvaluator struct {
 
 // Constraints returns an error if the configured resource name is not in the required set.
 func (o *ObjectCountEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
-	if !quota.Contains(required, o.ResourceName) {
+	if !resources.Contains(required, o.ResourceName) {
 		return fmt.Errorf("missing %s", o.ResourceName)
 	}
 	return nil
@@ -162,7 +163,7 @@ func (o *ObjectCountEvaluator) Matches(resourceQuota *api.ResourceQuota, item ru
 
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (o *ObjectCountEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
-	return quota.Intersection(input, []api.ResourceName{o.ResourceName})
+	return resources.Intersection(input, []api.ResourceName{o.ResourceName})
 }
 
 // Usage returns the resource usage for the specified object

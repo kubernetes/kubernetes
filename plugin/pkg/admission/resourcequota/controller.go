@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/quota"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -214,7 +215,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 		// that means that no quota docs applied, so it can get a pass
 		atLeastOneChangeForThisWaiter := false
 		for j := range newQuotas {
-			if !quota.Equals(quotas[j].Status.Used, newQuotas[j].Status.Used) {
+			if !resources.Equals(quotas[j].Status.Used, newQuotas[j].Status.Used) {
 				atLeastOneChanged = true
 				atLeastOneChangeForThisWaiter = true
 				break
@@ -243,7 +244,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 		newQuota := quotas[i]
 
 		// if this quota didn't have its status changed, skip it
-		if quota.Equals(originalQuotas[i].Status.Used, newQuota.Status.Used) {
+		if resources.Equals(originalQuotas[i].Status.Used, newQuota.Status.Used) {
 			continue
 		}
 
@@ -347,7 +348,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 			continue
 		}
 
-		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
+		hardResources := resources.ResourceNames(resourceQuota.Status.Hard)
 		requiredResources := evaluator.MatchingResources(hardResources)
 		if err := evaluator.Constraints(requiredResources, inputObject); err != nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("failed quota: %s: %v", resourceQuota.Name, err))
@@ -382,7 +383,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	}
 
 	// ensure that usage for input object is never negative (this would mean a resource made a negative resource requirement)
-	if negativeUsage := quota.IsNegative(deltaUsage); len(negativeUsage) > 0 {
+	if negativeUsage := resources.IsNegative(deltaUsage); len(negativeUsage) > 0 {
 		return nil, admission.NewForbidden(a, fmt.Errorf("quota usage is negative for resource(s): %s", prettyPrintResourceNames(negativeUsage)))
 	}
 
@@ -400,10 +401,10 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 			if innerErr != nil {
 				return quotas, innerErr
 			}
-			deltaUsage = quota.Subtract(deltaUsage, prevUsage)
+			deltaUsage = resources.Subtract(deltaUsage, prevUsage)
 		}
 	}
-	if quota.IsZero(deltaUsage) {
+	if resources.IsZero(deltaUsage) {
 		return quotas, nil
 	}
 
@@ -415,15 +416,15 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	for _, index := range interestingQuotaIndexes {
 		resourceQuota := outQuotas[index]
 
-		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
-		requestedUsage := quota.Mask(deltaUsage, hardResources)
-		newUsage := quota.Add(resourceQuota.Status.Used, requestedUsage)
-		maskedNewUsage := quota.Mask(newUsage, quota.ResourceNames(requestedUsage))
+		hardResources := resources.ResourceNames(resourceQuota.Status.Hard)
+		requestedUsage := resources.Mask(deltaUsage, hardResources)
+		newUsage := resources.Add(resourceQuota.Status.Used, requestedUsage)
+		maskedNewUsage := resources.Mask(newUsage, resources.ResourceNames(requestedUsage))
 
-		if allowed, exceeded := quota.LessThanOrEqual(maskedNewUsage, resourceQuota.Status.Hard); !allowed {
-			failedRequestedUsage := quota.Mask(requestedUsage, exceeded)
-			failedUsed := quota.Mask(resourceQuota.Status.Used, exceeded)
-			failedHard := quota.Mask(resourceQuota.Status.Hard, exceeded)
+		if allowed, exceeded := resources.LessThanOrEqual(maskedNewUsage, resourceQuota.Status.Hard); !allowed {
+			failedRequestedUsage := resources.Mask(requestedUsage, exceeded)
+			failedUsed := resources.Mask(resourceQuota.Status.Used, exceeded)
+			failedHard := resources.Mask(resourceQuota.Status.Hard, exceeded)
 			return nil, admission.NewForbidden(a,
 				fmt.Errorf("exceeded quota: %s, requested: %s, used: %s, limited: %s",
 					resourceQuota.Name,

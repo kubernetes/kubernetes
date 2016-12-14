@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -116,7 +117,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 				// responsible for enqueue of all resource quotas when doing a full resync (enqueueAll)
 				oldResourceQuota := old.(*v1.ResourceQuota)
 				curResourceQuota := cur.(*v1.ResourceQuota)
-				if quota.V1Equals(oldResourceQuota.Spec.Hard, curResourceQuota.Spec.Hard) {
+				if resources.V1Equals(oldResourceQuota.Spec.Hard, curResourceQuota.Spec.Hard) {
 					return
 				}
 				rq.addQuota(curResourceQuota)
@@ -281,9 +282,9 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.Resource
 
 	used := api.ResourceList{}
 	if resourceQuota.Status.Used != nil {
-		used = quota.Add(api.ResourceList{}, resourceQuota.Status.Used)
+		used = resources.Add(api.ResourceList{}, resourceQuota.Status.Used)
 	}
-	hardLimits := quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard)
+	hardLimits := resources.Add(api.ResourceList{}, resourceQuota.Spec.Hard)
 
 	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry)
 	if err != nil {
@@ -294,8 +295,8 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.Resource
 	}
 
 	// ensure set of used values match those that have hard constraints
-	hardResources := quota.ResourceNames(hardLimits)
-	used = quota.Mask(used, hardResources)
+	hardResources := resources.ResourceNames(hardLimits)
+	used = resources.Mask(used, hardResources)
 
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
@@ -312,7 +313,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.Resource
 		},
 	}
 
-	dirty = dirty || !quota.Equals(usage.Status.Used, resourceQuota.Status.Used)
+	dirty = dirty || !resources.Equals(usage.Status.Used, resourceQuota.Status.Used)
 
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
@@ -354,7 +355,7 @@ func (rq *ResourceQuotaController) replenishQuota(groupKind schema.GroupKind, na
 			glog.Error(err)
 			continue
 		}
-		resourceQuotaResources := quota.ResourceNames(internalResourceQuota.Status.Hard)
+		resourceQuotaResources := resources.ResourceNames(internalResourceQuota.Status.Hard)
 		if intersection := evaluator.MatchingResources(resourceQuotaResources); len(intersection) > 0 {
 			// TODO: make this support targeted replenishment to a specific kind, right now it does a full recalc on that quota.
 			rq.enqueueResourceQuota(resourceQuota)
