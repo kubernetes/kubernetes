@@ -294,7 +294,7 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 	// TODO: Check if this works with per-pod cgroups.
 	hc.CgroupParent = lc.GetCgroupParent()
 	// Apply security context.
-	applySandboxSecurityContext(lc, createConfig.Config, hc)
+	applySandboxSecurityContext(lc, createConfig.Config, hc, ds.networkPlugin)
 
 	return nil
 }
