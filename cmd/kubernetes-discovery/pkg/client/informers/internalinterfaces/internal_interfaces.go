@@ -19,15 +19,15 @@ limitations under the License.
 package internalinterfaces
 
 import (
+	clientset "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset"
-	release_1_5 "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	time "time"
 )
 
 type NewInternalInformerFunc func(internalclientset.Interface, time.Duration) cache.SharedIndexInformer
-type NewVersionedInformerFunc func(release_1_5.Interface, time.Duration) cache.SharedIndexInformer
+type NewVersionedInformerFunc func(clientset.Interface, time.Duration) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {

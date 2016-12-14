@@ -20,7 +20,7 @@ package v1alpha1
 
 import (
 	apiregistration_v1alpha1 "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1"
-	release_1_5 "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers/internalinterfaces"
 	v1alpha1 "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/v1alpha1"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -41,7 +41,7 @@ type aPIServiceInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newAPIServiceInformer(client release_1_5.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {

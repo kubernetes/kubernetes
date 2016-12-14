@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package release_1_5
+package clientset
 
 import (
 	"github.com/golang/glog"

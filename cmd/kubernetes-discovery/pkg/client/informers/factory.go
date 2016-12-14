@@ -19,8 +19,8 @@ limitations under the License.
 package informers
 
 import (
+	clientset "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset"
-	release_1_5 "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset"
 	apiregistration "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers/apiregistration"
 	internalinterfaces "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers/internalinterfaces"
 	cache "k8s.io/kubernetes/pkg/client/cache"
@@ -32,7 +32,7 @@ import (
 
 type sharedInformerFactory struct {
 	internalClient  internalclientset.Interface
-	versionedClient release_1_5.Interface
+	versionedClient clientset.Interface
 	lock            sync.Mutex
 	defaultResync   time.Duration
 
@@ -43,7 +43,7 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(internalClient internalclientset.Interface, versionedClient release_1_5.Interface, defaultResync time.Duration) SharedInformerFactory {
+func NewSharedInformerFactory(internalClient internalclientset.Interface, versionedClient clientset.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
 		internalClient:   internalClient,
 		versionedClient:  versionedClient,
