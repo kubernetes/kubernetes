@@ -264,7 +264,6 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 		t.Fatal(actual)
 	}
 	for i, obj := range actual {
-<<<<<<< HEAD
 		switch obj.(type) {
 		case runtime.Unstructured, *runtime.Unknown:
 			actualObj, err = runtime.Decode(
@@ -280,10 +279,6 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 		}
 		if !api.Semantic.DeepEqual(expected[i], actualObj) {
 			t.Errorf("unexpected object: \n%#v\n%#v", expected[i], actualObj)
-=======
-		if !api.Semantic.DeepEqual(expected[i], obj) {
-			t.Errorf("unexpected object: \n%#v\n%#v", expected[i], obj)
->>>>>>> e63bcc7... abstract decode part into a function and fix the test failure
 		}
 	}
 }
