@@ -22,7 +22,7 @@ go_library(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/cache:go_default_library",
-        "//federation/client/clientset_generated/federation_release_1_5:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
