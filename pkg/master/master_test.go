@@ -314,15 +314,16 @@ func TestValidOpenAPISpec(t *testing.T) {
 	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	config.GenericConfig.OpenAPIConfig.Definitions = openapigen.OpenAPIDefinitions
-	config.GenericConfig.EnableOpenAPISupport = true
 	config.GenericConfig.EnableIndex = true
+	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.OpenAPIDefinitions)
 	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
 			Version: "unversioned",
 		},
 	}
+	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+
 	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
