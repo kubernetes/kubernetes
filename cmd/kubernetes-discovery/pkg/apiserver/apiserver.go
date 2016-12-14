@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset"
-	clientset "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/release_1_5"
+	clientset "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/informers"
 	listers "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion"
 	apiservicestorage "k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/registry/apiservice/etcd"

@@ -28,7 +28,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/kubelet/container:go_default_library",
