@@ -48,6 +48,7 @@ import (
 	awscredentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -136,16 +137,16 @@ const ServiceAnnotationLoadBalancerSSLPorts = "service.beta.kubernetes.io/aws-lo
 const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
 
 const (
-	// volumeAttachmentStatusTimeout is the maximum time to wait for a volume attach/detach to complete
-	volumeAttachmentStatusTimeout = 30 * time.Minute
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
 	volumeAttachmentStatusConsecutiveErrorLimit = 10
-	// volumeAttachmentErrorDelay is the amount of time we wait before retrying after encountering an error,
-	// while waiting for a volume attach/detach to complete
-	volumeAttachmentStatusErrorDelay = 20 * time.Second
-	// volumeAttachmentStatusPollInterval is the interval at which we poll the volume,
-	// while waiting for a volume attach/detach to complete
-	volumeAttachmentStatusPollInterval = 10 * time.Second
+	// volumeAttachmentStatus* is configuration of exponential backoff for
+	// waiting for attach/detach operation to complete. Starting with 10
+	// seconds, multiplying by 1.2 with each step and taking 21 steps at maximum
+	// it will time out after 31.11 minutes, which roughly corresponds to GCE
+	// timeout (30 minutes).
+	volumeAttachmentStatusInitialDelay = 10 * time.Second
+	volumeAttachmentStatusFactor       = 1.2
+	volumeAttachmentStatusSteps        = 21
 )
 
 // Maps from backend protocol to ELB protocol
@@ -1303,25 +1304,28 @@ func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
 func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
-	// We wait up to 30 minutes for the attachment to complete.
-	// This mirrors the GCE timeout.
-	timeoutAt := time.Now().UTC().Add(volumeAttachmentStatusTimeout).Unix()
+	backoff := wait.Backoff{
+		Duration: volumeAttachmentStatusInitialDelay,
+		Factor:   volumeAttachmentStatusFactor,
+		Steps:    volumeAttachmentStatusSteps,
+	}
 
 	// Because of rate limiting, we often see errors from describeVolume
 	// So we tolerate a limited number of failures.
 	// But once we see more than 10 errors in a row, we return the error
 	describeErrorCount := 0
+	var attachment *ec2.VolumeAttachment
 
-	for {
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		info, err := d.describeVolume()
 		if err != nil {
 			describeErrorCount++
 			if describeErrorCount > volumeAttachmentStatusConsecutiveErrorLimit {
-				return nil, err
+				// report the error
+				return false, err
 			} else {
 				glog.Warningf("Ignoring error from describe volume; will retry: %q", err)
-				time.Sleep(volumeAttachmentStatusErrorDelay)
-				continue
+				return false, nil
 			}
 		} else {
 			describeErrorCount = 0
@@ -1330,7 +1334,6 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			// Shouldn't happen; log so we know if it is
 			glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
 		}
-		var attachment *ec2.VolumeAttachment
 		attachmentStatus := ""
 		for _, a := range info.Attachments {
 			if attachmentStatus != "" {
@@ -1349,18 +1352,15 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			attachmentStatus = "detached"
 		}
 		if attachmentStatus == status {
-			return attachment, nil
+			// Attachment is in requested state, finish waiting
+			return true, nil
 		}
-
-		if time.Now().Unix() > timeoutAt {
-			glog.Warningf("Timeout waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
-			return nil, fmt.Errorf("Timeout waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
-		}
-
+		// continue waiting
 		glog.V(2).Infof("Waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
+		return false, nil
+	})
 
-		time.Sleep(volumeAttachmentStatusPollInterval)
-	}
+	return attachment, err
 }
 
 // Deletes the EBS disk
