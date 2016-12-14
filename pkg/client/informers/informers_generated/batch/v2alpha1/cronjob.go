@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch_v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	release_1_5 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	v2alpha1 "k8s.io/kubernetes/pkg/client/listers/batch/v2alpha1"
 	runtime "k8s.io/kubernetes/pkg/runtime"
@@ -41,7 +41,7 @@ type cronJobInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newCronJobInformer(client release_1_5.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newCronJobInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {

@@ -20,8 +20,8 @@ package informers_generated
 
 import (
 	cache "k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	release_1_5 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	apps "k8s.io/kubernetes/pkg/client/informers/informers_generated/apps"
 	autoscaling "k8s.io/kubernetes/pkg/client/informers/informers_generated/autoscaling"
 	batch "k8s.io/kubernetes/pkg/client/informers/informers_generated/batch"
@@ -40,7 +40,7 @@ import (
 
 type sharedInformerFactory struct {
 	internalClient  internalclientset.Interface
-	versionedClient release_1_5.Interface
+	versionedClient clientset.Interface
 	lock            sync.Mutex
 	defaultResync   time.Duration
 
@@ -51,7 +51,7 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(internalClient internalclientset.Interface, versionedClient release_1_5.Interface, defaultResync time.Duration) SharedInformerFactory {
+func NewSharedInformerFactory(internalClient internalclientset.Interface, versionedClient clientset.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
 		internalClient:   internalClient,
 		versionedClient:  versionedClient,

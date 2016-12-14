@@ -14,7 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
-        "//federation/client/clientset_generated/federation_release_1_5:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/eventsink:go_default_library",
         "//pkg/api:go_default_library",
@@ -38,7 +38,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
-        "//federation/client/clientset_generated/federation_release_1_5/fake:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/test:go_default_library",
         "//pkg/api/v1:go_default_library",

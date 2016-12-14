@@ -20,7 +20,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//federation/client/clientset_generated/federation_release_1_5/typed/extensions/v1beta1:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",

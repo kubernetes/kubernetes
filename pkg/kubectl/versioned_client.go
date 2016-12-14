@@ -17,10 +17,10 @@ limitations under the License.
 package kubectl
 
 import (
-	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	externalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	extensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 func versionedClientsetForDeployment(internalClient internalclientset.Interface) externalclientset.Interface {
