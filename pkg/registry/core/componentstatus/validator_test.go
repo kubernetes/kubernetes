@@ -14,31 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package componentstatus
 
 import (
 	"errors"
 	"fmt"
 	"testing"
 
-	"net/http"
-	"net/url"
-	"time"
-
 	"k8s.io/kubernetes/pkg/probe"
 )
-
-type fakeHttpProber struct {
-	result probe.Result
-	body   string
-	err    error
-}
-
-func (f *fakeHttpProber) Probe(*url.URL, http.Header, time.Duration) (probe.Result, string, error) {
-	return f.result, f.body, f.err
-}
-
-func alwaysError([]byte) error { return errors.New("test error") }
 
 func matchError(data []byte) error {
 	if string(data) != "bar" {
