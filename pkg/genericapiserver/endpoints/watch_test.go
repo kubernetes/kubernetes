@@ -299,68 +299,68 @@ func TestWatchRead(t *testing.T) {
 
 	for _, protocol := range protocols {
 		for _, test := range testCases {
-			info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), test.MediaType)
-			if !ok || info.StreamSerializer == nil {
-				t.Fatal(info)
-			}
-			streamSerializer := info.StreamSerializer
+			func() {
+				info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), test.MediaType)
+				if !ok || info.StreamSerializer == nil {
+					t.Fatal(info)
+				}
+				streamSerializer := info.StreamSerializer
 
-			r, contentType := protocol.fn(test.Accept)
-			defer r.Close()
+				r, contentType := protocol.fn(test.Accept)
+				defer r.Close()
 
-			if contentType != "__default__" && contentType != test.ExpectedContentType {
-				t.Errorf("Unexpected content type: %#v", contentType)
-			}
-			objectCodec := api.Codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
+				if contentType != "__default__" && contentType != test.ExpectedContentType {
+					t.Errorf("Unexpected content type: %#v", contentType)
+				}
+				objectCodec := api.Codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
-			var fr io.ReadCloser = r
-			if !protocol.selfFraming {
-				fr = streamSerializer.Framer.NewFrameReader(r)
-			}
-			d := streaming.NewDecoder(fr, streamSerializer.Serializer)
+				var fr io.ReadCloser = r
+				if !protocol.selfFraming {
+					fr = streamSerializer.Framer.NewFrameReader(r)
+				}
+				d := streaming.NewDecoder(fr, streamSerializer.Serializer)
 
-			var w *watch.FakeWatcher
-			for w == nil {
-				w = simpleStorage.Watcher()
-				time.Sleep(time.Millisecond)
-			}
+				var w *watch.FakeWatcher
+				for w == nil {
+					w = simpleStorage.Watcher()
+					time.Sleep(time.Millisecond)
+				}
 
-			for i, item := range podWatchTestTable {
-				action, object := item.t, item.obj
-				name := fmt.Sprintf("%s-%s-%d", protocol.name, test.MediaType, i)
+				for i, item := range podWatchTestTable {
+					action, object := item.t, item.obj
+					name := fmt.Sprintf("%s-%s-%d", protocol.name, test.MediaType, i)
 
-				// Send
-				w.Action(action, object)
-				// Test receive
+					// Send
+					w.Action(action, object)
+					// Test receive
+					var got metav1.WatchEvent
+					_, _, err := d.Decode(nil, &got)
+					if err != nil {
+						t.Fatalf("%s: Unexpected error: %v", name, err)
+					}
+					if got.Type != string(action) {
+						t.Errorf("%s: Unexpected type: %v", name, got.Type)
+					}
+
+					gotObj, err := runtime.Decode(objectCodec, got.Object.Raw)
+					if err != nil {
+						t.Fatalf("%s: Decode error: %v", name, err)
+					}
+					if _, err := api.GetReference(gotObj); err != nil {
+						t.Errorf("%s: Unable to construct reference: %v", name, err)
+					}
+					if e, a := object, gotObj; !api.Semantic.DeepEqual(e, a) {
+						t.Errorf("%s: different: %s", name, diff.ObjectDiff(e, a))
+					}
+				}
+				w.Stop()
+
 				var got metav1.WatchEvent
 				_, _, err := d.Decode(nil, &got)
-				if err != nil {
-					t.Fatalf("%s: Unexpected error: %v", name, err)
+				if err == nil {
+					t.Errorf("Unexpected non-error")
 				}
-				if got.Type != string(action) {
-					t.Errorf("%s: Unexpected type: %v", name, got.Type)
-				}
-
-				gotObj, err := runtime.Decode(objectCodec, got.Object.Raw)
-				if err != nil {
-					t.Fatalf("%s: Decode error: %v", name, err)
-				}
-				if _, err := api.GetReference(gotObj); err != nil {
-					t.Errorf("%s: Unable to construct reference: %v", name, err)
-				}
-				if e, a := object, gotObj; !api.Semantic.DeepEqual(e, a) {
-					t.Errorf("%s: different: %s", name, diff.ObjectDiff(e, a))
-				}
-			}
-			w.Stop()
-
-			var got metav1.WatchEvent
-			_, _, err := d.Decode(nil, &got)
-			if err == nil {
-				t.Errorf("Unexpected non-error")
-			}
-
-			r.Close()
+			}()
 		}
 	}
 }
