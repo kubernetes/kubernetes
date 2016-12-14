@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"

@@ -20,8 +20,8 @@ go_library(
     deps = [
         "//cmd/kubernetes-discovery/pkg/apis/apiregistration:go_default_library",
         "//cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1:go_default_library",
+        "//cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset:go_default_library",
         "//cmd/kubernetes-discovery/pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//cmd/kubernetes-discovery/pkg/client/clientset_generated/release_1_5:go_default_library",
         "//cmd/kubernetes-discovery/pkg/client/informers:go_default_library",
         "//cmd/kubernetes-discovery/pkg/client/informers/apiregistration/internalversion:go_default_library",
         "//cmd/kubernetes-discovery/pkg/client/listers/apiregistration/internalversion:go_default_library",

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/core/v1"
+	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"

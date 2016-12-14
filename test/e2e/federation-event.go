@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -64,7 +64,7 @@ var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() 
 	})
 })
 
-func createEventOrFail(clientset *federation_release_1_5.Clientset, namespace string) *v1.Event {
+func createEventOrFail(clientset *federation_clientset.Clientset, namespace string) *v1.Event {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createEventOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}

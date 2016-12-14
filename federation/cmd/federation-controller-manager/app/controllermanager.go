@@ -26,7 +26,7 @@ import (
 	"net/http/pprof"
 	"strconv"
 
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"

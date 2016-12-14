@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"

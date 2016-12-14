@@ -18,7 +18,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
         "//vendor:github.com/golang/glog",
