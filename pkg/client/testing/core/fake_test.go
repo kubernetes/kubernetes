@@ -94,6 +94,65 @@ func TestFakeClientSetFiltering(t *testing.T) {
 	}
 }
 
+func TestFakeClientsetInheritsNamespace(t *testing.T) {
+	tc := clientsetfake.NewSimpleClientset(
+		testNamespace("nsA"),
+		testPod("nsA", "pod-1"),
+	)
+
+	_, err := tc.Core().Namespaces().Create(testNamespace("nsB"))
+	if err != nil {
+		t.Fatalf("Namespaces.Create: %s", err)
+	}
+
+	allNS, err := tc.Core().Namespaces().List(api.ListOptions{})
+	if err != nil {
+		t.Fatalf("Namespaces.List: %s", err)
+	}
+	if actual, expected := len(allNS.Items), 2; expected != actual {
+		t.Fatalf("Expected %d namespaces to match, got %d", expected, actual)
+	}
+
+	_, err = tc.Core().Pods("nsB").Create(testPod("", "pod-1"))
+	if err != nil {
+		t.Fatalf("Pods.Create nsB/pod-1: %s", err)
+	}
+
+	podB1, err := tc.Core().Pods("nsB").Get("pod-1", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Pods.Get nsB/pod-1: %s", err)
+	}
+	if podB1 == nil {
+		t.Fatalf("Expected to find pod nsB/pod-1 but it wasn't found")
+	}
+	if podB1.Namespace != "nsB" || podB1.Name != "pod-1" {
+		t.Fatalf("Expected to find pod nsB/pod-1t, got %s/%s", podB1.Namespace, podB1.Name)
+	}
+
+	_, err = tc.Core().Pods("nsA").Create(testPod("", "pod-1"))
+	if err == nil {
+		t.Fatalf("Expected Pods.Create to fail with already exists error")
+	}
+
+	_, err = tc.Core().Pods("nsA").Update(testPod("", "pod-1"))
+	if err != nil {
+		t.Fatalf("Pods.Update nsA/pod-1: %s", err)
+	}
+
+	_, err = tc.Core().Pods("nsA").Create(testPod("nsB", "pod-2"))
+	if err == nil {
+		t.Fatalf("Expected Pods.Create to fail with bad request from namespace mismtach")
+	}
+	if err.Error() != `request namespace does not match object namespace, request: "nsA" object: "nsB"` {
+		t.Fatalf("Expected Pods.Create error to provide object and request namespaces, got %q", err)
+	}
+
+	_, err = tc.Core().Pods("nsA").Update(testPod("", "pod-3"))
+	if err == nil {
+		t.Fatalf("Expected Pods.Update nsA/pod-3 to fail with not found error")
+	}
+}
+
 func testSA(ns, name string) *api.ServiceAccount {
 	return &api.ServiceAccount{
 		ObjectMeta: api.ObjectMeta{
@@ -108,6 +167,14 @@ func testPod(ns, name string) *api.Pod {
 		ObjectMeta: api.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
+		},
+	}
+}
+
+func testNamespace(ns string) *api.Namespace {
+	return &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name: ns,
 		},
 	}
 }
