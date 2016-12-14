@@ -85,7 +85,7 @@ func buildConformanceTest(binDir string) error {
 			commandToString(cmd), err, output)
 	}
 	// Save docker image into tar file.
-	cmd = exec.Command("docker", "save", getConformanceImageRepo(), "-o", filepath.Join(binDir, conformanceTarfile))
+	cmd = exec.Command("docker", "save", "-o", filepath.Join(binDir, conformanceTarfile), getConformanceImageRepo())
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to save node conformance docker image into tar file: command - %q, error - %v, output - %q",
 			commandToString(cmd), err, output)
