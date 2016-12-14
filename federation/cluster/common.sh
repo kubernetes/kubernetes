@@ -46,7 +46,7 @@ if [[ -z "${FEDERATION_PUSH_REPO_BASE}" ]]; then
 fi
 
 FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.io/google_containers'}
-FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation}
+FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
 
 KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 KUBE_ARCH=${KUBE_ARCH:-amd64}
@@ -351,6 +351,7 @@ function push-federation-images {
 }
 
 function cleanup-federation-api-objects {
+  echo "Cleaning Federation control plane objects"
   # Delete all resources with the federated-cluster label.
   $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
   # Delete all resources in FEDERATION_NAMESPACE.

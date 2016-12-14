@@ -54,6 +54,8 @@ const (
 	ClusterReady ClusterConditionType = "Ready"
 	// ClusterOffline means the cluster is temporarily down or not reachable
 	ClusterOffline ClusterConditionType = "Offline"
+	// FederationNamespaceSystem is the system namespace where we place federation control plane components.
+	FederationNamespaceSystem string = "federation-system"
 )
 
 // ClusterCondition describes current state of a cluster.
