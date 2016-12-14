@@ -2402,3 +2402,95 @@ func makePod(name string, spec *v1.PodSpec) *v1.Pod {
 	}
 	return pod
 }
+
+func TestMakeMountBindings(t *testing.T) {
+	tests := []struct {
+		mounts      []kubecontainer.Mount
+		selinux     bool
+		propagation string
+		bindings    []string
+	}{
+		{
+			mounts: []kubecontainer.Mount{
+				{
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp1",
+					ReadOnly:        true,
+					NeedPropagation: true,
+				},
+				{
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp2",
+					ReadOnly:        false,
+					SELinuxRelabel:  true,
+					NeedPropagation: true,
+				},
+			},
+			selinux:     false,
+			propagation: "rshared",
+			bindings: []string{
+				"/tmp:/tmp1:ro,rshared",
+				"/tmp:/tmp2:rshared",
+			},
+		},
+		{
+			mounts: []kubecontainer.Mount{
+				{
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp1",
+					ReadOnly:        true,
+					NeedPropagation: true,
+				},
+				{
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp2",
+					ReadOnly:        false,
+					SELinuxRelabel:  true,
+					NeedPropagation: true,
+				},
+			},
+			selinux:     false,
+			propagation: "rslave",
+			bindings: []string{
+				"/tmp:/tmp1:ro,rslave",
+				"/tmp:/tmp2:rslave",
+			},
+		},
+		{
+			mounts: []kubecontainer.Mount{
+				{
+					HostPath:        "/tmp",
+					ContainerPath:   "/tmp1",
+					ReadOnly:        true,
+					SELinuxRelabel:  true,
+					NeedPropagation: true,
+				},
+				{
+					HostPath:       "/tmp",
+					ContainerPath:  "/tmp2",
+					ReadOnly:       false,
+					SELinuxRelabel: true,
+				},
+				{
+					HostPath:       "/tmp",
+					ContainerPath:  "/tmp3",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+				},
+			},
+			selinux:     true,
+			propagation: "",
+			bindings: []string{
+				"/tmp:/tmp1:ro,Z",
+				"/tmp:/tmp2:Z",
+				"/tmp:/tmp3",
+			},
+		},
+	}
+	for _, test := range tests {
+		bindings := makeMountBindings(test.mounts, test.selinux, test.propagation)
+		if !reflect.DeepEqual(bindings, test.bindings) {
+			t.Errorf("Expected %v, got %v", test.bindings, bindings)
+		}
+	}
+}

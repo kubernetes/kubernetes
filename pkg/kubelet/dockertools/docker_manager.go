@@ -521,19 +521,23 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
 // relabeling
-func makeMountBindings(mounts []kubecontainer.Mount) (result []string) {
+func makeMountBindings(mounts []kubecontainer.Mount, selinuxEnabled bool, propagation string) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
+		attr := make([]string, 0, 3)
 		if m.ReadOnly {
-			bind += ":ro"
+			attr = append(attr, "ro")
 		}
-		if m.SELinuxRelabel && selinux.SELinuxEnabled() {
-			if m.ReadOnly {
-				bind += ",Z"
-			} else {
-				bind += ":Z"
-			}
 
+		if m.SELinuxRelabel && selinuxEnabled {
+			attr = append(attr, "Z")
+		}
+		// Propagation
+		if len(propagation) > 0 && m.NeedPropagation {
+			attr = append(attr, propagation)
+		}
+		if len(attr) > 0 {
+			bind = fmt.Sprintf("%s:%s", bind, strings.Join(attr, ","))
 		}
 		result = append(result, bind)
 	}
@@ -612,6 +616,13 @@ func (dm *DockerManager) runContainer(
 		return kubecontainer.ContainerID{}, err
 	}
 
+	// Check if current api version is newer than docker 1.10 requested
+	dockerNewerThanV110, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
+	if err != nil {
+		glog.Errorf("Failed to check docker api version: %v", err)
+		return kubecontainer.ContainerID{}, err
+	}
+
 	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
 	// while the Kubelet is down and there is no information available to recover the pod.
 	// TODO: keep these labels up to date if the pod changes
@@ -652,7 +663,20 @@ func (dm *DockerManager) runContainer(
 			CgroupPermissions: device.Permissions,
 		}
 	}
-	binds := makeMountBindings(opts.Mounts)
+
+	// Propagation mode is set to:
+	// "" for non HostPath volumes
+	// "rshared" for HostPath volume mount in priviledged containers
+	// "rslave" for HostPath volume mount in non-priviledged containers
+	var propagation string
+	if dockerNewerThanV110 >= 0 {
+		if container.SecurityContext != nil && *container.SecurityContext.Privileged {
+			propagation = "rshared"
+		} else {
+			propagation = "rslave"
+		}
+	}
+	binds := makeMountBindings(opts.Mounts, selinux.SELinuxEnabled(), propagation)
 
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
@@ -730,10 +754,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// If current api version is newer than docker 1.10 requested, set OomScoreAdj to HostConfig
-	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
-	if err != nil {
-		glog.Errorf("Failed to check docker api version: %v", err)
-	} else if result >= 0 {
+	if dockerNewerThanV110 >= 0 {
 		hc.OomScoreAdj = oomScoreAdj
 	}
 

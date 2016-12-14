@@ -386,6 +386,8 @@ type Mount struct {
 	ReadOnly bool
 	// Whether the mount needs SELinux relabeling
 	SELinuxRelabel bool
+	// Whether the mount need Propagation mode set.
+	NeedPropagation bool
 }
 
 type PortMapping struct {
