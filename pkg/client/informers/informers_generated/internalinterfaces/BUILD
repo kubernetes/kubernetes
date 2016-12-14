@@ -13,8 +13,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/runtime:go_default_library",
     ],
 )

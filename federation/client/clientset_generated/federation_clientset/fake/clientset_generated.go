@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
-	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
-	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/core/v1"
-	fakev1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/core/v1/fake"
-	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/extensions/v1beta1"
-	fakev1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/extensions/v1beta1/fake"
-	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/federation/v1beta1"
-	fakev1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/federation/v1beta1/fake"
+	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
+	fakev1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1/fake"
+	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1"
+	fakev1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1/fake"
+	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1"
+	fakev1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/testing/core"
