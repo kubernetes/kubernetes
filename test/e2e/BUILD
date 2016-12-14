@@ -216,17 +216,17 @@ go_library(
     ],
 )
 
-# this is a private library until we can support building the
-# test binary
-# TODO(mikedanese): fix @io_bazelbuild/rules_go
-go_library(
+go_test(
     name = "go_default_test",
     srcs = [
         "e2e_test.go",
         "metrics_grabber_test.go",
     ],
     library = "go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "skip",
+    ],
     visibility = ["//visibility:private"],
     deps = [
         "//pkg/api/v1:go_default_library",
