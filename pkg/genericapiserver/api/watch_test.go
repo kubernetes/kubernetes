@@ -307,7 +307,6 @@ func TestWatchRead(t *testing.T) {
 			streamSerializer := info.StreamSerializer
 
 			r, contentType := protocol.fn(test.Accept)
-			defer r.Close()
 
 			if contentType != "__default__" && contentType != test.ExpectedContentType {
 				t.Errorf("Unexpected content type: %#v", contentType)
