@@ -161,6 +161,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
 		Convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		Convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
+		Convert_v1_LocalDisk_To_api_LocalDisk,
+		Convert_api_LocalDisk_To_v1_LocalDisk,
 		Convert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		Convert_api_LocalObjectReference_To_v1_LocalObjectReference,
 		Convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
@@ -1840,6 +1842,28 @@ func Convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(in *api.LoadBalance
 	return autoConvert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(in, out, s)
 }
 
+func autoConvert_v1_LocalDisk_To_api_LocalDisk(in *LocalDisk, out *api.LocalDisk, s conversion.Scope) error {
+	out.LocalDir = in.LocalDir
+	out.Capacity = in.Capacity
+	out.Allocatable = in.Allocatable
+	return nil
+}
+
+func Convert_v1_LocalDisk_To_api_LocalDisk(in *LocalDisk, out *api.LocalDisk, s conversion.Scope) error {
+	return autoConvert_v1_LocalDisk_To_api_LocalDisk(in, out, s)
+}
+
+func autoConvert_api_LocalDisk_To_v1_LocalDisk(in *api.LocalDisk, out *LocalDisk, s conversion.Scope) error {
+	out.LocalDir = in.LocalDir
+	out.Capacity = in.Capacity
+	out.Allocatable = in.Allocatable
+	return nil
+}
+
+func Convert_api_LocalDisk_To_v1_LocalDisk(in *api.LocalDisk, out *LocalDisk, s conversion.Scope) error {
+	return autoConvert_api_LocalDisk_To_v1_LocalDisk(in, out, s)
+}
+
 func autoConvert_v1_LocalObjectReference_To_api_LocalObjectReference(in *LocalObjectReference, out *api.LocalObjectReference, s conversion.Scope) error {
 	out.Name = in.Name
 	return nil
@@ -2235,6 +2259,7 @@ func Convert_api_NodeSpec_To_v1_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conv
 func autoConvert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus, s conversion.Scope) error {
 	out.Capacity = *(*api.ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Allocatable = *(*api.ResourceList)(unsafe.Pointer(&in.Allocatable))
+	out.LocalDisks = *(*[]api.LocalDisk)(unsafe.Pointer(&in.LocalDisks))
 	out.Phase = api.NodePhase(in.Phase)
 	out.Conditions = *(*[]api.NodeCondition)(unsafe.Pointer(&in.Conditions))
 	out.Addresses = *(*[]api.NodeAddress)(unsafe.Pointer(&in.Addresses))
@@ -2257,6 +2282,7 @@ func Convert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus
 func autoConvert_api_NodeStatus_To_v1_NodeStatus(in *api.NodeStatus, out *NodeStatus, s conversion.Scope) error {
 	out.Capacity = *(*ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Allocatable = *(*ResourceList)(unsafe.Pointer(&in.Allocatable))
+	out.LocalDisks = *(*[]LocalDisk)(unsafe.Pointer(&in.LocalDisks))
 	out.Phase = NodePhase(in.Phase)
 	out.Conditions = *(*[]NodeCondition)(unsafe.Pointer(&in.Conditions))
 	out.Addresses = *(*[]NodeAddress)(unsafe.Pointer(&in.Addresses))

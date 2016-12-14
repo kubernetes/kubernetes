@@ -98,6 +98,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ListOptions, InType: reflect.TypeOf(&ListOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerIngress, InType: reflect.TypeOf(&LoadBalancerIngress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerStatus, InType: reflect.TypeOf(&LoadBalancerStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalDisk, InType: reflect.TypeOf(&LocalDisk{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalObjectReference, InType: reflect.TypeOf(&LocalObjectReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NFSVolumeSource, InType: reflect.TypeOf(&NFSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Namespace, InType: reflect.TypeOf(&Namespace{})},
@@ -1487,6 +1488,17 @@ func DeepCopy_v1_LoadBalancerStatus(in interface{}, out interface{}, c *conversi
 	}
 }
 
+func DeepCopy_v1_LocalDisk(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LocalDisk)
+		out := out.(*LocalDisk)
+		out.LocalDir = in.LocalDir
+		out.Capacity = in.Capacity
+		out.Allocatable = in.Allocatable
+		return nil
+	}
+}
+
 func DeepCopy_v1_LocalObjectReference(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*LocalObjectReference)
@@ -1783,6 +1795,15 @@ func DeepCopy_v1_NodeStatus(in interface{}, out interface{}, c *conversion.Clone
 			}
 		} else {
 			out.Allocatable = nil
+		}
+		if in.LocalDisks != nil {
+			in, out := &in.LocalDisks, &out.LocalDisks
+			*out = make([]LocalDisk, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
+		} else {
+			out.LocalDisks = nil
 		}
 		out.Phase = in.Phase
 		if in.Conditions != nil {
