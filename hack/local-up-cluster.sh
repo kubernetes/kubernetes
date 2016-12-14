@@ -49,7 +49,6 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-false}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
-DNS_REPLICAS=${KUBE_DNS_REPLICAS:-1}
 KUBECTL=${KUBECTL:-cluster/kubectl.sh}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
@@ -611,29 +610,29 @@ function start_kubeproxy {
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
-        sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-rc.yaml
+        sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-deployment.yaml
         if [[ "${FEDERATION:-}" == "true" ]]; then
           FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
           if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
             FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
           fi
           if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" kubedns-rc.yaml
+            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" kubedns-deployment.yaml
           else
-            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-rc.yaml
+            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
           fi
         else
-          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-rc.yaml
+          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
         fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
         
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create kubedns rc and service
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-rc.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns rc and service successfully deployed."
-        rm  kubedns-rc.yaml kubedns-svc.yaml
+        rm  kubedns-deployment.yaml kubedns-svc.yaml
     fi
 }
 
