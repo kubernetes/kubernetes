@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"os"
 	"runtime"
 
@@ -43,6 +44,7 @@ func main() {
 	}
 
 	cmd := server.NewCommandStartDiscoveryServer(os.Stdout, os.Stderr)
+	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		cmdutil.CheckErr(err)
 	}
