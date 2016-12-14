@@ -569,7 +569,7 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	// For example, any volume used by the pod that was backed by memory will have its
 	// pages charged to the pod cgroup until those volumes are removed by the kubelet.
 	// Hence we only reduce the cpu resource limits of the pod's cgroup
-	// and defer the responsibilty of destroying the pod's cgroup to the
+	// and defer the responsibility of destroying the pod's cgroup to the
 	// cleanup method and the housekeeping loop.
 	if reduceCpuLimts {
 		pcm.ReduceCPULimits(podCgroup)

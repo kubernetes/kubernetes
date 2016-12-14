@@ -32,9 +32,6 @@ type RESTStorageProvider struct {
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	// TODO figure out how to make the swagger generation stable, while allowing this endpoint to be disabled.
-	// if p.Authenticator == nil {
-	// 	return genericapiserver.APIGroupInfo{}, false
-	// }
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authentication.GroupName)
 
