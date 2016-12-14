@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"path"
 	rt "runtime"
@@ -105,16 +104,6 @@ type APIGroupVersion struct {
 	// for this API Group.
 	ResourceLister APIResourceLister
 }
-
-type ProxyDialerFunc func(network, addr string) (net.Conn, error)
-
-// TODO: Pipe these in through the apiserver cmd line
-const (
-	// Minimum duration before timing out read/write requests
-	MinTimeoutSecs = 300
-	// Maximum duration before timing out read/write requests
-	MaxTimeoutSecs = 600
-)
 
 // staticLister implements the APIResourceLister interface
 type staticLister struct {
