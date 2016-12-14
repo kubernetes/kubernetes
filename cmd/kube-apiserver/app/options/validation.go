@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ func validateServiceNodePort(options *ServerRunOptions) []error {
 	return errors
 }
 
+// Validate checks ServerRunOptions and return a slice of found errors.
 func (options *ServerRunOptions) Validate() []error {
 	var errors []error
 	if errs := options.Etcd.Validate(); len(errs) > 0 {
