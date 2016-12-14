@@ -31,6 +31,7 @@ import (
 
 func TestPodVolumesExist(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pods := []*v1.Pod{
@@ -115,6 +116,7 @@ func TestPodVolumesExist(t *testing.T) {
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
@@ -160,6 +162,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
@@ -230,6 +233,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("get", "nodes",
@@ -298,6 +302,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("get", "nodes",
