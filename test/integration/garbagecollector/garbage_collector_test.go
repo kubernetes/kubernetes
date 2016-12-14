@@ -428,7 +428,7 @@ func TestOrphaning(t *testing.T) {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
 
-	// these pods should be ophaned.
+	// these pods should be orphaned.
 	var podUIDs []types.UID
 	podsNum := 3
 	for i := 0; i < podsNum; i++ {
@@ -478,7 +478,7 @@ func TestOrphaning(t *testing.T) {
 	}
 	for _, pod := range pods.Items {
 		if len(pod.ObjectMeta.OwnerReferences) != 0 {
-			t.Errorf("pod %s still has non-empty OwnerRefereces: %v", pod.ObjectMeta.Name, pod.ObjectMeta.OwnerReferences)
+			t.Errorf("pod %s still has non-empty OwnerReferences: %v", pod.ObjectMeta.Name, pod.ObjectMeta.OwnerReferences)
 		}
 	}
 }
