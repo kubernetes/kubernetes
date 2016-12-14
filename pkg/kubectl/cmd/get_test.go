@@ -257,12 +257,33 @@ func TestGetSortedObjects(t *testing.T) {
 }
 
 func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
+	var actualObj runtime.Object
+	var err error
+	
 	if len(actual) != len(expected) {
 		t.Fatal(actual)
 	}
 	for i, obj := range actual {
+<<<<<<< HEAD
+		switch obj.(type) {
+		case runtime.Unstructured, *runtime.Unknown:
+			actualObj, err = runtime.Decode(
+				api.Codecs.UniversalDecoder(),
+				[]byte(runtime.EncodeOrDie(api.Codecs.LegacyCodec(), obj)))
+		default:
+			actualObj = obj
+			err = nil
+		}
+		
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !api.Semantic.DeepEqual(expected[i], actualObj) {
+			t.Errorf("unexpected object: \n%#v\n%#v", expected[i], actualObj)
+=======
 		if !api.Semantic.DeepEqual(expected[i], obj) {
 			t.Errorf("unexpected object: \n%#v\n%#v", expected[i], obj)
+>>>>>>> e63bcc7... abstract decode part into a function and fix the test failure
 		}
 	}
 }
