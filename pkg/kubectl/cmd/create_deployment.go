@@ -54,6 +54,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
 	cmd.Flags().StringSlice("image", []string{}, "Image name to run.")
+	cmd.Flags().Int("replicas", 1, "The desired number of replicas.")
 	cmd.MarkFlagRequired("image")
 	return cmd
 }
@@ -67,7 +68,11 @@ func CreateDeployment(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.DeploymentBasicV1Beta1GeneratorName:
-		generator = &kubectl.DeploymentBasicGeneratorV1{Name: name, Images: cmdutil.GetFlagStringSlice(cmd, "image")}
+		generator = &kubectl.DeploymentBasicGeneratorV1{
+			Name:     name,
+			Images:   cmdutil.GetFlagStringSlice(cmd, "image"),
+			Replicas: int32(cmdutil.GetFlagInt(cmd, "replicas")),
+		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
