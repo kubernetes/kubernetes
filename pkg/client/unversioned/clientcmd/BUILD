@@ -15,6 +15,7 @@ go_library(
         "client_config.go",
         "config.go",
         "doc.go",
+        "helpers.go",
         "loader.go",
         "merged_client_builder.go",
         "overrides.go",
