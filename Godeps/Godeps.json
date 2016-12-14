@@ -288,6 +288,22 @@
 			"Rev": "dfb21201d9270c1082d5fb0f07f500311ff72f18"
 		},
 		{
+			"ImportPath": "github.com/chai2010/gettext-go/gettext",
+			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
+		},
+		{
+			"ImportPath": "github.com/chai2010/gettext-go/gettext/mo",
+			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
+		},
+		{
+			"ImportPath": "github.com/chai2010/gettext-go/gettext/plural",
+			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
+		},
+		{
+			"ImportPath": "github.com/chai2010/gettext-go/gettext/po",
+			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
+		},
+		{
 			"ImportPath": "github.com/cloudflare/cfssl/auth",
 			"Comment": "1.2.0",
 			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
