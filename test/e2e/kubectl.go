@@ -391,6 +391,14 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
 
+			By("executing a very long command in the container")
+			veryLongData := make([]rune, 20000)
+			for i := 0; i < len(veryLongData); i++ {
+				veryLongData[i] = 'a'
+			}
+			execOutput = framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodName, "echo", string(veryLongData))
+			Expect(string(veryLongData)).To(Equal(strings.TrimSpace(execOutput)), "Unexpected kubectl exec output")
+
 			By("executing a command in the container with noninteractive stdin")
 			execOutput = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "cat").
 				WithStdinData("abcd1234").

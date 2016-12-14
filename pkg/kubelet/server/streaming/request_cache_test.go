@@ -1,0 +1,227 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package streaming
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/pkg/util/wait"
+)
+
+func TestInsert(t *testing.T) {
+	c, _ := newTestCache()
+
+	// Insert normal
+	oldestTok, err := c.Insert(nextRequest())
+	require.NoError(t, err)
+	assertCacheSize(t, c, 1)
+
+	// Insert until full
+	for i := 0; i < CacheMaxSize-2; i++ {
+		_, err := c.Insert(nextRequest())
+		require.NoError(t, err)
+	}
+	assertCacheSize(t, c, CacheMaxSize-1)
+
+	newestReq := nextRequest()
+	newestTok, err := c.Insert(newestReq)
+	require.NoError(t, err)
+	assertCacheSize(t, c, CacheMaxSize)
+	require.Contains(t, c.tokens, oldestTok, "oldest request should still be cached")
+
+	// Consume newest token.
+	req, ok := c.Consume(newestTok)
+	assert.True(t, ok, "newest request should still be cached")
+	assert.Equal(t, newestReq, req)
+	require.Contains(t, c.tokens, oldestTok, "oldest request should still be cached")
+
+	// Insert again (still full)
+	_, err = c.Insert(nextRequest())
+	require.NoError(t, err)
+	assertCacheSize(t, c, CacheMaxSize)
+
+	// Insert again (should evict)
+	_, err = c.Insert(nextRequest())
+	require.NoError(t, err)
+	assertCacheSize(t, c, CacheMaxSize)
+	assert.NotContains(t, c.tokens, oldestTok, "oldest request should be evicted")
+	_, ok = c.Consume(oldestTok)
+	assert.False(t, ok, "oldest request should be evicted")
+}
+
+func TestConsume(t *testing.T) {
+	c, clock := newTestCache()
+
+	{ // Insert & consume.
+		req := nextRequest()
+		tok, err := c.Insert(req)
+		require.NoError(t, err)
+		assertCacheSize(t, c, 1)
+
+		cachedReq, ok := c.Consume(tok)
+		assert.True(t, ok)
+		assert.Equal(t, req, cachedReq)
+		assertCacheSize(t, c, 0)
+	}
+
+	{ // Insert & consume out of order
+		req1 := nextRequest()
+		tok1, err := c.Insert(req1)
+		require.NoError(t, err)
+		assertCacheSize(t, c, 1)
+
+		req2 := nextRequest()
+		tok2, err := c.Insert(req2)
+		require.NoError(t, err)
+		assertCacheSize(t, c, 2)
+
+		cachedReq2, ok := c.Consume(tok2)
+		assert.True(t, ok)
+		assert.Equal(t, req2, cachedReq2)
+		assertCacheSize(t, c, 1)
+
+		cachedReq1, ok := c.Consume(tok1)
+		assert.True(t, ok)
+		assert.Equal(t, req1, cachedReq1)
+		assertCacheSize(t, c, 0)
+	}
+
+	{ // Consume a second time
+		req := nextRequest()
+		tok, err := c.Insert(req)
+		require.NoError(t, err)
+		assertCacheSize(t, c, 1)
+
+		cachedReq, ok := c.Consume(tok)
+		assert.True(t, ok)
+		assert.Equal(t, req, cachedReq)
+		assertCacheSize(t, c, 0)
+
+		_, ok = c.Consume(tok)
+		assert.False(t, ok)
+		assertCacheSize(t, c, 0)
+	}
+
+	{ // Consume without insert
+		_, ok := c.Consume("fooBAR")
+		assert.False(t, ok)
+		assertCacheSize(t, c, 0)
+	}
+
+	{ // Consume expired
+		tok, err := c.Insert(nextRequest())
+		require.NoError(t, err)
+		assertCacheSize(t, c, 1)
+
+		clock.Step(2 * CacheTTL)
+
+		_, ok := c.Consume(tok)
+		assert.False(t, ok)
+		assertCacheSize(t, c, 0)
+	}
+}
+
+func TestGC(t *testing.T) {
+	c, clock := newTestCache()
+
+	// When empty
+	c.gc()
+	assertCacheSize(t, c, 0)
+
+	// expired: tok1, tok2
+	// non-expired: tok3, tok4
+	tok1, err := c.Insert(nextRequest())
+	require.NoError(t, err)
+	clock.Step(10 * time.Second)
+	tok2, err := c.Insert(nextRequest())
+	require.NoError(t, err)
+	clock.Step(2 * CacheTTL)
+	tok3, err := c.Insert(nextRequest())
+	require.NoError(t, err)
+	clock.Step(10 * time.Second)
+	tok4, err := c.Insert(nextRequest())
+	require.NoError(t, err)
+	assertCacheSize(t, c, 4)
+
+	c.gc()
+
+	assertCacheSize(t, c, 2)
+	_, ok := c.Consume(tok1)
+	assert.False(t, ok)
+	_, ok = c.Consume(tok2)
+	assert.False(t, ok)
+	_, ok = c.Consume(tok3)
+	assert.True(t, ok)
+	_, ok = c.Consume(tok4)
+	assert.True(t, ok)
+
+	// When full, nothing is expired.
+	for i := 0; i < CacheMaxSize; i++ {
+		_, err := c.Insert(nextRequest())
+		require.NoError(t, err)
+	}
+	assertCacheSize(t, c, CacheMaxSize)
+	c.gc()
+	assertCacheSize(t, c, CacheMaxSize)
+
+	// When everything is expired
+	clock.Step(2 * CacheTTL)
+	c.gc()
+	assertCacheSize(t, c, 0)
+}
+
+func TestGCLoop(t *testing.T) {
+	c, clock := newTestCache()
+	c.startGC()
+
+	_, err := c.Insert(nextRequest())
+	require.NoError(t, err)
+	assertCacheSize(t, c, 1)
+
+	clock.Step(2 * CacheTTL)
+
+	wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		return len(c.tokens) == 0, nil
+	})
+	assertCacheSize(t, c, 0)
+}
+
+func newTestCache() (*requestCache, *clock.FakeClock) {
+	c := newRequestCache()
+	fakeClock := clock.NewFakeClock(time.Now())
+	c.clock = fakeClock
+	return c, fakeClock
+}
+
+func assertCacheSize(t *testing.T, cache *requestCache, expectedSize int) {
+	tokenLen := len(cache.tokens)
+	llLen := cache.ll.Len()
+	assert.Equal(t, tokenLen, llLen, "inconsistent cache size! len(tokens)=%d; len(ll)=%d", tokenLen, llLen)
+	assert.Equal(t, expectedSize, tokenLen, "unexpected cache size!")
+}
+
+var requestUID = 0
+
+func nextRequest() interface{} {
+	requestUID++
+	return requestUID
+}
