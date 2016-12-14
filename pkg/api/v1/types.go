@@ -2897,6 +2897,9 @@ type NodeStatus struct {
 	// Defaults to Capacity.
 	// +optional
 	Allocatable ResourceList `json:"allocatable,omitempty" protobuf:"bytes,2,rep,name=allocatable,casttype=ResourceList,castkey=ResourceName"`
+	// List of local disks
+	// +optional
+	LocalDisks []LocalDisk `json:"localDisks,omitempty"`
 	// NodePhase is the recently observed lifecycle phase of the node.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase
 	// The field is never populated, and now is deprecated.
@@ -2927,6 +2930,17 @@ type NodeStatus struct {
 	// List of volumes that are attached to the node.
 	// +optional
 	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty" protobuf:"bytes,10,rep,name=volumesAttached"`
+}
+
+type LocalDisk struct {
+	// Local directory
+	LocalDir string `json:"localDir,omitempty"`
+	// Total capacity, unit is Gi
+	Capacity uint32 `json:"capacity,omitempty"`
+	// Allocatable capacity represents the disk capacity that are available for scheduling, Unit is Gi
+	Allocatable uint32 `json:"allocatable,omitempty"`
+	// TODO: Add labels for local disk, e.g. kind=SSD. They will be helpful for scheduling.
+	// Labels map[string]string
 }
 
 type UniqueVolumeName string

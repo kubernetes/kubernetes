@@ -2498,6 +2498,9 @@ type NodeStatus struct {
 	// Allocatable represents the resources of a node that are available for scheduling.
 	// +optional
 	Allocatable ResourceList
+	// List of local disks
+	// +optional
+	LocalDisks []LocalDisk
 	// NodePhase is the current lifecycle phase of the node.
 	// +optional
 	Phase NodePhase
@@ -2522,6 +2525,17 @@ type NodeStatus struct {
 	// List of volumes that are attached to the node.
 	// +optional
 	VolumesAttached []AttachedVolume
+}
+
+type LocalDisk struct {
+	// Local directory
+	LocalDir string
+	// Total capacity, unit is Gi
+	Capacity uint32
+	// Allocatable capacity represents the disk capacity that are available for scheduling, Unit is Gi
+	Allocatable uint32
+	// TODO: Add labels for local disk, e.g. kind=SSD. They will be helpful for scheduling.
+	// Labels map[string]string
 }
 
 type UniqueVolumeName string
