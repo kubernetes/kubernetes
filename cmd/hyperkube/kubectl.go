@@ -21,9 +21,17 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 func NewKubectlServer() *Server {
+	i18n.LoadTranslations("kubectl", nil, []string{
+		"kubectl/default/LC_MESSAGES/k8s.po",
+		"kubectl/default/LC_MESSAGES/k8s.mo",
+		"kubectl/en_US/LC_MESSAGES/k8s.po",
+		"kubectl/en_US/LC_MESSAGES/k8s.mo",
+	})
+
 	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	localFlags := cmd.LocalFlags()
 	localFlags.SetInterspersed(false)

@@ -42,6 +42,7 @@ go_binary(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/flag:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/util/logs:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",

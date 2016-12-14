@@ -22,6 +22,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/logs"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 )
@@ -33,6 +34,12 @@ Any salient changes here will need to be manually reflected in that file.
 func Run() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
+	i18n.LoadTranslations("kubectl", nil, []string{
+		"kubectl/default/LC_MESSAGES/k8s.po",
+		"kubectl/default/LC_MESSAGES/k8s.mo",
+		"kubectl/en_US/LC_MESSAGES/k8s.po",
+		"kubectl/en_US/LC_MESSAGES/k8s.mo",
+	})
 
 	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()

@@ -15,6 +15,7 @@ go_library(
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/util/logs:go_default_library",
         "//pkg/version/prometheus:go_default_library",
     ],
