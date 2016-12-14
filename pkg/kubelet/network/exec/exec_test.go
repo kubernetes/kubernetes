@@ -37,12 +37,12 @@ import (
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
-func tmpDirOrDie() string {
+func tmpDirOrDie() (string, string) {
 	dir, err := utiltesting.MkTmpdir("exec-test")
 	if err != nil {
 		panic(fmt.Sprintf("error creating tmp dir: %v", err))
 	}
-	return path.Join(dir, "fake", "plugins", "net")
+	return dir, path.Join(dir, "fake", "plugins", "net")
 }
 
 var lock sync.Mutex
@@ -126,7 +126,8 @@ func tearDownPlugin(testPluginPath string) {
 
 func TestSelectPlugin(t *testing.T) {
 	// The temp dir where test plugins will be stored.
-	testPluginPath := tmpDirOrDie()
+	dir, testPluginPath := tmpDirOrDie()
+	defer os.RemoveAll(dir)
 
 	// install some random plugin under testPluginPath
 	pluginName := selectName()
@@ -146,7 +147,8 @@ func TestSelectPlugin(t *testing.T) {
 
 func TestSelectVendoredPlugin(t *testing.T) {
 	// The temp dir where test plugins will be stored.
-	testPluginPath := tmpDirOrDie()
+	dir, testPluginPath := tmpDirOrDie()
+	defer os.RemoveAll(dir)
 
 	// install some random plugin under testPluginPath
 	pluginName := selectName()
@@ -168,7 +170,8 @@ func TestSelectVendoredPlugin(t *testing.T) {
 
 func TestSelectWrongPlugin(t *testing.T) {
 	// The temp dir where test plugins will be stored.
-	testPluginPath := tmpDirOrDie()
+	dir, testPluginPath := tmpDirOrDie()
+	defer os.RemoveAll(dir)
 
 	// install some random plugin under testPluginPath
 	pluginName := selectName()
@@ -186,7 +189,8 @@ func TestSelectWrongPlugin(t *testing.T) {
 
 func TestPluginValidation(t *testing.T) {
 	// The temp dir where test plugins will be stored.
-	testPluginPath := tmpDirOrDie()
+	dir, testPluginPath := tmpDirOrDie()
+	defer os.RemoveAll(dir)
 
 	// install some random plugin under testPluginPath
 	pluginName := selectName()
@@ -215,7 +219,8 @@ func TestPluginValidation(t *testing.T) {
 
 func TestPluginSetupHook(t *testing.T) {
 	// The temp dir where test plugins will be stored.
-	testPluginPath := tmpDirOrDie()
+	dir, testPluginPath := tmpDirOrDie()
+	defer os.RemoveAll(dir)
 
 	// install some random plugin under testPluginPath
 	pluginName := selectName()
@@ -243,7 +248,8 @@ func TestPluginSetupHook(t *testing.T) {
 
 func TestPluginTearDownHook(t *testing.T) {
 	// The temp dir where test plugins will be stored.
-	testPluginPath := tmpDirOrDie()
+	dir, testPluginPath := tmpDirOrDie()
+	defer os.RemoveAll(dir)
 
 	// install some random plugin under testPluginPath
 	pluginName := selectName()
@@ -271,7 +277,8 @@ func TestPluginTearDownHook(t *testing.T) {
 
 func TestPluginStatusHook(t *testing.T) {
 	// The temp dir where test plugins will be stored.
-	testPluginPath := tmpDirOrDie()
+	dir, testPluginPath := tmpDirOrDie()
+	defer os.RemoveAll(dir)
 
 	// install some random plugin under testPluginPath
 	pluginName := selectName()
@@ -302,7 +309,8 @@ func TestPluginStatusHook(t *testing.T) {
 
 func TestPluginStatusHookIPv6(t *testing.T) {
 	// The temp dir where test plugins will be stored.
-	testPluginPath := tmpDirOrDie()
+	dir, testPluginPath := tmpDirOrDie()
+	defer os.RemoveAll(dir)
 
 	// install some random plugin under testPluginPath
 	pluginName := selectName()
