@@ -78,7 +78,7 @@ type FooList struct {
 	Items []Foo `json:"items"`
 }
 
-// installThirdParty installs a third party resoure and returns a defer func
+// installThirdParty installs a third party resource and returns a defer func
 func installThirdParty(t *testing.T, client clientset.Interface, clientConfig *restclient.Config, tpr *extensions.ThirdPartyResource, group, version, resource string) func() {
 	var err error
 	_, err = client.Extensions().ThirdPartyResources().Create(tpr)
