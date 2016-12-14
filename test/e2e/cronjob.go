@@ -27,7 +27,7 @@ import (
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/wait"

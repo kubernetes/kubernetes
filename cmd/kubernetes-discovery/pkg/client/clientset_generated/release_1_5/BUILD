@@ -15,7 +15,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubernetes-discovery/pkg/client/clientset_generated/release_1_5/typed/apiregistration/v1alpha1:go_default_library",
+        "//cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/util/flowcontrol:go_default_library",

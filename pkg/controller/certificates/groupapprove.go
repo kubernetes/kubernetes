@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
-	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
+	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
