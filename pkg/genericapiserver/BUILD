@@ -72,6 +72,7 @@ go_library(
         "//plugin/pkg/auth/authenticator/request/union:go_default_library",
         "//vendor:github.com/coreos/go-systemd/daemon",
         "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
