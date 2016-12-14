@@ -120,7 +120,7 @@ func updateGCIMounterPath(args, host, workspace string) (string, error) {
 		return args, fmt.Errorf("could not find GCI mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
 	}
 
-	glog.Infof("GCI node and GCI mounter both detected, modifying --experimental-mounter-path accordingly")
+	glog.V(2).Infof("GCI node and GCI mounter both detected, modifying --experimental-mounter-path accordingly")
 	// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 	// here will tell us to update the remote test runner.
 	mounterPath := filepath.Join(workspace, localGCIMounterPath)
@@ -154,7 +154,7 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testA
 	}
 
 	// Run the tests
-	glog.Infof("Starting tests on %q", host)
+	glog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
 		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s %s",
