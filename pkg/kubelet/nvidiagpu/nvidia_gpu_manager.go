@@ -33,18 +33,27 @@ import (
 
 const (
 	// All NVIDIA GPUs cards should be mounted with nvidiactl and nvidia-uvm
+	// If the driver installed correctly, the 2 devices must be there.
 	NvidiaDeviceCtl string = "/dev/nvidiactl"
 	NvidiaDeviceUVM string = "/dev/nvidia-uvm"
 )
 
+// Manage GPU devices.
 type NvidiaGPUManager struct {
 	gpuPaths []string
 	gpuMutex sync.Mutex
 
+	// The interface which could get GPU mapping from all the containers.
+	// TODO: Should make this independent of Docker in the future.
 	dockerClient dockertools.DockerInterface
 }
 
 // Get all the paths of NVIDIA GPU card from /dev/
+// TODO: Without NVML support we only can check whether there has GPU devices, but
+// could not give a health check or get more information like GPU cores, memory, or
+// family name. Need to support NVML in the future. But we do not need NVML until
+// we want more features, features like schedule containers according to GPU family
+// name.
 func (ngm *NvidiaGPUManager) discovery() error {
 	var err error
 	if ngm.gpuPaths == nil {
@@ -69,10 +78,12 @@ func Valid(path string) bool {
 	return check != nil && check[0] != ""
 }
 
+// Initial the GPU devices, so far only need to discover the GPU paths.
 func (ngm *NvidiaGPUManager) Init(dc dockertools.DockerInterface) error {
 	if _, err := os.Stat(NvidiaDeviceCtl); err != nil {
 		return err
 	}
+
 	if _, err := os.Stat(NvidiaDeviceUVM); err != nil {
 		return err
 	}
@@ -94,6 +105,7 @@ func (ngm *NvidiaGPUManager) Shutdown() {
 	ngm.gpuPaths = nil
 }
 
+// Get how many GPU cards we have.
 func (ngm *NvidiaGPUManager) Capacity() int {
 	ngm.gpuMutex.Lock()
 	defer ngm.gpuMutex.Unlock()
@@ -101,6 +113,8 @@ func (ngm *NvidiaGPUManager) Capacity() int {
 	return len(ngm.gpuPaths)
 }
 
+// Check whether the GPU device could be assigned to a container.
+// If a container is dead but still mapping GPUs, it will not be available.
 func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
 	containers, err := ngm.dockerClient.ListContainers(dockertypes.ContainerListOptions{All: true})
 
@@ -131,6 +145,7 @@ func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
 	return true
 }
 
+// Return the GPU paths as needed, otherwise, return error.
 func (ngm *NvidiaGPUManager) AllocateGPUs(num int) (paths []string, err error) {
 	if num <= 0 {
 		return
@@ -153,6 +168,7 @@ func (ngm *NvidiaGPUManager) AllocateGPUs(num int) (paths []string, err error) {
 	return
 }
 
+// Return GPUs' path which are not mapping to containers.
 func (ngm *NvidiaGPUManager) AvailableGPUs() (num int) {
 	ngm.gpuMutex.Lock()
 	defer ngm.gpuMutex.Unlock()
